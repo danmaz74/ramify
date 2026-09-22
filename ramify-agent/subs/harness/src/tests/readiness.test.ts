@@ -8,6 +8,7 @@ import {
   runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
 import { runLayout, type InfrastructureRecovery, type ReadinessAttempt } from '../run/records.js';
 import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import { gitService } from '../../subs/evidence/src/git.js';
 
 /*
  * Execution readiness, and the recoveries it is allowed. Missing
@@ -46,8 +47,8 @@ async function addNestedPackage(root: string, directory: string, installed: bool
 }
 
 /** Runs one run to its end and answers the last readiness attempt and its recovery. */
-async function readinessOf(root: string, options: Parameters<typeof openRuns>[1]) {
-  const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }], ...options });
+async function readinessOf(root: string, options: Omit<Parameters<typeof openRuns>[1], 'git'>) {
+  const { service } = await openRuns(root, { git: gitService, script: [{ kind: 'submit', input: emptyAnalysis() }], ...options });
   cleanups.push(() => service.close());
   const receipt = await service.execute(startRun('review-notes'));
   await service.settled('review-notes', receipt.jobId);

@@ -51,7 +51,7 @@ export interface ServerSettings extends Omit<ServerOptions, 'agent'> {
    */
   readonly ramify?: RamifyCli | undefined;
   /** Run settings for tests: the inputs, the policy, the stop bound and the write hook. */
-  readonly runs?: Partial<Omit<RunServiceOptions, 'projectRoot' | 'lock' | 'agent' | 'ramify' | 'checkExecution'>> | undefined;
+  readonly runs?: Partial<Omit<RunServiceOptions, 'projectRoot' | 'lock' | 'agent' | 'ramify'>> | undefined;
 }
 
 export interface RunningServer {
@@ -156,7 +156,7 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
       projectRoot,
       lock,
       ramify,
-      checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
+      checkExecution: options.runs?.checkExecution ?? createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
       ...(agent === undefined ? {} : { agent }),
     }));
   } catch (error) {

@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { CommandRejection } from '../jobs/commands.js';
 import { runCommandSchema, startRunCommandSchema } from '../interfaces/protocol/runs.js';
 import { copyFixture } from './helpers/fixture.js';
-import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, startRun, stopRun, until } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, onlyRun, startRun, stopRun, until } from './helpers/runs.js';
 
 /*
  * Plan 1's three command rules hold unchanged for the run's commands: an
@@ -13,16 +15,19 @@ import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, st
  * Every rule is decided before the command has any effect.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 async function target() {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
@@ -32,7 +37,10 @@ const waiting = [{ kind: 'stall', ms: 3000 } as const];
 describe('start-run', () => {
   test('an identical retry returns the original receipt and starts no second run', async () => {
     const root = await target();
-    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service } = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
+    });
     cleanups.push(() => service.close());
 
     const command = startRun('review-notes', 'scripted', 'start-once');
@@ -46,7 +54,10 @@ describe('start-run', () => {
 
   test('a reused ID with other content is a conflict, and nothing is started', async () => {
     const root = await target();
-    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service } = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
+    });
     cleanups.push(() => service.close());
 
     const first = await service.execute(startRun('review-notes', 'scripted', 'start-again'));

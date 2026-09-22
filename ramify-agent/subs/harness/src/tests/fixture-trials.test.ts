@@ -13,6 +13,7 @@ import { workLayout, type WorkItemOutline } from '../work/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { assign, byRole, completionProposed, outline, runScopeTests, submit, viewedInputs, write } from './helpers/iterations.js';
 import { git, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { gitService as productionGit } from '../../subs/evidence/src/git.js';
 
 /*
  * The fixture trials: implementation runs on a disposable copy of the
@@ -105,6 +106,7 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
     let runId: string;
     try {
       const opened = await openRuns(project!, {
+        git: productionGit,
         script: byRole(script),
         ramify: daemon.ramify,
         inputs: viewedInputs(daemon.ramify),
@@ -130,7 +132,7 @@ async function trial(plan: string, script: Parameters<typeof byRole>[0], check: 
     const report = JSON.parse(await readFile(join(parent, 'verification.json'), 'utf8')) as TrialResult['verification']['report'];
 
     const events = await runEventsOnDisk(project!, plan, runId);
-    const reopened = await openRuns(project!, {});
+    const reopened = await openRuns(project!, { git: productionGit });
     const snapshot = onlyRun(reopened.service, plan);
     await reopened.service.close();
 

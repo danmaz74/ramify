@@ -6,7 +6,9 @@ import type { CommandOutcome } from './run-command.js';
 /*
  * Git, for the run branch. Each function is one thin call over `runCommand`:
  * no git logic lives here beyond naming the invocation and reading what it
- * printed.
+ * printed. Git is an external system: lifecycle tests inject scripted
+ * GitService responses. Real Git belongs in this wrapper's integration tests,
+ * not in every test of a consumer.
  *
  * Committing gates make a run-branch commit before the audit executes; this
  * service owns that commit and the revision queries used by the audit and by
@@ -368,4 +370,37 @@ async function fileBytes(path: string): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The external Git boundary. Inject scripted answers in consumer tests;
+ * never reproduce repository behavior in a test double. Each function keeps
+ * the project's root explicit, just as the command adapter does.
+ */
+export interface GitService {
+  readonly currentHead: typeof currentHead;
+  readonly isCleanRepository: typeof isCleanRepository;
+  readonly createRunBranch: typeof createRunBranch;
+  readonly commitAccepted: typeof commitAccepted;
+  readonly findCommitByTrailer: typeof findCommitByTrailer;
+  readonly findCommitByTrailers: typeof findCommitByTrailers;
+  readonly changedPaths: typeof changedPaths;
+  readonly changedEntries: typeof changedEntries;
+  readonly diffNameStatus: typeof diffNameStatus;
+  readonly diffNumstat: typeof diffNumstat;
+  readonly commitNameStatus: typeof commitNameStatus;
+  readonly worktreeLineChanges: typeof worktreeLineChanges;
+}
+
+/** The process-backed adapter. Consumer tests should supply a scripted GitService. */
+export const gitService: GitService = {
+  currentHead, isCleanRepository, createRunBranch, commitAccepted,
+  findCommitByTrailer, findCommitByTrailers, changedPaths, changedEntries,
+  diffNameStatus, diffNumstat, commitNameStatus, worktreeLineChanges,
+};
+
+/** The commit the working directory is on, or '' where Git cannot say. */
+export async function currentHead(projectRoot: string): Promise<string> {
+  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: childEnvironment(), timeoutMs: 30_000 });
+  return run.outcome.kind === 'completed' && run.outcome.exitCode === 0 ? run.stdout.trim() : '';
 }

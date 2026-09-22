@@ -23,7 +23,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
  */
 
 /** The configured tRPC runtime, as the feature factories receive it. */
-type ProtocolRuntime = ReturnType<typeof createFacilities>;
+export type ProtocolRuntime = ReturnType<typeof createFacilities>;
 
 /**
  * The catalog's inspection, as the review's port. It fits without an adapter
@@ -34,7 +34,7 @@ type ProtocolRuntime = ReturnType<typeof createFacilities>;
  */
 const inspectionPort: InspectionPort = { inspect };
 
-function assembleRouter(facilities: ProtocolRuntime) {
+export function assembleRouter(facilities: ProtocolRuntime) {
   return facilities.router({
     catalog: createCatalogRouter(facilities),
     reviews: createReviewsRouter(facilities, inspectionPort),

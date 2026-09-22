@@ -1,7 +1,9 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { stat } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
-import { emptyAnalysis, initRepository, installTestRunner, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
 import type { RunEvent } from '../run/log.js';
 
@@ -15,9 +17,13 @@ import type { RunEvent } from '../run/log.js';
  * that drifts is caught where it happened and not at the end of a trial.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 /** Which record files exist at the moment each write completes. */
@@ -26,11 +32,11 @@ async function recordedAt(root: string) {
   cleanups.push(fixture.remove);
   void root;
   await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
 
   const seen: Array<{ write: string; files: string[] }> = [];
   const { service } = await openRuns(fixture.root, {
     script: [{ kind: 'submit', input: emptyAnalysis() }],
+    unchangedCheckpoints: ['final verification of plan "review-notes"'],
     afterWrite: async (write, runId) => {
       const candidates: Array<[string, string]> = [
         ['invocation.json', runLayout.invocation('inv-0001')],

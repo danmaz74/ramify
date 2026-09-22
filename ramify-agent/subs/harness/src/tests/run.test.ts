@@ -1,10 +1,12 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
 import {
-  emptyAnalysis, git, initRepository, installTestRunner, onlyRun, openRuns,
+  emptyAnalysis, installTestRunner, onlyRun,
   runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
 
@@ -14,9 +16,13 @@ import { runLayout } from '../run/records.js';
  * completes, with no client connected: the file system alone is watched.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 /** A directory outside the project, where a counting command keeps its count. */
@@ -31,14 +37,17 @@ async function target() {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  const head = await initRepository(fixture.root);
+  const head = 'unchanged-fixture-revision';
   return { root: fixture.root, head };
 }
 
 describe('an implementation run with no entry capabilities', () => {
   test('starts, passes readiness, passes its final gate and completes, with no client connected', async () => {
     const { root } = await target();
-    const { service, agent } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service, agent } = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
+    });
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));
@@ -86,28 +95,35 @@ describe('an implementation run with no entry capabilities', () => {
 
   test('works on its own branch, and its own records are never committed', async () => {
     const { root } = await target();
-    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service, git } = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
+    });
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
 
-    expect((await git(root, 'rev-parse', '--abbrev-ref', 'HEAD')).trim()).toBe(`ramify-agent/run-${receipt.jobId}`);
+    expect(git.operations()['createRunBranch']).toBe(1);
+    expect(git.branch()).toBe(`ramify-agent/run-${receipt.jobId}`);
     // Nothing changed, so the passing gate made no commit, and the tree is
     // clean although the run wrote its whole log into it.
-    expect((await git(root, 'status', '--porcelain', '--untracked-files=all')).trim()).toBe('');
+    expect(git.operations()['commitAccepted']).toBe(1);
+    expect(git.commits()).toEqual([]);
     const ignore = await readFile(runPath(root, 'review-notes', receipt.jobId, '..', '..', '.gitignore'), 'utf8');
     expect(ignore.trim().endsWith('*')).toBe(true);
   }, 120_000);
 
   test('a final gate that does not pass fails the run, with the attempt as evidence', async () => {
     const { root } = await target();
-    const counter = join(await counterDirectory(), 'tests-run');
     const { service } = await openRuns(root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
-      // The captured test command passes at readiness and fails the second
-      // time it runs, which is the final gate.
-      policy: projectRoot => testPolicy(projectRoot, { testsFailFrom: { run: 2, counter } }),
+      // Readiness passes; the direct executor then reports the final test
+      // command's completed failure to the production gate classifier.
+      checkScript: ({ check, context }) => context.checkpoint === 'final' && check.kind === 'tests'
+        ? { outcome: { kind: 'completed', exitCode: 1 } }
+        : {},
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
 
@@ -128,43 +144,6 @@ describe('an implementation run with no entry capabilities', () => {
     // audited and the failing attempt records that identity and evidence.
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as { verdict: string; cause: string; commit: string | null; audited: string | null; evidence: unknown };
     expect(attempt).toMatchObject({ verdict: 'failed', cause: 'in-scope', commit: null, audited: expect.any(String), evidence: expect.any(Object) });
-  }, 120_000);
-
-  test('a passing final gate over a changed tree makes exactly one commit, with the gate as its trailer', async () => {
-    const { root } = await target();
-    const { service } = await openRuns(root, {
-      script: [{ kind: 'submit', input: emptyAnalysis() }],
-      // A change that arrives after readiness blocks nothing: a gate runs the
-      // commit, then the gate audits that exact revision.
-      afterWrite: async write => {
-        if (write === 'readiness-attempted') await writeFile(join(root, 'src', 'late.ts'), 'export const late = true;\n');
-      },
-    });
-    cleanups.push(() => service.close());
-
-    const receipt = await service.execute(startRun('review-notes'));
-    await service.settled('review-notes', receipt.jobId);
-
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
-    const log = await git(root, 'log', '--format=%H %s', `ramify-agent/run-${receipt.jobId}`);
-    const commits = log.trim().split('\n');
-    expect(commits).toHaveLength(2);
-    expect(commits[0]).toContain('final verification of plan "review-notes"');
-
-    const body = await git(root, 'log', '-1', '--format=%B');
-    expect(body).toContain('Ramify-Run: ' + receipt.jobId);
-    expect(body).toContain('Ramify-Gate: ga-0002');
-    expect(body).toContain('Ramify-Invocations: inv-0001');
-    expect(body).not.toContain('Checks:');
-    expect(body).toContain('Audit-Note: git notes --ref=audit show');
-
-    // The commit holds the change and none of the run's own records.
-    const files = (await git(root, 'show', '--name-only', '--format=', 'HEAD')).trim().split('\n');
-    expect(files).toEqual(['src/late.ts']);
-
-    // The attempt record names the commit the effect made.
-    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as { commit: string | null };
-    expect(attempt.commit).toBe(commits[0]!.split(' ')[0]);
   }, 120_000);
 
   test('a run stopped mid-invocation ends stopped, and the late submission is rejected', async () => {

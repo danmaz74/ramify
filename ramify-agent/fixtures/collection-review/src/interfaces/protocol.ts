@@ -7,18 +7,18 @@ import type { createFacilities } from '../protocol.js';
  * The neutral protocol vocabulary the application root shares with its
  * dispatch-classified descendants.
  *
- * Only the names this owner exposes leave it. The remaining exports are the
- * shapes those exposed contracts are written in; a descendant builds them
- * through contextual typing rather than by importing them.
+ * Only the names this owner exposes leave it. Every project type named by an
+ * exposed signature is exposed explicitly as its companion.
  */
 
 /**
  * The application router's type, forwarded from the assembly that builds it.
  *
  * This is a same-owner alias rather than a new binding: the original stays in
- * `assembly.ts`, owned here and carrying this owner's `dispatch` tag, and the
- * assembly itself stays private. A descendant that receives the router type
- * imports it from this file, which is the only file the root exposes it from.
+ * `assembly.ts`, owned here and carrying this owner's `dispatch` tag. A
+ * descendant that receives the router type imports it from this file; the
+ * assembly exports that its signature names are exposed separately as its
+ * companions.
  *
  * `export type` erases the statement entirely, so nothing of the assembly's
  * Node runtime can travel to a browser along this route.

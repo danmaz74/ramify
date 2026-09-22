@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
 import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
@@ -8,9 +8,13 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, hypothesis, requestCompletion } from './helpers/analysis.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
 import { localDecision, registryChange, requestPlacement } from './helpers/placement.js';
-import {
-  initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun,
-} from './helpers/runs.js';
+import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { runLayout } from '../run/records.js';
+import { answeredGit, unchanged } from './helpers/contracts-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 /*
  * What a local architect decides for itself, and what it brings to the
@@ -22,11 +26,17 @@ import {
  * outside the subtree is evidence against localizing it, and a departure
  * about shared responsibility becomes a focused request with the
  * counterevidence that justifies it.
+ *
+ * No external tool takes part: Git, the command line and the readiness
+ * commands are answered, and the run's own files are what is read.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const catalogCore = 'collection-review/workspace/catalog/core';
@@ -38,7 +48,6 @@ async function target(): Promise<string> {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
@@ -105,6 +114,7 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
           question: 'Does formatting a compared field belong to the shared contracts, or to the catalog core?',
           outcome: 'reuse',
           capability: 'field-order',
+          changesExistingSymbols: false,
           owner: catalogCore,
           rationale: 'The catalog core already owns the field order, and it is the only reader of a record revision.',
           constraints: [],
@@ -127,12 +137,34 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
       engineer: [submit(completionProposed('Nothing needed changing for this iteration.'))],
     }));
 
-    const opened = await openRuns(project, { agent, inputs: treeInputs() });
+    // Git is answered, not run. No iteration of this scenario writes source,
+    // so every commit Git is asked for is one it reports as an unchanged tree.
+    const git = answeredGit(project, {
+      head: 'revision-00',
+      commits: [
+        unchanged('wi-001.i01'), unchanged('wi-001'),
+        unchanged('wi-002.i01'), unchanged('wi-002'),
+        unchanged('wi-003.i01'), unchanged('wi-003'),
+        unchanged('final verification of plan "revision-diff"'),
+      ],
+    });
+    const opened = await openRuns(project, {
+      agent, inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+    });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
     await opened.service.settled('revision-diff', receipt.jobId);
     const runId = receipt.jobId;
     expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed');
+
+    // What the run asked Git: its own branch, one commit for each gate, and
+    // no revision, because nothing in the tree changed. Every answer this
+    // scenario stated was used and nothing else was asked of Git.
+    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.minted()).toEqual([]);
+    expect(git.lookups()).toHaveLength(git.messages().length);
+    git.assertAnswered();
+
 
     const events = await runEventsOnDisk(project, 'revision-diff', runId);
     const types = events.map(event => event.type);
@@ -209,5 +241,18 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
       runPath(project, 'revision-diff', runId, 'work-items/wi-001/outline/1.json'), 'utf8',
     )) as { hypothesesSeen: Array<{ id: string; revision: number }> };
     expect(outlineOne.hypothesesSeen).toEqual([{ id: 'shared-formatting', revision: 1, hash: expect.any(String) }]);
+
+    // Git could not measure lines here, and the run recorded that as the
+    // gap it is rather than as no change: an external system that cannot
+    // answer leaves its reason in the invocation's own record.
+    expect(git.worktreeLineChanges.mock.calls.length).toBeGreaterThan(0);
+    const writer = events.find(event => event.type === 'invocation-started'
+      && (event.data as { role: string }).role === 'engineer')!;
+    const lines = JSON.parse(await readFile(runPath(
+      project, 'revision-diff', runId, runLayout.lineEvents((writer.data as { invocation: string }).invocation),
+    ), 'utf8')) as { coverage: string; gaps: string[]; paths: unknown[] };
+    expect(lines.coverage).toBe('partial');
+    expect(lines.gaps.join(' ')).toContain('Line measurements are unavailable in this scenario');
+    expect(lines.paths).toEqual([]);
   }, 180_000);
 });

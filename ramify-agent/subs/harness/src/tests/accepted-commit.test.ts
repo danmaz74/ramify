@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { commitMessage } from '../run/gates.js';
 import { acceptedCommit } from '../checks/accepted.js';
 import { checkOutputPath, type CheckExecutionPort } from '../checks/execution.js';
@@ -10,15 +10,18 @@ import { runLayout } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
-import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
-import { changedPaths, worktreeLineChanges } from '../../subs/evidence/src/git.js';
+import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { RunQueries } from '../projections/queries.js';
 import {
-  crashLock, freeze, git, initRepository, onlyRun, openRuns,
+  staleCrashLock, freeze, installTestRunner, onlyRun, openRuns,
   runEventsOnDisk, runPath, startRun, until,
 } from './helpers/runs.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 /*
  * The commit at an accepted boundary.
@@ -26,19 +29,35 @@ import {
  * A change to the working directory blocks nothing: once the gate plan is
  * verified, the harness commits and audits that exact revision. A crash after
  * the commit re-audits one commit, because the effect is keyed by the gate
- * attempt and a repeat finds it by its trailer.
+ * attempt and a repeat finds it by its trailers.
  *
- * What the commit added or removed is read from the commit, never from what
- * an agent said.
+ * Git is an external system here, not a repository. Each scenario states the
+ * revision Git answers at every boundary it reaches — including the
+ * boundaries where Git reports an unchanged tree and answers none — and the
+ * commits a repeat of an attempt finds, each under the exact identity
+ * trailers Git would have to be asked for. What the assertions read is the
+ * run's own durable records and the ordered ledger of what it asked Git,
+ * never a tree, a diff or a history.
+ *
+ * A direct stale-lock fixture marks crash recovery without starting a helper
+ * process; the process guard proves these lifecycle cases cross no process
+ * boundary.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
+
+/** The revision the fixture is on before a run commits anything. */
+const base = 'revision-00';
+
+/** A boundary Git reports as unchanged, which commits nothing. */
+const unchanged: GateCommit = { commit: null };
 
 const firstTest = [
   'import { test, expect } from \'vitest\';',
@@ -59,15 +78,8 @@ async function target(options: { readonly withNotes?: boolean } = {}) {
       'src/tests/notes.test.ts': firstTest,
     });
   }
-  await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
+  await installTestRunner(fixture.root);
   return fixture.root;
-}
-
-/** The commits of the run branch, newest first, each as its whole message. */
-async function commits(root: string, runId: string): Promise<string[]> {
-  const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
-  return log.split('\u001e').map(part => part.trim()).filter(Boolean);
 }
 
 async function readResult(root: string, runId: string, number: number): Promise<IterationResult> {
@@ -83,17 +95,44 @@ function onePass(steps: Parameters<typeof submit>[1][] = []) {
   };
 }
 
+/** The store the engineer writes, and the entry Git reports for it. */
+const storePath = `${notesDirectory}/src/store.ts`;
+
+/** What Git reports the created notes module added. */
+const moduleEntries = [
+  { status: 'A', path: `${notesDirectory}/module.ramify` },
+  { status: 'A', path: `${notesDirectory}/README.md` },
+  { status: 'A', path: `${notesDirectory}/src/notes.ts` },
+  { status: 'A', path: `${notesDirectory}/src/tests/notes.test.ts` },
+];
+const storeWrite = write(storePath, 'export const store = new Map();\n');
+const latePath = `${notesDirectory}/src/late.ts`;
+
 describe('a change to the working directory blocks nothing', () => {
   test('a verified gate makes one commit before audit, including a late change before that commit', async () => {
     const root = await target();
+    const scripted = gateGit(root, {
+      head: base,
+      commits: [
+        {
+          commit: 'revision-01',
+          changes: [{ status: 'A', path: storePath }, { status: 'A', path: latePath }],
+        },
+        unchanged,
+        unchanged,
+      ],
+    });
     const opened = await openRuns(root, {
-      script: byRole(onePass([write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')])),
+      script: byRole(onePass([storeWrite])),
       inputs: treeInputs(),
+      git: scripted.git,
+      readinessExecution: directReadinessExecution(),
       afterWrite: async current => {
         // A late write lands after verification and before the commit. It
         // blocks nothing and joins the revision the audit checks.
         if (current === 'gate-attempted') {
-          await writeFile(join(root, notesDirectory, 'src', 'late.ts'), 'export const late = true;\n');
+          await writeFile(join(root, latePath), 'export const late = true;\n');
+          scripted.mark('the late write');
         }
       },
     });
@@ -104,129 +143,181 @@ describe('a change to the working directory blocks nothing', () => {
     expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
     const result = await readResult(root, receipt.jobId, 1);
     expect(result.outcome).toBe('accepted');
-    const accepted = (await commits(root, receipt.jobId)).find(commit => commit.includes('Ramify-Iteration: wi-001.i01'));
-    expect(accepted).toBeDefined();
+    expect(result.commit).toBe('revision-01');
+    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(result.gate!)), 'utf8')) as GateAttempt;
+    expect(attempt).toMatchObject({ verdict: 'passed', head: base, commit: 'revision-01', audited: 'revision-01' });
 
-    const files = await git(root, 'show', '--name-only', '--format=', result.commit!);
-    expect(files).toContain(`${notesDirectory}/src/store.ts`);
-    expect(files).toContain(`${notesDirectory}/src/late.ts`);
-  }, 300_000);
+    // One commit for the iteration, and the late write really happened
+    // before the harness asked for it: the ledger of what the run asked Git
+    // puts the mark between the verification and the commit.
+    const ledger = scripted.calls.map(call => `${call.operation}${call.operation === 'mark' ? `:${call.detail}` : ''}`);
+    expect(ledger.filter(operation => operation === 'commitAccepted')).toHaveLength(3);
+    expect(ledger.indexOf('mark:the late write')).toBeGreaterThan(-1);
+    expect(ledger.indexOf('mark:the late write')).toBeLessThan(ledger.indexOf('commitAccepted'));
+    expect(scripted.messages[0]).toContain('Ramify-Iteration: wi-001.i01');
+    // Both files are really in the tree the commit boundary was reached over.
+    expect(await readFile(join(root, storePath), 'utf8')).toBe('export const store = new Map();\n');
+    expect(await readFile(join(root, latePath), 'utf8')).toBe('export const late = true;\n');
+    scripted.assertComplete();
+  }, 120_000);
 
   test('a crash between the gate\'s verification and audit completion makes exactly one commit', async () => {
-    for (const boundary of ['gate-attempted', 'gate-committing'] as const satisfies readonly RunWrite[]) {
+    // Three crashes at the commit-and-audit effect, each with the commits
+    // its repeat finds. The gate is `ga-0002` in every one of them, and the
+    // last states a commit under another run's identity carrying that same
+    // gate id, which this run's lookup must not find.
+    const rows = [
+      { name: 'crashed before the commit', boundary: 'gate-attempted', committed: 0, trailed: [] as Array<{ run: string; gate: string; commit: string }> },
+      {
+        name: 'crashed after the commit',
+        boundary: 'gate-committing',
+        committed: 1,
+        trailed: [{ run: 'this', gate: 'ga-0002', commit: 'revision-01' }],
+      },
+      {
+        name: 'crashed before the commit, with another run\'s commit at the same gate id',
+        boundary: 'gate-attempted',
+        committed: 0,
+        trailed: [{ run: 'other-run', gate: 'ga-0002', commit: 'another-run-revision' }],
+      },
+    ] as const satisfies ReadonlyArray<{ name: string; boundary: RunWrite; committed: number; trailed: ReadonlyArray<{ run: string; gate: string; commit: string }> }>;
+
+    for (const row of rows) {
       const root = await target();
+      const crashedGit = gateGit(root, {
+        head: base,
+        commits: [{ commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }],
+      });
       const crashed = await openRuns(root, {
-        script: byRole(onePass([write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')])),
+        script: byRole(onePass([storeWrite])),
         inputs: treeInputs(),
+        git: crashedGit.git,
+        readinessExecution: directReadinessExecution(),
         afterWrite: async current => {
-          if (current === boundary) await freeze();
+          if (current === row.boundary) await freeze();
         },
       });
       const receipt = await crashed.service.execute(startRun('review-notes'));
       const events = runPath(root, 'review-notes', receipt.jobId, runLayout.events);
       // The intent is in the log before the commit is made, so each boundary
-      // is the intent plus the number of commits the branch holds there.
+      // is the intent plus the number of commits the run has asked for there.
       await until(async () => {
         const text = await readFile(events, 'utf8').catch(() => '');
         if (!text.includes('"gate-committing"')) return false;
-        const made = (await commits(root, receipt.jobId)).filter(commit => commit.includes('Ramify-Run:')).length;
-        return boundary === 'gate-attempted' ? made === 0 : made === 1;
-      }, 120_000);
-      await crashLock(root);
+        return crashedGit.calls.filter(call => call.operation === 'commitAccepted').length === row.committed;
+      }, 60_000);
+      await staleCrashLock(root);
 
-      const reopened = await openRuns(root, { inputs: treeInputs() });
+      const crashedLog = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
+      const committing = crashedLog.filter(event => event.type === 'gate-committing');
+      expect(committing).toHaveLength(1);
+      const gate = committing[0]!.data.gate;
+      expect(gate).toBe('ga-0002');
+
+      // The repeat finds the commit of this run's own gate where there is
+      // one, and nothing where the only commit at that gate id belongs to
+      // another run.
+      const recoveryGit = gateGit(root, {
+        head: row.committed === 0 ? base : 'revision-01',
+        commits: row.committed === 0 ? [{ commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }] : [],
+        trailed: row.trailed.map(known => ({
+          trailers: [
+            { key: 'Ramify-Run', value: known.run === 'this' ? receipt.jobId : known.run },
+            { key: 'Ramify-Gate', value: known.gate },
+          ],
+          commit: known.commit,
+        })),
+      });
+      const reopened = await openRuns(root, {
+        inputs: treeInputs(),
+        git: recoveryGit.git,
+        readinessExecution: directReadinessExecution(),
+      });
       cleanups.push(() => reopened.service.close());
       expect(onlyRun(reopened.service, 'review-notes').state).toBe('interrupted');
 
-      // The effect is keyed by the gate attempt: recovery performs it again,
-      // finds the commit by its trailer where it was already made, and makes
-      // no second one.
+      // The intent held the verified operation, and its completion is what
+      // recovery wrote: one attempt, once.
       const log = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
-      const committing = log.filter(event => event.type === 'gate-committing');
-      expect(committing).toHaveLength(1);
-      const gate = committing[0]!.data.gate;
-      const attempted = log.filter(event => event.type === 'gate-attempted' && event.data.gate === gate);
-      expect(attempted).toHaveLength(1);
-      const made = (await commits(root, receipt.jobId)).filter(commit => commit.includes(`Ramify-Gate: ${gate}`));
-      expect(`${boundary}: ${made.length}`).toBe(`${boundary}: 1`);
+      expect(log.filter(event => event.type === 'gate-committing')).toHaveLength(1);
+      expect(log.filter(event => event.type === 'gate-attempted' && event.data.gate === gate)).toHaveLength(1);
+
+      // The effect is keyed by the gate attempt: recovery performs it again,
+      // asks for the commit by both identity trailers, and makes a second
+      // one only where the first attempt made none.
+      expect(recoveryGit.lookups).toEqual([[
+        { key: 'Ramify-Run', value: receipt.jobId },
+        { key: 'Ramify-Gate', value: gate },
+      ]]);
+      const asked = crashedGit.calls.filter(call => call.operation === 'commitAccepted').length
+        + recoveryGit.calls.filter(call => call.operation === 'commitAccepted').length;
+      expect(`${row.name}: ${asked}`).toBe(`${row.name}: 1`);
 
       const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(gate)), 'utf8')) as GateAttempt;
       expect(attempt.verdict).toBe('passed');
-      expect(attempt.commit).not.toBeNull();
+      expect(attempt.commit).toBe('revision-01');
+      expect(attempt.audited).toBe(attempt.commit);
+      expect(attempt.commit).not.toBe('another-run-revision');
+      recoveryGit.assertComplete();
     }
-  }, 600_000);
-
-  test('recovery does not reuse an ancestor commit with another run\'s same gate id', async () => {
-    const root = await target();
-    await git(root, 'switch', '--create', 'ramify-agent/run-other');
-    await writeFile(join(root, 'other-run.txt'), 'belongs to the earlier run\n');
-    await git(root, 'add', 'other-run.txt');
-    await git(
-      root,
-      '-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost',
-      'commit', '--message', 'earlier run\n\nRamify-Run: other-run\nRamify-Gate: ga-0002\n',
-    );
-    const foreignCommit = (await git(root, 'rev-parse', 'HEAD')).trim();
-
-    const crashed = await openRuns(root, {
-      script: byRole(onePass([write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')])),
-      inputs: treeInputs(),
-      afterWrite: async current => {
-        if (current === 'gate-attempted') await freeze();
-      },
-    });
-    const receipt = await crashed.service.execute(startRun('review-notes'));
-    const events = runPath(root, 'review-notes', receipt.jobId, runLayout.events);
-    await until(async () => {
-      const text = await readFile(events, 'utf8').catch(() => '');
-      if (!text.includes('"gate-committing"')) return false;
-      const own = (await commits(root, receipt.jobId)).filter(commit => commit.includes(`Ramify-Run: ${receipt.jobId}`));
-      return own.length === 0;
-    }, 120_000);
-    await crashLock(root);
-
-    const reopened = await openRuns(root, { inputs: treeInputs() });
-    cleanups.push(() => reopened.service.close());
-    const log = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
-    const gate = log.find(event => event.type === 'gate-committing')!.data.gate;
-    expect(gate).toBe('ga-0002');
-    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(gate)), 'utf8')) as GateAttempt;
-
-    expect(attempt.commit).not.toBe(foreignCommit);
-    expect(attempt.commit).not.toBeNull();
-    expect(attempt.audited).toBe(attempt.commit);
-    const own = (await commits(root, receipt.jobId)).filter(commit => commit.includes(`Ramify-Run: ${receipt.jobId}`) && commit.includes(`Ramify-Gate: ${gate}`));
-    expect(own).toHaveLength(1);
   }, 300_000);
 
   test('a later source change invalidates nothing: the accepted commit stays as it is', async () => {
     const root = await target();
+    const scripted = gateGit(root, {
+      head: base,
+      commits: [
+        { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] },
+        unchanged,
+        unchanged,
+      ],
+    });
     const opened = await openRuns(root, {
-      script: byRole(onePass([write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')])),
+      script: byRole(onePass([storeWrite])),
       inputs: treeInputs(),
+      git: scripted.git,
+      readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
     await opened.service.settled('review-notes', receipt.jobId);
 
     const result = await readResult(root, receipt.jobId, 1);
-    const head = result.commit!;
+    expect(result.commit).toBe('revision-01');
+    const settled = scripted.calls.length;
     // A change made after the boundary is uncommitted work for the next
-    // gate. It does not reopen the iteration and does not touch the commit.
+    // gate. It does not reopen the iteration, does not touch the commit and
+    // asks Git for nothing.
     await writeFile(join(root, notesDirectory, 'src', 'notes.ts'), 'export const noteLimit = 1;\n');
-    expect((await git(root, 'rev-parse', head)).trim()).toBe(head);
-    expect((await git(root, 'show', '--format=', '--name-only', head))).not.toContain('nothing');
-    const status = await git(root, 'status', '--porcelain');
-    expect(status).toContain(`${notesDirectory}/src/notes.ts`);
+    expect(await readFile(join(root, notesDirectory, 'src', 'notes.ts'), 'utf8')).toBe('export const noteLimit = 1;\n');
+    expect(scripted.calls).toHaveLength(settled);
+    expect(scripted.revisions()).toEqual(['revision-01']);
     const reloaded = await readResult(root, receipt.jobId, 1);
     expect(reloaded).toEqual(result);
-  }, 300_000);
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('the accepted boundary after an audit infrastructure retry', () => {
   test('an unchanged retry accepts the earlier commit, and later unchanged checkpoints retain it without repeating notices', async () => {
     const root = await target({ withNotes: false });
-    const audit = createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(root) });
+    const scripted = gateGit(root, {
+      head: base,
+      commits: [
+        // The attempt whose audit could not run still committed what the
+        // engineer wrote, including the declaration of the new module.
+        { commit: 'revision-01', changes: moduleEntries, against: base, subject: 'wi-001.i01' },
+        // The retry finds the same files still standing against the
+        // accepted boundary, which has not moved, and a tree Git reports as
+        // unchanged against the commit the first attempt made. The work
+        // item's gate and the run's own gate then stand on that accepted
+        // revision, with nothing changed against it.
+        { commit: null, changes: moduleEntries, against: base },
+        { commit: null, against: 'revision-01' },
+        { commit: null, against: 'revision-01' },
+      ],
+    });
+    const direct = createPassingCheckExecution();
     let failedOnce = false;
     const checkExecution: CheckExecutionPort = {
       async run(checks, request) {
@@ -251,7 +342,7 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
           }));
           return { commands, audited: null, evidence: null };
         }
-        return audit.run(checks, request);
+        return direct.run(checks, request);
       },
     };
     const opened = await openRuns(root, {
@@ -270,6 +361,8 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
         )],
       }),
       inputs: treeInputs(),
+      git: scripted.git,
+      readinessExecution: directReadinessExecution(),
       checkExecution,
     });
     cleanups.push(() => opened.service.close());
@@ -283,9 +376,9 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       .filter((body): body is GateAttempt => body.schema === 'ramify-agent.gate-attempt/2');
     const [failed, retry] = attempts.filter(attempt => attempt.checkpoint === 'iteration');
     expect(failed).toMatchObject({ verdict: 'not-verified', cause: 'infrastructure' });
-    expect(failed!.commit).not.toBeNull();
+    expect(failed!.commit).toBe('revision-01');
     expect(failed!.audited).toBeNull();
-    expect(retry).toMatchObject({ verdict: 'passed', commit: null, audited: failed!.commit });
+    expect(retry).toMatchObject({ verdict: 'passed', commit: null, audited: 'revision-01' });
 
     const accepted = failed!.commit!;
     expect(acceptedCommit(committed.entries, committed.record.manifest.source?.commit ?? attempts[0]!.head)).toBe(accepted);
@@ -303,8 +396,10 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       kind: 'module-created', module: notes, declaration: `${notesDirectory}/module.ramify`,
       commit: accepted, iteration: 'wi-001.i01', decision: null,
     }]);
-    expect(await changedPaths(root, accepted)).toEqual([]);
-    expect(await worktreeLineChanges(root, accepted)).toEqual([]);
+    // Exactly one revision was ever minted, and the three boundaries that
+    // followed it were each told the tree was unchanged.
+    expect(scripted.revisions()).toEqual([accepted]);
+    expect(attempts.map(attempt => attempt.head)).toEqual([base, base, accepted, accepted, accepted]);
 
     const queries = new RunQueries(opened.service);
     const metrics = await queries.metrics('review-notes', receipt.jobId);
@@ -324,7 +419,8 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
     expect(invocations.filter(invocation => invocation.role === 'local-architect').at(-1)?.base).toBe(accepted);
     const architect = opened.agent!.sessions.filter(session => session.spec.role === 'local-architect').at(-1)!;
     expect(architect.spec.prompt).toContain(`committed as ${accepted}`);
-  }, 300_000);
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('the message the harness writes', () => {

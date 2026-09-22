@@ -7,6 +7,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, shell, submit, treeInputs } from './helpers/iterations.js';
 import { initRepository, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
+import { gitService } from '../../subs/evidence/src/git.js';
 
 /*
  * C3: a stop is bounded, a late write settles before the next writer or the
@@ -53,6 +54,7 @@ describe('a tool that writes after cancellation', () => {
     const late = join(root, `${notesDirectory}/src/late.ts`);
 
     const { service } = await openRuns(root, {
+      git: gitService,
       inputs: treeInputs(),
       // The policy's own bound, not the tests' impatient one: the run's
       // terminal event is its last write, so the invocation the driver has

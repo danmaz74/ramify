@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { architectViewDirectory } from '../../subs/evidence/src/views.js';
+import { gitService } from '../../subs/evidence/src/git.js';
 import { baselineScope, captureSnapshot, scopeSize } from '../kpi/capture.js';
 import { runLayout, type Invocation, type MeasurementSnapshot, type RunRecord } from '../run/records.js';
 import { RunQueries } from '../projections/queries.js';
@@ -48,7 +49,7 @@ describe('the frozen baseline', () => {
     const root = await target();
     // The run's inputs materialize the architect view at capture, as a
     // served run's do, so every component of B has a size.
-    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }], ramify: ramify.ramify, inputs: viewedInputs(ramify.ramify) });
+    const { service } = await openRuns(root, { git: gitService, script: [{ kind: 'submit', input: emptyAnalysis() }], ramify: ramify.ramify, inputs: viewedInputs(ramify.ramify) });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -84,7 +85,7 @@ describe('the frozen baseline', () => {
 
   test('the one invocation records its snapshot reference and its S_s components', async () => {
     const root = await target();
-    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }], ramify: ramify.ramify });
+    const { service } = await openRuns(root, { git: gitService, script: [{ kind: 'submit', input: emptyAnalysis() }], ramify: ramify.ramify });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -148,6 +149,7 @@ describe('a component the producer cannot supply', () => {
     const directory = await temporaryDirectory();
     cleanups.push(directory.remove);
     const { service } = await openRuns(root, {
+      git: gitService,
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       ramify: new RamifyCli({ executable: join(directory.path, 'no-such-ramify'), timeoutMs: 10_000 }),
     });

@@ -5,9 +5,10 @@ import { expect } from 'vitest';
 import type { RunEvent } from '../../run/log.js';
 import type { RunWrite } from '../../run/service.js';
 import {
-  crashAt, fileHashes, gateTrailers, identityOf, logLines, plan, recordText, recoveryCompletions, removeRecordFiles,
-  runDirectory, scenarios, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
+  crashAt, committedGates, fileHashes, identityOf, logLines, plan, recordText, recoveryCompletions, removeRecordFiles,
+  runDirectory, scenarios, source, statedCommands, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
 } from './composition.js';
+import { directReadinessExecution } from './external-tools.js';
 import { onlyRun, openRuns } from './runs.js';
 
 /*
@@ -52,8 +53,22 @@ export interface RecoveryRow {
   readonly when?: CrashPoint['when'];
   /** The external effect recovery performs again, named as its report names it. */
   readonly effect?: RegExp | undefined;
-  /** How many commits carrying a gate trailer the branch holds after recovery, beside how many before. */
+  /** How many commits the run branch holds after recovery, beside how many before. */
   readonly commits?: { readonly before: number; readonly after: number } | undefined;
+  /**
+   * What the restart asks Git for at a commit boundary: whether it makes the
+   * commit the interrupted attempt had not made, or finds by the attempt's
+   * identity trailers the one it had. A row that states neither performs no
+   * commit operation at all.
+   */
+  readonly recovery?: 'makes-the-commit' | 'finds-the-commit' | undefined;
+  /**
+   * The attempt that boundary is about, and the revision its commit is: the
+   * gate the crash landed in, and the revision this row's scenario states
+   * for it. A row that finds its commit is the one whose crash left it
+   * behind, and it says so here rather than leaving Git to deduce it.
+   */
+  readonly at?: { readonly gate: string; readonly revision: string } | undefined;
 }
 
 const interrupted: RunEvent['type'][] = ['job-interrupted'];
@@ -106,12 +121,14 @@ export const recoveryTable = {
   },
   'gate-attempted': {
     machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
-    effect: /the commit and audit of gate ga-\d+/, commits: { before: 0, after: 1 },
+    effect: /the commit and audit of gate ga-\d+/, commits: { before: 0, after: 1 }, recovery: 'makes-the-commit',
+    at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once',
   },
   'gate-committing': {
     machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
-    effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 1 },
+    effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 1 }, recovery: 'finds-the-commit',
+    at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt',
   },
   'gate-committed': {
@@ -244,19 +261,34 @@ export function allRows(): Array<RecoveryRow & { readonly name: string; readonly
 export async function verifyRow(row: RecoveryRow & { readonly name: string; readonly write: RunWrite }): Promise<void> {
   const scenario = scenarios[row.scenario];
   const crashed = await crashAt(scenario, { write: row.write, when: row.when });
-  const { root, runId, agent } = crashed;
+  const { root, runId, agent, git } = crashed;
   const reopened: Array<{ close(): Promise<void> }> = [];
   try {
     const frozen = await logLines(root, runId);
     // The crash landed where the row says: the last line is the boundary's own.
     expect(frozen.at(-1)?.event.type, `the last line before the crash at ${row.name}`).toBe(lastLineOf[row.write]);
     const frozenTerminal = ['job-completed', 'job-failed', 'job-stopped', 'job-interrupted'].includes(frozen.at(-1)?.event.type ?? '');
-    const trailersBefore = await gateTrailers(root, runId);
+    const committedBefore = committedGates(git);
+    const askedBefore = { made: git.commits().length, found: git.recovered().length };
     const jobRecord = await readFile(join(runDirectory(root, runId), 'job.json'), 'utf8');
     await removeRecordFiles(root, runId, frozen);
     const sessionsBefore = agent.sessions.length;
 
-    const first = await openRuns(root, { agent, inputs: scenario.inputs() });
+    // The attempt the boundary is about is the one the log names, and the
+    // row states which it is.
+    if (row.at !== undefined) {
+      const boundary = frozen.map(line => line.event).filter(event => event.type === 'gate-committing').at(-1);
+      expect(boundary?.data.gate, `the gate the crash at ${row.name} landed in`).toBe(row.at.gate);
+    }
+    // The same Git answers the restart: the commit the interrupted run made
+    // is the one this one finds by the attempt's identity trailers.
+    const first = await openRuns(root, {
+      agent, git, readinessExecution: directReadinessExecution(),
+      // Recovery runs no command; one it ran would fail here rather than
+      // starting a process.
+      commandExecution: statedCommands(root, []),
+      inputs: scenario.inputs(),
+    });
     reopened.push(first.service);
     const recovered = await logLines(root, runId);
 
@@ -301,19 +333,33 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     const identities = recovered.map(line => identityOf(line.event)).filter((identity): identity is string => identity !== null);
     expect(identities.filter((identity, index) => identities.indexOf(identity) !== index), 'duplicated in the log').toEqual([]);
 
-    // One commit per changed attempt, and no gate trailer twice.
-    const trailers = await gateTrailers(root, runId);
-    expect(trailers.filter((trailer, index) => trailers.indexOf(trailer) !== index), 'a gate committed twice').toEqual([]);
+    // One commit per changed attempt, and no gate committed twice.
+    const committed = committedGates(git);
+    expect(committed.filter((gate, index) => committed.indexOf(gate) !== index), 'a gate committed twice').toEqual([]);
     if (row.commits !== undefined) {
-      expect(trailersBefore.length).toBe(row.commits.before);
-      expect(trailers.length).toBe(row.commits.after);
+      expect(committedBefore.length, 'the commits the branch held before the restart').toBe(row.commits.before);
+      expect(committed.length, 'the commits the branch holds after the restart').toBe(row.commits.after);
     }
-    const committedGates = recovered.filter(line => line.records.some(record => {
+    // What the restart asked Git for at the boundary: the commit it made, or
+    // the one it found again, and nothing where the row states neither.
+    const asked = { made: git.commits().length - askedBefore.made, found: git.recovered().length - askedBefore.found };
+    expect(asked, `what the restart after ${row.name} asked Git to do`).toEqual({
+      made: row.recovery === 'makes-the-commit' ? 1 : 0,
+      found: row.recovery === 'finds-the-commit' ? 1 : 0,
+    });
+    if (row.recovery === 'makes-the-commit') {
+      expect(git.commits().at(-1)).toEqual({ gate: row.at!.gate, commit: row.at!.revision });
+    }
+    if (row.recovery === 'finds-the-commit') expect(git.recovered()).toEqual([row.at!.gate]);
+    git.assertAnswered();
+    // Every attempt the log records a commit for is a commit the branch
+    // holds, and the attempts name the revisions Git answered with, in order.
+    const attempts = recovered.flatMap(line => line.records.flatMap(record => {
       const body = record.body as { schema?: unknown; commit?: unknown } | null;
-      return body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.commit === 'string';
+      return body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.commit === 'string' ? [body.commit] : [];
     }));
-    expect(trailers.length).toBe(committedGates.length);
-    expect(new Set(trailers).size).toBe(trailers.length);
+    expect(attempts).toEqual(git.accepted());
+    expect(new Set(committed).size).toBe(committed.length);
 
     // Every record file the log commits is there again, byte for byte, and
     // the run's own record was never touched.
@@ -324,11 +370,20 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     const hashes = await fileHashes(runDirectory(root, runId));
     await first.service.close();
     reopened.pop();
-    const second = await openRuns(root, { agent, inputs: scenario.inputs() });
+    const askedAgain = { made: git.commits().length, found: git.recovered().length };
+    const second = await openRuns(root, {
+      agent, git, readinessExecution: directReadinessExecution(),
+      commandExecution: statedCommands(root, []),
+      inputs: scenario.inputs(),
+    });
     reopened.push(second.service);
     expect(second.recovery.interrupted).toEqual([]);
     expect(second.recovery.effects).toEqual([]);
     expect(second.recovery.rematerialized).toEqual([]);
+    // The second restart makes no commit and looks none up: it performs no
+    // external effect at all.
+    expect({ made: git.commits().length, found: git.recovered().length }).toEqual(askedAgain);
+    expect(committedGates(git)).toEqual(committed);
     expect((await logLines(root, runId)).map(line => line.text)).toEqual(recovered.map(line => line.text));
     expect(await fileHashes(runDirectory(root, runId))).toEqual(hashes);
     expect(agent.sessions.length).toBe(sessionsBefore);

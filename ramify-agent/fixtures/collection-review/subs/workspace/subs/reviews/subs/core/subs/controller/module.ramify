@@ -3,4 +3,4 @@ ramify 1
 // import it.
 module controller
 
-expose-src tick from "controller.ts" to parent
+expose-src tick, ScheduledTask, TaskVerdict from "controller.ts" to parent

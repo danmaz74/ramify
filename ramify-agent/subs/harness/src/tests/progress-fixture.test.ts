@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import {
   capabilityListResponseSchema, capabilityStateSchema, moduleCapabilityComparisonResponseSchema, runQueryLimits, runResponseSchema,
@@ -11,7 +11,14 @@ import {
   archive, capabilityBoundHypotheses, contracts, core, panel, progressFixture, reviewsCore, rowBoundHypotheses, rowBoundInvolved,
   sharedUi, validation, type FixtureRun, type ProgressFixture,
 } from './helpers/progress-fixture.js';
-import { runEventsOnDisk, stubRamify, testPolicy } from './helpers/runs.js';
+import { runEventsOnDisk, testPolicy } from './helpers/runs.js';
+import { FakeRamifyCli } from './helpers/fake-ramify.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { scriptedGit, type ScriptedGit } from './helpers/scripted-git.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 /*
  * The capability-progress fixture over HTTP: five scripted runs of one
@@ -23,21 +30,35 @@ import { runEventsOnDisk, stubRamify, testPolicy } from './helpers/runs.js';
 
 let fixture: ProgressFixture;
 let server: RunningServer;
+let serverGit: ScriptedGit;
 
 beforeAll(async () => {
   fixture = await progressFixture();
+  serverGit = scriptedGit(fixture.root, { head: 'progress-fixture-server', checkpoints: [] });
   server = await startServerWith({
     projectRoot: fixture.root,
     port: 0,
     assetsDirectory: join(fixture.root, 'no-such-build'),
-    ramify: await stubRamify(),
-    runs: { inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
+    ramify: new FakeRamifyCli(),
+    runs: {
+      inputs: treeInputs(),
+      git: serverGit,
+      readinessExecution: directReadinessExecution(),
+      checkExecution: createPassingCheckExecution(),
+      policy: projectRoot => testPolicy(projectRoot),
+      stopGraceMs: 500,
+      warn: () => undefined,
+    },
   });
-}, 600_000);
+}, 60_000);
 
 afterAll(async () => {
-  await server?.close();
-  await fixture?.remove();
+  try {
+    await server?.close();
+    await fixture?.remove();
+    serverGit?.assertComplete();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 async function get(path: string): Promise<unknown> {

@@ -11,15 +11,15 @@ import { summarizeTaskResult } from '../../tasks/src/result.js';
  * to each other of their own.
  *
  * The task's input and summary types are read off the operations themselves
- * rather than imported. Exposing a function does not expose the types its
- * signature mentions, and this owner needs no name for them.
+ * rather than imported, then exported so they can accompany `tick` wherever
+ * the module exposes it.
  */
 
 /** Everything one scheduled inspection needs, as the task that runs it defines it. */
-type ScheduledTask = Parameters<typeof runInspectionTask>[0];
+export type ScheduledTask = Parameters<typeof runInspectionTask>[0];
 
 /** The verdict of one run, as the summary helper defines it. */
-type TaskVerdict = ReturnType<typeof summarizeTaskResult>;
+export type TaskVerdict = ReturnType<typeof summarizeTaskResult>;
 
 /**
  * Runs the scheduled task and summarizes what it produced.

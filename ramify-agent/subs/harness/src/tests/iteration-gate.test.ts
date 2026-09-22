@@ -1,38 +1,62 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
-import type { LineEventSummary } from '../run/records.js';
-import { changedPaths, diffNumstat } from '../../subs/evidence/src/git.js';
-import { childEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import {
-  git, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath,
-  startRun, testPolicy as testPolicyOf,
-} from './helpers/runs.js';
+import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
  * The iteration gate: what a failure is attributed to, what it returns for,
  * and how each of its causes is spent.
  *
- * The defect is real source in a real module, the gate runs a real runner
- * over the files the selection resolved to, and the repair is a real `edit`
- * through the port's own built-in.
+ * The defect is real source in a real module and the repair is a real `edit`
+ * through the port's own built-in, behind the real write guard. What each
+ * command answered is stated by the scenario, and so is what Git reports at
+ * every commit boundary, including the boundaries where the tree is
+ * unchanged and no commit is made. The one scenario whose subject is a real
+ * failing runner and the audit published against the revision it failed on
+ * keeps every real tool, in `iteration-gate-integration.test.ts`.
+ *
+ * The process guard below is the negative control: every scenario here
+ * starts no process at all, and one that tried would name itself.
  */
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
-const auditCli = fileURLToPath(new URL('../../../../node_modules/ramify-audit/dist/cli.js', import.meta.url));
+
+/** The revision the fixture is on before a run commits anything. */
+const base = 'revision-00';
+
+/** A boundary Git reports as unchanged, which commits nothing and keeps the accepted revision. */
+const unchanged: GateCommit = { commit: null };
+
+/** A boundary Git reports as one modified file, answering the revision it made. */
+const modified = (commit: string, ...paths: string[]): GateCommit => ({
+  commit,
+  changes: paths.map(path => ({ status: 'M', path })),
+});
+
+/** The same, for paths Git has not seen before. */
+const added = (commit: string, ...paths: string[]): GateCommit => ({
+  commit,
+  changes: paths.map(path => ({ status: 'A', path })),
+});
 
 const limitTest = [
   'import { test, expect } from \'vitest\';',
@@ -44,25 +68,35 @@ const limitTest = [
   '',
 ].join('\n');
 
-async function target(options: { readonly miniRunner?: boolean; readonly limit?: number; readonly tests?: boolean } = {}) {
+async function target(options: { readonly limit?: number; readonly tests?: boolean } = {}) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await addModule(fixture.root, notesDirectory, 'notes', {
     'src/notes.ts': `export const noteLimit = ${options.limit ?? 400};\n`,
     ...(options.tests === false ? {} : { 'src/tests/notes.test.ts': limitTest }),
   });
-  if (options.miniRunner === false) await installTestRunner(fixture.root);
-  else await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
+  await installTestRunner(fixture.root);
   return fixture.root;
 }
 
-async function run(root: string, plan: Parameters<typeof byRole>[0], options: Parameters<typeof openRuns>[1] = {}) {
-  const opened = await openRuns(root, { script: byRole(plan), inputs: treeInputs(), ...options });
+async function run(
+  root: string,
+  plan: Parameters<typeof byRole>[0],
+  answers: Omit<GateGitOptions, 'head'>,
+  options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
+) {
+  const scripted = gateGit(root, { head: base, ...answers });
+  const opened = await openRuns(root, {
+    script: byRole(plan),
+    inputs: treeInputs(),
+    git: scripted.git,
+    readinessExecution: directReadinessExecution(),
+    ...options,
+  });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
-  return { ...opened, runId: receipt.jobId };
+  return { ...opened, runId: receipt.jobId, scripted };
 }
 
 async function readGate(root: string, runId: string, id: string): Promise<GateAttempt> {
@@ -81,85 +115,10 @@ async function gates(root: string, runId: string): Promise<GateAttempt[]> {
 }
 
 describe('K1: a module gate fails, is repaired and reruns the complete gate', () => {
-  test('a real failing assertion in scope returns in-scope diagnostics and one repair round', async () => {
-    const root = await target();
-    const { service, runId } = await run(root, {
-      'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-      engineer: [
-        // The first attempt proposes completion with the defect still there.
-        submit(completionProposed('Added the note store.'), write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')),
-        // The repair is a real edit of the real defect.
-        submit(completionProposed('Raised the limit to 500, which is what the test states.'),
-          edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500')),
-      ],
-    });
-
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
-    const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
-    expect(iterationGates).toHaveLength(2);
-
-    const [failed, repaired] = iterationGates as [GateAttempt, GateAttempt];
-    expect(failed.verdict).toBe('failed');
-    expect(failed.cause).toBe('in-scope');
-    expect(failed.next).toBe('repair');
-    expect(failed.repairRound).toBe(0);
-    expect(failed.commit).not.toBeNull();
-    expect(failed.audited).toBe(failed.commit);
-    expect(failed.evidence).not.toBeNull();
-    expect(failed.commands[0]!.exitCode).toBe(1);
-    expect(failed.commands[0]!.output.tail).toContain('not ok');
-
-    // The rerun is a repair round and runs the complete required set again,
-    // not only the command that failed.
-    expect(repaired.repairRound).toBe(1);
-    expect(repaired.verdict).toBe('passed');
-    expect(repaired.commit).not.toBeNull();
-    expect(repaired.audited).toBe(repaired.commit);
-    expect(repaired.evidence).not.toBeNull();
-    expect(repaired.commands.map(command => command.kind)).toEqual(failed.commands.map(command => command.kind));
-    expect(repaired.commands.every(command => command.outcome === 'passed')).toBe(true);
-
-    const result = await readResult(root, runId, 'wi-001', 1);
-    expect(result.outcome).toBe('accepted');
-    expect(result.gate).toBe(repaired.id);
-    expect(result.commit).toBe(repaired.audited);
-    expect(result.invocations).toHaveLength(2);
-
-    // The two attempts report the delivered change once: their line events
-    // and paths equal the final accepted diff from the preceding boundary,
-    // just as if that final tree had been committed in one attempt.
-    const lines = await Promise.all(result.invocations.map(async invocation =>
-      JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.lineEvents(invocation)), 'utf8')) as LineEventSummary));
-    const delivered = await diffNumstat(root, failed.head, result.commit!);
-    expect(lines.flatMap(summary => summary.paths).map(path => [path.path, path.added, path.deleted] as const).sort()).toEqual(
-      delivered.map(path => [path.path, path.added, path.deleted] as const).sort(),
-    );
-    expect(await changedPaths(root, result.commit!)).toEqual([]);
-    const closed = (await runEventsOnDisk(root, 'review-notes', runId)).find(event => event.type === 'iteration-closed' && event.data.iteration === result.iteration);
-    expect(closed?.type === 'iteration-closed' && closed.data.notices).toEqual([]);
-
-    // Each changed attempt made one commit before its audit: fail, then pass.
-    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
-    const commits = log.split('\u001e').map(part => part.trim()).filter(Boolean);
-    expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
-    expect(commits.some(commit => commit.includes(`Ramify-Gate: ${failed.id}`))).toBe(true);
-    expect(await git(root, 'notes', '--ref=audit', 'show', failed.audited!)).toContain('Audited-Overall: fail');
-    expect(await git(root, 'notes', '--ref=audit', 'show', repaired.audited!)).toContain('Audited-Overall: pass');
-    const branchAudit = await runCommand({
-      argv: [process.execPath, auditCli, 'check-branch', `ramify-agent/run-${runId}`, '--cwd', root, '--json'],
-      cwd: root,
-      env: childEnvironment({ GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }),
-      timeoutMs: 30_000,
-    });
-    expect(branchAudit.outcome).toEqual({ kind: 'completed', exitCode: 0 });
-    expect(JSON.parse(branchAudit.stdout) as unknown).toMatchObject({ auditStillApplies: true, auditPassed: true });
-    expect(await readFile(join(root, notesDirectory, 'src', 'notes.ts'), 'utf8')).toBe('export const noteLimit = 500;\n');
-  }, 300_000);
-
   test('a gate that fails three times exhausts and returns the original cause to the local architect', async () => {
     const root = await target();
-    const { service, runId } = await run(root, {
+    const iterationAttempts = new Set<string>();
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [
         submit(assign(notes, {}, outline())),
@@ -176,6 +135,22 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
         submit(completionProposed('I believe this once more.')),
         submit(completionProposed('Raised the limit to 500.'), edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500')),
       ],
+    }, {
+      // The three attempts that repair nothing change nothing, so Git
+      // reports no commit for any of them; the repair is the one revision.
+      commits: [
+        unchanged, unchanged, unchanged,
+        modified('revision-01', `${notesDirectory}/src/notes.ts`),
+        unchanged, unchanged,
+      ],
+    }, {
+      checkScript: ({ check, context }) => {
+        if (context.checkpoint !== 'iteration') return {};
+        iterationAttempts.add(context.attemptId);
+        return iterationAttempts.size <= 3 && check.kind === 'tests'
+          ? { outcome: { kind: 'completed', exitCode: 1 }, stderr: 'not ok\n' }
+          : {};
+      },
     });
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -184,6 +159,10 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(exhausted.map(gate => gate.repairRound)).toEqual([0, 1, 2]);
     expect(exhausted.map(gate => gate.next)).toEqual(['repair', 'repair', 'exhausted']);
     expect(exhausted.every(gate => gate.cause === 'in-scope')).toBe(true);
+    // Each failing attempt was audited over the revision it stood on, which
+    // is the run's own boundary: none of them committed one of its own.
+    expect(exhausted.map(gate => gate.commit)).toEqual([null, null, null]);
+    expect(exhausted.map(gate => gate.audited)).toEqual([base, base, base]);
 
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('exhausted');
@@ -192,16 +171,23 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(result.invocations).toHaveLength(3);
     // The cause the architect receives is the first attempt's, not the last.
     expect(result.findings.some(finding => finding.includes(`in-scope at gate ${exhausted[0]!.id}`))).toBe(true);
-    // The repair iteration the architect then assigned is the one accepted.
+    // The repair iteration the architect then assigned is the one accepted,
+    // and it is the only one whose commit boundary answered a revision.
     const repaired = await readResult(root, runId, 'wi-001', 2);
     expect(repaired.outcome).toBe('accepted');
-  }, 300_000);
+    expect(repaired.commit).toBe('revision-01');
+    expect(scripted.revisions()).toEqual(['revision-01']);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('K8: every gate resolves the current tests under the captured policy', () => {
   test('a failing test added after the assignment, during repair, fails that attempt', async () => {
     const root = await target({ limit: 500 });
-    const { service, runId } = await run(root, {
+    let firstIteration: string | undefined;
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: [
@@ -220,6 +206,30 @@ describe('K8: every gate resolves the current tests under the captured policy', 
         submit(completionProposed('Corrected the second rule.'),
           edit(`${notesDirectory}/src/tests/second.test.ts`, 'toBe(1)', 'toBe(500)')),
       ],
+    }, {
+      commits: [
+        { ...added('revision-01', `${notesDirectory}/src/tests/second.test.ts`), against: base, subject: 'wi-001.i01' },
+        // The repair is asked about the same accepted boundary, which the
+        // failing attempt's own commit did not move.
+        { ...modified('revision-02', `${notesDirectory}/src/tests/second.test.ts`), against: base, subject: 'wi-001.i01' },
+        { commit: null, against: 'revision-02' },
+        { commit: null, against: 'revision-02' },
+      ],
+      // The accepted boundary is reached from the revision the run started
+      // on, because the attempt between them failed and accepted nothing.
+      diffs: [{
+        from: base,
+        to: 'revision-02',
+        changes: [{ status: 'A', path: `${notesDirectory}/src/tests/second.test.ts` }],
+      }],
+    }, {
+      checkScript: ({ check, context }) => {
+        if (context.checkpoint !== 'iteration') return {};
+        firstIteration ??= context.attemptId;
+        return context.attemptId === firstIteration && check.kind === 'tests'
+          ? { outcome: { kind: 'completed', exitCode: 1 }, stderr: 'not ok\n' }
+          : {};
+      },
     });
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -232,11 +242,18 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     expect(iterationGates[0]!.verdict).toBe('failed');
     expect(iterationGates[1]!.verdict).toBe('passed');
     expect(iterationGates[1]!.commands[0]!.selection!.resolved).toEqual(iterationGates[0]!.commands[0]!.selection!.resolved);
-  }, 300_000);
+    // A failing attempt commits the revision it was audited over, and the
+    // repair that follows is a revision of its own, over that one.
+    expect(iterationGates.map(gate => gate.commit)).toEqual(['revision-01', 'revision-02']);
+    expect(iterationGates.map(gate => gate.head)).toEqual([base, 'revision-01']);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 
   test('an owner with no test yet can add its first one; leaving it testless is not-verified', async () => {
     const root = await target({ tests: false, limit: 500 });
-    const { service, runId } = await run(root, {
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [
         submit(assign(notes, {}, outline())),
@@ -253,6 +270,12 @@ describe('K8: every gate resolves the current tests under the captured policy', 
         submit(completionProposed('Added the first test of this module.'),
           write(`${notesDirectory}/src/tests/notes.test.ts`, limitTest)),
       ],
+    }, {
+      commits: [
+        added('revision-01', `${notesDirectory}/src/tests/notes.test.ts`),
+        unchanged,
+        unchanged,
+      ],
     });
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -264,22 +287,28 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     expect(iterationGates[0]!.commands.every(command => command.outcome === 'not-verified')).toBe(true);
     expect(iterationGates[0]!.next).toBe('return-to-local-architect');
     expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('unsuitable');
+    // An attempt that runs nothing commits nothing either.
+    expect(iterationGates[0]).toMatchObject({ commit: null, audited: null });
 
     expect(iterationGates.at(-1)!.verdict).toBe('passed');
     expect(iterationGates.at(-1)!.commands[0]!.selection!.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
     expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
-  }, 300_000);
+    expect(scripted.revisions()).toEqual(['revision-01']);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 
   test('a discovery that fails never falls back to an earlier list', async () => {
     const root = await target({ limit: 500 });
-    const { service, runId } = await run(root, {
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: [
         submit(completionProposed('Done.')),
         submit(completionProposed('Done again.')),
       ],
-    }, {
+    }, { commits: [unchanged, unchanged] }, {
       // The second gate's refresh cannot answer, so its discovery fails.
       inputs: failingRefreshAfter(1),
     });
@@ -294,12 +323,23 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     expect(events.some(event => event.type === 'gate-committing' && event.data.gate === failedDiscovery!.id)).toBe(false);
     // The selection is empty rather than the list the earlier attempt used.
     expect(failedDiscovery!.commands[0]!.selection!.resolved).toEqual([]);
-  }, 300_000);
+    // An attempt that never reached the commit boundary asked Git for no
+    // commit: the boundaries this run reached are the ones scripted here.
+    expect(scripted.messages.every(message => !message.includes(failedDiscovery!.id))).toBe(true);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('K5b: an invalid session, a timeout and an exhausted limit keep distinct causes', () => {
   test('a session the implementation can no longer read is reconstructed, and the counters are kept', async () => {
     const root = await target();
+    let firstIteration: string | undefined;
+    const scripted = gateGit(root, {
+      head: base,
+      commits: [unchanged, modified('revision-01', `${notesDirectory}/src/notes.ts`), unchanged, unchanged],
+    });
     const opened = await openRuns(root, {
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
@@ -310,6 +350,15 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
         ],
       }),
       inputs: treeInputs(),
+      git: scripted.git,
+      readinessExecution: directReadinessExecution(),
+      checkScript: ({ check, context }) => {
+        if (context.checkpoint !== 'iteration') return {};
+        firstIteration ??= context.attemptId;
+        return context.attemptId === firstIteration && check.kind === 'tests'
+          ? { outcome: { kind: 'completed', exitCode: 1 }, stderr: 'not ok\n' }
+          : {};
+      },
     });
     cleanups.push(() => opened.service.close());
     // The engineer's session is forgotten between the failing gate and the
@@ -342,15 +391,28 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     expect(second.attempt).toBe(2);
     const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
     expect(iterationGates.map(gate => gate.repairRound)).toEqual([0, 1]);
-  }, 300_000);
+    expect(result.commit).toBe('revision-01');
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 
   test('a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows', async () => {
     const root = await target();
-    const { service, runId } = await run(root, {
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: [submit(completionProposed('Done.'))],
-    }, { policy: projectRoot => timingOutScopedTests(projectRoot) });
+    }, {
+      // Every attempt commits before it runs its checks, and every one of
+      // them stands on the tree the run started from: the iteration's two
+      // attempts, the work item's two and the run's own two.
+      commits: [unchanged, unchanged, unchanged, unchanged, unchanged, unchanged],
+    }, {
+      checkScript: ({ check }) => check.kind === 'tests'
+        ? { outcome: { kind: 'timed-out', timeoutMs: check.command.timeoutMs } }
+        : {},
+    });
 
     // The scoped run is the same command at every checkpoint, so the work
     // item's own gate cannot answer either and the run ends with evidence.
@@ -369,7 +431,12 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('exhausted');
     expect(result.findings.some(finding => finding.includes('timeout'))).toBe(true);
-  }, 300_000);
+    // Neither attempt accepted anything, so the run's boundary never moved.
+    expect(scripted.revisions()).toEqual([]);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 /** Inputs whose refresh stops answering after `times`, so a later discovery fails. */
@@ -381,18 +448,6 @@ function failingRefreshAfter(times: number) {
     refresh: async (projectRoot: string) => {
       seen += 1;
       return seen > times ? null : base.refresh(projectRoot);
-    },
-  };
-}
-
-/** A policy whose scoped test run never answers within its timeout. */
-function timingOutScopedTests(projectRoot: string) {
-  const base = testPolicyOf(projectRoot);
-  return {
-    ...base,
-    commands: {
-      ...base.commands,
-      scopedTests: { ...base.commands.scopedTests, argv: [process.execPath, '-e', 'setTimeout(() => undefined, 60000)'], cwd: projectRoot, timeoutMs: 500 },
     },
   };
 }

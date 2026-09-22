@@ -153,9 +153,14 @@
       "owner": 6,
       "tests": [
         {
+          "file": "subs/harness/src/tests/iterations-integration.test.ts",
+          "titles": [
+            "G8: one small work item completes in one iteration"
+          ]
+        },
+        {
           "file": "subs/harness/src/tests/iterations.test.ts",
           "titles": [
-            "G8: one small work item completes in one iteration",
             "G8: a work item revised across several iterations keeps every obligation"
           ]
         }
@@ -165,6 +170,12 @@
       "case": "G9",
       "owner": 6,
       "tests": [
+        {
+          "file": "subs/harness/src/tests/module-creation-integration.test.ts",
+          "titles": [
+            "G9: an accepted proposed entry owner reaches implementation"
+          ]
+        },
         {
           "file": "subs/harness/src/tests/module-creation.test.ts",
           "titles": [
@@ -204,7 +215,12 @@
         {
           "file": "subs/harness/src/tests/requirement-verification.test.ts",
           "titles": [
-            "P2: the contract gate rejects a fake under a production-looking name",
+            "P2: the contract gate rejects a fake under a production-looking name"
+          ]
+        },
+        {
+          "file": "subs/harness/src/tests/requirement-architect-view.test.ts",
+          "titles": [
             "P2: architectural evidence does not present a fake as production behavior"
           ]
         }
@@ -215,7 +231,7 @@
       "owner": 9,
       "tests": [
         {
-          "file": "subs/harness/src/tests/contract-revision.test.ts",
+          "file": "subs/harness/src/tests/contract-revision-scripted.test.ts",
           "titles": [
             "P3: a contract revision reschedules current evidence without resetting completed work"
           ]
@@ -295,7 +311,7 @@
       "owner": 9,
       "tests": [
         {
-          "file": "subs/harness/src/tests/contract-delegation.test.ts",
+          "file": "subs/harness/src/tests/contract-delegation-integration.test.ts",
           "titles": [
             "K4: the contract gate runs the suite against the fake and the provider gate runs it against the real provider"
           ]

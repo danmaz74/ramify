@@ -1,10 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ObservationLog } from '../run/observations.js';
 import { runLayout } from '../run/records.js';
 import { temporaryDirectory, copyFixture } from './helpers/fixture.js';
-import { emptyAnalysis, initRepository, installTestRunner, openRuns, runPath, startRun } from './helpers/runs.js';
+import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from './helpers/external-tools.js';
+import { emptyAnalysis, installTestRunner, runPath, startRun } from './helpers/runs.js';
+import { scriptedGit } from './helpers/scripted-git.js';
 
 /*
  * The observation log of one invocation. It is canonical for what was
@@ -13,10 +15,20 @@ import { emptyAnalysis, initRepository, installTestRunner, openRuns, runPath, st
  * dropped, so replay counts once and a new tool call counts again.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
+
+function observationGit(root: string) {
+  return scriptedGit(root, { head: 'observation-base', checkpoints: [
+    { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
+  ] });
+}
 
 async function log() {
   const directory = await temporaryDirectory();
@@ -81,12 +93,13 @@ describe('what a run observes', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
 
-    const { service } = await openRuns(fixture.root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const git = observationGit(fixture.root);
+    const { service } = await openRunsWithoutProcesses(fixture.root, git, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
+    git.assertComplete();
 
     const lines = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0001')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { kind?: string; detail?: string } });
@@ -99,9 +112,9 @@ describe('what a run observes', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
 
-    const { service } = await openRuns(fixture.root, {
+    const git = observationGit(fixture.root);
+    const { service } = await openRunsWithoutProcesses(fixture.root, git, {
       script: [
         { kind: 'message', text: 'orienting', usage: { input: 10, output: 2, cacheRead: 1, cacheWrite: 0, total: 13 } },
         { kind: 'context', tokens: 1000, window: 200_000 },
@@ -113,6 +126,7 @@ describe('what a run observes', () => {
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
+    git.assertComplete();
 
     const lines = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0001')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: Record<string, unknown> });

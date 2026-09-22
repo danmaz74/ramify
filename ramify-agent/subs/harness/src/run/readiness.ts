@@ -5,8 +5,8 @@ import { runGate } from '../checks/gate.js';
 import { allProjectChecks, checkpointPolicies } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
-import { isCleanRepository, GitError } from '../../subs/evidence/src/git.js';
-import { runCommand } from '../../subs/evidence/src/run-command.js';
+import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
+import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { discoverNestedPackages } from './policy.js';
 import {
@@ -44,6 +44,7 @@ export interface ReadinessRequest {
   readonly gateId: string;
   readonly policy: RunPolicy;
   readonly ramify: RamifyCli;
+  readonly git?: GitService | undefined;
   /** The commit readiness ran on. */
   readonly head: string;
   readonly signal?: AbortSignal | undefined;
@@ -68,7 +69,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
   const steps: StepResult[] = [];
 
   steps.push(await projectRootStep(projectRoot));
-  steps.push(await gitCleanStep(projectRoot, request.signal));
+  steps.push(await gitCleanStep(projectRoot, request.signal, request.git ?? gitService));
   steps.push(await compilerConfigStep(projectRoot));
   steps.push(await testRunnerStep(projectRoot));
 
@@ -187,9 +188,9 @@ async function projectRootStep(projectRoot: string): Promise<StepResult> {
   return { step: 'project-root', outcome: 'passed', detail: `${projectRoot}, with its package.json` };
 }
 
-async function gitCleanStep(projectRoot: string, signal: AbortSignal | undefined): Promise<StepResult> {
+async function gitCleanStep(projectRoot: string, signal: AbortSignal | undefined, git: GitService): Promise<StepResult> {
   try {
-    const clean = await isCleanRepository(projectRoot, signal);
+    const clean = await git.isCleanRepository(projectRoot, signal);
     return clean
       ? { step: 'git-clean', outcome: 'passed', detail: 'the working tree is clean' }
       : { step: 'git-clean', outcome: 'failed', detail: 'the working tree has uncommitted changes; a run starts from a clean repository so that every accepted boundary is its own commit' };
@@ -331,6 +332,9 @@ export interface RecoveryRequest {
   readonly projectRoot: string;
   readonly policy: RunPolicy;
   readonly ramify: RamifyCli;
+  readonly git?: GitService | undefined;
+  /** External command execution for recovery work; production uses the process-backed runner. */
+  readonly commandExecution?: CommandRunner | undefined;
   /** The count of committed recoveries for this subject, this one included. */
   readonly count: number;
   /** Where the recovery's command output goes. */
@@ -354,7 +358,7 @@ export async function performRecovery(request: RecoveryRequest): Promise<Infrast
           continue;
         }
         const outputFile = join(request.directory, `${request.id}-${directory.split('/').join('-')}.log`);
-        const run = await runCommand({
+        const run = await (request.commandExecution ?? runCommand)({
           argv: command.argv, cwd: command.cwd, env: checkCommandEnvironment(command), timeoutMs: command.timeoutMs, outputFile,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         });

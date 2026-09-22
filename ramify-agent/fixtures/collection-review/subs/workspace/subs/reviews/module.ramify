@@ -15,4 +15,4 @@ expose-sub InspectionPort from core to parent
 expose-sub validateRevisionChain from validation to descendants
 
 // The connected view, up to the shell that composes it.
-expose-sub ReviewPanel from "ui" to parent
+expose-sub ReviewPanel, ReviewPanelProps from "ui" to parent

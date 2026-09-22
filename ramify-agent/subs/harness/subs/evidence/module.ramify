@@ -16,7 +16,7 @@ expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurem
 
 // Running one of the target project's own commands, in its own process group
 // and with a clean environment.
-expose-src runCommand, CommandRequest, CommandRun, CommandOutcome, CommandOutput, childEnvironment, environmentNames, outputTailBytes from "run-command.ts" to parent
+expose-src CommandRunner, runCommand, CommandRequest, CommandRun, CommandOutcome, CommandOutput, childEnvironment, environmentNames, outputTailBytes from "run-command.ts" to parent
 
 // The identity of the state the evidence describes.
 expose-src guardedFilesHash from "guarded-files.ts" to parent
@@ -25,3 +25,6 @@ expose-src guardedFilesHash from "guarded-files.ts" to parent
 // gate audits, recovery by exact trailers, and what changed.
 expose-src GitError, CommitTrailer, isCleanRepository, createRunBranch, commitAccepted, findCommitByTrailer, findCommitByTrailers, changedPaths, diffNumstat from "git.ts" to parent
 expose-src commitNameStatus, diffNameStatus, worktreeLineChanges, changedEntries from "git.ts" to parent
+
+// Consumers inject this boundary; real Git integration tests live with the adapter.
+expose-src GitService, gitService, currentHead from "git.ts" to parent

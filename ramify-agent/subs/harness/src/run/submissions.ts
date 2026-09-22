@@ -120,19 +120,25 @@ export class SubmissionJudge<T> {
    * toward the same bound and is recorded as a rejection with the reason,
    * which is the implementation's, not a reading of its message text.
    */
-  async countImplementationRejection(callId: string, tool: string, reason: string): Promise<void> {
+  countImplementationRejection(callId: string, tool: string, reason: string): () => Promise<void> {
     this.attemptCount += 1;
     this.rejectionCount += 1;
-    await this.options.observations.record({
-      type: 'rejection',
-      data: {
-        callId,
-        target: tool,
-        attempt: this.attemptCount,
-        errors: [{ path: '(input)', message: reason }],
-      },
-    });
+    const attempt = this.attemptCount;
     if (this.attemptCount > this.options.bound) this.reached = true;
+    // The port callback cannot await this append. The count is immediate so a
+    // following submission sees it; the recorder invokes the returned write
+    // in the same ordered queue as the implementation's other observations.
+    return async () => {
+      await this.options.observations.record({
+        type: 'rejection',
+        data: {
+          callId,
+          target: tool,
+          attempt,
+          errors: [{ path: '(input)', message: reason }],
+        },
+      });
+    };
   }
 
   /** Judges one input that reached the harness. Nothing changes unless it is accepted. */

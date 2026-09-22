@@ -1,9 +1,14 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { initRepository, onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 import {
   consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites, established, paths, providerWrites,
   type Seam,
@@ -17,11 +22,17 @@ import type { RunEvent } from '../run/log.js';
  *
  * A cycle is a cycle of capabilities. A cycle of modules is not one, and a
  * cycle of changes is not one either, which is what the second test shows.
+ *
+ * Each scenario states what Git reports for every commit its run attempts,
+ * and the scheduling is then read from the run's own ledger and records.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const notes = 'collection-review/workspace/reviews/notes';
@@ -44,12 +55,20 @@ const noteLimit: Seam = {
 
 const tagLimit: Seam = { ...noteLimit, consumerDirectory: tagsDirectory, consumerFile: 'tags.ts' };
 
-async function run(root: string, plan: Parameters<typeof byRole>[0]) {
-  const opened = await openRuns(root, { script: byRole(plan), inputs: treeInputs() });
+/**
+ * A run whose Git answers are this scenario's own fixture data: the
+ * revisions it reports for each commit the harness attempts, and the
+ * attempts it reports as an unchanged tree.
+ */
+async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
+  const git = answeredGit(root, { head: 'revision-00', commits });
+  const opened = await openRuns(root, {
+    script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+  });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
-  return { ...opened, runId: receipt.jobId };
+  return { ...opened, git, runId: receipt.jobId };
 }
 
 async function fixtureWith(modules: ReadonlyArray<{ directory: string; name: string; files: Record<string, string> }>) {
@@ -57,7 +76,6 @@ async function fixtureWith(modules: ReadonlyArray<{ directory: string; name: str
   cleanups.push(fixture.remove);
   for (const module of modules) await addModule(fixture.root, module.directory, module.name, module.files);
   await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
@@ -92,7 +110,13 @@ describe('P5: a shared obligation runs its provider once and each consumer verif
       { directory: limitsDirectory, name: 'limits', files: {} },
     ]);
 
-    const { service, runId } = await run(root, {
+    // What Git reports for this scenario: the agreement's own files when the
+    // contract iteration establishes them, the provider's when it implements
+    // them, each consumer's when it moves off the fake, and an unchanged tree
+    // for every gate that follows a commit without a write of its own.
+    const note = paths(noteLimit);
+    const tag = paths(tagLimit);
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes), entry('review-tags', tags)]))],
       'local-architect': [
         submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
@@ -119,7 +143,17 @@ describe('P5: a shared obligation runs its provider once and each consumer verif
         // The same agreement, a second consumer: only the integration differs.
         submit(established(tagLimit), write(paths(tagLimit).consumer, consumerAgainstReal(tagLimit).replace('createNoteLimit(', 'createNoteLimitFake(').replace('/src/note-limit.ts', '/src/fakes/note-limit.fake.ts').replace('{ createNoteLimit }', '{ createNoteLimitFake }'))),
       ],
-    });
+    }, [
+      accepted('wi-001.i02', 'revision-01', [...added(note.contract, note.fake, note.subjects, note.conformance), ...modified(note.consumer)]),
+      accepted('wi-003.i01', 'revision-02', [...added(note.real), ...modified(note.subjects)]),
+      unchanged('wi-003'),
+      accepted('wi-001.i03', 'revision-03', modified(note.consumer)),
+      unchanged('wi-001'),
+      accepted('wi-002.i02', 'revision-04', modified(tag.consumer)),
+      accepted('wi-002.i03', 'revision-05', modified(tag.consumer)),
+      unchanged('wi-002'),
+      unchanged('final verification of plan "review-notes"'),
+    ]);
 
     expect(onlyRun(service, 'review-notes').failure).toBeNull();
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -145,7 +179,13 @@ describe('P5: a shared obligation runs its provider once and each consumer verif
     expect(log.filter(event => event.type === 'work-item-completed')).toHaveLength(3);
     expect(onlyRun(service, 'review-notes').counts.openRequirements).toBe(0);
     expect(onlyRun(service, 'review-notes').notices).toEqual([]);
-  }, 600_000);
+
+    // The run committed on its own branch, once for each gate, and recorded
+    // the revisions Git reported for the five that changed the tree.
+    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
+    git.assertAnswered();
+  }, 60_000);
 });
 
 describe('P5: a chain of changes back through a module that has yielded is not a cycle', () => {
@@ -174,7 +214,9 @@ describe('P5: a chain of changes back through a module that has yielded is not a
       },
     ]);
 
-    const { service, runId } = await run(root, {
+    const limit = paths(noteLimit);
+    const format = paths(noteFormat);
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
       'local-architect': [
         // wi-001 in A: it needs the limit, which is B's.
@@ -210,7 +252,17 @@ describe('P5: a chain of changes back through a module that has yielded is not a
         submit(established(noteLimit), ...contractWrites(noteLimit)),
         submit(established(noteFormat), ...contractWrites(noteFormat)),
       ],
-    });
+    }, [
+      accepted('wi-001.i02', 'revision-01', [...added(limit.contract, limit.fake, limit.subjects, limit.conformance), ...modified(limit.consumer)]),
+      accepted('wi-002.i02', 'revision-02', [...added(format.contract, format.fake, format.subjects, format.conformance), ...modified(format.consumer)]),
+      accepted('wi-003.i01', 'revision-03', [...added(format.real), ...modified(format.subjects)]),
+      unchanged('wi-003'),
+      accepted('wi-002.i03', 'revision-04', [...added(limit.real), ...modified(format.consumer, limit.subjects)]),
+      unchanged('wi-002'),
+      accepted('wi-001.i03', 'revision-05', modified(limit.consumer)),
+      unchanged('wi-001'),
+      unchanged('final verification of plan "review-notes"'),
+    ]);
 
     expect(onlyRun(service, 'review-notes').failure).toBeNull();
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -233,7 +285,12 @@ describe('P5: a chain of changes back through a module that has yielded is not a
     // which is what the depth-first stack records.
     const resumed = log.filter(event => event.type === 'work-item-resumed').map(event => event.data.workItem);
     expect(resumed).toEqual(['wi-002', 'wi-001']);
-  }, 600_000);
+
+    // Each provider and each consumer committed once, in the order the chain
+    // completed, and the gates between them changed nothing.
+    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
+    git.assertAnswered();
+  }, 60_000);
 });
 
 describe('P5: a capability that transitively depends on itself', () => {
@@ -256,7 +313,9 @@ describe('P5: a capability that transitively depends on itself', () => {
       { directory: limitsDirectory, name: 'limits', files: { 'src/limit-work.ts': consumerStub, 'src/tests/limit-work.test.ts': consumerTest('limit-work.ts') } },
     ]);
 
-    const { service, runId } = await run(root, {
+    const limit = paths(noteLimit);
+    const back = paths(backToNotes);
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
       'local-architect': [
         submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
@@ -277,7 +336,13 @@ describe('P5: a capability that transitively depends on itself', () => {
         submit(established(backToNotes), ...contractWrites(backToNotes)),
         submit(established(backToNotes), ...contractWrites(backToNotes)),
       ],
-    });
+    }, [
+      accepted('wi-001.i02', 'revision-01', [...added(limit.contract, limit.fake, limit.subjects, limit.conformance), ...modified(limit.consumer)]),
+      accepted('wi-002.i02', 'revision-02', [...added(back.contract, back.fake, back.subjects, back.conformance), ...modified(back.consumer)]),
+      // The second attempt at the same agreement writes the same files with
+      // the same content, and Git reports an unchanged tree for it.
+      unchanged('wi-002.i04'),
+    ]);
 
     const snapshot = onlyRun(service, 'review-notes');
     expect(snapshot.state).toBe('failed');
@@ -303,5 +368,11 @@ describe('P5: a capability that transitively depends on itself', () => {
     expect(notices).toHaveLength(2);
     expect(notices[0]).toMatchObject({ cycle: ['note-limit', 'review-notes'], closedBy: 'wi-002', resolved: false });
     expect(notices[0]!.summary).toContain('note-limit → review-notes → note-limit');
-  }, 600_000);
+
+    // The run that failed on the cycle still committed what each agreement
+    // established, and its repeat of the same agreement committed nothing.
+    expect(git.minted()).toEqual(['revision-01', 'revision-02']);
+    expect(git.subjects().at(-1)).toContain('wi-002.i04');
+    git.assertAnswered();
+  }, 60_000);
 });

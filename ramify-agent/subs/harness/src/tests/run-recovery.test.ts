@@ -1,11 +1,13 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
 import {
-  crashLock, emptyAnalysis, freeze, git, initRepository, installTestRunner, onlyRun, openRuns,
+  staleCrashLock, emptyAnalysis, freeze, installTestRunner, onlyRun, openRuns,
   runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { modified, scenarioGit, untracked, type CommitResponse, type RecoveredCommit, type ScenarioGit } from './helpers/recovery-git.js';
 import { workLayout } from '../work/records.js';
 import { type IterationAssignment, iterationLayout } from '../work/iterations.js';
 import {
@@ -27,6 +29,10 @@ import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import type { RunEvent } from '../run/log.js';
+import { statedCommands } from './helpers/composition.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 /*
  * The recovery table of this iteration's run log. For every durable
@@ -37,19 +43,73 @@ import type { RunEvent } from '../run/log.js';
  *
  * A crash is what it is on disk: the service is abandoned rather than
  * closed, so it writes nothing more, and the lock is replaced by one held by
- * a process that is gone.
+ * a process that is gone. What is on disk is the whole of the durable state
+ * a restart reads, and every file, record and transition below is the run's
+ * own.
+ *
+ * Git is external, and is answered rather than run: each scenario states
+ * what its commits answer, and its answers outlive the crashed service,
+ * because the commit an interrupted run made is the one its restart finds
+ * again by the attempt's identity trailers. The commands readiness would
+ * spawn are answered directly for the same reason.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+    const unanswered = [...gits.values()].flatMap(git => [...git.unexpected]);
+    gits.clear();
+    expect(unanswered, 'Git operations a scenario states no answer for').toEqual([]);
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
-async function target() {
+/** The revision every project of this file is on before its run commits anything. */
+const base = 'source-00';
+const source = (n: number) => `source-${String(n).padStart(2, '0')}`;
+/** A checkpoint over a tree with nothing to commit. */
+const unchanged = (against: string): CommitResponse => ({ commit: null, against });
+
+/**
+ * The Git of each project this file drives, by that project's root: a
+ * scenario states its answers when it prepares its target, and the crash and
+ * every restart over that project are answered by the same one.
+ */
+const gits = new Map<string, ScenarioGit>();
+
+function gitOf(root: string): ScenarioGit {
+  const git = gits.get(root);
+  if (git === undefined) throw new Error(`No Git was stated for ${root}`);
+  return git;
+}
+
+function stateGit(
+  root: string,
+  commits: readonly CommitResponse[],
+  recovered: readonly RecoveredCommit[] = [],
+  after = base,
+): void {
+  gits.set(root, scenarioGit(root, { head: base, after, commits, recovered }));
+}
+
+/**
+ * The one commit a gate makes over the file `changeTree` leaves in the
+ * project after readiness, which is what the three commit boundaries below
+ * are about.
+ */
+const lateCommit: readonly CommitResponse[] = [{ commit: source(1), against: base, changes: untracked('src/late.ts') }];
+const lateRecovery: readonly RecoveredCommit[] = [{ gate: 'ga-0002', answers: [null, source(1)] }];
+
+async function target(
+  commits: readonly CommitResponse[] = [],
+  recovered: readonly RecoveredCommit[] = [],
+  after = base,
+) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
+  stateGit(fixture.root, commits, recovered, after);
   return fixture.root;
 }
 
@@ -66,9 +126,14 @@ async function crashAfter(
   agent?: OpenRunsOptions['agent'],
   freezeAt?: (current: RunWrite) => boolean,
   ready?: (types: readonly string[]) => boolean,
+  commandExecution?: OpenRunsOptions['commandExecution'],
 ) {
   let runId = '';
+  let frozenAtBoundary = false;
   const { service } = await openRuns(root, {
+    git: gitOf(root),
+    readinessExecution: directReadinessExecution(),
+    ...(commandExecution === undefined ? {} : { commandExecution }),
     ...(agent === undefined ? { script: script ?? [{ kind: 'submit', input: emptyAnalysis() }] } : { agent }),
     ...(inputs === undefined ? {} : { inputs }),
     afterWrite: async (current, runId) => {
@@ -76,21 +141,27 @@ async function crashAfter(
       if (changeTree && current === 'readiness-attempted') {
         await writeFile(join(root, 'src', 'late.ts'), 'export const late = true;\n');
       }
-      if (freezeAt === undefined ? current === write : freezeAt(current)) await freeze();
+      if (freezeAt === undefined ? current === write : freezeAt(current)) {
+        // The log line becomes visible before its record files finish
+        // materializing. Mark the boundary only from this post-write hook so
+        // the crash fixture cannot race ahead of the complete durable write.
+        frozenAtBoundary = true;
+        await freeze();
+      }
     },
   });
   const receipt = await service.execute(startRun('review-notes'));
   runId = receipt.jobId;
   const path = runPath(root, 'review-notes', runId, runLayout.events);
-  await until(async () => (ready === undefined ? reached(root, runId, path, write) : ready(await eventTypes(path))), 90_000);
-  await crashLock(root);
+  await until(async () => (ready !== undefined || frozenAtBoundary)
+    && (ready === undefined ? reached(root, runId, path, write) : ready(await eventTypes(path))), 90_000);
+  await staleCrashLock(root);
   return { runId };
 }
 
-/** How many commits the run branch holds. */
-async function commitCount(root: string, runId: string): Promise<number> {
-  const log = await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`).catch(() => '');
-  return log.trim().split('\n').filter(Boolean).length;
+/** How many commits the run made on its branch, as Git answered them. */
+function commitCount(root: string): number {
+  return gitOf(root).accepted().length;
 }
 
 /** Whether the frozen run has written everything the boundary is named for. */
@@ -111,11 +182,11 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'iteration-closed': return types.includes('iteration-closed');
     case 'work-item-completed': return types.includes('work-item-completed');
     // The operation intent is in the log and the commit is not made yet.
-    case 'gate-attempted': return types.includes('gate-committing') && (await commitCount(root, runId)) === 1;
+    case 'gate-attempted': return types.includes('gate-committing') && commitCount(root) === 0;
     // The commit is made and the exact revision has not completed audit yet.
-    case 'gate-committing': return types.includes('gate-committing') && !types.includes('gate-attempted') && (await commitCount(root, runId)) === 2;
+    case 'gate-committing': return types.includes('gate-committing') && !types.includes('gate-attempted') && commitCount(root) === 1;
     // The complete attempt is the effect's completion line.
-    case 'gate-committed': return types.includes('gate-attempted') && (await commitCount(root, runId)) === 2;
+    case 'gate-committed': return types.includes('gate-attempted') && commitCount(root) === 1;
     case 'placement-requested': return types.includes('placement-requested');
     case 'view-refreshed': return types.includes('view-refreshed');
     case 'fork-returned-partial': return types.includes('fork-returned-partial');
@@ -171,7 +242,11 @@ function oneWorkItem(): OpenRunsOptions['script'] {
 
 /** Reopens the project after the crash and answers what recovery did. */
 async function reopen(root: string, agent?: OpenRunsOptions['agent']) {
-  const reopened = await openRuns(root, agent === undefined ? {} : { agent });
+  const reopened = await openRuns(root, {
+    git: gitOf(root),
+    readinessExecution: directReadinessExecution(),
+    ...(agent === undefined ? {} : { agent }),
+  });
   cleanups.push(() => reopened.service.close());
   return reopened;
 }
@@ -383,16 +458,19 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash between the commit intent and the commit performs the effect again and makes one commit', async () => {
-    const root = await target();
+    const root = await target(lateCommit, lateRecovery, source(1));
+    const git = gitOf(root);
     const { runId } = await crashAfter(root, 'gate-attempted', true);
 
-    const before = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
-    expect(before).toHaveLength(1);
+    // The verified operation is durable and no commit was made for it.
+    expect(git.commits()).toEqual([]);
 
     const { recovery } = await reopen(root);
     expect(recovery.effects).toEqual([`review-notes/${runId}: the commit and audit of gate ga-0002`]);
-    const after = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
-    expect(after).toHaveLength(2);
+    // The restart looked the gate's commit up, was told there is none, and
+    // made exactly one for it.
+    expect(git.commits()).toEqual([{ gate: 'ga-0002', commit: source(1) }]);
+    expect(git.recovered()).toEqual([]);
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.map(event => event.type)).toEqual([
@@ -400,40 +478,56 @@ describe('the recovery table', () => {
       'readiness-passed', 'gate-committing', 'gate-attempted', 'job-interrupted',
     ]);
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate('ga-0002')), 'utf8')) as { commit: string | null };
-    expect(attempt.commit).toBe(after[0]);
+    expect(attempt.commit).toBe(source(1));
+    git.assertComplete();
   }, 180_000);
 
   test('a crash after the commit, before its completion line, finds the commit and makes no second one', async () => {
-    const root = await target();
+    const root = await target(lateCommit, lateRecovery, source(1));
+    const git = gitOf(root);
     const { runId } = await crashAfter(root, 'gate-committing', true);
 
-    const before = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
-    expect(before).toHaveLength(2);
+    // The commit was made before the crash, and its attempt is not written.
+    const before = [...git.commits()];
+    expect(before).toEqual([{ gate: 'ga-0002', commit: source(1) }]);
 
     const { recovery } = await reopen(root);
     expect(recovery.effects).toEqual([`review-notes/${runId}: the commit and audit of gate ga-0002`]);
-    const after = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
-    expect(after).toEqual(before);
+    // The restart found that commit by the attempt's identity trailers and
+    // made no second one.
+    expect(git.recovered()).toEqual(['ga-0002']);
+    expect(git.commits()).toEqual(before);
 
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate('ga-0002')), 'utf8')) as { commit: string | null };
-    expect(attempt.commit).toBe(before[0]);
+    expect(attempt.commit).toBe(source(1));
+    git.assertComplete();
   }, 180_000);
 
   test('a crash after the complete attempt leaves the commit alone and appends the interruption only', async () => {
-    const root = await target();
+    const root = await target(lateCommit, lateRecovery, source(1));
+    const git = gitOf(root);
     const { runId } = await crashAfter(root, 'gate-committed', true);
 
-    const before = (await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean);
+    const before = [...git.commits()];
     const { recovery } = await reopen(root);
     expect(recovery.effects).toEqual([]);
-    expect((await git(root, 'log', '--format=%H', `ramify-agent/run-${runId}`)).trim().split('\n').filter(Boolean)).toEqual(before);
+    // The complete attempt is the effect's completion: the restart neither
+    // commits nor looks a commit up.
+    expect(git.commits()).toEqual(before);
+    expect(git.recovered()).toEqual([]);
+    git.assertComplete();
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.at(-1)!.type).toBe('job-interrupted');
   }, 180_000);
 
   test('a restart of a completed run rewrites nothing and appends nothing', async () => {
-    const root = await target();
-    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const root = await target([unchanged(base)]);
+    const git = gitOf(root);
+    const { service } = await openRuns(root, {
+      git,
+      readinessExecution: directReadinessExecution(),
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+    });
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
     const before = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
@@ -443,6 +537,7 @@ describe('the recovery table', () => {
     expect(reopened.recovery).toMatchObject({ interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [] });
     expect(await runEventsOnDisk(root, 'review-notes', receipt.jobId)).toEqual(before);
     expect(onlyRun(reopened.service, 'review-notes').state).toBe('completed');
+    git.assertComplete();
   }, 180_000);
 
   test('a crash after work-item-started starts no second one and delivers nothing twice', async () => {
@@ -490,7 +585,9 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash after work-item-completed leaves the item completed and starts it no second time', async () => {
-    const root = await target();
+    // Nothing was written, so the work-item checkpoint before the boundary
+    // has nothing to commit.
+    const root = await target([unchanged(base)]);
     const { runId } = await crashAfter(root, 'work-item-completed', false, oneWorkItem());
 
     const { service } = await reopen(root);
@@ -515,7 +612,11 @@ describe('the recovery table', () => {
       manifest: { planHash: 'a'.repeat(64), source: null, versions: { architectPrompt: null, procedure: null, skill: null, ramify: null }, architectView: { status: 'placeholder' } },
     }, null, 2)}\n`);
 
-    const { service, recovery, warnings } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service, recovery, warnings } = await openRuns(root, {
+      git: gitOf(root),
+      readinessExecution: directReadinessExecution(),
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+    });
     cleanups.push(() => service.close());
     expect(service.listRuns('review-notes')).toEqual([]);
     expect(recovery.skipped).toEqual([]);
@@ -535,7 +636,7 @@ describe('the boundaries of an iteration', () => {
   const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
   /** A fixture copy with one module of this test's own and a runner that really runs its test. */
-  async function iterationTarget() {
+  async function iterationTarget(commits: readonly CommitResponse[] = [], after = base) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await addModule(fixture.root, notesDirectory, 'notes', {
@@ -549,7 +650,7 @@ describe('the boundaries of an iteration', () => {
       ].join('\n'),
     });
     await installMiniRunner(fixture.root);
-    await initRepository(fixture.root);
+    stateGit(fixture.root, commits, [], after);
     return fixture.root;
   }
 
@@ -569,7 +670,7 @@ describe('the boundaries of an iteration', () => {
     const root = await iterationTarget();
     const { runId } = await crashAfter(root, 'iteration-assigned', false, oneIteration(), treeInputs());
     const assignment = runPath(root, 'review-notes', runId, iterationLayout.assignment('wi-001', 1));
-    await rm(assignment);
+    await rm(assignment, { force: true });
 
     const { service, recovery, agent } = await reopen(root);
     expect(agent).toBeUndefined();
@@ -601,7 +702,7 @@ describe('the boundaries of an iteration', () => {
     const { runId } = await crashAfter(root, 'iteration-assigned', false, script, treeInputs());
     const path = runPath(root, 'review-notes', runId, iterationLayout.assignment('wi-001', 1));
     const before = await readFile(path, 'utf8');
-    await rm(path);
+    await rm(path, { force: true });
 
     const { service, recovery, agent } = await reopen(root);
     expect(agent).toBeUndefined();
@@ -650,7 +751,17 @@ describe('the boundaries of an iteration', () => {
   test('a crash after writer-released keeps what the shell wrote, closes the invocation and releases no second writer', async () => {
     const root = await iterationTarget();
     const written = `${notesDirectory}/src/store.ts`;
-    const { runId } = await crashAfter(root, 'writer-released', false, oneShellIteration(written), treeInputs());
+    const command = `printf 'export const store = new Map();\\n' > ${written}`;
+    const commands = statedCommands(root, [{
+      argv: () => ['bash', '-c', command],
+      async leaves(project) {
+        await writeFile(join(project, written), 'export const store = new Map();\n');
+      },
+    }]);
+    const { runId } = await crashAfter(
+      root, 'writer-released', false, oneShellIteration(written), treeInputs(), undefined, undefined, undefined, commands,
+    );
+    commands.assertComplete();
 
     // The tree is what the interrupted engineer left: recovery never
     // reverts, and the next run reads it as it stands.
@@ -668,7 +779,7 @@ describe('the boundaries of an iteration', () => {
     // Nothing was checked or committed against a tree the harness never saw
     // settle into a proposal.
     expect(events.some(event => event.type === 'gate-attempted')).toBe(false);
-    expect(await commitCount(root, runId)).toBe(1);
+    expect(commitCount(root)).toBe(0);
 
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost' });
@@ -681,11 +792,14 @@ describe('the boundaries of an iteration', () => {
   }, 180_000);
 
   test('a crash after iteration-closed leaves the accepted iteration accepted and its one commit where it is', async () => {
-    const root = await iterationTarget();
+    const root = await iterationTarget(
+      [{ commit: source(1), against: base, changes: untracked(`${notesDirectory}/src/store.ts`) }],
+      source(1),
+    );
     const { runId } = await crashAfter(root, 'iteration-closed', false, oneIteration(), treeInputs());
     const result = runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1));
     const before = await readFile(result, 'utf8');
-    await rm(result);
+    await rm(result, { force: true });
 
     const { service, recovery } = await reopen(root);
     expect(existsSync(result)).toBe(true);
@@ -698,11 +812,13 @@ describe('the boundaries of an iteration', () => {
     expect(events.at(-1)!.type).toBe('job-interrupted');
     expect(events.some(event => event.type === 'work-item-completed')).toBe(false);
     expect(onlyRun(service, 'review-notes').state).toBe('interrupted');
-    expect(await commitCount(root, runId)).toBe(2);
+    expect(commitCount(root)).toBe(1);
   }, 180_000);
 
   test('an interrupted run leaves every completed work item completed, and starts none of them again', async () => {
-    const root = await iterationTarget();
+    // The first work item is completed with nothing written, so its
+    // checkpoint has nothing to commit.
+    const root = await iterationTarget([unchanged(base)]);
     // Two entry capabilities: the first work item is closed before the crash.
     const script = byRole({
       'initial-architect': [submitStep(analysis([entry('review-note', notes), entry('review-note-two', notes)]))],
@@ -747,8 +863,21 @@ describe('the boundaries of a delegation', () => {
     behavior: 'A note of at most 500 characters is within the limit.',
   };
 
+  /**
+   * What a contract iteration leaves in the tree, as this scenario states
+   * it: the agreement's artifacts, and the consumer against its fake.
+   */
+  const contractCommit = (revision: number, agreement: Seam): CommitResponse => ({
+    commit: source(revision),
+    against: revision === 1 ? base : source(revision - 1),
+    changes: [
+      ...modified(paths(agreement).consumer),
+      ...untracked(paths(agreement).fake, paths(agreement).contract, paths(agreement).conformance, paths(agreement).subjects),
+    ],
+  });
+
   /** A project with the consumer that needs the behavior and the owner that will provide it. */
-  async function delegationTarget() {
+  async function delegationTarget(commits: readonly CommitResponse[] = [], after = base) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await addModule(fixture.root, consumerDirectory, 'notes', {
@@ -757,7 +886,7 @@ describe('the boundaries of a delegation', () => {
     });
     await addModule(fixture.root, providerDirectory, 'limits', {});
     await installMiniRunner(fixture.root);
-    await initRepository(fixture.root);
+    stateGit(fixture.root, commits, [], after);
     return fixture.root;
   }
 
@@ -790,7 +919,7 @@ describe('the boundaries of a delegation', () => {
     const root = await delegationTarget();
     const { runId } = await crashAfter(root, 'contract-requested', false, oneDelegation(), treeInputs());
     const assignment = runPath(root, 'review-notes', runId, iterationLayout.assignment('wi-001', 2));
-    await rm(assignment);
+    await rm(assignment, { force: true });
 
     const { service, recovery, agent } = await reopen(root);
     expect(agent).toBeUndefined();
@@ -806,13 +935,13 @@ describe('the boundaries of a delegation', () => {
   }, 180_000);
 
   test('a restart after contract-registered recovers one obligation and one requirement, and the caller reads the outcome from them', async () => {
-    const root = await delegationTarget();
+    const root = await delegationTarget([contractCommit(1, seam)], source(1));
     const { runId } = await crashAfter(root, 'contract-registered', false, oneDelegation(), treeInputs());
     const contract = runPath(root, 'review-notes', runId, contractsLayout.contract('ct-001', 1));
     const obligation = runPath(root, 'review-notes', runId, contractsLayout.obligation('ob-ct-001', 1));
     const requirement = runPath(root, 'review-notes', runId, contractsLayout.requirement('rq-001', 1));
     const providerItem = runPath(root, 'review-notes', runId, workLayout.item('wi-002'));
-    for (const path of [contract, obligation, requirement, providerItem]) await rm(path);
+    for (const path of [contract, obligation, requirement, providerItem]) await rm(path, { force: true });
 
     const { service, recovery, agent } = await reopen(root);
     expect(agent).toBeUndefined();
@@ -892,7 +1021,7 @@ describe('the boundaries of a delegation', () => {
   }
 
   test('a crash after revision-needed leaves the report standing and revises nothing', async () => {
-    const root = await delegationTarget();
+    const root = await delegationTarget([contractCommit(1, seam)], source(1));
     const { runId } = await crashAfter(root, 'revision-needed', false, oneRevision(), treeInputs());
 
     const { service, recovery } = await reopen(root);
@@ -910,14 +1039,17 @@ describe('the boundaries of a delegation', () => {
   }, 300_000);
 
   test('a restart after evidence-reopened recovers one revision of each record with the same bindings', async () => {
-    const root = await delegationTarget();
+    // The agreement is established, and then revised: one commit each.
+    const root = await delegationTarget([contractCommit(1, seam), contractCommit(2, relaxed)], source(2));
     const { runId } = await crashAfter(root, 'evidence-reopened', false, oneRevision(), treeInputs());
     const reopenedRecords = [
       contractsLayout.contract('ct-001', 2),
       contractsLayout.obligation('ob-ct-001', 2),
       contractsLayout.requirement('rq-001', 2),
     ].map(path => runPath(root, 'review-notes', runId, path));
-    for (const path of reopenedRecords) await rm(path);
+    // A crash may leave a committed record already absent; either way the
+    // restart must materialize every record named by the durable line.
+    for (const path of reopenedRecords) await rm(path, { force: true });
 
     const { service, recovery } = await reopen(root);
     expect(recovery.interrupted).toEqual([`review-notes/${runId}`]);
@@ -943,7 +1075,7 @@ describe('the boundaries of a delegation', () => {
   }, 300_000);
 
   test('a crash after work-item-yielded leaves the yield standing and starts no provider work', async () => {
-    const root = await delegationTarget();
+    const root = await delegationTarget([contractCommit(1, seam)], source(1));
     const { runId } = await crashAfter(root, 'work-item-yielded', false, oneDelegation(), treeInputs());
 
     const { service, recovery } = await reopen(root);

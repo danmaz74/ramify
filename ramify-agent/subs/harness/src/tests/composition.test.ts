@@ -27,12 +27,16 @@ import { RunQueries } from '../projections/queries.js';
 import { crashAt, fileHashes, logLines, plan, runDirectory, runToEnd, scenarios, type ScenarioName } from './helpers/composition.js';
 import { allRows, machineNames, type Machine } from './helpers/recovery-table.js';
 import { observeValues, unionInventory } from './helpers/unions.js';
-import { git, initRepository, openRuns, startRun, stopRun } from './helpers/runs.js';
+import { openRuns, startRun, stopRun } from './helpers/runs.js';
+import { directReadinessExecution } from './helpers/external-tools.js';
+import { scenarioGit } from './helpers/recovery-git.js';
 import { copyFixture } from './helpers/fixture.js';
 
 /*
  * The composition suite, T1: the whole loop on the scripted agent, with no
- * pi and no network.
+ * pi and no network. Git and the commands readiness would run are external
+ * and are answered rather than run; every file the runs write, every record
+ * they commit and every transition they make are their own.
  *
  * It holds four things. The recovery table of all ten state machines is
  * complete and is run, row by row, by the three `composition-recovery*`
@@ -70,20 +74,28 @@ beforeAll(async () => {
   // Two run directories this harness cannot serve, as a client's run list
   // names them: one whose record is not JSON, one of a later version.
   const project = await copyFixture();
-  await initRepository(project.root);
   const jobs = join(project.root, 'plans', plan, '.harness', 'jobs');
   await mkdir(join(jobs, '20260921T000000Z-000001'), { recursive: true });
   await writeFile(join(jobs, '20260921T000000Z-000001', 'job.json'), '{ this is not a record');
   await mkdir(join(jobs, '20260921T000000Z-000002'), { recursive: true });
   await writeFile(join(jobs, '20260921T000000Z-000002', 'job.json'), `${JSON.stringify({ schema: 'ramify-agent.job/9' })}\n`);
-  const unserving = await openRuns(project.root, { inputs: scenarios.iteration.inputs() });
+  const unserving = await openRuns(project.root, {
+    git: scenarioGit(project.root, { head: 'source-00', commits: [] }),
+    readinessExecution: directReadinessExecution(),
+    inputs: scenarios.iteration.inputs(),
+  });
   answeredWhileRunning.push({ schema: runListResponseSchema, value: await new RunQueries(unserving.service).list(plan) });
   await unserving.service.close();
   await project.remove();
 
   // A run a crash interrupted, as a client reads it after the restart.
   const crashed = await crashAt(scenarios.iteration, { write: 'work-item-started' });
-  const reopened = await openRuns(crashed.root, { agent: crashed.agent, inputs: scenarios.iteration.inputs() });
+  const reopened = await openRuns(crashed.root, {
+    agent: crashed.agent,
+    git: crashed.git,
+    readinessExecution: directReadinessExecution(),
+    inputs: scenarios.iteration.inputs(),
+  });
   const queries = new RunQueries(reopened.service);
   answeredWhileRunning.push({ schema: runListResponseSchema, value: await queries.list(plan) });
   await reopened.service.close();
@@ -95,10 +107,16 @@ afterAll(async () => {
 });
 
 describe('the composed runs', () => {
-  test('each scenario runs to the end it is written for', () => {
+  test('each scenario runs to the end it is written for, and asks Git exactly what it states', () => {
     for (const [name, run] of finished) {
       const snapshot = run.service.getRun(plan, run.runId)!;
       expect([name, snapshot.state]).toEqual([name, scenarios[name].ends]);
+      // Each scenario states what its commits answer. A run that made
+      // another commit, or one fewer, is a scenario whose fixture data no
+      // longer describes it.
+      expect([name, run.git.commits().map(call => call.commit)])
+        .toEqual([name, scenarios[name].git.commits.map(response => response.commit)]);
+      run.git.assertAnswered();
     }
   });
 });
@@ -133,7 +151,9 @@ describe('no query appends an event', () => {
       const directory = runDirectory(run.root, run.runId);
       const before = await fileHashes(directory);
       const lines = (await logLines(run.root, run.runId)).length;
-      const tree = await git(run.root, 'status', '--porcelain', '--untracked-files=all');
+      // What the run had asked Git by the time it ended. A query that
+      // observed the project at all would ask it something more.
+      const asked = run.git.operations();
       const queries = new RunQueries(run.service);
       for (let round = 0; round < 2; round += 1) {
         await queries.list(plan);
@@ -152,7 +172,7 @@ describe('no query appends an event', () => {
       }
       expect([name, (await logLines(run.root, run.runId)).length]).toEqual([name, lines]);
       expect(await fileHashes(directory)).toEqual(before);
-      expect(await git(run.root, 'status', '--porcelain', '--untracked-files=all')).toBe(tree);
+      expect([name, run.git.operations()], 'a query asked Git something').toEqual([name, asked]);
     }
   }, 300_000);
 });
@@ -259,11 +279,13 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log.type', values: ['global-context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
   { union: 'run log.type', values: ['job-interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after job.json, before the first event, leaves a run that loads and is interrupted' },
   { union: 'run log[brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'G4: a crash after the append and before its completion answers already-present, and one brief exists' },
-  { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
+  { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation-integration.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
   { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
   { union: 'run log[job-failed].data.reason', values: ['repair-exhausted'], file: 'subs/harness/src/tests/work-items.test.ts', test: 'returns to the same local architect, which revises its outline, and exhausts deterministically' },
   { union: 'run log[job-failed].data.reason', values: ['recovery-exhausted'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a failure that keeps recurring ends the run once the bounded recoveries are spent' },
   { union: 'run log[job-failed].data.reason', values: ['writer-unsettled'], file: 'subs/harness/src/tests/writer-settlement.test.ts', test: 'fails as writer-unsettled, and runs no gate against that tree' },
+  { union: 'run log[iteration-closed].data.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'run log[gate-attempted].data.verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'observation log[hook-check].data.outcome', values: ['passed'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'a check that passed with nothing new tells the engineer nothing' },
   { union: 'observation log[hook-check].data.outcome', values: ['findings'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'findings are reported with their count, and the same finding reported again is not new' },
   { union: 'observation log[coverage-gap].data.kind', values: ['observation-truncated'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after writer-released keeps what the shell wrote, closes the invocation and releases no second writer' },
@@ -285,6 +307,10 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['session-lost'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
   { union: 'record ramify-agent.invocation-outcome/1.disposition', values: ['superseded'], file: 'subs/harness/src/tests/late-writes.test.ts', test: 'is settled with its process group, and its result completes nothing' },
   { union: 'record ramify-agent.gate-attempt/2.rules[].outcome', values: ['failed'], file: 'subs/harness/src/tests/requirement-verification.test.ts', test: 'a file without .fake, an export without Fake and a re-export that drops it each fail the gate' },
+  { union: 'record ramify-agent.gate-attempt/2.commands[].outcome', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/2.verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/2.cause', values: ['in-scope'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/2.next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['runner-error'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'records a runner error with the structured error the spawn gave it' },
   { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['command-missing'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
@@ -297,6 +323,11 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-attempt/2.next', values: ['retry-infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.capability/1.origin', values: ['global-decision'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry' },
   { union: 'record ramify-agent.iteration-result/1.outcome', values: ['superseded'], file: 'subs/harness/src/tests/contract-revision.test.ts', test: 'an unfinished item is reused and its open assignment closes as superseded; a completed one is followed' },
+  { union: 'record ramify-agent.iteration-result/1.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'query work-item.iterations[].result.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'query work-item.iterations[].gates[].verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'query work-item.iterations[].gates[].next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.placement-decision/1.outcome', values: ['create'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry' },
   { union: 'record ramify-agent.placement-decision/1.outcome', values: ['extract'], file: 'subs/harness/src/tests/placement.test.ts', test: 'it names what it affects, and the consequence reaches that work item before its own turn' },
   { union: 'submission engineer[unsuitable].reason', values: ['break-discovered'], file: 'subs/harness/src/tests/breaking-work.test.ts', test: 'break-discovered returns to the local architect, which restages, and the engineer widened nothing' },
@@ -308,7 +339,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'error.error.code', values: ['unavailable'], file: 'subs/harness/src/tests/run-commands.test.ts', test: 'a start without a configured agent, or naming another one, is unavailable' },
   { union: 'error.error.code', values: ['unsupported-version'], file: 'subs/harness/src/tests/run-protocol.test.ts', test: 'surfaces as unsupported-version with evidence, never as an absent run' },
   { union: 'query runs.runs[].notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/run-protocol.test.ts', test: 'driven while only the file system is watched; read over HTTP, and again after two restarts' },
-  { union: 'query work-items.workItems[].origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
+  { union: 'query work-items.workItems[].origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision-scripted.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
   { union: 'query metrics.baseline.state', values: ['measured'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'a run freezes B from its first snapshot, and job.json names it' },
 ];
 

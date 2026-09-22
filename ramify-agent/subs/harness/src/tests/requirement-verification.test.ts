@@ -1,11 +1,15 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { initRepository, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
-import { loadArchitectIndex } from '../../subs/evidence/src/views.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 import { remainingInjections } from '../contracts/verification.js';
 import type { ContractRecord } from '../contracts/records.js';
 import { runLayout } from '../run/records.js';
@@ -19,11 +23,19 @@ import type { GateAttempt } from '../checks/records.js';
  * also requires that no location the requirement named still reaches the
  * fake, and the check reads the consumer's source rather than what the
  * engineer said about it. Passing against a fake is never completion.
+ *
+ * The lifecycle scenarios below answer Git and the gate's commands from
+ * their own data and read the consumer's real source for the guard. The
+ * architect view of an accepted delegation, which needs the real command
+ * line, is in `requirement-architect-view.test.ts`.
  */
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0)) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const consumer = 'collection-review/workspace/reviews/notes';
@@ -188,22 +200,41 @@ async function target() {
   });
   await addModule(fixture.root, providerDirectory, 'limits', {});
   await installMiniRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
-async function run(root: string, plan: Parameters<typeof byRole>[0]) {
-  const opened = await openRuns(root, { script: byRole(plan), inputs: treeInputs() });
+/**
+ * A run whose Git answers are this scenario's own fixture data: the revision
+ * it reports for each commit the harness attempts, or that the tree was
+ * unchanged.
+ */
+/** The files of the seam, as this scenario's Git answers name them. */
+const seam = {
+  interface: `${providerDirectory}/src/interfaces/note-limit.ts`,
+  fake: `${providerDirectory}/src/fakes/note-limit.fake.ts`,
+  standIn: `${providerDirectory}/src/fakes/note-limit-stand-in.ts`,
+  subjects: `${providerDirectory}/src/tests/note-limit.subjects.ts`,
+  conformance: `${providerDirectory}/src/tests/note-limit.conformance.test.ts`,
+  real: `${providerDirectory}/src/note-limit.ts`,
+  consumer: `${consumerDirectory}/src/notes.ts`,
+  note: `${consumerDirectory}/src/limit-note.ts`,
+};
+
+async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
+  const git = answeredGit(root, { head: 'revision-00', commits });
+  const opened = await openRuns(root, {
+    script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+  });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
-  return { ...opened, runId: receipt.jobId };
+  return { ...opened, git, runId: receipt.jobId };
 }
 
 describe('a requirement whose fake is still injected is not verified', () => {
   test('a passing verification that left the fake in place closes nothing, and completion is refused until it is gone', async () => {
     const root = await target();
-    const { service, runId } = await run(root, {
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', consumer)]))],
       'local-architect': [
         submit({ ...assign(consumer, {}, outline()), localDecisions: [placeTheLimit] }),
@@ -236,7 +267,17 @@ describe('a requirement whose fake is still injected is not verified', () => {
         write(`${providerDirectory}/src/tests/note-limit.conformance.test.ts`, conformanceFile),
         write(`${consumerDirectory}/src/notes.ts`, integrated),
       )],
-    });
+    }, [
+      // The agreement, the real provider, the verification that wrote a note
+      // of its own and left the fake, and the one that replaced it.
+      accepted('wi-001.i02', 'revision-01', [...added(seam.interface, seam.fake, seam.subjects, seam.conformance), ...modified(seam.consumer)]),
+      accepted('wi-002.i01', 'revision-02', [...added(seam.real), ...modified(seam.subjects)]),
+      unchanged('wi-002'),
+      accepted('wi-001.i03', 'revision-03', added(seam.note)),
+      accepted('wi-001.i04', 'revision-04', modified(seam.consumer)),
+      unchanged('wi-001'),
+      unchanged('final verification of plan "review-notes"'),
+    ]);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const log = await runEventsOnDisk(root, 'review-notes', runId);
@@ -261,7 +302,14 @@ describe('a requirement whose fake is still injected is not verified', () => {
 
     const source = await readFile(`${root}/${consumerDirectory}/src/notes.ts`, 'utf8');
     expect(source).not.toContain('Fake');
-  }, 300_000);
+
+    // The verification that left the fake in place still committed what it
+    // wrote: nothing is rewound, and the requirement closed over the commit
+    // that followed it.
+    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04']);
+    git.assertAnswered();
+  }, 60_000);
 });
 
 describe('P2: the contract gate rejects a fake under a production-looking name', () => {
@@ -291,7 +339,7 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
       '',
     ].join('\n');
 
-    const { service, runId } = await run(root, {
+    const { service, runId, git } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', consumer)]))],
       'local-architect': [
         submit({ ...assign(consumer, {}, outline()), localDecisions: [placeTheLimit] }),
@@ -323,7 +371,20 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
         write(`${providerDirectory}/src/tests/note-limit.conformance.test.ts`, "import { test, expect } from 'vitest';\ntest('the agreement holds', () => { expect(1).toBe(1); });\n"),
         write(`${consumerDirectory}/src/notes.ts`, reExporting),
       )],
-    });
+    }, [
+      // The first attempt at the agreement commits what it wrote. Each
+      // repair round writes the same files with the same content, and Git
+      // reports an unchanged tree for both, so those attempts audit the
+      // revision the first one made.
+      accepted('wi-001.i02', 'revision-01', [
+        ...added(seam.interface, seam.fake, seam.standIn, seam.conformance), ...modified(seam.consumer),
+      ]),
+      unchanged('wi-001.i02'),
+      unchanged('wi-001.i02'),
+      accepted('wi-001.i03', 'revision-02', modified(seam.consumer)),
+      unchanged('wi-001'),
+      unchanged('final verification of plan "review-notes"'),
+    ]);
 
     // The run finishes: the agreement was refused, and the caller carried
     // the work itself.
@@ -366,43 +427,18 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
       expect(attempt.audited).toBe(attempt.commit ?? attempt.head);
       expect(attempt.evidence).not.toBeNull();
     }
-  }, 300_000);
-});
 
-describe('P2: architectural evidence does not present a fake as production behavior', () => {
-  test('the architect view of the accepted state shows the fake under its fake name', async () => {
-    const daemon = await realRamify();
-    cleanups.push(() => daemon.dispose());
-    const root = await target();
-
-    // The state an accepted delegation leaves: the contract, the fake beside
-    // it, the real provider, and a consumer that uses the real provider.
-    const put = async (path: string, content: string) => {
-      await mkdir(`${root}/${path}`.replace(/\/[^/]+$/, ''), { recursive: true });
-      await writeFile(`${root}/${path}`, content);
-    };
-    await put(`${providerDirectory}/src/interfaces/note-limit.ts`, contractFile);
-    await put(`${providerDirectory}/src/fakes/note-limit.fake.ts`, fakeFile);
-    await put(`${providerDirectory}/src/note-limit.ts`, realProvider);
-    await put(`${consumerDirectory}/src/notes.ts`, replaced);
-
-    const materialized = await daemon.ramify.materialize(root);
-    expect(materialized.ok).toBe(true);
-    const index = await loadArchitectIndex(root);
-    const records = index.symbols.get(provider) ?? [];
-    expect(records.length).toBeGreaterThan(0);
-
-    // Every name the view records for the fake's file carries `Fake`, so a
-    // reader of the generated evidence cannot mistake it for the provider.
-    const fromTheFake = records.filter(record => record.file.includes('note-limit.fake'));
-    expect(fromTheFake.map(record => record.name)).toContain('createNoteLimitFake');
-    for (const record of fromTheFake) expect(record.name).toContain('Fake');
-
-    // The real provider is there too, under its own behavior-oriented name,
-    // and it is not the fake's file.
-    const real = records.find(record => record.name === 'createNoteLimit');
-    expect(real).toBeDefined();
-    expect(real!.file).not.toContain('.fake');
-    expect(index.modules.has(provider)).toBe(true);
-  }, 600_000);
+    // Exactly one of the three attempts at the agreement changed the tree,
+    // and the two that repeated it audited the revision it made.
+    expect(git.minted()).toEqual(['revision-01', 'revision-02']);
+    expect(contractGates.map(attempt => attempt.commit)).toEqual(['revision-01', null, null]);
+    expect(contractGates.slice(1).map(attempt => attempt.head)).toEqual(['revision-01', 'revision-01']);
+    // No attempt at the agreement was ever accepted, so every observation
+    // the run made was taken against the revision it started from: a failed
+    // attempt's commit is not a boundary.
+    expect([...new Set(git.bases('changedPaths'))]).toEqual(['revision-00']);
+    expect([...new Set(git.bases('changedEntries'))]).toEqual(['revision-00']);
+    expect(git.bases('diffNameStatus')).toEqual(['revision-00']);
+    git.assertAnswered();
+  }, 60_000);
 });

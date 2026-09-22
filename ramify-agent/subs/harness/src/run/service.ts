@@ -1,7 +1,8 @@
+import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
-import { changedEntries, changedPaths, createRunBranch, diffNameStatus, GitError } from '../../subs/evidence/src/git.js';
+import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
@@ -82,7 +83,7 @@ import { workLayout, workItemId, workItemOutlineSchema, type WorkItem, type Work
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
-import { commitForGate, commitMessage, currentHead, prepareCheckpoint, type CheckpointRequest } from './gates.js';
+import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
@@ -152,6 +153,8 @@ export type RunWrite =
   | 'job-completed';
 
 export interface RunServiceOptions {
+  /** External command execution. Tests script outcomes; actual process tests use the default. */
+  readonly commandExecution?: CommandRunner | undefined;
   readonly projectRoot: string;
   /** The project lock, held for as long as the service runs. */
   readonly lock: ProjectLock;
@@ -161,8 +164,17 @@ export interface RunServiceOptions {
   readonly inputs: RunInputs;
   /** The Ramify command line the run's readiness and measurements use. */
   readonly ramify: RamifyCli;
-  /** How committing checkpoint commands run. Readiness remains in place. */
+  /** External Git operations. Lifecycle tests supply scripted answers, like their agent port. */
+  readonly git?: GitService | undefined;
+  /** How committing checkpoint commands run. */
   readonly checkExecution: CheckExecutionPort;
+  /**
+   * How readiness commands run: in place by default, which is what a run
+   * over a real project does. A lifecycle test whose subject is the run's
+   * state machine, and which must start no process, supplies a direct port;
+   * readiness discovery, classification and recovery are unaffected.
+   */
+  readonly readinessExecution?: CheckExecutionPort | undefined;
   /** The policy the run captures. Without one it is the hardcoded default over this project. */
   readonly policy?: ((projectRoot: string, nested: Awaited<ReturnType<typeof discoverNestedPackages>>) => RunPolicy) | undefined;
   /** The module the baseline is frozen over; the architect view's root by default. */
@@ -175,6 +187,8 @@ export interface RunServiceOptions {
   readonly groups?: ProcessGroups | undefined;
   /** Called after each durable write; tests freeze a run there, as a crash would. */
   readonly afterWrite?: ((write: RunWrite, runId: string) => Promise<void>) | undefined;
+  /** The wall clock. Tests control it at invocation boundaries. */
+  readonly now?: (() => Date) | undefined;
   readonly warn?: ((message: string) => void) | undefined;
 }
 
@@ -318,8 +332,13 @@ export class RunService {
   private readonly commands = new CommandLedger();
   private readonly commandMutex = new Mutex();
   private closed = false;
+  private closing: Promise<void> | undefined;
 
-  private constructor(private readonly options: RunServiceOptions) {}
+  private readonly git: GitService;
+
+  private constructor(private readonly options: RunServiceOptions) {
+    this.git = options.git ?? gitService;
+  }
 
   /**
    * Loads every run of the project and recovers those without a terminal
@@ -341,6 +360,10 @@ export class RunService {
 
   private warn(message: string): void {
     (this.options.warn ?? console.warn)(message);
+  }
+
+  private now(): Date {
+    return this.options.now?.() ?? new Date();
   }
 
   private async afterWrite(write: RunWrite, runId: string): Promise<void> {
@@ -470,7 +493,7 @@ export class RunService {
     for (const started of run.log.all('invocation-started')) {
       const id = started.data.invocation;
       if (ended.has(id)) continue;
-      const settled = await run.writer.release(id).catch(() => ({ confirmed: false, at: new Date().toISOString(), groupsKilled: 0, lateWrites: [] }));
+      const settled = await run.writer.release(id).catch(() => ({ confirmed: false, at: this.now().toISOString(), groupsKilled: 0, lateWrites: [] }));
       // Observations are appended without a transaction, by decision 2, so
       // the last of an invocation the harness was interrupted in may be
       // missing. The gap is recorded rather than left to be read as an
@@ -500,7 +523,7 @@ export class RunService {
   }
 
   private newWriter(policy: RunPolicy, boundary: () => string): WriterOwnership {
-    const tree: TreeObserver = { changed: () => changedPaths(this.projectRoot, boundary()).catch(() => []) };
+    const tree: TreeObserver = { changed: () => this.git.changedPaths(this.projectRoot, boundary()).catch(() => []) };
     return new WriterOwnership({
       settleMs: policy.limits.writerSettleMs,
       tree,
@@ -527,7 +550,7 @@ export class RunService {
         if (body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.head === 'string') return body.head;
       }
     }
-    return currentHead(this.projectRoot);
+    return this.git.currentHead(this.projectRoot);
   }
 
   // Queries
@@ -630,7 +653,7 @@ export class RunService {
     const captured = await capturePlan(this.projectRoot, planId);
     const { manifest, packages, promptManifest, policy } = await this.captureInputs(captured);
 
-    const now = new Date();
+    const now = this.now();
     const runId = newJobId(now);
     const directory = runDirectory(this.projectRoot, planId, runId);
 
@@ -658,7 +681,7 @@ export class RunService {
     await writeOnce(join(directory, runLayout.record), `${JSON.stringify(record, null, 2)}\n`);
 
     const log = await RunLog.open(join(directory, runLayout.events), runId);
-    const base = manifest.source?.commit ?? await currentHead(this.projectRoot);
+    const base = manifest.source?.commit ?? await this.git.currentHead(this.projectRoot);
     let run!: Run;
     run = new Run(record, directory, log, base, this.newWriter(policy, () => this.accepted(run)));
     run.index = await this.options.inputs.index(this.projectRoot, manifest).catch(() => null);
@@ -738,14 +761,16 @@ export class RunService {
       this.commands.requireVersion(command, run.log.version);
       if (run.log.terminal) throw new CommandRejection('conflict', `The run has already ended (${run.log.terminal.type})`);
       if (run.stopRequested) throw new CommandRejection('conflict', 'A stop was already accepted for this run');
-      const at = new Date();
+      const at = this.now();
       const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
       await run.log.append({ type: 'stop-requested', data: { command: accepted } }, at);
       run.stopRequested = true;
       this.commands.remember(accepted);
       return accepted.receipt;
     });
-    run.done = this.endStopped(run).catch(error => this.warn(`Run ${jobId}: ${message(error)}`));
+    const driving = run.done;
+    const stopping = this.endStopped(run).catch(error => this.warn(`Run ${jobId}: ${message(error)}`));
+    run.done = Promise.all([driving, stopping]).then(() => undefined);
     return receipt;
   }
 
@@ -813,7 +838,7 @@ export class RunService {
     // an invocation already running is bounded by its own limits below.
     const limits = run.record.policy.limits;
     const invocations = run.log.count('invocation-started');
-    const age = Date.now() - Date.parse(run.record.createdAt);
+    const age = this.now().getTime() - Date.parse(run.record.createdAt);
     if (invocations + 1 > limits.maxInvocationsPerRun || age > limits.runAbsoluteMs) {
       await this.fail(run, 'limit-exceeded', invocations + 1 > limits.maxInvocationsPerRun
         ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
@@ -832,7 +857,7 @@ export class RunService {
       scope: request.scope,
       writer: request.writer === true,
       base: this.accepted(run),
-      startedAt: new Date().toISOString(),
+      startedAt: this.now().toISOString(),
     } satisfies Invocation);
 
     await mkdir(run.path(runLayout.session(id)), { recursive: true });
@@ -872,7 +897,7 @@ export class RunService {
       return { id, ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped' };
     }
 
-    const started = Date.now();
+    const started = this.now().getTime();
     let value: T | undefined;
     let submissionHash: string | null = null;
     const judge = new SubmissionJudge<T>({
@@ -955,8 +980,7 @@ export class RunService {
     const limits = run.record.policy.limits;
     const outcome = await bounds.outcome(agentSession);
     const interruption = bounds.interruption;
-    const elapsedMs = Date.now() - started;
-    await recorder.recordGaps(agent);
+    const elapsedMs = this.now().getTime() - started;
     if (outcome.kind === 'context-budget-reached') {
       budget = { threshold: context.budgetTokens ?? 0, observed: outcome.tokens, reportDelivered: outcome.report !== undefined };
     }
@@ -969,6 +993,10 @@ export class RunService {
     // An architect writes nothing, so it holds no writer; its settlement is
     // still the harness's own observation of the session.
     const settled = await this.settleSession(run, id, agentSession);
+    // `onEvent` cannot be async at the port boundary. Its ordered writes must
+    // still finish before gaps are derived and before this driver can settle.
+    await recorder.drain();
+    await recorder.recordGaps(agent);
     const ref = agentSession.ref;
 
     // What the tree says changed since the last accepted commit. It is the
@@ -978,7 +1006,7 @@ export class RunService {
     if (request.writer === true) {
       const snapshot = await recordSettledSnapshot({
         projectRoot: this.projectRoot,
-        changed: () => changedPaths(this.projectRoot, this.accepted(run)),
+        changed: () => this.git.changedPaths(this.projectRoot, this.accepted(run)),
         scope: request.guarded,
       }, observations);
       outsideScope = [...snapshot.outsideScope];
@@ -2174,6 +2202,7 @@ export class RunService {
     readonly tests: TestSelectionPolicy;
   }): EngineerEquipment {
     return engineerEquipment({
+      commandExecution: this.options.commandExecution,
       projectRoot: this.projectRoot,
       ramify: this.options.ramify,
       commands: run.record.policy.commands,
@@ -2293,7 +2322,7 @@ export class RunService {
       }
 
       attempt += 1;
-      const before = await takeLineSnapshot(this.projectRoot, this.accepted(run));
+      const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
@@ -2355,7 +2384,7 @@ export class RunService {
       // The line events of this writer, from the two snapshots around it.
       // Two snapshots see the tree and not the history between them, so a
       // command that changed a file and put it back is invisible to them.
-      const after = await takeLineSnapshot(this.projectRoot, this.accepted(run));
+      const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
         ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
         : []);
@@ -2790,7 +2819,7 @@ export class RunService {
     for (;;) {
       if (this.ignoring(run)) return null;
       attempt += 1;
-      const before = await takeLineSnapshot(this.projectRoot, this.accepted(run));
+      const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope);
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
@@ -2838,7 +2867,7 @@ export class RunService {
       invocations.push(result.id);
       sessionRef = result.ref === '' ? undefined : result.ref;
 
-      const after = await takeLineSnapshot(this.projectRoot, this.accepted(run));
+      const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
         ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
         : []);
@@ -2951,7 +2980,7 @@ export class RunService {
       checkpoint: 'contract',
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
-      head: await currentHead(this.projectRoot),
+      head: await this.git.currentHead(this.projectRoot),
       policy: run.record.policy,
       proposedBy: invocation,
       repairRound,
@@ -3415,7 +3444,7 @@ export class RunService {
       checkpoint: assignment.gate.checkpoint,
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
-      head: await currentHead(this.projectRoot),
+      head: await this.git.currentHead(this.projectRoot),
       policy: run.record.policy,
       proposedBy: invocation,
       repairRound,
@@ -3477,7 +3506,7 @@ export class RunService {
   private async pendingModules(run: Run, iteration: string): Promise<ModuleNotice[]> {
     let entries: Array<{ status: string; path: string }>;
     try {
-      entries = await changedEntries(this.projectRoot, this.accepted(run));
+      entries = await this.git.changedEntries(this.projectRoot, this.accepted(run));
     } catch (error) {
       this.warn(`Run ${run.record.jobId}: the pending module declarations could not be read: ${message(error)}`);
       return [];
@@ -3525,7 +3554,7 @@ export class RunService {
     if (commit === null || gate === null) return [];
     let changes: Array<{ status: string; path: string }>;
     try {
-      changes = await diffNameStatus(this.projectRoot, this.acceptedBefore(run, gate), commit);
+      changes = await this.git.diffNameStatus(this.projectRoot, this.acceptedBefore(run, gate), commit);
     } catch (error) {
       this.warn(`Run ${run.record.jobId}: the commit's module declarations could not be read: ${message(error)}`);
       return [];
@@ -3668,7 +3697,7 @@ export class RunService {
       checkpoint: 'work-item',
       projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)),
-      head: await currentHead(this.projectRoot),
+      head: await this.git.currentHead(this.projectRoot),
       policy: run.record.policy,
       proposedBy: invocation,
       repairRound,
@@ -3703,7 +3732,7 @@ export class RunService {
       return released;
     }
     const idle = await session.settled().catch(() => 'timed-out' as const);
-    const settled = { confirmed: idle === 'settled', at: new Date().toISOString(), groupsKilled: 0, lateWrites: [] as string[] };
+    const settled = { confirmed: idle === 'settled', at: this.now().toISOString(), groupsKilled: 0, lateWrites: [] as string[] };
     if (!settled.confirmed) {
       run.writer.markUnsettled(id, 'its session did not become idle within the implementation\'s bound');
     }
@@ -3737,14 +3766,15 @@ export class RunService {
       const gateId = gateAttemptId(this.gateCount(run) + 1);
       // Readiness runs on the branch the project is on. The run branch is
       // created only once a clean repository has been established.
-      const head = await currentHead(this.projectRoot);
-      const result = await runReadiness(inPlaceCheckExecution, {
+      const head = await this.git.currentHead(this.projectRoot);
+      const result = await runReadiness(this.options.readinessExecution ?? inPlaceCheckExecution, {
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
         gateDirectory: run.path(runLayout.gateOutput(gateId)),
         gateId,
         policy: run.record.policy,
         ramify: this.options.ramify,
+        git: this.git,
         head,
       });
 
@@ -3772,6 +3802,7 @@ export class RunService {
           projectRoot: this.projectRoot,
           policy: run.record.policy,
           ramify: this.options.ramify,
+          commandExecution: this.options.commandExecution,
           count: spent + 1,
           directory: run.path('recoveries'),
         });
@@ -3819,7 +3850,7 @@ export class RunService {
       return;
     }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
-    const head = await currentHead(this.projectRoot);
+    const head = await this.git.currentHead(this.projectRoot);
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
       runId: run.record.jobId,
@@ -3901,7 +3932,7 @@ export class RunService {
       },
       perform: async () => {
         await this.afterWrite('gate-attempted', run.record.jobId);
-        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message);
+        const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
         const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit);
@@ -3935,7 +3966,7 @@ export class RunService {
    */
   private async createBranch(run: Run): Promise<void> {
     try {
-      await createRunBranch(this.projectRoot, run.record.jobId);
+      await this.git.createRunBranch(this.projectRoot, run.record.jobId);
     } catch (error) {
       if (!(error instanceof GitError)) throw error;
       this.warn(`Run ${run.record.jobId}: the run branch could not be created: ${error.message}`);
@@ -3952,16 +3983,50 @@ export class RunService {
   }
 
   /**
-   * Stops accepting commands and asks a running session to stop, recording
-   * nothing: the next start of the harness marks the run interrupted. Then
-   * releases the project lock.
+   * Stops accepting commands and asks every running session to stop,
+   * recording nothing: the next start of the harness marks an unfinished
+   * run interrupted. The project lock remains held until every run driver
+   * is quiescent, so no durable write can cross into a successor service's
+   * ownership. A driver that does not quiesce within the captured settlement
+   * bound makes close fail and leaves the lock held for a later retry. A
+   * completed driver whose settlement was not confirmed also leaves it held;
+   * the service has no recovery contract that can later declare it settled.
    */
-  async close(): Promise<void> {
+  close(): Promise<void> {
+    if (this.closing !== undefined) return this.closing;
     this.closed = true;
-    await Promise.all([...this.runs.values()]
-      .filter(run => !run.log.terminal && run.session)
-      .map(run => Promise.race([run.session!.stop().catch(() => undefined), delay(this.options.stopGraceMs ?? 5000)])));
-    await this.options.lock.release();
+    const closing = this.closeQuiescent();
+    this.closing = closing.catch(error => {
+      this.closing = undefined;
+      throw error;
+    });
+    return this.closing;
+  }
+
+  private async closeQuiescent(): Promise<void> {
+    await this.commandMutex.run(async () => {
+      const drivers = [...this.runs.values()];
+      const active = drivers.filter(run => !run.log.terminal);
+      for (const run of active) void run.session?.stop().catch(() => undefined);
+
+      if (drivers.length > 0) {
+        const bound = Math.max(...drivers.map(run => run.record.policy.limits.stopSettleMs));
+        let timer: NodeJS.Timeout | undefined;
+        const quiescent = await Promise.race([
+          Promise.all(drivers.map(run => run.done)).then(() => true),
+          new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), bound); }),
+        ]);
+        clearTimeout(timer);
+        if (!quiescent) {
+          throw new Error(`The harness did not become quiescent within ${bound} ms; its project lock remains held`);
+        }
+      }
+      const unsettled = drivers.filter(run => run.writer.isUnsettled);
+      if (unsettled.length > 0) {
+        throw new Error(`The harness has ${unsettled.length} run driver${unsettled.length === 1 ? '' : 's'} whose settlement was not confirmed; its project lock remains held`);
+      }
+      await this.options.lock.release();
+    });
   }
 }
 

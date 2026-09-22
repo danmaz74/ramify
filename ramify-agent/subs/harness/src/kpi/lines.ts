@@ -1,5 +1,5 @@
 import { sep } from 'node:path';
-import { worktreeLineChanges } from '../../subs/evidence/src/git.js';
+import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { ArchitectIndex, ModuleEntry } from '../../subs/evidence/src/views.js';
 import { lineEventSummarySchema, type LineEventSummary } from '../run/records.js';
 
@@ -41,9 +41,9 @@ export type LineSnapshot =
   | { readonly available: false; readonly reason: string };
 
 /** Takes one snapshot. A repository that cannot answer leaves its reason, never a zero. */
-export async function takeLineSnapshot(projectRoot: string, accepted: string = 'HEAD'): Promise<LineSnapshot> {
+export async function takeLineSnapshot(projectRoot: string, accepted: string = 'HEAD', git: GitService = gitService): Promise<LineSnapshot> {
   try {
-    return { available: true, changes: await worktreeLineChanges(projectRoot, accepted) };
+    return { available: true, changes: await git.worktreeLineChanges(projectRoot, accepted) };
   } catch (error) {
     return { available: false, reason: error instanceof Error ? error.message : String(error) };
   }

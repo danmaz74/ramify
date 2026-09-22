@@ -3,8 +3,7 @@ import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
 import type { PreparedGate } from '../checks/gate.js';
 import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference } from '../checks/records.js';
-import { commitAccepted, findCommitByTrailers } from '../../subs/evidence/src/git.js';
-import { childEnvironment, runCommand } from '../../subs/evidence/src/run-command.js';
+import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { RunPolicy } from './records.js';
 
 /*
@@ -127,13 +126,14 @@ export async function commitForGate(
   gateId: string,
   message: string,
   signal?: AbortSignal,
+  git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'> = gitService,
 ): Promise<string | null> {
-  const existing = await findCommitByTrailers(projectRoot, [
+  const existing = await git.findCommitByTrailers(projectRoot, [
     { key: runTrailer, value: runId },
     { key: gateTrailer, value: gateId },
   ], signal);
   if (existing !== null) return existing;
-  return commitAccepted(projectRoot, message, signal);
+  return git.commitAccepted(projectRoot, message, signal);
 }
 
 export interface CommitMessageParts {
@@ -189,8 +189,5 @@ export function commitMessage(parts: CommitMessageParts): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** The commit the working directory is on, or `''` where git cannot say. */
-export async function currentHead(projectRoot: string): Promise<string> {
-  const run = await runCommand({ argv: ['git', 'rev-parse', 'HEAD'], cwd: projectRoot, env: childEnvironment(), timeoutMs: 30_000 });
-  return run.outcome.kind === 'completed' && run.outcome.exitCode === 0 ? run.stdout.trim() : '';
-}
+// Retained for callers of the former gate-local helper. Git execution belongs to evidence.
+export { currentHead } from '../../subs/evidence/src/git.js';

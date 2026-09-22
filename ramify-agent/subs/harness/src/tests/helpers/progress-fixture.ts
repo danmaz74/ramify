@@ -1,17 +1,24 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { analysis, entry, hypothesis, requestCompletion, unresolved } from './analysis.js';
 import { copyFixture } from './fixture.js';
-import { byRole, submit, treeInputs } from './iterations.js';
+import { byRole, readDeclaredTree, submit, treeInputs } from './iterations.js';
 import { forkDecision, registryChange, requestPlacement } from './placement.js';
-import { initRepository, installTestRunner, openRuns, realRamify, startRun } from './runs.js';
+import { installTestRunner, openRuns, startRun } from './runs.js';
+import { scriptedGit } from './scripted-git.js';
+import { FakeRamifyCli } from './fake-ramify.js';
+import { directReadinessExecution } from './external-tools.js';
+import { createPassingCheckExecution } from './direct-check-execution.js';
 
 /*
  * The capability-progress fixture: one copy of the `collection-review`
  * project with five completed or failed scripted runs whose two progress
  * diagrams hold every case the browser acceptance needs. It is built by the
  * real run service with the scripted fake, never by writing records, and
- * its architect view is materialized by the installed Ramify, so the
+ * its current module tree is stated as deterministic fixture data, so the
  * module-capability comparison and the capability list are the harness's
- * own answers.
+ * own answers. Git, Ramify, readiness and gate commands are explicit fakes:
+ * no subprocess establishes any projection assertion here.
  *
  * - `placements` (revision-diff, completed): matching placement, changed
  *   placement, implemented-only, all three initial roles, dependency depth,
@@ -223,6 +230,15 @@ const scripts: Record<FixtureRun, () => ReturnType<typeof byRole>> = {
   sixtyRows: sixtyRowsScript,
 };
 
+/** The unchanged commit boundaries each scripted run reaches. */
+const checkpoints: Record<FixtureRun, readonly string[]> = {
+  placements: ['wi-001', 'wi-002', 'final verification of plan "revision-diff"'],
+  proposed: [],
+  capabilityBound: ['final verification of plan "reviewer-identity"'],
+  rowBound: ['final verification of plan "status-badge-tone"'],
+  sixtyRows: ['final verification of plan "status-badge-tone"'],
+};
+
 export interface ProgressFixture {
   readonly root: string;
   /** Each run's plan and ID. */
@@ -231,19 +247,30 @@ export interface ProgressFixture {
 }
 
 /**
- * Builds the fixture: a git copy of the project, each run driven to its end
- * by its own run service, and then the architect view materialized by a
- * private Ramify daemon, which is disposed before this returns.
+ * Builds the fixture: a project copy, each run driven to its end by its own
+ * run service over explicit external-system answers, and a deterministic
+ * current-tree fixture for the HTTP projection.
  */
 export async function progressFixture(): Promise<ProgressFixture> {
   const fixture = await copyFixture();
   try {
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
     const runs = {} as Record<FixtureRun, { planId: string; runId: string; state: string }>;
     for (const name of Object.keys(scripts) as FixtureRun[]) {
       const planId = fixturePlans[name];
-      const opened = await openRuns(fixture.root, { script: scripts[name](), inputs: treeInputs() });
+      const git = scriptedGit(fixture.root, {
+        head: `progress-fixture-${name}`,
+        checkpoints: checkpoints[name].map(subject => ({ subject, commit: null, changes: [] })),
+      });
+      const ramify = new FakeRamifyCli();
+      const opened = await openRuns(fixture.root, {
+        script: scripts[name](),
+        inputs: treeInputs(),
+        git,
+        ramify,
+        readinessExecution: directReadinessExecution(),
+        checkExecution: createPassingCheckExecution(),
+      });
       try {
         const runId = (await opened.service.execute(startRun(planId))).jobId;
         await opened.service.settled(planId, runId);
@@ -252,17 +279,48 @@ export async function progressFixture(): Promise<ProgressFixture> {
       } finally {
         await opened.service.close();
       }
+      git.assertComplete();
+      assertFakeRamifyComplete(name, fixture.root, ramify);
     }
-    const daemon = await realRamify();
-    try {
-      const materialized = await daemon.ramify.materialize(fixture.root);
-      if (!materialized.ok) throw new Error(`The fixture's architect view was not materialized: ${JSON.stringify(materialized)}`);
-    } finally {
-      await daemon.dispose();
-    }
+    await writeArchitectTreeFixture(fixture.root);
     return { root: fixture.root, runs, remove: fixture.remove };
   } catch (error) {
     await fixture.remove();
     throw error;
+  }
+}
+
+/** Every run consumes the exact fake command-line answers its lifecycle needs. */
+function assertFakeRamifyComplete(name: FixtureRun, root: string, ramify: FakeRamifyCli): void {
+  const calls = ramify.calls.map(call => `${call.operation} ${call.argv.join(' ')}`);
+  const expected = [
+    `run measure --root ${root} --format json`,
+    'run --version',
+    ...(name === 'placements' ? [
+      `materialize materialize --view architect --view api --from subs/workspace/subs/catalog/subs/core --root ${root}`,
+      `materialize materialize --view architect --view api --from subs/workspace/subs/catalog/subs/ui --root ${root}`,
+    ] : []),
+  ];
+  if (JSON.stringify(calls) !== JSON.stringify(expected)) {
+    throw new Error(`The ${name} fixture made unexpected Ramify calls: ${JSON.stringify(calls)}; expected ${JSON.stringify(expected)}`);
+  }
+}
+
+/** Writes exactly the module documents the projection reader consumes. */
+async function writeArchitectTreeFixture(root: string): Promise<void> {
+  const tree = await readDeclaredTree(root);
+  const directory = join(root, '.ramify-architect');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, '_meta.json'), JSON.stringify({
+    schema: 'ramify.architect-view/1',
+    revision: tree.revision,
+    input: tree.input,
+    modules: tree.modules.size,
+    dependencies: 'measured',
+  }));
+  for (const module of tree.modules.values()) {
+    const target = join(directory, ...module.module.split('/'));
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, 'module.json'), JSON.stringify(module));
   }
 }

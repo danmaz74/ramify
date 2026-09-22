@@ -108,6 +108,20 @@ compares nothing, and no identity of the working tree is taken anywhere.
 
 ## Git, for the run branch
 
+Git is an external system. `GitService` is the injectable boundary and
+`gitService` is its real process adapter. `RunServiceOptions.git` accepts a
+replacement just as its agent option does. Lifecycle tests should supply
+scenario-specific responses and assert how the harness uses them. Never
+rebuild Git in a mock: do not scan deterministic fixture writes, keep file
+snapshots, compute diffs or simulate repository history to answer it.
+`currentHead` belongs here too; gate orchestration does not run Git directly.
+
+Real Git is exercised by the wrapper's focused integration tests. Group
+related checks into coherent scenarios so repository setup, file writes and
+cleanup are paid once. Keep independently runnable scenarios isolated; this
+principle also applies when scripted adapters themselves perform file I/O.
+
+
 `git.ts` holds a few thin calls over `runCommand`: `isCleanRepository`, which
 readiness needs; `createRunBranch`, which finds the run's branch again after
 a crash and never resets it; `commitAccepted`, the commit made after a gate

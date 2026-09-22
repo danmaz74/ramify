@@ -1,6 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
@@ -8,39 +8,59 @@ import { ObservationLog, type Observation, type ObservationOf } from '../run/obs
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
-  addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline,
-  runScopeTests, submit, treeInputs, viewedInputs, write,
+  addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write,
 } from './helpers/iterations.js';
-import {
-  git, initRepository, installTestRunner, onlyRun, openRuns, realRamify, runEventsOnDisk,
-  runPath, startRun,
-} from './helpers/runs.js';
+import { gateGit, operationsOf, type GateCommit } from './helpers/gate-git.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
  * Iteration assignments, engineers and the iteration gate, over the fixture
  * project.
  *
- * Every run here works a real copy of the fixture: a real git repository, a
- * real architect view materialized and refreshed by the installed Ramify, a
- * real write guard over real paths, and a real test runner whose exit code
- * the harness reads. The agent is the scripted fake, which writes for real
- * through the port's own built-ins.
+ * Every run here works a real copy of the fixture: a real module tree read
+ * from its own declarations, a real write guard over real paths, the real
+ * state machine and the real ledger. The agent is the scripted fake, which
+ * writes for real through the port's own built-ins.
+ *
+ * Git is an external system and is answered rather than run: each scenario
+ * states, in order, what Git reports at each commit boundary, including the
+ * boundaries where it reports an unchanged tree. Nothing below observes a
+ * repository; what it observes is the run's own records and the calls the
+ * run made at that boundary. The one scenario whose subject is the boundary
+ * itself — a passing commit and the audit published against it — keeps every
+ * real tool, in `iterations-integration.test.ts`.
+ *
+ * The process guard below is the negative control: every scenario here
+ * starts no process at all, and one that tried would name itself.
  */
+
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+    expectNoProcesses();
+  } finally { forgetExternalTools(); }
 });
 
 const reviews = 'collection-review/workspace/reviews';
 const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
+/** The revision the fixture is on before a run commits anything. */
+const base = 'revision-00';
+
+/** A boundary Git reports as unchanged, which is what a passing gate over an unchanged tree records. */
+const unchanged: GateCommit = { commit: null };
+
 /**
  * A copy of the fixture with one module of its own, so that an iteration has
  * somewhere real to work and its tests are files this test wrote.
  */
-async function target(options: { readonly miniRunner?: boolean; readonly notes?: boolean } = {}) {
+async function target(options: { readonly notes?: boolean } = {}) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   if (options.notes !== false) {
@@ -57,29 +77,23 @@ async function target(options: { readonly miniRunner?: boolean; readonly notes?:
       ].join('\n'),
     });
   }
-  if (options.miniRunner === true) await installMiniRunner(fixture.root);
-  else await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
+  await installTestRunner(fixture.root);
   return fixture.root;
 }
 
-/** Opens a run over `root` with the scripted fake, the real Ramify and a real architect view. */
-async function run(root: string, plan: Parameters<typeof byRole>[0], options: { readonly declaredTree?: boolean } = {}) {
-  // A test that must prove the refresh gets an installed Ramify with a
-  // daemon of its own, disposed with the test: a daemon that has analysed a
-  // project which is then removed cannot be relied on for the next.
-  const daemon = options.declaredTree === true ? undefined : await realRamify();
-  if (daemon !== undefined) cleanups.push(() => daemon.dispose());
+/** Opens a run over `root` with the scripted fake and the stated Git answers. */
+async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly GateCommit[]) {
+  const scripted = gateGit(root, { head: base, commits });
   const opened = await openRuns(root, {
     script: byRole(plan),
-    ...(daemon === undefined
-      ? { inputs: treeInputs() }
-      : { ramify: daemon.ramify, inputs: viewedInputs(daemon.ramify) }),
+    inputs: treeInputs(),
+    git: scripted.git,
+    readinessExecution: directReadinessExecution(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
-  return { ...opened, runId: receipt.jobId };
+  return { ...opened, runId: receipt.jobId, scripted };
 }
 
 async function readGate(root: string, runId: string, id: string): Promise<GateAttempt> {
@@ -94,84 +108,12 @@ async function readResult(root: string, runId: string, workItem: string, number:
   return JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result(workItem, number)), 'utf8')) as IterationResult;
 }
 
-describe('G8: one small work item completes in one iteration', () => {
-  test('a local architect assigns it, an engineer works it, the gate accepts it and the harness commits', async () => {
-    const root = await target({ miniRunner: true });
-    const { service, runId } = await run(root, {
-      'initial-architect': [submit(analysis([entry('review-note', notes)]))],
-      'local-architect': [
-        submit(assign(notes, {}, outline())),
-        submit(requestCompletion({ changes: 'The iteration carried the goal; the work item is ready.', revisionReason: 'The iteration is accepted.' })),
-      ],
-      engineer: [submit(
-        completionProposed('Raised the note limit to the 500 characters the plan asks for.'),
-        edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
-        runScopeTests(),
-      )],
-    });
-
-    const snapshot = onlyRun(service, 'review-notes');
-    expect(snapshot.state).toBe('completed');
-
-    const events = await runEventsOnDisk(root, 'review-notes', runId);
-    const types = events.map(event => event.type);
-    expect(types).toContain('iteration-assigned');
-    expect(types).toContain('writer-acquired');
-    expect(types).toContain('writer-released');
-    expect(types).toContain('iteration-closed');
-    // The writer is acquired before the session starts and released before
-    // the gate runs.
-    expect(types.indexOf('writer-acquired')).toBeLessThan(types.indexOf('writer-released'));
-
-    const assignment = await readAssignment(root, runId, 'wi-001', 1);
-    expect(assignment.id).toBe('wi-001.i01');
-    expect(assignment.gate).toEqual({
-      checkpoint: 'iteration',
-      tests: { policy: 'owned-by-scope', exactOwners: [notes], subtrees: [], extraSuites: [] },
-    });
-    expect(assignment.scope.resolved.roots.some(path => path.endsWith(`${notesDirectory}/src`))).toBe(true);
-    expect(assignment.guarded.map(file => file.path)).toContain('package.json');
-
-    const result = await readResult(root, runId, 'wi-001', 1);
-    expect(result.outcome).toBe('accepted');
-    expect(result.gate).not.toBeNull();
-    expect(result.commit).not.toBeNull();
-
-    // The gate ran the files the policy resolved to, and the repair the
-    // engineer made is what let it pass.
-    const gate = await readGate(root, runId, result.gate!);
-    expect(gate.verdict).toBe('passed');
-    expect(gate.subject).toEqual({ workItem: 'wi-001', iteration: 'wi-001.i01' });
-    expect(gate.commands[0]!.selection!.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
-    expect(await readFile(join(root, notesDirectory, 'src', 'notes.ts'), 'utf8')).toBe('export const noteLimit = 500;\n');
-
-    // One commit for the accepted iteration, with the harness's own message.
-    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
-    const commits = log.split('\u001e').map(part => part.trim()).filter(Boolean);
-    const accepted = commits.find(commit => commit.includes('Ramify-Iteration: wi-001.i01'));
-    expect(accepted).toBeDefined();
-    expect(accepted).toContain('Raised the note limit to the 500 characters the plan asks for.');
-    expect(accepted).not.toContain('Checks:');
-    expect(accepted).toContain('Audit-Note: git notes --ref=audit show');
-    expect(accepted).toContain(`Ramify-Gate: ${result.gate}`);
-    expect(accepted).toContain('1 file; owners collection-review/workspace/reviews/notes');
-
-    // The fixture's Cucumber suite is outside the one runner this MVP
-    // selects. It is a coverage gap on the attempt, never an absence of
-    // tests, and it is read from the project's own manifest.
-    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations(result.invocations[0]!)), 'utf8'))
-      .split('\n').filter(Boolean).map(line => JSON.parse(line) as Observation)
-      .filter((line): line is ObservationOf<'coverage-gap'> => line.type === 'coverage-gap');
-    const unsupported = observations.filter(line => line.data.kind === 'unsupported-runner');
-    expect(unsupported).toHaveLength(1);
-    expect(unsupported[0]!.data.detail).toContain('test:cucumber');
-  }, 300_000);
-});
-
 describe('G8: a work item revised across several iterations keeps every obligation', () => {
   test('three outline revisions, each from its own turn of one continuing session, and nothing already closed reopens', async () => {
     const root = await target();
-    const { service, runId } = await run(root, {
+    // The engineer writes the store once; the two revisions that follow it
+    // write the same content, which Git reports as an unchanged tree.
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [
         submit(assign(notes, {}, outline({ changes: 'The note needs a store and a limit.', revisionReason: '' }))),
@@ -189,7 +131,13 @@ describe('G8: a work item revised across several iterations keeps every obligati
         })),
       ],
       engineer: [submit(completionProposed('Added the note store.'), write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n'))],
-    }, { declaredTree: true });
+    }, [
+      { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] },
+      unchanged,
+      unchanged,
+      unchanged,
+      unchanged,
+    ]);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const events = await runEventsOnDisk(root, 'review-notes', runId);
@@ -220,13 +168,35 @@ describe('G8: a work item revised across several iterations keeps every obligati
       expect(result.gate).not.toBeNull();
     }
     expect(events.filter(event => event.type === 'work-item-completed')).toHaveLength(1);
-  }, 300_000);
+
+    // What the run did with Git's answers: one commit for the iteration that
+    // changed the tree, and the accepted boundary of every later attempt is
+    // that same revision, which no unchanged attempt replaced.
+    const attempts = await Promise.all(
+      [...new Set(events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate))]
+        .map(id => readGate(root, runId, id)));
+    expect(attempts.map(attempt => attempt.commit)).toEqual(['revision-01', null, null, null, null]);
+    expect(attempts.map(attempt => attempt.audited)).toEqual(['revision-01', 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
+    expect(attempts.map(attempt => attempt.head)).toEqual([base, 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
+    expect(scripted.revisions()).toEqual(['revision-01']);
+    expect(scripted.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(scripted.messages).toHaveLength(5);
+    expect(scripted.messages[0]).toContain('Ramify-Iteration: wi-001.i01');
+    expect(scripted.messages[0]).toContain('Added the note store.');
+    // The store the first iteration wrote is really on disk, whatever Git
+    // was told to answer about it.
+    expect(await readFile(join(root, notesDirectory, 'src', 'store.ts'), 'utf8')).toBe('export const store = new Map();\n');
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('K3: exact-owner and included-subtree selections at gate time', () => {
   test('two assignments over one owner differ by exactly the included subtree\'s test files', async () => {
     const root = await target({ notes: false });
-    const { service, runId } = await run(root, {
+    // No engineer turn writes anything, so every boundary is an unchanged tree.
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', reviews)]))],
       'local-architect': [
         submit(assign(reviews, {}, outline())),
@@ -240,7 +210,7 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
         submit(requestCompletion()),
       ],
       engineer: [submit(completionProposed('Nothing needed changing.'))],
-    }, { declaredTree: true });
+    }, [unchanged, unchanged, unchanged, unchanged]);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const first = await readAssignment(root, runId, 'wi-001', 1);
@@ -267,7 +237,16 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
     // The scope the engineer could write differs the same way.
     expect(first.scope.resolved.roots.some(path => path.includes('subs/reviews/subs/core'))).toBe(false);
     expect(second.scope.resolved.roots.some(path => path.endsWith('subs/workspace/subs/reviews/subs/core'))).toBe(true);
-  }, 300_000);
+
+    // An accepted iteration over a tree Git reports unchanged commits
+    // nothing and keeps the boundary the run started from.
+    expect(firstGate).toMatchObject({ commit: null, audited: base, verdict: 'passed' });
+    expect(secondGate).toMatchObject({ commit: null, audited: base, verdict: 'passed' });
+    expect(scripted.revisions()).toEqual([]);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('X1a: an engineer reaches its context budget', () => {
@@ -278,17 +257,20 @@ describe('X1a: an engineer reaches its context budget', () => {
       { kind: 'context' as const, tokens: 200_000, window: null },
       { kind: 'message' as const, text: 'I raised the limit and have not written its test.' },
     ];
-    const { service, runId } = await run(root, {
+    // The iteration is never accepted, so no gate of its own is reached: the
+    // boundaries are the work item's and the run's.
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: [budgetTurn, budgetTurn, budgetTurn],
-    }, { declaredTree: true });
+    }, [unchanged, unchanged]);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('partial');
     expect(result.invocations).toHaveLength(3);
     expect(result.findings.some(finding => finding.includes('return 3 of 3'))).toBe(true);
+    expect(result.commit).toBeNull();
 
     for (const [index, invocation] of result.invocations.entries()) {
       const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome(invocation)), 'utf8')) as {
@@ -310,7 +292,10 @@ describe('X1a: an engineer reaches its context budget', () => {
       expect(observations).not.toContain('"compaction"');
       expect(observations).toContain('"context"');
     }
-  }, 300_000);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });
 
 describe('X4: a denied call mutates nothing and stays deduplicated', () => {
@@ -318,7 +303,9 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
     const root = await target();
     const outside = 'subs/workspace/subs/shared-ui/src/status-badge.tsx';
     const before = await readFile(join(root, outside), 'utf8');
-    const { service, runId } = await run(root, {
+    // Only the allowed write reaches the tree, and that is the one change
+    // Git is told to report for the iteration's commit.
+    const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: [submit(
@@ -327,7 +314,11 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
         write(outside, 'export const tamperedAgain = true;\n'),
         write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n'),
       )],
-    }, { declaredTree: true });
+    }, [
+      { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] },
+      unchanged,
+      unchanged,
+    ]);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const result = await readResult(root, runId, 'wi-001', 1);
@@ -352,5 +343,16 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
     const replayed = { ...guards[0]!.data, reason: 'replayed' };
     expect(await log.record({ type: 'guard', data: replayed })).toBe(false);
     expect(await log.record({ type: 'guard', data: { ...replayed, callId: 'call-99' } })).toBe(true);
-  }, 300_000);
+
+    // The one path the guard allowed is the one changed entry the commit
+    // boundary was told about, and the run asked Git for nothing else.
+    expect(result.commit).toBe('revision-01');
+    expect(operationsOf(scripted)).toEqual([
+      'changedEntries', 'changedPaths', 'commitAccepted', 'createRunBranch',
+      'currentHead', 'diffNameStatus', 'findCommitByTrailers', 'isCleanRepository', 'worktreeLineChanges',
+    ]);
+    // No external tool was started for any of this.
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
 });

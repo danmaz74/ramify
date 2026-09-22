@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   AUDIT_PROTOCOL_VERSION,
@@ -563,23 +563,32 @@ describe('ramify-audit 0.1.0 conformance', () => {
       }),
     });
     const request = auditRequest(repository, [registeredCheck('result', 'host.result')]);
-    const first = await createAuditService({
-      git: gitWithHarnessIdentity(), now, registeredExecutors: failing,
-    }).run(request);
-    const second = await createAuditService({
-      git: gitWithHarnessIdentity(), now, registeredExecutors: passing,
-    }).run({ ...request, requestId: 'same-second-retry' });
-    expect(first).toMatchObject({ status: 'completed', summary: { overall: 'fail' } });
-    expect(second).toMatchObject({ status: 'completed', summary: { overall: 'pass' } });
-    if (first.status !== 'completed' || second.status !== 'completed') return;
-    expect(second.refs.runRef).toBe(first.refs.runRef);
-    expect(second.refs.treeRef).toBe(first.refs.treeRef);
-    expect(second.refs.reportCommit).not.toBe(first.refs.reportCommit);
-    expect(git(repository.root, ['rev-parse', second.refs.runRef])).toBe(second.refs.reportCommit);
-    expect(git(repository.root, ['rev-parse', second.refs.treeRef])).toBe(second.refs.reportCommit);
-    await expect(readCommitAuditNote(repository.commit, repository.root)).resolves.toMatchObject({
-      overall: 'pass', reportCommit: second.refs.reportCommit,
-    });
+    // The package's injected clock timestamps evidence, while ref naming in
+    // 0.1.0 still reads the global Date. Freeze Date only (not timers) so the
+    // conformance fact cannot cross a wall-clock second under suite load.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now());
+    try {
+      const first = await createAuditService({
+        git: gitWithHarnessIdentity(), now, registeredExecutors: failing,
+      }).run(request);
+      const second = await createAuditService({
+        git: gitWithHarnessIdentity(), now, registeredExecutors: passing,
+      }).run({ ...request, requestId: 'same-second-retry' });
+      expect(first).toMatchObject({ status: 'completed', summary: { overall: 'fail' } });
+      expect(second).toMatchObject({ status: 'completed', summary: { overall: 'pass' } });
+      if (first.status !== 'completed' || second.status !== 'completed') return;
+      expect(second.refs.runRef).toBe(first.refs.runRef);
+      expect(second.refs.treeRef).toBe(first.refs.treeRef);
+      expect(second.refs.reportCommit).not.toBe(first.refs.reportCommit);
+      expect(git(repository.root, ['rev-parse', second.refs.runRef])).toBe(second.refs.reportCommit);
+      expect(git(repository.root, ['rev-parse', second.refs.treeRef])).toBe(second.refs.reportCommit);
+      await expect(readCommitAuditNote(repository.commit, repository.root)).resolves.toMatchObject({
+        overall: 'pass', reportCommit: second.refs.reportCommit,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fact 11: cancelled and failed audits publish nothing', async () => {

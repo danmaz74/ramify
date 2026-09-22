@@ -1,5 +1,7 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent, type ScriptedAgent } from '../../subs/agent/src/scripted.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { analysisLayout, type Hypothesis, type RegistryEntry } from '../analysis/records.js';
@@ -12,7 +14,7 @@ import { analysis, entry, hypothesis, requestCompletion } from './helpers/analys
 import { byRole, readDeclaredTree, submit, treeInputs } from './helpers/iterations.js';
 import { forkDecision, forkPartial, registryChange, requestPlacement } from './helpers/placement.js';
 import {
-  initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun,
+  installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun,
 } from './helpers/runs.js';
 
 /*
@@ -29,20 +31,24 @@ import {
  * the refreshed view and the committed records, and checks current facts.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const core = 'collection-review/workspace/catalog/core';
 const panel = 'collection-review/workspace/catalog/ui';
+const unchangedPlacementCheckpoints = ['wi-001', 'wi-002', 'final verification of plan "revision-diff"'] as const;
 
 /** A copy of the fixture project, made a git repository with the runner readiness looks for. */
 async function target(): Promise<string> {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  await initRepository(fixture.root);
   return fixture.root;
 }
 
@@ -146,6 +152,7 @@ describe('G2, G3: two sequential placement forks, and the brief between them', (
     const opened = await openRuns(project, {
       agent,
       inputs: treeInputs(),
+      unchangedCheckpoints: unchangedPlacementCheckpoints,
       afterWrite: async write => {
         if (write === 'decision-accepted' || write === 'brief-appended') {
           sessions.push({ write, started: agent.sessions.length });
@@ -251,7 +258,7 @@ describe('X1c: a fork that returns partial findings and no decision', () => {
       ],
       'global-fork': [submit(forkPartial(['two modules could own it'], ['the view publishes no dependency facts']))],
     }));
-    const opened = await openRuns(project, { agent, inputs: treeInputs() });
+    const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
 
     const receipt = await opened.service.execute(startRun('revision-diff'));
@@ -303,6 +310,7 @@ describe('a view identity that changes under an investigation', () => {
     const opened = await openRuns(project, {
       agent,
       inputs,
+      unchangedCheckpoints: unchangedPlacementCheckpoints,
       // The source changes while the first fork is investigating, so the
       // evidence it decided on is no longer the evidence in front of the
       // harness.
@@ -351,7 +359,7 @@ describe('the invocation of a fork', () => {
       'local-architect': [submit(requestPlacement({ forCapability: 'compare-revisions' })), submit(requestCompletion()), submit(requestCompletion())],
       'global-fork': [submit(firstDecision('field-diff belongs to the catalog core.'))],
     }));
-    const opened = await openRuns(project, { agent, inputs: treeInputs() });
+    const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
     await opened.service.settled('revision-diff', receipt.jobId);
@@ -399,6 +407,7 @@ describe('a parent context that can no longer be read', () => {
     const opened = await openRuns(project, {
       agent,
       inputs: treeInputs(),
+      unchangedCheckpoints: unchangedPlacementCheckpoints,
       afterWrite: async write => {
         // The parent is lost while the first decision is committed and its
         // brief is not appended yet.
@@ -470,7 +479,7 @@ describe('a fork whose submissions are invalid', () => {
         { kind: 'submit', input: firstDecision('field-diff belongs to the catalog core.') },
       ]],
     }));
-    const opened = await openRuns(project, { agent, inputs: treeInputs() });
+    const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
     await opened.service.settled('revision-diff', receipt.jobId);
@@ -572,7 +581,7 @@ describe('a decision that replaces an earlier one', () => {
         })),
       ],
     }));
-    const opened = await openRuns(project, { agent, inputs: treeInputs() });
+    const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
     await opened.service.settled('revision-diff', receipt.jobId);

@@ -11,6 +11,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
 import { initRepository, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { gitService } from '../../subs/evidence/src/git.js';
 
 /*
  * The post-write hook check.
@@ -207,6 +208,7 @@ describe('a mutation is observed even when the tool failed', () => {
     await initRepository(root);
 
     const { service } = await openRuns(root, {
+      git: gitService,
       inputs: treeInputs(),
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],

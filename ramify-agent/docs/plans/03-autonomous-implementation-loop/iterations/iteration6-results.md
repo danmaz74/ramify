@@ -308,10 +308,10 @@ before these figures were taken.
 
 | Item | Where it is proved |
 | --- | --- |
-| A run over the fixture where one work item is assigned, executed and accepted | `iterations.test.ts`, "a local architect assigns it, an engineer works it, the gate accepts it and the harness commits": the events in order, the assignment with its derived gate, the passing attempt with its resolved selection, the repaired source on disk and the one commit with the harness's message |
+| A run over the fixture where one work item is assigned, executed and accepted | `iterations-integration.test.ts`, "a local architect assigns it, an engineer works it, the gate accepts it and the harness commits": the events in order, the assignment with its derived gate, the passing attempt with its resolved selection, the repaired source on disk and the one commit with the harness's message |
 | A second work item revised across three outline revisions | `iterations.test.ts`, "three outline revisions, each from its own turn of one continuing session": three assignments, three accepted iterations, four outline revisions from four invocations of one session, and every earlier result still accepted |
 | An assignment naming an absent module without accepted creation authority is rejected | `module-creation.test.ts`, "an absent owner with no accepted authority is rejected…" (rejected in a run, corrected in the same session) and `local-architect-submission.test.ts`, "the module is one the view has, or one an accepted proposal creates" |
-| A valid proposed entry creates a new module with nested source directories and its first test, passes the gate and emits its creation notice | `module-creation.test.ts`, "a bootstrap assignment creates the module with nested source and its first test…": the bootstrap captured from the registry, `src/store/notes.ts` in a directory that did not exist, the module in the refreshed view before the gate passed, the notice read from the commit, and `Modules created:` in the message |
+| A valid proposed entry creates a new module with nested source directories and its first test, passes the gate and emits its creation notice | `module-creation-integration.test.ts`, "a bootstrap assignment creates the module with nested source and its first test…": the bootstrap captured from the registry, `src/store/notes.ts` in a directory that did not exist, the module in the refreshed view before the gate passed, the notice read from the commit, and `Modules created:` in the message |
 | An assignment selecting a grandchild rather than a direct child is rejected | `local-architect-submission.test.ts`, "an included child is a direct child, never a descendant" |
 | Two gate-time `TestSelection.resolved` lists that differ only by an included subtree | `iterations.test.ts`, "two assignments over one owner differ by exactly the included subtree's test files"; the same at resolver level in `test-selection.test.ts` |
 | A newly added failing test prevents acceptance, including on repair | `iteration-gate.test.ts`, "a failing test added after the assignment, during repair, fails that attempt" |
@@ -327,8 +327,8 @@ before these figures were taken.
 
 | # | Case | The tests that prove it |
 | --- | --- | --- |
-| G8 | One small work item completes in one iteration; another is revised across several without losing obligations | `iterations.test.ts`, the two tests of the `G8` describes. The first: one outline `single-iteration`, one assignment, one accepted iteration, one commit. The second: three assignments, three accepted iterations, four outline revisions, and each earlier result still accepted with its gate after the later ones committed |
-| G9 | An accepted proposed entry owner reaches implementation | `module-creation.test.ts`. A valid `ModuleProposal` on an entry gives the first assignment its `bootstrap`; the engineer creates the declaration, the README, a nested `src/store/` and its first test; the refreshed view has the owner before the gate passes; the `module-created` notice is read from the commit and names no decision, because none proposed it. Beside it: an absent owner with no authority is rejected with its path, and a write outside the creation scope is `blocked-scope` and creates nothing |
+| G8 | One small work item completes in one iteration; another is revised across several without losing obligations | `iterations-integration.test.ts`, "a local architect assigns it, an engineer works it, the gate accepts it and the harness commits", and `iterations.test.ts`, "three outline revisions, each from its own turn of one continuing session, and nothing already closed reopens". The first: one outline `single-iteration`, one assignment, one accepted iteration, one commit. The second: three assignments, three accepted iterations, four outline revisions, and each earlier result still accepted with its gate after the later ones committed |
+| G9 | An accepted proposed entry owner reaches implementation | `module-creation-integration.test.ts` proves the positive real-view boundary: a valid `ModuleProposal` on an entry gives the first assignment its `bootstrap`; the engineer creates the declaration, the README, a nested `src/store/` and its first test; the refreshed view has the owner before the gate passes; the `module-created` notice is read from the commit and names no decision, because none proposed it. Beside it, `module-creation.test.ts` proves that an absent owner with no authority is rejected with its path, and a write outside the creation scope is `blocked-scope` and creates nothing |
 | C4 | A crash after passing checks recovers the accepted result; a later source change invalidates stale evidence | `accepted-commit.test.ts`, "a crash between the gate's pass and the commit's completion makes exactly one commit" (both boundaries), and "a later source change invalidates nothing: the accepted commit stays as it is". Beside them `run-recovery.test.ts`, "a crash after iteration-closed leaves the accepted iteration accepted and its one commit where it is". By Dan's decision of 2026-09-20 a later source change invalidates nothing: it is uncommitted work for the next gate |
 | K3 | Exact-owner and included-child-subtree test selection are both exercised | `iterations.test.ts`, "two assignments over one owner differ by exactly the included subtree's test files": two gate attempts over `workspace/reviews`, whose `TestSelection.resolved` differ by exactly the four test files of `reviews/core` and its two children. `test-selection.test.ts` shows the same at the resolver, with the sibling subtrees that contribute nothing |
 | K5b | An invalid session, a test timeout and exhausted repair limits retain distinct causes and recovery paths | `iteration-gate.test.ts`, the two `K5b` tests and the exhaustion test. A session the implementation can no longer read is reconstructed from records, recorded on the invocation as `requested: continued`, `actual: fresh` with its reason, and the repair rounds are unchanged; a scoped run that never answers is `not-verified`/`timeout` with one infrastructure retry and then `exhausted`, proposed by the same invocation because a timeout is never repaired by the engineer; exhausted repair rounds preserve the first attempt's cause |
@@ -391,10 +391,12 @@ extended.
 | --- | ---: | --- |
 | `write-guard.test.ts` | 8 | X3, X5, the block's text, and the lifted resolver |
 | `test-selection.test.ts` | 9 | K3 and K8 at the resolver, over a real copy of the fixture |
-| `iterations.test.ts` | 5 | G8, K3 at gate time, X1a, X4 |
+| `iterations-integration.test.ts` | 1 | G8's real Git, Ramify and audit boundary |
+| `iterations.test.ts` | 4 | G8's revised-work-item case, K3 at gate time, X1a, X4 |
 | `iteration-gate.test.ts` | 7 | K1, K8 and K5b |
 | `accepted-commit.test.ts` | 4 | The commit guard and C4, and the message as a pure function |
-| `module-creation.test.ts` | 2 | G9 |
+| `module-creation-integration.test.ts` | 1 | G9's real architect-view bootstrap boundary |
+| `module-creation.test.ts` | 2 | G9's rejection and G10 against scripted external boundaries |
 | `no-rewind.test.ts` | 2 | The no-rewind guard and K2 |
 | `engineer-submission.test.ts` | 9 | Rule 10 for the engineer and for its tool |
 | `line-events.test.ts` | 6 | Line events, the owner of a path, and M5 |
@@ -512,8 +514,8 @@ needed; `harness/agent` by the write built-ins the fake now performs.
     can produce, so they are not in the schema yet.
 11. **`test-selection.test.ts` and most run tests read the module inventory
     from the project's own `module.ramify` declarations.** The refresh itself
-    is proved against the installed Ramify in `iterations.test.ts` and
-    `module-creation.test.ts`, which is where it matters: a module created
+    is proved against the installed Ramify in `iterations-integration.test.ts` and
+    `module-creation-integration.test.ts`, which is where it matters: a module created
     mid-run must appear in the refreshed view before its gate can pass. A
     test that only needs to know which directory an owner is in reads the same
     fact from the same tree with `treeInputs`, which costs no analysis. The

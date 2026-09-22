@@ -1,3 +1,4 @@
+import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
@@ -242,6 +243,8 @@ export const scopeTestsInputSchema = z.object({}).strict();
 export const scopeTestsJsonSchema = z.toJSONSchema(scopeTestsInputSchema) as JsonSchema;
 
 export interface ScopeTestsOptions {
+  /** External command execution. Tests script outcomes; actual process tests use the default. */
+  readonly commandExecution?: CommandRunner | undefined;
   readonly projectRoot: string;
   readonly commands: ProjectCommands;
   readonly policy: TestSelectionPolicy;
@@ -301,7 +304,7 @@ export function createScopeTestsTool(options: ScopeTestsOptions): ToolDefinition
           text: 'The selection is empty: this assignment owns no test file yet. Writing the first one is part of the work.',
         };
       }
-      const run = await runCommand({
+      const run = await (options.commandExecution ?? runCommand)({
         argv: check.command.argv,
         cwd: check.command.cwd,
         env: checkCommandEnvironment(check.command),

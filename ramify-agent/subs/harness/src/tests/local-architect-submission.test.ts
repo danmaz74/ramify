@@ -1,6 +1,8 @@
+import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
@@ -11,7 +13,7 @@ import { assign, outline } from './helpers/iterations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion, unresolved } from './helpers/analysis.js';
-import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
 /*
  * Everything a local architect tells the harness is validated JSON: the
@@ -20,9 +22,13 @@ import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, 
  * the bound ends the invocation as `invalid-submission`.
  */
 
+vi.mock('node:child_process', async original =>
+  (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
+
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 
 const index: ArchitectIndex = {
@@ -299,13 +305,13 @@ describe('the rules an assignment must satisfy', () => {
 describe('a rejected submission in a run', () => {
   const reviews = 'collection-review/workspace/reviews';
 
-  async function run(inputs: readonly unknown[]) {
+  async function run(inputs: readonly unknown[], unchangedCheckpoints: readonly string[] = []) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-    await initRepository(fixture.root);
-    const submitted = analysis([entry('reviewer-note', reviews)]);
+      const submitted = analysis([entry('reviewer-note', reviews)]);
     const { service, agent } = await openRuns(fixture.root, {
+      unchangedCheckpoints,
       script: (spec: SessionSpec) => (spec.role === 'initial-architect'
         ? [{ kind: 'submit' as const, input: submitted }]
         : inputs.map(input => ({ kind: 'submit' as const, input }))),
@@ -317,7 +323,10 @@ describe('a rejected submission in a run', () => {
   }
 
   test('a broken schema returns every error to the same session, and a corrected input is accepted', async () => {
-    const { root, runId, service, agent } = await run([{ kind: 'request-completion', summary: 'done' }, requestCompletion()]);
+    const { root, runId, service, agent } = await run(
+      [{ kind: 'request-completion', summary: 'done' }, requestCompletion()],
+      ['wi-001', 'final verification of plan "review-notes"'],
+    );
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const local = agent!.sessions.find(session => session.spec.role === 'local-architect')!;
