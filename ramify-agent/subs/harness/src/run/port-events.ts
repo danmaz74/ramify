@@ -1,13 +1,15 @@
 import type { AgentEvent, AgentPort, AgentSession, ContextPolicy, SessionOutcome } from '../../subs/agent/src/interfaces/port.js';
 import { activityOf } from '../jobs/activity.js';
+import type { InvocationTranscript } from '../transcripts/recorder.js';
 import type { ExcursionWatcher } from './excursions.js';
 import type { ObservationLog } from './observations.js';
 import type { InvocationOutcome } from './records.js';
 
 /*
- * What one session's port events leave in its observation log. An
- * implementation run and a standalone session record the same observations
- * from the same events, so the same readers work on both.
+ * What one session's port events leave in its observation log and its
+ * transcript. An implementation run and a standalone session record the
+ * same observations and entries from the same events, so the same readers
+ * work on both.
  */
 
 /** Token usage summed over a session's messages. */
@@ -26,12 +28,14 @@ export interface PortEventRecorderOptions {
   readonly judge: { countImplementationRejection(callId: string, tool: string, reason: string): () => Promise<void> };
   readonly excursions: ExcursionWatcher;
   readonly context: ContextPolicy;
+  /** The invocation's transcript, which receives every event in the order it arrives. */
+  readonly transcript?: InvocationTranscript | undefined;
 }
 
 /**
  * Records one session's port events: its usage, the call in flight for each
  * tool, context and compaction observations, the implementation's own input
- * rejections, activity and read excursions.
+ * rejections, activity and read excursions, and the transcript's entries.
  */
 export class PortEventRecorder {
   private readonly calls = new Map<string, string>();
@@ -54,6 +58,9 @@ export class PortEventRecorder {
 
   /** Records one event. What is counted is counted before its ordered durable write. */
   record(event: AgentEvent): Promise<void> {
+    // The transcript queues its own entry in order; a failed write there is
+    // its own coverage gap and never this observation's failure.
+    this.options.transcript?.event(event);
     if (event.type === 'message' && event.role === 'assistant' && event.usage) {
       this.usageObserved = true;
       for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part];

@@ -123,6 +123,8 @@ export const runPolicySchema = z.object({
     runAbsoluteMs: z.int().positive(),
   }).strict(),
   context: z.record(roleSchema, contextPolicySchema),
+  /** A transcript body larger than `inlineBodyBytes` is stored in the content store, not in its entry. */
+  transcript: z.object({ inlineBodyBytes: z.int().positive() }).strict(),
   commands: z.object({
     typeCheck: checkCommandSchema,
     allTests: checkCommandSchema,
@@ -640,11 +642,16 @@ export const runLayout = {
   outcome: (id: InvocationId): string => join('invocations', id, 'outcome.json'),
   observations: (id: InvocationId): string => join('invocations', id, 'observations.jsonl'),
   lineEvents: (id: InvocationId): string => join('invocations', id, 'lines.json'),
+  /** The executor's own session record, such as pi's, which only it reads. */
   session: (id: InvocationId): string => join('invocations', id, 'session'),
   /** The complete output of one `shell` call, which the tool answers only the tail of. */
   shellOutput: (id: InvocationId, call: number): string => join('invocations', id, 'shell', `${String(call).padStart(3, '0')}.log`),
   /** What one post-write hook check printed, which its observation names. */
   hookOutput: (id: InvocationId, check: number): string => join('invocations', id, 'hooks', `${String(check).padStart(3, '0')}.json`),
+  /** The harness's transcript of one session: raw output, never a record. */
+  transcript: (session: SessionId): string => join('transcripts', `${session}.jsonl`),
+  /** The content store the run's transcripts name bodies in, `blobs/<sha256>`. */
+  blobs: 'blobs',
 } as const;
 
 /** The schema literal of each record kind, for a reader that answers unsupported version. */

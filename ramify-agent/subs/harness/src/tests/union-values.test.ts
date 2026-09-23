@@ -268,7 +268,7 @@ describe('the observation log', () => {
     ]);
     const kinds = [
       'unguarded-shell', 'changed-paths-unknown', 'usage-unavailable', 'context-unavailable',
-      'observation-truncated', 'unsupported-runner',
+      'observation-truncated', 'unsupported-runner', 'transcript-incomplete',
     ];
     for (const kind of kinds) {
       expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' } }).success).toBe(true);

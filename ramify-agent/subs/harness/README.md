@@ -35,6 +35,9 @@ signatures name, and the `session` command's entry with the types it names:
     evaluation evidence beside them, with the limit of each list. Each answer
     is a projection; the durable records and the internal event union stay
     private, so the log can change without changing the wire.
+  - `transcripts.ts` holds the entry schema of a session's transcript: its
+    numbered entries, each block's header and body, and where a body is
+    stored. It is not exposed yet; the session queries will expose it.
 
 Every export of those files is a Zod schema, a type inferred from one, or a
 constant. They import nothing but `zod` and each other, so every export
@@ -163,7 +166,8 @@ hiding or measured complexity justifies it.
     schemas are here and not beside the types they mirror, because
     persisting a record is the run's concern.
   - `policy.ts`: the hardcoded policy a run captures, its bounds, each role's
-    context policy and every command it reaches the project through, each
+    context policy, the transcript's inline body limit (8 KiB) and every
+    command it reaches the project through, each
     naming the environment the harness built for it. `job.json` holds those
     names and the harness's own settings, never a value of this process's
     environment; a run recorded before that is read as the names its map
@@ -209,7 +213,9 @@ hiding or measured complexity justifies it.
     loop kept; each end records whether the session is kept or finished, and
     run end and recovery finish every session still kept. Each start that is
     not fresh records its point and its reason, and each end a start the
-    executor could not honor.
+    executor could not honor. Each invocation writes its session's
+    transcript beside its observations: its start before the session
+    starts, and its end and point after the log's.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
     guard saw; comparing it with the write scope fills `outsideScope`, and
@@ -492,6 +498,21 @@ hiding or measured complexity justifies it.
   it. The agent is pi, the scripted fake chosen explicitly as `fake` (an
   analysis with no entry capability), or an implementation a test supplies
   through `startServerWith`, which stays internal with the run settings.
+- `transcripts/`: the harness's transcript of each session, which is raw
+  output and never a record.
+  - `writer.ts`: one session's file, `transcripts/<session>.jsonl` in a run
+    and `transcript.jsonl` in a standalone session. Each entry is one synced
+    line numbered one above the last, so a crash keeps every earlier entry,
+    a torn last line is discarded, and a number is never reset. A body over
+    the policy's inline limit goes to the content store.
+  - `store.ts`: the content store, `blobs/<sha256>`, which stores a body
+    once however many entries name it.
+  - `recorder.ts`: what one invocation writes: its start, every message,
+    compaction and retry the port reports, the harness's own decisions
+    (guard denials, submission verdicts, post-write checks, read reminders,
+    appends and the budget), its end and its point. A failed write is one
+    coverage gap in the invocation's observations and never fails the
+    session.
 - `sessions/`: one engineer session on one module, from a prompt a person
   writes, outside any run; the root's `session` command runs it.
   - `single.ts`: `runSingleSession` takes the project lock, resolves the
@@ -506,8 +527,10 @@ hiding or measured complexity justifies it.
   - `records.ts`: the session's plain files under
     `plans/.harness/sessions/<session-id>/`: `session.json`,
     `observations.jsonl` with the run's observation schema, `submission.json`,
-    `outcome.json`, the shell and hook outputs, the implementation's
-    transcript under `session/`, and the gate attempt under `gate/`.
+    `outcome.json`, the shell and hook outputs, the harness's
+    `transcript.jsonl` and its `blobs/`, the executor's own record under
+    `session/`, and the gate attempt under `gate/`. The session is its own
+    one invocation, so its identifier names both.
     `session.json` names the executor and the model it was asked for; a
     session with an outcome is finished, and one without was interrupted.
   - `command.ts`: `runSessionCommand`, the command's entry. It builds the

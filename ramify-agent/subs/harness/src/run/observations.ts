@@ -106,6 +106,8 @@ export const observationSchema = z.discriminatedUnion('type', [
       'observation-truncated',
       /** A suite of the project that the MVP's one supported runner does not select. */
       'unsupported-runner',
+      /** An entry of the session's transcript could not be written; the session went on without it. */
+      'transcript-incomplete',
     ]),
     detail: z.string(),
   }).strict()),

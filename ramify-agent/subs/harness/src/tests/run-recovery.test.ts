@@ -30,6 +30,7 @@ import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import type { RunEvent } from '../run/log.js';
 import { reduceSessions } from '../run/sessions.js';
+import { readTranscript } from '../transcripts/writer.js';
 import { statedCommands } from './helpers/composition.js';
 
 vi.mock('node:child_process', async original =>
@@ -316,6 +317,12 @@ describe('the recovery table', () => {
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost', disposition: 'incomplete', submission: null });
     expect(outcome.settled.confirmed).toBe(false);
     expect(onlyRun(service, 'review-notes').counts.invocations).toBe(1);
+
+    // The transcript's start was durable before the crash, and recovery
+    // adds the interrupted invocation's end after it, removing nothing.
+    const transcript = await readTranscript(runPath(root, 'review-notes', runId, runLayout.transcript('ses-0001')));
+    expect(transcript.entries.map(entry => [entry.n, entry.type])).toEqual([[1, 'started'], [2, 'ended'], [3, 'point']]);
+    expect(transcript.entries[1]).toMatchObject({ invocation: 'inv-0001', ended: 'failed', interruption: 'session-lost', actual: null });
   }, 180_000);
 
   test('a crash after invocation-ended leaves the outcome as it was and appends no second end', async () => {
@@ -328,6 +335,10 @@ describe('the recovery table', () => {
     expect(events.filter(event => event.type === 'invocation-ended')).toHaveLength(1);
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('submitted');
+    // The transcript's end was written with the log's, and not again.
+    const transcript = await readTranscript(runPath(root, 'review-notes', runId, runLayout.transcript('ses-0001')));
+    expect(transcript.entries.filter(entry => entry.type === 'ended')).toHaveLength(1);
+    expect(transcript.entries.at(-1)).toMatchObject({ type: 'point', point: { session: 'ses-0001', invocation: 'inv-0001' } });
   }, 180_000);
 
   test('a crash after analysis-accepted re-materializes the entries and accepts no second analysis', async () => {

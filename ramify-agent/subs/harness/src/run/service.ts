@@ -99,6 +99,9 @@ import {
 } from './records.js';
 import { reduceSessions, type RunSessions } from './sessions.js';
 import { runSnapshot, type RunSnapshot } from './snapshot.js';
+import { InvocationTranscript, recordAppend, verdictNote } from '../transcripts/recorder.js';
+import { ContentStore } from '../transcripts/store.js';
+import { TranscriptWriter } from '../transcripts/writer.js';
 import { SubmissionJudge, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
 
@@ -343,6 +346,10 @@ class Run {
   /** The writer of the run; one at a time, and the log says which. */
   readonly writer: WriterOwnership;
   index: ArchitectIndex | null = null;
+  /** The content store the run's transcripts name their large bodies in. */
+  readonly store: ContentStore;
+  /** One transcript writer per session, so each session's entries keep one order. */
+  readonly transcripts = new Map<SessionId, TranscriptWriter>();
 
   constructor(
     readonly record: RunRecord,
@@ -353,6 +360,7 @@ class Run {
   ) {
     this.writer = writer;
     this.stopRequested = log.find('stop-requested') !== undefined;
+    this.store = new ContentStore(join(directory, runLayout.blobs));
   }
 
   get key(): string {
@@ -476,6 +484,35 @@ export class RunService {
       .filter(event => event.data.session === session && event.sequence > ended)
       .map(event => event.data.decision);
     return { from: point, reason, briefs };
+  }
+
+  /** The transcript of one of the run's sessions. */
+  private transcriptOf(run: Run, session: SessionId): TranscriptWriter {
+    let writer = run.transcripts.get(session);
+    if (writer === undefined) {
+      writer = new TranscriptWriter({
+        session,
+        path: run.path(runLayout.transcript(session)),
+        root: run.directory,
+        store: run.store,
+        inlineBytes: run.record.policy.transcript.inlineBodyBytes,
+        now: () => this.now(),
+      });
+      run.transcripts.set(session, writer);
+    }
+    return writer;
+  }
+
+  /**
+   * What one invocation writes to its session's transcript. An entry that
+   * could not be written is a coverage gap in the invocation's own
+   * observations, and never fails the invocation.
+   */
+  private invocationTranscript(run: Run, session: SessionId, invocation: string, observations?: ObservationLog): InvocationTranscript {
+    return new InvocationTranscript(this.transcriptOf(run, session), invocation, async detail => {
+      const log = observations ?? await ObservationLog.open(run.path(runLayout.observations(invocation)));
+      await log.record({ type: 'coverage-gap', data: { kind: 'transcript-incomplete', detail } });
+    });
   }
 
   /** The run's sessions as its log derives them, or undefined, with a warning, where the log breaks the lifecycle. */
@@ -1001,6 +1038,23 @@ export class RunService {
     }, [
       { path: runLayout.invocation(id), id, revision: 1, body: invocation },
     ]);
+    // The transcript's start holds the prompts, and is written before the
+    // session starts, so a crash before the first reply still leaves them.
+    const transcript = this.invocationTranscript(run, session, id, observations);
+    await transcript.started({
+      role: request.role,
+      work: request.work,
+      start: opens ? 'opened' : 'continued',
+      requested: request.start.mode,
+      continues,
+      fork: request.start.mode === 'fork' ? request.fork : undefined,
+      replaces: opens ? request.replaces : undefined,
+      requestedBy: opens ? request.requestedBy : undefined,
+      executor: agent.name,
+      model: this.options.model ?? null,
+      systemPrompt: request.systemPrompt,
+      prompt: request.prompt,
+    });
     if (request.writer === true) {
       // The writer is acquired before the session starts, so a stop that
       // arrives between them applies to a writer the log already names.
@@ -1009,7 +1063,7 @@ export class RunService {
       await this.afterWrite('writer-acquired', run.record.jobId);
     }
     try {
-      return await this.runSession(run, agent, id, session, observations, request);
+      return await this.runSession(run, agent, id, session, observations, transcript, request);
     } finally {
       closed();
     }
@@ -1021,6 +1075,7 @@ export class RunService {
     id: string,
     session: SessionId,
     observations: ObservationLog,
+    transcript: InvocationTranscript,
     request: InvocationRequest<T>,
   ): Promise<InvocationResult<T>> {
     // What the harness does with the session once this invocation ends. A
@@ -1029,7 +1084,7 @@ export class RunService {
       (this.ignoring(run) ? finished('run-ended') : request.keep(ended, value));
     await this.afterWrite('invocation-started', run.record.jobId);
     if (this.ignoring(run)) {
-      await this.endInvocation(run, id, session, keeping('stopped', undefined), stoppedOutcome());
+      await this.endInvocation(run, id, session, keeping('stopped', undefined), stoppedOutcome(), undefined, transcript);
       return { id, ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session, kept: false };
     }
 
@@ -1059,12 +1114,13 @@ export class RunService {
       scope: request.guarded,
     });
     const context = run.record.policy.context[request.role];
-    const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context });
+    const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context, transcript });
     const equipment: Equipment = request.equip?.({
       invocation: id,
       observations,
       callId: tool => recorder.callId(tool),
       reminders: () => excursions.takeReminders(),
+      transcript,
     }) ?? {};
 
     // Every port event is activity; `touch` is what the idle bound resets.
@@ -1086,7 +1142,11 @@ export class RunService {
         name: request.toolName,
         description: request.description,
         inputSchema: request.inputSchema,
-        accept: input => judge.judge(input),
+        accept: async input => {
+          const verdict = await judge.judge(input);
+          transcript.note(verdictNote(recorder.callId(request.toolName), request.toolName, verdict));
+          return verdict;
+        },
       },
       sessionDirectory: run.path(runLayout.session(id)),
       onEvent: event => {
@@ -1106,7 +1166,7 @@ export class RunService {
         ended: 'failed',
         interruption: 'adapter-fault',
         error: `The agent session could not start: ${message(error)}`,
-      });
+      }, undefined, transcript);
       return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept };
     }
     run.session = agentSession;
@@ -1125,6 +1185,7 @@ export class RunService {
     const elapsedMs = this.now().getTime() - started;
     if (outcome.kind === 'context-budget-reached') {
       budget = { threshold: context.budgetTokens ?? 0, observed: outcome.tokens, reportDelivered: outcome.report !== undefined };
+      transcript.note({ kind: 'budget-reached', tokens: outcome.tokens, threshold: context.budgetTokens, reportDelivered: outcome.report !== undefined });
     }
 
     // Whatever the equipment started ends before the writer is released:
@@ -1181,7 +1242,7 @@ export class RunService {
       usage: recorder.outcomeUsage(agent),
       elapsedMs,
       ...(outcome.kind === 'failed' && interruption === undefined ? { error: outcome.error } : {}),
-    }, degraded);
+    }, degraded, transcript);
 
     return {
       id,
@@ -2119,6 +2180,15 @@ export class RunService {
         records: [],
       }),
     }));
+    // The brief and the point it makes, in the transcript of the session
+    // appended to. A failed write loses the entries and never the append.
+    const appended = run.log.all('brief-appended').find(event => event.data.decision === decision.id);
+    if (appended !== undefined) {
+      await recordAppend(this.transcriptOf(run, appended.data.session), {
+        kind: 'brief-appended', decision: decision.id, generation: appended.data.generation,
+        outcome: appended.data.outcome, text: briefText(decision),
+      }, appended.sequence).catch(error => this.warn(`Run ${run.record.jobId}: the brief of ${decision.id} is missing from ${appended.data.session}'s transcript: ${message(error)}`));
+    }
     await this.afterWrite('brief-appended', run.record.jobId);
     // The session that held a context the agent can no longer read is not
     // used again: the next fork is oriented from the records instead.
@@ -2507,7 +2577,8 @@ export class RunService {
       let start: SessionStart = { mode: 'fresh' };
       let degraded: InvocationRequest<EngineerSubmission>['degraded'];
       if (sessionRef !== undefined) {
-        const appended = await agent.appendContext(sessionRef, `${assignment.id}:${attempt}`, `Continuing iteration ${assignment.id}.`);
+        const note = `Continuing iteration ${assignment.id}.`;
+        const appended = await agent.appendContext(sessionRef, `${assignment.id}:${attempt}`, note);
         if (appended.outcome === 'session-lost') {
           const used = this.reconstructions(run, item.id);
           if (used >= run.record.policy.limits.sessionReconstructionsPerWork) {
@@ -2523,6 +2594,11 @@ export class RunService {
           session = undefined;
         } else {
           start = { mode: 'continue', ref: appended.ref };
+          if (appended.outcome === 'appended' && session !== undefined) {
+            const kept = session;
+            await recordAppend(this.transcriptOf(run, kept), { kind: 'note-appended', text: note }, null)
+              .catch(error => this.warn(`Run ${run.record.jobId}: the note continuing ${kept} is missing from its transcript: ${message(error)}`));
+          }
         }
       }
 
@@ -3994,6 +4070,7 @@ export class RunService {
     keeping: SessionKeeping,
     body: Omit<InvocationOutcome, 'schema' | 'invocation'>,
     degraded?: DegradeRelation,
+    transcript?: InvocationTranscript,
   ): Promise<void> {
     if (run.log.all('invocation-ended').some(event => event.data.invocation === id)) return;
     const outcome = invocationOutcomeSchema.parse({ schema: 'ramify-agent.invocation-outcome/1', invocation: id, ...body });
@@ -4001,12 +4078,25 @@ export class RunService {
       invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null, session,
       ...(degraded === undefined ? {} : { degraded }),
     };
-    await this.write(run, {
+    const written = await this.write(run, {
       type: 'invocation-ended',
       data: keeping.kept ? { ...ended, kept: true } : { ...ended, kept: false, finished: keeping.finished },
     }, [
       { path: runLayout.outcome(id), id, revision: 1, body: outcome },
     ]);
+    // The transcript's end follows the log's, so the point it names is one
+    // the log has; recovery ends an interrupted invocation's transcript too.
+    if (written !== 'ended') {
+      await (transcript ?? this.invocationTranscript(run, session, id)).end({
+        ended: outcome.ended,
+        interruption: outcome.interruption ?? null,
+        error: outcome.error ?? null,
+        actual: outcome.session === undefined ? null : {
+          mode: outcome.session.mode === 'continued' ? 'continue' : outcome.session.mode,
+          degradedReason: outcome.session.degradedReason ?? null,
+        },
+      });
+    }
     await this.afterWrite('invocation-ended', run.record.jobId);
   }
 

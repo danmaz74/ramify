@@ -11,7 +11,9 @@ import { testSelectionPolicySchema } from '../work/iterations.js';
  *
  * A session is not a job: it has no ledger, no run log and no events, and
  * nothing replays these files. They are plain files written once each. The
- * observation log has the run's schema, so the same readers work on it.
+ * observation log and the transcript have the run's schemas, so the same
+ * readers work on them. The session is its own one invocation, so its
+ * identifier names both.
  */
 
 const text = z.string().min(1);
@@ -26,8 +28,12 @@ export const sessionLayout = {
   observations: 'observations.jsonl',
   submission: 'submission.json',
   outcome: 'outcome.json',
-  /** The implementation's own transcript, such as pi's. */
-  transcript: 'session',
+  /** The executor's own session record, such as pi's, which only it reads. */
+  executorSession: 'session',
+  /** The harness's transcript of the session: raw output, never a record. */
+  transcript: 'transcript.jsonl',
+  /** The content store the transcript names bodies in, `blobs/<sha256>`. */
+  blobs: 'blobs',
   shellOutput: (call: number): string => join('shell', `${String(call).padStart(3, '0')}.log`),
   hookOutput: (check: number): string => join('hooks', `${String(check).padStart(3, '0')}.json`),
   gate: join('gate', 'attempt.json'),
