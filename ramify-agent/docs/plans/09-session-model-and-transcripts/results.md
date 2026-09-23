@@ -1,7 +1,7 @@
 # Plan 9 results: session model and transcripts
 
 **Date:** 2026-09-23. **Status:** implemented on `feat/plan9-session-model`;
-the audit of the final commit is pending (ST14).
+both audits pass on its final implementation commit `0a6d192` (ST14).
 
 The harness now owns sessions. Every invocation belongs to a recorded session
 whose state a pure reducer derives from the run log, and continuation, forking,
@@ -37,7 +37,7 @@ file, run by explicit path (see [Verification](#verification)).
 | ST11 | Passed | `8f985f1`, `f844963`. [session-marks.test.tsx](../../../subs/web/src/tests/session-marks.test.tsx) (10) covers counts and role chips, the suspended mark, the element list, the run-level strip and a mark that changes within one poll. [session-fixture.test.ts](../../../subs/harness/src/tests/session-fixture.test.ts) (4) reads the served fixture. Browser: `progress-by-module*-*.png` and `progress-dependencies*-*.png`. |
 | ST12 | Passed | `eb8af13`. [session-timeline.test.tsx](../../../subs/web/src/tests/session-timeline.test.tsx) (10) covers segments, gaps, appends, forks, replacements, requests and degraded starts, keyboard order and the text alternative. Browser: `timeline-lineage-*.png`, `timeline-lineage-replacement-*.png` and `timeline-live-*.png`. |
 | ST13 | Passed | `64c27bf`. The [metrics glossary](../../metrics/glossary.md) defines each measurement and [lineage.md](../../metrics/lineage.md) specifies `lineage/1`. [lineage-metrics.test.ts](../../../subs/harness/src/tests/lineage-metrics.test.ts) (10) computes every measurement from a scripted run with hand-computed values, and reports `unavailable` with its known subtotal and reason when inputs are missing. |
-| ST14 | Pending audit | Browser evidence at both widths: 22 captures with no console error, warning or page error and no page-level horizontal overflow ([evidence/](evidence/), `61020c8`). Development pi check: passed ([below](#development-pi-check)). `npm run check:self`: 0 errors, 0 warnings, 132 analysis limits. Audit: pending: orchestrator runs the ramify-audit request and the root cucumber-viz audit on commit <hash>. |
+| ST14 | Passed | Browser evidence at both widths: 22 captures with no console error, warning or page error and no page-level horizontal overflow ([evidence/](evidence/), `61020c8`). Development pi check: passed ([below](#development-pi-check)). `npm run check:self`: 0 errors, 0 warnings, 132 analysis limits. Audits of `0a6d192`: the recorded ramify-audit request and the root cucumber-viz audit both pass ([below](#audits)). |
 
 ## Review decisions
 
@@ -335,6 +335,20 @@ npm run check:self
 node docs/plans/09-session-model-and-transcripts/evidence/capture.mjs
 # 22 captures, no console error or warning, no page-level horizontal overflow.
 ```
+
+## Audits
+
+Both audits ran on `0a6d192`, the commit that completed iteration 11, from a
+clean worktree. This section was recorded in a later documentation commit.
+
+| Audit | Result | Evidence |
+| --- | --- | --- |
+| The recorded [ramify-audit request](../../../audit/ramify-agent-suite.request.json) | PASS: all five checks, 143 s. `agent-tests`: 129 files passed, 1 skipped; 935 tests passed, 2 skipped. | `refs/audited/runs/2026-09-23T07-24-01Z-0a6d192c6` |
+| The root cucumber-viz audit, full test mode | PASS, 3 min 17 s. Regression: 169 files, 2260 tests passed. Static: type check and worktree dependencies passed. | `refs/audited/runs/2026-09-23T07-27-26Z-0a6d192` |
+
+Retrieve either summary with
+`git show <run ref>:reports/audit/summary.json`, and the commit's notes with
+`git notes --ref=audit show 0a6d192`.
 
 ## Open items
 
