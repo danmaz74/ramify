@@ -4,6 +4,8 @@ export const apiPrefix = '/api/v1';
 const plan = (planId: string): string => `${apiPrefix}/plans/${encodeURIComponent(planId)}`;
 const runs = (planId: string): string => `${plan(planId)}/runs`;
 const run = (planId: string, runId: string): string => `${runs(planId)}/${encodeURIComponent(runId)}`;
+const runSession = (planId: string, runId: string, session: string): string => `${run(planId, runId)}/sessions/${encodeURIComponent(session)}`;
+const standaloneSession = (session: string): string => `${apiPrefix}/sessions/standalone/${encodeURIComponent(session)}`;
 
 /** The paths of the queries and of the command endpoint, relative to the server's origin. */
 export const protocolPaths = {
@@ -26,4 +28,25 @@ export const protocolPaths = {
   runModuleCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/module-capabilities`,
   runGate: (planId: string, runId: string, gate: string): string => `${run(planId, runId)}/gates/${encodeURIComponent(gate)}`,
   runMetrics: (planId: string, runId: string): string => `${run(planId, runId)}/metrics`,
+  /** Every session of the project, a page of at most 200 from `offset`. */
+  sessions: (offset = 0): string => `${apiPrefix}/sessions?offset=${offset}`,
+  /** A run's sessions, with their invocations, lineage and the diagram elements each reaches. */
+  runSessions: (planId: string, runId: string): string => `${run(planId, runId)}/sessions`,
+  /** The entries of one of a run's sessions after entry `after`. */
+  runSessionTranscript: (planId: string, runId: string, session: string, after: number): string =>
+    `${runSession(planId, runId, session)}/transcript?after=${after}`,
+  /** A poll of one run: the sessions changed after run version `version`, and the entries of each followed session after its cursor. */
+  runSessionUpdates: (planId: string, runId: string, version: number, cursors: ReadonlyArray<{ readonly session: string; readonly after: number }>): string =>
+    `${run(planId, runId)}/sessions/updates?version=${version}&cursors=${encodeURIComponent(cursors.map(cursor => `${cursor.session}:${cursor.after}`).join(','))}`,
+  /** A body of the run's content store, by its hash. */
+  runBody: (planId: string, runId: string, hash: string): string => `${run(planId, runId)}/bodies/${encodeURIComponent(hash)}`,
+  /** A file one of the run's session transcripts names, by its path relative to the run's directory. */
+  runSessionFile: (planId: string, runId: string, session: string, path: string): string =>
+    `${runSession(planId, runId, session)}/files?path=${encodeURIComponent(path)}`,
+  /** One standalone session: its summary, prompt, outcome and evaluation. */
+  standaloneSession,
+  standaloneTranscript: (session: string, after: number): string => `${standaloneSession(session)}/transcript?after=${after}`,
+  standaloneBody: (session: string, hash: string): string => `${standaloneSession(session)}/bodies/${encodeURIComponent(hash)}`,
+  /** A file the standalone session's transcript names, by its path relative to the session's directory. */
+  standaloneFile: (session: string, path: string): string => `${standaloneSession(session)}/files?path=${encodeURIComponent(path)}`,
 } as const;

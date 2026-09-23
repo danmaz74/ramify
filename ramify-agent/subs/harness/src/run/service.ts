@@ -730,6 +730,19 @@ export class RunService {
     return this.runsOf(planId).map(run => ({ record: run.record, directory: run.directory, entries: run.log.ledger.replay() }));
   }
 
+  /**
+   * Every run it serves, of every plan, with its version: the sequence of its
+   * last event. A reader compares versions to know which runs changed,
+   * without replaying any log.
+   */
+  runVersions(): Array<{ readonly planId: string; readonly runId: string; readonly version: number }> {
+    return [...this.runs.values()].map(run => ({
+      planId: run.record.planId,
+      runId: run.record.jobId,
+      version: run.log.events.at(-1)?.sequence ?? 0,
+    }));
+  }
+
   /** The name of the agent a run starts with, or undefined when none is configured and no run can start. */
   get agentName(): string | undefined {
     return this.options.agent?.name;

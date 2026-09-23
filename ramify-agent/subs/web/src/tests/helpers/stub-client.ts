@@ -5,6 +5,11 @@ import type {
   AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
   RunCommand, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
+import type {
+  RunSessionsResponse, SessionBodyResponse, SessionCursor, SessionListResponse, SessionRef, SessionTranscriptResponse,
+  SessionUpdatesResponse, StandaloneSessionResponse,
+} from '../../../../harness/src/interfaces/protocol/sessions.js';
+import type { TranscriptBody } from '../../../../harness/src/interfaces/protocol/transcripts.js';
 import { ClientError, type ConnectionState, type ProjectInfo, type ProtocolClient } from '../../client.js';
 
 export const project: ProjectInfo = { name: 'collection-review', root: '/work/collection-review', planPattern: 'plans/<plan-id>/plan.md' };
@@ -35,6 +40,17 @@ export class StubClient implements ProtocolClient {
   commands: RunCommand[] = [];
   receipt: Receipt = { commandId: 'c', jobId: '20260921T080000Z-c0ffee', sequence: 1, acceptedAt: '2026-09-21T08:00:00.000Z' };
   tree: ModuleTree = { status: 'unavailable', message: 'The architect view has not been materialized yet.' };
+  sessionList: SessionListResponse = { sessions: [], total: 0, offset: 0, next: null, unserved: [] };
+  /** A run's sessions, by run ID. */
+  runSessions = new Map<string, RunSessionsResponse>();
+  /** Standalone sessions, by ID. */
+  standalone = new Map<string, StandaloneSessionResponse>();
+  /** Transcript pages by session key and cursor, `<session>@<after>`; a missing page is not found. */
+  transcripts = new Map<string, SessionTranscriptResponse>();
+  /** Poll answers, in the order they are given. */
+  polls: SessionUpdatesResponse[] = [];
+  /** Stored and file bodies, by hash or path. */
+  bodies = new Map<string, SessionBodyResponse>();
   private listeners = new Set<(state: ConnectionState) => void>();
 
   async getProject(): Promise<ProjectInfo> {
@@ -101,6 +117,40 @@ export class StubClient implements ProtocolClient {
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 
+  async listSessions(offset = 0): Promise<SessionListResponse> {
+    this.calls.push(`listSessions:${offset}`);
+    if (this.failure) throw this.failure;
+    return this.sessionList;
+  }
+
+  async getStandaloneSession(session: string): Promise<StandaloneSessionResponse> {
+    this.calls.push(`getStandaloneSession:${session}`);
+    return found(this.failure, this.standalone.get(session), `standalone session ${session}`);
+  }
+
+  async getRunSessions(_planId: string, runId: string): Promise<RunSessionsResponse> {
+    this.calls.push(`getRunSessions:${runId}`);
+    return found(this.failure, this.runSessions.get(runId), `sessions of run ${runId}`);
+  }
+
+  async getTranscript(session: SessionRef, after: number): Promise<SessionTranscriptResponse> {
+    const key = `${session.session}@${after}`;
+    this.calls.push(`getTranscript:${key}`);
+    return found(this.failure, this.transcripts.get(key), `transcript page ${key}`);
+  }
+
+  async pollSessions(_planId: string, runId: string, version: number, cursors: readonly SessionCursor[]): Promise<SessionUpdatesResponse> {
+    this.calls.push(`pollSessions:${runId}:${version}:${cursors.map(cursor => `${cursor.session}:${cursor.after}`).join(',')}`);
+    return found(this.failure, this.polls.shift(), `poll of run ${runId}`);
+  }
+
+  async getBody(_session: SessionRef, body: TranscriptBody): Promise<SessionBodyResponse> {
+    if (body.stored === 'inline') return { content: body.text, bytes: body.bytes, truncated: false };
+    const key = body.stored === 'blob' ? body.hash : body.path;
+    this.calls.push(`getBody:${key}`);
+    return found(this.failure, this.bodies.get(key), `body ${key}`);
+  }
+
   async sendCommand(command: RunCommand): Promise<Receipt> {
     this.calls.push(`sendCommand:${command.type}`);
     this.commands.push(command);
@@ -121,4 +171,11 @@ export class StubClient implements ProtocolClient {
     this.state = state;
     for (const listener of this.listeners) listener(state);
   }
+}
+
+/** A stubbed answer, the stub's failure, or not found. */
+function found<T>(failure: ClientError | undefined, value: T | undefined, what: string): T {
+  if (failure) throw failure;
+  if (value === undefined) throw new ClientError('protocol', `No ${what}`, 'not-found');
+  return value;
 }

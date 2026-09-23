@@ -6,7 +6,11 @@ import { acceptedCommandSchema, activitySchema, apiViewEvidenceSchema, receiptSc
 import { citationSchema, inputManifestSchema, modulePathSchema, moduleTreeResponseSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
-import { moduleCapabilityComparisonResponseSchema, runQueryLimits } from '../interfaces/protocol/runs.js';
+import { moduleCapabilityComparisonResponseSchema, runEventRefKindSchema, runQueryLimits } from '../interfaces/protocol/runs.js';
+import {
+  runSessionViewSchema, sessionBodyResponseSchema, sessionListEntrySchema, sessionQueryLimits, sessionRefSchema,
+  sessionTranscriptResponseSchema, sessionUpdatesResponseSchema, standaloneSessionIdSchema,
+} from '../interfaces/protocol/sessions.js';
 
 describe('queries', () => {
   test('a plan list carries readable and unreadable entries', () => {
@@ -254,5 +258,105 @@ describe('the module-capability comparison', () => {
     // And the schema refuses such a field where a client might look for it.
     expect(accepts({ ...valid, deployed: true })).toBe(false);
     expect(accepts(with_(response => { (response.modules[1]!.capabilities[0]! as Record<string, unknown>)['commit'] = 'abc'; }))).toBe(false);
+  });
+});
+
+describe('sessions', () => {
+  const at = '2026-09-23T10:00:00.000Z';
+  const run = { source: 'run', planId: 'review-notes', runId: '20260923T100000Z-a1b2c3', session: 'ses-0001' } as const;
+  const standalone = { source: 'standalone', session: '20260923T101500Z-d4e5f6' } as const;
+  const entry = {
+    ref: run, state: 'live', finished: null, role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' },
+    executor: 'scripted', model: null, invocations: 1,
+    reaches: { kind: 'work-item', workItem: 'wi-001', capability: 'review-note', module: 'app/notes' },
+    startedAt: at, changedAt: at,
+  };
+  const page = { file: 'present', entries: [], cursor: 3, more: false, partial: false, unreadable: [] };
+
+  test('the paths encode their IDs and carry the cursors', () => {
+    expect(protocolPaths.sessions()).toBe('/api/v1/sessions?offset=0');
+    expect(protocolPaths.sessions(200)).toBe('/api/v1/sessions?offset=200');
+    expect(protocolPaths.runSessions('p', 'r 1')).toBe('/api/v1/plans/p/runs/r%201/sessions');
+    expect(protocolPaths.runSessionTranscript('p', 'r', 'ses-0002', 7)).toBe('/api/v1/plans/p/runs/r/sessions/ses-0002/transcript?after=7');
+    expect(protocolPaths.runSessionUpdates('p', 'r', 12, [{ session: 'ses-0001', after: 5 }, { session: 'ses-0002', after: 0 }]))
+      .toBe('/api/v1/plans/p/runs/r/sessions/updates?version=12&cursors=ses-0001%3A5%2Cses-0002%3A0');
+    expect(protocolPaths.runBody('p', 'r', 'a'.repeat(64))).toBe(`/api/v1/plans/p/runs/r/bodies/${'a'.repeat(64)}`);
+    expect(protocolPaths.runSessionFile('p', 'r', 'ses-0001', 'invocations/inv-0003/shell/001.log'))
+      .toBe('/api/v1/plans/p/runs/r/sessions/ses-0001/files?path=invocations%2Finv-0003%2Fshell%2F001.log');
+    expect(protocolPaths.standaloneSession('s 1')).toBe('/api/v1/sessions/standalone/s%201');
+    expect(protocolPaths.standaloneTranscript('s', 0)).toBe('/api/v1/sessions/standalone/s/transcript?after=0');
+    expect(protocolPaths.standaloneFile('s', 'shell/001.log')).toBe('/api/v1/sessions/standalone/s/files?path=shell%2F001.log');
+  });
+
+  test('the bounds', () => {
+    expect(sessionQueryLimits).toEqual({ sessions: 200, runSessions: 500, entries: 200, pageBytes: 512 * 1024, pollSessions: 50, bodyBytes: 1024 * 1024 });
+  });
+
+  test('a session is a run\'s, by plan, run and ses- number, or a standalone one, by its own ID', () => {
+    expect(sessionRefSchema.parse(run)).toEqual(run);
+    expect(sessionRefSchema.parse(standalone)).toEqual(standalone);
+    expect(sessionRefSchema.safeParse({ ...run, session: 'ses-1' }).success).toBe(false);
+    expect(sessionRefSchema.safeParse({ ...run, session: '../ses-0001' }).success).toBe(false);
+    for (const id of ['', '../x', 'a/b', '.hidden']) expect(standaloneSessionIdSchema.safeParse(id).success).toBe(false);
+    expect(sessionRefSchema.safeParse({ source: 'standalone', session: 'ses-0001', planId: 'p' }).success).toBe(false);
+  });
+
+  test('a list entry shows interrupted as a state, names its executor and reaches its elements', () => {
+    expect(sessionListEntrySchema.parse(entry)).toEqual(entry);
+    for (const state of ['live', 'suspended', 'finished', 'interrupted']) expect(sessionListEntrySchema.safeParse({ ...entry, state }).success).toBe(true);
+    expect(sessionListEntrySchema.safeParse({ ...entry, state: 'running' }).success).toBe(false);
+    expect(sessionListEntrySchema.safeParse({ ...entry, agent: 'scripted' }).success).toBe(false);
+    for (const reaches of [{ kind: 'run' }, { kind: 'request', request: 'pr-001', workItem: 'wi-001', capability: null }, { kind: 'module', module: 'app/notes' }]) {
+      expect(sessionListEntrySchema.safeParse({ ...entry, reaches }).success).toBe(true);
+    }
+    expect(sessionListEntrySchema.safeParse({ ...entry, reaches: { kind: 'run', module: 'app' } }).success).toBe(false);
+  });
+
+  test('a missing transcript has no entries; a page names its cursor, never a body outside its entries', () => {
+    expect(sessionTranscriptResponseSchema.safeParse({ session: run, page }).success).toBe(true);
+    expect(sessionTranscriptResponseSchema.safeParse({ session: standalone, page: { ...page, file: 'missing' } }).success).toBe(true);
+    const started = {
+      n: 1, at, type: 'started', invocation: 'inv-0001', role: 'engineer', work: {}, start: 'opened', requested: 'fresh',
+      continues: null, fork: null, replaces: null, requestedBy: null, executor: 'scripted', model: null,
+      systemPrompt: { stored: 'blob', hash: 'a'.repeat(64), bytes: 20_000, preview: 'You are the engineer.' },
+      prompt: { stored: 'inline', text: 'Raise the limit.', bytes: 16 },
+    };
+    expect(sessionTranscriptResponseSchema.safeParse({ session: run, page: { ...page, entries: [started], cursor: 1 } }).success).toBe(true);
+    expect(sessionTranscriptResponseSchema.safeParse({ session: run, page: { ...page, file: 'missing', entries: [started] } }).success).toBe(false);
+    expect(sessionTranscriptResponseSchema.safeParse({ session: run, page: { ...page, file: 'missing', more: true } }).success).toBe(false);
+    expect(sessionTranscriptResponseSchema.safeParse({ session: run, page: { ...page, cursor: -1 } }).success).toBe(false);
+  });
+
+  test('a run session\'s invocations carry their moments, points and evaluation; the poll answers views and pages', () => {
+    const view = {
+      session: 'ses-0002', state: 'suspended', finished: null, role: 'local-architect', work: { workItem: 'wi-001' },
+      executor: 'scripted', model: 'provider/model-7',
+      reaches: { kind: 'work-item', workItem: 'wi-001', capability: 'review-note', module: 'app/notes' },
+      opened: { sequence: 9, at }, changed: { sequence: 12, at }, awaiting: null,
+      point: { session: 'ses-0002', invocation: 'inv-0002' },
+      invocations: [{
+        invocation: 'inv-0002', start: 'opened', started: { sequence: 10, at }, ended: { sequence: 12, at }, outcome: 'submitted', kept: true,
+        continues: null, degraded: { requested: 'fork', actual: 'fresh', reason: 'no history' },
+        point: { session: 'ses-0002', invocation: 'inv-0002' }, evaluation: null,
+      }],
+      appends: [],
+      suspended: [{ from: { sequence: 12, at }, until: null }],
+      lineage: { fork: null, replaces: null, replacedBy: null, requestedBy: null, requested: [], forks: ['ses-0003'] },
+    };
+    expect(runSessionViewSchema.parse(view)).toEqual(view);
+    expect(runSessionViewSchema.safeParse({ ...view, invocations: [{ ...view.invocations[0], started: { sequence: 0, at } }] }).success).toBe(false);
+    const poll = { version: 12, sessions: [view], transcripts: [{ session: 'ses-0002', page }] };
+    expect(sessionUpdatesResponseSchema.parse(poll)).toEqual(poll);
+    expect(sessionUpdatesResponseSchema.safeParse({ ...poll, transcripts: Array.from({ length: 51 }, () => ({ session: 'ses-0002', page })) }).success).toBe(false);
+  });
+
+  test('a body is at most 1 MiB, with its whole size', () => {
+    expect(sessionBodyResponseSchema.safeParse({ content: 'x'.repeat(1024 * 1024), bytes: 3_000_000, truncated: true }).success).toBe(true);
+    expect(sessionBodyResponseSchema.safeParse({ content: 'x'.repeat(1024 * 1024 + 1), bytes: 3_000_000, truncated: true }).success).toBe(false);
+    expect(sessionBodyResponseSchema.safeParse({ content: 'é'.repeat(600 * 1024), bytes: 1_228_800, truncated: false }).success).toBe(false);
+  });
+
+  test('a projected event refers to the sessions it names', () => {
+    expect(runEventRefKindSchema.options).toContain('session');
   });
 });

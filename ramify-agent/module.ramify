@@ -72,3 +72,34 @@ expose-sub MetricState, metricSchema, Metric, guardingViewSchema, GuardingView f
 expose-sub lineageMetricSchema, LineageMetric from harness to descendants
 expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to descendants
 expose-sub metricsResponseSchema, MetricsResponse from harness to descendants
+
+// protocol/transcripts.ts
+expose-sub transcriptBodySchema, TranscriptBody, transcriptLineRangeSchema from harness to descendants
+expose-sub transcriptToolActionSchema, TranscriptToolAction, thinkingVisibilitySchema from harness to descendants
+expose-sub transcriptContentBlockSchema, TranscriptContentBlock from harness to descendants
+expose-sub transcriptAssistantBlockSchema, TranscriptAssistantBlock from harness to descendants
+expose-sub transcriptMessageDetailSchema, TranscriptMessageDetail from harness to descendants
+expose-sub transcriptPointSchema, TranscriptPoint, transcriptContinuesSchema from harness to descendants
+expose-sub transcriptForkSchema, transcriptReplacesSchema, transcriptRequestedBySchema from harness to descendants
+expose-sub transcriptWorkSchema, transcriptStartModeSchema, transcriptEndedSchema from harness to descendants
+expose-sub transcriptInterruptionSchema, transcriptHarnessDecisionSchema from harness to descendants
+expose-sub TranscriptHarnessDecision, transcriptEntrySchema, TranscriptEntry from harness to descendants
+expose-sub TranscriptEntryType, TranscriptEntryOf from harness to descendants
+
+// protocol/sessions.ts
+expose-sub sessionQueryLimits, runSessionIdSchema, standaloneSessionIdSchema from harness to descendants
+expose-sub sessionRefSchema, SessionRef, sessionStateSchema, ShownSessionState from harness to descendants
+expose-sub sessionFinishReasonSchema, SessionFinishReasonView, sessionReachSchema from harness to descendants
+expose-sub SessionReach, sessionListEntrySchema, SessionListEntry from harness to descendants
+expose-sub unservedSessionSourceSchema, UnservedSessionSource from harness to descendants
+expose-sub sessionListResponseSchema, SessionListResponse, sessionMomentSchema from harness to descendants
+expose-sub SessionMoment, sessionDegradeSchema, SessionDegrade from harness to descendants
+expose-sub sessionInvocationSchema, SessionInvocation, sessionAppendSchema from harness to descendants
+expose-sub SessionAppend, sessionSuspensionSchema, SessionSuspension from harness to descendants
+expose-sub sessionLineageSchema, SessionLineage, runSessionViewSchema, RunSessionView from harness to descendants
+expose-sub runSessionsResponseSchema, RunSessionsResponse, transcriptPageSchema from harness to descendants
+expose-sub TranscriptPage, sessionTranscriptResponseSchema, SessionTranscriptResponse from harness to descendants
+expose-sub sessionCursorSchema, SessionCursor, sessionUpdatesResponseSchema from harness to descendants
+expose-sub SessionUpdatesResponse, sessionBodyResponseSchema, SessionBodyResponse from harness to descendants
+expose-sub sessionBodyHashSchema, standaloneSessionResponseSchema from harness to descendants
+expose-sub StandaloneSessionResponse from harness to descendants

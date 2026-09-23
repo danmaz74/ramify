@@ -33,7 +33,10 @@ function describe(event: RunEvent): [string, Ref[]] {
           + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}, generation ${fork.generation})`)
           + (replaces === undefined ? '' : `, in place of ${replaces.session} (${replaces.reason})`)
           + (requestedBy === undefined ? '' : `, requested by ${requestedBy.invocation} (${requestedBy.reason})`),
-        [...workRefs(event.data.work), ...pointRefs(fork?.from), ...ref('invocation', requestedBy?.invocation)],
+        [
+          ...ref('session', event.data.session), ...workRefs(event.data.work), ...pointRefs(fork?.from),
+          ...ref('session', replaces?.session), ...ref('invocation', requestedBy?.invocation),
+        ],
       ];
     }
     case 'invocation-started': {
@@ -41,7 +44,7 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [
         `The ${event.data.role} invocation ${event.data.invocation} started, ${event.data.start === 'opened' ? 'opening' : 'continuing'} session ${event.data.session}`
           + (continues === undefined ? '' : ` from ${pointLabel(continues.from)} (${continues.reason})`),
-        [...ref('invocation', event.data.invocation), ...pointRefs(continues?.from)],
+        [...ref('invocation', event.data.invocation), ...ref('session', event.data.session), ...pointRefs(continues?.from)],
       ];
     }
     case 'invocation-ended': {
@@ -49,11 +52,11 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [
         `Invocation ${event.data.invocation} ended: ${event.data.ended}; session ${event.data.session} ${event.data.kept ? 'is kept' : `finished (${event.data.finished})`}`
           + (degraded === undefined ? '' : `; it started ${degraded.actual} where ${degraded.requested} was requested${degraded.reason === null ? '' : `: ${degraded.reason}`}`),
-        ref('invocation', event.data.invocation),
+        [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)],
       ];
     }
     case 'session-finished':
-      return [`Session ${event.data.session} finished (${event.data.reason})`, []];
+      return [`Session ${event.data.session} finished (${event.data.reason})`, ref('session', event.data.session)];
     case 'analysis-accepted':
       return [
         `The initial analysis was accepted: ${counted(event.data.entries, 'entry capability', 'entry capabilities')}, ${counted(event.data.hypotheses, 'hypothesis', 'hypotheses')}, ${counted(event.data.workItems, 'work item', 'work items')}`,
@@ -93,7 +96,7 @@ function describe(event: RunEvent): [string, Ref[]] {
         [...ref('decision', event.data.decision), ...ref('request', event.data.request), ...ref('work-item', event.data.workItem)],
       ];
     case 'brief-appended':
-      return [`The brief of ${event.data.decision} reached the global architect's context (${event.data.outcome})`, ref('decision', event.data.decision)];
+      return [`The brief of ${event.data.decision} reached the global architect's context (${event.data.outcome})`, [...ref('decision', event.data.decision), ...ref('session', event.data.session)]];
     case 'global-context-rebuilt':
       return [`The global architect's context was rebuilt (generation ${event.data.generation}): ${event.data.reason}`, []];
     case 'decision-delivered':

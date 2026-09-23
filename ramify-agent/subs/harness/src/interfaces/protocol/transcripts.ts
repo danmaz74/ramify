@@ -102,19 +102,26 @@ export const transcriptPointSchema = z.union([
 ]);
 export type TranscriptPoint = z.infer<typeof transcriptPointSchema>;
 
-const continues = z.object({
+/** A continued start: the point it continues from, why, and the briefs appended since the previous invocation. */
+export const transcriptContinuesSchema = z.object({
   from: transcriptPointSchema,
   reason: z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']),
   briefs: z.array(text),
 }).strict();
-const fork = z.object({
+/** A forked start: the source point, why, the context generation and the briefs held at the point. */
+export const transcriptForkSchema = z.object({
   from: transcriptPointSchema,
   reason: z.enum(['placement-request']),
   generation: z.int().positive(),
   briefs: z.array(text),
 }).strict();
-const replaces = z.object({ session: text, reason: z.enum(['reconstructed', 'context-rebuilt']) }).strict();
-const requestedBy = z.object({ invocation: text, reason: z.enum(['contract-needed']) }).strict();
+/** The session a new one took the place of, and why. */
+export const transcriptReplacesSchema = z.object({ session: text, reason: z.enum(['reconstructed', 'context-rebuilt']) }).strict();
+/** The invocation whose result asked for a session, and why. */
+export const transcriptRequestedBySchema = z.object({ invocation: text, reason: z.enum(['contract-needed']) }).strict();
+
+/** The work an invocation belongs to, as the run log records it. */
+export const transcriptWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict();
 
 /** A session start, in the port's terms: what was requested, and what an invocation's end says was actual. */
 export const transcriptStartModeSchema = z.enum(['fresh', 'continue', 'fork']);
@@ -207,14 +214,14 @@ const ofInvocation = { invocation: text };
 const startedEntry = entry('started', {
   ...ofInvocation,
   role: roleSchema,
-  work: z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict(),
+  work: transcriptWorkSchema,
   /** `opened` for the first invocation of the session, `continued` for one that joins it. */
   start: z.enum(['opened', 'continued']),
   requested: transcriptStartModeSchema,
-  continues: continues.nullable(),
-  fork: fork.nullable(),
-  replaces: replaces.nullable(),
-  requestedBy: requestedBy.nullable(),
+  continues: transcriptContinuesSchema.nullable(),
+  fork: transcriptForkSchema.nullable(),
+  replaces: transcriptReplacesSchema.nullable(),
+  requestedBy: transcriptRequestedBySchema.nullable(),
   executor: text,
   model: text.nullable(),
   systemPrompt: transcriptBodySchema,

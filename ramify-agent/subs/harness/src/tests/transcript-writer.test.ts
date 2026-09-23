@@ -87,6 +87,24 @@ describe('a transcript', () => {
     expect(after.gaps).toEqual([]);
   });
 
+  test('a reader skips a complete line that is not JSON, keeps every other entry, and says a missing file is missing', async () => {
+    const { path, writer, root } = await directory();
+    expect(await readTranscript(path)).toEqual({ missing: true, entries: [], discardedPartial: false, unreadable: [] });
+    const first = invocation(writer(), 'inv-0001');
+    await first.transcript.started(start());
+    await first.transcript.drain();
+    // A damaged line, then an entry after it.
+    await appendFile(path, 'not a JSON value\n');
+    await appendFile(path, `${JSON.stringify({ n: 2, at: '2026-09-23T10:00:00.000Z', type: 'message', invocation: 'inv-0001', role: 'user', blocks: [] })}\n`);
+    const read = await readTranscript(path);
+    expect(read).toMatchObject({ missing: false, discardedPartial: false, unreadable: [2] });
+    expect(read.entries.map(entry => entry.n)).toEqual([1, 2]);
+    // An empty file exists, and has no entries.
+    const empty = join(root, 'transcripts', 'ses-0002.jsonl');
+    await writeFile(empty, '');
+    expect(await readTranscript(empty)).toEqual({ missing: false, entries: [], discardedPartial: false, unreadable: [] });
+  });
+
   test('a session\'s entries are numbered across its invocations and appends, and a number is never reused', async () => {
     const { path, writer } = await directory();
     const session = writer();

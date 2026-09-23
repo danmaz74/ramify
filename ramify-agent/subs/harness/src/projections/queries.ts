@@ -30,6 +30,8 @@ export interface RunSource {
   readonly agentName: string | undefined;
   committed(planId: string, runId: string): CommittedRun | undefined;
   committedRuns(planId: string): CommittedRun[];
+  /** Every run it serves, of every plan, with the sequence of its last event. */
+  runVersions(): ReadonlyArray<{ readonly planId: string; readonly runId: string; readonly version: number }>;
 }
 
 export class RunQueries {
@@ -106,12 +108,17 @@ export class RunQueries {
 
   /** The view of one served run; a run that exists and is not served is reported with why, never as absent. */
   private async view(planId: string, runId: string): Promise<RunView> {
-    const run = this.source.committed(planId, runId);
-    if (run !== undefined) return runView(run);
-    const unserved = await unservedRun(this.source.projectRoot, planId, runId);
-    if (unserved !== null) throw unserved;
-    throw new ProjectionError('not-found', `No run ${runId} for plan "${planId}"`);
+    return runView(await servedRun(this.source, planId, runId));
   }
+}
+
+/** One run the source serves; a run that exists and is not served is reported with why, never as absent. */
+export async function servedRun(source: RunSource, planId: string, runId: string): Promise<CommittedRun> {
+  const run = source.committed(planId, runId);
+  if (run !== undefined) return run;
+  const unserved = await unservedRun(source.projectRoot, planId, runId);
+  if (unserved !== null) throw unserved;
+  throw new ProjectionError('not-found', `No run ${runId} for plan "${planId}"`);
 }
 
 /** The coverage limits the accepted analysis submission recorded, read from the run's own file. */

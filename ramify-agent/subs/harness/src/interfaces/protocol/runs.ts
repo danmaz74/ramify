@@ -233,7 +233,7 @@ export type RunResponse = z.infer<typeof runResponseSchema>;
 /** What a projected event refers to. */
 export const runEventRefKindSchema = z.enum([
   'work-item', 'iteration', 'invocation', 'gate', 'decision', 'request',
-  'contract', 'obligation', 'requirement', 'capability', 'commit',
+  'contract', 'obligation', 'requirement', 'capability', 'commit', 'session',
 ]);
 export type RunEventRefKind = z.infer<typeof runEventRefKindSchema>;
 

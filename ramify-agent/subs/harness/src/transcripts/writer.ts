@@ -138,28 +138,47 @@ function relativePath(root: string, path: string): string {
 
 /** A transcript as a reader loads it. */
 export interface TranscriptRead {
+  /** The file does not exist; it has no entries. */
+  readonly missing: boolean;
   readonly entries: readonly TranscriptEntry[];
   /** A trailing line without its newline was discarded, as an interrupted append. */
   readonly discardedPartial: boolean;
-  /** Complete lines that are not entries of this schema, by line number. */
+  /** Complete lines that are not entries of this schema, JSON or not, by line number. */
   readonly unreadable: readonly number[];
 }
 
 /**
- * Reads a transcript without changing it. A missing file has no entries.
- * A torn last line is discarded; a complete line that is not an entry is
- * reported by its number and skipped.
+ * Reads a transcript without changing it. A missing file has no entries,
+ * and says so. A torn last line is discarded; a complete line that is not an
+ * entry, whether it is not JSON or not of the schema, is reported by its
+ * number and skipped, so one damaged line never hides the others.
  */
 export async function readTranscript(path: string): Promise<TranscriptRead> {
-  const loaded = await readJsonLines(path);
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { missing: true, entries: [], discardedPartial: false, unreadable: [] };
+    throw error;
+  }
+  const complete = bytes.lastIndexOf(0x0a) + 1;
+  const lines = bytes.subarray(0, complete).toString('utf8').split('\n');
+  lines.pop();
   const entries: TranscriptEntry[] = [];
   const unreadable: number[] = [];
-  loaded.records.forEach((record, index) => {
+  lines.forEach((line, index) => {
+    let record: unknown;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      unreadable.push(index + 1);
+      return;
+    }
     const parsed = transcriptEntrySchema.safeParse(record);
     if (parsed.success) entries.push(parsed.data);
     else unreadable.push(index + 1);
   });
-  return { entries, discardedPartial: loaded.discardedPartial !== null, unreadable };
+  return { missing: false, entries, discardedPartial: complete < bytes.length, unreadable };
 }
 
 /** A body's content: inline, from the content store, or the file it names. Null where it can no longer be read. */
