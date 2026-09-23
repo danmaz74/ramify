@@ -73,3 +73,9 @@ expose-sub GateView, gateResponseSchema, GateResponse, metricStateSchema from ha
 expose-sub MetricState, metricSchema, Metric, guardingViewSchema, GuardingView from harness to descendants
 expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to descendants
 expose-sub metricsResponseSchema, MetricsResponse from harness to descendants
+expose-sub scenarioKindSchema, ScenarioKind, scenarioOriginViewSchema, ScenarioOriginView from harness to descendants
+expose-sub trackedScenarioStateSchema, TrackedScenarioState, scenarioStatusSchema, ScenarioStatus from harness to descendants
+expose-sub scenarioCheckModeSchema, ScenarioCheckMode, scenarioWarningKindSchema, ScenarioWarningKind from harness to descendants
+expose-sub scenarioWarningViewSchema, ScenarioWarningView, analysisScenarioSchema, AnalysisScenario from harness to descendants
+expose-sub scenarioCheckViewSchema, ScenarioCheckView, scenarioGateResultSchema, ScenarioGateResult from harness to descendants
+expose-sub scenarioViewSchema, ScenarioView, scenarioListResponseSchema, ScenarioListResponse from harness to descendants

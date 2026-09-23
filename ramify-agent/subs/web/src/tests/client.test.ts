@@ -72,3 +72,15 @@ test('reads the run\'s event page after a cursor', async () => {
   await expect(client.getEvents('p', 'r1', 42)).rejects.toMatchObject({ kind: 'invalid-response' });
   expect(urls).toEqual(['http://h/api/v1/plans/p/runs/r1/events?after=42']);
 });
+
+test('reads the scenario list at its path and validates it', async () => {
+  const urls: string[] = [];
+  const list = { scenarios: [], total: 0 };
+  const client = createProtocolClient('http://h', async input => {
+    urls.push(String(input));
+    return new Response(JSON.stringify(urls.length === 1 ? list : { scenarios: [{ id: 'sc-001' }], total: 1 }), { status: 200, headers: { 'content-type': 'application/json' } });
+  });
+  expect(await client.getScenarios('p', 'r 1')).toEqual(list);
+  await expect(client.getScenarios('p', 'r 1')).rejects.toMatchObject({ kind: 'invalid-response' });
+  expect(urls).toEqual(['http://h/api/v1/plans/p/runs/r%201/scenarios', 'http://h/api/v1/plans/p/runs/r%201/scenarios']);
+});

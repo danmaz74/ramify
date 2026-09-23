@@ -7,8 +7,10 @@ public evidence and protocol contracts from the root, and nothing else from
 `harness`.
 
 It shows the project's plans and their implementation runs. Start, on the
-Plan page, and Stop, on the Run page, are its only commands; nothing else on
-it is editable, and closing or reloading it does not affect a run.
+Plan page, with or without the review stop, and Stop and Approve, on the Run
+page, are its only commands; Approve's reviewer and note are the only fields
+besides Start's option, and closing or reloading the page does not affect a
+run.
 
 ## Entry points
 
@@ -24,10 +26,11 @@ it is editable, and closing or reloading it does not affect a run.
 - `src/run-page.tsx` is the Run page, list and detail only: the overview
   with notices first (every module created or removed, then every
   dependency cycle, resolved or not), then state, current work, waits,
-  counts, failure and the event feed; the plan and entries; hypotheses as
-  forecasts with standing and revision beside the decisions; work items;
-  checks with bounded output tails; capability progress; and the metrics
-  with the evaluation evidence. The connection to the harness is shown apart
+  counts, failure, the review and the event feed; the plan and entries,
+  with the review of the scenarios; hypotheses as forecasts with standing
+  and revision beside the decisions; work items; the scenarios; checks with
+  bounded output tails and each scenario check's summary; capability
+  progress; and the metrics with the evaluation evidence. The connection to the harness is shown apart
   from the run's state. `src/run-progress.ts` reads the event page after a
   cursor, as Plan 1's page did, and reads each area again when the run's
   version moves.
@@ -55,6 +58,18 @@ it is editable, and closing or reloading it does not affect a run.
   Selected detail opens the capability's work-item history. With the dev
   server, `?example=capability-graph` previews it over the projection's
   answers for the cases of `harness/src/tests/progress.test.ts`.
+- `src/run-scenarios.tsx` holds the acceptance scenarios' views. The review,
+  under Plan and entries, shows each entry's scenarios with their origin and
+  frozen text, each integration scenario with the plan's text beside its
+  sub-scenarios, and the warnings the acceptance recorded, on the scenario
+  they concern too. The Scenarios area lists every tracked scenario with its
+  state, what it belongs to, its owner and file, and every gate that ran
+  it with its status there. Approve asks for a reviewer and an optional
+  note and sends `approve-analysis` at the run's version, once more at the
+  version a `stale-version` refusal names; it is offered at the review stop
+  and wherever the run is not reviewed, has an accepted analysis, is not in
+  its final verification and was not failed, stopped or interrupted, and the
+  page reads the run again once it is accepted.
 - `src/module-tree.tsx` draws modules marked as touched on the project's
   module tree, with their weights. Branches that hold marked modules are
   open; a module that does not exist yet is drawn under its parent and marked

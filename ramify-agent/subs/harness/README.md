@@ -406,12 +406,21 @@ hiding or measured complexity justifies it.
   projects each event to its transition, references and time; `analysis.ts`
   holds the hypotheses and the decision list, read from the records that hold
   each choice; `work.ts` the work items and gates, each output tail bounded
-  at 8 KiB and each command's environment withheld; `progress.ts` the
-  capability progress, where `completed` needs current verification
-  evidence, a provider wait stays working with its reason, a reopening
-  returns a completed capability to working and a superseded hypothesis
-  leaves the list; `metrics.ts` the KPIs and the evaluation evidence;
-  `queries.ts` the one entry point the HTTP adapter calls.
+  at 8 KiB and each command's environment withheld, and a scenario check's
+  summary in compact form (statuses and failures, without bindings);
+  `progress.ts` the capability progress, where `completed` needs current
+  verification evidence, a provider wait stays working with its reason, a
+  reopening returns a completed capability to working and a superseded
+  hypothesis leaves the list, and each entry counts its scenarios,
+  implemented of all it has; `scenarios.ts` the tracked scenarios, replayed
+  as `run/feature-files.ts` replays them: the review's frozen text with the
+  warnings `analysis-accepted` recorded, and the scenario list
+  (`GET .../runs/:runId/scenarios`) with each scenario's state, origin, work
+  item, owner, file, implementing gate and every gate attempt whose scenario
+  check ran it, with its status there read from that attempt's summary;
+  `metrics.ts` the KPIs and the evaluation evidence; `queries.ts` the one
+  entry point the HTTP adapter calls. A projected scenario event refers to
+  its scenario.
 - `prompts/`: one prompt package per role, versioned and hashed into the
   run's `prompts/manifest.json`. `submissionKinds` names the union members a
   package offers its role; a member a package does not offer is one no run
@@ -958,6 +967,11 @@ The run's own tests are beside them.
   follows, repair that exhausts, a failure outside the last scope that
   returns to the local architect, a module created from an accepted
   proposal, and a second iteration that rewrites nothing.
+- `scenario-projections.test.ts` reads the scenario list, the review, the
+  entries' scenario counts, a gate's scenario summary and the events'
+  scenario references over the scripted run of an integration scenario that
+  fails once at its first iteration gate, and over HTTP; and every state
+  over constructed records.
 - `accepted-commit.test.ts` covers the commit at an accepted boundary: a file
   changed while the gate ran that joins it, a crash on either side of the
   commit that still makes exactly one, and the message as a pure function of

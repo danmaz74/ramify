@@ -162,6 +162,8 @@ export const runQueryLimits = {
   decisions: 500,
   workItems: 200,
   capabilities: 500,
+  /** Tracked scenarios of the scenario list and of the analysis's review. */
+  scenarios: 500,
   /** Module-capability rows of one comparison, of the capabilities kept whole within `capabilities`. */
   moduleCapabilityRows: 2000,
   /** Bytes of a gate command's output a client receives; the complete output stays a file of the run. */
@@ -285,7 +287,7 @@ export type RunResponse = z.infer<typeof runResponseSchema>;
 /** What a projected event refers to. */
 export const runEventRefKindSchema = z.enum([
   'work-item', 'iteration', 'invocation', 'gate', 'decision', 'request',
-  'contract', 'obligation', 'requirement', 'capability', 'commit',
+  'contract', 'obligation', 'requirement', 'capability', 'commit', 'scenario',
 ]);
 export type RunEventRefKind = z.infer<typeof runEventRefKindSchema>;
 
@@ -361,10 +363,83 @@ export const hypothesisViewSchema = z.object({
 }).strict();
 export type HypothesisView = z.infer<typeof hypothesisViewSchema>;
 
+// The acceptance scenarios a run tracks, as the review and the scenario list read them.
+
+/** Whether a scenario is one entry's, or a plan scenario that combines several entries. */
+export const scenarioKindSchema = z.enum(['entry', 'integration']);
+export type ScenarioKind = z.infer<typeof scenarioKindSchema>;
+
+/**
+ * Where a tracked scenario comes from: the plan, whose text is the
+ * requirement, with the plan's lines; or the initial architect, with the
+ * parts of the plan it cites.
+ */
+export const scenarioOriginViewSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('plan'), planScenario: text, lines: z.tuple([z.int().positive(), z.int().positive()]) }).strict(),
+  z.object({
+    kind: z.literal('architect'),
+    refs: z.array(z.object({ anchor: text.optional(), lines: z.tuple([count, count]).optional() }).strict()),
+  }).strict(),
+]);
+export type ScenarioOriginView = z.infer<typeof scenarioOriginViewSchema>;
+
+/**
+ * A tracked scenario's state: `pending` and `bound` keep the pending tag in
+ * the source, `declared` waits for a gate to verify it, `implemented` passed
+ * one. Only the harness moves a state.
+ */
+export const trackedScenarioStateSchema = z.enum(['pending', 'bound', 'declared', 'implemented']);
+export type TrackedScenarioState = z.infer<typeof trackedScenarioStateSchema>;
+
+/** One scenario's result in one Cucumber run: the worst of its steps. */
+export const scenarioStatusSchema = z.enum(['passed', 'failed', 'undefined', 'pending', 'ambiguous', 'skipped']);
+export type ScenarioStatus = z.infer<typeof scenarioStatusSchema>;
+
+/** The execution mode of a scenario check, fixed for the whole check. */
+export const scenarioCheckModeSchema = z.enum(['quick', 'full']);
+export type ScenarioCheckMode = z.infer<typeof scenarioCheckModeSchema>;
+
+/** The kinds of warning the accepted analysis recorded on its scenarios. */
+export const scenarioWarningKindSchema = z.enum(['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps']);
+export type ScenarioWarningKind = z.infer<typeof scenarioWarningKindSchema>;
+
+/** A warning of the accepted analysis, never a rejection, with the scenarios it concerns. */
+export const scenarioWarningViewSchema = z.object({
+  kind: scenarioWarningKindSchema,
+  scenarios: z.array(text),
+  message: text,
+}).strict();
+export type ScenarioWarningView = z.infer<typeof scenarioWarningViewSchema>;
+
+/**
+ * One tracked scenario as the accepted analysis froze it, with its text: an
+ * entry scenario with its entry, a sub-scenario with the integration scenario
+ * it came from, and an integration scenario, whose text is the plan's, with
+ * its sub-scenarios.
+ */
+export const analysisScenarioSchema = z.object({
+  id: text,
+  kind: scenarioKindSchema,
+  /** The entry capability; null for an integration scenario. */
+  entry: text.nullable(),
+  owner: text,
+  origin: scenarioOriginViewSchema,
+  /** The integration scenario this one is a sub-scenario of. */
+  partOf: text.nullable(),
+  subScenarios: z.array(text),
+  name: z.string(),
+  /** The `Scenario` block as the feature file carries it, tags excluded. */
+  source: z.array(z.string()),
+  /** The feature file that carries it, relative to the project. */
+  file: text,
+}).strict();
+export type AnalysisScenario = z.infer<typeof analysisScenarioSchema>;
+
 /**
  * `GET /api/v1/plans/:planId/runs/:runId/analysis`: the captured plan, the
- * entry assignments with their owners and the hypotheses with their standing
- * and revision. `pending` until the analysis is accepted.
+ * entry assignments with their owners, the hypotheses with their standing
+ * and revision, and the tracked scenarios with the warnings the acceptance
+ * recorded on them. `pending` until the analysis is accepted.
  */
 export const analysisResponseSchema = z.object({
   plan: z.object({ markdown: z.string(), hash: text }).strict(),
@@ -375,7 +450,10 @@ export const analysisResponseSchema = z.object({
       view: viewIdentitySchema,
       entries: z.array(entryViewSchema).max(runQueryLimits.analysis),
       hypotheses: z.array(hypothesisViewSchema).max(runQueryLimits.analysis),
-      total: z.object({ entries: count, hypotheses: count }).strict(),
+      /** Entry scenarios in the order the analysis submitted them, then integration scenarios. */
+      scenarios: z.array(analysisScenarioSchema).max(runQueryLimits.scenarios),
+      warnings: z.array(scenarioWarningViewSchema),
+      total: z.object({ entries: count, hypotheses: count, scenarios: count }).strict(),
     }).strict(),
   ]),
 }).strict();
@@ -598,6 +676,8 @@ export const capabilityProgressSchema = z.object({
   dependsOn: z.array(z.object({ capability: text, tentative: z.boolean() }).strict()),
   workItems: z.array(text),
   evidence: z.array(text),
+  /** An entry's scenarios: how many are implemented of all it has. Null for a capability that is not an entry. */
+  scenarios: z.object({ implemented: count, total: count }).strict().nullable(),
 }).strict();
 export type CapabilityProgress = z.infer<typeof capabilityProgressSchema>;
 
@@ -765,6 +845,44 @@ export type ModuleCapabilityComparisonResponse = z.infer<typeof moduleCapability
 
 const tailBytes = (tail: string): number => new TextEncoder().encode(tail).byteLength;
 
+/** A failing scenario's first failing step and its message. */
+const scenarioFailureView = z.object({ step: z.string(), message: z.string() }).strict();
+
+/**
+ * What a `scenarios` command established, in compact form: its mode and
+ * selection, each module's run by exit code, each tracked scenario's status
+ * with its failure and undefined steps, the project's own scenarios by count,
+ * and why the check did not pass. The bindings and message streams stay
+ * files of the run.
+ */
+export const scenarioCheckViewSchema = z.object({
+  mode: scenarioCheckModeSchema,
+  selection: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('identity'), scenarios: z.array(text).min(1) }).strict(),
+    z.object({ kind: z.literal('all-untagged') }).strict(),
+    z.object({ kind: z.literal('all') }).strict(),
+  ]),
+  dryRun: z.boolean(),
+  /** Tracked scenarios the runs' files held and the selection kept out. */
+  excluded: count,
+  runs: z.array(z.object({ module: text, exit: z.int().nullable() }).strict()),
+  scenarios: z.array(z.object({
+    id: text,
+    /** The module whose run executed it. */
+    run: text,
+    status: scenarioStatusSchema,
+    file: z.string(),
+    line: z.int().positive(),
+    failure: scenarioFailureView.nullable(),
+    /** Step texts no definition matched. */
+    undefined: z.array(z.string()),
+  }).strict()),
+  untracked: z.object({ passed: count, skipped: count, failed: count }).strict(),
+  /** One line per reason the check did not pass; empty when it passed. */
+  failures: z.array(z.string()),
+}).strict();
+export type ScenarioCheckView = z.infer<typeof scenarioCheckViewSchema>;
+
 /** One gate attempt, with each command's output tail bounded at 8 KiB and its environment withheld. */
 export const gateViewSchema = z.object({
   id: text,
@@ -815,6 +933,8 @@ export const gateViewSchema = z.object({
       truncated: z.boolean(),
       tail: z.string().refine(tail => tailBytes(tail) <= runQueryLimits.outputTailBytes, 'An output tail is at most 8 KiB'),
     }).strict(),
+    /** A `scenarios` command's summary; null for every other kind, and for one that recorded none. */
+    scenarios: scenarioCheckViewSchema.nullable(),
   }).strict()),
 }).strict();
 export type GateView = z.infer<typeof gateViewSchema>;
@@ -822,6 +942,61 @@ export type GateView = z.infer<typeof gateViewSchema>;
 /** `GET /api/v1/plans/:planId/runs/:runId/gates/:gate`. */
 export const gateResponseSchema = z.object({ gate: gateViewSchema }).strict();
 export type GateResponse = z.infer<typeof gateResponseSchema>;
+
+/** One gate attempt whose scenario check ran a tracked scenario, with the scenario's status there. */
+export const scenarioGateResultSchema = z.object({
+  gate: text,
+  checkpoint: gateCheckpointSchema,
+  subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
+  /** The attempt's verdict, which covers every check it ran. */
+  verdict: gateVerdictSchema,
+  mode: scenarioCheckModeSchema,
+  dryRun: z.boolean(),
+  status: scenarioStatusSchema,
+  failure: scenarioFailureView.nullable(),
+  undefined: z.array(z.string()),
+}).strict();
+export type ScenarioGateResult = z.infer<typeof scenarioGateResultSchema>;
+
+/**
+ * One tracked scenario as the run holds it now: its state, where it came
+ * from, what it belongs to, who owns it and in which file, and every gate
+ * attempt that ran it, in the order they were committed.
+ */
+export const scenarioViewSchema = z.object({
+  id: text,
+  kind: scenarioKindSchema,
+  name: z.string(),
+  state: trackedScenarioStateSchema,
+  origin: scenarioOriginViewSchema,
+  /** The entry capability; null for an integration scenario. */
+  entry: text.nullable(),
+  /** The integration scenario this one is a sub-scenario of. */
+  partOf: text.nullable(),
+  subScenarios: z.array(text),
+  /**
+   * The work item that binds it: its entry's, or for an integration scenario
+   * the integration work item, null until its sub-scenarios are implemented.
+   */
+  workItem: text.nullable(),
+  owner: text,
+  file: text,
+  /** The gate whose pass made it `implemented`; null while it is not. */
+  implementedBy: text.nullable(),
+  gates: z.array(scenarioGateResultSchema),
+}).strict();
+export type ScenarioView = z.infer<typeof scenarioViewSchema>;
+
+/**
+ * `GET /api/v1/plans/:planId/runs/:runId/scenarios`: every tracked scenario,
+ * at most 500, entry scenarios first, then integration scenarios. Empty until
+ * the analysis is accepted.
+ */
+export const scenarioListResponseSchema = z.object({
+  scenarios: z.array(scenarioViewSchema).max(runQueryLimits.scenarios),
+  total: count,
+}).strict();
+export type ScenarioListResponse = z.infer<typeof scenarioListResponseSchema>;
 
 export const metricStateSchema = z.enum(['measured', 'partial', 'unavailable', 'not-applicable']);
 export type MetricState = z.infer<typeof metricStateSchema>;

@@ -50,7 +50,7 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'work-item-started':
       return [
         `Work item ${event.data.workItem} started in ${event.data.module}${event.data.scenario === undefined ? '' : ` to bind the integration scenario ${event.data.scenario}`}`,
-        ref('work-item', event.data.workItem),
+        [...ref('work-item', event.data.workItem), ...ref('scenario', event.data.scenario)],
       ];
     case 'hypotheses-delivered':
       return [
@@ -159,18 +159,18 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'scenario-declared':
       return [
         `Scenario ${event.data.scenario} was declared and is ${event.data.state}${event.data.state === 'bound' ? ', keeping its pending tag while its work item holds fakes' : ''}`,
-        ref('invocation', event.data.by),
+        [...ref('scenario', event.data.scenario), ...ref('invocation', event.data.by)],
       ];
     case 'scenario-due':
-      return [`Scenario ${event.data.scenario} is due: its work item's requirements are verified, so it runs without fakes`, []];
+      return [`Scenario ${event.data.scenario} is due: its work item's requirements are verified, so it runs without fakes`, ref('scenario', event.data.scenario)];
     case 'scenario-implemented':
-      return [`Scenario ${event.data.scenario} is implemented`, ref('gate', event.data.gate)];
+      return [`Scenario ${event.data.scenario} is implemented`, [...ref('scenario', event.data.scenario), ...ref('gate', event.data.gate)]];
     case 'scenario-bound-passed':
-      return [`Scenario ${event.data.scenario} passed against its work item's fakes and stays bound`, ref('gate', event.data.gate)];
+      return [`Scenario ${event.data.scenario} passed against its work item's fakes and stays bound`, [...ref('scenario', event.data.scenario), ...ref('gate', event.data.gate)]];
     case 'scenarios-withdrawing':
-      return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, ref('work-item', event.data.workItem)];
+      return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, [...ref('work-item', event.data.workItem), ...event.data.scenarios.flatMap(scenario => ref('scenario', scenario))]];
     case 'scenario-withdrawn':
-      return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, ref('commit', event.data.commit)];
+      return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, [...ref('scenario', event.data.scenario), ...ref('commit', event.data.commit)]];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-attempted':

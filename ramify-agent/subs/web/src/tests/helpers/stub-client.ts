@@ -3,7 +3,7 @@ import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.j
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
   AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
-  RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
+  RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, ScenarioListResponse, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, type ConnectionState, type ProjectInfo, type ProtocolClient } from '../../client.js';
 
@@ -20,6 +20,7 @@ export interface StubRun {
   capabilities?: CapabilityListResponse;
   moduleCapabilities?: ModuleCapabilityComparisonResponse;
   gates?: Record<string, GateView>;
+  scenarios?: ScenarioListResponse;
   metrics?: MetricsResponse;
 }
 
@@ -98,6 +99,7 @@ export class StubClient implements ProtocolClient {
   async getWorkItem(_planId: string, runId: string, workItem: string) { this.calls.push(`getWorkItem:${runId}:${workItem}`); return this.answer(runId, run => run.workItem?.[workItem], `work item ${workItem}`); }
   async getCapabilities(_planId: string, runId: string) { this.calls.push(`getCapabilities:${runId}`); return this.answer(runId, run => run.capabilities, 'capabilities'); }
   async getModuleCapabilities(_planId: string, runId: string) { this.calls.push(`getModuleCapabilities:${runId}`); return this.answer(runId, run => run.moduleCapabilities, 'module capabilities'); }
+  async getScenarios(_planId: string, runId: string) { this.calls.push(`getScenarios:${runId}`); return this.answer(runId, run => run.scenarios, 'scenarios'); }
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 

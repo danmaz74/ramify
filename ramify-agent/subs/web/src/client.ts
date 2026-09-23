@@ -14,10 +14,10 @@ import {
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
   metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
-  workItemListResponseSchema, workItemResponseSchema,
+  scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
-  type WorkItemListResponse, type WorkItemResponse,
+  type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 
 export type ProjectInfo = ProjectResponse['project'];
@@ -63,6 +63,8 @@ export interface ProtocolClient {
   getCapabilities(planId: string, runId: string): Promise<CapabilityListResponse>;
   /** The initial analysis's module associations beside the capabilities verified at their current owners. */
   getModuleCapabilities(planId: string, runId: string): Promise<ModuleCapabilityComparisonResponse>;
+  /** Every tracked acceptance scenario with its state and the gates that ran it. */
+  getScenarios(planId: string, runId: string): Promise<ScenarioListResponse>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
   /**
@@ -137,6 +139,7 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getWorkItem: (planId, runId, workItem) => get(protocolPaths.runWorkItem(planId, runId, workItem), workItemResponseSchema),
     getCapabilities: (planId, runId) => get(protocolPaths.runCapabilities(planId, runId), capabilityListResponseSchema),
     getModuleCapabilities: (planId, runId) => get(protocolPaths.runModuleCapabilities(planId, runId), moduleCapabilityComparisonResponseSchema),
+    getScenarios: (planId, runId) => get(protocolPaths.runScenarios(planId, runId), scenarioListResponseSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
     sendCommand: async command => {

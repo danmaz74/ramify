@@ -1,8 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   analysisResponseSchema, capabilityListResponseSchema, capabilityStateSchema, decisionListResponseSchema, gateViewSchema, metricsResponseSchema,
-  moduleCapabilityComparisonResponseSchema, runSnapshotSchema, workItemListResponseSchema, workItemResponseSchema, type RunSnapshot, type WorkItemSummary,
+  moduleCapabilityComparisonResponseSchema, runSnapshotSchema, scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
+  type RunSnapshot, type WorkItemSummary,
 } from '../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
@@ -37,6 +38,23 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
   });
 }
 
+const noteFailure = { step: 'Then the note is listed', message: 'expected one note, got none' };
+
+function scenarioText(id: string, entry: string | null, owner: string, extra: Record<string, unknown> = {}) {
+  return {
+    id, kind: 'entry', entry, owner, origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }] }, partOf: null, subScenarios: [],
+    name: `Scenario ${id}`, source: [`Scenario: Scenario ${id}`, '  When it is used', '  Then it works'],
+    file: `subs/${owner.split('/').at(-1)}/src/tests/features/review-notes/${entry ?? 'integration'}.feature`, ...extra,
+  };
+}
+
+function scenarioView(id: string, entry: string | null, state: string, extra: Record<string, unknown> = {}) {
+  return {
+    id, kind: 'entry', name: `Scenario ${id}`, state, origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }] }, entry, partOf: null, subScenarios: [],
+    workItem: 'wi-001', owner: 'shop/notes', file: `subs/notes/src/tests/features/review-notes/${entry ?? 'integration'}.feature`, implementedBy: null, gates: [], ...extra,
+  };
+}
+
 function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
   return {
     snapshot: snapshot(extra),
@@ -50,7 +68,10 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
       plan: { markdown: '# Reviewer notes\n\nA plan.', hash: 'a'.repeat(64) },
       analysis: {
         status: 'accepted', view: { status: 'placeholder' },
-        entries: [{ capability: 'review-note', description: 'd', owner: 'shop/notes', proposed: null, workItem: 'wi-001' }],
+        entries: [
+          { capability: 'review-note', description: 'd', owner: 'shop/notes', proposed: null, workItem: 'wi-001' },
+          { capability: 'note-tags', description: 't', owner: 'shop/tags', proposed: null, workItem: 'wi-002' },
+        ],
         hypotheses: [{
           id: 'note-search', capability: 'note-search', revision: 2, standing: 'superseded', change: 'reuse',
           changesExistingSymbols: false, suggestedOwner: 'shop/search',
@@ -58,7 +79,17 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
           initial: { change: 'create', suggestedOwner: 'shop/notes', rationale: 'Notes may need to be searched later.' },
           decisions: ['gd-001'], supersededBy: null, confirmedBy: null,
         }],
-        total: { entries: 1, hypotheses: 1 },
+        scenarios: [
+          scenarioText('sc-001', 'review-note', 'shop/notes', { origin: { kind: 'plan', planScenario: 'ps-01', lines: [10, 14] }, name: 'A reviewer writes a note' }),
+          scenarioText('sc-002', 'review-note', 'shop/notes', { partOf: 'sc-004', name: 'A note is written for tagging' }),
+          scenarioText('sc-003', 'note-tags', 'shop/tags', { partOf: 'sc-004', name: 'A written note is tagged', source: ['Scenario: A written note is tagged', '  Given a note was written', '  When the person tags it', '  Then the tag is shown'] }),
+          scenarioText('sc-004', null, 'shop', {
+            kind: 'integration', origin: { kind: 'plan', planScenario: 'ps-02', lines: [20, 25] }, subScenarios: ['sc-002', 'sc-003'], name: 'A written note is shown with its tag',
+            source: ['Scenario: A written note is shown with its tag', '  When the person writes a note', '  And the person tags it', '  Then the tag is shown'],
+          }),
+        ],
+        warnings: [{ kind: 'sub-scenario-shares-no-step', scenarios: ['sc-003'], message: 'sc-003 picks no step of sc-004 verbatim' }],
+        total: { entries: 2, hypotheses: 1, scenarios: 4 },
       },
     }),
     decisions: decisionListResponseSchema.parse({
@@ -71,10 +102,10 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     }),
     capabilities: capabilityListResponseSchema.parse({
       capabilities: [
-        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'Waiting for provider ob-ct-001 (rq-001)', dependsOn: [{ capability: 'send-email', tentative: false }], workItems: ['wi-001'], evidence: [] },
-        { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'completed', reason: 'Provider work completed with current evidence', dependsOn: [], workItems: ['wi-002'], evidence: ['ga-0007', 'ga-0006'] },
-        { capability: 'note-rendering', owner: 'collection-review', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-rendering at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [{ capability: 'note-storage', tentative: true }], workItems: [], evidence: [] },
-        { capability: 'note-storage', owner: 'collection-review/workspace/reviews', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-storage at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [], workItems: [], evidence: [] },
+        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'Waiting for provider ob-ct-001 (rq-001)', dependsOn: [{ capability: 'send-email', tentative: false }], workItems: ['wi-001'], evidence: [], scenarios: { implemented: 0, total: 1 } },
+        { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'completed', reason: 'Provider work completed with current evidence', dependsOn: [], workItems: ['wi-002'], evidence: ['ga-0007', 'ga-0006'], scenarios: null },
+        { capability: 'note-rendering', owner: 'collection-review', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-rendering at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [{ capability: 'note-storage', tentative: true }], workItems: [], evidence: [], scenarios: null },
+        { capability: 'note-storage', owner: 'collection-review/workspace/reviews', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis note-storage at revision 1 (tentative); no work derives from a hypothesis', dependsOn: [], workItems: [], evidence: [], scenarios: null },
       ],
       total: 4,
     }),
@@ -114,7 +145,16 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
         commands: [{
           kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' },
+          runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
+        }, {
+          kind: 'scenarios', argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
+          runnerError: null, selection: null, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
+          scenarios: {
+            mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-001'] }, dryRun: false, excluded: 3, runs: [{ module: 'shop/notes', exit: 1 }],
+            scenarios: [{ id: 'sc-001', run: 'shop/notes', status: 'failed', file: 'subs/notes/src/tests/features/review-notes/review-note.feature', line: 4, failure: noteFailure, undefined: [] }],
+            untracked: { passed: 2, skipped: 0, failed: 0 },
+            failures: ['sc-001 failed at "Then the note is listed": expected one note, got none'],
+          },
         }],
       }),
       'ga-0003': gateViewSchema.parse({
@@ -124,10 +164,25 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
           kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' },
+          runnerError: null, selection: null, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
         }],
       }),
     },
+    scenarios: scenarioListResponseSchema.parse({
+      scenarios: [
+        scenarioView('sc-001', 'review-note', 'implemented', {
+          origin: { kind: 'plan', planScenario: 'ps-01', lines: [10, 14] }, name: 'A reviewer writes a note', implementedBy: 'ga-0003',
+          gates: [
+            { gate: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'failed', mode: 'quick', dryRun: false, status: 'failed', failure: noteFailure, undefined: [] },
+            { gate: 'ga-0003', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, verdict: 'passed', mode: 'quick', dryRun: false, status: 'passed', failure: null, undefined: [] },
+          ],
+        }),
+        scenarioView('sc-002', 'review-note', 'bound', { partOf: 'sc-004' }),
+        scenarioView('sc-003', 'note-tags', 'declared', { partOf: 'sc-004', owner: 'shop/tags', workItem: 'wi-002' }),
+        scenarioView('sc-004', null, 'pending', { kind: 'integration', origin: { kind: 'plan', planScenario: 'ps-02', lines: [20, 25] }, subScenarios: ['sc-002', 'sc-003'], owner: 'shop', workItem: null }),
+      ],
+      total: 4,
+    }),
     metrics: metricsResponseSchema.parse({
       policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1',
       baseline: { state: 'unavailable', reason: 'ramify measure could not be run', subtotal: null },
@@ -182,14 +237,16 @@ test('after the run ends the notices stay, and an empty list says that nothing w
   expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
 });
 
-test('Stop sends stop-job with the run\'s version, and is the only command on the page', async () => {
+test('Stop sends stop-job with the run\'s version; the only fields on the page are the approval\'s', async () => {
   const client = clientWith(stubRun());
   render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Stop' }));
   await screen.findByRole('button', { name: 'Stopping…' });
   expect(client.commands).toEqual([expect.objectContaining({ type: 'stop-job', expectedVersion: 12, payload: { planId: 'review-notes', jobId: runId } })]);
-  // Nothing on the page is editable.
-  expect(screen.queryAllByRole('textbox')).toEqual([]);
+  // Nothing else on the page is editable: the reviewer and the note belong to Approve.
+  const approval = screen.getByRole('form', { name: 'Approve the analysis' });
+  expect(screen.queryAllByRole('textbox')).toEqual(within(approval).getAllByRole('textbox'));
+  expect(within(approval).getAllByRole('textbox').map(field => field.getAttribute('name'))).toEqual(['reviewer', 'note']);
 });
 
 test('a lost connection is shown apart from the run\'s state, which stays as last read', async () => {
@@ -357,8 +414,8 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
     ...failed,
     capabilities: capabilityListResponseSchema.parse({
       capabilities: [
-        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'wi-001 is under way, iteration wi-001.i02', dependsOn: [], workItems: ['wi-001'], evidence: [] },
-        { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'todo', reason: 'wi-002 not started', dependsOn: [], workItems: ['wi-002'], evidence: [] },
+        { capability: 'send-button', owner: 'collection-review/workspace/reviews', entry: true, tentative: false, state: 'working', reason: 'wi-001 is under way, iteration wi-001.i02', dependsOn: [], workItems: ['wi-001'], evidence: [], scenarios: { implemented: 0, total: 1 } },
+        { capability: 'send-email', owner: 'collection-review/workspace/reviews', entry: false, tentative: false, state: 'todo', reason: 'wi-002 not started', dependsOn: [], workItems: ['wi-002'], evidence: [], scenarios: null },
       ],
       total: 2,
     }),
@@ -445,4 +502,157 @@ test('an unavailable metric reads unavailable with its known subtotal, never zer
   expect(cells[5]).toBe('1 of 2');
   expect(screen.getByText(/A count of blocked calls is not evidence/)).toBeTruthy();
   expect(within(screen.getByLabelText('Outside the write scope')).getByText('subs/reviews/src/outside.ts')).toBeTruthy();
+});
+
+// Acceptance scenarios: the review, Approve and the scenario list.
+
+test('the Scenarios area lists every tracked scenario with its state, origin, work item, file and the gates that ran it', async () => {
+  const client = clientWith(stubRun());
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Scenarios' }));
+  const table = await screen.findByLabelText('Tracked scenarios');
+  expect(client.calls.filter(call => call.startsWith('getScenarios'))).toEqual([`getScenarios:${runId}`]);
+  const row = (id: string) => table.querySelector<HTMLElement>(`[data-scenario="${id}"]`)!;
+  const cells = (id: string) => [...row(id).querySelectorAll('td')].map(cell => cell.textContent);
+  expect([...table.querySelectorAll('tbody tr')].map(one => one.getAttribute('data-scenario'))).toEqual(['sc-001', 'sc-002', 'sc-003', 'sc-004']);
+  expect(within(row('sc-001')).getByText('implemented').className).toContain('scenario-state-implemented');
+  expect(cells('sc-001')[1]).toBe('implementedby ga-0003');
+  expect(cells('sc-001')[2]).toBe('from the plan (ps-01, lines 10–14)');
+  expect(cells('sc-002')[1]).toBe('bound');
+  expect(cells('sc-002')[3]).toBe('entry review-note, work item wi-001; sub-scenario of sc-004');
+  expect(cells('sc-003')[1]).toBe('declared');
+  expect(cells('sc-004')[1]).toBe('pending');
+  expect(cells('sc-004')[3]).toBe('integration of sc-002, sc-003; no work item until its sub-scenarios are implemented');
+  expect(cells('sc-004')[4]).toContain('subs/notes/src/tests/features/review-notes/integration.feature');
+  expect(cells('sc-004')[5]).toBe('not run yet');
+  const gates = within(row('sc-001')).getByLabelText('Gates of sc-001');
+  expect([...gates.querySelectorAll('li')].map(item => item.textContent)).toEqual([
+    'ga-0002 iteration wi-002.i01, quick: failedThen the note is listed: expected one note, got none',
+    'ga-0003 iteration wi-002.i01, quick: passed',
+  ]);
+  expect(screen.getByLabelText('Scenario states').textContent).toBe('1 pending · 1 bound · 1 declared · 1 implemented');
+});
+
+test('before the analysis is accepted the Scenarios area says nothing is tracked', async () => {
+  render(<RunPage client={clientWith({ ...stubRun(), scenarios: { scenarios: [], total: 0 } })} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Scenarios' }));
+  expect(await screen.findByText(/No scenario is tracked yet/)).toBeTruthy();
+});
+
+test('the review on the analysis page: each entry\'s scenarios with their origin, the integration scenario\'s plan text beside its sub-scenarios, and the warnings', async () => {
+  render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Plan and entries' }));
+  const note = await screen.findByLabelText('Scenarios of review-note');
+  expect(within(note).getAllByRole('listitem').map(item => item.getAttribute('aria-label'))).toEqual(['Scenario sc-001', 'Scenario sc-002']);
+  const first = within(note).getByLabelText('Scenario sc-001');
+  expect(first.textContent).toContain('A reviewer writes a note');
+  expect(first.textContent).toContain('from the plan (ps-01, lines 10–14)');
+  expect(first.querySelector('.badge')!.textContent).toBe('plan');
+  const second = within(note).getByLabelText('Scenario sc-002');
+  expect(second.textContent).toContain('written by the architect, citing Acceptance; a sub-scenario of sc-004');
+  expect(second.querySelector('pre')!.textContent).toBe('Scenario: Scenario sc-002\n  When it is used\n  Then it works');
+
+  const integration = screen.getByLabelText('Integration scenario sc-004');
+  expect(within(integration).getByRole('heading', { level: 3 }).textContent).toBe('Integration scenario sc-004: A written note is shown with its tag');
+  expect(within(integration).getByLabelText('The plan\'s text').querySelector('pre')!.textContent)
+    .toBe('Scenario: A written note is shown with its tag\n  When the person writes a note\n  And the person tags it\n  Then the tag is shown');
+  const subs = within(integration).getByLabelText('Its sub-scenarios');
+  expect(within(subs).getAllByRole('listitem').map(item => item.getAttribute('aria-label'))).toEqual(['Scenario sc-002', 'Scenario sc-003']);
+  // The warning is listed, and shown on the scenario it concerns.
+  expect(screen.getByLabelText('Warnings of the analysis').textContent).toContain('sub-scenario-shares-no-step on sc-003: sc-003 picks no step of sc-004 verbatim');
+  expect(within(subs).getByLabelText('Scenario sc-003').querySelector('.warn')!.textContent).toBe('Warning (sub-scenario-shares-no-step): sc-003 picks no step of sc-004 verbatim');
+  expect(within(note).queryByText(/Warning/)).toBeNull();
+});
+
+test('at the review stop the run says it waits, and Approve sends approve-analysis with the reviewer and the note', async () => {
+  const client = clientWith(stubRun({ phase: 'awaiting-review', current: null, writer: { held: null, unsettled: null } }));
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  const review = (await screen.findByRole('heading', { name: 'Review' })).closest('section')!;
+  expect(review.textContent).toContain('Not reviewed.');
+  expect(review.textContent).toContain('The run waits at its review stop');
+  const form = within(review).getByRole('form', { name: 'Approve the analysis' });
+  const approve = within(form).getByRole('button', { name: 'Approve' }) as HTMLButtonElement;
+  expect(approve.disabled).toBe(true);
+  fireEvent.change(within(form).getByRole('textbox', { name: 'Reviewer' }), { target: { value: ' dana@example.com ' } });
+  fireEvent.change(within(form).getByRole('textbox', { name: 'Note (optional)' }), { target: { value: 'The scenarios say what the plan asks.' } });
+  const reads = client.calls.filter(call => call.startsWith('getEvents')).length;
+  fireEvent.click(approve);
+  await within(form).findByRole('button', { name: 'Approved' });
+  expect(client.commands).toEqual([expect.objectContaining({
+    type: 'approve-analysis', expectedVersion: 12,
+    payload: { planId: 'review-notes', jobId: runId, reviewer: 'dana@example.com', note: 'The scenarios say what the plan asks.' },
+  })]);
+  // The page reads the run again at once, rather than at its next poll.
+  await waitFor(() => expect(client.calls.filter(call => call.startsWith('getEvents')).length).toBeGreaterThan(reads));
+});
+
+test('Approve after the run completed, without a note, is sent again at the version a stale refusal names', async () => {
+  class StaleOnce extends StubClient {
+    override async sendCommand(command: Parameters<StubClient['sendCommand']>[0]) {
+      if (this.commands.length === 0) {
+        this.commands.push(command);
+        throw new ClientError('protocol', 'The run is at version 15', 'stale-version', 15);
+      }
+      return super.sendCommand(command);
+    }
+  }
+  const client = new StaleOnce();
+  client.runs.set(runId, stubRun({ state: 'completed', phase: 'ended', endedAt: at, current: null, writer: { held: null, unsettled: null } }));
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Plan and entries' }));
+  const form = await screen.findByRole('form', { name: 'Approve the reviewed analysis' });
+  fireEvent.change(within(form).getByRole('textbox', { name: 'Reviewer' }), { target: { value: 'dana@example.com' } });
+  fireEvent.click(within(form).getByRole('button', { name: 'Approve' }));
+  await within(form).findByRole('button', { name: 'Approved' });
+  expect(client.commands.map(command => [command.type, command.expectedVersion, command.payload])).toEqual([
+    ['approve-analysis', 12, { planId: 'review-notes', jobId: runId, reviewer: 'dana@example.com' }],
+    ['approve-analysis', 15, { planId: 'review-notes', jobId: runId, reviewer: 'dana@example.com' }],
+  ]);
+});
+
+test('a refused approval says why; a reviewed, failed, stopped or unanalysed run offers no Approve', async () => {
+  const refusing = clientWith(stubRun());
+  refusing.sendCommand = async command => { refusing.commands.push(command); throw new ClientError('protocol', 'The analysis was already approved', 'conflict'); };
+  render(<RunPage client={refusing} planId="review-notes" runId={runId} interval={60_000} />);
+  const form = await screen.findByRole('form', { name: 'Approve the analysis' });
+  fireEvent.change(within(form).getByRole('textbox', { name: 'Reviewer' }), { target: { value: 'dana' } });
+  fireEvent.click(within(form).getByRole('button', { name: 'Approve' }));
+  expect((await within(form).findByRole('alert')).textContent).toBe('The approval was refused: The analysis was already approved');
+  cleanup();
+
+  const reviewed = clientWith(stubRun({ review: { reviewer: 'dana@example.com', at, duringRun: true } }));
+  render(<RunPage client={reviewed} planId="review-notes" runId={runId} interval={60_000} />);
+  const review = (await screen.findByRole('heading', { name: 'Review' })).closest('section')!;
+  expect(review.textContent).toContain(`Approved by dana@example.com at ${at}, while the run was working.`);
+  expect(screen.getAllByText('Review').find(node => node.tagName === 'DT')!.nextElementSibling?.textContent).toBe(`Approved by dana@example.com at ${at}, while the run was working`);
+  expect(screen.queryByRole('form', { name: 'Approve the analysis' })).toBeNull();
+  cleanup();
+
+  const ended = { current: null, endedAt: at, phase: 'ended' as const, writer: { held: null, unsettled: null } };
+  for (const extra of [
+    { state: 'failed' as const, ...ended, failure: { reason: 'repair-exhausted' as const, message: 'm', evidence: [] } },
+    { state: 'stopped' as const, ...ended },
+    { state: 'interrupted' as const, ...ended },
+    { phase: 'analysis' as const },
+    { phase: 'final-verification' as const },
+    { stopRequested: true },
+  ]) {
+    render(<RunPage client={clientWith(stubRun(extra))} planId="review-notes" runId={runId} interval={60_000} />);
+    await screen.findByRole('heading', { name: 'Review' });
+    expect([extra, screen.queryByRole('form', { name: 'Approve the analysis' })]).toEqual([extra, null]);
+    cleanup();
+  }
+});
+
+test('a gate\'s scenario check shows each scenario\'s status and failure', async () => {
+  render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'ga-0002' }));
+  const gate = await screen.findByLabelText('Gate ga-0002');
+  const check = within(gate).getByLabelText('Scenario check');
+  expect(check.textContent).toContain('Mode quick, selection by identity: sc-001, 3 excluded.');
+  expect(within(check).getByLabelText('Scenario results').textContent)
+    .toBe('sc-001 failed in shop/notes, subs/notes/src/tests/features/review-notes/review-note.feature:4Then the note is listed: expected one note, got none');
+  expect(within(check).getByLabelText('Why the scenario check did not pass').textContent).toBe('sc-001 failed at "Then the note is listed": expected one note, got none');
+  expect(within(gate).getAllByLabelText('Scenario check')).toHaveLength(1);
 });

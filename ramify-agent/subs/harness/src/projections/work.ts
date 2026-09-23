@@ -5,6 +5,7 @@ import {
 import { originKindOf, type WorkItem } from '../work/records.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { ProjectionError, type RunView } from './inputs.js';
+import { scenarioCheckViewOf } from './scenarios.js';
 
 /*
  * Work items, their iterations and their gates, as a client reads them.
@@ -254,6 +255,7 @@ export function gateOf(view: RunView, id: string): GateView {
         truncated: command.output.truncated,
         tail: boundedTail(command.output.tail),
       },
+      scenarios: command.scenarios === undefined ? null : scenarioCheckViewOf(command.scenarios),
     })),
   };
 }

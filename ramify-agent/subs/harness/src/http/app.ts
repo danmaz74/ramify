@@ -15,7 +15,7 @@ import {
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
   metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
-  workItemListResponseSchema, workItemResponseSchema,
+  scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
 import { CommandRejection } from '../jobs/commands.js';
 import { discoverPlans, readPlan } from '../plans/discover.js';
@@ -136,6 +136,10 @@ export function createApp(options: AppOptions): express.Express {
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/module-capabilities`, async (request: RunRequest, response) => {
     send(response, moduleCapabilityComparisonResponseSchema, await projected(() => queries.moduleCapabilities(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/scenarios`, async (request: RunRequest, response) => {
+    send(response, scenarioListResponseSchema, await projected(() => queries.scenarios(request.params.planId, request.params.runId)));
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/gates/:gate`, async (request: GateRequest, response) => {

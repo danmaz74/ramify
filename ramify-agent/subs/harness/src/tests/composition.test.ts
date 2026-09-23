@@ -19,7 +19,7 @@ import { contractSubmissionSchema } from '../contracts/submission.js';
 import { shellInputSchema } from '../tools/shell.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema, metricsResponseSchema,
-  runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema, workItemListResponseSchema,
+  runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema, scenarioListResponseSchema, workItemListResponseSchema,
   workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
@@ -68,6 +68,7 @@ beforeAll(async () => {
     const queries = new RunQueries(service);
     answeredWhileRunning.push({ schema: runResponseSchema, value: await queries.run(plan, runId) });
     answeredWhileRunning.push({ schema: analysisResponseSchema, value: await queries.analysis(plan, runId) });
+    answeredWhileRunning.push({ schema: scenarioListResponseSchema, value: await queries.scenarios(plan, runId) });
   })));
   names.forEach((name, index) => finished.set(name, runs[index]!));
 
@@ -164,6 +165,7 @@ describe('no query appends an event', () => {
         const { workItems } = await queries.workItems(plan, run.runId);
         for (const item of workItems) await queries.workItem(plan, run.runId, item.id);
         await queries.capabilities(plan, run.runId);
+        await queries.scenarios(plan, run.runId);
         await queries.metrics(plan, run.runId);
         const page = await queries.events(plan, run.runId, 0);
         for (const gate of new Set(page.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
@@ -201,6 +203,7 @@ function unionRoots(): Record<string, unknown> {
     'query work-items': workItemListResponseSchema,
     'query work-item': workItemResponseSchema,
     'query capabilities': capabilityListResponseSchema,
+    'query scenarios': scenarioListResponseSchema,
     'query gate': gateResponseSchema,
     'query metrics': metricsResponseSchema,
   };
@@ -255,6 +258,7 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
     observeValues(workItemListResponseSchema, items, observed);
     for (const item of items.workItems) observeValues(workItemResponseSchema, await queries.workItem(plan, run.runId, item.id), observed);
     observeValues(capabilityListResponseSchema, await queries.capabilities(plan, run.runId), observed);
+    observeValues(scenarioListResponseSchema, await queries.scenarios(plan, run.runId), observed);
     observeValues(metricsResponseSchema, await queries.metrics(plan, run.runId), observed);
     for (const gate of new Set(page.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
       observeValues(gateResponseSchema, await queries.gate(plan, run.runId, gate), observed);
@@ -364,6 +368,10 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[job-failed].data.reason', values: ['acceptance-incomplete'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a passing final gate whose scenario check did not pass a tracked scenario does not complete the run' },
   { union: 'command.type', values: ['approve-analysis'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
   { union: 'query runs.runs[].phase', values: ['awaiting-review'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
+  // The composed runs declare no scenario while a requirement is open; the
+  // query projects the state from scenario-declared, whose bound value
+  // scenario-states produces.
+  { union: 'query scenarios.scenarios[].state', values: ['bound'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'every state, the entry\'s work item, an integration scenario without its work item yet, and no gate that did not run it' },
   { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
 ];
 
@@ -382,6 +390,11 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
   ['query gate.gate.commands[].kind', 'record ramify-agent.gate-attempt/3.commands[].kind'],
   ['query gate.gate.commands[].notVerified', 'record ramify-agent.gate-attempt/3.commands[].notVerified'],
   ['query gate.gate.commands[].selection.policy', 'record ramify-agent.gate-attempt/3.commands[].selection.policy'],
+  ['query analysis.analysis[accepted].scenarios[].kind', 'record ramify-agent.scenario/1.kind'],
+  ['query analysis.analysis[accepted].scenarios[].origin.kind', 'record ramify-agent.scenario/1.origin.kind'],
+  ['query analysis.analysis[accepted].warnings[].kind', 'run log[analysis-accepted].data.warnings[].kind'],
+  ['query scenarios.scenarios[].gates[].status', 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status'],
+  ['query gate.gate.commands[].scenarios.selection.kind', 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind'],
 ];
 
 /**

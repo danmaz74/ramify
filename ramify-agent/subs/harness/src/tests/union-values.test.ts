@@ -811,6 +811,7 @@ describe('the run protocol a client reads', () => {
       ['contract-registered', { contract: 'ct-001', revision: 1, mode: 'fake-backed', iteration: 'wi-001.i02', obligation: 'ob-ct-001', requirements: ['rq-001'], providerWorkItem: 'wi-002' }],
       ['invocation-started', { invocation: 'inv-0001', role: 'engineer' }],
       ['revision-needed', { obligation: r, iteration: 'wi-002.i01', consumerWorkItem: 'wi-001' }],
+      ['scenario-implemented', { scenario: 'sc-001', gate: 'ga-0003' }],
     ];
     const kinds = new Set(events.flatMap(([type, data], index) =>
       projectEvent(runEventSchema.parse({ sequence: index + 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type, data })).refs.map(ref => ref.kind)));

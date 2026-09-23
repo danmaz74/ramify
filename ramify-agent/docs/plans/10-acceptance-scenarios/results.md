@@ -1353,3 +1353,139 @@ not run.
   another module of the write scope bind only through an import from them.
   The rule's wording follows §6.
 - A symbol-free-load rule for testing source remains the toolkit's to add.
+
+## Iteration 10: Projections, protocol and web
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **Protocol** (`interfaces/protocol/runs.ts`, `paths.ts`). New schemas,
+  each with its type: `scenarioKindSchema`, `scenarioOriginViewSchema`
+  (`{ kind: plan, planScenario, lines }` or `{ kind: architect, refs }`),
+  `trackedScenarioStateSchema`, `scenarioStatusSchema`,
+  `scenarioCheckModeSchema`, `scenarioWarningKindSchema`,
+  `scenarioWarningViewSchema`, `analysisScenarioSchema` (a scenario's frozen
+  text: ID, kind, entry, owner, origin, `partOf`, `subScenarios`, name,
+  source, file), `scenarioCheckViewSchema` (the compact summary),
+  `scenarioGateResultSchema`, `scenarioViewSchema` and
+  `scenarioListResponseSchema`. `runQueryLimits.scenarios` is 500.
+  - The accepted analysis gains `scenarios` (entry scenarios in submission
+    order, then integration ones), `warnings` (from `analysis-accepted`) and
+    `total.scenarios`.
+  - `capabilityProgressSchema` gains `scenarios: { implemented, total }`,
+    null for a capability that is not an entry.
+  - Each command of `gateViewSchema` gains `scenarios`: the compact summary
+    of a `scenarios` command (mode, selection, dry run, excluded count, each
+    run by exit code, each tracked scenario's status, file, line, failure and
+    undefined steps, the project's own by count, and the failure lines),
+    null for every other command. Bindings and stream paths stay files of
+    the run.
+  - `runEventRefKindSchema` gains `scenario`.
+  - `GET /api/v1/plans/:planId/runs/:runId/scenarios`
+    (`protocolPaths.runScenarios`) answers `{ scenarios, total }`. Each
+    `ScenarioView` holds the ID, kind, name, state, origin, entry, `partOf`,
+    `subScenarios`, `workItem` (the entry's work item, or the integration
+    work item, null until it is created), owner, file, `implementedBy` (the
+    gate of `scenario-implemented`) and `gates`: every gate attempt whose
+    scenario check ran the scenario, in first-commit order, with checkpoint,
+    subject, the attempt's verdict, mode, dry run, the scenario's status
+    there, its failure and undefined steps.
+  - The root's `module.ramify` re-exposes the 24 new names to the web.
+- **Projections.** A new `projections/scenarios.ts`: `scenariosOf` replays
+  the records and states with `run/feature-files.ts`'s `trackedScenarios`;
+  `analysisScenariosOf`, `scenarioListOf`, `scenarioCheckViewOf` and
+  `entryScenarioCounts`. `analysis.ts`, `progress.ts` and `work.ts`'s
+  `gateOf` use them; `queries.ts` gains `scenarios(planId, runId)`;
+  `inputs.ts` lists `ramify-agent.scenario/1` among the supported record
+  versions, so another version is refused with evidence. `events.ts` adds a
+  `scenario` reference to `scenario-declared`, `scenario-due`,
+  `scenario-implemented`, `scenario-bound-passed`, `scenarios-withdrawing`,
+  `scenario-withdrawn` and an integration item's `work-item-started`.
+- **HTTP.** `http/app.ts` serves the scenario list, validated against its
+  schema.
+- **Web** (`subs/web`). `client.ts` gains `getScenarios`. A new
+  `run-scenarios.tsx`: `ScenarioReview`, `ScenarioTable`,
+  `ScenarioCheckSummaryView`, `ReviewPanel`, `ApproveForm`, `canApprove`,
+  `reviewText`, `originText`. The Run page has a Scenarios area; the
+  overview shows the scenario counts, the review status and a Review panel
+  (with the wait at the review stop); Plan and entries has "Review of the
+  scenarios" with each entry's scenarios, each integration scenario's plan
+  text beside its sub-scenarios, and the warnings, listed and on the
+  scenario they concern; a gate's detail shows its scenario check. Approve
+  (reviewer, optional note) is in the Review panel and under the review,
+  wherever `canApprove` holds: not reviewed, no stop requested, and either
+  completed or running outside `analysis` and `final-verification`. It
+  sends at the run's version and once more at the version a `stale-version`
+  refusal names; `useRunProgress` gains `refresh`, which the page calls
+  after an approval so a completed run, which no longer polls, shows it.
+  The Plan page's Start has the review-stop checkbox and always sends
+  `reviewStop`. Capability details show an entry's scenario count. Styles
+  for all of it in `styles.css`.
+- **Tests.** A new `scenario-projections.test.ts` (3 tests). Updated:
+  `protocol-contract` (a new block of 6 tests), `union-values` (the
+  `scenario` reference kind's producer), `projections-pure` (the new query
+  in-process and over HTTP), `composition` (the query is observed while the
+  composed runs run and after, and in the no-append test; five query unions
+  are mapped to the record unions they project, and `bound` is cited to the
+  new test), the web's `run-page` (the fixtures, the Stop test, 7 new
+  tests), `plan-page` (`reviewStop` in the payload, a new test), `client`
+  (a new test) and `capability-graph` (the fixture's `scenarios`), and the
+  capability-graph example. The harness and web READMEs describe the
+  change.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/scenario-projections.test.ts` | 3 passed: over the scripted composition-failure run, the list (IDs, kinds, states, entries, `partOf`, sub-scenarios, work items with `wi-003` for the integration scenario, owners, files, origins), sc-003's gates `iteration wi-003.i01 failed` (with the failure), `passed`, `work-item wi-003 passed`, `final full passed`, `implementedBy` the passing attempt, sc-001 passed at the attempt that failed the gate; the review's text, the integration scenario's source equal to the plan's; the entries' counts `1 of 1`, null for other capabilities; the failing gate's compact summary; the events' scenario references; the same list over HTTP and `not-found` for an unknown run; over constructed records every state, an integration scenario without its work item, and the warnings and counts |
+| `npx vitest run` over `protocol-contract`, `union-values`, `projections-pure`, `composition` | passed; before its update `union-values` failed on the reference kinds, and `composition` on 13 query union values without a producer |
+| `npx vitest run` over the 24 harness files that import the projections or the run protocol, read run events or gates, or drive scenario runs (`accepted-commit`, `integration-scenarios`, `kpi-metrics`, `local-authority`, `analysis-scenarios`, `projections-pure`, `progress`, `measurement`, `run-projections`, `review-stop`, `protocol-contract`, `progress-fixture`, `run-commands`, `work-items`, `union-values`, `scenario-projections`, `run-protocol`, `http`, `scenario-states`, the three `composition-recovery*`, `materialization`, `placement`) | 24 files, 269 passed |
+| `npx vitest run subs/harness/src/tests/run-protocol-materialization.integration.test.ts` | 1 passed |
+| `npx vitest run subs/web` | 7 files, 72 passed. Before their update every `run-page` test failed on its fixture, then the Stop test on the approval's fields, and `plan-page`'s Start test on the payload |
+| `npm run type-check` | passed (root, web and scripts) |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 122 analysis limits: iteration 9's 110 and 12 `signature-inferred` on the new exposed schema constants |
+| `npm run build:web` | built, `dist/web/assets/index-*.js` 680 kB (Vite's usual chunk-size warning) |
+
+No test makes a model call. The full suite was not run, per the plan's
+rules.
+
+### Deviations
+
+- **The review's text is on the analysis answer**, not on the scenario
+  list: the review reads the frozen text, which the list leaves out so it
+  stays about states and gates. Both are served from the same records.
+- **The list names the work item that binds a scenario** rather than only
+  an integration scenario's: an entry scenario's is its entry's first work
+  item, which the page shows beside the entry.
+- **`implementedBy`** is on the list beside the gates, from
+  `scenario-implemented`; the plan names only the gates. A fake-backed pass
+  is visible as a gate the scenario passed while it stayed `bound`.
+- **The gate view's summary is compact**: no binding and no stream or
+  profile paths. The composition-failure diagnostics are not projected; the
+  failing integration scenario and its passing sub-scenarios show side by
+  side on the list and in the gate.
+- **Approve is also under the review**, beside the scenarios it approves,
+  as well as in the overview's Review panel. It is offered on a completed
+  run, as the harness accepts it there.
+- **An approval refused as `stale-version` is sent once more** at the
+  version the refusal names, with a new command ID: the analysis it
+  approves is frozen, and a working run's version moves between polls.
+- **`reviewStop` is not added to the snapshot** (iteration 3's open item):
+  the page reads the phase, and the Review panel says when the run waits.
+- **One union value is cited to a projection test**: `bound` in the
+  scenario list, whose producer is the constructed-records test, since the
+  composed runs declare nothing while a requirement is open; the record's
+  `bound` is produced by `scenario-states`.
+
+### Open items
+
+- The composition-failure suspects (`compositionFailures`) and the
+  `scope-tests` observation's scenarios are not projected; an accepted
+  gate's bindings stay in its attempt file.
+- Gates per scenario are not bounded; they are bounded by the run's gate
+  attempts.
+- The scenario list cannot open a gate's detail in the Checks area; it
+  names the gate.
