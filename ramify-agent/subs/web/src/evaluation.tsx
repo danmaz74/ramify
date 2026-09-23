@@ -1,29 +1,29 @@
 import type { InvocationEvaluation } from '../../harness/src/interfaces/protocol/runs.js';
 
 /*
- * One invocation's evaluation, as the Run page's Sessions table and a
- * transcript's chapter show it: guarding, hook checks, reads outside the
- * scope, lines and tokens. Unavailable is said, never shown as zero.
+ * One invocation's evaluation, as its chapter of the transcript shows it:
+ * guarding, hook checks, reads outside the scope, lines and tokens.
+ * Unavailable is said, never shown as zero.
  */
 
-export function guardingText(evaluation: InvocationEvaluation): string {
+function guardingText(evaluation: InvocationEvaluation): string {
   return evaluation.guarding.complete ? 'complete' : 'partial';
 }
 
-export function hookChecksText(evaluation: InvocationEvaluation): string {
+function hookChecksText(evaluation: InvocationEvaluation): string {
   const { passed, findings, notChecked } = evaluation.hookChecks;
   return `${passed} passed, ${findings} with findings, ${notChecked} not checked`;
 }
 
-export function excursionsText(evaluation: InvocationEvaluation): string {
+function excursionsText(evaluation: InvocationEvaluation): string {
   return evaluation.excursions.join(', ') || '—';
 }
 
-export function linesText(evaluation: InvocationEvaluation): string {
+function linesText(evaluation: InvocationEvaluation): string {
   return evaluation.lines === null ? '—' : `+${evaluation.lines.added} −${evaluation.lines.deleted} (${evaluation.lines.coverage})`;
 }
 
-export function usageText(evaluation: InvocationEvaluation): string {
+function usageText(evaluation: InvocationEvaluation): string {
   const usage = evaluation.usage;
   return 'unavailable' in usage
     ? `unavailable: ${usage.unavailable}`

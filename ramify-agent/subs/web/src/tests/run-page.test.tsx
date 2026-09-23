@@ -480,16 +480,19 @@ test('the lineage measurements show their values, coverage and reasons; an unava
   expect(degraded.slice(1, 6)).toEqual(['partial', 'partial', '1', '3', '3 of 4']);
 });
 
-test('Run → Sessions opens each session\'s transcript and each invocation\'s chapter', async () => {
+test('Run → Sessions draws the timeline, each segment opening its chapter; Measurements no longer lists invocations', async () => {
   const client = clientWith(stubRun());
   client.runSessions.set(runId, { version: 12, sessions: [architect, liveEngineer()], total: 2 });
   render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
   fireEvent.click(await screen.findByRole('tab', { name: 'Sessions' }));
   const area = await screen.findByLabelText('Sessions');
-  const engineer = (await within(area).findByRole('link', { name: 'ses-0002 engineer' })).closest('li')!;
-  expect(within(engineer).getByRole('link', { name: 'ses-0002 engineer' }).getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0002`);
-  expect(within(engineer).getByRole('link', { name: 'inv-0004' }).getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0002/chapters/inv-0004`);
-  expect(engineer.textContent).toContain('inv-0004 awaited');
+  const engineer = await within(area).findByRole('group', { name: 'ses-0002 engineer, live' });
+  expect(within(engineer).getByRole('link', { name: 'ses-0002' }).getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0002`);
+  expect(within(engineer).getByRole('link', { name: /^Chapter 2 of ses-0002: inv-0004/ }).getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0002/chapters/inv-0004`);
   expect(engineer.querySelector('.session-state')!.textContent).toBe('live');
-  expect(within(area).getByRole('link', { name: 'ses-0001 initial-architect' }).closest('li')!.textContent).toContain('the run itself');
+  expect(within(area).getByRole('group', { name: 'ses-0001 initial-architect, finished' })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Measurements' }));
+  await screen.findByLabelText('Metrics');
+  expect(screen.queryByRole('table', { name: 'Sessions' })).toBeNull();
 });

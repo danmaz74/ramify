@@ -1,17 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type {
-  DecisionView, GateView, HypothesisView, InvocationEvaluation, LineageMetric, Metric, MetricsResponse,
+  DecisionView, GateView, HypothesisView, LineageMetric, Metric, MetricsResponse,
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
-import { excursionsText, guardingText, hookChecksText, linesText, usageText } from './evaluation.js';
 import { Markdown } from './markdown.js';
-import { chapterHref, routeHref, sessionHref } from './routes.js';
-import { figure, metricValue, reachText, RunState, SessionState, StateBadge } from './run-labels.js';
+import { routeHref } from './routes.js';
+import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
 import type { DiagramSessions } from './session-marks.js';
+import { SessionTimeline } from './session-timeline.js';
 
 /*
  * The Run page: one run, read-only, as the harness projects it. Its overview
@@ -588,41 +588,17 @@ function Dependencies({ client, planId, runId, version, onOpenWorkItem, sessions
 // Sessions
 
 /*
- * The run's sessions, each opening its transcript and each invocation its
- * chapter. It is read again whenever the run's version moves.
+ * The run's sessions as a lineage timeline. It is read again whenever the
+ * run's version moves, so a live session's segments grow as the run does.
  */
 function RunSessions({ client, planId, runId, version }: AreaProps) {
   const state = useRunQuery(`sessions:${runId}`, version, () => client.getRunSessions(planId, runId));
   return (
-    <div className="area" aria-label="Sessions">
+    <div className="area area-wide" aria-label="Sessions">
       <Loading state={state} what="the sessions">
-        {data => data.sessions.length === 0 ? <p className="muted">No session has been opened yet.</p> : (
-          <ul className="session-list">
-            {data.sessions.map(session => {
-              const ref = { source: 'run', planId, runId, session: session.session } as const;
-              return (
-                <li key={session.session} className={`session-entry session-entry-${session.state}`}>
-                  <p className="session-entry-title">
-                    <a href={sessionHref(ref)}><code>{session.session}</code> {session.role}</a>
-                    <SessionState state={session.state} />
-                    {session.finished && <span className="muted"> {session.finished}</span>}
-                  </p>
-                  <p className="muted">{reachText(session.reaches)}{session.lineage.fork ? ` · forked from ${session.lineage.fork.from.session}` : ''}</p>
-                  <p className="session-chapters">
-                    Chapters:{' '}
-                    {session.invocations.map((invocation, index) => (
-                      <span key={invocation.invocation}>
-                        {index > 0 && ', '}
-                        <a href={chapterHref(ref, invocation.invocation)}>{invocation.invocation}</a>
-                        <span className="muted"> {invocation.outcome ?? (session.state === 'live' && session.awaiting === invocation.invocation ? 'awaited' : 'not ended')}</span>
-                      </span>
-                    ))}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        {data => data.sessions.length === 0
+          ? <p className="muted">No session has been opened yet.</p>
+          : <SessionTimeline planId={planId} runId={runId} answer={data} />}
       </Loading>
     </div>
   );
@@ -662,13 +638,6 @@ function Measurements({ client, planId, runId, version }: AreaProps) {
                 <tbody>{data.lineage.metrics.map(metric => <MetricRow key={metric.id} metric={metric} />)}</tbody>
               </table>
             </section>
-            <section className="panel">
-              <h2>Sessions</h2>
-              <table className="table" aria-label="Sessions">
-                <thead><tr><th>Invocation</th><th>Role</th><th>Ended</th><th>Guarding</th><th>Hook checks</th><th>Reads outside</th><th>Lines</th><th>Tokens</th></tr></thead>
-                <tbody>{data.evaluation.invocations.map(invocation => <SessionRow key={invocation.invocation} invocation={invocation} />)}</tbody>
-              </table>
-            </section>
           </>
         )}
       </Loading>
@@ -686,21 +655,6 @@ function MetricRow({ metric }: { readonly metric: Metric | LineageMetric }) {
       <td>{figure(metric.denominator)}</td>
       <td>{metric.coverage ? `${metric.coverage.covered} of ${metric.coverage.total}` : '—'}</td>
       <td>{metric.note ?? ''}{metric.evidence.length > 0 && <details><summary>evidence</summary><ul>{metric.evidence.map(item => <li key={item}>{item}</li>)}</ul></details>}</td>
-    </tr>
-  );
-}
-
-function SessionRow({ invocation }: { readonly invocation: InvocationEvaluation }) {
-  return (
-    <tr>
-      <td>{invocation.invocation}{invocation.iteration ? <div className="muted">{invocation.iteration}</div> : null}</td>
-      <td>{invocation.role}</td>
-      <td>{invocation.ended ?? 'running'}</td>
-      <td>{guardingText(invocation)}{invocation.outsideScope.length > 0 ? <div className="warn">outside scope: {invocation.outsideScope.join(', ')}</div> : null}</td>
-      <td>{hookChecksText(invocation)}</td>
-      <td>{excursionsText(invocation)}</td>
-      <td>{linesText(invocation)}</td>
-      <td>{usageText(invocation)}</td>
     </tr>
   );
 }

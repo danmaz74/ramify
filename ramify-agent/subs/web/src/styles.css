@@ -348,7 +348,7 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .app-nav a[aria-current='page'] { color: var(--ink); font-weight: 600; }
 .app-nav a:hover, .app-nav a:focus-visible { text-decoration: underline; }
 
-/* Sessions: the project's list and a run's. */
+/* Sessions: the project's list. */
 .session-state-live { background: #dde8f6; color: var(--accent); }
 .session-state-suspended { background: #f7ecd4; color: var(--warn); }
 .session-state-finished { background: #eceff2; color: var(--muted); }
@@ -362,8 +362,73 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .session-entry-title { font-weight: 600; }
 .session-entry-title .muted { font-weight: normal; }
 .entry-note { margin: 0.1rem 0; font-size: 0.85rem; }
-.session-entry-where, .session-entry-facts, .session-chapters { font-size: 0.88rem; }
+.session-entry-where, .session-entry-facts { font-size: 0.88rem; }
 .pager { display: flex; gap: 0.5rem; margin: 1rem 0; }
+
+/* Run → Sessions: the lineage timeline. Lanes, segments and marks are
+ * placed by the layout; the lane labels stay in view while the timeline
+ * scrolls sideways inside its frame. */
+.session-timeline { padding: 0; overflow: hidden; }
+.legend-segment { width: 1.4rem; height: 0.7rem; border: 1px solid var(--accent); border-radius: 3px; background: #dde8f6; display: inline-block; }
+.legend-segment.legend-awaited { background: repeating-linear-gradient(135deg, #dde8f6 0 4px, #fff 4px 7px); }
+.legend-gap { width: 1.7rem; border-top: 2px dashed #8a949f; display: inline-block; }
+.legend-mark { width: 0.55rem; height: 0.55rem; background: var(--warn); transform: rotate(45deg); display: inline-block; }
+.legend-link { width: 1.7rem; border-top: 2px solid var(--accent); display: inline-block; }
+.legend-link.legend-replace { border-top-style: dashed; border-top-color: var(--bad); }
+.legend-link.legend-request { border-top-style: dotted; border-top-color: var(--good); }
+.legend-degraded, .timeline-degraded {
+  display: inline-flex; align-items: center; justify-content: center; width: 0.95rem; height: 0.95rem; flex: 0 0 auto;
+  border-radius: 50%; background: var(--warn); color: #fff; font-style: normal; font-weight: 800; font-size: 0.7rem; line-height: 1;
+}
+.timeline-scroll { overflow: auto; max-height: 40rem; background: #fafbfc; scrollbar-gutter: stable; }
+.timeline-scroll:focus-visible { outline: 3px solid rgb(47 95 167 / 28%); outline-offset: -3px; }
+.timeline-surface { position: relative; }
+.timeline-drawing { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.timeline-lane-band { fill: rgb(29 35 43 / 3%); }
+.timeline-rule { stroke: #e3e7ec; stroke-width: 1; stroke-dasharray: 2 4; }
+.timeline-gap { stroke: #8a949f; stroke-width: 2; stroke-dasharray: 5 4; }
+.timeline-gap-open { stroke: var(--warn); }
+.timeline-link { fill: none; stroke: var(--accent); stroke-width: 2; }
+.timeline-link-replace { stroke: var(--bad); stroke-dasharray: 7 5; }
+.timeline-link-request { stroke: var(--good); stroke-dasharray: 2 4; stroke-linecap: round; }
+.timeline-arrow path { fill: var(--accent); }
+.timeline-arrow-replace path { fill: var(--bad); }
+.timeline-arrow-request path { fill: var(--good); }
+.timeline-axis { position: relative; }
+/* The corner above the lane labels, which covers the ticks scrolled under it. */
+.timeline-corner { position: sticky; left: 0; z-index: 2; display: block; box-sizing: border-box; height: 100%; background: #fafbfc; border-right: 1px solid var(--line); }
+.timeline-tick {
+  position: absolute; top: 6px; transform: translateX(-50%); color: var(--muted);
+  font-size: 0.7rem; font-variant-numeric: tabular-nums;
+}
+.timeline-lane { position: relative; box-sizing: border-box; }
+.timeline-lane-label {
+  position: sticky; left: 0; z-index: 2; box-sizing: border-box; height: 100%;
+  display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 0 0.3rem;
+  padding: 0 0.5rem 0 0.75rem; background: var(--panel); border-right: 1px solid var(--line); font-size: 0.8rem;
+}
+.timeline-lane-label .badge { margin-left: 0; font-size: 0.7rem; }
+.timeline-lane-role { flex-basis: 100%; color: var(--muted); font-size: 0.72rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-segment {
+  position: absolute; z-index: 1; box-sizing: border-box; display: flex; align-items: center; gap: 0.2rem; padding: 0 0.25rem;
+  border: 1px solid var(--accent); border-radius: 5px; background: #dde8f6; color: var(--ink); text-decoration: none; overflow: hidden;
+}
+.timeline-segment:hover { background: #c9daf1; }
+.timeline-segment:focus-visible { outline: 3px solid rgb(47 95 167 / 40%); outline-offset: 1px; }
+.timeline-segment-label { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-segment-open { border-right-style: dashed; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.timeline-segment-awaited { background: repeating-linear-gradient(135deg, #dde8f6 0 6px, #fff 6px 10px); }
+.timeline-segment-not-ended { border-color: var(--bad); background: #f6dcd9; }
+.timeline-segment-failed, .timeline-segment-stopped, .timeline-segment-context-budget-reached, .timeline-segment-invalid-submission { border-color: var(--bad); }
+.timeline-segment-degraded { box-shadow: inset 0 0 0 1px var(--warn); }
+.timeline-mark {
+  position: absolute; z-index: 1; width: 0.7rem; height: 0.7rem; background: var(--warn); border: 1px solid #fff;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.timeline-mark:focus-visible { outline: 3px solid rgb(47 95 167 / 40%); outline-offset: 2px; }
+.timeline-list ol { padding-left: 1.2rem; }
+.timeline-list-session p { margin: 0.2rem 0; overflow-wrap: anywhere; }
+.timeline-list-session ul { margin: 0 0 0.5rem; padding-left: 1.1rem; font-size: 0.88rem; overflow-wrap: anywhere; }
 
 /* One session's transcript. Its chapters scroll inside a frame that keeps to
  * the bottom while the reader is there. */
