@@ -1,6 +1,7 @@
-import { After, BeforeAll } from '@cucumber/cucumber';
+import { After, AfterAll, BeforeAll } from '@cucumber/cucumber';
 
 import { recordBeforeAll } from './initialization.js';
+import { startServedSystem, stopServedSystem, testMode } from './mode.js';
 import type { CollectionReviewWorld } from './world.js';
 
 /**
@@ -20,12 +21,23 @@ import type { CollectionReviewWorld } from './world.js';
  * is the whole effect. `recordBeforeAll` is a capability this file genuinely
  * uses, not an export invented so that a side effect would have something to
  * call.
+ *
+ * The same hooks start and stop full mode's listener, so a run in either
+ * mode needs nothing started before it; a dry run executes no hook.
  */
 
-BeforeAll(() => {
+BeforeAll(async () => {
   recordBeforeAll();
+
+  if (testMode() === 'full') {
+    await startServedSystem();
+  }
 });
 
 After(async function (this: CollectionReviewWorld) {
   await this.closeAll();
+});
+
+AfterAll(async () => {
+  await stopServedSystem();
 });

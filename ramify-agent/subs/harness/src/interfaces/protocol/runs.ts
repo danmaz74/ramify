@@ -96,6 +96,10 @@ export const runFailureReasonSchema = z.enum([
   'analysis-invalid',
   /** Readiness did not pass within its bounded recoveries. */
   'readiness-failed',
+  /** Readiness found no valid `ramify-agent.json`, or support code it names outside every test area. */
+  'project-config-invalid',
+  /** Readiness found no `cucumber-js`, or an acceptance mode's command that does not resolve. */
+  'acceptance-harness-missing',
   /** An agent session crashed or could not start. */
   'agent-failed',
   /** Every allowed submission of one invocation was invalid. */

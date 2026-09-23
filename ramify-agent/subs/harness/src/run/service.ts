@@ -90,7 +90,8 @@ import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './lo
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
 import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
-import { failingStep, performRecovery, recoveryFor, runReadiness, withRecovery } from './readiness.js';
+import { captureProjectConfig } from './project-config.js';
+import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
   recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, snapshotId,
@@ -693,6 +694,9 @@ export class RunService {
       manifest,
       prompts: Object.fromEntries([...packages].map(([role, loaded]) => [role, { package: loaded.package, hash: loaded.hash }])),
       policy,
+      // Read once, beside the policy. A missing or invalid file is captured
+      // with its reason; readiness reports it, and the start is not refused.
+      projectConfig: await captureProjectConfig(this.projectRoot),
       baseline: baseline.reference,
       // The plan's own scenarios, extracted once from the captured bytes. A
       // block that does not parse is a limitation, never a refusal.
@@ -3572,11 +3576,18 @@ export class RunService {
   /**
    * Suites of the project the MVP's one supported runner does not select.
    * They are a coverage gap on every attempt, never an absence of tests, and
-   * they are read from the project's own manifest.
+   * they are read from the project's own manifest. A Cucumber script is none
+   * once the captured configuration names the acceptance modes, which run
+   * the project's scenarios in the harness's own profile.
    */
   private async recordRunnerGaps(run: Run, invocation: string): Promise<void> {
     const manifest = await readJson(join(this.projectRoot, 'package.json')) as { scripts?: Record<string, unknown> } | null;
-    const scripts = Object.keys(manifest?.scripts ?? {}).filter(name => name.startsWith('test:')).sort();
+    const declared = manifest?.scripts ?? {};
+    const acceptance = 'config' in run.record.projectConfig;
+    const scripts = Object.keys(declared)
+      .filter(name => name.startsWith('test:'))
+      .filter(name => !(acceptance && typeof declared[name] === 'string' && /\bcucumber-js\b/u.test(declared[name])))
+      .sort();
     if (scripts.length === 0) return;
     const observations = await ObservationLog.open(run.path(runLayout.observations(invocation)));
     for (const script of scripts) {
@@ -3861,6 +3872,8 @@ export class RunService {
         gateDirectory: run.path(runLayout.gateOutput(gateId)),
         gateId,
         policy: run.record.policy,
+        projectConfig: run.record.projectConfig,
+        index: run.index,
         ramify: this.options.ramify,
         git: this.git,
         head,
@@ -3910,7 +3923,7 @@ export class RunService {
       await this.afterWrite('readiness-attempted', run.record.jobId);
 
       if (final) {
-        await this.fail(run, 'readiness-failed', `Readiness failed at ${step?.step ?? 'an unknown step'} after ${attemptNumber} attempt${attemptNumber === 1 ? '' : 's'}: ${step?.detail ?? ''}`,
+        await this.fail(run, readinessFailureReason(step?.step), `Readiness failed at ${step?.step ?? 'an unknown step'} after ${attemptNumber} attempt${attemptNumber === 1 ? '' : 's'}: ${step?.detail ?? ''}`,
           [runLayout.readiness(attemptNumber), ...(result.gate === null ? [] : [runLayout.gate(gateId)])]);
         return false;
       }

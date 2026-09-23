@@ -8,17 +8,21 @@ import type { GateAttempt } from '../checks/records.js';
 import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
+import type { RunFailureReason } from '../interfaces/protocol/runs.js';
 import { discoverNestedPackages } from './policy.js';
+import { matchSupport, moduleTestAreas, unresolvedCommands } from './project-config.js';
 import {
   readinessAttemptSchema, infrastructureRecoverySchema,
-  type InfrastructureRecovery, type ReadinessAttempt, type ReadinessStep, type RecoveryId, type RunPolicy,
+  type CapturedProjectConfig, type InfrastructureRecovery, type ReadinessAttempt, type ReadinessStep, type RecoveryId, type RunPolicy,
 } from './records.js';
 
 /*
  * Execution readiness. Before any work is assigned, the harness verifies the
  * project it will work in: that it is there, that it is a clean git
- * repository, that the compiler configuration, the test runner and the
- * independent nested packages are present and installed, that tests are
+ * repository, that the compiler configuration, the test runner, the
+ * project's configuration, its scenario harness and the independent nested
+ * packages are present and installed, that tests are
  * discovered, that Ramify answers, and that the project's own baseline
  * passes.
  *
@@ -43,6 +47,10 @@ export interface ReadinessRequest {
   readonly gateDirectory: string;
   readonly gateId: string;
   readonly policy: RunPolicy;
+  /** The project's configuration as `start-run` captured it. */
+  readonly projectConfig: CapturedProjectConfig;
+  /** The architect view that names the modules, or null where the run has none. */
+  readonly index?: ArchitectIndex | null | undefined;
   readonly ramify: RamifyCli;
   readonly git?: GitService | undefined;
   /** The commit readiness ran on. */
@@ -72,6 +80,8 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
   steps.push(await gitCleanStep(projectRoot, request.signal, request.git ?? gitService));
   steps.push(await compilerConfigStep(projectRoot));
   steps.push(await testRunnerStep(projectRoot));
+  steps.push(await projectConfigStep(projectRoot, request.projectConfig, request.index ?? null));
+  steps.push(await acceptanceRunnerStep(projectRoot, request.projectConfig));
 
   const nested = await discoverNestedPackages(projectRoot);
   steps.push(nestedPackagesStep(nested, policy));
@@ -176,6 +186,17 @@ export function failingStep(attempt: ReadinessAttempt): ReadinessAttempt['steps'
   return attempt.steps.find(step => step.outcome !== 'passed');
 }
 
+/**
+ * The reason a run fails with when readiness ends at this step. The
+ * project's configuration and its scenario harness name their own; every
+ * other step is `readiness-failed`.
+ */
+export function readinessFailureReason(step: string | undefined): RunFailureReason {
+  if (step === 'project-config') return 'project-config-invalid';
+  if (step === 'acceptance-runner') return 'acceptance-harness-missing';
+  return 'readiness-failed';
+}
+
 // The steps.
 
 async function projectRootStep(projectRoot: string): Promise<StepResult> {
@@ -219,6 +240,59 @@ async function testRunnerStep(projectRoot: string): Promise<StepResult> {
     return { step: 'test-runner', outcome: 'failed', detail: `\`test\` is \`${script}\`, and node_modules/.bin/vitest is not installed` };
   }
   return { step: 'test-runner', outcome: 'passed', detail: `\`test\` is \`${script}\`, with node_modules/.bin/vitest installed` };
+}
+
+/**
+ * `ramify-agent.json` validated at `start-run`, and every `support` entry
+ * matching at least one file, each inside a module's test area. A failure is
+ * not a code-repair assignment: the project's configuration is the person's.
+ */
+async function projectConfigStep(projectRoot: string, captured: CapturedProjectConfig, index: ArchitectIndex | null): Promise<StepResult> {
+  if ('invalid' in captured) return { step: 'project-config', outcome: 'failed', detail: captured.invalid };
+  const support = captured.config.acceptance.support;
+  const areas = await moduleTestAreas(projectRoot, index);
+  const matches = await matchSupport(projectRoot, support, areas);
+  const problems = matches.flatMap(match => [
+    ...(match.inside.length === 0 && match.outside.length === 0 ? [`\`${match.entry}\` matches no file`] : []),
+    ...(match.outside.length > 0 ? [`\`${match.entry}\` matches ${match.outside.slice(0, 3).join(', ')}${match.outside.length > 3 ? ', …' : ''} outside every module's test area`] : []),
+  ]);
+  if (problems.length > 0) {
+    return {
+      step: 'project-config',
+      outcome: 'failed',
+      detail: `${captured.path}: support code is testing source of the module whose test area holds it, its src/tests/ or a testing module's src/: ${problems.join('; ')}`,
+    };
+  }
+  const files = matches.flatMap(match => match.inside);
+  return {
+    step: 'project-config',
+    outcome: 'passed',
+    detail: `${captured.path} validates against ramify-agent.project/1; ${support.length === 0 ? 'it names no support code' : `its support code is ${files.join(', ')}`}; full mode's readiness is ${captured.config.acceptance.modes.full.readiness}`,
+  };
+}
+
+/**
+ * The scenario harness the configuration names: `cucumber-js` installed, and
+ * each mode's commands resolving. A missing runner is as unrecoverable here
+ * as a missing `vitest` is for `test-runner`.
+ */
+async function acceptanceRunnerStep(projectRoot: string, captured: CapturedProjectConfig): Promise<StepResult> {
+  if ('invalid' in captured) {
+    return { step: 'acceptance-runner', outcome: 'not-verified', detail: 'not reached: the project\'s configuration names no acceptance modes' };
+  }
+  const runner = join(projectRoot, 'node_modules', '.bin', 'cucumber-js');
+  const problems: string[] = [];
+  if (!(await isFile(runner))) problems.push('node_modules/.bin/cucumber-js is not installed');
+  for (const command of await unresolvedCommands(projectRoot, captured.config)) {
+    problems.push(`${command.mode} mode's ${command.role} \`${command.argv.join(' ')}\` does not resolve: ${command.reason}`);
+  }
+  if (problems.length > 0) return { step: 'acceptance-runner', outcome: 'failed', detail: problems.join('; ') };
+  const { quick, full } = captured.config.acceptance.modes;
+  return {
+    step: 'acceptance-runner',
+    outcome: 'passed',
+    detail: `node_modules/.bin/cucumber-js is installed; quick mode runs \`${quick.command.join(' ')}\`, full mode \`${full.command.join(' ')}\``,
+  };
 }
 
 function nestedPackagesStep(

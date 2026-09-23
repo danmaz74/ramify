@@ -129,6 +129,63 @@ export const runPolicySchema = z.object({
 export type RunPolicy = z.infer<typeof runPolicySchema>;
 export type CheckCommandRecord = z.infer<typeof checkCommandSchema>;
 
+// The project's configuration.
+
+/** The version a project's `ramify-agent.json` declares. */
+export const projectConfigVersion = 'ramify-agent.project/1';
+
+/** An argv the harness runs as it stands, with its first element the executable or `npm`. */
+const argvSchema = z.array(text).min(1);
+
+/** One execution mode of the project's scenario harness. */
+export const acceptanceModeSchema = z.object({
+  /** Starts `cucumber-js` in this mode and passes the harness's own arguments through. */
+  command: argvSchema,
+  /** Run once per gate attempt before the mode's first run. */
+  setup: argvSchema.optional(),
+  /** Run once per gate attempt after the mode's last run. */
+  teardown: argvSchema.optional(),
+}).strict();
+export type AcceptanceMode = z.infer<typeof acceptanceModeSchema>;
+
+/** Whether readiness loads full mode with `--dry-run` or executes it. */
+export const fullModeReadinessSchema = z.enum(['dry-run', 'run']);
+
+/**
+ * `ramify-agent.json`, the target project's configuration for the harness:
+ * only what the harness cannot derive. In v1 that is the scenario harness,
+ * the support code Cucumber imports before any step file and the command of
+ * each execution mode.
+ */
+export const projectConfigSchema = z.object({
+  schema: z.literal(projectConfigVersion),
+  acceptance: z.object({
+    /** Project-relative files or globs, imported in order before any step file. */
+    support: z.array(text),
+    modes: z.object({
+      quick: acceptanceModeSchema,
+      full: z.object({
+        command: argvSchema,
+        setup: argvSchema.optional(),
+        teardown: argvSchema.optional(),
+        readiness: fullModeReadinessSchema.default('dry-run'),
+      }).strict(),
+    }).strict(),
+  }).strict(),
+}).strict();
+export type ProjectConfig = z.infer<typeof projectConfigSchema>;
+
+/**
+ * The configuration as `start-run` found it, captured in `job.json`: the
+ * validated file with its hash, or why there is none. An invalid or missing
+ * file is not a refusal to start; readiness reports it.
+ */
+export const capturedProjectConfigSchema = z.union([
+  z.object({ path: text, hash: sha256Schema, config: projectConfigSchema }).strict(),
+  z.object({ path: text, hash: sha256Schema.nullable(), invalid: text }).strict(),
+]);
+export type CapturedProjectConfig = z.infer<typeof capturedProjectConfigSchema>;
+
 /** A committed record at one revision; `hash` is the SHA-256 of the file's bytes. */
 export const recordRefSchema = z.object({ id: z.string(), revision: z.int().nonnegative(), hash: sha256Schema }).strict();
 export type RecordRef = z.infer<typeof recordRefSchema>;
@@ -145,6 +202,8 @@ export const runRecordSchema = z.object({
   /** Prompt and skill packages by role, each a content hash. A role without a package has none yet. */
   prompts: z.partialRecord(roleSchema, z.object({ package: text, hash: sha256Schema }).strict()),
   policy: runPolicySchema,
+  /** The project's `ramify-agent.json`, validated or with the reason it is not. */
+  projectConfig: capturedProjectConfigSchema,
   /** The frozen measurement baseline B, or the reason the producer gave none. */
   baseline: z.union([
     z.object({ measurement: recordRefSchema }).strict(),
@@ -218,7 +277,7 @@ export type EntryAssignments = z.infer<typeof entryAssignmentsSchema>;
 
 /** The steps readiness verifies, in the order it verifies them. */
 export const readinessSteps = [
-  'project-root', 'git-clean', 'compiler-config', 'test-runner', 'nested-packages',
+  'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner', 'nested-packages',
   'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
 ] as const;
 export const readinessStepSchema = z.enum(readinessSteps);

@@ -748,9 +748,9 @@ describe('the protocol vocabulary', () => {
 
   test('every failure reason and every phase is named', () => {
     expect(runFailureReasonSchema.options).toEqual([
-      'analysis-invalid', 'readiness-failed', 'agent-failed', 'invalid-submission', 'inputs-changed',
-      'dependency-cycle', 'unresolvable-requirement', 'repair-exhausted', 'recovery-exhausted',
-      'writer-unsettled', 'limit-exceeded', 'internal',
+      'analysis-invalid', 'readiness-failed', 'project-config-invalid', 'acceptance-harness-missing',
+      'agent-failed', 'invalid-submission', 'inputs-changed', 'dependency-cycle', 'unresolvable-requirement',
+      'repair-exhausted', 'recovery-exhausted', 'writer-unsettled', 'limit-exceeded', 'internal',
     ]);
     expect(runPhaseSchema.options).toEqual(['analysis', 'awaiting-review', 'readiness', 'working', 'final-verification', 'ended']);
     expect(sessionModeSchema.options).toEqual(['fresh', 'continued', 'fork']);

@@ -178,7 +178,9 @@ Then(
     const payload = readPayload(called.content);
 
     assert.ok(called.isError !== true, 'The review answered with an error result.');
-    assert.equal(payload.invocation.sessionId, 'feature-session');
+    // The id the server saw: the one asked for in process, the one the
+    // listener's transport generated over HTTP.
+    assert.equal(payload.invocation.sessionId, this.mcpSession.sessionId);
     assert.deepEqual(payload.invocation.scope, this.binding);
     assert.equal(payload.outcome.status, 'failed');
     assert.deepEqual(

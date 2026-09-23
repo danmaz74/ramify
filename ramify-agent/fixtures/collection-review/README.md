@@ -41,6 +41,8 @@ port the operating system picks.
 npm run type-check    # ordinary source, every src/tests/, and the config files
 npm test              # every owner's tests, under Node
 npm run test:cucumber # the one feature scenario, through the real runner
+npm run acceptance:quick # the scenarios in quick mode: the system in process
+npm run acceptance:full  # the scenarios in full mode: the listener over HTTP
 npm run build         # the browser bundle, into dist/
 ```
 
@@ -75,6 +77,29 @@ capability invented to justify the load. The scenario's last step asserts that
 the initialization was evaluated once and the run-level hook registered once.
 This is that fixture and not this package's test framework, which is Vitest.
 
+### The scenario harness
+
+`ramify-agent.json` beside `package.json` declares the package's scenario
+harness to ramify-agent: the support code Cucumber imports before any step
+file, `integration-tests`' World and hooks, and the command of each execution
+mode. The mode is fixed for one run of the runner by `TEST_MODE` and never
+written into a scenario. `acceptance:quick` drives the configured system in
+process, through `createTestSystem`, as every other test does.
+`acceptance:full` reaches the same system through the real listener on a
+loopback port: the `BeforeAll` hook starts it with `startServedTestSystem`,
+which the root also exposes to its descendants, the typed client and the MCP
+sessions speak HTTP to it, and the `AfterAll` hook stops it. Full mode needs no
+browser and no `setup` or `teardown` command, and a dry run starts nothing. An
+MCP session's id is the one the listener's transport generated there, which
+the scenario compares against the id the server saw. `test:cucumber` runs
+quick mode under this package's own `cucumber.js` profile; a run of the
+harness passes its own profile instead.
+
+Step definitions and feature files sit in the conventional directories the
+harness collects: a module's `src/tests/steps/` and `src/tests/features/`, or,
+for a testing module such as `integration-tests`, its `src/steps/` and
+`src/features/`.
+
 ## The ownership tree
 
 Every module owns the `src/` beside its `module.ramify`, with children only
@@ -101,7 +126,8 @@ plus the header's required-importer tags, never `browser`.
 | `workspace/reviews/ui/pure-ui` | `[ui, browser]` | `[testing, ui]` |
 
 `integration-tests` is the one testing module: its header classifies its
-ordinary `src/`, where the scenario lives, and it exposes nothing. Every other
+ordinary `src/`, where the scenario, its World and its hooks live, and it
+exposes nothing. Every other
 owner keeps its tests in `src/tests/`.
 
 `workspace` is the browser shell and the tree's relay point: feature adapters

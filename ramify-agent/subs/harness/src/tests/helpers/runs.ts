@@ -54,16 +54,20 @@ export async function initRepository(root: string): Promise<string> {
 }
 
 /**
- * The test runner readiness looks for. The fixture project carries no
- * `node_modules`, so a copy that a run works in is given the one binary the
- * `test-runner` step requires.
+ * The test runners readiness looks for. The fixture project carries no
+ * `node_modules`, so a copy that a run works in is given the two binaries the
+ * `test-runner` and `acceptance-runner` steps require. Neither runs anything:
+ * the commands a lifecycle test's gates run are its policy's, and the
+ * scenario runner is a scripted command wherever one runs.
  */
 export async function installTestRunner(root: string): Promise<void> {
   const directory = join(root, 'node_modules', '.bin');
   await mkdir(directory, { recursive: true });
-  const path = join(directory, 'vitest');
-  await writeFile(path, '#!/bin/sh\nexit 0\n');
-  await chmod(path, 0o755);
+  for (const name of ['vitest', 'cucumber-js']) {
+    const path = join(directory, name);
+    await writeFile(path, '#!/bin/sh\nexit 0\n');
+    await chmod(path, 0o755);
+  }
 }
 
 /** A command that runs for real and answers `code`. */

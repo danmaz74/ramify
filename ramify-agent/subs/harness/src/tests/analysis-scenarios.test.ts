@@ -227,6 +227,8 @@ describe('acceptance', () => {
       moduleEntry('collection-review/workspace', 'subs/workspace', 'collection-review'),
       moduleEntry(reviews, 'subs/workspace/subs/reviews', 'collection-review/workspace'),
       moduleEntry(`${reviews}/checks`, 'subs/workspace/subs/reviews/subs/checks', reviews, { tags: ['testing'] }),
+      // Readiness judges the fixture's scenario support code against the view.
+      moduleEntry('collection-review/integration-tests', 'subs/integration-tests', 'collection-review', { tags: ['testing', 'dispatch'] }),
     ], new Map([[reviews, [{ module: reviews, name: 'attachReviewNote', file: 'subs/workspace/subs/reviews/src/notes.ts' }]]]));
     const plan = await planWithScenarios(project);
     const [, panel] = extractPlanScenarios(plan).scenarios;

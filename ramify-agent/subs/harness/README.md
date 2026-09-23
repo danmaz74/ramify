@@ -155,7 +155,8 @@ hiding or measured complexity justifies it.
   the bodies of every record it commits, and the files beneath the run are
   materialized copies of it.
   - `records.ts`: the run's records and where each is materialized beneath
-    it: `RunRecord`, `RunPolicy`, the entry assignments, the readiness
+    it: `RunRecord`, `RunPolicy`, the project's configuration
+    (`ramify-agent.project/1`), the entry assignments, the readiness
     attempts, the infrastructure recoveries, the measurement snapshots, the
     invocations with their outcomes, and the reader of a gate attempt. The
     schemas are here and not beside the types they mirror, because
@@ -179,6 +180,11 @@ hiding or measured complexity justifies it.
     observation: the session idle, and every registered process group killed
     and confirmed gone. A release that could not be confirmed blocks every
     writer and every gate that would follow.
+  - `project-config.ts`: the project's `ramify-agent.json`, read at
+    `start-run` through `subs/evidence`, validated and captured into
+    `job.json` beside the policy, with the reason where it is missing or
+    invalid; and what readiness asks of a valid one: the modules' test areas
+    its support code must match, and whether each mode's commands resolve.
   - `readiness.ts`: the readiness steps, their bounded recovery and the
     discovery of the project's test files. A failure a preparation can
     repair consumes one recovery; one it cannot consumes none.
@@ -629,12 +635,22 @@ Neither child receives this module's vocabulary.
   `repairRoundsPerWorkItemGate` fails the run with `repair-exhausted` and the
   original cause preserved.
 - **Readiness.** The project root, a clean git repository, the compiler
-  configuration, the test runner, the independent nested packages, test
-  discovery, the Ramify command line, and then the project's own baseline:
+  configuration, the test runner, the project's configuration, its scenario
+  harness, the independent nested packages, test discovery, the Ramify
+  command line, and then the project's own baseline:
   its tests, its type check and a complete Ramify check, as one gate
   attempt. The run branch, `ramify-agent/run-<run-id>`, is created once a
   clean repository has been established. Agents never commit, and the harness
-  never resets or reverts.
+  never resets or reverts. `project-config` fails a run whose captured
+  `ramify-agent.json` is missing or invalid, or names support code outside
+  every module's test area (a module's `src/tests/`, a testing module's
+  `src/`), with reason `project-config-invalid`; `acceptance-runner` fails one
+  without `node_modules/.bin/cucumber-js` or with a mode command that does not
+  resolve (`npm run <script>` resolves when the script exists), with reason
+  `acceptance-harness-missing`. Neither consumes a recovery, and neither is a
+  code-repair assignment. A missing or invalid file never refuses
+  `start-run`. Once the configuration names the acceptance modes, a `test:`
+  script that runs `cucumber-js` is no longer an unsupported runner.
 - **The work-item and final gates.** All project tests, the type check and a
   complete Ramify check, on the current tree. `work-item-completed` requires
   a passing `work-item` attempt and is the only thing that closes a work
@@ -736,7 +752,9 @@ The run's own tests are beside them.
   architect session and reads the observations back.
 - `run-commands.test.ts` covers the three command rules for `start-run` and
   `stop-job`; `review-stop.test.ts` covers the stop, its approval, a stop and
-  a crash during it, approvals without it, their refusals and the budget; `readiness.test.ts` builds one fixture per failing step and
+  a crash during it, approvals without it, their refusals and the budget;
+  `project-config.test.ts` covers the configuration's schema, its capture
+  into `job.json` and the two steps that read it; `readiness.test.ts` builds one fixture per failing step and
   separates the failures a preparation can repair from the ones it cannot;
   `run-recovery.test.ts` forces a restart after every durable boundary of the
   run log and compares what recovery did; `writer-settlement.test.ts` kills

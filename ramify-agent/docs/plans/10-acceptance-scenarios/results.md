@@ -318,3 +318,165 @@ From `ramify-agent/`:
   the review section of the analysis page are iteration 10's.
 - The snapshot does not report `reviewStop` itself; a client reads the
   phase. Iteration 10 may add it if the page needs it before the stop.
+
+## Iteration 4: The project configuration
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **Reading the file** (`subs/evidence/src/project-configuration.ts`, exposed
+  to the harness). `readProjectConfiguration(root)` reads `ramify-agent.json`
+  and answers `present` with its text and SHA-256, `missing`, or
+  `unreadable` with the reason; it never throws and does not parse.
+  `projectConfigurationFile` names the path.
+- **Schema** (`run/records.ts`, beside the run policy).
+  `projectConfigSchema` is `ramify-agent.project/1`: `acceptance.support`
+  (project-relative paths or globs, possibly empty), `acceptance.modes.quick`
+  and `acceptance.modes.full`, each `{ command, setup?, teardown? }` with
+  non-empty argvs, and `full.readiness: 'dry-run' | 'run'` defaulting to
+  `'dry-run'`. Every object is strict, so an unknown field, a third mode or
+  `readiness` on quick mode is rejected. `capturedProjectConfigSchema` is
+  `{ path, hash, config }` or `{ path, hash | null, invalid }`.
+  `RunRecord.projectConfig` holds it, required, directly after `policy`.
+- **Capture** (`run/project-config.ts`). `captureProjectConfig(root)` runs at
+  `start-run` and never refuses: a missing file is `invalid: 'ramify-agent.json
+  is missing at the project root'`, an invalid one carries
+  `ramify-agent.json does not validate against ramify-agent.project/1:
+  <path>: <message>; …` (or `is not JSON: …`) with its hash.
+  `parseProjectConfig(text)` is the pure validation. The same file has
+  `moduleTestAreas(root, index | null)`, `matchSupport(root, support,
+  areas)` and `unresolvedCommands(root, config)`.
+- **Readiness** (`run/readiness.ts`). `readinessSteps` gains
+  `project-config` and `acceptance-runner` directly after `test-runner`.
+  `ReadinessRequest` gains `projectConfig` (the captured one) and `index`
+  (the run's architect view, or null).
+  - `project-config` fails with the captured reason, or when a `support`
+    entry matches no file or matches a file outside every module's test
+    area. A test area is a module's `src/tests/`, or a testing module's
+    `src/`; the modules and their tags come from the view where the run has
+    one, else from the `module.ramify` headers found at the root and beneath
+    each `subs/`. Globs use `node:path`'s `matchesGlob`.
+  - `acceptance-runner` requires `node_modules/.bin/cucumber-js` and that
+    every `command`, `setup` and `teardown` of both modes resolves: `npm run
+    <script>` (or `run-script`) when `package.json` declares the script, a
+    path by the file it names from the project root, a bare name in
+    `node_modules/.bin` or on the `PATH`. With an invalid configuration it
+    is `not-verified` ("not reached").
+  - Neither step has a recovery (`recoveryFor` answers null, as for
+    `test-runner`), so the failure is final at once and no code-repair
+    assignment follows. `readinessFailureReason(step)` maps the failing step
+    to the `job-failed` reason: `project-config-invalid`,
+    `acceptance-harness-missing`, otherwise `readiness-failed`. The
+    `readiness-failed` event is unchanged; it names the step.
+- **Failure reasons.** `runFailureReasonSchema` gains
+  `project-config-invalid` and `acceptance-harness-missing` after
+  `readiness-failed`.
+- **Runner gaps.** `recordRunnerGaps` no longer reports a `test:` script
+  that runs `cucumber-js` once the captured configuration is valid, so the
+  fixture's `test:cucumber` is no longer an `unsupported-runner` gap.
+- **The fixture's scenario harness** (`fixtures/collection-review`).
+  - `ramify-agent.json`: support `subs/integration-tests/src/support/world.ts`
+    and `hooks.ts`; quick `npm run acceptance:quick --`, full `npm run
+    acceptance:full --` with `readiness: dry-run`, no `setup` or `teardown`.
+  - `package.json`: `acceptance:quick` (`TEST_MODE=quick NODE_OPTIONS='--import
+    tsx' cucumber-js`) and `acceptance:full` (`TEST_MODE=full …`).
+    `test:cucumber` stays and runs quick mode.
+  - Root `src/tests/setup.ts`: `McpSession` gains `sessionId` (the id the
+    server sees); `startServedTestSystem()` starts `startApiServer({ port: 0
+    })` and answers a `ServedTestSystem { origin, client, connectMcpSession,
+    close }` whose tRPC client and MCP sessions speak HTTP to
+    `127.0.0.1:<port>`. The root's `module.ramify` exposes
+    `startServedTestSystem, ServedTestSystem` with `expose-test` to
+    descendants.
+  - `integration-tests`: a new `support/mode.ts` reads `TEST_MODE` (unset is
+    quick, anything but `quick` or `full` throws) and holds the served
+    system; `hooks.ts` starts it in `BeforeAll` in full mode and stops it in
+    `AfterAll`; the World's `configure()` takes `createTestSystem()` in quick
+    mode and the served system in full mode. The step that compared the
+    invocation's session id with `'feature-session'` now compares it with
+    the opened session's `sessionId`, since over HTTP the listener's
+    transport generates the id.
+  - The conventional directories already exist: `integration-tests` is a
+    testing module with `src/steps/` and `src/features/`. No other empty
+    directory is committed; iteration 6 writes the plan's feature files.
+  - Both READMEs describe the harness and the modes.
+- **Test helpers.** `installTestRunner` and `installMiniRunner` also install
+  a `cucumber-js` shim that exits 0. A new `helpers/project-config.ts` has
+  `minimalProjectConfig` (no support, both modes
+  `node_modules/.bin/cucumber-js`) and `writeProjectConfig(root, config?)`;
+  `constructedRecord()` carries the minimal configuration. Every test
+  project copies the fixture, so none needed a written file.
+
+### The World's placement
+
+Architecture §0 puts the World and hooks at a common ancestor, exposed to
+descendants with `expose-test`. The fixture keeps them in `integration-tests`
+for now, and nothing is exposed from there. The reason is the tag model, not
+convenience: the World wraps `createTestSystem`, whose `[testing, dispatch]`
+tags every symbol built on it must carry, and `shared-ui`, the owner of
+`status-badge-tone`, is `[ui, browser]`, so its test profile `[testing, ui]`
+could import a World at no ancestor. The badge is a presentation primitive
+rendered to markup, so iteration 11's step definitions need nothing from
+the World: Cucumber gives every step the World instance, and a step file may
+keep its own state on it or in module scope. A World or driver that a
+non-`dispatch` owner must import would have to be a separate one without the
+system in its signature, exposed from the root's `src/tests/`; iteration 11
+decides that if its scenario needs it.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/project-config.test.ts` | 26 passed: the fixture's file and the dry-run default; setup, teardown, globs, an empty support list and `readiness: run` accepted; 13 rejections, each with the schema's path (not JSON, another version, no acceptance, no support, an empty support entry, no quick, no full, an empty command, a string command, an unknown readiness, readiness on quick, a third mode, an unknown top-level field); capture of a missing, an invalid and a valid file; the test areas without a view (15 modules, `integration-tests` by its `src/`) and with one; on the fixture with scripted Git and no process started: both steps pass after `test-runner` and `job.json` holds the configuration directly after `policy`; `readiness: run` captured; no file (`project-config-invalid`, no recovery, `acceptance-runner` not verified, no branch, one invocation); an invalid file; support matching nothing or source outside the test areas; no `cucumber-js` (`acceptance-harness-missing`); a missing npm script and a missing executable, each named; the reason mapping |
+| `npx vitest run subs/harness/subs/evidence/src/tests/project-configuration.test.ts` | 3 passed: present with hash, missing, unreadable |
+| `npx vitest run subs/harness/src/tests/fixture-check.test.ts` | 1 passed: the real checker over a fresh fixture copy, no error, only the two configuration warnings |
+| `npx vitest run` over the 65 files that open runs, copy the fixture, install the runners, construct records or name readiness, the composition or the protocol (harness and web) | 63 passed, 1 skipped (`fixture-trials`, conditional), 1 failed: `analysis-scenarios`' view test constructs an index without `integration-tests`, so readiness (rightly) found the fixture's support code outside every test area; the index now lists it, and the file passes (18) |
+| `npx vitest run` over the 19 remaining harness files outside that list and the evidence module's `guarded-files` and `project-configuration` | 19 files, 148 passed |
+| `npx vitest run subs/web` | 7 files, 63 passed |
+| Updated before those runs: `run.test.ts` (the step list), `union-values.test.ts` (the reasons), `composition.test.ts` (producers of the two reasons, `readiness: run` and `unsupported-runner`), `iterations-integration.test.ts` | each failed before its update and passed after; `iterations-integration` now adds a `test:e2e` script to its copy, asserts it is the only `unsupported-runner` gap, and asserts both new steps passed against the real view |
+| The fixture in a temporary copy with `npm ci` (233 packages) | `npm run type-check` passed; `npm run acceptance:quick` 1 scenario, 12 steps passed (session id `feature-session`); `npm run acceptance:full` 1 scenario, 12 steps passed over HTTP (session id a transport UUID); `npm run acceptance:full -- --dry-run` 12 steps skipped, no hook run; `npm run test:cucumber` passed; `TEST_MODE=bogus` fails with its message; `npx vitest run` 20 files, 77 tests passed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits, as in iteration 3 (the new exposed string constant is annotated) |
+
+### Deviations
+
+- **A support entry also fails when it matches source outside every test
+  area**, not only when it matches nothing inside one. Cucumber imports
+  every file an entry matches, and architecture §0 makes support code
+  "ordinary testing source of the module whose test area holds it"; a glob
+  that also loads production source would break that silently.
+- **The reason is the `job-failed` reason**, not a field of the
+  `readiness-failed` event, which already names the step. The snapshot's
+  `failure.reason` is therefore `project-config-invalid` or
+  `acceptance-harness-missing` for these two steps, and `readiness-failed`
+  for every other.
+- **`acceptance-runner` checks `setup` and `teardown` too**, beside
+  `command`, and resolves a non-npm argv by path or by name in
+  `node_modules/.bin` or on the `PATH`. It is `not-verified` when the
+  configuration is invalid.
+- **Without a view, the test areas come from the `module.ramify` headers on
+  disk**, read by a header regex. Every lifecycle test runs without a view,
+  and iteration 2's conventional placement assumed no testing module, which
+  would have failed the fixture's support code.
+- **`McpSession` gains `sessionId`** in the fixture, so the scenario's step
+  compares the invocation's id with the one the server saw in either mode;
+  the existing tests only read `client` and `close`.
+- **The World stays in `integration-tests`**, as recorded above.
+- **Iteration 5's step list is not reserved**: `baseline-acceptance` and
+  `acceptance-full` are not in `readinessSteps` yet.
+
+### Open items
+
+- The configuration is captured but not guarded; architecture §0 guards it
+  like `package.json`. `guardedConfigurationFiles` does not list
+  `ramify-agent.json` yet (iteration 6's guarded files).
+- `startApiServer` listens on every interface, not only loopback; full mode
+  reaches it on `127.0.0.1`. A `host` option would keep it loopback-only.
+- The `unsupported-runner` rule recognizes a Cucumber script by
+  `cucumber-js` in its text; a script that reaches the runner another way
+  is still reported.
+- iteration 11: whether the badge's step definitions need a World without
+  `dispatch` (see "The World's placement").
