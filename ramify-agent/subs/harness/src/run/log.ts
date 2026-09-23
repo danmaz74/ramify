@@ -2,9 +2,9 @@ import { dirname } from 'node:path';
 import { z } from 'zod';
 import { jobIdSchema } from '../interfaces/protocol/ids.js';
 import { acceptedCommandSchema } from '../interfaces/protocol/jobs.js';
-import { runFailureReasonSchema } from '../interfaces/protocol/runs.js';
+import { roleSchema, runFailureReasonSchema } from '../interfaces/protocol/runs.js';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
-import { recordRefSchema } from './records.js';
+import { invocationWorkSchema, recordRefSchema, sessionFinishReasonSchema, sessionIdSchema } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 
@@ -28,22 +28,65 @@ const event = <T extends string, D extends z.ZodType>(type: T, data: D) => z.obj
 
 const text = z.string().min(1);
 
+/** What an invocation ended with, as its outcome record says. */
+const invocationEndedSchema = z.enum(['submitted', 'ended', 'failed', 'stopped', 'context-budget-reached', 'invalid-submission']);
+
+/** The fields every `invocation-ended` carries, whether its session is kept or finished. */
+const invocationEndedFields = {
+  invocation: text,
+  ended: invocationEndedSchema,
+  submission: z.string().nullable(),
+  /** The session the invocation belongs to. */
+  session: sessionIdSchema,
+};
+
 /** One line of a run's event log. */
 export const runEventSchema = z.discriminatedUnion('type', [
   /** The run's first event, holding the start command. It licenses the initial architect. */
   event('job-started', z.object({ command: acceptedCommandSchema }).strict()),
   /**
+   * A fresh or forked invocation opens a session, appended just before that
+   * invocation's `invocation-started`. It names the role and the work the
+   * session is for, the executor that runs it and the model the harness
+   * asked for, null where the executor chooses its own. How the session
+   * relates to others is added beside these fields, never in their place.
+   */
+  event('session-opened', z.object({
+    session: sessionIdSchema,
+    role: roleSchema,
+    work: invocationWorkSchema,
+    executor: text,
+    model: text.nullable(),
+  }).strict()),
+  /**
    * Appended before `startSession`, so a stop arriving between this event and
    * the session's start applies to a known invocation. It commits the
    * `Invocation` and the `MeasurementSnapshot` its scope was measured at.
+   * `start` says whether it is the first invocation of the session just
+   * opened or continues a suspended one.
    */
-  event('invocation-started', z.object({ invocation: text, role: text }).strict()),
-  /** Commits the `InvocationOutcome` and the hash of the submission, if any. */
-  event('invocation-ended', z.object({
+  event('invocation-started', z.object({
     invocation: text,
-    ended: z.enum(['submitted', 'ended', 'failed', 'stopped', 'context-budget-reached', 'invalid-submission']),
-    submission: z.string().nullable(),
+    role: text,
+    session: sessionIdSchema,
+    work: invocationWorkSchema,
+    start: z.enum(['opened', 'continued']),
   }).strict()),
+  /**
+   * Commits the `InvocationOutcome` and the hash of the submission, if any,
+   * and whether the harness keeps the session to use it again or finishes it,
+   * with the reason.
+   */
+  event('invocation-ended', z.discriminatedUnion('kept', [
+    z.object({ ...invocationEndedFields, kept: z.literal(true) }).strict(),
+    z.object({ ...invocationEndedFields, kept: z.literal(false), finished: sessionFinishReasonSchema }).strict(),
+  ])),
+  /**
+   * A session the harness kept is released: none of its invocations is
+   * awaited and it will not be used again. A run records one for every
+   * session it still keeps before its terminal event.
+   */
+  event('session-finished', z.object({ session: sessionIdSchema, reason: sessionFinishReasonSchema }).strict()),
   /**
    * Commits `EntryAssignments`, every `Hypothesis` at revision 1, one
    * `RegistryEntry` per entry capability and one `WorkItem` per entry
@@ -126,8 +169,10 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('brief-appended', z.object({
     decision: text,
     generation: z.int().positive(),
-    /** The point the parent's history reached, which the next fork forks from. */
-    session: text,
+    /** The session that holds the parent context, which the brief was appended to. */
+    session: sessionIdSchema,
+    /** The executor's opaque point the parent's history reached, which the next fork forks from. */
+    ref: text,
     /** Whether the append added the brief or found its key already there. */
     outcome: z.enum(['appended', 'already-present']),
   }).strict()),

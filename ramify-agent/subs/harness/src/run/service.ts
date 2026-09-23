@@ -19,7 +19,7 @@ import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex } from '../jobs/mutex.js';
-import { declaredSchemaOf, listJobDirectories, newJobId, planStateDirectory } from '../jobs/records.js';
+import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planStateDirectory } from '../jobs/records.js';
 import { ensureStateDirectory } from '../store/state-directory.js';
 import { readPlan } from '../plans/discover.js';
 import {
@@ -92,9 +92,11 @@ import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
 import { failingStep, performRecovery, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
-  recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, snapshotId,
+  recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
+  type SessionFinishReason, type SessionId,
 } from './records.js';
+import { reduceSessions, type RunSessions } from './sessions.js';
 import { runSnapshot, type RunSnapshot } from './snapshot.js';
 import { SubmissionJudge, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
@@ -128,8 +130,10 @@ export type RunWrite =
   | 'evidence-reopened'
   | 'revision-needed'
   | 'dependency-cycle-detected'
+  | 'session-opened'
   | 'invocation-started'
   | 'invocation-ended'
+  | 'session-finished'
   | 'analysis-accepted'
   | 'readiness-attempted'
   | 'work-item-started'
@@ -160,6 +164,8 @@ export interface RunServiceOptions {
   readonly lock: ProjectLock;
   /** The agent that runs the run's sessions. Without one, a start is refused as unavailable. */
   readonly agent?: AgentPort | undefined;
+  /** The model the agent was asked to run, recorded with each session; without one, the agent chose its own. */
+  readonly model?: string | undefined;
   /** The evidence side of a run: its manifest, the view its analysis is checked against, and its inputs. */
   readonly inputs: RunInputs;
   /** The Ramify command line the run's readiness and measurements use. */
@@ -251,7 +257,23 @@ interface InvocationRequest<T> {
   readonly endedAs?: (() => InvocationOutcome['ended'] | undefined) | undefined;
   /** A session mode the caller could not honor, recorded on the invocation. */
   readonly degraded?: { readonly requested: 'fresh' | 'continued' | 'fork'; readonly reason: string } | undefined;
+  /** The session a continued start joins; a fresh or forked start opens a new one. */
+  readonly session?: SessionId | undefined;
+  /**
+   * Whether the harness keeps the session once this invocation ends: kept,
+   * to continue it or append to it, or finished with the reason. It is
+   * answered from how the invocation ended and what it submitted, before the
+   * end is recorded. A run that is ending finishes it as `run-ended`,
+   * whatever this answers.
+   */
+  readonly keep: (ended: InvocationOutcome['ended'], value: T | undefined) => SessionKeeping;
 }
+
+/** What the harness does with a session when one of its invocations ends. */
+type SessionKeeping = { readonly kept: true } | { readonly kept: false; readonly finished: SessionFinishReason };
+
+const kept: SessionKeeping = { kept: true };
+const finished = (reason: SessionFinishReason): SessionKeeping => ({ kept: false, finished: reason });
 
 /**
  * What one iteration ended with: the result that closed it, and the need it
@@ -292,6 +314,10 @@ interface InvocationResult<T> {
   /** The point the session's history reached, for a turn that continues it. */
   readonly ref: string;
   readonly outcomeKind: string;
+  /** The session the invocation belongs to; empty where no invocation started. */
+  readonly session: SessionId;
+  /** Whether the harness kept the session to use it again. */
+  readonly kept: boolean;
 }
 
 class Run {
@@ -387,6 +413,53 @@ export class RunService {
     });
   }
 
+  /**
+   * The run's terminal event, with a `session-finished` before it for every
+   * session the run still holds and awaits no invocation of: each one it
+   * kept, as `run-ended`, and one opened whose first invocation never
+   * started, for `opening`'s reason. They are one serialized write, so no
+   * invocation can start between them, and a final run holds no suspended
+   * session. A session whose invocation is still awaited is left live: its
+   * end is that invocation's own.
+   */
+  private endRun(run: Run, terminal: RunEventInput, opening: SessionFinishReason = 'run-ended'): Promise<'committed' | 'ended'> {
+    return run.mutex.run(async () => {
+      if (run.log.terminal) return 'ended';
+      const sessions = this.sessionsOf(run);
+      for (const session of sessions?.values() ?? []) {
+        const reason = session.state === 'suspended' ? 'run-ended' : session.state === 'live' && session.awaiting === null ? opening : null;
+        if (reason !== null) await run.log.append({ type: 'session-finished', data: { session: session.id, reason } });
+      }
+      await run.log.append(terminal);
+      return 'committed';
+    });
+  }
+
+  /**
+   * Releases a session the harness kept and will not use again. A session
+   * that is not suspended is left alone: it was finished when its last
+   * invocation ended, or the run has ended.
+   */
+  private async finishSession(run: Run, session: SessionId | undefined, reason: SessionFinishReason): Promise<void> {
+    if (session === undefined) return;
+    const written = await run.mutex.run(async () => {
+      if (run.log.terminal || this.sessionsOf(run)?.get(session)?.state !== 'suspended') return false;
+      await run.log.append({ type: 'session-finished', data: { session, reason } });
+      return true;
+    });
+    if (written) await this.afterWrite('session-finished', run.record.jobId);
+  }
+
+  /** The run's sessions as its log derives them, or undefined, with a warning, where the log breaks the lifecycle. */
+  private sessionsOf(run: Run): RunSessions | undefined {
+    try {
+      return reduceSessions(run.log.events);
+    } catch (error) {
+      this.warn(`Run ${run.record.jobId}: its sessions cannot be derived: ${message(error)}`);
+      return undefined;
+    }
+  }
+
   // Loading and recovery
 
   private async load(): Promise<RunRecoveryReport> {
@@ -421,13 +494,15 @@ export class RunService {
         for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
         for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
         for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
-        if (!run.log.terminal) {
-          await run.log.append({
-            type: 'job-interrupted',
-            data: { message: 'The harness stopped while the run was running. Its records are complete to the last committed transition; start a new run to continue.' },
-          });
-          report.interrupted.push(run.key);
-        }
+        // Every session the run still keeps is finished as a run end
+        // finishes it, and one opened whose first invocation never started
+        // was interrupted with it, so a recovered run holds no suspended
+        // session either.
+        const ended = await this.endRun(run, {
+          type: 'job-interrupted',
+          data: { message: 'The harness stopped while the run was running. Its records are complete to the last committed transition; start a new run to continue.' },
+        }, 'interrupted');
+        if (ended === 'committed') report.interrupted.push(run.key);
       }
 
       for (const event of run.log.events) {
@@ -485,7 +560,8 @@ export class RunService {
    * An invocation whose start has no end was interrupted with the harness.
    * It is closed as `failed` with `session-lost`, which calls no agent: the
    * successor of an interrupted invocation belongs to a run that is started
-   * again, and the tree it left is what that run's engineer reads.
+   * again, and the tree it left is what that run's engineer reads. Its
+   * session is finished with it, as `interrupted`.
    */
   private async closeInterruptedInvocations(run: Run): Promise<string[]> {
     const closed: string[] = [];
@@ -505,7 +581,7 @@ export class RunService {
           detail: 'the harness stopped while this invocation was running, so its last observations may be missing',
         },
       }).catch(error => this.warn(`Run ${run.record.jobId}: ${id}'s truncation gap was not recorded: ${message(error)}`));
-      await this.endInvocation(run, id, {
+      await this.endInvocation(run, id, started.data.session, finished('interrupted'), {
         ended: 'failed',
         interruption: 'session-lost',
         disposition: 'incomplete',
@@ -667,7 +743,7 @@ export class RunService {
 
     const baseline = await this.freezeBaseline(directory, planId, manifest, packages);
     const record = runRecordSchema.parse({
-      schema: 'ramify-agent.job/2',
+      schema: jobSchemaVersion,
       jobId: runId,
       planId,
       kind: 'implementation',
@@ -796,7 +872,7 @@ export class RunService {
     await Promise.race([run.invocationDone, new Promise<void>(resolve => { timer = setTimeout(resolve, grace); })]);
     clearTimeout(timer);
     if (this.closed) return;
-    await this.write(run, { type: 'job-stopped', data: { settled } });
+    await this.endRun(run, { type: 'job-stopped', data: { settled } });
   }
 
   // The run itself
@@ -843,9 +919,14 @@ export class RunService {
       await this.fail(run, 'limit-exceeded', invocations + 1 > limits.maxInvocationsPerRun
         ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
         : `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`);
-      return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped' };
+      return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
     }
     const id = invocationId(invocations + 1);
+    // A fresh or forked start opens a session; a continued one joins the
+    // session the caller kept. The executor's ref stays the caller's.
+    const opens = request.start.mode !== 'continue';
+    if (!opens && request.session === undefined) throw new Error(`The ${request.role} invocation ${id} continues a session it does not name`);
+    const session = opens ? sessionId(run.log.count('session-opened') + 1) : request.session!;
     const invocation = invocationSchema.parse({
       schema: 'ramify-agent.invocation/1',
       id,
@@ -867,7 +948,17 @@ export class RunService {
     // event and the session's start applies to a known invocation.
     let closed = () => undefined as void;
     run.invocationDone = new Promise<void>(resolve => { closed = () => resolve(); });
-    await this.write(run, { type: 'invocation-started', data: { invocation: id, role: request.role } }, [
+    if (opens) {
+      await this.write(run, {
+        type: 'session-opened',
+        data: { session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null },
+      });
+      await this.afterWrite('session-opened', run.record.jobId);
+    }
+    await this.write(run, {
+      type: 'invocation-started',
+      data: { invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued' },
+    }, [
       { path: runLayout.invocation(id), id, revision: 1, body: invocation },
     ]);
     if (request.writer === true) {
@@ -878,7 +969,7 @@ export class RunService {
       await this.afterWrite('writer-acquired', run.record.jobId);
     }
     try {
-      return await this.runSession(run, agent, id, observations, request);
+      return await this.runSession(run, agent, id, session, observations, request);
     } finally {
       closed();
     }
@@ -888,13 +979,18 @@ export class RunService {
     run: Run,
     agent: AgentPort,
     id: string,
+    session: SessionId,
     observations: ObservationLog,
     request: InvocationRequest<T>,
   ): Promise<InvocationResult<T>> {
+    // What the harness does with the session once this invocation ends. A
+    // run that is ending uses none again.
+    const keeping = (ended: InvocationOutcome['ended'], value: T | undefined): SessionKeeping =>
+      (this.ignoring(run) ? finished('run-ended') : request.keep(ended, value));
     await this.afterWrite('invocation-started', run.record.jobId);
     if (this.ignoring(run)) {
-      await this.endInvocation(run, id, stoppedOutcome());
-      return { id, ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped' };
+      await this.endInvocation(run, id, session, keeping('stopped', undefined), stoppedOutcome());
+      return { id, ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session, kept: false };
     }
 
     const started = this.now().getTime();
@@ -964,13 +1060,14 @@ export class RunService {
     try {
       agentSession = agent.startSession(spec);
     } catch (error) {
-      await this.endInvocation(run, id, {
+      const keptAs = keeping('failed', undefined);
+      await this.endInvocation(run, id, session, keptAs, {
         ...stoppedOutcome(),
         ended: 'failed',
         interruption: 'adapter-fault',
         error: `The agent session could not start: ${message(error)}`,
       });
-      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed' };
+      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept };
     }
     run.session = agentSession;
 
@@ -1013,7 +1110,8 @@ export class RunService {
     }
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
-    await this.endInvocation(run, id, {
+    const keptAs = keeping(ended, ended === 'submitted' ? value : undefined);
+    await this.endInvocation(run, id, session, keptAs, {
       ended,
       ...(interruption === undefined ? {} : {
         interruption,
@@ -1040,7 +1138,15 @@ export class RunService {
       ...(outcome.kind === 'failed' && interruption === undefined ? { error: outcome.error } : {}),
     });
 
-    return { id, ended, value: ended === 'submitted' ? value : undefined, ref, outcomeKind: interruption === undefined ? outcome.kind : 'failed' };
+    return {
+      id,
+      ended,
+      value: ended === 'submitted' ? value : undefined,
+      ref,
+      outcomeKind: interruption === undefined ? outcome.kind : 'failed',
+      session,
+      kept: keptAs.kept,
+    };
   }
 
   // The initial analysis
@@ -1076,6 +1182,9 @@ export class RunService {
       inputSchema: initialAnalysisJsonSchema,
       submissionSchema: 'ramify-agent.initial-analysis/1',
       validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape }),
+      // An accepted analysis session becomes the run's architect context:
+      // briefs are appended to it and every placement request forks it.
+      keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
       scope: {
         write: null,
         measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
@@ -1326,6 +1435,8 @@ export class RunService {
     const scope = baselineScope(item.module, baseline.supplementary.map(entry => entry.path));
 
     let sessionRef: string | undefined;
+    /** The session this architect's turns share, while the harness keeps it; `sessionRef` is its executor's point. */
+    let session: SessionId | undefined;
     let attempt = 0;
     let gateRound = 0;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
@@ -1437,6 +1548,13 @@ export class RunService {
         systemPrompt,
         prompt,
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
+        session,
+        // The architect is continued after a placement request, an
+        // iteration and a refused or failed completion. A yield and an
+        // unresolved request end its use: a resumed work item starts afresh.
+        keep: (ended, value) => (ended === 'submitted' && value !== undefined && value.kind !== 'unresolved' && value.kind !== 'yield-for-providers'
+          ? kept
+          : finished('not-kept')),
         toolName: localArchitectToolName,
         description: 'End this turn with the work item\'s result. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
         inputSchema: localArchitectJsonSchema,
@@ -1458,7 +1576,8 @@ export class RunService {
           size: scopeSize(baseline, scope),
         },
       });
-      sessionRef = result.ref === '' ? undefined : result.ref;
+      sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
+      session = sessionRef === undefined ? undefined : result.session;
 
       if (this.ignoring(run)) return null;
       if (result.ended !== 'submitted' || result.value === undefined) {
@@ -1519,8 +1638,12 @@ export class RunService {
         failedGate = undefined;
         // The provider reported that the agreement cannot be met. This work
         // item's turn ends here: what blocks it is the consumer architect's
-        // to answer, and the report is already in the log.
-        if (outcome.reportedRevision === true) return 'reported';
+        // to answer, and the report is already in the log. Its next turn
+        // starts a session of its own.
+        if (outcome.reportedRevision === true) {
+          await this.finishSession(run, session, 'not-kept');
+          return 'reported';
+        }
         if (outcome.need !== undefined) {
           const contract = await this.takeContract(run, agent, packages, baseline, item, {
             ...outcome.need,
@@ -1579,6 +1702,7 @@ export class RunService {
       if (gate.verdict === 'passed') {
         await this.write(run, { type: 'work-item-completed', data: { workItem: item.id, gate: gate.id } });
         await this.afterWrite('work-item-completed', run.record.jobId);
+        await this.finishSession(run, session, 'work-closed');
         return 'completed';
       }
 
@@ -1763,13 +1887,17 @@ export class RunService {
           decisions,
           // A parent that was rebuilt has no session to fork: the next fork
           // is oriented from the records, and becomes the context itself.
-          ...(context.session === null
+          ...(context.ref === null
             ? { orientation: orientation({ hypotheses: current.hypotheses, registry: current.registry, decisions }) }
             : {}),
           ...(partial === undefined ? {} : { partial }),
           ...(revalidate === undefined ? {} : { revalidate }),
         }),
-        start: context.session === null ? { mode: 'fresh' } : { mode: 'fork', from: context.session },
+        start: context.ref === null ? { mode: 'fresh' } : { mode: 'fork', from: context.ref },
+        // A fork is never continued. The first fork after a rebuild is the
+        // exception: it becomes the architect context, which is kept for
+        // the briefs appended to it and the forks taken from it.
+        keep: ended => (context.session === null && ended === 'submitted' ? kept : finished('not-kept')),
         toolName: forkToolName,
         description: 'End this fork with its decision, or with the findings and gaps of a fork that could not decide. The harness validates it; an invalid submission is returned with every error and its path.',
         inputSchema: forkJsonSchema,
@@ -1893,7 +2021,7 @@ export class RunService {
         hypotheses: decision.hypothesisRevisions.length,
       },
     };
-    await run.mutex.run(() => run.log.ledger.effect<AppendResult>({
+    const result = await run.mutex.run(() => run.log.ledger.effect<AppendResult>({
       key: `brief:${decision.id}`,
       intent: {
         event: run.log.next(intent?.input ?? fallback),
@@ -1904,32 +2032,36 @@ export class RunService {
         // frozen here is one that crashed between them.
         await this.afterWrite('decision-accepted', run.record.jobId);
         const context = this.globalContextOf(run);
-        if (context.session === null) {
-          return { outcome: 'session-lost', generation: context.generation, reason: 'the run has no architect context to append to' };
+        if (context.session === null || context.ref === null) {
+          return { outcome: 'session-lost', generation: context.generation, session: context.session, reason: 'the run has no architect context to append to' };
         }
-        const answer = await agent.appendContext(context.session, decision.id, briefText(decision));
+        const answer = await agent.appendContext(context.ref, decision.id, briefText(decision));
         // The append reached the parent and its completion is not in the log.
         await this.afterWrite('brief-appending', run.record.jobId);
         if (answer.outcome === 'session-lost') {
           return {
             outcome: 'session-lost',
             generation: context.generation,
+            session: context.session,
             reason: `the architect context of generation ${context.generation} can no longer be read`,
           };
         }
-        return { outcome: answer.outcome, generation: context.generation, session: answer.ref };
+        return { outcome: answer.outcome, generation: context.generation, session: context.session, ref: answer.ref };
       },
       complete: result => ({
         event: run.log.next(result.outcome === 'session-lost'
           ? { type: 'global-context-rebuilt', data: { generation: result.generation + 1, reason: result.reason } }
           : {
               type: 'brief-appended',
-              data: { decision: decision.id, generation: result.generation, session: result.session, outcome: result.outcome },
+              data: { decision: decision.id, generation: result.generation, session: result.session, ref: result.ref, outcome: result.outcome },
             }),
         records: [],
       }),
     }));
     await this.afterWrite('brief-appended', run.record.jobId);
+    // The session that held a context the agent can no longer read is not
+    // used again: the next fork is oriented from the records instead.
+    if (result.outcome === 'session-lost') await this.finishSession(run, result.session ?? undefined, 'lost');
   }
 
   /** The accepted decision returns to the requesting local architect, before any contract work. */
@@ -2287,17 +2419,22 @@ export class RunService {
     const invocations: string[] = [];
     const findings: string[] = [];
     let sessionRef: string | undefined;
+    /** The engineer's session while the harness keeps it; `sessionRef` is its executor's point. */
+    let session: SessionId | undefined;
     let handoff: { done: string[]; unfinished: string[] } | undefined;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
     let firstCause: { gate: string; cause: string | null } | undefined;
     let repairRound = 0;
     let attempt = 0;
 
-    const close = async (outcome: IterationResult['outcome'], extra: Partial<IterationResult> = {}): Promise<IterationOutcome> => ({
-      result: await this.closeIteration(run, item, number, assignment, {
+    // Closing the iteration closes the work of a session still kept for it.
+    const close = async (outcome: IterationResult['outcome'], extra: Partial<IterationResult> = {}): Promise<IterationOutcome> => {
+      const result = await this.closeIteration(run, item, number, assignment, {
         outcome, invocations, findings, gate: null, commit: null, ...extra,
-      }),
-    });
+      });
+      await this.finishSession(run, session, 'work-closed');
+      return { result };
+    };
 
     for (;;) {
       if (this.ignoring(run)) return null;
@@ -2312,10 +2449,14 @@ export class RunService {
           const used = this.reconstructions(run, item.id);
           if (used >= run.record.policy.limits.sessionReconstructionsPerWork) {
             findings.push(`The engineer's session was lost and ${used} reconstruction${used === 1 ? '' : 's'} were already spent`);
+            await this.finishSession(run, session, 'lost');
             return close('exhausted');
           }
+          // The session reconstructed from records takes the lost one's place.
+          await this.finishSession(run, session, 'replaced');
           degraded = { requested: 'continued', reason: 'the implementation can no longer read the session; it was reconstructed from records' };
           sessionRef = undefined;
+          session = undefined;
         } else {
           start = { mode: 'continue', ref: appended.ref };
         }
@@ -2350,7 +2491,19 @@ export class RunService {
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
         }),
         start,
+        session,
         ...(degraded === undefined ? {} : { degraded }),
+        // A proposed completion is kept for the repair its gate may ask
+        // for; any other result closes the iteration, and a budget return
+        // starts a fresh session unless it is the last one the iteration may
+        // make.
+        keep: (ended, value) => {
+          if (ended === 'context-budget-reached') {
+            return finished(this.budgetReturns(run, assignment.id) + 1 >= run.record.policy.limits.budgetReturnsPerIteration ? 'work-closed' : 'not-kept');
+          }
+          if (ended !== 'submitted' || value === undefined) return finished('not-kept');
+          return value.kind === 'completion-proposed' ? kept : finished('work-closed');
+        },
         toolName: engineerToolName,
         description: engineerSubmissionDescription,
         inputSchema: engineerJsonSchema,
@@ -2379,7 +2532,8 @@ export class RunService {
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       invocations.push(result.id);
-      sessionRef = result.ref === '' ? undefined : result.ref;
+      sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
+      session = sessionRef === undefined ? undefined : result.session;
 
       // The line events of this writer, from the two snapshots around it.
       // Two snapshots see the tree and not the history between them, so a
@@ -2401,6 +2555,7 @@ export class RunService {
           return close('partial');
         }
         sessionRef = undefined;
+        session = undefined;
         continue;
       }
 
@@ -2467,6 +2622,7 @@ export class RunService {
             commit: gate.audited,
             ...(proposal.recommendation === undefined ? {} : { recommendation: proposal.recommendation }),
           });
+          await this.finishSession(run, session, 'work-closed');
           // The evidence this acceptance discharges: a provider that ran the
           // agreed suite against the real implementation has conformed, and a
           // verification that replaced every fake injection closes its
@@ -2812,6 +2968,8 @@ export class RunService {
     const invocations: string[] = [];
     const findings: string[] = [];
     let sessionRef: string | undefined;
+    /** The contract engineer's session while the harness keeps it; `sessionRef` is its executor's point. */
+    let session: SessionId | undefined;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
     let repairRound = 0;
     let attempt = 0;
@@ -2846,6 +3004,13 @@ export class RunService {
           ...(failedGate === undefined ? {} : { failedGate }),
         }),
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
+        session,
+        // An established agreement is kept for the repair its gate may ask
+        // for; a budget return or an incomplete one closes the iteration.
+        keep: (ended, value) => {
+          if (ended === 'submitted' && value !== undefined) return value.kind === 'established' ? kept : finished('work-closed');
+          return finished(ended === 'context-budget-reached' ? 'work-closed' : 'not-kept');
+        },
         toolName: contractToolName,
         description: 'End your turn with the result of this contract iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
         inputSchema: contractJsonSchema,
@@ -2865,7 +3030,8 @@ export class RunService {
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       invocations.push(result.id);
-      sessionRef = result.ref === '' ? undefined : result.ref;
+      sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
+      session = sessionRef === undefined ? undefined : result.session;
 
       const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
@@ -2917,6 +3083,7 @@ export class RunService {
         const closed = await this.closeIteration(run, item, subject.number, assignment, {
           outcome: 'accepted', invocations, findings, gate: gate.id, commit: gate.audited,
         });
+        await this.finishSession(run, session, 'work-closed');
         if (this.ignoring(run)) return null;
         return { findings, result: closed, ...(registration.cycle === undefined ? {} : { cycle: registration.cycle }) };
       }
@@ -2931,6 +3098,7 @@ export class RunService {
         outcome: gate.next === 'return-to-local-architect' ? 'unsuitable' : 'exhausted',
         invocations, findings, gate: null, commit: null,
       });
+      await this.finishSession(run, session, 'work-closed');
       return this.ignoring(run) ? null : { findings, result: closed };
     }
   }
@@ -3739,11 +3907,24 @@ export class RunService {
     return settled;
   }
 
-  /** Closes one invocation: the outcome record and the event, in one transition. */
-  private async endInvocation(run: Run, id: string, body: Omit<InvocationOutcome, 'schema' | 'invocation'>): Promise<void> {
+  /**
+   * Closes one invocation: the outcome record and the event, in one
+   * transition, with whether the harness keeps its session.
+   */
+  private async endInvocation(
+    run: Run,
+    id: string,
+    session: SessionId,
+    keeping: SessionKeeping,
+    body: Omit<InvocationOutcome, 'schema' | 'invocation'>,
+  ): Promise<void> {
     if (run.log.all('invocation-ended').some(event => event.data.invocation === id)) return;
     const outcome = invocationOutcomeSchema.parse({ schema: 'ramify-agent.invocation-outcome/1', invocation: id, ...body });
-    await this.write(run, { type: 'invocation-ended', data: { invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null } }, [
+    const ended = { invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null, session };
+    await this.write(run, {
+      type: 'invocation-ended',
+      data: keeping.kept ? { ...ended, kept: true } : { ...ended, kept: false, finished: keeping.finished },
+    }, [
       { path: runLayout.outcome(id), id, revision: 1, body: outcome },
     ]);
     await this.afterWrite('invocation-ended', run.record.jobId);
@@ -3871,7 +4052,7 @@ export class RunService {
     await this.afterWrite('gate-committed', run.record.jobId);
     if (this.ignoring(run)) return;
     const workItems = run.log.count('work-item-completed');
-    await this.write(run, { type: 'job-completed', data: { gate: gateId, commit: attempt.audited, workItems } });
+    await this.endRun(run, { type: 'job-completed', data: { gate: gateId, commit: attempt.audited, workItems } });
     await this.afterWrite('job-completed', run.record.jobId);
   }
 
@@ -3979,7 +4160,7 @@ export class RunService {
   }
 
   private async fail(run: Run, reason: RunFailureReason, text: string, evidence: readonly string[] = []): Promise<void> {
-    await this.write(run, { type: 'job-failed', data: { reason, message: text, evidence: [...evidence] } });
+    await this.endRun(run, { type: 'job-failed', data: { reason, message: text, evidence: [...evidence] } });
   }
 
   /**
@@ -4035,10 +4216,10 @@ type PlacementResolution =
   | { readonly kind: 'decided'; readonly decision: PlacementDecision }
   | { readonly kind: 'unresolved'; readonly request: string; readonly findings: readonly string[]; readonly gaps: readonly string[] };
 
-/** What the parent append did, as the effect's completion records it. */
+/** What the parent append did, as the effect's completion records it, with the session that holds the context. */
 type AppendResult =
-  | { readonly outcome: 'appended' | 'already-present'; readonly generation: number; readonly session: string }
-  | { readonly outcome: 'session-lost'; readonly generation: number; readonly reason: string };
+  | { readonly outcome: 'appended' | 'already-present'; readonly generation: number; readonly session: SessionId; readonly ref: string }
+  | { readonly outcome: 'session-lost'; readonly generation: number; readonly session: SessionId | null; readonly reason: string };
 
 /** The records the placement rules are checked against, as the log holds them. */
 /** The obligation a provider work item exists to satisfy, as its architect is told it. */

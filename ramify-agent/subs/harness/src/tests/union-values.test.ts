@@ -85,7 +85,7 @@ describe('the run log', () => {
   test('every event type is written and read back, and the terminal ones are named', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'readiness-passed', 'readiness-failed',
       'work-item-started', 'hypotheses-delivered',
       'placement-requested', 'view-refreshed', 'fork-returned-partial', 'decision-accepted',
@@ -805,7 +805,7 @@ describe('the run protocol a client reads', () => {
       ['decision-accepted', { request: 'pr-001', decision: 'gd-001', workItem: 'wi-001', invocation: 'inv-0002', registry: 0, hypotheses: 0 }],
       ['iteration-closed', { workItem: 'wi-001', iteration: 'wi-001.i01', outcome: 'accepted', gate: 'ga-0001', commit: 'abc', notices: [] }],
       ['contract-registered', { contract: 'ct-001', revision: 1, mode: 'fake-backed', iteration: 'wi-001.i02', obligation: 'ob-ct-001', requirements: ['rq-001'], providerWorkItem: 'wi-002' }],
-      ['invocation-started', { invocation: 'inv-0001', role: 'engineer' }],
+      ['invocation-started', { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' }],
       ['revision-needed', { obligation: r, iteration: 'wi-002.i01', consumerWorkItem: 'wi-001' }],
     ];
     const kinds = new Set(events.flatMap(([type, data], index) =>
@@ -878,8 +878,10 @@ describe('the run protocol a client reads', () => {
 function sampleData(type: RunEvent['type']): unknown {
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
-    'invocation-started': { invocation: 'inv-0001', role: 'engineer' },
-    'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null },
+    'session-opened': { session: 'ses-0001', role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null },
+    'invocation-started': { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' },
+    'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null, session: 'ses-0001', kept: false, finished: 'work-closed' },
+    'session-finished': { session: 'ses-0001', reason: 'run-ended' },
     'analysis-accepted': { invocation: 'inv-0001', entries: 0, hypotheses: 0, registry: 0, workItems: 0 },
     'readiness-passed': { attempt: 1, gate: 'ga-0001' },
     'readiness-failed': { attempt: 1, step: 'git-clean', detail: '', recovery: null, final: true },
@@ -889,7 +891,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'view-refreshed': { request: 'pr-001', attempt: 1, view: { status: 'placeholder' }, unavailable: null },
     'fork-returned-partial': { request: 'pr-001', invocation: 'inv-0002', retry: 1 },
     'decision-accepted': { request: 'pr-001', decision: 'gd-001', workItem: 'wi-001', invocation: 'inv-0002', registry: 0, hypotheses: 0 },
-    'brief-appended': { decision: 'gd-001', generation: 1, session: 's', outcome: 'appended' },
+    'brief-appended': { decision: 'gd-001', generation: 1, session: 'ses-0001', ref: 's', outcome: 'appended' },
     'global-context-rebuilt': { generation: 2, reason: 'lost' },
     'decision-delivered': { decision: 'gd-001', workItem: 'wi-001' },
     'outline-revised': { workItem: 'wi-001', revision: 1, invocation: 'inv-0002' },

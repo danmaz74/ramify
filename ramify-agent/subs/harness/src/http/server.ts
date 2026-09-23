@@ -140,6 +140,9 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
   const agent = options.agent === 'fake'
     ? createScriptedAgent(demonstrationScript())
     : options.agent === 'pi' ? createPiAgent({ model: options.piModel }) : options.agent;
+  // pi resolves the model it runs, and each session records it.
+  const readiness = options.agent === 'pi' ? await piReadiness({ model: options.piModel }) : undefined;
+  const model = readiness?.ready === true ? readiness.model : options.piModel;
   const lock = await acquireProjectLock(projectRoot);
   let owned: Awaited<ReturnType<typeof privateRamify>> | undefined;
   let runs: RunService;
@@ -158,6 +161,7 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
       ramify,
       checkExecution: options.runs?.checkExecution ?? createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
       ...(agent === undefined ? {} : { agent }),
+      ...(model === undefined ? {} : { model }),
     }));
   } catch (error) {
     await owned?.dispose();
@@ -179,11 +183,9 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
     throw error;
   }
   const { port } = server.address() as AddressInfo;
-  let agentStatus: string | undefined;
-  if (options.agent === 'pi') {
-    const readiness = await piReadiness({ model: options.piModel });
-    agentStatus = readiness.ready ? `pi runs ${readiness.model}.` : `pi cannot run a session yet: ${readiness.reason}`;
-  }
+  const agentStatus = readiness === undefined
+    ? undefined
+    : readiness.ready ? `pi runs ${readiness.model}.` : `pi cannot run a session yet: ${readiness.reason}`;
   return {
     url: `http://${host.includes(':') ? `[${host}]` : host}:${port}`,
     projectRoot,

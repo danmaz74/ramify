@@ -54,8 +54,10 @@ describe('a stop between the invocation and its session', () => {
 
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'invocation-started', 'stop-requested', 'invocation-ended', 'job-stopped',
+      'job-started', 'session-opened', 'invocation-started', 'stop-requested', 'invocation-ended', 'job-stopped',
     ]);
+    // The run was ending when the invocation ended, so its session ended with it.
+    expect(events.find(event => event.type === 'invocation-ended')!.data).toMatchObject({ kept: false, finished: 'run-ended' });
 
     // The invocation is a record, and it says what became of it.
     const invocation = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.invocation('inv-0001')), 'utf8')) as { id: string; role: string };

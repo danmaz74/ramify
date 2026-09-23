@@ -81,13 +81,13 @@ describe('a run whose work items need no change', () => {
 
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'readiness-passed',
-      'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
-      'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
-      'gate-committing', 'gate-attempted', 'job-completed',
+      'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
+      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed', 'session-finished',
+      'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
+      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed', 'session-finished',
+      'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
     ]);
 
     // One event holds every record of the analysis phase.

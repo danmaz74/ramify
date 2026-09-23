@@ -36,7 +36,7 @@ export const sessionLayout = {
 
 /** What a session was started with, written before the agent starts. */
 export const sessionRecordSchema = z.object({
-  schema: z.literal('ramify-agent.session/1'),
+  schema: z.literal('ramify-agent.session/2'),
   id: text,
   role: z.literal('engineer'),
   module: modulePathSchema,
@@ -44,7 +44,10 @@ export const sessionRecordSchema = z.object({
   directory: z.string(),
   /** The person's prompt, which is the iteration's goal. */
   prompt: text,
+  /** The executor that runs it, by the agent port's name. */
   agent: text,
+  /** The model the executor was asked to run; null where it chose its own. */
+  model: text.nullable(),
   startedAt: timestamp,
   /** The commit the session started from; `''` outside git. */
   base: z.string(),
@@ -110,3 +113,15 @@ export const sessionOutcomeSchema = z.object({
   finishedAt: timestamp,
 }).strict();
 export type SessionOutcomeRecord = z.infer<typeof sessionOutcomeSchema>;
+
+/**
+ * A standalone session's state, as a reader derives it from its records. It
+ * holds the project lock for its whole life, so a reader that can read it
+ * never sees it running: with its outcome it is finished, and without one it
+ * was interrupted.
+ */
+export type StandaloneSessionState = 'finished' | 'interrupted';
+
+export function standaloneSessionState(outcome: SessionOutcomeRecord | null): StandaloneSessionState {
+  return outcome === null ? 'interrupted' : 'finished';
+}

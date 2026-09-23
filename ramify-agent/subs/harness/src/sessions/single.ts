@@ -60,6 +60,8 @@ export interface SingleSessionOptions {
   /** The person's prompt, which becomes the iteration's goal. */
   readonly prompt: string;
   readonly agent: AgentPort;
+  /** The model the agent was asked to run, which the session records; without one, the agent chose its own. */
+  readonly model?: string | undefined;
   /** The Ramify command line the hook check and the API views use. */
   readonly ramify: RamifyCli;
   /** Git observations. Tests inject scenario answers; production uses Git. */
@@ -297,13 +299,14 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const shown = scopePaths(projectRoot, scope);
 
   const record: SessionRecord = sessionRecordSchema.parse({
-    schema: 'ramify-agent.session/1',
+    schema: 'ramify-agent.session/2',
     id,
     role: 'engineer',
     module: entry.module,
     directory: entry.dir,
     prompt: options.prompt.trim(),
     agent: agent.name,
+    model: options.model ?? null,
     startedAt: new Date().toISOString(),
     base: head,
     scope: { roots: shown.roots, files: shown.files, extra },

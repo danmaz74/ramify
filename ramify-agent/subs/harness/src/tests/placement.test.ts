@@ -9,6 +9,7 @@ import { architectureLayout, type PlacementDecision, type PlacementRequest } fro
 import type { RunInputs } from '../run/inputs.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunEvent } from '../run/log.js';
+import { reduceSessions } from '../run/sessions.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, hypothesis, requestCompletion } from './helpers/analysis.js';
 import { byRole, readDeclaredTree, submit, treeInputs } from './helpers/iterations.js';
@@ -456,6 +457,18 @@ describe('a parent context that can no longer be read', () => {
       runPath(project, 'revision-diff', runId, runLayout.outcome((started[1]!.data as { invocation: string }).invocation)),
     );
     expect(outcome.session?.mode).toBe('fresh');
+
+    // The session that held the lost context is finished as lost, and the
+    // fork that rebuilt the context is kept as the context itself: the
+    // second brief is appended to it, and run end finishes it.
+    const sessions = reduceSessions(events);
+    const context = (started[0]!.data as { session: string }).session;
+    expect(context).not.toBe('ses-0001');
+    expect(sessions.get('ses-0001')).toMatchObject({ role: 'initial-architect', state: 'finished', finished: 'lost', appends: [] });
+    const rebuiltContext = (started[1]!.data as { session: string }).session;
+    expect(sessions.get(rebuiltContext)).toMatchObject({ role: 'global-fork', state: 'finished', finished: 'run-ended' });
+    expect(sessions.get(rebuiltContext)!.appends).toHaveLength(1);
+    expect(sessions.get(context)).toMatchObject({ state: 'finished', finished: 'not-kept' });
   }, 120_000);
 });
 

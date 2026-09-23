@@ -28,6 +28,8 @@ export type InvocationId = string;
 export type RecoveryId = string;
 /** `ms-0007`, the count of committed measurement snapshots. */
 export type SnapshotId = string;
+/** `ses-0003`, the count of committed `session-opened` events of the run. */
+export type SessionId = string;
 
 const counted = (prefix: string, width: number) => (count: number): string => `${prefix}-${String(count).padStart(width, '0')}`;
 
@@ -35,6 +37,19 @@ export const invocationId = counted('inv', 4);
 export const gateAttemptId = counted('ga', 4);
 export const recoveryId = counted('rec', 4);
 export const snapshotId = counted('ms', 4);
+export const sessionId = counted('ses', 4);
+
+/** A run's session identifier, as its log records it. */
+export const sessionIdSchema = z.string().regex(/^ses-\d{4,}$/);
+
+/**
+ * Why the harness finished a session: its iteration or work item closed, its
+ * run ended, the agent can no longer read it, a session reconstructed from
+ * records took its place, recovery closed its interrupted invocation, or the
+ * harness has no further use for it.
+ */
+export const sessionFinishReasonSchema = z.enum(['work-closed', 'run-ended', 'lost', 'replaced', 'interrupted', 'not-kept']);
+export type SessionFinishReason = z.infer<typeof sessionFinishReasonSchema>;
 
 /** A readiness attempt's directory name, `01`. */
 export const readinessDirectory = (attempt: number): string => String(attempt).padStart(2, '0');
@@ -54,11 +69,11 @@ const text = z.string().min(1);
  * receives and `envAdditions` the harness's own settings; `checks/records.ts`
  * says why.
  *
- * A run written before this harness recorded names holds `env` as a
+ * A command recorded before this harness recorded names holds `env` as a
  * name-to-value map. It is read as the names it maps, which is the whole of
- * what this harness now keeps of one, so a run on disk stays readable through
- * the same `ramify-agent.job/2`: a version bump would have made every
- * recorded run unreadable to gain nothing, since no reader wanted the values.
+ * what this harness now keeps of one: a version bump for it alone would have
+ * made every recorded run unreadable to gain nothing, since no reader wanted
+ * the values.
  * Its settings are not recoverable from such a map and are read as none.
  */
 export const checkCommandSchema = z.object({
@@ -330,11 +345,15 @@ export const usageSchema = z.object({
   total: z.int().nonnegative(),
 }).strict();
 
+/** The work one invocation, and the session it belongs to, is for: none for the initial architect. */
+export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict();
+export type InvocationWork = z.infer<typeof invocationWorkSchema>;
+
 export const invocationSchema = z.object({
   schema: z.literal('ramify-agent.invocation/1'),
   id: text,
   role: roleSchema,
-  work: z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict(),
+  work: invocationWorkSchema,
   /** The count of this role's invocations for this work, this one included. */
   attempt: z.int().positive(),
   /** `actual` differs from `requested` when the implementation could not continue or fork. */

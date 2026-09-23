@@ -1,5 +1,5 @@
 import { runQueryLimits, type ProjectedRunEvent, type RunEventPage, type RunEventRefKind } from '../interfaces/protocol/runs.js';
-import type { RunEvent } from '../run/log.js';
+import type { RunEvent, RunEventOf } from '../run/log.js';
 import type { RunView } from './inputs.js';
 import { snapshotOf } from './snapshot.js';
 
@@ -24,10 +24,20 @@ function describe(event: RunEvent): [string, Ref[]] {
   switch (event.type) {
     case 'job-started':
       return ['The run started', []];
+    case 'session-opened':
+      return [`The ${event.data.role} session ${event.data.session} opened on ${event.data.executor}${event.data.model === null ? '' : `, model ${event.data.model}`}`, workRefs(event.data.work)];
     case 'invocation-started':
-      return [`The ${event.data.role} session ${event.data.invocation} started`, ref('invocation', event.data.invocation)];
+      return [
+        `The ${event.data.role} invocation ${event.data.invocation} started, ${event.data.start === 'opened' ? 'opening' : 'continuing'} session ${event.data.session}`,
+        ref('invocation', event.data.invocation),
+      ];
     case 'invocation-ended':
-      return [`Session ${event.data.invocation} ended: ${event.data.ended}`, ref('invocation', event.data.invocation)];
+      return [
+        `Invocation ${event.data.invocation} ended: ${event.data.ended}; session ${event.data.session} ${event.data.kept ? 'is kept' : `finished (${event.data.finished})`}`,
+        ref('invocation', event.data.invocation),
+      ];
+    case 'session-finished':
+      return [`Session ${event.data.session} finished (${event.data.reason})`, []];
     case 'analysis-accepted':
       return [
         `The initial analysis was accepted: ${counted(event.data.entries, 'entry capability', 'entry capabilities')}, ${counted(event.data.hypotheses, 'hypothesis', 'hypotheses')}, ${counted(event.data.workItems, 'work item', 'work items')}`,
@@ -162,6 +172,11 @@ function describe(event: RunEvent): [string, Ref[]] {
 }
 
 const counted = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+
+/** The records a session's work names. */
+const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => [
+  ...ref('work-item', work.workItem), ...ref('iteration', work.iteration), ...ref('request', work.request),
+];
 
 function unreachable(event: never): never {
   throw new Error(`No projection for event ${(event as RunEvent).type}`);

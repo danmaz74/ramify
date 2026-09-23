@@ -405,6 +405,8 @@ describe('the session\'s records', () => {
 
     const record = sessionRecordSchema.parse(JSON.parse(await readFile(join(records, 'session.json'), 'utf8')));
     expect(record).toMatchObject({ id: summary.session, module: notes, directory: notesDirectory, prompt: 'Raise the note limit to 500.', gate: true });
+    // The session records its executor and the model it was asked for: none, for the fake.
+    expect(record).toMatchObject({ schema: 'ramify-agent.session/2', agent: 'scripted', model: null });
     expect(record.scope.roots).toEqual([`${notesDirectory}/src`]);
 
     const observations = await observationsOf(records);

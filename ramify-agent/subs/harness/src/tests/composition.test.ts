@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { runEventSchema } from '../run/log.js';
 import { observationSchema } from '../run/observations.js';
 import { runSchemas } from '../run/records.js';
+import { reduceSessions } from '../run/sessions.js';
 import { analysisSchemas } from '../analysis/records.js';
 import { workSchemas } from '../work/records.js';
 import { iterationSchemas } from '../work/iterations.js';
@@ -121,12 +122,24 @@ describe('the composed runs', () => {
   });
 });
 
+describe('the sessions of the composed runs', () => {
+  test('every invocation belongs to a session the log derives, and no final run holds a live or suspended session', () => {
+    for (const [name, run] of finished) {
+      const events = run.service.events(plan, run.runId)!;
+      const sessions = [...reduceSessions(events).values()];
+      const started = events.flatMap(event => (event.type === 'invocation-started' ? [event.data.invocation] : []));
+      expect([name, sessions.flatMap(session => session.invocations).sort()]).toEqual([name, [...started].sort()]);
+      expect([name, sessions.filter(session => session.state !== 'finished').map(session => `${session.id} ${session.state}`)]).toEqual([name, []]);
+    }
+  });
+});
+
 describe('the recovery tables of the ten state machines', () => {
   test('there is a row for every durable boundary, every machine has rows, and the three recovery files run all of them', async () => {
     const rows = allRows();
     // `recoveryTable` is typed against the run service's own boundary union,
     // so a boundary without a row does not compile; this states the count.
-    expect(new Set(rows.map(row => row.write)).size).toBe(33);
+    expect(new Set(rows.map(row => row.write)).size).toBe(35);
     const machines = new Set(rows.flatMap(row => row.machines));
     expect([...machines].sort()).toEqual((Object.keys(machineNames) as Machine[]).sort());
 
@@ -278,6 +291,9 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
   { union: 'run log.type', values: ['global-context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
   { union: 'run log.type', values: ['job-interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after job.json, before the first event, leaves a run that loads and is interrupted' },
+  { union: 'run log[invocation-ended].data[false].finished', values: ['interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
+  { union: 'run log[invocation-ended].data[false].finished', values: ['lost'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
+  { union: 'run log[invocation-ended].data[false].finished', values: ['replaced'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a session the implementation can no longer read is reconstructed, and the counters are kept' },
   { union: 'run log[brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'G4: a crash after the append and before its completion answers already-present, and one brief exists' },
   { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation-integration.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
   { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
@@ -381,7 +397,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'Written where the harness finds itself inconsistent: a prompt package that is not loaded, an assignment without an outline, a revision of an agreement the run never registered. No test builds any of those states, because the run service does not reach them from records it wrote itself.',
   },
   {
-    union: 'record ramify-agent.job/2.agent', values: ['pi'],
+    union: 'record ramify-agent.job/3.agent', values: ['pi'],
     reason: 'A run started on pi. No pi session ran in this environment: there is no pi login, so the real trial (T2) was not run and nothing produced it. It is produced only by a real `serve --agent pi` run.',
   },
   {

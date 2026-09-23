@@ -29,6 +29,7 @@ import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import type { RunEvent } from '../run/log.js';
+import { reduceSessions } from '../run/sessions.js';
 import { statedCommands } from './helpers/composition.js';
 
 vi.mock('node:child_process', async original =>
@@ -169,8 +170,10 @@ async function reached(root: string, runId: string, events: string, write: RunWr
   const types = await eventTypes(events);
   switch (write) {
     case 'job-created': return types.length >= 1;
+    case 'session-opened': return types.includes('session-opened');
     case 'invocation-started': return types.includes('invocation-started');
     case 'invocation-ended': return types.includes('invocation-ended');
+    case 'session-finished': return types.includes('session-finished');
     case 'analysis-accepted': return types.includes('analysis-accepted');
     case 'readiness-attempted': return types.includes('readiness-passed') || types.includes('readiness-failed');
     case 'work-item-started': return types.includes('work-item-started');
@@ -270,6 +273,19 @@ function placementPlan(brief = 'The capability stays where the registry places i
 }
 
 describe('the recovery table', () => {
+  test('a crash after session-opened finishes that session as interrupted and starts no invocation', async () => {
+    const root = await target();
+    const { runId } = await crashAfter(root, 'session-opened');
+
+    const { recovery, agent } = await reopen(root);
+    expect(agent).toBeUndefined();
+    expect(recovery.invocations).toEqual([]);
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.map(event => event.type)).toEqual(['job-started', 'session-opened', 'session-finished', 'job-interrupted']);
+    expect(events[2]!.data).toEqual({ session: 'ses-0001', reason: 'interrupted' });
+    expect(reduceSessions(events).get('ses-0001')).toMatchObject({ state: 'finished', finished: 'interrupted', invocations: [] });
+  }, 180_000);
+
   test('a crash after job.json, before the first event, leaves a run that loads and is interrupted', async () => {
     const root = await target();
     const { runId } = await crashAfter(root, 'job-created');
@@ -290,8 +306,11 @@ describe('the recovery table', () => {
     expect(agent).toBeUndefined();
     expect(recovery.invocations).toEqual([`review-notes/${runId}: inv-0001`]);
     const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.map(event => event.type)).toEqual(['job-started', 'invocation-started', 'invocation-ended', 'job-interrupted']);
+    expect(events.map(event => event.type)).toEqual(['job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'job-interrupted']);
     expect(events.filter(event => event.type === 'invocation-started')).toHaveLength(1);
+    // The interrupted invocation's session is finished with it.
+    expect(events.find(event => event.type === 'invocation-ended')!.data).toMatchObject({ session: 'ses-0001', kept: false, finished: 'interrupted' });
+    expect(reduceSessions(events).get('ses-0001')).toMatchObject({ state: 'finished', finished: 'interrupted', invocations: ['inv-0001'] });
 
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost', disposition: 'incomplete', submission: null });
@@ -474,9 +493,13 @@ describe('the recovery table', () => {
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'gate-committing', 'gate-attempted', 'job-interrupted',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-interrupted',
     ]);
+    // The architect context the run kept is finished as a run end finishes
+    // it, so the recovered run holds no suspended session.
+    expect(events.at(-2)!.data).toEqual({ session: 'ses-0001', reason: 'run-ended' });
+    expect([...reduceSessions(events).values()].map(session => session.state)).toEqual(['finished']);
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate('ga-0002')), 'utf8')) as { commit: string | null };
     expect(attempt.commit).toBe(source(1));
     git.assertComplete();

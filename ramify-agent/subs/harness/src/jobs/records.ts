@@ -17,8 +17,11 @@ import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
  * whose record this harness does not support is reported rather than served.
  */
 
-/** The one `job.json` schema a job declares. */
-export const jobSchemaVersion = 'ramify-agent.job/2';
+/**
+ * The one `job.json` schema a job declares. Version 3 is the run log with
+ * sessions: a run recorded before it is not served.
+ */
+export const jobSchemaVersion = 'ramify-agent.job/3';
 
 /** The kinds of job a directory under `jobs/` can hold. */
 export const jobKindSchema = z.enum(['implementation']);

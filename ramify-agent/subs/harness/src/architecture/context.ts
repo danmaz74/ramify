@@ -19,8 +19,10 @@ import type { PlacementDecision } from './records.js';
 export interface GlobalContext {
   /** Rises when the parent is rebuilt from records. */
   readonly generation: number;
-  /** The point the parent's history has reached, or null while the run has none. */
+  /** The session that holds the parent, or null while this generation has none. */
   readonly session: string | null;
+  /** The executor's point the parent's history has reached, or null while the run has none. */
+  readonly ref: string | null;
   /** The decisions whose briefs this generation holds. */
   readonly appended: readonly string[];
   /** Accepted decisions whose briefs are not appended yet. A rebuild clears them. */
@@ -60,7 +62,8 @@ export function globalContext(source: ContextSource): GlobalContext {
 
   return {
     generation,
-    session: latest?.data.session ?? base ?? null,
+    session: parent?.data.session ?? null,
+    ref: latest?.data.ref ?? base ?? null,
     appended,
     pending: accepted.map(event => event.data.decision).filter(decision => !appended.includes(decision)),
   };

@@ -168,6 +168,11 @@ hiding or measured complexity justifies it.
     held. It also walks the project for independent nested packages.
   - `log.ts`: the run log and its events, from `job-started` through
     readiness to the terminal event. Nothing follows a terminal event.
+  - `sessions.ts`: the run's sessions, derived from its log by a pure
+    reducer: `session-opened`, the invocations each session awaits, the
+    briefs appended to it and `session-finished`. A session is live,
+    suspended or finished, and an event that is not a transition of the
+    session it names is rejected with its sequence.
   - `observations.ts`: one invocation's observation log. It is canonical for
     what was observed and for nothing else, so it does not go through the
     ledger; a replayed `(invocation, callId, type)` is dropped.
@@ -192,7 +197,10 @@ hiding or measured complexity justifies it.
     their recovery and the queries that read them. One invocation goes
     through one path, whatever its role: the record is committed before
     `startSession`, the judge is the one answer to an invalid submission, and
-    the closing event is the last write of the invocation.
+    the closing event is the last write of the invocation. A fresh or forked
+    invocation opens a session and a continued one joins the session its
+    loop kept; each end records whether the session is kept or finished, and
+    run end and recovery finish every session still kept.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
     guard saw; comparing it with the write scope fills `outsideScope`, and
@@ -486,6 +494,8 @@ hiding or measured complexity justifies it.
     `observations.jsonl` with the run's observation schema, `submission.json`,
     `outcome.json`, the shell and hook outputs, the implementation's
     transcript under `session/`, and the gate attempt under `gate/`.
+    `session.json` names the executor and the model it was asked for; a
+    session with an outcome is finished, and one without was interrupted.
   - `command.ts`: `runSessionCommand`, the command's entry. It builds the
     agent, pi after its readiness unless the person chose the scripted fake
     with a JSON script file, and a private Ramify daemon, and disposes of both. The

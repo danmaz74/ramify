@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect } from 'vitest';
 import type { RunEvent } from '../../run/log.js';
 import type { RunWrite } from '../../run/service.js';
+import { reduceSessions } from '../../run/sessions.js';
 import {
   crashAt, committedGates, fileHashes, identityOf, logLines, plan, recordText, recoveryCompletions, removeRecordFiles,
   runDirectory, scenarios, source, statedCommands, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
@@ -24,7 +25,12 @@ import { onlyRun, openRuns } from './runs.js';
  * work, obligation, decision, brief, effect or commit is duplicated; the run
  * is interrupted, or left completed; and a second restart changes nothing.
  * `appended` is each row's stated state: exactly what recovery adds to the
- * log at that boundary.
+ * log at that boundary, apart from the `session-finished` events that every
+ * row is held to by one rule. Recovery finishes each session the crash left
+ * kept as `run-ended`, and one opened whose first invocation never started
+ * as `interrupted`, just before the interruption; an interrupted invocation's
+ * own end finishes its session as `interrupted`; and the recovered run holds
+ * no live or suspended session.
  */
 
 export type Machine = 'SM1' | 'SM2' | 'SM3' | 'SM4' | 'SM5' | 'SM6' | 'SM7' | 'SM8' | 'SM9' | 'SM10';
@@ -78,6 +84,10 @@ export const recoveryTable = {
   'job-created': {
     machines: ['SM1'], scenario: 'iteration', appended: interrupted,
     stated: 'Loads the run and appends job-interrupted; no invocation is started',
+  },
+  'session-opened': {
+    machines: ['SM1'], scenario: 'iteration', appended: interrupted,
+    stated: 'The session opened before its first invocation started is finished as interrupted; no invocation is started',
   },
   'invocation-started': {
     machines: ['SM1', 'SM10'], scenario: 'iteration', appended: ['invocation-ended', 'job-interrupted'],
@@ -138,6 +148,10 @@ export const recoveryTable = {
   'iteration-closed': {
     machines: ['SM5'], scenario: 'iteration', appended: interrupted,
     stated: 'The accepted iteration stays accepted with its one commit; the work item is not closed by the interruption',
+  },
+  'session-finished': {
+    machines: ['SM5'], scenario: 'iteration', appended: interrupted,
+    stated: 'The engineer session its accepted iteration released stays finished; the sessions the run still keeps are finished before the interruption',
   },
   'work-item-completed': {
     machines: ['SM4'], scenario: 'iteration', appended: interrupted,
@@ -299,7 +313,8 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // exactly the row's stated state.
     expect(recovered.slice(0, frozen.length).map(line => line.text)).toEqual(frozen.map(line => line.text));
     const appended = recovered.slice(frozen.length).map(line => line.event);
-    expect(appended.map(event => event.type), `what recovery appended after ${row.name}`).toEqual(row.appended);
+    expect(appended.filter(event => event.type !== 'session-finished').map(event => event.type), `what recovery appended after ${row.name}`).toEqual(row.appended);
+    expectSessionsFinished(frozen.map(line => line.event), appended, recovered.map(line => line.event), row.name);
     for (const event of appended) expect(recoveryCompletions.has(event.type), `${event.type} is not a completion`).toBe(true);
     if (!frozenTerminal) {
       expect(first.recovery.interrupted).toEqual([`${plan}/${runId}`]);
@@ -323,6 +338,9 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
           break;
         case 'brief-appended': case 'global-context-rebuilt':
           expect(frozenEvents.some(e => e.type === 'decision-accepted')).toBe(true);
+          break;
+        case 'session-finished':
+          expect(frozenEvents.some(e => e.type === 'session-opened' && e.data.session === data.session)).toBe(true);
           break;
         default:
           break;
@@ -391,6 +409,34 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     for (const service of reopened) await service.close();
     await crashed.remove();
   }
+}
+
+/**
+ * The sessions recovery finished: one `session-finished` for each session the
+ * crash left kept, as `run-ended`, and for each opened with no invocation
+ * started, as `interrupted`, in the order they were opened and just before
+ * the interruption; an interrupted invocation's end finishing its session as
+ * `interrupted`; and no session live or suspended afterwards.
+ */
+function expectSessionsFinished(frozen: readonly RunEvent[], appended: readonly RunEvent[], recovered: readonly RunEvent[], name: string): void {
+  const left = [...reduceSessions(frozen).values()];
+  const released = appended.filter(event => event.type === 'session-finished').map(event => event.data);
+  if (frozen.some(event => ['job-completed', 'job-failed', 'job-stopped', 'job-interrupted'].includes(event.type))) {
+    expect(released, `sessions finished after the ended run ${name}`).toEqual([]);
+  } else {
+    expect(released, `the sessions recovery finished after ${name}`).toEqual(left.flatMap(session =>
+      session.state === 'suspended' ? [{ session: session.id, reason: 'run-ended' }]
+        : session.state === 'live' && session.awaiting === null ? [{ session: session.id, reason: 'interrupted' }]
+          : []));
+    const tail = appended.slice(appended.length - 1 - released.length).map(event => event.type);
+    expect(tail, `where recovery finished the sessions after ${name}`).toEqual([...released.map(() => 'session-finished'), 'job-interrupted']);
+  }
+  for (const event of appended) {
+    if (event.type !== 'invocation-ended') continue;
+    expect(event.data, `the session of the invocation recovery closed after ${name}`).toMatchObject({ kept: false, finished: 'interrupted' });
+  }
+  const states = [...reduceSessions(recovered).values()].map(session => session.state);
+  expect(states.filter(state => state !== 'finished'), `sessions a recovered run still holds after ${name}`).toEqual([]);
 }
 
 async function expectMaterialized(root: string, runId: string, lines: readonly LogLine[]): Promise<void> {
