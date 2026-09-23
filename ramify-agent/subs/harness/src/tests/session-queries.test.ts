@@ -139,7 +139,7 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
       const entry = list.sessions.find(candidate => candidate.ref.source === 'run' && candidate.ref.session === session.id);
       expect(entry, session.id).toMatchObject({
         ref: { source: 'run', planId: plan, runId }, state: 'finished', finished: session.finished, role: session.role, work: session.work,
-        executor: 'scripted', model: 'provider/model-7', invocations: session.invocations.length,
+        executor: 'scripted', model: 'provider/model-7', invocations: session.invocations.length, degradedStarts: 0,
         startedAt: session.opened.at, changedAt: session.changed.at,
       });
     }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { sessionQueryLimits, type SessionListEntry, type SessionListResponse } from '../../harness/src/interfaces/protocol/sessions.js';
 import type { ProtocolClient } from './client.js';
 import { routeHref, sessionHref, sessionKey } from './routes.js';
-import { reachText, SessionState } from './run-labels.js';
+import { DegradedStarts, reachText, SessionState } from './run-labels.js';
 import { isFinal } from './session-progress.js';
 import { useQuery } from './use-query.js';
 
@@ -26,6 +26,7 @@ function SessionItem({ entry }: { readonly entry: SessionListEntry }) {
       <p className="session-entry-title">
         <a href={sessionHref(ref)}><code>{ref.session}</code> {entry.role}</a>
         <SessionState state={entry.state} />
+        {entry.degradedStarts > 0 && <DegradedStarts count={entry.degradedStarts} />}
         {entry.finished && <span className="muted"> {entry.finished}</span>}
       </p>
       <p className="muted session-entry-where">

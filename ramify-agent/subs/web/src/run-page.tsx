@@ -7,7 +7,7 @@ import { CapabilityDependencyGraph } from './capability-graph.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
 import { Markdown } from './markdown.js';
-import { routeHref } from './routes.js';
+import { chapterHref, routeHref } from './routes.js';
 import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
 import type { DiagramSessions } from './session-marks.js';
@@ -15,11 +15,11 @@ import { SessionTimeline } from './session-timeline.js';
 
 /*
  * The Run page: one run, read-only, as the harness projects it. Its overview
- * shows notices first: every module created or removed, and every detected
- * dependency cycle, resolved or not, during the run and after it. Start and
- * Stop are the only commands, and Start is on the Plan page. The connection
- * to the harness is shown apart from the run's state: losing it changes
- * nothing in the run.
+ * shows notices first: every module created or removed, every detected
+ * dependency cycle, resolved or not, during the run and after it, and every
+ * degraded start. Start and Stop are the only commands, and Start is on the
+ * Plan page. The connection to the harness is shown apart from the run's
+ * state: losing it changes nothing in the run.
  */
 
 const areas = [
@@ -113,7 +113,7 @@ function Overview({ client, run, events }: { readonly client: ProtocolClient; re
   const running = run.state === 'running';
   return (
     <div className="area" aria-label="Overview">
-      <Notices run={run} />
+      <Notices client={client} run={run} />
       <section className="panel" aria-labelledby="state-heading">
         <header className="page-header">
           <h2 id="state-heading">State</h2>
@@ -176,16 +176,56 @@ function currentText(current: NonNullable<RunSnapshot['current']>): string {
   return parts.join(', ');
 }
 
-/** What the person must be told, first: modules created or removed, then every dependency cycle. */
-function Notices({ run }: { readonly run: RunSnapshot }) {
+/**
+ * What the person must be told, first: modules created or removed, then
+ * every dependency cycle, then the run's degraded starts, where it has any.
+ */
+function Notices({ client, run }: { readonly client: ProtocolClient; readonly run: RunSnapshot }) {
   const ended = run.state !== 'running';
+  const degraded = run.counts.degradedStarts;
   return (
     <section className="panel notices" aria-labelledby="notices-heading">
       <h2 id="notices-heading">Notices</h2>
-      {run.notices.length === 0
+      {run.notices.length === 0 && degraded === 0
         ? <p className="muted">{ended ? 'No module was created or removed, and no dependency cycle was detected.' : 'None so far: no module created or removed, and no dependency cycle detected.'}</p>
-        : <ul className="notice-list">{run.notices.map(notice => <Notice key={`${notice.kind}-${notice.sequence}-${'module' in notice ? notice.module : notice.cycle.join()}`} notice={notice} />)}</ul>}
+        : (
+          <ul className="notice-list">
+            {run.notices.map(notice => <Notice key={`${notice.kind}-${notice.sequence}-${'module' in notice ? notice.module : notice.cycle.join()}`} notice={notice} />)}
+            {degraded > 0 && <DegradedStartsNotice client={client} run={run} />}
+          </ul>
+        )}
     </section>
+  );
+}
+
+/**
+ * The run's degraded starts: counted by its snapshot, and read from its
+ * sessions, which are asked for only when there is one, to link each to
+ * its chapter.
+ */
+function DegradedStartsNotice({ client, run }: { readonly client: ProtocolClient; readonly run: RunSnapshot }) {
+  const { planId, jobId: runId, version } = run;
+  const state = useRunQuery(`degraded-starts:${runId}`, version, () => client.getRunSessions(planId, runId));
+  const count = run.counts.degradedStarts;
+  const starts = state.status === 'ready'
+    ? state.data.sessions.flatMap(session => session.invocations.flatMap(invocation => invocation.degraded === null ? [] : [{ session, invocation: invocation.invocation, ...invocation.degraded }]))
+    : [];
+  return (
+    <li className="notice notice-degraded-start">
+      <strong>{count === 1 ? 'A degraded start' : `${count} degraded starts`}</strong>
+      <p>The executor was asked to continue or fork a session's conversation and started a fresh one instead, without its history.</p>
+      {state.status === 'failed' && <p className="muted">The sessions could not be read to name them: {state.error.message}</p>}
+      {starts.length > 0 && (
+        <ul>
+          {starts.map(({ session, invocation, requested, actual, reason }) => (
+            <li key={invocation}>
+              <a href={chapterHref({ source: 'run', planId, runId, session: session.session }, invocation)}>{session.session} {session.role}, {invocation}</a>
+              : {requested} was requested and {actual} was made{reason ? ` (${reason})` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 

@@ -5,6 +5,8 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { lineageMetricSchema, type LineageMetric, type Role } from '../interfaces/protocol/runs.js';
 import { runView } from '../projections/inputs.js';
 import { metricsOf } from '../projections/metrics.js';
+import { runSessionEntry, runSessionViews } from '../projections/sessions.js';
+import { snapshotOf } from '../projections/snapshot.js';
 import { reduceSessions } from '../run/sessions.js';
 import {
   invocationOutcomeSchema, invocationSchema, runLayout,
@@ -230,6 +232,15 @@ describe('ST13: the lineage measurements of a scripted run', () => {
     expect(find(lineage.metrics, 'degraded-starts').value).toBeCloseTo(1 / 3);
     expect(find(lineage.metrics, 'degraded-starts.continue')).toMatchObject({ state: 'measured', numerator: 1, denominator: 3 });
     expect(find(lineage.metrics, 'degraded-starts.fork')).toMatchObject({ state: 'measured', numerator: 1, denominator: 3 });
+  });
+
+  test('the same degraded starts are counted by each session of the project\'s list and by the run\'s snapshot', () => {
+    const view = runView(constructedRun([{ type: 'job-started', data: {} }, ...lines]));
+    const counted = runSessionViews(view).map(session => runSessionEntry('review-notes', view.record.jobId, session))
+      .filter(entry => entry.degradedStarts > 0)
+      .map(entry => [entry.ref.session, entry.degradedStarts]);
+    expect(counted).toEqual([['ses-0004', 1], ['ses-0008', 1]]);
+    expect(snapshotOf(view).counts.degradedStarts).toBe(2);
   });
 
   test('replacements by reason, and the forks each context generation served', async () => {

@@ -53,3 +53,14 @@ export function figure(value: number | null): string {
 export function metricValue(metric: Metric | LineageMetric): string {
   return metric.state === 'measured' ? figure(metric.value) : metric.state;
 }
+
+/**
+ * A session's degraded starts, as a badge whose accessible name and title
+ * say what happened: the executor was asked to continue or fork the
+ * conversation and started a fresh one.
+ */
+export function DegradedStarts({ count }: { readonly count: number }) {
+  const label = count === 1 ? 'degraded start' : `${count} degraded starts`;
+  const explanation = `${count === 1 ? 'An invocation' : `${count} invocations`} of this session asked the executor to continue or fork its conversation, and the executor started a fresh one instead.`;
+  return <span className="badge degraded-badge" role="img" aria-label={`${label}: ${explanation}`} title={explanation}>{label}</span>;
+}

@@ -128,6 +128,31 @@ function SessionFacts({ at: ref, detail }: { readonly at: SessionRef; readonly d
   );
 }
 
+/**
+ * The session's degraded starts, before its facts, so a reader sees them
+ * without scrolling: each links to its chapter. Nothing when it has none.
+ */
+function DegradedStartsNotice({ at: ref, session }: { readonly at: SessionRef; readonly session: RunSessionView }) {
+  // A chapter's number is its invocation's place in the session.
+  const degraded = session.invocations.flatMap((invocation, index) => invocation.degraded === null ? [] : [{ ...invocation.degraded, invocation: invocation.invocation, number: index + 1 }]);
+  if (degraded.length === 0) return null;
+  return (
+    <section className="notice degraded-notice" aria-label="Degraded starts">
+      <p>
+        <strong>{degraded.length === 1 ? 'A degraded start' : `${degraded.length} degraded starts`}.</strong>
+        {' '}The executor was asked to continue or fork this session's conversation and started a fresh one instead, without its history.
+      </p>
+      <ul>
+        {degraded.map(({ invocation, number, requested, actual, reason }) => (
+          <li key={invocation}>
+            <a href={chapterHref(ref, invocation)}>Chapter {number}: {invocation}</a>: {requested} was requested and {actual} was made{reason ? ` (${reason})` : ''}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** How a chapter's invocation started: from the run's view where there is one, else from its `started` entry. */
 function StartRelation({ at: ref, invocation, started, session, sessions }: {
   readonly at: SessionRef;
@@ -312,6 +337,7 @@ export function SessionPage({ client, session: ref, anchor, interval }: {
             : `${changed ? `It became ${state} while this page was open. ` : ''}The session is ${stateSentence(state, detail)}. ${following ? 'Following its transcript as it grows.' : 'Its transcript is complete as read.'}`}
       </p>
       {notFound && !detail && <p className="failure" role="alert">{error.message}</p>}
+      {detail?.source === 'run' && <DegradedStartsNotice at={ref} session={detail.session} />}
       {detail && <SessionFacts at={ref} detail={detail} />}
       {file === 'missing' && (
         <p className="warn transcript-missing" role="alert">

@@ -16,7 +16,7 @@ const standaloneId = '20260921T101500Z-a1b2c3';
 
 function entry(extra: Partial<SessionListEntry> & Pick<SessionListEntry, 'ref' | 'state'>): SessionListEntry {
   return {
-    finished: null, role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i02' }, executor: 'scripted', model: null, invocations: 2,
+    finished: null, role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i02' }, executor: 'scripted', model: null, invocations: 2, degradedStarts: 0,
     reaches: { kind: 'work-item', workItem: 'wi-001', capability: 'send-button', module: 'shop/reviews' }, startedAt: at(5), changedAt: at(14),
     ...extra,
   };
@@ -46,6 +46,26 @@ test('ST09: the Sessions page lists live and suspended sessions first, across ru
   expect(within(closed).getAllByRole('listitem')[1]!.textContent).toContain('work-closed');
   expect(within(open).getAllByRole('listitem')[0]!.textContent).toContain('work item wi-001, capability send-button, module shop/reviews');
   expect(screen.getByRole('alert').textContent).toContain('plans/old/runs/x');
+});
+
+test('a session with degraded starts is flagged with their count and why; the others are not', async () => {
+  const client = new StubClient();
+  client.sessionList = sessionListResponseSchema.parse({
+    sessions: [
+      entry({ ref: { source: 'run', planId, runId, session: 'ses-0002' }, state: 'finished', finished: 'work-closed', degradedStarts: 1 }),
+      entry({ ref: { source: 'run', planId, runId, session: 'ses-0004' }, state: 'finished', finished: 'work-closed', degradedStarts: 2 }),
+      entry({ ref: { source: 'run', planId, runId, session: 'ses-0005' }, state: 'finished', finished: 'work-closed' }),
+    ],
+    total: 3, offset: 0, next: null, unserved: [],
+  });
+  render(<SessionsPage client={client} interval={60_000} />);
+  const [once, twice, none] = within((await screen.findByRole('heading', { name: 'Finished and interrupted' })).closest('section')!).getAllByRole('listitem');
+  const flag = within(once!).getByRole('img', { name: /^degraded start: / });
+  expect(flag.textContent).toBe('degraded start');
+  expect(flag.getAttribute('title')).toBe('An invocation of this session asked the executor to continue or fork its conversation, and the executor started a fresh one instead.');
+  expect(within(twice!).getByRole('img', { name: /^2 degraded starts: 2 invocations of this session/ }).textContent).toBe('2 degraded starts');
+  expect(within(none!).queryByRole('img')).toBeNull();
+  expect(none!.textContent).not.toContain('degraded');
 });
 
 test('the list is read again while a session is live, and pages follow the harness\'s offsets', async () => {

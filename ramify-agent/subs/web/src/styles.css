@@ -172,6 +172,9 @@ main.route-run { max-width: none; }
 .notice { border-left: 3px solid var(--warn); padding: 0.2rem 0.75rem; }
 .notice p { margin: 0.15rem 0; }
 .notice-module-created, .notice-module-removed { border-left-color: var(--accent); }
+.notice ul { margin: 0.15rem 0; padding-left: 1.2rem; overflow-wrap: anywhere; }
+.degraded-notice { margin: 0.75rem 0; }
+.degraded-badge { background: #f7ecd4; color: var(--warn); }
 .facts div { display: flex; flex-wrap: wrap; gap: 0 0.5rem; margin: 0.15rem 0; }
 .facts dt { color: var(--muted); min-width: 10rem; }
 .facts dd { margin: 0; overflow-wrap: anywhere; }

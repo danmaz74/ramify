@@ -271,6 +271,25 @@ test('chapters carry their start relation and reason; points and the fork source
   expect(screen.getByText(/Forked from/, { selector: 'li' }).textContent).toContain('placement-request, context generation 1');
 });
 
+test('a degraded start is noticed above the session\'s facts, with a link to its chapter; a session without one has no notice', async () => {
+  const client = clientWith();
+  const ses3 = { ...ses2, session: 'ses-0003' };
+  client.transcripts.set('ses-0003@0', { session: ses3, page: page([]) });
+  render(<SessionPage client={client} session={ses3} anchor={null} interval={60_000} />);
+  const notice = await screen.findByRole('region', { name: 'Degraded starts' });
+  expect(notice.textContent).toContain('A degraded start.');
+  expect(notice.textContent).toContain('fork was requested and fresh was made (the source session file is gone)');
+  expect(within(notice).getByRole('link', { name: 'Chapter 1: inv-0003' }).getAttribute('href'))
+    .toBe(`#/plans/${planId}/runs/${runId}/sessions/ses-0003/chapters/inv-0003`);
+  // It comes before the facts, so it is read before scrolling.
+  expect(notice.compareDocumentPosition(document.querySelector('.facts')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  cleanup();
+
+  render(<SessionPage client={clientWith(finishedEngineer())} session={ses2} anchor={null} interval={60_000} />);
+  await screen.findByRole('heading', { name: /Chapter 1: inv-0002/ });
+  expect(screen.queryByRole('region', { name: 'Degraded starts' })).toBeNull();
+});
+
 test('a point lists the sessions forked from it; a link to a chapter opens that chapter', async () => {
   const client = new StubClient();
   client.runSessions.set(runId, { version: 20, sessions: [architect, finishedEngineer(), globalFork], total: 3 });
@@ -301,7 +320,7 @@ test('a standalone session is one chapter with its evaluation and outcome, and i
   client.standalone.set(id, standaloneSessionResponseSchema.parse({
     session: {
       ref: { source: 'standalone', session: id }, state: 'interrupted', finished: null, role: 'engineer', work: {}, executor: 'scripted', model: null,
-      invocations: 1, reaches: { kind: 'module', module: 'shop/reviews' }, startedAt: at(1), changedAt: at(3),
+      invocations: 1, degradedStarts: 0, reaches: { kind: 'module', module: 'shop/reviews' }, startedAt: at(1), changedAt: at(3),
     },
     prompt: 'Add the send button.',
     outcome: null,

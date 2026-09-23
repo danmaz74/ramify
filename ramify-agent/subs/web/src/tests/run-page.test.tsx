@@ -6,7 +6,7 @@ import {
 } from '../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
-import { architect, liveEngineer } from './helpers/sessions.js';
+import { architect, globalFork, liveEngineer } from './helpers/sessions.js';
 import { StubClient, type StubRun } from './helpers/stub-client.js';
 
 // Progress → By module draws the packaged React Flow canvas, which jsdom cannot measure.
@@ -24,7 +24,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     startedAt: at, updatedAt: at, endedAt: null, failure: null,
     current: { workItem: 'wi-002', iteration: 'wi-002.i01', role: 'engineer', invocation: 'inv-0006' },
     waits: [],
-    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3 },
+    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, degradedStarts: 0 },
     writer: { held: 'inv-0006', unsettled: null },
     notices: [
       {
@@ -175,6 +175,28 @@ test('the overview shows notices first: the module created, then every cycle, re
   expect(notices[0]!.textContent).toContain('Module created: shop/notes/drafts');
   expect(notices[0]!.textContent).toContain('No placement decision proposed it.');
   expect(notices[1]!.textContent).toContain('resolved');
+});
+
+test('a run with a degraded start notices it with its count and a link to its chapter; a run without one asks for no sessions', async () => {
+  const counts = { ...snapshot().counts, degradedStarts: 1 };
+  const client = clientWith(stubRun({ counts, notices: [] }));
+  client.runSessions.set(runId, { version: 12, sessions: [architect, liveEngineer(), globalFork], total: 3 });
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  const overview = await screen.findByLabelText('Overview');
+  const link = await within(overview).findByRole('link', { name: 'ses-0003 global-fork, inv-0003' });
+  expect(link.getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0003/chapters/inv-0003`);
+  const notice = link.closest('.notice')!;
+  expect(notice.className).toBe('notice notice-degraded-start');
+  expect(notice.textContent).toContain('A degraded start');
+  expect(notice.textContent).toContain('fork was requested and fresh was made (the source session file is gone)');
+  expect(within(overview).queryByText(/No module was created or removed/)).toBeNull();
+  cleanup();
+
+  const quiet = clientWith(stubRun());
+  render(<RunPage client={quiet} planId="review-notes" runId={runId} interval={60_000} />);
+  await screen.findByLabelText('Overview');
+  expect(document.querySelector('.notice-degraded-start')).toBeNull();
+  expect(quiet.calls.filter(call => call.startsWith('getRunSessions'))).toEqual([]);
 });
 
 test('after the run ends the notices stay, and an empty list says that nothing was created', async () => {

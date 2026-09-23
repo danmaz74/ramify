@@ -76,6 +76,14 @@ describe('the session fixture over HTTP', () => {
     expect(sessions.find(session => session.session === reconstruction.lineage.replaces!.session)).toMatchObject({ finished: 'replaced' });
     expect(sessions.flatMap(session => session.invocations).filter(invocation => invocation.degraded !== null).map(invocation => invocation.degraded))
       .toContainEqual(expect.objectContaining({ requested: 'continue', actual: 'fresh' }));
+    // The project's list and the run's snapshot count the degraded starts the log records.
+    const degraded = sessions.map(session => [session.session, session.invocations.filter(invocation => invocation.degraded !== null).length] as const)
+      .filter(([, count]) => count > 0);
+    const list = await get(protocolPaths.sessions(), sessionListResponseSchema);
+    expect(list.sessions.filter(entry => entry.ref.source === 'run' && entry.ref.runId === runs.lineage.runId && entry.degradedStarts > 0)
+      .map(entry => [entry.ref.session, entry.degradedStarts]).sort()).toEqual([...degraded].sort());
+    const { run } = await get(protocolPaths.run(runs.lineage.planId, runs.lineage.runId), runResponseSchema);
+    expect(run.counts.degradedStarts).toBe(degraded.reduce((total, [, count]) => total + count, 0));
   });
 
   test('interrupted: a stopped run whose architect its log leaves live', async () => {

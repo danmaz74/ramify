@@ -198,6 +198,8 @@ export const runSnapshotSchema = z.object({
     invocations: count,
     readinessAttempts: count,
     gateAttempts: count,
+    /** Invocations whose executor started otherwise than the harness asked: a continuation or fork made fresh. */
+    degradedStarts: count,
   }).strict(),
   /** The one writer: which invocation holds it, and an invocation whose release was not confirmed. */
   writer: z.object({ held: text.nullable(), unsettled: text.nullable() }).strict(),

@@ -99,6 +99,12 @@ export const sessionListEntrySchema = z.object({
   /** The model the executor was asked for; null where it chose its own. */
   model: text.nullable(),
   invocations: count,
+  /**
+   * Its invocations the executor started otherwise than the harness asked:
+   * a continuation or fork made fresh. A standalone session starts fresh, so
+   * it has none.
+   */
+  degradedStarts: count,
   reaches: sessionReachSchema,
   startedAt: timestamp,
   /** Its last change of state or history. */

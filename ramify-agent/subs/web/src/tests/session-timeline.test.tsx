@@ -30,7 +30,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
   return runSnapshotSchema.parse({
     jobId: runId, planId, agent: 'scripted', version: 16, state: 'running', phase: 'working', stopRequested: false,
     startedAt: at(0), updatedAt: at(16), endedAt: null, failure: null, current: null, waits: [],
-    counts: { workItems: 1, completedWorkItems: 0, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 0 },
+    counts: { workItems: 1, completedWorkItems: 0, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 0, degradedStarts: 0 },
     writer: { held: null, unsettled: null }, notices: [],
     ...extra,
   });

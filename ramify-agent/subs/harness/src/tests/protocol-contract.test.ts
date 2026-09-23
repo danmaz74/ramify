@@ -267,7 +267,7 @@ describe('sessions', () => {
   const standalone = { source: 'standalone', session: '20260923T101500Z-d4e5f6' } as const;
   const entry = {
     ref: run, state: 'live', finished: null, role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' },
-    executor: 'scripted', model: null, invocations: 1,
+    executor: 'scripted', model: null, invocations: 1, degradedStarts: 0,
     reaches: { kind: 'work-item', workItem: 'wi-001', capability: 'review-note', module: 'app/notes' },
     startedAt: at, changedAt: at,
   };
