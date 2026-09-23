@@ -1736,8 +1736,8 @@ passed three times alone, and the rerun of the same commit passed, so it is
 recorded as a load flake, like the known MT09 flake, rather than a defect of
 this plan.
 
-Remaining open: the real pi run on `status-badge-tone`, which waits for Dan's
-go-ahead.
+The real pi run on `status-badge-tone` ran on 2026-09-23; see
+[Real pi run](#real-pi-run).
 
 ## Merge with Plan 9
 
@@ -1859,3 +1859,107 @@ followed.
 The analysis-limit count rose from 122 before the merge to 167. Plan 9's
 exposed session and transcript schemas added these limits: each is a
 `signature-inferred` limit, like every other exposed schema.
+
+## Real pi run
+
+Dan approved the run on 2026-09-23. It ran `npm run real-session -- --plan
+status-badge-tone --model openai-codex/gpt-5.6-sol:high` on a fresh copy of
+the fixture, from `ramify-agent` at `e84921a`. The run did not use the review
+stop, because `real-session` starts runs without it.
+
+- **Run:** `20260923T164537Z-dbf0c2`, completed in 12 minutes (16:45:38 to
+  16:57:34).
+- **Work:** 1 work item, 1 iteration, 4 invocations, 4 gate attempts. Every
+  gate passed at its first attempt.
+- **Tokens:** 101,031 input, 17,582 output and 836,480 cache reads over the
+  four invocations.
+- **Changed files:** `trial verify` found 2 modified and 2 added files, all
+  inside the recorded write scope, and a clean tree.
+- **Where it is kept:** the copy is at
+  `/tmp/ramify-agent-loop-trial-XJHJla/collection-review`, and the run's
+  records are under its `plans/status-badge-tone/.harness/jobs/`.
+
+### What the scenarios did
+
+- **Extraction.** The initial architect gave the entry
+  `render-status-badge-tone` both plan scenarios verbatim, `ps-01` and
+  `ps-02`. The harness froze them as `sc-001` and `sc-002` at
+  `analysis-accepted`, with the plan's line ranges as their origin.
+- **Readiness** passed at the first attempt. Gate `ga-0001` ran the project's
+  one untracked scenario in quick mode, and a full-mode dry run.
+- **Materialization.** The commit "Scenarios of status-badge-tone" (with the
+  trailer `Ramify-Scenarios: materialized`) wrote one feature file into
+  `shared-ui/src/tests/features/status-badge-tone/`, with both scenarios
+  tagged `@ramify-pending`.
+- **Assignment.** The local architect assigned both scenarios to the single
+  iteration. The engineer's briefing carried both scenarios, the binding
+  rules and the feature file's path.
+- **Binding.** The engineer wrote step definitions in
+  `shared-ui/src/tests/steps/` and declared both scenarios in its completion
+  proposal. Both moved from `pending` straight to `declared`, which is
+  correct because no requirement was open. The harness removed the pending
+  tags in the iteration's gate commit.
+- **Gates:**
+  - `ga-0002` (iteration) ran both scenarios in quick mode, selected by
+    identity. Both became `implemented`.
+  - `ga-0003` (work item) ran every untagged scenario of both owners in quick
+    mode.
+  - `ga-0004` (final) ran all scenarios in full mode, and
+    `acceptance-incomplete` did not fire.
+  - The scenario check added 1.2 to 2.6 seconds to each gate.
+- **Web view.** The run page's Scenarios area showed 2 implemented, with each
+  scenario's origin, entry, work item, file and the verdicts of its three
+  gates.
+
+### Findings
+
+1. **A `.tsx` step file is not loaded, and nothing says so.**
+   - The scenario profiles import `<area>/steps/**/*.{ts,js}`
+     (`subs/harness/subs/scenarios/src/profiles.ts:105`).
+   - The engineer first wrote `status-badge-tone.steps.tsx`, the natural
+     choice in a React project.
+   - `run_scope_tests` then reported both scenarios `undefined`, "no step
+     definition matches". Neither the briefing nor that diagnostic names the
+     file pattern that is loaded.
+   - The engineer inferred the cause, renamed the file to `.ts` and replaced
+     JSX with `createElement`, and recorded that as a finding.
+   - It cost one extra round, about 25 seconds, and a style compromise.
+   - Fixed by `5d6057c`. The pattern is now `{ts,tsx,js,jsx,mts,mjs}`, and
+     a real-runner test binds a step from a `.tsx` file. Before the fix, that
+     test fails the way the run did. The ramify-agent suite audit passes on
+     that commit: `refs/audited/runs/2026-09-23T17-13-00Z-5d6057ca3`, with
+     1,226 tests.
+   - Still open: name the pattern in the briefing's "Binding a scenario"
+     section and in the undefined-step diagnostic.
+2. **Wording of two event summaries.**
+   - `scenarios-materializing` and `scenarios-materialized` say "The 1 feature
+     file of the plan's scenarios are …".
+   - `scenario-declared` says "Scenario sc-001 was declared and is declared"
+     when the state is `declared`. It should read differently from the
+     `bound` case, for example "was declared, and is due".
+3. **A stale web bundle.** `real-session` and `serve` serve `dist/web`
+   without rebuilding it. The bundle there dated from before Plans 9 and 10,
+   so the page lacked their areas until `npm run build:web` was run during
+   the run. Proposal: have `serve` warn when the bundle is older than the web
+   sources.
+4. **The gate's profile path.** The gates in the audit worktree pass
+   `--config ../../<copy>/plans/…/profile.mjs`, a relative path from the
+   worktree back into the project's `.harness`. This works, but the audited
+   run reads its profile from outside the audited tree.
+5. **Acceptance references.** The initial architect cited the plan's third
+   acceptance bullet for both scenarios. That bullet says the existing tests
+   still pass, which no scenario states. The citation is harmless, since
+   references are not checked against scenario content.
+
+### Not exercised
+
+This run did not exercise:
+
+- the review stop, since `real-session` has no approve step;
+- the `bound` state and `scenario-due`, since no requirement was open;
+- a withdrawal;
+- an integration scenario or integration work item;
+- scenarios written by the architect, since the plan supplied its own;
+- a failing scenario at a gate.
+
+The scripted trial of iteration 11 covers these.
