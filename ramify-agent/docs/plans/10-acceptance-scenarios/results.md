@@ -1689,8 +1689,6 @@ failed once under load in iteration 6, passed in the suite's run.
 ### Open items
 
 - The real pi run on `status-badge-tone` waits for Dan's go-ahead.
-- The repository root cucumber-viz audit is the orchestrator's; AS12 waits
-  for it.
 - The `reviewer-identity` fixture trial was not re-run; its plan is
   unchanged.
 - The analysis's "What this changes" says the local architect can no longer
@@ -1716,4 +1714,27 @@ The plan's [acceptance](main-plan.md#acceptance) criteria and their evidence.
 | AS09 | Briefings and diagnostics carry what §6 and the scenario check specify | Iteration 9's `scenario-briefings` | met |
 | AS10 | The scenario list, the review section and the approve action are served and shown | Iteration 10's `scenario-projections`, `protocol-contract` and the web tests | met |
 | AS11 | A scripted run on the fixture completes with every scenario `implemented` and passing in full mode | The trial: three scenarios implemented and passed at the full-mode final gate, with the scripted runner by default and the real `cucumber-js` in the gated variant (4 passed); the `status-badge-tone` run and fixture trial | met |
-| AS12 | Both audits pass on one commit | The ramify-agent suite audit passed on `d888635`; the root cucumber-viz audit is pending | pending |
+| AS12 | Both audits pass on one commit | Both pass on `e851d5e`; see [final audits](#final-audits) | met |
+
+## Final audits
+
+Both audits ran on `e851d5e`, the documents commit whose parent is the last
+implementation commit `d888635`. Plan 10 changes nothing outside
+`ramify-agent/`.
+
+| Audit | Result | Evidence |
+| --- | --- | --- |
+| ramify-agent suite request | pass: all five checks; `agent-vitest` 1,094 passed, 7 skipped | `refs/audited/runs/2026-09-23T15-15-38Z-e851d5ea9` |
+| Root cucumber-viz audit | pass: static and regression, 2,260 tests | `refs/audited/runs/2026-09-23T15-12-54Z-e851d5e` |
+
+The first root audit of the same commit
+(`refs/audited/runs/2026-09-23T15-08-40Z-e851d5e`) failed one toolkit test,
+`subs/analysis/src/tests/session-worker.test.ts` > "cancels queued and active
+calls without losing the last published revision", which expected revision
+sequence 1 and saw 2. The toolkit's source is unchanged by this plan, the test
+passed three times alone, and the rerun of the same commit passed, so it is
+recorded as a load flake, like the known MT09 flake, rather than a defect of
+this plan.
+
+Remaining open: the real pi run on `status-badge-tone`, which waits for Dan's
+go-ahead.

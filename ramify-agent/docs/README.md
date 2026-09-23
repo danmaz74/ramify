@@ -77,8 +77,8 @@ Design documents for the separate agent harness:
   completion gate is verified, while run delivery or merge remains out of scope
 - [Plan 10: acceptance scenarios](plans/10-acceptance-scenarios/main-plan.md),
   the v1 acceptance scenarios architecture in eleven iterations; implemented,
-  with its [results](plans/10-acceptance-scenarios/results.md); its suite
-  audit passed and the root audit is pending
+  with its [results](plans/10-acceptance-scenarios/results.md); both audits
+  pass
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and
