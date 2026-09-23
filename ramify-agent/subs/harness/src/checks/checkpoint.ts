@@ -180,6 +180,12 @@ export interface ScenarioPlanningOptions {
   readonly dryRun?: boolean | undefined;
   /** How a failure of the check is attributed; the tests' own attribution at this checkpoint. */
   readonly attribution?: 'in-scope' | 'project' | undefined;
+  /**
+   * For an `identity` selection: scenarios of the scope selected whatever
+   * their state, as `run_scope_tests` selects the work item's pending ones.
+   * No gate passes it.
+   */
+  readonly include?: readonly string[] | undefined;
 }
 
 /** A state whose scenario an identity selection names: it was declared, so it runs although it may carry the pending tag. */
@@ -205,7 +211,7 @@ export function planScenarioCheck(checkpoint: Checkpoint, inputs: ScenarioCheckI
     const inScope = (owner: string): boolean =>
       scope.exactOwners.includes(owner) || scope.subtrees.some(subtree => owner === subtree || owner.startsWith(`${subtree}/`));
     const selected = inputs.scenarios
-      .filter(scenario => selectedByIdentity.includes(scenario.state) && inScope(scenario.owner))
+      .filter(scenario => (selectedByIdentity.includes(scenario.state) || (options.include ?? []).includes(scenario.id)) && inScope(scenario.owner))
       .sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
     if (selected.length === 0) return { none: 'none-selected' };
     const byOwner = new Map<string, PlannedScenario[]>();

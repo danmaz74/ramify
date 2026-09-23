@@ -1193,3 +1193,163 @@ step files through `expose-test`. No test makes a model call.
   the same check. The work-item gate runs them all; an iteration gate does
   when the scope includes the children, which the judge requires.
 - Integration items count against `maxWorkItems`.
+
+## Iteration 9: Briefings, procedures and diagnostics
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **The scenario briefings** (`work/scenario-briefing.ts`, new).
+  `BriefedScenario` (`id`, `name`, `state`, `file`, `source`, `partOf`),
+  `entryScenariosOf(records, states, entry)` (none for `entry: null`),
+  `EngineerScenarios` (`{ kind: 'entry', scenarios }` with every scenario of
+  the entry, or `{ kind: 'integration', integration: IntegrationBriefing,
+  state }`), `architectScenarioSection` and `engineerScenarioSection`.
+- **The local architect** (`work/session.ts`). `WorkItemBriefing.scenarios`
+  puts a section `## The scenarios of this work item` after the plan's
+  references (and after iteration 8's integration section, which stays): per
+  scenario `### sc-NNN (<state>): <name>`, its feature file, for a
+  sub-scenario the integration scenario it came from, and its text, then how
+  binding, declaring, `bound` and `declared`, `assignment.scenarios`,
+  `request-completion.scenarios` and the completion refusal work. The service
+  fills it for an entry's work item only. `lastIteration.scenarios` carries,
+  for an accepted iteration, each scenario its gate passed with the
+  definition that bound each step (`passedScenarioLines`), with a line on
+  bindings reached through an import. The `blocked` section's closing text
+  now says how a scenario is implemented.
+- **The procedure** (`local-architect.procedure.md`, version 2). Step 5 is
+  §6's: a goal a module already meets still needs its scenarios bound;
+  declare them with the completion request where existing step definitions
+  bind them, otherwise assign an iteration that writes them. A new section
+  `## Scenarios` explains the states, declaring, the refusal, withdrawal and
+  what a gate section shows; `assign` documents `assignment.scenarios`;
+  `request-completion` its `scenarios` and the scenarios the work-item gate
+  runs.
+- **`assignment.scenarios?: string[]`** (`work/assignment.ts`,
+  `work/iterations.ts`). Optional on the submitted body and on the frozen
+  `IterationAssignment` (copied unless the assignment is a contract
+  revision). `assignedScenarioErrors(ids, context)` (`work/declarations.ts`,
+  beside the new `ownScenarios(context)`) accepts scenarios of the work item
+  in any state and rejects, at `assignment.scenarios.<i>`, another work
+  item's scenario, an integration scenario of an entry's item, and an
+  unknown ID; a provider item names none. `assignmentErrors` applies it with
+  `AssignmentEvidence.scenarios`, which `validateLocalArchitect` passes from
+  `WorkEvidence.scenarios`. Nothing requires the engineer to declare these.
+- **The engineer** (`work/engineer.ts`). `IterationBriefing.scenarios` adds,
+  after the completion evidence: a line that the gate runs the scope's
+  declared scenarios by identity; `## Scenarios to bind` with the assigned
+  ones; the entry's other unimplemented ones (or `## The scenarios of this
+  work item` when none is assigned), each with state, file and text; a count
+  of implemented ones; and `## Binding a scenario` with §6's three rules and
+  the request for named imports of another owner's step files. An
+  integration item's engineer gets `## The integration scenario to bind`,
+  the sub-scenarios' owners and their step files, and `## Binding it` (one
+  step file at the ancestor, no step of its own, `expose-test` along each
+  path, never a feature file, declare once it passes, named imports). The
+  service passes nothing for a provider or follow-up item, whose message says
+  nothing about scenarios.
+- **Prompts.** `engineer.system.md` version 3 (what `run_scope_tests` runs),
+  `engineer.procedure.md` version 3 (step 4 and 5, a section `## Scenarios`
+  with the rules, `scenarios` in `completion-proposed`). Packages
+  `local-architect/2` and `engineer/2`; `contract-engineer/1` is unchanged,
+  since none of its files or its schema changed.
+- **`run_scope_tests`** (`work/engineer.ts`, `work/engineer-equipment.ts`).
+  `ScopeTestsOptions.scenarios?: ScopeScenarioCheck` (`plan`, `directory`,
+  `names`). After the tests (whatever their outcome, an empty selection
+  included) the tool plans the check anew, runs it with `runScenarioCheck`
+  through the same command runner, and appends `Scenarios: passed|failed;
+  <mode and selection>.` and the per-scenario lines of the diagnostics; the
+  result is an error when either half did not pass. With nothing selected it
+  says so. `EngineerEquipmentInputs.scenarios` carries the planning; the
+  equipment numbers each call's directory, `runLayout.scopeScenarios(invocation,
+  call)` (`invocations/<id>/scenarios/NNN/`, the profiles, streams and
+  `scenarios.log`). The service's `scopeScenarioCheck(run, item, policy)`
+  plans `iteration` (quick, identity) over the tool's own policy with
+  `ScenarioPlanningOptions.include`, new in `checks/checkpoint.ts`: the work
+  item's pending scenarios are selected beside the scope's bound, declared
+  and implemented ones. A run with no tracked scenario, or no valid
+  configuration, gets no scenario part. The `scope-tests` observation gains
+  an optional `scenarios { selected, passed, failures }`.
+- **Diagnostics** (`checks/diagnostics.ts`). `gateDiagnostics(gate,
+  audience, names?)` renders a `scenarios` command from its summary rather
+  than its output tail: a header with the mode and selection, then
+  `scenarioCheckLines(summary, names, { indent, only })`: per scenario that
+  did not pass its name, `file:line`, the failing step, the message (at most
+  12 lines and 1,500 characters) and the steps no definition matched; per
+  passed scenario each step's definition as `uri:line`; the project's own
+  scenarios where any failed; and every failure line of iteration 5's that
+  is not about one scenario. A passing scenario check in a failing gate lists
+  the binding of each scenario it passed. `describeScenarioCheck` is the
+  header phrase. The service's `diagnosticsOf` passes the records' names; the
+  composition-failure lines of iteration 8 follow unchanged.
+- **Test helpers.** `scriptedScenarioRun(request)`
+  (`helpers/project-config.ts`) is the scripted `cucumber-js` answered in
+  the test's process, for command runners that are functions; it reads the
+  profile as text. `StatedCommand.scenarios` (`helpers/composition.ts`)
+  states a scenario run by the mode's command, and the composition's
+  `iteration` and `testless` scenarios state the one each `run_scope_tests`
+  call now makes.
+- **Tests.** A new `scenario-briefings.test.ts` (14 tests). Updated:
+  `analysis-submission` (the two versions), `engineer-submission` (the tool's
+  scenario part, its observation and directory), `integration-scenarios`
+  (the entry and integration briefings of both roles, the repair briefing's
+  scenario lines), `scenario-states` (`assignment.scenarios` recorded and
+  shown under "Scenarios to bind", the states each architect turn finds, a
+  provider item's silence), the composition helper. The harness README
+  describes the change.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/scenario-briefings.test.ts` | 14 passed: the local architect's section per scenario (ID, state, text, file, the integration scenario of a sub-scenario; another entry's and the integration scenario absent; declaring and the refusal), a provider item's silence and the refusal's closing text, the accepted iteration's binding lines; the engineer's "Scenarios to bind", the entry's other scenarios, implemented ones counted, the three rules and named imports, the all-implemented case, the integration engineer's section, a provider's message with no mention of scenarios; `assignment.scenarios` over entry, integration and provider items and through `validateLocalArchitect`; `run_scope_tests` with a scripted runner over the recorded `undefined` and `passing` streams (argv, the identity expression with the pending one, per-scenario lines, the observation, one directory per call, nothing selected); the diagnostics of a recorded failing, undefined and passing check for both audiences, a passing check's binding in a failing gate, and the message bound |
+| `npx vitest run` over `scenario-briefings`, `engineer-submission`, `composition`, `scenario-states`, `integration-scenarios`, `analysis-submission`, `engineer-briefing`, `gate-diagnostics` | 8 files, 79 passed. Before their update `engineer-submission` (the scripted runner refused the scenario run) and `composition` (an unstated command) failed |
+| `npx vitest run` over the 76 harness test files other than the integration and fixture files, `integration-scenarios`, `subs/harness/subs` and `subs/web` | 119 files, 1,046 passed |
+| `npx vitest run` over `iterations-integration`, `integration-scenarios-integration`, `single-session-integration`, `iteration-gate-integration`, `module-creation-integration`, `contract-delegation-integration`, `scenario-check-integration`, `run-protocol-materialization.integration`, `run-git.integration`, `fixture-check`, one at a time | 10 files, 18 passed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits, as in iteration 8 |
+
+No test makes a model call. The full suite was not run, per the plan's
+rules; `fixture-trials` and `fixture-acceptance` are conditional and were
+not run.
+
+### Deviations
+
+- **`run_scope_tests` selects the work item's own pending scenarios,** not
+  every pending scenario of the scope's owners, beside the bound, declared
+  and implemented ones an iteration gate selects. Another entry's pending
+  scenario in the same module is nobody's to bind yet and would fail as
+  undefined on every call.
+- **The scenario half runs whatever the tests did,** an empty or
+  unresolvable selection included, and the tool's result is an error when
+  either half did not pass: an engineer binding scenarios in a module with no
+  unit test still sees them.
+- **The contract engineer's `run_scope_tests` runs no scenario check,** and
+  its package stays `contract-engineer/1`: a contract sub-session binds no
+  scenario, and its gate still runs the declared ones. A provider or
+  follow-up item's engineer does get the scenario half (the scope's declared
+  scenarios, none pending of its own), and its tool description and system
+  prompt mention it; its briefing message says nothing about scenarios.
+- **The binding also reaches the local architect after a pass.** The
+  architecture has the architect see it "in the gate section"; the gate
+  sections exist for failing gates, so an accepted iteration's section lists
+  what its gate passed with each binding.
+- **The local architect's system prompt is unchanged** (file version 1);
+  its procedure (version 2) and its submission schema changed, so the package
+  is `local-architect/2`.
+- **`assignment.scenarios` stays optional on `iteration-assignment/1`**, as
+  iteration 7 added `scenarios` to the submissions without a version: an
+  additive optional field.
+
+### Open items
+
+- Iteration 10: the scenario query and the run page may show the
+  `scope-tests` observation's `scenarios` and an accepted gate's bindings.
+- The engineer is told the owner's step directory; a run of the owner's
+  scenarios loads only that module's step files, so step definitions in
+  another module of the write scope bind only through an import from them.
+  The rule's wording follows §6.
+- A symbol-free-load rule for testing source remains the toolkit's to add.

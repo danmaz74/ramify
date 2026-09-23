@@ -1,6 +1,8 @@
-import { chmod, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { chmod, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import type { CommandRequest, CommandRun } from '../../../subs/evidence/src/run-command.js';
 import { projectConfigSchema, type ProjectConfig } from '../../run/records.js';
+import { commandResult } from './command-result.js';
 
 /*
  * The project configuration a test project needs to pass readiness's
@@ -100,4 +102,61 @@ export async function installScriptedCucumber(path: string): Promise<void> {
   await writeFile(path, scriptedCucumber);
   await chmod(path, 0o755);
   await writeFile(join(dirname(path), 'scripted-cucumber.mjs'), scriptedCucumberProgram);
+}
+
+/**
+ * The scripted `cucumber-js` answered in the test's own process, for a test
+ * whose command runner is a function rather than an installed program: the
+ * same selection and the same stream as `scriptedCucumberProgram`, read from
+ * the profile the request names. Undefined for a request with no `--config`.
+ */
+export async function scriptedScenarioRun(request: CommandRequest): Promise<CommandRun | undefined> {
+  const at = request.argv.indexOf('--config');
+  if (at < 0 || request.argv[at + 1] === undefined) return undefined;
+  // The profile is the module `buildScenarioProfile` writes, one JSON value
+  // per property line, so it is read as text rather than imported.
+  const text = await readFile(resolve(request.cwd, request.argv[at + 1]!), 'utf8');
+  const property = <T>(name: string): T | undefined => {
+    const found = new RegExp(`^  ${name}: (.+),$`, 'mu').exec(text);
+    return found === null ? undefined : JSON.parse(found[1]!) as T;
+  };
+  const profile = { format: property<string[]>('format'), tags: property<string>('tags'), paths: property<string[]>('paths') };
+  const format = (profile.format ?? []).find(entry => entry.startsWith('message:'));
+  if (format === undefined) return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });
+
+  const expression = profile.tags ?? null;
+  const selects = (tags: readonly string[]): boolean => {
+    if (expression === null) return true;
+    if (expression.startsWith('not ')) return !tags.includes(expression.slice(4).trim());
+    return expression.split(' or ').some(tag => tags.includes(tag.trim()));
+  };
+  const features: string[] = [];
+  const walk = async (path: string): Promise<void> => {
+    const found = await stat(path).catch(() => null);
+    if (found === null) return;
+    if (found.isDirectory()) for (const name of (await readdir(path)).sort()) await walk(join(path, name));
+    else if (path.endsWith('.feature')) features.push(path);
+  };
+  for (const path of profile.paths ?? []) await walk(resolve(request.cwd, path));
+
+  const time = { seconds: 0, nanos: 0 };
+  const messages: unknown[] = [{ testRunStarted: { timestamp: time } }];
+  for (const file of features) {
+    const uri = relative(request.cwd, file).split(sep).join('/');
+    for (const line of (await readFile(file, 'utf8')).split('\n')) {
+      const tags = line.trim().split(/\s+/);
+      const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
+      if (identity === undefined || !selects(tags)) continue;
+      const id = identity.slice('@ramify-'.length);
+      messages.push(
+        { pickle: { id: `pickle-${id}`, uri, name: id, language: 'en', astNodeIds: [`node-${id}`], tags: tags.map(name => ({ name, astNodeId: `tag-${name}` })), steps: [] } },
+        { testCase: { id: `case-${id}`, pickleId: `pickle-${id}`, testSteps: [] } },
+        { testCaseStarted: { id: `started-${id}`, testCaseId: `case-${id}`, attempt: 0, timestamp: time } },
+        { testCaseFinished: { testCaseStartedId: `started-${id}`, willBeRetried: false, timestamp: time } },
+      );
+    }
+  }
+  messages.push({ testRunFinished: { success: true, timestamp: time } });
+  await writeFile(format.slice('message:'.length), `${messages.map(message => JSON.stringify(message)).join('\n')}\n`);
+  return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });
 }

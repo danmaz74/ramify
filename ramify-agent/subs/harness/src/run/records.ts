@@ -682,6 +682,8 @@ export const runLayout = {
   shellOutput: (id: InvocationId, call: number): string => join('invocations', id, 'shell', `${String(call).padStart(3, '0')}.log`),
   /** What one post-write hook check printed, which its observation names. */
   hookOutput: (id: InvocationId, check: number): string => join('invocations', id, 'hooks', `${String(check).padStart(3, '0')}.json`),
+  /** The profiles, streams and log of one scenario check `run_scope_tests` ran. */
+  scopeScenarios: (id: InvocationId, call: number): string => join('invocations', id, 'scenarios', String(call).padStart(3, '0')),
 } as const;
 
 /** The schema literal of each record kind, for a reader that answers unsupported version. */

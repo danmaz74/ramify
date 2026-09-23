@@ -87,6 +87,16 @@ export const observationSchema = z.discriminatedUnion('type', [
     notVerified: z.string().nullable(),
     exitCode: z.int().nullable(),
     elapsedMs: z.int().nonnegative(),
+    /**
+     * The scenario check the call ran beside the tests, where the run tracks
+     * scenarios: the ones it selected, the ones that passed, and how many
+     * reasons it did not pass.
+     */
+    scenarios: z.object({
+      selected: z.array(z.string()),
+      passed: z.array(z.string()),
+      failures: z.int().nonnegative(),
+    }).strict().optional(),
   }).strict()),
   /** Always an estimate; `tokens: null` is unknown and never room. */
   observation('context', z.object({

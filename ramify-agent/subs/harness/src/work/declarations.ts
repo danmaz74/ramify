@@ -28,13 +28,19 @@ export interface DeclarationContext {
   readonly records: readonly ScenarioRecord[];
 }
 
+/** The scenarios of one work item: its entry's, or an integration work item's one scenario; none for any other. */
+export function ownScenarios(context: DeclarationContext): string[] {
+  const integration = context.integration ?? null;
+  return integration !== null
+    ? [integration]
+    : context.records.filter(record => record.kind === 'entry' && record.entry !== null && record.entry === context.entry).map(record => record.id);
+}
+
 /** Every reason the declared IDs cannot be accepted, each at its path. */
 export function declarationErrors(ids: readonly string[], context: DeclarationContext, path = 'scenarios'): SubmissionError[] {
   const records = new Map(context.records.map(record => [record.id, record]));
   const integration = context.integration ?? null;
-  const own = integration !== null
-    ? [integration]
-    : context.records.filter(record => record.kind === 'entry' && record.entry !== null && record.entry === context.entry).map(record => record.id);
+  const own = ownScenarios(context);
   const expected = own.length === 0 ? 'an empty list: this work item has no scenarios' : `IDs among ${own.join(', ')}`;
   const errors: SubmissionError[] = [];
   ids.forEach((id, index) => {
@@ -86,4 +92,28 @@ export function scenariosToDeclare(ids: readonly string[], states: ScenarioState
     if (states.get(id) === 'pending' && !moved.includes(id)) moved.push(id);
   }
   return moved;
+}
+
+/**
+ * Every reason an assignment's `scenarios` cannot name these IDs. The list is
+ * informative, the scenarios the iteration is expected to bind, so it names
+ * scenarios of this work item in any state; binding them is still declared
+ * by the engineer, and the harness never requires exactly these.
+ */
+export function assignedScenarioErrors(ids: readonly string[], context: DeclarationContext, path = 'assignment.scenarios'): SubmissionError[] {
+  const known = new Set(context.records.map(record => record.id));
+  const own = ownScenarios(context);
+  const expected = own.length === 0 ? 'no scenarios: this work item has none' : `IDs among ${own.join(', ')}`;
+  const errors: SubmissionError[] = [];
+  ids.forEach((id, index) => {
+    if (own.includes(id)) return;
+    errors.push({
+      path: `${path}.${index}`,
+      message: known.has(id)
+        ? `${id} is not a scenario of this work item, so no iteration of it binds ${id}`
+        : `"${id}" is no tracked scenario of this run`,
+      expected,
+    });
+  });
+  return errors;
 }

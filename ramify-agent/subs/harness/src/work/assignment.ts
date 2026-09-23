@@ -6,6 +6,7 @@ import { planRefSchema } from '../run/records.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
 import { extraPurposeSchema } from './iterations.js';
+import { assignedScenarioErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
 
@@ -107,6 +108,12 @@ export const assignmentBodySchema = z.object({
    * fills the revision: a submission never chooses one.
    */
   revisesContract: text.optional(),
+  /**
+   * The scenarios of this work item the iteration is expected to bind. It is
+   * informative: their text reaches the engineer under "Scenarios to bind",
+   * and the harness never requires that the engineer declare exactly these.
+   */
+  scenarios: z.array(text).optional(),
 }).strict();
 export type AssignmentBody = z.infer<typeof assignmentBodySchema>;
 
@@ -129,6 +136,8 @@ export interface AssignmentEvidence {
    * ancestor with the children on the paths to the sub-scenarios' owners.
    */
   readonly integration?: IntegrationScope | undefined;
+  /** The work item's scenarios and the run's tracked ones, which `scenarios` is judged against. */
+  readonly scenarios?: DeclarationContext | undefined;
 }
 
 /** The registry entry that authorizes creating `module`, or undefined when none does. */
@@ -346,6 +355,12 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
         });
       }
     }
+  }
+
+  // The scenarios named for the engineer are this work item's: an iteration
+  // binds nothing another work item owns.
+  if (body.scenarios !== undefined && body.scenarios.length > 0) {
+    errors.push(...assignedScenarioErrors(body.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
   }
 
   const stages = evidence.outline?.stages.length ?? 0;

@@ -150,8 +150,12 @@ hiding or measured complexity justifies it.
     it. Each command that did not pass is named with what it reported: a
     Ramify check's findings, worded by the one function that words a finding
     anywhere, or the bounded end of the command's own output where it
-    reported no structure. The local architect also receives what a module
-    violation leaves it to decide.
+    reported no structure. A scenario check is read from its summary
+    instead: each tracked scenario that did not pass with its name, file and
+    line, its failing step, its bounded message and the steps no definition
+    matched; each one that passed with the definition that bound each step
+    as `uri:line`; and the check's other failure lines. The local architect
+    also receives what a module violation leaves it to decide.
 - `run/`: implementation runs. A run is a job, and the only durable authority
   of one is its `events.jsonl`: one flushed line is one transition, carrying
   the bodies of every record it commits, and the files beneath the run are
@@ -307,7 +311,10 @@ hiding or measured complexity justifies it.
   - `engineer.ts`: what an engineer submits, its own test tool, and the
     briefing it starts from. `run_scope_tests` takes nothing: the assignment
     and the files its policy selects are the harness's, and it resolves them
-    anew on every call. Beside it the engineer receives `shell`, which the
+    anew on every call. Where the run tracks scenarios it also runs the
+    scope's scenarios in quick mode, selected by identity as an iteration
+    gate selects them plus the work item's pending ones, and reports each
+    one; its profiles and streams go beneath the invocation. Beside it the engineer receives `shell`, which the
     `tools/` directory owns. `contract-needed` is how it reports that the
     behavior it needs is owned elsewhere: the need is stated as behavior, its
     turn ends there, and no session of its own is started for it.
@@ -328,6 +335,17 @@ hiding or measured complexity justifies it.
     registry, and the placement decided for it — its own, and the
     consequences of a decision that names it. Where a view cannot be materialized the message says so, so
     that absence is never read as a refusal.
+  - `scenario-briefing.ts`: what the briefings say of a work item's
+    scenarios (architecture §6). The local architect is given every
+    scenario of its entry with its ID, state, text, feature file and, for a
+    sub-scenario, the integration scenario it came from; the engineer each
+    one not implemented, the ones `assignment.scenarios` names under
+    "Scenarios to bind", the rules of binding and the request for named
+    imports of another owner's step files; an integration item's engineer
+    its scenario and the step files it imports. A provider or follow-up work
+    item's briefings say nothing about scenarios. `assignment.scenarios` is
+    informative: the judge accepts only scenarios of the work item, and no
+    engineer must declare exactly those.
 - `contracts/`: one agreement between a consumer and a provider, and the
   scheduling it creates. Nothing here writes the log; the run drives it.
   - `records.ts`: the `ContractRecord`, the one `ProviderObligation` keyed
@@ -890,6 +908,15 @@ The run's own tests are beside them.
   completion and gives the tree to the installed Ramify, which accepts the
   ancestor's named imports of both step files and refuses one once its
   `expose-test` is removed. Both share `helpers/integration-scenario.ts`.
+- `scenario-briefings.test.ts` covers what the agents are told of
+  scenarios: the local architect's section per scenario, the engineer's
+  "Scenarios to bind", other unimplemented scenarios and rules, the
+  integration engineer's section and a provider's silence;
+  `assignment.scenarios`' judge; `run_scope_tests` with a scripted runner
+  over the recorded streams; and the diagnostics rendered from a recorded
+  failing stream. `helpers/project-config.ts`' `scriptedScenarioRun` answers
+  a scenario run in the test's own process where the command runner is a
+  function, and the composition states each one.
 - `analysis-scenarios.test.ts` captures plans with and without `gherkin`
   blocks and with one that does not parse, rejects a submission per form
   rule through the real validation path and under the per-turn bound, and

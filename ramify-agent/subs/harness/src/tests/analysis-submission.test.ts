@@ -391,7 +391,7 @@ describe('the prompt package', () => {
     // Each role is offered exactly the members a run of this iteration
     // produces, and no other.
     const local = manifest.packages['local-architect']!;
-    expect(local.package).toBe('local-architect/1');
+    expect(local.package).toBe('local-architect/2');
     expect(local.submissionKinds).toEqual(['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved']);
 
     const fork = manifest.packages['global-fork']!;
@@ -400,7 +400,7 @@ describe('the prompt package', () => {
     expect(fork.hash).toMatch(/^[0-9a-f]{64}$/);
 
     const engineer = manifest.packages['engineer']!;
-    expect(engineer.package).toBe('engineer/1');
+    expect(engineer.package).toBe('engineer/2');
     expect(engineer.submissionKinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'contract-needed']);
     expect(engineer.hash).toMatch(/^[0-9a-f]{64}$/);
 

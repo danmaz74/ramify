@@ -207,6 +207,7 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
       ...(evidence.contracts === undefined ? {} : { contracts: evidence.contracts }),
       ...(evidence.guardedPaths === undefined ? {} : { guardedPaths: evidence.guardedPaths }),
       ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
+      ...(evidence.scenarios === undefined ? {} : { scenarios: evidence.scenarios }),
     }),
   ];
   return errors.length === 0 ? shape : { ok: false, errors };

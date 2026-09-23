@@ -128,6 +128,22 @@ describe('the integration work item', () => {
     expect(briefing).toContain(`- \`${tags}\`, in \`${tagsDirectory}/src/tests/steps/\`: \`${tagSteps}\`.`);
     expect(briefing).toContain(`Assign an iteration whose scope base is \`${reviews}\` with the children \`${notes}\`, \`${tags}\` included`);
     expect(briefing).toContain(`writes a step file in \`${reviewsDirectory}/src/tests/steps/\``);
+    // Its origin is the integration scenario, so it has no entry scenarios of its own.
+    expect(briefing).not.toContain('## The scenarios of this work item');
+    // An entry's local architect is given its entry's scenario, and the integration scenario it came from.
+    const entryBriefing = sessions.find(session => session.spec.role === 'local-architect' && session.spec.prompt.startsWith('# Work item wi-001'))!.spec.prompt;
+    expect(entryBriefing).toContain('## The scenarios of this work item');
+    expect(entryBriefing).toContain(`### sc-001 (pending): A note is written for tagging\n\n- Feature file: \`${noteFeature}\`.\n- A sub-scenario of the integration scenario \`sc-003\``);
+    // Its engineer, each scenario not implemented and the rules; the
+    // integration item's engineer, the scenario and the step files it imports.
+    const engineerOf = (iteration: string) => sessions.find(session => session.spec.role === 'engineer' && session.spec.prompt.startsWith(`# Iteration ${iteration}`))!.spec.prompt;
+    expect(engineerOf('wi-001.i01')).toContain('### sc-001 (pending): A note is written for tagging');
+    expect(engineerOf('wi-001.i01')).toContain('## Binding a scenario');
+    const binder = engineerOf('wi-003.i01');
+    expect(binder).toContain('## The integration scenario to bind: sc-003 (pending): A written note is shown with its tag');
+    expect(binder).toContain(`- \`${notes}\`, in \`${notesDirectory}/src/tests/steps/\`: \`${noteSteps}\`.`);
+    expect(binder).toContain(`- Write one step file in \`${reviewsDirectory}/src/tests/steps/\``);
+    expect(binder).not.toContain('## Binding a scenario');
     // The narrower scope was refused through the judge, with the one expected.
     const architect = sessions.find(session => session.spec.prompt.startsWith('# Work item wi-003'))!;
     const refused = JSON.parse((architect.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string; expected: string }> };
@@ -207,6 +223,10 @@ describe('the integration work item', () => {
     expect(repair).toContain('- composition failure: `sc-003` failed while its sub-scenarios `sc-001`, `sc-002` passed, so their step definitions work one by one and not together.');
     expect(repair).toContain('  - The bridging Given of `sc-002` is suspect: "Given a note was written with review-note" assumes what the real behavior may not do.');
     expect(repair).not.toContain('The bridging Given of `sc-001`');
+    // And the failing scenario itself, with its name, file, line, step and
+    // message; each passing one with its binding.
+    expect(repair).toMatch(/ {2}- `sc-003` "A written note is shown with its tag" failed, at `[^`]+\.feature:\d+`:\n {4}- The failing step: `Then the outcome review-tags promises is shown`\.\n {4}- Its message: expected the tag on the note, got no note/);
+    expect(repair).toMatch(/ {2}- `sc-001` "A note is written for tagging" passed/);
     // The scenario stayed declared through the repair and was implemented by the passing attempt.
     expect(log.filter(event => (event.type === 'scenario-declared' || event.type === 'scenario-implemented') && (event.data as { scenario: string }).scenario === 'sc-003')
       .map(event => event.type)).toEqual(['scenario-declared', 'scenario-implemented']);

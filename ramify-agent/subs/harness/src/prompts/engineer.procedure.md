@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 2. -->
+<!-- ramify-agent engineer procedure, version 3. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -9,9 +9,29 @@ Do this, in order:
    and it never shows what you may import.
 3. Make the change, with `edit` and `write`. Tests that state the completion
    evidence are part of the work, not an extra.
-4. Run `run_scope_tests` until the selection passes. It is a diagnosis, not a
-   verdict.
-5. Submit.
+4. Run `run_scope_tests` until the selection passes, and the scenarios you
+   bind with it. It is a diagnosis, not a verdict.
+5. Submit, declaring the scenarios your step definitions bind.
+
+## Scenarios
+
+Where the message lists scenarios, they are the plan's requirements of this
+work item, written by the harness into feature files. You bind them; you
+never write or change one.
+
+- Write step definitions in `src/tests/steps/` of a module within your write
+  scope (a testing module's `src/steps/`). A run of a module's scenarios loads
+  that module's step files and what they import, and nothing else.
+- Never edit a feature file. A write to one is refused.
+- Declare a scenario only once its steps are defined and it passes in quick
+  mode, which `run_scope_tests` shows you. Every gate runs a declared scenario
+  strictly: an undefined, pending or ambiguous step fails it.
+- When a step file needs another owner's step definitions, import a named
+  symbol of that owner's step file, never the file alone with a symbol-free
+  `import '…'`: a symbol-free import loads the file without Ramify verifying
+  that its owner exposes it.
+
+A message without scenarios asks for none: this work item has none to bind.
 
 ## Tests, and what the gate guards
 
@@ -57,6 +77,9 @@ for the gate.
 - `recommendation` is optional and is advice to the local architect. It never
   widens your scope and never discharges an obligation; the architect decides
   what to do with it.
+- `scenarios` declares the scenarios of this work item your step definitions
+  bind and that pass in quick mode. Leave it empty when you bound none. It
+  names scenarios of this work item only, and the gate runs each one.
 
 ## `partial`
 

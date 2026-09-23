@@ -7,6 +7,7 @@ import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
 import type { IterationApiViews } from './engineer.js';
 import type { IntegrationBriefing } from './integration.js';
+import { architectScenarioSection, type BriefedScenario } from './scenario-briefing.js';
 import type { WorkItem, WorkItemOutline } from './records.js';
 
 /*
@@ -127,6 +128,8 @@ export interface WorkItemBriefing {
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   /** For an integration work item: its scenario, the sub-scenarios, their owners' step files and the engineer's scope. */
   readonly integration?: IntegrationBriefing | undefined;
+  /** For an entry's work item: every scenario of its entry, with its state. */
+  readonly scenarios?: readonly BriefedScenario[] | undefined;
   /** The iteration this architect last assigned, as the harness closed it. */
   readonly lastIteration?: {
     readonly id: string;
@@ -136,6 +139,8 @@ export interface WorkItemBriefing {
     readonly commit: string | null;
     /** The gate that returned it, where one did, with what each failing command reported. */
     readonly gate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
+    /** The scenarios its passing gate ran, each with the step definitions that bound it. */
+    readonly scenarios?: readonly string[] | undefined;
   } | undefined;
 }
 
@@ -191,6 +196,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     'Tests that state the acceptance are part of the work.',
     '',
     ...(briefing.integration === undefined ? [] : integrationSection(briefing.integration)),
+    ...architectScenarioSection(briefing.scenarios ?? []),
     '## Your module',
     '',
     `- Declared name: \`${item.module}\`.`,
@@ -305,7 +311,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   if (delegation?.blocked !== undefined && delegation.blocked.length > 0) {
     lines.push('## Completion was refused', '');
     for (const reason of delegation.blocked) lines.push(`- ${reason}`);
-    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider.', '');
+    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a scenario is implemented when a gate passes it after its declaration, so declare with the request the ones existing step definitions bind, and assign an iteration that writes the step definitions for the others.', '');
   }
 
   if (briefing.unresolvedRequest !== undefined) {
@@ -329,6 +335,11 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     if (last.gate !== undefined) {
       lines.push('', `Its gate \`${last.gate.id}\` did not pass${last.gate.cause === null ? '' : ` (${last.gate.cause})`}. What ran, and what it reported:`, '');
       lines.push(...last.gate.summary);
+    }
+    if (last.scenarios !== undefined && last.scenarios.length > 0) {
+      lines.push('', 'The scenarios its gate passed, and the step definition that bound each step:', '');
+      lines.push(...last.scenarios);
+      lines.push('', 'A definition outside the owner\'s own step files reached the run through an import, which Ramify verified.');
     }
     lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');
   }

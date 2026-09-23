@@ -3,6 +3,7 @@ import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { commandResult } from './helpers/command-result.js';
+import { scriptedScenarioRun } from './helpers/project-config.js';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -196,7 +197,11 @@ describe('a rejected submission in a run', () => {
     });
     await installMiniRunner(fixture.root);
     const { service, agent } = await openRuns(fixture.root, {
-      commandExecution: request => {
+      commandExecution: async request => {
+        // The tool runs the scope's scenarios beside its tests, answered by
+        // the scripted runner in this process.
+        const scenarios = await scriptedScenarioRun(request);
+        if (scenarios !== undefined) return scenarios;
         expect(request.argv).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
         return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });
       },
@@ -319,13 +324,20 @@ describe('a rejected submission in a run', () => {
     expect(answer.isError).toBe(false);
     expect(answer.text).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
     expect(answer.text).toContain('Outcome: passed');
+    // The work item's pending scenario ran beside the tests, selected by its
+    // identity although nothing has declared it, and passed.
+    expect(answer.text).toContain('Scenarios: passed; quick mode, selected by identity: sc-001.');
+    expect(answer.text).toMatch(/- `sc-001` ".+" passed, at `.+\.feature:\d+`, with no step bound\./);
 
     const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0003')), 'utf8'))
-      .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { resolved?: string[]; outcome?: string } });
+      .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { resolved?: string[]; outcome?: string; scenarios?: unknown } });
     const ran = observations.filter(line => line.type === 'scope-tests');
     expect(ran).toHaveLength(1);
     expect(ran[0]!.data.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
     expect(ran[0]!.data.outcome).toBe('passed');
+    expect(ran[0]!.data.scenarios).toEqual({ selected: ['sc-001'], passed: ['sc-001'], failures: 0 });
+    // Its profile and stream are the invocation's, outside the worktree.
+    expect(existsSync(runPath(root, 'review-notes', runId, join(runLayout.scopeScenarios('inv-0003', 1), 'scenarios.log')))).toBe(true);
     expect(existsSync(join(root, notesDirectory, 'src', 'notes.ts'))).toBe(true);
   }, 300_000);
 });

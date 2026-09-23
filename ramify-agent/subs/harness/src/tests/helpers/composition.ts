@@ -21,6 +21,7 @@ import {
 } from './iterations.js';
 import { decision as decisionBody, forkDecision, forkPartial, localDecision, registryChange, requestPlacement } from './placement.js';
 import { commandResult } from './command-result.js';
+import { scriptedScenarioRun } from './project-config.js';
 import { directReadinessExecution } from './external-tools.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
 import {
@@ -124,6 +125,12 @@ export interface StatedCommand {
   readonly stdout?: string | undefined;
   /** What the command is stated to leave in the project. */
   readonly leaves?: ((root: string) => Promise<void>) | undefined;
+  /**
+   * A scenario run: `argv` is the mode's command, which `--config` and the
+   * profile the harness wrote follow, and the scripted runner answers it
+   * from that profile.
+   */
+  readonly scenarios?: boolean | undefined;
 }
 
 /**
@@ -144,8 +151,11 @@ export function statedCommands(root: string, commands: readonly StatedCommand[])
     const stated = commands[cursor];
     const expectedArgv = stated?.argv(root);
     const expectedCwd = stated?.cwd?.(root) ?? root;
+    const received = stated?.scenarios === true && request.argv.length === (expectedArgv?.length ?? 0) + 2 && request.argv.at(-2) === '--config'
+      ? request.argv.slice(0, -2)
+      : request.argv;
     if (stated === undefined || expectedArgv === undefined
-      || JSON.stringify(request.argv) !== JSON.stringify(expectedArgv) || request.cwd !== expectedCwd) {
+      || JSON.stringify(received) !== JSON.stringify(expectedArgv) || request.cwd !== expectedCwd) {
       const expected = stated === undefined
         ? `only ${commands.length} command response(s) were stated`
         : `expected \`${expectedArgv.join(' ')}\` in ${expectedCwd}`;
@@ -155,6 +165,7 @@ export function statedCommands(root: string, commands: readonly StatedCommand[])
     }
     cursor += 1;
     await stated.leaves?.(root);
+    if (stated.scenarios === true) return (await scriptedScenarioRun(request))!;
     return commandResult(request, {
       outcome: { kind: 'completed', exitCode: stated.exitCode ?? 0 },
       ...(stated.stdout === undefined ? {} : { stdout: stated.stdout }),
@@ -244,6 +255,9 @@ const scopeTestRun = (...files: string[]): StatedCommand => ({
   argv: root => [join(root, 'node_modules', '.bin', 'vitest'), 'run', ...files],
 });
 
+/** The quick scenario run `run_scope_tests` makes beside the tests, with the fixture's configured command. */
+const scopeScenarioRun: StatedCommand = { argv: () => ['npm', 'run', 'acceptance:quick', '--'], scenarios: true };
+
 /** The command the iteration's engineer runs through the unguarded shell. */
 const shellCommand = `rm -r ${draftsDirectory} && printf "left by the shell\\n" > shell-note.txt`;
 
@@ -261,8 +275,12 @@ const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
 const iteration: Scenario = {
   name: 'iteration',
   commands: [
+    // Each call of the engineer's test tool runs the tests, then the scope's
+    // scenarios: the work item's pending one, selected by its identity.
     { ...scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`), exitCode: 1 },
+    scopeScenarioRun,
     scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`),
+    scopeScenarioRun,
     {
       // What the shell leaves: the child module gone, and a note outside
       // every module. It is stated here and written directly; no shell runs.
@@ -709,6 +727,9 @@ const repair: Scenario = {
  */
 const testless: Scenario = {
   name: 'testless',
+  // The engineer's test tool finds no test to run, and still runs the work
+  // item's pending scenario.
+  commands: [scopeScenarioRun],
   // The owner has no test of its own: its iteration checkpoint is not
   // verified and commits nothing, and neither checkpoint that follows has
   // anything to commit after the feature files.

@@ -9,6 +9,7 @@ import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { declarationErrors } from '../work/declarations.js';
 import { validateEngineer } from '../work/engineer.js';
+import { iterationLayout } from '../work/iterations.js';
 import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
@@ -292,11 +293,11 @@ describe('§8: providers, fakes and bound scenarios', () => {
     const feature = featureOf(notesDirectory, 'review-notes');
     const steps = stepsOf(notesDirectory, 'review-notes');
     const seen = new Map<string, string>();
-    const { service, runId, git } = await run(root, {
+    const { service, runId, git, agent } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
       'local-architect': [
         submit({ ...assign(notes, {}, outline()), localDecisions: [placeTheLimit] }),
-        submit(assign(notes, { goal: 'Bind the scenario against the fake.' })),
+        submit(assign(notes, { goal: 'Bind the scenario against the fake.', scenarios: ['sc-001'] })),
         submit(yieldFor(['rq-001'])),
         submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit.' }))),
         submit(requestCompletion()),
@@ -373,6 +374,26 @@ describe('§8: providers, fakes and bound scenarios', () => {
     expect(summaryOf(itemGate)).toMatchObject({ selection: { kind: 'all-untagged' }, scenarios: [{ id: 'sc-001', status: 'passed' }] });
     expect(log.find(event => event.type === 'scenario-implemented')!.data).toEqual({ scenario: 'sc-001', gate: itemGate.id });
     expect(onlyRun(service, plan).counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 1 });
+
+    // The briefings: the assigned scenario under "Scenarios to bind", its
+    // state as each architect turn finds it, and nothing about scenarios for
+    // the provider work item.
+    const sessions = agent!.sessions;
+    const prompt = (role: string, start: string) => sessions.filter(session => session.spec.role === role && session.spec.prompt.startsWith(start)).map(session => session.spec.prompt);
+    const assigned = JSON.parse(readFileSync(runPath(root, plan, runId, iterationLayout.assignment('wi-001', 3)), 'utf8')) as { scenarios?: string[] };
+    expect(assigned.scenarios).toEqual(['sc-001']);
+    expect(prompt('engineer', '# Iteration wi-001.i03')[0]).toContain('## Scenarios to bind\n\nThe architect expects this iteration to bind these:\n\n### sc-001 (pending)');
+    expect(prompt('engineer', '# Iteration wi-001.i04')[0]).toContain('### sc-001 (bound)');
+    const architect = prompt('local-architect', '# Work item wi-001');
+    expect(architect[0]).toContain('### sc-001 (pending)');
+    expect(architect.some(text => text.includes('### sc-001 (bound)'))).toBe(true);
+    // After requirement-verified it is due, and the architect finds it declared.
+    expect(architect.at(-1)).toContain('### sc-001 (declared)');
+    for (const text of [...prompt('engineer', '# Iteration wi-002'), ...prompt('local-architect', '# Work item wi-002')]) {
+      expect(text).not.toContain('## The scenarios of this work item');
+      expect(text).not.toContain('## Binding a scenario');
+    }
+    expect(prompt('engineer', '# Iteration wi-002')).toHaveLength(1);
     git.assertAnswered();
   }, 120_000);
 });
@@ -606,11 +627,11 @@ describe('§7: withdrawal', () => {
     const steps = stepsOf(notesDirectory, 'review-notes');
     const feature = featureOf(notesDirectory, 'review-notes');
     let failed = false;
-    const { service, runId, git } = await run(root, {
+    const { service, runId, git, agent } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
       'local-architect': [
         submit({ ...assign(notes, {}, outline()), localDecisions: [placeTheLimit] }),
-        submit(assign(notes, { goal: 'Bind the scenario against the fake.' })),
+        submit(assign(notes, { goal: 'Bind the scenario against the fake.', scenarios: ['sc-001'] })),
         submit(yieldFor(['rq-001'])),
         submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit.' }))),
         submit(requestCompletion()),

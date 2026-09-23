@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { findingsOf, sentenceOf, type HookFinding } from '../hooks/post-write.js';
-import type { GateAttempt, GateAttribution, GateCommandRecord } from './records.js';
+import type { GateAttempt, GateAttribution, GateCommandRecord, ScenarioCheckSummary } from './records.js';
 
 /*
  * What a failing gate says to the agent that receives it.
@@ -70,8 +70,17 @@ export async function ramifyFindingsOf(command: GateCommandRecord): Promise<Hook
  * or the output of each one that did not pass, and, for the local
  * architect, what a module violation leaves it to decide. The lines are
  * placed as they are; nothing that reads them prefixes them again.
+ *
+ * A scenario check is read from its summary rather than quoted: each
+ * scenario that did not pass with its file and line, its failing step, the
+ * message and the steps no definition matched, and each one that passed
+ * with its binding. `names` gives each tracked scenario's name.
  */
-export async function gateDiagnostics(gate: GateAttempt, audience: GateAudience): Promise<GateDiagnostics> {
+export async function gateDiagnostics(
+  gate: GateAttempt,
+  audience: GateAudience,
+  names: ReadonlyMap<string, string> = new Map(),
+): Promise<GateDiagnostics> {
   const summary: string[] = [];
   let findings: HookFinding[] = [];
   for (const command of gate.commands) {
@@ -79,6 +88,17 @@ export async function gateDiagnostics(gate: GateAttempt, audience: GateAudience)
       ? `not verified (${command.notVerified ?? 'unknown'})`
       : command.outcome;
     const exit = command.exitCode === null ? '' : `, exit ${command.exitCode}`;
+    if (command.kind === 'scenarios' && command.scenarios !== undefined) {
+      const passed = command.outcome === 'passed';
+      const lines = scenarioCheckLines(command.scenarios, names, { indent: '  ', only: passed ? 'passed' : 'all' });
+      if (lines.length > 0) {
+        summary.push(passed
+          ? `- \`${command.kind}\`: ${outcome}${exit}; each scenario it passed, and the step definitions that bound it:`
+          : `- \`${command.kind}\`: ${outcome}${exit}; ${describeScenarioCheck(command.scenarios)}:`);
+        summary.push(...lines);
+        continue;
+      }
+    }
     if (command.outcome === 'passed') {
       summary.push(`- \`${command.kind}\`: ${outcome}${exit}`);
       continue;
@@ -123,6 +143,94 @@ function architectRemedy(findings: readonly HookFinding[]): string {
     + `${from} Re-brief the iteration naming what the module already receives and what to use instead, submit`
     + ' `request-placement` where another owner would have to expose a symbol, or re-plan the scope so the work sits'
     + ' with the owner that has what it needs.';
+}
+
+/** How many lines of one scenario's failure message a briefing carries. */
+export const briefedMessageLines = 12;
+
+/** The bound on those lines together, in characters. */
+export const briefedMessageCharacters = 1_500;
+
+/** A failure line of the check about one tracked scenario, which the lines per scenario say in full. */
+const perScenarioFailure = /^sc-\d{3,} (?:passed|failed|undefined|pending|ambiguous|skipped):/;
+
+/** The mode and the selection of one scenario check, in a phrase. */
+export function describeScenarioCheck(summary: ScenarioCheckSummary): string {
+  const selection = summary.selection.kind === 'identity'
+    ? `selected by identity: ${summary.selection.scenarios.join(', ')}`
+    : summary.selection.kind === 'all-untagged' ? 'every scenario without the pending tag' : 'every scenario';
+  return `${summary.mode} mode${summary.dryRun ? ', a dry run' : ''}, ${selection}`;
+}
+
+/**
+ * What one scenario check says, a line per point, each ready to place:
+ * every tracked scenario that did not pass, with its name, its file and
+ * line, the failing step, the message and each step no definition matched;
+ * every one that passed, with the definition that bound each step as
+ * `uri:line`; the project's own scenarios where any did not pass; and every
+ * other reason the check failed. `only: 'passed'` keeps the passed ones.
+ */
+export function scenarioCheckLines(
+  summary: ScenarioCheckSummary,
+  names: ReadonlyMap<string, string> = new Map(),
+  options: { readonly indent?: string; readonly only?: 'all' | 'passed' } = {},
+): string[] {
+  const indent = options.indent ?? '';
+  const only = options.only ?? 'all';
+  const passes = (status: string) => status === 'passed' || (summary.dryRun && status === 'skipped');
+  const lines: string[] = [];
+  const title = (id: string) => (names.has(id) ? `\`${id}\` "${names.get(id)}"` : `\`${id}\``);
+  for (const result of summary.scenarios) {
+    if (passes(result.status)) continue;
+    if (only === 'passed') continue;
+    lines.push(`- ${title(result.id)} ${result.status}, at \`${result.file}:${result.line}\`:`);
+    if (result.failure !== undefined) {
+      lines.push(`  - The failing step: \`${result.failure.step}\`.`);
+      const message = boundedMessage(result.failure.message);
+      if (message.length === 1) lines.push(`  - Its message: ${message[0]}`);
+      else if (message.length > 1) {
+        lines.push('  - Its message:');
+        for (const line of message) lines.push(`        ${line}`);
+      }
+    }
+    if (result.undefined.length > 0) {
+      lines.push(`  - No step definition matches ${result.undefined.map(text => `"${text}"`).join(', ')}.`);
+    }
+  }
+  for (const result of summary.scenarios) {
+    if (!passes(result.status)) continue;
+    if (result.binding.length === 0) {
+      lines.push(`- ${title(result.id)} ${result.status}, at \`${result.file}:${result.line}\`, with no step bound.`);
+      continue;
+    }
+    lines.push(`- ${title(result.id)} ${result.status}, at \`${result.file}:${result.line}\`, bound by:`);
+    for (const binding of result.binding) lines.push(`  - \`${binding.step}\` → \`${binding.definition}\``);
+  }
+  if (only === 'all') {
+    const { passed, skipped, failed } = summary.untracked;
+    if (failed > 0 || (!summary.dryRun && skipped > 0)) {
+      lines.push(`- The project's own scenarios: ${passed} passed, ${skipped} skipped, ${failed} failed.`);
+    }
+    for (const failure of summary.failures) {
+      if (!perScenarioFailure.test(failure)) lines.push(`- ${failure}`);
+    }
+  }
+  return lines.map(line => `${indent}${line}`);
+}
+
+/** The first lines of a failure message, bounded in lines and in characters. */
+function boundedMessage(message: string): string[] {
+  const lines = message.split('\n').map(line => line.trimEnd()).filter(line => line.trim() !== '');
+  const kept: string[] = [];
+  let characters = 0;
+  for (const line of lines.slice(0, briefedMessageLines)) {
+    if (characters + line.length > briefedMessageCharacters) break;
+    characters += line.length;
+    kept.push(line);
+  }
+  if (kept.length === 0 && lines.length > 0) kept.push(`${lines[0]!.slice(0, briefedMessageCharacters)}…`);
+  else if (kept.length < lines.length) kept.push('…');
+  return kept;
 }
 
 /** The last lines of what one command printed, bounded in lines and in characters. */

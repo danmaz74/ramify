@@ -64,7 +64,7 @@ import {
 import { remainingInjections } from '../contracts/verification.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import { creationAuthority } from '../work/assignment.js';
-import { engineerEquipment, type EngineerEquipment, type EquipContext, type Equipment } from '../work/engineer-equipment.js';
+import { engineerEquipment, type EngineerEquipment, type EngineerEquipmentInputs, type EquipContext, type Equipment } from '../work/engineer-equipment.js';
 import {
   engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
@@ -84,12 +84,12 @@ import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js'
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
-import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
+import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
 import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
-import type { ScenarioCheckInputs } from '../checks/checkpoint.js';
+import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
@@ -104,6 +104,7 @@ import type { ScenarioState } from '../../subs/scenarios/src/states.js';
 import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { scenariosToDeclare, type DeclarationContext } from '../work/declarations.js';
 import { dueIntegrations, integrationBriefing, integrationWorkItem, type IntegrationBriefing } from '../work/integration.js';
+import { entryScenariosOf, type EngineerScenarios } from '../work/scenario-briefing.js';
 import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
@@ -1519,6 +1520,11 @@ export class RunService {
         iteration: event.data.iteration,
         detail: (current.results.get(event.data.iteration)?.findings ?? []).join('; '),
       }));
+      // The scenarios of this work item's entry, in the states this turn
+      // finds them, and what the last accepted iteration's gate bound.
+      const scenarioLedger = trackedScenarios(run.log.ledger.replay());
+      const scenarios = entryScenariosOf(scenarioLedger.records, scenarioLedger.states, 'entry' in item.origin ? item.origin.entry : null);
+      const lastScenarios = lastResult === undefined ? [] : await this.passedScenarioLines(run, lastResult);
       const prompt = workItemMessage({
         item,
         plan,
@@ -1549,6 +1555,7 @@ export class RunService {
         },
         ...(unresolvedRequest === undefined ? {} : { unresolvedRequest }),
         ...(integration === undefined ? {} : { integration }),
+        ...(scenarios.length === 0 ? {} : { scenarios }),
         ...(failedGate === undefined ? {} : { failedGate }),
         ...(lastResult === undefined ? {} : {
           lastIteration: {
@@ -1558,6 +1565,7 @@ export class RunService {
             ...(lastResult.recommendation === undefined ? {} : { recommendation: lastResult.recommendation }),
             commit: lastResult.commit,
             ...(lastIterationGate === undefined ? {} : { gate: lastIterationGate }),
+            ...(lastScenarios.length === 0 ? {} : { scenarios: lastScenarios }),
           },
         }),
       });
@@ -2333,6 +2341,7 @@ export class RunService {
       guarded: await captureGuardedFiles(this.projectRoot, artifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run)),
       authorizations,
       ...(revised === undefined ? {} : { revisesContract: refOf(revised.id, revised.revision, revised) }),
+      ...(revised !== undefined || body.scenarios === undefined || body.scenarios.length === 0 ? {} : { scenarios: [...body.scenarios] }),
     } satisfies IterationAssignment);
 
     await this.write(run, revised === undefined
@@ -2371,6 +2380,7 @@ export class RunService {
     readonly scopeRevision: number;
     readonly guarded: GuardedScope;
     readonly tests: TestSelectionPolicy;
+    readonly scenarios?: EngineerEquipmentInputs['scenarios'];
   }): EngineerEquipment {
     return engineerEquipment({
       commandExecution: this.options.commandExecution,
@@ -2383,7 +2393,7 @@ export class RunService {
       ...options,
       outputPath: (kind, invocation, number) => run.path(kind === 'shell'
         ? runLayout.shellOutput(invocation, number)
-        : runLayout.hookOutput(invocation, number)),
+        : kind === 'hook' ? runLayout.hookOutput(invocation, number) : runLayout.scopeScenarios(invocation, number)),
     });
   }
 
@@ -2495,15 +2505,18 @@ export class RunService {
       attempt += 1;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
+      const briefedScenarios = await this.engineerScenarios(run, item);
+      // The engineer's own test run is a diagnosis over the modules it was
+      // given. Where the gate is the whole project, the tool still resolves
+      // this iteration's own modules, with the suites its evidence requires.
+      const probed = assignment.gate.tests.policy === 'all-project'
+        ? { ...scopeProbePolicyOf(assignment.scope.base), extraSuites: [...assignment.gate.tests.extraSuites] }
+        : assignment.gate.tests;
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
-        // The engineer's own test run is a diagnosis over the modules it was
-        // given. Where the gate is the whole project, the tool still resolves
-        // this iteration's own modules, with the suites its evidence requires.
-        tests: assignment.gate.tests.policy === 'all-project'
-          ? { ...scopeProbePolicyOf(assignment.scope.base), extraSuites: [...assignment.gate.tests.extraSuites] }
-          : assignment.gate.tests,
+        tests: probed,
+        scenarios: this.scopeScenarioCheck(run, item, probed),
       });
 
       const result = await this.runInvocation<EngineerSubmission>(run, agent, {
@@ -2519,6 +2532,7 @@ export class RunService {
           views: await this.iterationViews(run, assignment),
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
+          ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
         }),
         start,
         ...(degraded === undefined ? {} : { degraded }),
@@ -4362,6 +4376,49 @@ export class RunService {
   }
 
   /**
+   * The scenario check an engineer's `run_scope_tests` runs beside its
+   * tests: quick mode, the scope's scenarios selected by identity as an
+   * iteration gate selects them, and this work item's pending ones too, so
+   * the engineer sees the scenarios it binds pass before it declares them.
+   * Planned anew on each call; nothing where the run tracks no scenario or
+   * has no scenario harness.
+   */
+  private scopeScenarioCheck(run: Run, item: WorkItem, scope: TestSelectionPolicy): EngineerEquipmentInputs['scenarios'] {
+    const { records } = trackedScenarios(run.log.ledger.replay());
+    if (records.length === 0) return undefined;
+    return {
+      names: new Map(records.map(record => [record.id, record.name])),
+      plan: async () => {
+        const inputs = await this.scenarioInputs(run);
+        if (inputs === undefined) return undefined;
+        const pending = this.unfinishedScenarios(run, item, ['pending']).map(scenario => scenario.id);
+        return planScenarioCheck('iteration', inputs, {
+          projectRoot: this.projectRoot,
+          scope: { exactOwners: scope.exactOwners, subtrees: scope.subtrees },
+          include: pending,
+        });
+      },
+    };
+  }
+
+  /**
+   * What an engineer is told of its work item's scenarios: its entry's, or
+   * an integration work item's one scenario with its sub-scenarios' step
+   * files. Undefined for a provider or follow-up work item, whose briefing
+   * says nothing about scenarios.
+   */
+  private async engineerScenarios(run: Run, item: WorkItem): Promise<EngineerScenarios | undefined> {
+    const tracked = trackedScenarios(run.log.ledger.replay());
+    const integration = integrationScenarioOf(item);
+    if (integration !== null) {
+      const briefing = await this.integrationOfItem(run, item);
+      return briefing === undefined ? undefined : { kind: 'integration', integration: briefing, state: tracked.states.get(integration) ?? 'pending' };
+    }
+    const scenarios = entryScenariosOf(tracked.records, tracked.states, 'entry' in item.origin ? item.origin.entry : null);
+    return scenarios.length === 0 ? undefined : { kind: 'entry', scenarios };
+  }
+
+  /**
    * Applies an accepted declaration: each `pending` scenario it names
    * becomes `bound` while the work item holds fakes, and `declared`
    * otherwise. A `bound`, `declared` or `implemented` one is left as it is.
@@ -4550,9 +4607,24 @@ export class RunService {
    * scenario check shows one.
    */
   private async diagnosticsOf(run: Run, gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
-    const diagnostics = await gateDiagnostics(gate, audience);
-    const composition = compositionLines(gate, trackedScenarios(run.log.ledger.replay()).records);
+    const { records } = trackedScenarios(run.log.ledger.replay());
+    const diagnostics = await gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])));
+    const composition = compositionLines(gate, records);
     return { ...diagnostics, summary: [...diagnostics.summary, ...composition] };
+  }
+
+  /**
+   * The scenarios an accepted iteration's gate passed, each with the step
+   * definitions that bound it, for the local architect: binding is
+   * recorded, not policed, and this is where the architect sees it.
+   */
+  private async passedScenarioLines(run: Run, result: IterationResult): Promise<string[]> {
+    if (result.outcome !== 'accepted' || result.gate === null) return [];
+    const gate = await this.readGate(run, result.gate);
+    const summary = gate?.commands.find(command => command.kind === 'scenarios')?.scenarios;
+    if (summary === undefined) return [];
+    const { records } = trackedScenarios(run.log.ledger.replay());
+    return scenarioCheckLines(summary, new Map(records.map(record => [record.id, record.name])), { only: 'passed' });
   }
 
   private async readGate(run: Run, id: string): Promise<GateAttempt | null> {
