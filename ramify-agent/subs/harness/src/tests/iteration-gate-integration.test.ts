@@ -123,7 +123,11 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(lines.flatMap(summary => summary.paths).map(path => [path.path, path.added, path.deleted] as const).sort()).toEqual(
       delivered.map(path => [path.path, path.added, path.deleted] as const).sort(),
     );
-    expect(await changedPaths(root, result.commit!)).toEqual([]);
+    // Past the accepted commit, the tree holds only the feature file the
+    // work-item gate's commit rendered without its pending tag, once the
+    // completion request declared its scenario.
+    expect(await changedPaths(root, result.commit!)).toEqual([`${notesDirectory}/src/tests/features/review-notes/review-note.feature`]);
+    expect(await changedPaths(root, 'HEAD')).toEqual([]);
     const closed = events.find(event => event.type === 'iteration-closed' && event.data.iteration === result.iteration);
     expect(closed?.type === 'iteration-closed' && closed.data.notices).toEqual([]);
 

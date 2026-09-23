@@ -1,8 +1,9 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { scriptedGit } from './helpers/scripted-git.js';
+import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { commandResult } from './helpers/command-result.js';
+import { scriptedScenarioRun } from './helpers/project-config.js';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -171,6 +172,7 @@ describe('break-discovered', () => {
 
 describe('a rejected submission in a run', () => {
   const completedCheckpoints = [
+    scenariosCommit('review-notes'),
     'wi-001.i01: Carry out the work in collection-review/workspace/reviews/notes.',
     'wi-001',
     'final verification of plan "review-notes"',
@@ -179,7 +181,7 @@ describe('a rejected submission in a run', () => {
   async function run(
     inputs: readonly unknown[],
     toolCalls: readonly unknown[] = [],
-    unchangedCheckpoints: readonly string[] = [],
+    unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
   ) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
@@ -195,7 +197,11 @@ describe('a rejected submission in a run', () => {
     });
     await installMiniRunner(fixture.root);
     const { service, agent } = await openRuns(fixture.root, {
-      commandExecution: request => {
+      commandExecution: async request => {
+        // The tool runs the scope's scenarios beside its tests, answered by
+        // the scripted runner in this process.
+        const scenarios = await scriptedScenarioRun(request);
+        if (scenarios !== undefined) return scenarios;
         expect(request.argv).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
         return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });
       },
@@ -252,7 +258,7 @@ describe('a rejected submission in a run', () => {
 
   test('a rule the schema cannot hold is answered the same way, and the bound ends the invocation', async () => {
     const forged = { kind: 'completion-proposed', summary: 'Done.\nRamify-Gate: ga-0001', findings: [] };
-    const { root, runId, service, agent } = await run([forged, forged, forged, forged]);
+    const { root, runId, service, agent } = await run([forged, forged, forged, forged], [], [scenariosCommit('review-notes')]);
 
     const snapshot = onlyRun(service, 'review-notes');
     expect(snapshot.state).toBe('failed');
@@ -274,6 +280,7 @@ describe('a rejected submission in a run', () => {
     const { root, runId, service, agent } = await run(
       [completionProposed('Left the limit as the plan asks.')],
       [{ suite: 'everything' }, { suite: 'everything' }, { suite: 'everything' }],
+      [scenariosCommit('review-notes')],
     );
 
     const snapshot = onlyRun(service, 'review-notes');
@@ -317,13 +324,20 @@ describe('a rejected submission in a run', () => {
     expect(answer.isError).toBe(false);
     expect(answer.text).toContain(`${notesDirectory}/src/tests/notes.test.ts`);
     expect(answer.text).toContain('Outcome: passed');
+    // The work item's pending scenario ran beside the tests, selected by its
+    // identity although nothing has declared it, and passed.
+    expect(answer.text).toContain('Scenarios: passed; quick mode, selected by identity: sc-001.');
+    expect(answer.text).toMatch(/- `sc-001` ".+" passed, at `.+\.feature:\d+`, with no step bound\./);
 
     const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0003')), 'utf8'))
-      .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { resolved?: string[]; outcome?: string } });
+      .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { resolved?: string[]; outcome?: string; scenarios?: unknown } });
     const ran = observations.filter(line => line.type === 'scope-tests');
     expect(ran).toHaveLength(1);
     expect(ran[0]!.data.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
     expect(ran[0]!.data.outcome).toBe('passed');
+    expect(ran[0]!.data.scenarios).toEqual({ selected: ['sc-001'], passed: ['sc-001'], failures: 0 });
+    // Its profile and stream are the invocation's, outside the worktree.
+    expect(existsSync(runPath(root, 'review-notes', runId, join(runLayout.scopeScenarios('inv-0003', 1), 'scenarios.log')))).toBe(true);
     expect(existsSync(join(root, notesDirectory, 'src', 'notes.ts'))).toBe(true);
   }, 300_000);
 });
@@ -348,11 +362,11 @@ describe('a Ramify module violation in a run', () => {
     const marker = '/* NOT-EXPOSED-IMPORT */';
     const file = `${notesDirectory}/src/notes.ts`;
     const git = scriptedGit(root, { head: 'base', checkpoints: [
+      scenariosCommit('review-notes'),
       { subject: 'wi-001.i01', commit: 'fixed-source', changes: [{ status: 'M', path: file }] },
       { subject: 'wi-001', commit: null, changes: [] },
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
     ] });
-    git.givenWrites();
     const ramify = new FakeRamifyCli();
     const finding = {
       id: `source-diagnostic/1:${file}`, category: 'import', code: 'not-visible',
@@ -371,6 +385,8 @@ describe('a Ramify module violation in a run', () => {
       .mockResolvedValue(answer([]));
     const { service, agent } = await openRunsWithGit(root, {
       inputs: treeInputs(), git, ramify, readinessExecution: directReadinessExecution(),
+      // The engineer's writes are what Git reports once the feature files are committed.
+      afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],

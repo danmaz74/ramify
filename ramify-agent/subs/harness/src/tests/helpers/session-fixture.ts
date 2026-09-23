@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { AgentPort } from '../../../subs/agent/src/interfaces/port.js';
+import { extractPlanScenarios } from '../../../subs/scenarios/src/extraction.js';
 import { createScriptedAgent, type ScriptedAgent, type ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { CheckExecutionPort } from '../../checks/execution.js';
 import { protocolPaths } from '../../interfaces/protocol/paths.js';
@@ -14,7 +17,8 @@ import { assign, byRole, completionProposed, outline, read, submit, treeInputs }
 import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { sharedUi, writeArchitectTreeFixture } from './progress-fixture.js';
 import { emptyAnalysis, runPath, startRun, stopRun, testPolicy, until } from './runs.js';
-import { scriptedGit, type ScriptedGit } from './scripted-git.js';
+import { declaringScenarios } from './declarations.js';
+import { scenariosCommit, scriptedGit, type ScriptedGit } from './scripted-git.js';
 import { runSessionScenario } from './session-scenario.js';
 
 /*
@@ -208,12 +212,24 @@ function pacedEngineer(pacer: Pacer): ScriptStep[] {
   return steps;
 }
 
-/** The live run's script: a placement request, its fork, an iteration and a paced engineer. */
-function liveScript(pacer: Pacer) {
-  return byRole({
+/**
+ * The live run's script: a placement request, its fork, an iteration and a
+ * paced engineer. The entry takes the plan's two scenarios verbatim, and
+ * its completion request declares them.
+ */
+function liveScript(root: string, pacer: Pacer) {
+  const { scenarios } = extractPlanScenarios(readFileSync(join(root, 'plans', sessionPlans.live, 'plan.md'), 'utf8'));
+  return declaringScenarios(byRole({
     'initial-architect': [submit(analysis(
       [entry(tone, sharedUi, 'Gives the status badge a tone its markup carries.')],
       [hypothesis('tone-legend', { change: 'create', suggestedOwner: sharedUi, dependsOn: [tone] })],
+      [],
+      scenarios.map((scenario, index) => ({
+        key: `badge-tone-${index + 1}`,
+        entry: tone,
+        origin: { kind: 'plan' as const, planScenario: scenario.id },
+        gherkin: scenario.source.join('\n'),
+      })),
     ))],
     'local-architect': [
       submit(requestPlacement({
@@ -239,7 +255,7 @@ function liveScript(pacer: Pacer) {
       brief: 'tone-palette is new in the shared UI; badge-tone consumes it.',
     }))],
     engineer: [pacedEngineer(pacer)],
-  });
+  }));
 }
 
 /** The server settings that let the serving process drive the live run. */
@@ -255,9 +271,13 @@ export function liveRunSettings(root: string, pacer: Pacer, checkExecution: Chec
   const planId = sessionPlans.live;
   const git = scriptedGit(root, {
     head: 'session-fixture-live',
-    checkpoints: ['wi-001.i01', 'wi-001', `final verification of plan "${planId}"`].map(subject => ({ subject, commit: null, changes: [] })),
+    checkpoints: [
+      // The run's feature files, committed once readiness has passed.
+      scenariosCommit(planId),
+      ...['wi-001.i01', 'wi-001', `final verification of plan "${planId}"`].map(subject => ({ subject, commit: null, changes: [] })),
+    ],
   });
-  const scripted = createScriptedAgent(liveScript(pacer));
+  const scripted = createScriptedAgent(liveScript(root, pacer));
   return {
     agent: scripted,
     scripted,

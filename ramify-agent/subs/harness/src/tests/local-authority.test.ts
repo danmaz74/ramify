@@ -5,12 +5,13 @@ import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
 import type { RunEvent } from '../run/log.js';
 import { copyFixture } from './helpers/fixture.js';
+import { declaringScenarios } from './helpers/declarations.js';
 import { analysis, entry, hypothesis, requestCompletion } from './helpers/analysis.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
 import { localDecision, registryChange, requestPlacement } from './helpers/placement.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
-import { answeredGit, unchanged } from './helpers/contracts-git.js';
+import { answeredGit, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -58,7 +59,7 @@ function index(events: readonly RunEvent[], predicate: (event: RunEvent) => bool
 describe('G5, G6, G7: local authority, escalation and what a revision reaches', () => {
   test('one architect refines locally, one escalates with counterevidence, and the revision reaches the rest before their work', async () => {
     const project = await target();
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysis(
         [entry('revision-compare', catalogCore, 'Compares two revisions of one record.'),
           entry('compare-card', catalogUi, 'Shows the comparison on the record card.'),
@@ -135,13 +136,14 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
         brief: 'field-order stays in the catalog core; the shared-formatting forecast is superseded.',
       })],
       engineer: [submit(completionProposed('Nothing needed changing for this iteration.'))],
-    }));
+    })));
 
     // Git is answered, not run. No iteration of this scenario writes source,
     // so every commit Git is asked for is one it reports as an unchanged tree.
     const git = answeredGit(project, {
       head: 'revision-00',
       commits: [
+        scenariosCommitted('revision-diff'),
         unchanged('wi-001.i01'), unchanged('wi-001'),
         unchanged('wi-002.i01'), unchanged('wi-002'),
         unchanged('wi-003.i01'), unchanged('wi-003'),
@@ -157,12 +159,13 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
     const runId = receipt.jobId;
     expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed');
 
-    // What the run asked Git: its own branch, one commit for each gate, and
-    // no revision, because nothing in the tree changed. Every answer this
-    // scenario stated was used and nothing else was asked of Git.
+    // What the run asked Git: its own branch, the feature files' commit, one
+    // commit for each gate, and no other revision, because nothing else in
+    // the tree changed. Every answer this scenario stated was used and
+    // nothing else was asked of Git; only the gates' commits are looked up.
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(git.minted()).toEqual([]);
-    expect(git.lookups()).toHaveLength(git.messages().length);
+    expect(git.minted()).toEqual(['scenarios-of-revision-diff']);
+    expect(git.lookups()).toHaveLength(git.messages().length - 1);
     git.assertAnswered();
 
 

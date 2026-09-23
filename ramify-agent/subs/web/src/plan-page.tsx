@@ -33,10 +33,11 @@ export function PlanPage({ client, planId, navigate = hash => { window.location.
   );
 }
 
-/** The plan's implementation runs, newest first, and Start. */
+/** The plan's implementation runs, newest first, and Start, with or without the review stop. */
 function Runs({ client, planId, navigate }: { readonly client: ProtocolClient; readonly planId: string; readonly navigate: (hash: string) => void }) {
   const { state, reload } = useQuery(`runs:${planId}`, () => client.listRuns(planId));
   const [start, setStart] = useState<{ status: 'idle' | 'sending' } | { status: 'failed'; message: string }>({ status: 'idle' });
+  const [reviewStop, setReviewStop] = useState(false);
   const list: RunListResponse | undefined = state.status === 'ready' ? state.data : undefined;
   const running = list?.runs.find(run => run.state === 'running');
 
@@ -45,7 +46,7 @@ function Runs({ client, planId, navigate }: { readonly client: ProtocolClient; r
     setStart({ status: 'sending' });
     try {
       const receipt = await client.sendCommand({
-        commandId: newCommandId(), expectedVersion: 0, type: 'start-run', payload: { planId, agent: list.agent },
+        commandId: newCommandId(), expectedVersion: 0, type: 'start-run', payload: { planId, agent: list.agent, reviewStop },
       });
       setStart({ status: 'idle' });
       navigate(routeHref({ page: 'run', planId, runId: receipt.jobId }));
@@ -63,6 +64,10 @@ function Runs({ client, planId, navigate }: { readonly client: ProtocolClient; r
           {start.status === 'sending' ? 'Starting…' : 'Start a run'}
         </button>
       </header>
+      <label className="review-stop">
+        <input type="checkbox" checked={reviewStop} onChange={event => setReviewStop(event.target.checked)} />
+        {' '}Stop for review after the analysis: the run waits, holding the project and writing nothing, until its analysis is approved.
+      </label>
       {list && list.agent === null && <p className="muted">No agent is configured, so no run can start. The harness starts runs with <code>--agent pi</code> or <code>--agent fake</code>.</p>}
       {list?.agent && <p className="muted">Runs start on the <strong>{list.agent}</strong> agent.{running ? ` Run ${running.jobId} is running; one run runs at a time.` : ''}</p>}
       {start.status === 'failed' && <p className="failure" role="alert">The start was refused: {start.message}</p>}

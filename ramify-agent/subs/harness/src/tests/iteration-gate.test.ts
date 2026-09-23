@@ -6,7 +6,7 @@ import { runLayout } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -42,6 +42,9 @@ const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 /** The revision the fixture is on before a run commits anything. */
 const base = 'revision-00';
+/** The harness's own commit of the run's feature files, made once readiness has passed. */
+const materialized = 'scenarios-00';
+const scenarios = scenariosCommit('review-notes', materialized, base);
 
 /** A boundary Git reports as unchanged, which commits nothing and keeps the accepted revision. */
 const unchanged: GateCommit = { commit: null };
@@ -139,6 +142,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
       // The three attempts that repair nothing change nothing, so Git
       // reports no commit for any of them; the repair is the one revision.
       commits: [
+        scenarios,
         unchanged, unchanged, unchanged,
         modified('revision-01', `${notesDirectory}/src/notes.ts`),
         unchanged, unchanged,
@@ -162,7 +166,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     // Each failing attempt was audited over the revision it stood on, which
     // is the run's own boundary: none of them committed one of its own.
     expect(exhausted.map(gate => gate.commit)).toEqual([null, null, null]);
-    expect(exhausted.map(gate => gate.audited)).toEqual([base, base, base]);
+    expect(exhausted.map(gate => gate.audited)).toEqual([materialized, materialized, materialized]);
 
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('exhausted');
@@ -176,7 +180,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     const repaired = await readResult(root, runId, 'wi-001', 2);
     expect(repaired.outcome).toBe('accepted');
     expect(repaired.commit).toBe('revision-01');
-    expect(scripted.revisions()).toEqual(['revision-01']);
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
     // No external tool was started for any of this.
     expectNoProcesses();
     scripted.assertComplete();
@@ -208,17 +212,18 @@ describe('K8: every gate resolves the current tests under the captured policy', 
       ],
     }, {
       commits: [
-        { ...added('revision-01', `${notesDirectory}/src/tests/second.test.ts`), against: base, subject: 'wi-001.i01' },
+        scenarios,
+        { ...added('revision-01', `${notesDirectory}/src/tests/second.test.ts`), against: materialized, subject: 'wi-001.i01' },
         // The repair is asked about the same accepted boundary, which the
         // failing attempt's own commit did not move.
-        { ...modified('revision-02', `${notesDirectory}/src/tests/second.test.ts`), against: base, subject: 'wi-001.i01' },
+        { ...modified('revision-02', `${notesDirectory}/src/tests/second.test.ts`), against: materialized, subject: 'wi-001.i01' },
         { commit: null, against: 'revision-02' },
         { commit: null, against: 'revision-02' },
       ],
       // The accepted boundary is reached from the revision the run started
       // on, because the attempt between them failed and accepted nothing.
       diffs: [{
-        from: base,
+        from: materialized,
         to: 'revision-02',
         changes: [{ status: 'A', path: `${notesDirectory}/src/tests/second.test.ts` }],
       }],
@@ -245,7 +250,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     // A failing attempt commits the revision it was audited over, and the
     // repair that follows is a revision of its own, over that one.
     expect(iterationGates.map(gate => gate.commit)).toEqual(['revision-01', 'revision-02']);
-    expect(iterationGates.map(gate => gate.head)).toEqual([base, 'revision-01']);
+    expect(iterationGates.map(gate => gate.head)).toEqual([materialized, 'revision-01']);
     // No external tool was started for any of this.
     expectNoProcesses();
     scripted.assertComplete();
@@ -272,6 +277,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
       ],
     }, {
       commits: [
+        scenarios,
         added('revision-01', `${notesDirectory}/src/tests/notes.test.ts`),
         unchanged,
         unchanged,
@@ -293,7 +299,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     expect(iterationGates.at(-1)!.verdict).toBe('passed');
     expect(iterationGates.at(-1)!.commands[0]!.selection!.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
     expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
-    expect(scripted.revisions()).toEqual(['revision-01']);
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
     // No external tool was started for any of this.
     expectNoProcesses();
     scripted.assertComplete();
@@ -308,7 +314,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
         submit(completionProposed('Done.')),
         submit(completionProposed('Done again.')),
       ],
-    }, { commits: [unchanged, unchanged] }, {
+    }, { commits: [scenarios, unchanged, unchanged] }, {
       // The second gate's refresh cannot answer, so its discovery fails.
       inputs: failingRefreshAfter(1),
     });
@@ -338,7 +344,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     let firstIteration: string | undefined;
     const scripted = gateGit(root, {
       head: base,
-      commits: [unchanged, modified('revision-01', `${notesDirectory}/src/notes.ts`), unchanged, unchanged],
+      commits: [scenarios, unchanged, modified('revision-01', `${notesDirectory}/src/notes.ts`), unchanged, unchanged],
     });
     const opened = await openRuns(root, {
       script: byRole({
@@ -420,7 +426,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
       // Every attempt commits before it runs its checks, and every one of
       // them stands on the tree the run started from: the iteration's two
       // attempts, the work item's two and the run's own two.
-      commits: [unchanged, unchanged, unchanged, unchanged, unchanged, unchanged],
+      commits: [scenarios, unchanged, unchanged, unchanged, unchanged, unchanged, unchanged],
     }, {
       checkScript: ({ check }) => check.kind === 'tests'
         ? { outcome: { kind: 'timed-out', timeoutMs: check.command.timeoutMs } }
@@ -444,8 +450,9 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('exhausted');
     expect(result.findings.some(finding => finding.includes('timeout'))).toBe(true);
-    // Neither attempt accepted anything, so the run's boundary never moved.
-    expect(scripted.revisions()).toEqual([]);
+    // Neither attempt accepted anything, so the run's boundary stayed at the
+    // feature files' commit.
+    expect(scripted.revisions()).toEqual([materialized]);
     // No external tool was started for any of this.
     expectNoProcesses();
     scripted.assertComplete();

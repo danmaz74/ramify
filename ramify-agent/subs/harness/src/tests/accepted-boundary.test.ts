@@ -10,7 +10,7 @@ function line(
   audited: string | null,
 ): AcceptedBoundaryLine {
   const attempt: GateAttempt = {
-    schema: 'ramify-agent.gate-attempt/2', id, checkpoint, subject: {}, proposedBy: null,
+    schema: 'ramify-agent.gate-attempt/3', id, checkpoint, subject: {}, proposedBy: null,
     repairRound: 0, infrastructureAttempt: 0, head: 'base', commit, audited, evidence: null,
     guardedChanges: [], commands: [], verdict, cause: verdict === 'passed' ? null : 'infrastructure',
     next: verdict === 'passed' ? 'accept' : 'retry-infrastructure',

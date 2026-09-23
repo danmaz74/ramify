@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { resolveContainedPath, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import type { ToolAction } from '../../subs/agent/src/interfaces/port.js';
 import { blockExplanation, decideWrite, type GuardedScope } from '../guard/write-guard.js';
-import { guardedScopeOf, resolveWriteScope } from '../work/scope.js';
+import { deniedFiles, guardedScopeOf, resolveWriteScope } from '../work/scope.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 
@@ -179,6 +179,38 @@ describe('X3: allowed and denied targets', () => {
     // The parent's own `subs/` is not authorized, and neither is a second module beside the one proposed.
     expect((await decideWrite(scope, root, writing('subs/orders/subs/other/module.ramify'))).verdict).toBe('blocked-scope');
     expect(existsSync(join(root, 'subs/orders/subs/notes'))).toBe(false);
+  });
+});
+
+describe('the files only the harness writes', () => {
+  test('a feature file and the configuration are refused outright, although the scope contains them, and nothing is written', async () => {
+    const { root, index } = await project();
+    const feature = 'subs/orders/src/tests/features/notes/add-note.feature';
+    await mkdir(join(root, 'subs/orders/src/tests/features/notes'), { recursive: true });
+    await writeFile(join(root, feature), 'Feature: add-note\n');
+    await writeFile(join(root, 'ramify-agent.json'), '{}\n');
+    const resolved = await resolveWriteScope({
+      projectRoot: root, index, view: { status: 'placeholder' }, revision: 3,
+      // The whole project, so that only the denial stands between the agent and the two files.
+      base: { modules: ['shop'], rationale: 'everything' }, extra: [], read: [], bootstrap: [], rationale: 'everything',
+    });
+    const denied = await deniedFiles(root, [feature, 'subs/orders/src/tests/features/notes/not-written-yet.feature']);
+    expect(denied).toEqual([
+      join(root, 'ramify-agent.json'), join(root, feature), join(root, 'subs/orders/src/tests/features/notes/not-written-yet.feature'),
+    ]);
+    const scope = guardedScopeOf(resolved, denied);
+
+    for (const target of [feature, 'ramify-agent.json', `./subs/orders/src/tests/features/notes/../notes/add-note.feature`]) {
+      const decision = await decideWrite(scope, root, writing(target));
+      expect(decision).toMatchObject({ verdict: 'blocked-scope', denied: true, reason: expect.stringContaining('is written by the harness alone') });
+      expect(blockExplanation(decision, scope)).toContain('which only the harness writes. Nothing was written.');
+    }
+    // A file beside them in the same directory stays the scope's to allow.
+    expect((await decideWrite(scope, root, writing('subs/orders/src/tests/steps/add-note.steps.ts'))).verdict).toBe('allowed');
+    expect(await readFile(join(root, feature), 'utf8')).toBe('Feature: add-note\n');
+    expect(await readFile(join(root, 'ramify-agent.json'), 'utf8')).toBe('{}\n');
+    // Without the denial the same scope allows both.
+    expect((await decideWrite(guardedScopeOf(resolved), root, writing(feature))).verdict).toBe('allowed');
   });
 });
 

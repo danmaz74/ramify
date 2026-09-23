@@ -345,6 +345,28 @@ button.link[aria-pressed='true'] { font-weight: 700; }
   .capability-graph-scroll { max-height: 34rem; }
 }
 
+/* Acceptance scenarios: the review, Approve, the scenario list and a gate's scenario check. */
+.review-stop { display: block; margin: 0.25rem 0 0.5rem; font-size: 0.9rem; }
+.approve-form { display: grid; gap: 0.4rem; max-width: 32rem; margin: 0.5rem 0; }
+.approve-form label { display: grid; gap: 0.15rem; font-size: 0.9rem; }
+.approve-form input, .approve-form textarea { font: inherit; padding: 0.3rem 0.45rem; border: 1px solid var(--line); border-radius: 4px; }
+.approve-form button { justify-self: start; }
+.gherkin { background: #f1f3f5; padding: 0.5rem 0.6rem; border-radius: 6px; margin: 0.3rem 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.82rem; }
+.review-entry h3, .review-integration h3 { color: var(--ink); }
+.review-integration { border-top: 1px solid var(--line); margin-top: 0.75rem; }
+.review-integration h4 { font-size: 0.9rem; margin: 0.4rem 0 0.2rem; color: var(--muted); }
+.review-warnings { border-left: 3px solid var(--warn); padding-left: 0.75rem; }
+.scenario-plan { border-left: 3px solid var(--accent); }
+.badge.origin-plan { background: #dde8f6; color: var(--accent); }
+.badge.origin-architect { background: #eceff2; color: var(--muted); }
+.scenario-state-bound, .scenario-state-declared { background: #dde8f6; color: var(--accent); }
+.scenario-state-implemented { background: #dcefe3; color: var(--good); }
+.scenario-gates { list-style: none; padding: 0; margin: 0; }
+.scenario-gates li { margin-bottom: 0.2rem; }
+.scenario-status-passed { color: var(--good); }
+.scenario-status-failed, .scenario-status-undefined, .scenario-status-ambiguous, .scenario-status-pending { color: var(--bad); }
+.scenario-check ul { margin: 0.3rem 0; }
+
 /* The header's pages. */
 .app-nav { display: flex; gap: 0.9rem; }
 .app-nav a { color: var(--muted); text-decoration: none; }

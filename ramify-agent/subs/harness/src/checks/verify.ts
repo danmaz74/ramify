@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { delimiter, isAbsolute, join } from 'node:path';
 import { checkCommandEnvironment } from './records.js';
 import type { CheckCommand, CheckCommandKind, NotVerified, TestSelection } from './records.js';
+import type { ScenarioCheckPlan } from './scenario-check.js';
 
 /*
  * Verification before execution. Every command and every selection of an
@@ -32,6 +33,12 @@ export interface PlannedCheck {
    * says. It is decided by which files ran, never by what they printed.
    */
   readonly attribution?: 'in-scope' | 'project' | undefined;
+  /**
+   * For a `scenarios` check: its runs, setup and teardown. The command is
+   * then the mode's configured command, which each run extends with its
+   * profile, and its timeout the bound of the whole check.
+   */
+  readonly scenarios?: ScenarioCheckPlan | undefined;
 }
 
 /** Why one planned command cannot run. */
@@ -60,6 +67,13 @@ async function verifyCheck(check: PlannedCheck): Promise<VerificationFailure | n
   }
   if (!(await isExecutable(executable, check.command))) {
     return { notVerified: 'command-missing', detail: `${executable} cannot be run from ${check.command.cwd}` };
+  }
+  for (const around of [check.scenarios?.setup, check.scenarios?.teardown]) {
+    const aroundExecutable = around?.argv[0];
+    if (around === null || around === undefined) continue;
+    if (aroundExecutable === undefined || !(await isExecutable(aroundExecutable, around))) {
+      return { notVerified: 'command-missing', detail: `${aroundExecutable ?? 'An empty setup or teardown'} cannot be run from ${around.cwd}` };
+    }
   }
 
   const selection = check.selection;

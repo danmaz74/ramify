@@ -9,7 +9,8 @@ import { copyFixture } from './fixture.js';
 import { decision as decisionBody, forkDecision, localDecision, registryChange, requestPlacement } from './placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write, type Turn } from './iterations.js';
 import { openRuns, runEventsOnDisk, runPath, startRun } from './runs.js';
-import { accepted, added, answeredGit, modified, unchanged } from './contracts-git.js';
+import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged } from './contracts-git.js';
+import { declaringScenarios } from './declarations.js';
 import { directReadinessExecution } from './external-tools.js';
 
 /*
@@ -174,6 +175,8 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
   const git = answeredGit(root, {
     head: 'revision-00',
     commits: [
+      // The run's feature files, committed once readiness has passed.
+      scenariosCommitted('review-notes'),
       accepted('wi-001.i02', 'revision-01', [...added(seam.interface, seam.fake, seam.subjects, seam.conformance), ...modified(seam.consumer)]),
       // The provider's first attempt commits its work and fails; the
       // repair it is continued for finds the tree unchanged, and passes.
@@ -218,7 +221,8 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
     const [first, ...rest] = turns[role];
     turns[role] = [[...steps, ...(first ?? [])], ...rest];
   }
-  const script: Script = byRole(turns);
+  // Each completion request declares its entry's scenarios.
+  const script: Script = declaringScenarios(byRole(turns));
   const scripted = createScriptedAgent(script);
   let providerAttempt: string | undefined;
   const opened = await openRuns(root, {

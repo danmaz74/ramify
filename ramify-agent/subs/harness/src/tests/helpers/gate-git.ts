@@ -41,6 +41,15 @@ export interface GateCommit {
   readonly subject?: string | undefined;
 }
 
+/**
+ * The commit that writes the run's feature files onto its branch, before
+ * the first work item: "Scenarios of <planId>", made over the tree
+ * readiness found, adding each feature file.
+ */
+export function scenariosCommit(planId: string, commit: string, against: string, files: readonly string[] = []): GateCommit {
+  return { commit, against, subject: `Scenarios of ${planId}`, changes: files.map(path => ({ status: 'A', path })) };
+}
+
 /** One commit Git answers for an exact conjunction of identity trailers. */
 export interface TrailedCommit {
   readonly trailers: ReadonlyArray<{ readonly key: string; readonly value: string }>;
@@ -205,6 +214,8 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
       // The message the harness wrote carries the identity the lookup just
       // asked for, so a commit and its recovery name the same attempt.
       if (branch !== null) expect(message).toContain(`Ramify-Run: ${branch.slice('ramify-agent/run-'.length)}`);
+      // A scenario commit of the harness's own is made without a lookup and names no gate.
+      if (message.includes('\nRamify-Scenarios: ')) gate = null;
       if (gate !== null) expect(message).toContain(`Ramify-Gate: ${gate}`);
       if (entry.subject !== undefined) expect(message.split('\n')[0]).toContain(entry.subject);
       record('commitAccepted', entry.commit ?? 'unchanged');

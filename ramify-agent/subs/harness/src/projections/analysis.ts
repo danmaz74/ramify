@@ -3,10 +3,11 @@ import { runQueryLimits, type AnalysisResponse, type DecisionView, type Hypothes
 import { runLayout } from '../run/records.js';
 import { capabilityOf } from '../work/frontier.js';
 import { readRunFile, type RunView } from './inputs.js';
+import { analysisScenariosOf } from './scenarios.js';
 
 /*
- * The plan and its entries, the hypotheses beside the decisions, and the
- * decision list.
+ * The plan and its entries with their scenarios, the hypotheses beside the
+ * decisions, and the decision list.
  *
  * A hypothesis is shown at its current revision with its standing, beside
  * what revision 1 forecast, which is never rewritten. It is linked to the
@@ -41,6 +42,7 @@ export async function analysisOf(view: RunView): Promise<AnalysisResponse> {
   }));
 
   const hypotheses = hypothesesOf(view);
+  const { scenarios, warnings } = analysisScenariosOf(view);
   return {
     plan,
     analysis: {
@@ -48,7 +50,9 @@ export async function analysisOf(view: RunView): Promise<AnalysisResponse> {
       view: assignments.view,
       entries: entries.slice(0, runQueryLimits.analysis),
       hypotheses: hypotheses.slice(0, runQueryLimits.analysis),
-      total: { entries: entries.length, hypotheses: hypotheses.length },
+      scenarios: scenarios.slice(0, runQueryLimits.scenarios),
+      warnings,
+      total: { entries: entries.length, hypotheses: hypotheses.length, scenarios: scenarios.length },
     },
   };
 }

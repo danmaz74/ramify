@@ -1,4 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -43,8 +44,8 @@ async function target(): Promise<string> {
 
 const root = 'collection-review';
 const reviews = 'collection-review/workspace/reviews';
-const twoWorkItemCheckpoints = ['wi-001', 'wi-002', 'final verification of plan "review-notes"'] as const;
-const oneWorkItemCheckpoints = ['wi-001', 'final verification of plan "review-notes"'] as const;
+const twoWorkItemCheckpoints = [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'] as const;
+const oneWorkItemCheckpoints = [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'] as const;
 
 /** The scripted fake, answering each role with its own submission. */
 function script(initial: unknown, local: (spec: SessionSpec) => unknown) {
@@ -82,11 +83,13 @@ describe('a run whose work items need no change', () => {
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed',
+      'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
+      // Each completion request declares its entry's scenario, and the
+      // work item's gate implements it.
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed', 'session-finished',
+      'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed', 'session-finished',
+      'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
       'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
     ]);
 
@@ -247,7 +250,7 @@ describe('a work-item gate that does not pass', () => {
       checkScript: ({ check, context }) => context.checkpoint === 'work-item' && check.kind === 'tests'
         ? { outcome: { kind: 'completed', exitCode: 1 } }
         : {},
-      unchangedCheckpoints: ['wi-001', 'wi-001', 'wi-001', 'wi-001'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-001', 'wi-001', 'wi-001'],
       script: (spec: SessionSpec) => {
         if (spec.role === 'initial-architect') return [{ kind: 'submit' as const, input: submitted }];
         turn += 1;
@@ -300,7 +303,10 @@ describe('a local architect that cannot meet the request', () => {
   test('`unresolved` ends the run with the conflict and its evidence, and no gate runs', async () => {
     const project = await target();
     const submitted = analysis([entry('reviewer-note', reviews)]);
-    const { service } = await openRuns(project, { script: script(submitted, () => unresolved('The note would outlive the run it belongs to.')) });
+    const { service } = await openRuns(project, {
+      script: script(submitted, () => unresolved('The note would outlive the run it belongs to.')),
+      unchangedCheckpoints: [scenariosCommit('review-notes')],
+    });
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));

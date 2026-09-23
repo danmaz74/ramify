@@ -9,6 +9,11 @@ import {
   replaceRelationSchema, requestRelationSchema, sessionFinishReasonSchema, sessionIdSchema,
 } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
+import { scenarioWarningSchema } from '../analysis/records.js';
+import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
+import {
+  scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
+} from '../../subs/scenarios/src/states.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 
 /*
@@ -105,8 +110,10 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('session-finished', z.object({ session: sessionIdSchema, reason: sessionFinishReasonSchema }).strict()),
   /**
    * Commits `EntryAssignments`, every `Hypothesis` at revision 1, one
-   * `RegistryEntry` per entry capability and one `WorkItem` per entry
-   * capability. One event holds every record of the phase.
+   * `RegistryEntry` per entry capability, one `WorkItem` per entry
+   * capability and one `ScenarioRecord` per scenario, `sc-001` to
+   * `sc-<scenarios>`, every one `pending`. One event holds every record of
+   * the phase, and the warnings the scenarios' form rules gave.
    */
   event('analysis-accepted', z.object({
     invocation: text,
@@ -114,6 +121,27 @@ export const runEventSchema = z.discriminatedUnion('type', [
     hypotheses: z.int().nonnegative(),
     registry: z.int().nonnegative(),
     workItems: z.int().nonnegative(),
+    scenarios: z.int().nonnegative(),
+    warnings: z.array(scenarioWarningSchema),
+  }).strict()),
+  /**
+   * The run was started with its review stop: after the analysis is
+   * accepted it waits, holding the project, for `analysis-approved` or a
+   * stop. Nothing is written to the tree before one of them.
+   */
+  event('review-requested', z.object({}).strict()),
+  /**
+   * A person approved the accepted analysis, holding the command. At the
+   * review stop it continues the run to readiness; otherwise it changes
+   * nothing but the run's review. `duringRun` says the run was working when
+   * it was given, rather than waiting at the stop or complete. It is the one
+   * event that may follow `job-completed`.
+   */
+  event('analysis-approved', z.object({
+    command: acceptedCommandSchema,
+    reviewer: text,
+    note: z.string().nullable(),
+    duringRun: z.boolean(),
   }).strict()),
   /** Commits the readiness `GateAttempt` and the `ReadinessAttempt` that names it. */
   event('readiness-passed', z.object({ attempt: z.int().positive(), gate: text }).strict()),
@@ -129,8 +157,70 @@ export const runEventSchema = z.discriminatedUnion('type', [
     recovery: z.string().nullable(),
     final: z.boolean(),
   }).strict()),
-  /** The work item's turn begins; it licenses its local architect. */
-  event('work-item-started', z.object({ workItem: text, module: text }).strict()),
+  /**
+   * The durable intent of the materialization effect: the tracked feature
+   * files about to be written onto the run branch and committed as
+   * "Scenarios of <planId>". A crash before its completion is recovered by
+   * re-rendering and by the commit's trailers.
+   */
+  event('scenarios-materializing', z.object({ files: z.array(text) }).strict()),
+  /**
+   * The feature files are on the run branch: the commit that holds them, or
+   * null where the tree already held them, and every tracked file. It
+   * precedes the first work item, and the commit is an accepted boundary.
+   */
+  event('scenarios-materialized', z.object({ commit: z.string().nullable(), files: z.array(text) }).strict()),
+  /**
+   * An engineer's completion proposal or a local architect's completion
+   * request declared a `pending` scenario of its work item's entry. It is
+   * `bound` while the work item has an open requirement or owes a
+   * conformance, and keeps its pending tag; otherwise `declared`, and the
+   * next commit removes the tag.
+   */
+  event('scenario-declared', scenarioDeclaredDataSchema),
+  /**
+   * The last open requirement of the scenario's work item was verified and
+   * no conformance is owed: a `bound` scenario would now run without fakes,
+   * so it is `declared`.
+   */
+  event('scenario-due', scenarioDueDataSchema),
+  /** A passing gate ran a `declared` scenario, which is now `implemented` for good. */
+  event('scenario-implemented', scenarioImplementedDataSchema),
+  /**
+   * A passing gate ran a `bound` scenario: its pass is against the fakes its
+   * work item still holds, so the state stays `bound`, and the attempt is
+   * recorded as its fake-backed pass. A scenario with one since its
+   * declaration is not withdrawn.
+   */
+  event('scenario-bound-passed', z.object({ scenario: scenarioIdSchema, gate: text }).strict()),
+  /**
+   * The durable intent of a withdrawal commit: the scenarios about to return
+   * to `pending`, why, and the withdrawal's ordinal in the run, which is its
+   * commit's `Ramify-Scenarios: withdrawn-<n>` trailer. The first
+   * `scenario-withdrawn` is its completion.
+   */
+  event('scenarios-withdrawing', z.object({
+    withdrawal: z.int().positive(),
+    workItem: text,
+    scenarios: z.array(scenarioIdSchema).min(1),
+    reason: text,
+  }).strict()),
+  /**
+   * A `declared` or `bound` scenario with no pass since its declaration
+   * returned to `pending` when its work item left the repair path without
+   * one, with the commit that restored its pending tag.
+   */
+  event('scenario-withdrawn', scenarioWithdrawnDataSchema),
+  /**
+   * The work item's turn begins; it licenses its local architect. It names
+   * the item's origin, and an integration work item's scenario.
+   */
+  event('work-item-started', z.object({
+    workItem: text,
+    module: text,
+    origin: z.enum(['entry', 'obligation', 'verification', 'integration']),
+    scenario: scenarioIdSchema.optional(),
+  }).strict()),
   /**
    * Which hypothesis revisions the work item received, at a coordination
    * point. Delivery never rewrites an active assignment, and no work is
@@ -373,10 +463,18 @@ export type RunEvent = z.infer<typeof runEventSchema>;
 export type RunEventType = RunEvent['type'];
 export type RunEventOf<T extends RunEventType> = Extract<RunEvent, { type: T }>;
 
-/** The event types that end a run. Nothing follows one. */
+/**
+ * The event types that end a run. Nothing follows one, except that a person
+ * may approve the analysis of a run that completed.
+ */
 export const terminalRunEvents = ['job-completed', 'job-failed', 'job-stopped', 'job-interrupted'] as const satisfies readonly RunEventType[];
 
 const terminal = new Set<string>(terminalRunEvents);
+
+/** Whether an event of `type` may follow the run's terminal event. */
+function mayFollow(ended: RunEvent, type: RunEventType): boolean {
+  return ended.type === 'job-completed' && type === 'analysis-approved';
+}
 
 /** An event to append: its type and data. The log assigns the sequence and time. */
 export type RunEventInput = { [T in RunEventType]: { readonly type: T; readonly data: RunEventOf<T>['data'] } }[RunEventType];
@@ -419,7 +517,7 @@ export class RunLog {
       if (current.sequence !== index + 1) throw new CorruptRunLogError(path, index + 1, `sequence ${current.sequence}, expected ${index + 1}`);
       if (current.jobId !== runId) throw new CorruptRunLogError(path, index + 1, `event of run ${current.jobId}`);
       const ended = terminalOf(events.slice(0, index));
-      if (ended) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
+      if (ended && !mayFollow(ended, current.type)) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
     });
     return new RunLog(path, runId, ledger);
   }
@@ -473,7 +571,7 @@ export class RunLog {
   /** The event a caller is about to commit with its records, refused after a terminal event. */
   next(input: RunEventInput, at: Date = new Date()): RunEvent {
     const ended = this.terminal;
-    if (ended) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
+    if (ended && !mayFollow(ended, input.type)) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
     return runEvent(this.runId, this.nextSequence, input, at);
   }
 }

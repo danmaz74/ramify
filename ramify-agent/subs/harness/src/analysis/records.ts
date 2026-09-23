@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { citationSchema, modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { moduleProposalSchema, recordRefSchema } from '../run/records.js';
+import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
+import type { ScenarioWarningKind } from '../../subs/scenarios/src/form.js';
 
 /*
  * The records the initial analysis commits beside its entry assignments: one
@@ -88,6 +90,23 @@ export const registryEntrySchema = z.object({
   previousOwner: modulePathSchema.optional(),
 }).strict();
 export type RegistryEntry = z.infer<typeof registryEntrySchema>;
+
+/** The kinds of warning the scenarios' form rules give, as the accepted analysis records them. */
+const scenarioWarningKinds = ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'] as const satisfies readonly ScenarioWarningKind[];
+const _everyWarningKind: (typeof scenarioWarningKinds)[number] = undefined as unknown as ScenarioWarningKind;
+void _everyWarningKind;
+
+/**
+ * A warning on the accepted analysis's scenarios, never a rejection: it is
+ * recorded with the scenarios it concerns, by their IDs, and shown in the
+ * review.
+ */
+export const scenarioWarningSchema = z.object({
+  kind: z.enum(scenarioWarningKinds),
+  scenarios: z.array(scenarioIdSchema),
+  message: text,
+}).strict();
+export type RecordedScenarioWarning = z.infer<typeof scenarioWarningSchema>;
 
 /** Where the analysis's records are materialized, relative to the run's directory. */
 export const analysisLayout = {

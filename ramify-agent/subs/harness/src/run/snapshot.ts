@@ -1,7 +1,12 @@
 import type { JobState } from '../interfaces/protocol/jobs.js';
-import type { Role, RunFailureReason, RunPhase } from '../interfaces/protocol/runs.js';
+import type { Role, RunFailureReason, RunPhase, RunReview } from '../interfaces/protocol/runs.js';
 import type { RunEvent } from './log.js';
 import type { RunRecord } from './records.js';
+import { scenarioIdOf } from '../../subs/scenarios/src/records.js';
+import {
+  applyScenarioEvent, countScenarioStates, initialScenarioStates, scenarioEventTypes,
+  type ScenarioEvent, type ScenarioState, type ScenarioStates,
+} from '../../subs/scenarios/src/states.js';
 
 /*
  * The run's projection. It is a pure function of the run's `job.json` and
@@ -30,11 +35,15 @@ export interface RunSnapshot {
     readonly invocations: number;
     readonly readinessAttempts: number;
     readonly gateAttempts: number;
+    /** The tracked scenarios in each state; all zero before the analysis is accepted. */
+    readonly scenarios: Readonly<Record<ScenarioState, number>>;
     /** Invocations whose `invocation-ended` records a degraded start. */
     readonly degradedStarts: number;
   };
   /** The writer's standing: whether one is held, and whether the last release was confirmed. */
   readonly writer: { readonly held: string | null; readonly unsettled: string | null };
+  /** `not-reviewed` until a person approves the analysis; then who, when, and whether the run was working. */
+  readonly review: RunReview;
   /** Things the person must be told, kept for the whole run and after it, resolved or not. */
   readonly notices: readonly RunNotice[];
 }
@@ -98,6 +107,8 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
   const verifiedRequirements = new Set<string>();
   const notices: RunNotice[] = [];
   const completedItems = new Set<string>();
+  let scenarios: ScenarioStates = initialScenarioStates([]);
+  let review: RunReview = 'not-reviewed';
 
   for (const event of events) {
     switch (event.type) {
@@ -113,7 +124,18 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
         break;
       case 'analysis-accepted':
         workItems = event.data.workItems;
+        // Numbered sc-001 to sc-<count>, every one pending.
+        scenarios = initialScenarioStates(Array.from({ length: event.data.scenarios ?? 0 }, (_, index) => scenarioIdOf(index + 1)));
         phase = 'readiness';
+        break;
+      case 'review-requested':
+        phase = 'awaiting-review';
+        break;
+      // At the stop the approval continues the run to readiness; during a
+      // run, or after it, it changes nothing but the review.
+      case 'analysis-approved':
+        review = { reviewer: event.data.reviewer, at: event.at, duringRun: event.data.duringRun };
+        if (phase === 'awaiting-review') phase = 'readiness';
         break;
       case 'work-item-started':
         phase = 'working';
@@ -189,6 +211,13 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
         failure = { reason: event.data.reason, message: event.data.message, evidence: event.data.evidence };
         break;
       default:
+        // A scenario event moves one scenario by the events table. The
+        // harness commits no transition the table rejects, so one that is
+        // rejected here leaves the states as they were.
+        if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
+          const applied = applyScenarioEvent(scenarios, event as unknown as ScenarioEvent);
+          if (applied.ok) scenarios = applied.states;
+        }
         break;
     }
   }
@@ -231,9 +260,11 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
       invocations,
       readinessAttempts,
       gateAttempts,
+      scenarios: countScenarioStates(scenarios),
       degradedStarts,
     },
     writer: { held: heldWriter, unsettled },
+    review,
     notices: resolvedNotices,
   };
 }

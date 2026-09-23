@@ -974,6 +974,10 @@ person asked for is the person's review after the run. This departs from the
 brief's "original feature acceptance" at the final gate, and the departure is
 recorded in the completion report. An executable acceptance check, as a file of
 the target project beside its plan, is [deferred](#deferred-work).
+Plan 10 reversed this decision, and the deferral of a second test runner, on
+purpose on 2026-09-23: the plan's
+[acceptance scenarios](../../architecture/acceptance-scenarios.md) are that
+executable check, run by Cucumber, and the final gate runs them in full mode.
 
 ### Queries
 

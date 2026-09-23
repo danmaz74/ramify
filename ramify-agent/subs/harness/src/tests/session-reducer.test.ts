@@ -175,7 +175,7 @@ describe('the session reducer', () => {
 
   test('an event the model does not read leaves the sessions as they were', () => {
     const before: RunSessions = reduceSessions(log(opened(), started('inv-0001', 'opened')));
-    const [other] = log({ type: 'work-item-started', data: { workItem: 'wi-001', module: 'm' } });
+    const [other] = log({ type: 'work-item-started', data: { workItem: 'wi-001', module: 'm', origin: 'entry' } });
     expect(applySessionEvent(before, other!)).toBe(before);
   });
 

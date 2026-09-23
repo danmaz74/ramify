@@ -5,7 +5,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
-import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -84,7 +84,7 @@ function consumerModule(directory: string, name: string, file: string) {
  * unchanged.
  */
 async function run(root: string, plan: Parameters<typeof byWork>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits });
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
   const opened = await openRuns(root, {
     script: byWork(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
   });
@@ -274,13 +274,13 @@ describe('P4: an ordinary provider engineer reports inability to conform through
     // it revises: the run made four commits on its own branch, and the gates
     // that followed them without a write of their own changed nothing.
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04']);
-    expect(git.subjects().slice(0, 2).map(subject => subject.split(':')[0])).toEqual(['wi-001.i02', 'wi-001.i03']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04']);
+    expect(git.subjects().slice(1, 3).map(subject => subject.split(':')[0])).toEqual(['wi-001.i02', 'wi-001.i03']);
     // Each commit was made over the revision the one before it was accepted
     // at: the boundary the run observed against advanced once per accepted
     // attempt, and the revision never reset it.
-    expect(git.bases('changedEntries')).toEqual(['revision-00', 'revision-01', 'revision-02', 'revision-03']);
-    expect(git.bases('diffNameStatus')).toEqual(['revision-00', 'revision-01', 'revision-02', 'revision-03']);
+    expect(git.bases('changedEntries')).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03']);
+    expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03']);
     git.assertAnswered();
   }, 60_000);
 
@@ -331,7 +331,7 @@ describe('P4: an ordinary provider engineer reports inability to conform through
 
     // The failing run committed the agreement it did establish, and nothing
     // after it: a failure is not a rewind.
-    expect(git.minted()).toEqual(['revision-01']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01']);
     git.assertAnswered();
   }, 60_000);
 });

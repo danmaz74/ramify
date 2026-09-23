@@ -101,10 +101,19 @@ unavailable with that reason, never a zero.
 
 `guarded-files.ts` holds `guardedFilesHash`: the SHA-256 of each file whose
 change could weaken a check, which is the test runner's and the compiler's
-configuration, the package manifests and the contract artifacts an assignment
-names. It is one hash per file rather than one over the set, so a change
+configuration, the package manifests, `ramify-agent.json`, and whatever the
+caller names, such as the contract artifacts an assignment requires and the
+scenario harness's support files. It is one hash per file rather than one over the set, so a change
 names the file that changed, and a file that is not there is `null`. It
 compares nothing, and no identity of the working tree is taken anywhere.
+
+## The project's configuration
+
+`project-configuration.ts` reads `ramify-agent.json` at the project root, the
+file in which a target project declares what the harness cannot derive, such
+as the commands of its acceptance modes. It answers the file's text and
+SHA-256, or that it is missing or unreadable, and never throws for either.
+What the file must say is the harness's: this module does not parse it.
 
 ## Git, for the run branch
 
@@ -151,7 +160,7 @@ group, a child's environment is the allowlist and not this process's, a
 variable outside it does not reach a real child, a timeout is told
 from a non-zero exit and a spawn failure carries its string code, the
 measurement document's versions and rejections, the guarded set's hashes and
-absences, and the run branch, whose commit succeeds where a project hook
+absences, the project configuration's three answers, and the run branch, whose commit succeeds where a project hook
 fails and where no identity is configured. Ramify's check forms are answered
 by a stand-in, so that no test starts a daemon; `ramify-cli.ts`'s
 materialization is still exercised by the harness's mapping tests against the

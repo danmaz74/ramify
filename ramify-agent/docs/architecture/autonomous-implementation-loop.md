@@ -20,6 +20,15 @@ where they require a person's architectural approval, and from the
 [non-breaking-only MVP](../decomposition/breaking-vs-non-breaking-plans.md). Those documents
 remain unchanged; this hypothesis explores a different implementation boundary.
 
+[Acceptance scenarios](acceptance-scenarios.md), implemented by
+[Plan 10](../plans/10-acceptance-scenarios/main-plan.md), change this design
+in four places. The initial analysis also assigns the plan's Gherkin
+scenarios to entry capabilities and writes one for each entry that has none.
+A run started with the review stop waits for a person's approval after the
+analysis is accepted, the one human-review wait. Every committing gate runs
+a scenario check, and a work item completes only when its scenarios are
+implemented. The final gate runs every tracked scenario in full mode.
+
 The [metrics glossary](../metrics/glossary.md) distinguishes search space from
 its measurements. Here, an invocation's search space is its available source
 and selected views; model context usage is the tokens occupying its model
@@ -859,6 +868,11 @@ hardcoded type-check command. Behavioral test selection is mechanical:
 | Breaking-change iteration | All project tests. |
 | Local architect proposes work-item completion | All project tests. |
 | Final run completion | All project tests and the original feature acceptance checks. |
+
+Since Plan 10 each committing gate also runs the scenario check its
+checkpoint plans in [acceptance scenarios](acceptance-scenarios.md#the-scenario-check),
+and the final run completion's feature acceptance checks are the plan's
+tracked scenarios, run in full mode.
 
 For an ordinary iteration, the scope means the assigned module's own tests
 plus all tests in each included child subtree. A contract artifact at a common

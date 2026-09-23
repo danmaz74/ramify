@@ -14,10 +14,10 @@ import {
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
   metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
-  workItemListResponseSchema, workItemResponseSchema,
+  scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
-  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommand, type RunEventPage, type RunListResponse, type RunSnapshot,
-  type WorkItemListResponse, type WorkItemResponse,
+  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
+  type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import {
   runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionTranscriptResponseSchema,
@@ -70,6 +70,8 @@ export interface ProtocolClient {
   getCapabilities(planId: string, runId: string): Promise<CapabilityListResponse>;
   /** The initial analysis's module associations beside the capabilities verified at their current owners. */
   getModuleCapabilities(planId: string, runId: string): Promise<ModuleCapabilityComparisonResponse>;
+  /** Every tracked acceptance scenario with its state and the gates that ran it. */
+  getScenarios(planId: string, runId: string): Promise<ScenarioListResponse>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
   /** Every session of the project, live and suspended first; a page of at most 200 from `offset`. */
@@ -89,7 +91,7 @@ export interface ProtocolClient {
    * answer, the identical command is sent again, which is safe: a retry
    * returns the original receipt.
    */
-  sendCommand(command: RunCommand): Promise<Receipt>;
+  sendCommand(command: RunCommandInput): Promise<Receipt>;
   connection(): ConnectionState;
   /** Calls `listener` on every change of connection state; returns the unsubscribe. */
   onConnectionChange(listener: (state: ConnectionState) => void): () => void;
@@ -156,6 +158,7 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getWorkItem: (planId, runId, workItem) => get(protocolPaths.runWorkItem(planId, runId, workItem), workItemResponseSchema),
     getCapabilities: (planId, runId) => get(protocolPaths.runCapabilities(planId, runId), capabilityListResponseSchema),
     getModuleCapabilities: (planId, runId) => get(protocolPaths.runModuleCapabilities(planId, runId), moduleCapabilityComparisonResponseSchema),
+    getScenarios: (planId, runId) => get(protocolPaths.runScenarios(planId, runId), scenarioListResponseSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
     listSessions: (offset = 0) => get(protocolPaths.sessions(offset), sessionListResponseSchema),

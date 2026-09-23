@@ -90,8 +90,9 @@ describe('an implementation run with no entry capabilities', () => {
     expect(attempt.verdict).toBe('passed');
     expect(attempt.steps.every(step => step.outcome === 'passed')).toBe(true);
     expect(attempt.steps.map(step => step.step)).toEqual([
-      'project-root', 'git-clean', 'compiler-config', 'test-runner', 'nested-packages',
-      'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+      'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
+      'nested-packages', 'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+      'baseline-acceptance', 'acceptance-full',
     ]);
   }, 120_000);
 

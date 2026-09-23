@@ -65,7 +65,20 @@ test('the plan lists its runs, and Start sends start-run with the harness\'s age
   expect(await screen.findByText('This plan has no run yet.')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Start a run' }));
   await waitFor(() => expect(opened).toEqual(['#/plans/p/runs/20260921T090000Z-beef00']));
-  expect(client.commands).toEqual([expect.objectContaining({ type: 'start-run', expectedVersion: 0, payload: { planId: 'p', agent: 'scripted' } })]);
+  expect(client.commands).toEqual([expect.objectContaining({ type: 'start-run', expectedVersion: 0, payload: { planId: 'p', agent: 'scripted', reviewStop: false } })]);
+});
+
+test('Start with the review stop checked sends reviewStop', async () => {
+  const client = clientWith('# Plan');
+  const opened: string[] = [];
+  render(<PlanPage client={client} planId="p" navigate={hash => opened.push(hash)} />);
+  await screen.findByText('This plan has no run yet.');
+  const stop = screen.getByRole('checkbox', { name: /Stop for review after the analysis/ }) as HTMLInputElement;
+  expect(stop.checked).toBe(false);
+  fireEvent.click(stop);
+  fireEvent.click(screen.getByRole('button', { name: 'Start a run' }));
+  await waitFor(() => expect(opened).toHaveLength(1));
+  expect(client.commands).toEqual([expect.objectContaining({ type: 'start-run', payload: { planId: 'p', agent: 'scripted', reviewStop: true } })]);
 });
 
 test('without an agent no run can start, and a run directory the harness does not read is reported', async () => {

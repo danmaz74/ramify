@@ -1,5 +1,6 @@
 import { join, posix, relative, sep } from 'node:path';
 import { guardedFilesHash } from '../../subs/evidence/src/guarded-files.js';
+import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { findModule, type ArchitectIndex, type ModuleEntry } from '../../subs/evidence/src/views.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
@@ -24,7 +25,7 @@ import type { IterationKind, WriteScope } from './iterations.js';
 /** The configuration a run guards: the files that decide what the checks discover and run. */
 export const guardedConfigurationFiles = [
   'package.json', 'tsconfig.json', 'vitest.config.ts', 'vitest.config.js', 'vitest.config.mts',
-  'vite.config.ts', 'vite.config.js', 'cucumber.js',
+  'vite.config.ts', 'vite.config.js', 'cucumber.js', 'ramify-agent.json',
 ] as const;
 
 /** The project-relative source area of a module's own contents. */
@@ -125,9 +126,28 @@ function bootstrapDirectory(bootstrap: WriteScope['bootstrap'], module: string):
   return entry?.directory ?? null;
 }
 
-/** The scope as the guard compares against it. */
-export function guardedScopeOf(scope: WriteScope): GuardedScope {
-  return { revision: scope.revision, roots: scope.resolved.roots, files: scope.resolved.files };
+/**
+ * The scope as the guard compares against it. `denied` are canonical files
+ * the guard refuses whatever the scope contains: the tracked feature files
+ * and the project's configuration, which only the harness writes.
+ */
+export function guardedScopeOf(scope: WriteScope, denied: readonly string[] = []): GuardedScope {
+  return { revision: scope.revision, roots: scope.resolved.roots, files: scope.resolved.files, denied };
+}
+
+/**
+ * The canonical files no agent may edit or write, whatever its scope: the
+ * project's configuration for the harness and every tracked feature file,
+ * both project-relative in. A path that cannot be resolved is left out,
+ * since nothing could write it either.
+ */
+export async function deniedFiles(projectRoot: string, featureFiles: readonly string[]): Promise<string[]> {
+  const denied: string[] = [];
+  for (const path of [projectConfigurationFile, ...featureFiles]) {
+    const target = await resolveRealTarget(projectRoot, path);
+    if (target.ok && !denied.includes(target.resolved)) denied.push(target.resolved);
+  }
+  return denied;
 }
 
 /** The project-relative paths of the scope, for a prompt and for a reader. */
@@ -160,12 +180,27 @@ export function testPolicyOf(
   return { policy: 'owned-by-scope', exactOwners: [base.module], subtrees: [...base.includedChildren], extraSuites };
 }
 
+/** What a run guards beyond the configuration and the contract artifacts. */
+export interface GuardedScenarioFiles {
+  /** The files `acceptance.support` names, project-relative, hashed as they stand. */
+  readonly support?: readonly string[] | undefined;
+  /**
+   * Every tracked feature file with the hash of its expected rendering. It
+   * is guarded whether or not the tree holds it, and against the rendering
+   * rather than the tree, so drift already there is found.
+   */
+  readonly expected?: ReadonlyArray<{ readonly path: string; readonly hash: string }> | undefined;
+}
+
 /**
- * The guarded files of one assignment, hashed as they stand: the project's
- * compiler and test-runner configuration, its package manifests, and the
- * contract artifacts a registered agreement requires. A gate compares the
- * tree with these, so a change no record authorized is the attempt's cause,
- * and a deletion is `after: null` rather than an absent file that passes.
+ * The guarded files of one assignment: the project's compiler and
+ * test-runner configuration, its package manifests, its configuration for
+ * the harness, the contract artifacts a registered agreement requires and
+ * the scenario harness's support files, hashed as they stand, and every
+ * tracked feature file with the hash of its expected rendering. A gate
+ * compares the tree with these, so a change no record authorized is the
+ * attempt's cause, and a deletion is `after: null` rather than an absent
+ * file that passes.
  *
  * A file the project does not have is not guarded: there is nothing to
  * compare. One it does have is captured whether or not this assignment has
@@ -174,9 +209,16 @@ export function testPolicyOf(
 export async function captureGuardedFiles(
   projectRoot: string,
   requiredArtifacts: readonly string[] = [],
+  scenarios: GuardedScenarioFiles = {},
 ): Promise<Array<{ path: string; hash: string }>> {
-  const hashed = await guardedFilesHash(projectRoot, [...guardedConfigurationFiles, ...requiredArtifacts]);
-  return hashed.flatMap(file => (file.hash === null ? [] : [{ path: file.path, hash: file.hash }]));
+  const expected = scenarios.expected ?? [];
+  const rendered = new Set(expected.map(file => file.path));
+  const hashed = await guardedFilesHash(projectRoot, [...guardedConfigurationFiles, ...requiredArtifacts, ...(scenarios.support ?? [])]
+    .filter(path => !rendered.has(path)));
+  return [
+    ...hashed.flatMap(file => (file.hash === null ? [] : [{ path: file.path, hash: file.hash }])),
+    ...expected.map(file => ({ path: file.path, hash: file.hash })),
+  ].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
 /**

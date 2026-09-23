@@ -36,7 +36,7 @@ Design documents for the separate agent harness:
   acceptance gate: their origin and review, matching to entries, late binding,
   quick and full modes, and Cucumber runs scoped to the module tree
 - [Acceptance scenarios: the v1 architecture](architecture/acceptance-scenarios.md),
-  proposed design for the first step, with Dan's decisions of 2026-09-23: plan
+  the design of the first step, implemented by Plan 10, with Dan's decisions of 2026-09-23: plan
   scenarios extracted at capture, frozen at analysis, a review stop,
   harness-materialized feature files, four scenario states, declarations
   verified by every gate, one Cucumber run per owner module read from its
@@ -87,6 +87,10 @@ Design documents for the separate agent harness:
   the session list, live transcripts, diagram markers, a lineage timeline and
   lineage measurements; implemented 2026-09-23, with its
   [results](plans/09-session-model-and-transcripts/results.md)
+- [Plan 10: acceptance scenarios](plans/10-acceptance-scenarios/main-plan.md),
+  the v1 acceptance scenarios architecture in eleven iterations; implemented,
+  with its [results](plans/10-acceptance-scenarios/results.md), and merged
+  with Plan 9's session model; both audits pass on the merge
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

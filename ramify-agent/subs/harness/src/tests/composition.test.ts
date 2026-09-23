@@ -20,7 +20,7 @@ import { contractSubmissionSchema } from '../contracts/submission.js';
 import { shellInputSchema } from '../tools/shell.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema, metricsResponseSchema,
-  runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema, workItemListResponseSchema,
+  runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema, scenarioListResponseSchema, workItemListResponseSchema,
   workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
@@ -69,6 +69,7 @@ beforeAll(async () => {
     const queries = new RunQueries(service);
     answeredWhileRunning.push({ schema: runResponseSchema, value: await queries.run(plan, runId) });
     answeredWhileRunning.push({ schema: analysisResponseSchema, value: await queries.analysis(plan, runId) });
+    answeredWhileRunning.push({ schema: scenarioListResponseSchema, value: await queries.scenarios(plan, runId) });
   })));
   names.forEach((name, index) => finished.set(name, runs[index]!));
 
@@ -139,7 +140,7 @@ describe('the recovery tables of the ten state machines', () => {
     const rows = allRows();
     // `recoveryTable` is typed against the run service's own boundary union,
     // so a boundary without a row does not compile; this states the count.
-    expect(new Set(rows.map(row => row.write)).size).toBe(35);
+    expect(new Set(rows.map(row => row.write)).size).toBe(38);
     const machines = new Set(rows.flatMap(row => row.machines));
     expect([...machines].sort()).toEqual((Object.keys(machineNames) as Machine[]).sort());
 
@@ -177,6 +178,7 @@ describe('no query appends an event', () => {
         const { workItems } = await queries.workItems(plan, run.runId);
         for (const item of workItems) await queries.workItem(plan, run.runId, item.id);
         await queries.capabilities(plan, run.runId);
+        await queries.scenarios(plan, run.runId);
         await queries.metrics(plan, run.runId);
         const page = await queries.events(plan, run.runId, 0);
         for (const gate of new Set(page.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
@@ -214,13 +216,14 @@ function unionRoots(): Record<string, unknown> {
     'query work-items': workItemListResponseSchema,
     'query work-item': workItemResponseSchema,
     'query capabilities': capabilityListResponseSchema,
+    'query scenarios': scenarioListResponseSchema,
     'query gate': gateResponseSchema,
     'query metrics': metricsResponseSchema,
   };
 }
 
 const submissionSchemas: Readonly<Record<string, unknown>> = {
-  'ramify-agent.initial-analysis/1': initialAnalysisSubmissionSchema,
+  'ramify-agent.initial-analysis/2': initialAnalysisSubmissionSchema,
   'ramify-agent.local-architect-submission/1': localArchitectSubmissionSchema,
   'ramify-agent.engineer-submission/1': engineerSubmissionSchema,
   'ramify-agent.fork-submission/1': forkSubmissionSchema,
@@ -268,6 +271,7 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
     observeValues(workItemListResponseSchema, items, observed);
     for (const item of items.workItems) observeValues(workItemResponseSchema, await queries.workItem(plan, run.runId, item.id), observed);
     observeValues(capabilityListResponseSchema, await queries.capabilities(plan, run.runId), observed);
+    observeValues(scenarioListResponseSchema, await queries.scenarios(plan, run.runId), observed);
     observeValues(metricsResponseSchema, await queries.metrics(plan, run.runId), observed);
     for (const gate of new Set(page.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
       observeValues(gateResponseSchema, await queries.gate(plan, run.runId, gate), observed);
@@ -303,6 +307,10 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'G4: a crash after the append and before its completion answers already-present, and one brief exists' },
   { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation-integration.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
   { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
+  { union: 'run log[job-failed].data.reason', values: ['project-config-invalid'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a project without the file starts, and fails readiness with project-config-invalid and no recovery' },
+  { union: 'run log[job-failed].data.reason', values: ['acceptance-harness-missing'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a project without cucumber-js fails acceptance-runner with acceptance-harness-missing and no recovery' },
+  { union: 'record ramify-agent.job/3.projectConfig|0.config.acceptance.modes.full.readiness', values: ['run'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a configuration asking readiness to run full mode is captured with it' },
+  { union: 'observation log[coverage-gap].data.kind', values: ['unsupported-runner'], file: 'subs/harness/src/tests/iterations-integration.test.ts', test: 'a local architect assigns it, an engineer works it, the gate accepts it and the harness commits' },
   { union: 'run log[job-failed].data.reason', values: ['repair-exhausted'], file: 'subs/harness/src/tests/work-items.test.ts', test: 'returns to the same local architect, which revises its outline, and exhausts deterministically' },
   { union: 'run log[job-failed].data.reason', values: ['recovery-exhausted'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a failure that keeps recurring ends the run once the bounded recoveries are spent' },
   { union: 'run log[job-failed].data.reason', values: ['writer-unsettled'], file: 'subs/harness/src/tests/writer-settlement.test.ts', test: 'fails as writer-unsettled, and runs no gate against that tree' },
@@ -329,21 +337,24 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['adapter-fault'], file: 'subs/harness/src/tests/run-bounds.test.ts', test: 'is an adapter fault: the invocation ends failed with that interruption, and the run fails agent-failed' },
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['session-lost'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
   { union: 'record ramify-agent.invocation-outcome/1.disposition', values: ['superseded'], file: 'subs/harness/src/tests/late-writes.test.ts', test: 'is settled with its process group, and its result completes nothing' },
-  { union: 'record ramify-agent.gate-attempt/2.rules[].outcome', values: ['failed'], file: 'subs/harness/src/tests/requirement-verification.test.ts', test: 'a file without .fake, an export without Fake and a re-export that drops it each fail the gate' },
-  { union: 'record ramify-agent.gate-attempt/2.commands[].outcome', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
-  { union: 'record ramify-agent.gate-attempt/2.verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
-  { union: 'record ramify-agent.gate-attempt/2.cause', values: ['in-scope'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
-  { union: 'record ramify-agent.gate-attempt/2.next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
-  { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
-  { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['runner-error'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'records a runner error with the structured error the spawn gave it' },
-  { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['command-missing'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
-  { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['discovery-error'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
-  { union: 'record ramify-agent.gate-attempt/2.commands[].notVerified', values: ['required-suite-missing'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'refuses a selection that lost a required suite, and one discovery could not establish' },
-  { union: 'record ramify-agent.gate-attempt/2.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
-  { union: 'record ramify-agent.gate-attempt/2.cause', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
-  { union: 'record ramify-agent.gate-attempt/2.cause', values: ['outside-assignment'], file: 'subs/harness/src/tests/no-rewind.test.ts', test: 'the work-item gate returns it to the local architect, who assigns the owner that failed' },
-  { union: 'record ramify-agent.gate-attempt/2.cause', values: ['guarded-change'], file: 'subs/harness/src/tests/breaking-work.test.ts', test: 'an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes' },
-  { union: 'record ramify-agent.gate-attempt/2.next', values: ['retry-infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
+  { union: 'record ramify-agent.gate-attempt/3.rules[].outcome', values: ['failed'], file: 'subs/harness/src/tests/requirement-verification.test.ts', test: 'a file without .fake, an export without Fake and a re-export that drops it each fail the gate' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].outcome', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/3.verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/3.next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['runner-error'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'records a runner error with the structured error the spawn gave it' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['command-missing'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['discovery-error'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['required-suite-missing'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'refuses a selection that lost a required suite, and one discovery could not establish' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['outside-assignment'], file: 'subs/harness/src/tests/no-rewind.test.ts', test: 'the work-item gate returns it to the local architect, who assigns the owner that failed' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['guarded-change'], file: 'subs/harness/src/tests/breaking-work.test.ts', test: 'an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind', values: ['identity'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'a passing identity run: the profile written outside the project, its argv, and a summary that passes' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status', values: ['passed', 'failed', 'undefined', 'pending', 'ambiguous'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'all-untagged: every tracked failure by ID, the project\'s own by count, and the pending one excluded' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status', values: ['skipped'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'a dry run passes skipped scenarios and fails on undefined and ambiguous steps' },
+  { union: 'record ramify-agent.gate-attempt/3.next', values: ['retry-infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.capability/1.origin', values: ['global-decision'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry' },
   { union: 'record ramify-agent.iteration-result/1.outcome', values: ['superseded'], file: 'subs/harness/src/tests/contract-revision.test.ts', test: 'an unfinished item is reused and its open assignment closes as superseded; a completed one is followed' },
   { union: 'record ramify-agent.iteration-result/1.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
@@ -364,6 +375,27 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'query runs.runs[].notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/run-protocol.test.ts', test: 'driven while only the file system is watched; read over HTTP, and again after two restarts' },
   { union: 'query work-items.workItems[].origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision-scripted.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
   { union: 'query metrics.baseline.state', values: ['measured'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'a run freezes B from its first snapshot, and job.json names it' },
+  // The composed runs work from plans without `gherkin` blocks, so their
+  // analyses hold architect scenarios only and give no warning.
+  { union: 'submission initial-analysis.scenarios[].origin.kind', values: ['plan'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
+  { union: 'record ramify-agent.scenario/1.kind', values: ['integration'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
+  { union: 'record ramify-agent.scenario/1.origin.kind', values: ['plan'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
+  // The composed runs start without the review stop.
+  { union: 'run log.type', values: ['review-requested', 'analysis-approved'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'waits at awaiting-review holding the project, and an approval continues it to completion' },
+  { union: 'run log.type', values: ['scenario-bound-passed', 'scenario-due'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a declaration while a requirement is open is bound and keeps its tag, passes against the fake, survives the yield, is due at requirement-verified and implemented by the work-item gate' },
+  { union: 'run log[scenario-declared].data.state', values: ['bound'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a declaration while a requirement is open is bound and keeps its tag, passes against the fake, survives the yield, is due at requirement-verified and implemented by the work-item gate' },
+  { union: 'run log.type', values: ['scenarios-withdrawing', 'scenario-withdrawn'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'by exhaustion: the iteration spends its repair rounds, and "Withdraw sc-001" restores the pending tag at once' },
+  { union: 'run log[work-item-started].data.origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision-scripted.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
+  { union: 'run log[work-item-started].data.origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'created by the last sub-scenario\'s implementation at the common ancestor, queued, briefed, bound at the ancestor, implemented by its iteration gate, and completed' },
+  { union: 'query work-items.workItems[].origin', values: ['integration'], file: 'subs/harness/src/tests/integration-scenarios.test.ts', test: 'created by the last sub-scenario\'s implementation at the common ancestor, queued, briefed, bound at the ancestor, implemented by its iteration gate, and completed' },
+  { union: 'run log[job-failed].data.reason', values: ['acceptance-incomplete'], file: 'subs/harness/src/tests/scenario-states.test.ts', test: 'a passing final gate whose scenario check did not pass a tracked scenario does not complete the run' },
+  { union: 'command.type', values: ['approve-analysis'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
+  { union: 'query runs.runs[].phase', values: ['awaiting-review'], file: 'subs/harness/src/tests/review-stop.test.ts', test: 'start-run with reviewStop and approve-analysis are accepted as stop-job is, and a malformed approval is refused' },
+  // The composed runs declare no scenario while a requirement is open; the
+  // query projects the state from scenario-declared, whose bound value
+  // scenario-states produces.
+  { union: 'query scenarios.scenarios[].state', values: ['bound'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'every state, the entry\'s work item, an integration scenario without its work item yet, and no gate that did not run it' },
+  { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
 ];
 
 /**
@@ -375,12 +407,17 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
 const projections: ReadonlyArray<readonly [query: string, record: string]> = [
   ['query decisions.decisions[][placement].outcome', 'record ramify-agent.placement-decision/1.outcome'],
   ['query work-item.iterations[].result.outcome', 'record ramify-agent.iteration-result/1.outcome'],
-  ['query work-item.iterations[].gates[].cause', 'record ramify-agent.gate-attempt/2.cause'],
-  ['query work-item.iterations[].gates[].next', 'record ramify-agent.gate-attempt/2.next'],
-  ['query gate.gate.rules[].outcome', 'record ramify-agent.gate-attempt/2.rules[].outcome'],
-  ['query gate.gate.commands[].kind', 'record ramify-agent.gate-attempt/2.commands[].kind'],
-  ['query gate.gate.commands[].notVerified', 'record ramify-agent.gate-attempt/2.commands[].notVerified'],
-  ['query gate.gate.commands[].selection.policy', 'record ramify-agent.gate-attempt/2.commands[].selection.policy'],
+  ['query work-item.iterations[].gates[].cause', 'record ramify-agent.gate-attempt/3.cause'],
+  ['query work-item.iterations[].gates[].next', 'record ramify-agent.gate-attempt/3.next'],
+  ['query gate.gate.rules[].outcome', 'record ramify-agent.gate-attempt/3.rules[].outcome'],
+  ['query gate.gate.commands[].kind', 'record ramify-agent.gate-attempt/3.commands[].kind'],
+  ['query gate.gate.commands[].notVerified', 'record ramify-agent.gate-attempt/3.commands[].notVerified'],
+  ['query gate.gate.commands[].selection.policy', 'record ramify-agent.gate-attempt/3.commands[].selection.policy'],
+  ['query analysis.analysis[accepted].scenarios[].kind', 'record ramify-agent.scenario/1.kind'],
+  ['query analysis.analysis[accepted].scenarios[].origin.kind', 'record ramify-agent.scenario/1.origin.kind'],
+  ['query analysis.analysis[accepted].warnings[].kind', 'run log[analysis-accepted].data.warnings[].kind'],
+  ['query scenarios.scenarios[].gates[].status', 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status'],
+  ['query gate.gate.commands[].scenarios.selection.kind', 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind'],
 ];
 
 /**
@@ -424,15 +461,15 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'No code path writes it: a provider error reaches the harness as a failed session outcome, which is recorded as ended: failed with the error text and no interruption.',
   },
   {
-    union: 'record ramify-agent.gate-attempt/2.commands[].kind', values: ['conformance'],
+    union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['conformance'],
     reason: 'A conformance suite runs inside the project\'s own tests command, selected through extraSuites (iteration 9); no gate records a command of kind conformance.',
   },
   {
-    union: 'record ramify-agent.gate-attempt/2.commands[].selection.policy', values: ['all-project'],
+    union: 'record ramify-agent.gate-attempt/3.commands[].selection.policy', values: ['all-project'],
     reason: 'An all-project checkpoint attaches no TestSelection to its commands (iteration 4, deviation 10), and the breaking gate\'s probe is an owned-by-scope selection (iteration 10), so no recorded selection has this policy.',
   },
   {
-    union: 'record ramify-agent.gate-attempt/2.cause', values: ['invalid-session'],
+    union: 'record ramify-agent.gate-attempt/3.cause', values: ['invalid-session'],
     reason: 'A session the implementation can no longer read is detected before the gate and recorded on the invocation as a degraded session mode (iteration 6, deviation 8), so no gate attempt carries this cause.',
   },
   {

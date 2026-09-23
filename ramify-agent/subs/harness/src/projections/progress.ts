@@ -1,6 +1,7 @@
 import type { CapabilityProgress } from '../interfaces/protocol/runs.js';
 import type { WorkItem } from '../work/records.js';
 import type { RunView } from './inputs.js';
+import { entryScenarioCounts } from './scenarios.js';
 import { capabilityOfItem } from './work.js';
 
 /*
@@ -18,6 +19,8 @@ import { capabilityOfItem } from './work.js';
  *   follow-up work item is open, and the earlier completion stays history.
  * - A superseded hypothesis leaves the list without becoming `completed`;
  *   a live one is listed as tentative, a forecast and never a commitment.
+ * - An entry also counts its acceptance scenarios, implemented of all it
+ *   has; the count is beside its state and does not decide it.
  */
 
 interface Standing {
@@ -63,6 +66,7 @@ function standingOf(view: RunView): Standing {
 /** The capabilities the run knows: registered first, in committed order, then those forecast only. */
 export function capabilityProgressOf(view: RunView): CapabilityProgress[] {
   const standing = standingOf(view);
+  const scenarioCounts = entryScenarioCounts(view);
   const itemsOf = new Map<string, WorkItem[]>();
   for (const item of view.records.workItems) {
     const capability = capabilityOfItem(view, item);
@@ -114,6 +118,7 @@ export function capabilityProgressOf(view: RunView): CapabilityProgress[] {
       dependsOn: dependsOnOf(entry.capability),
       workItems: items.map(item => item.id),
       evidence: judged.evidence,
+      scenarios: entry.origin === 'entry' ? { ...(scenarioCounts.get(entry.capability) ?? { implemented: 0, total: 0 }) } : null,
     });
   }
 
@@ -131,6 +136,7 @@ export function capabilityProgressOf(view: RunView): CapabilityProgress[] {
       dependsOn: tentativeLinks(hypothesis.capability).map(dependency => ({ capability: dependency, tentative: true })),
       workItems: [],
       evidence: [],
+      scenarios: null,
     });
   }
   return progress;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { citationSchema, modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { planRefSchema, recordRefSchema } from '../run/records.js';
 import { slugSchema } from '../analysis/records.js';
+import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
 
 /*
  * A module work item and the outline its local architect writes for it.
@@ -10,6 +11,11 @@ import { slugSchema } from '../analysis/records.js';
  * One work item is created per entry capability, always: its module is the
  * entry's owner and its goal the entry's description. Iterations, their
  * assignments and their results belong to the iteration that assigns them.
+ *
+ * An integration work item exists for one integration scenario, which it
+ * names in place of an entry capability: the harness creates it at the
+ * scenario's owner, the lowest common ancestor of its sub-scenarios' owners,
+ * once every sub-scenario is implemented (architecture §10).
  */
 
 const text = z.string().min(1);
@@ -23,11 +29,16 @@ export const workItemSchema = z.object({
   schema: z.literal('ramify-agent.work-item/1'),
   id: text,
   module: modulePathSchema,
-  /** The harness derives the one capability from the entry, obligation or requirement. */
+  /**
+   * The harness derives the one capability from the entry, obligation or
+   * requirement. An integration work item binds one scenario and implements
+   * no capability of its own.
+   */
   origin: z.union([
     z.object({ entry: slugSchema }).strict(),
     z.object({ obligation: recordRefSchema }).strict(),
     z.object({ verification: recordRefSchema }).strict(),
+    z.object({ integration: scenarioIdSchema }).strict(),
   ]),
   /** A completed item's follow-up preserves that item's historical completion. */
   follows: text.optional(),
@@ -38,6 +49,22 @@ export const workItemSchema = z.object({
   startedFor: text.nullable(),
 }).strict();
 export type WorkItem = z.infer<typeof workItemSchema>;
+
+/** The kind of a work item's origin, as `work-item-started` and the projections name it. */
+export type WorkItemOriginKind = 'entry' | 'obligation' | 'verification' | 'integration';
+
+/** Which of the four origins a work item has. */
+export function originKindOf(item: WorkItem): WorkItemOriginKind {
+  if ('entry' in item.origin) return 'entry';
+  if ('obligation' in item.origin) return 'obligation';
+  if ('verification' in item.origin) return 'verification';
+  return 'integration';
+}
+
+/** The integration scenario an integration work item binds; null for every other origin. */
+export function integrationScenarioOf(item: WorkItem): string | null {
+  return 'integration' in item.origin ? item.origin.integration : null;
+}
 
 export const decompositionSchema = z.object({
   kind: z.enum(['single-iteration', 'staged']),

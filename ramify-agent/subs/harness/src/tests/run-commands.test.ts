@@ -147,11 +147,11 @@ describe('stop-job', () => {
 });
 
 describe('the command schema', () => {
-  test('start-run carries the plan and the agent, and nothing the harness executes', () => {
+  test('start-run carries the plan, the agent and the review stop, and nothing the harness executes', () => {
     const accepted = startRunCommandSchema.parse({
       commandId: 'c1', expectedVersion: 0, type: 'start-run', payload: { planId: 'review-notes', agent: 'pi' },
     });
-    expect(accepted.payload).toEqual({ planId: 'review-notes', agent: 'pi' });
+    expect(accepted.payload).toEqual({ planId: 'review-notes', agent: 'pi', reviewStop: false });
     expect(startRunCommandSchema.safeParse({
       commandId: 'c1', expectedVersion: 0, type: 'start-run', payload: { planId: 'review-notes', agent: 'scripted', command: 'rm -rf /' },
     }).success).toBe(false);
@@ -160,8 +160,8 @@ describe('the command schema', () => {
     }).success).toBe(false);
   });
 
-  test('the run serves start-run and Plan 1\'s stop-job, and nothing else', () => {
-    expect(runCommandSchema.options.map(option => option.shape.type.value)).toEqual(['start-run', 'stop-job']);
+  test('the run serves start-run, Plan 1\'s stop-job and approve-analysis, and nothing else', () => {
+    expect(runCommandSchema.options.map(option => option.shape.type.value)).toEqual(['start-run', 'stop-job', 'approve-analysis']);
     expect(runCommandSchema.safeParse({
       commandId: 'c1', expectedVersion: 0, type: 'start-mapping', payload: { planId: 'review-notes' },
     }).success).toBe(false);

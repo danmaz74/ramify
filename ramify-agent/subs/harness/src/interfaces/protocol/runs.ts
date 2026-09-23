@@ -42,23 +42,49 @@ export type RunAgent = z.infer<typeof runAgentSchema>;
 
 /**
  * Starts an implementation run for a plan. It creates the run, so it expects
- * version 0. It carries nothing the harness will execute.
+ * version 0. It carries nothing the harness will execute. With `reviewStop`
+ * the run waits after its analysis is accepted until a person approves it or
+ * stops the run; without it, which is the default, the run goes on.
  */
 export const startRunCommandSchema = z.object({
   commandId: commandIdSchema,
   expectedVersion: jobVersionSchema,
   type: z.literal('start-run'),
-  payload: z.object({ planId: planIdSchema, agent: runAgentSchema }).strict(),
+  payload: z.object({ planId: planIdSchema, agent: runAgentSchema, reviewStop: z.boolean().default(false) }).strict(),
 }).strict();
 export type StartRunCommand = z.infer<typeof startRunCommandSchema>;
+
+/**
+ * A person approves the run's accepted analysis. At the review stop the run
+ * goes on to readiness. Any other run records the approval and changes
+ * nothing else: it is accepted before `final-verification` and after the run
+ * completed, and refused a second time, before the analysis is accepted, and
+ * for a run that failed, stopped or was interrupted. It expects the run's
+ * current version.
+ */
+export const approveAnalysisCommandSchema = z.object({
+  commandId: commandIdSchema,
+  expectedVersion: jobVersionSchema,
+  type: z.literal('approve-analysis'),
+  payload: z.object({
+    planId: planIdSchema,
+    jobId: jobIdSchema,
+    reviewer: z.string().min(1).max(200),
+    note: z.string().max(4000).optional(),
+  }).strict(),
+}).strict();
+export type ApproveAnalysisCommand = z.infer<typeof approveAnalysisCommandSchema>;
 
 /**
  * The commands a run serves. `stop-job` is Plan 1's, unchanged: a run is a
  * job, and it takes over that lifecycle of commands, receipts, versions and
  * stop.
  */
-export const runCommandSchema = z.discriminatedUnion('type', [startRunCommandSchema, stopJobCommandSchema]);
+export const runCommandSchema = z.discriminatedUnion('type', [startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema]);
+/** A command as the harness receives it, with every default applied. */
 export type RunCommand = z.infer<typeof runCommandSchema>;
+/** A command as a client may send it: a field with a default may be left out. */
+export type RunCommandInput = z.input<typeof runCommandSchema>;
 export type RunCommandType = RunCommand['type'];
 
 /**
@@ -70,6 +96,10 @@ export const runFailureReasonSchema = z.enum([
   'analysis-invalid',
   /** Readiness did not pass within its bounded recoveries. */
   'readiness-failed',
+  /** Readiness found no valid `ramify-agent.json`, or support code it names outside every test area. */
+  'project-config-invalid',
+  /** Readiness found no `cucumber-js`, or an acceptance mode's command that does not resolve. */
+  'acceptance-harness-missing',
   /** An agent session crashed or could not start. */
   'agent-failed',
   /** Every allowed submission of one invocation was invalid. */
@@ -82,6 +112,13 @@ export const runFailureReasonSchema = z.enum([
   'unresolvable-requirement',
   /** Repair rounds were spent without a passing gate. */
   'repair-exhausted',
+  /**
+   * A tracked scenario was not `implemented` before the final gate, or the
+   * final gate's scenario check did not pass every one in full mode, or a
+   * work item asked for completion with a scenario of its entry unfinished
+   * more often than the bound allows.
+   */
+  'acceptance-incomplete',
   /** Infrastructure recoveries were spent without a running check. */
   'recovery-exhausted',
   /** A writer could not be confirmed settled, so no writer and no gate may follow. */
@@ -93,8 +130,11 @@ export const runFailureReasonSchema = z.enum([
 ]);
 export type RunFailureReason = z.infer<typeof runFailureReasonSchema>;
 
-/** Which part of a run's lifecycle it has reached. */
-export const runPhaseSchema = z.enum(['analysis', 'readiness', 'working', 'final-verification', 'ended']);
+/**
+ * Which part of a run's lifecycle it has reached. `awaiting-review` is the
+ * review stop: the analysis is accepted, and the run waits for a person.
+ */
+export const runPhaseSchema = z.enum(['analysis', 'awaiting-review', 'readiness', 'working', 'final-verification', 'ended']);
 export type RunPhase = z.infer<typeof runPhaseSchema>;
 
 // The answers a client reads. Each one is a projection, never a record.
@@ -102,6 +142,17 @@ export type RunPhase = z.infer<typeof runPhaseSchema>;
 const text = z.string().min(1);
 const timestamp = z.iso.datetime();
 const count = z.int().nonnegative();
+
+/**
+ * Whether a person approved the run's analysis: `not-reviewed` until then,
+ * and afterwards who approved it, when, and whether the run was working
+ * while they did, rather than waiting at its review stop or complete.
+ */
+export const runReviewSchema = z.union([
+  z.literal('not-reviewed'),
+  z.object({ reviewer: text, at: timestamp, duringRun: z.boolean() }).strict(),
+]);
+export type RunReview = z.infer<typeof runReviewSchema>;
 
 /** The most items each list query answers with, and the bound on a gate command's output tail. */
 export const runQueryLimits = {
@@ -111,6 +162,8 @@ export const runQueryLimits = {
   decisions: 500,
   workItems: 200,
   capabilities: 500,
+  /** Tracked scenarios of the scenario list and of the analysis's review. */
+  scenarios: 500,
   /** Module-capability rows of one comparison, of the capabilities kept whole within `capabilities`. */
   moduleCapabilityRows: 2000,
   /** Bytes of a gate command's output a client receives; the complete output stays a file of the run. */
@@ -198,11 +251,14 @@ export const runSnapshotSchema = z.object({
     invocations: count,
     readinessAttempts: count,
     gateAttempts: count,
+    /** The tracked acceptance scenarios in each state. */
+    scenarios: z.object({ pending: count, bound: count, declared: count, implemented: count }).strict(),
     /** Invocations whose executor started otherwise than the harness asked: a continuation or fork made fresh. */
     degradedStarts: count,
   }).strict(),
   /** The one writer: which invocation holds it, and an invocation whose release was not confirmed. */
   writer: z.object({ held: text.nullable(), unsettled: text.nullable() }).strict(),
+  review: runReviewSchema,
   /** Module notices first, then cycles, each in the order the log established them. */
   notices: z.array(runNoticeSchema),
 }).strict();
@@ -235,7 +291,8 @@ export type RunResponse = z.infer<typeof runResponseSchema>;
 /** What a projected event refers to. */
 export const runEventRefKindSchema = z.enum([
   'work-item', 'iteration', 'invocation', 'gate', 'decision', 'request',
-  'contract', 'obligation', 'requirement', 'capability', 'commit', 'session',
+  'contract', 'obligation', 'requirement', 'capability', 'commit', 'scenario',
+  'session',
 ]);
 export type RunEventRefKind = z.infer<typeof runEventRefKindSchema>;
 
@@ -311,10 +368,83 @@ export const hypothesisViewSchema = z.object({
 }).strict();
 export type HypothesisView = z.infer<typeof hypothesisViewSchema>;
 
+// The acceptance scenarios a run tracks, as the review and the scenario list read them.
+
+/** Whether a scenario is one entry's, or a plan scenario that combines several entries. */
+export const scenarioKindSchema = z.enum(['entry', 'integration']);
+export type ScenarioKind = z.infer<typeof scenarioKindSchema>;
+
+/**
+ * Where a tracked scenario comes from: the plan, whose text is the
+ * requirement, with the plan's lines; or the initial architect, with the
+ * parts of the plan it cites.
+ */
+export const scenarioOriginViewSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('plan'), planScenario: text, lines: z.tuple([z.int().positive(), z.int().positive()]) }).strict(),
+  z.object({
+    kind: z.literal('architect'),
+    refs: z.array(z.object({ anchor: text.optional(), lines: z.tuple([count, count]).optional() }).strict()),
+  }).strict(),
+]);
+export type ScenarioOriginView = z.infer<typeof scenarioOriginViewSchema>;
+
+/**
+ * A tracked scenario's state: `pending` and `bound` keep the pending tag in
+ * the source, `declared` waits for a gate to verify it, `implemented` passed
+ * one. Only the harness moves a state.
+ */
+export const trackedScenarioStateSchema = z.enum(['pending', 'bound', 'declared', 'implemented']);
+export type TrackedScenarioState = z.infer<typeof trackedScenarioStateSchema>;
+
+/** One scenario's result in one Cucumber run: the worst of its steps. */
+export const scenarioStatusSchema = z.enum(['passed', 'failed', 'undefined', 'pending', 'ambiguous', 'skipped']);
+export type ScenarioStatus = z.infer<typeof scenarioStatusSchema>;
+
+/** The execution mode of a scenario check, fixed for the whole check. */
+export const scenarioCheckModeSchema = z.enum(['quick', 'full']);
+export type ScenarioCheckMode = z.infer<typeof scenarioCheckModeSchema>;
+
+/** The kinds of warning the accepted analysis recorded on its scenarios. */
+export const scenarioWarningKindSchema = z.enum(['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps']);
+export type ScenarioWarningKind = z.infer<typeof scenarioWarningKindSchema>;
+
+/** A warning of the accepted analysis, never a rejection, with the scenarios it concerns. */
+export const scenarioWarningViewSchema = z.object({
+  kind: scenarioWarningKindSchema,
+  scenarios: z.array(text),
+  message: text,
+}).strict();
+export type ScenarioWarningView = z.infer<typeof scenarioWarningViewSchema>;
+
+/**
+ * One tracked scenario as the accepted analysis froze it, with its text: an
+ * entry scenario with its entry, a sub-scenario with the integration scenario
+ * it came from, and an integration scenario, whose text is the plan's, with
+ * its sub-scenarios.
+ */
+export const analysisScenarioSchema = z.object({
+  id: text,
+  kind: scenarioKindSchema,
+  /** The entry capability; null for an integration scenario. */
+  entry: text.nullable(),
+  owner: text,
+  origin: scenarioOriginViewSchema,
+  /** The integration scenario this one is a sub-scenario of. */
+  partOf: text.nullable(),
+  subScenarios: z.array(text),
+  name: z.string(),
+  /** The `Scenario` block as the feature file carries it, tags excluded. */
+  source: z.array(z.string()),
+  /** The feature file that carries it, relative to the project. */
+  file: text,
+}).strict();
+export type AnalysisScenario = z.infer<typeof analysisScenarioSchema>;
+
 /**
  * `GET /api/v1/plans/:planId/runs/:runId/analysis`: the captured plan, the
- * entry assignments with their owners and the hypotheses with their standing
- * and revision. `pending` until the analysis is accepted.
+ * entry assignments with their owners, the hypotheses with their standing
+ * and revision, and the tracked scenarios with the warnings the acceptance
+ * recorded on them. `pending` until the analysis is accepted.
  */
 export const analysisResponseSchema = z.object({
   plan: z.object({ markdown: z.string(), hash: text }).strict(),
@@ -325,7 +455,10 @@ export const analysisResponseSchema = z.object({
       view: viewIdentitySchema,
       entries: z.array(entryViewSchema).max(runQueryLimits.analysis),
       hypotheses: z.array(hypothesisViewSchema).max(runQueryLimits.analysis),
-      total: z.object({ entries: count, hypotheses: count }).strict(),
+      /** Entry scenarios in the order the analysis submitted them, then integration scenarios. */
+      scenarios: z.array(analysisScenarioSchema).max(runQueryLimits.scenarios),
+      warnings: z.array(scenarioWarningViewSchema),
+      total: z.object({ entries: count, hypotheses: count, scenarios: count }).strict(),
     }).strict(),
   ]),
 }).strict();
@@ -423,7 +556,7 @@ export const workItemSummarySchema = z.object({
   id: text,
   module: text,
   capability: text.nullable(),
-  origin: z.enum(['entry', 'obligation', 'verification']),
+  origin: z.enum(['entry', 'obligation', 'verification', 'integration']),
   goal: text,
   state: workItemStateSchema,
   /** A completed item this one follows up after its evidence was reopened. */
@@ -548,6 +681,8 @@ export const capabilityProgressSchema = z.object({
   dependsOn: z.array(z.object({ capability: text, tentative: z.boolean() }).strict()),
   workItems: z.array(text),
   evidence: z.array(text),
+  /** An entry's scenarios: how many are implemented of all it has. Null for a capability that is not an entry. */
+  scenarios: z.object({ implemented: count, total: count }).strict().nullable(),
 }).strict();
 export type CapabilityProgress = z.infer<typeof capabilityProgressSchema>;
 
@@ -715,6 +850,44 @@ export type ModuleCapabilityComparisonResponse = z.infer<typeof moduleCapability
 
 const tailBytes = (tail: string): number => new TextEncoder().encode(tail).byteLength;
 
+/** A failing scenario's first failing step and its message. */
+const scenarioFailureView = z.object({ step: z.string(), message: z.string() }).strict();
+
+/**
+ * What a `scenarios` command established, in compact form: its mode and
+ * selection, each module's run by exit code, each tracked scenario's status
+ * with its failure and undefined steps, the project's own scenarios by count,
+ * and why the check did not pass. The bindings and message streams stay
+ * files of the run.
+ */
+export const scenarioCheckViewSchema = z.object({
+  mode: scenarioCheckModeSchema,
+  selection: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('identity'), scenarios: z.array(text).min(1) }).strict(),
+    z.object({ kind: z.literal('all-untagged') }).strict(),
+    z.object({ kind: z.literal('all') }).strict(),
+  ]),
+  dryRun: z.boolean(),
+  /** Tracked scenarios the runs' files held and the selection kept out. */
+  excluded: count,
+  runs: z.array(z.object({ module: text, exit: z.int().nullable() }).strict()),
+  scenarios: z.array(z.object({
+    id: text,
+    /** The module whose run executed it. */
+    run: text,
+    status: scenarioStatusSchema,
+    file: z.string(),
+    line: z.int().positive(),
+    failure: scenarioFailureView.nullable(),
+    /** Step texts no definition matched. */
+    undefined: z.array(z.string()),
+  }).strict()),
+  untracked: z.object({ passed: count, skipped: count, failed: count }).strict(),
+  /** One line per reason the check did not pass; empty when it passed. */
+  failures: z.array(z.string()),
+}).strict();
+export type ScenarioCheckView = z.infer<typeof scenarioCheckViewSchema>;
+
 /** One gate attempt, with each command's output tail bounded at 8 KiB and its environment withheld. */
 export const gateViewSchema = z.object({
   id: text,
@@ -742,7 +915,7 @@ export const gateViewSchema = z.object({
     violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
   }).strict()),
   commands: z.array(z.object({
-    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance']),
+    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
     argv: z.array(z.string()),
     cwd: text,
     startedAt: z.string(),
@@ -765,6 +938,8 @@ export const gateViewSchema = z.object({
       truncated: z.boolean(),
       tail: z.string().refine(tail => tailBytes(tail) <= runQueryLimits.outputTailBytes, 'An output tail is at most 8 KiB'),
     }).strict(),
+    /** A `scenarios` command's summary; null for every other kind, and for one that recorded none. */
+    scenarios: scenarioCheckViewSchema.nullable(),
   }).strict()),
 }).strict();
 export type GateView = z.infer<typeof gateViewSchema>;
@@ -772,6 +947,61 @@ export type GateView = z.infer<typeof gateViewSchema>;
 /** `GET /api/v1/plans/:planId/runs/:runId/gates/:gate`. */
 export const gateResponseSchema = z.object({ gate: gateViewSchema }).strict();
 export type GateResponse = z.infer<typeof gateResponseSchema>;
+
+/** One gate attempt whose scenario check ran a tracked scenario, with the scenario's status there. */
+export const scenarioGateResultSchema = z.object({
+  gate: text,
+  checkpoint: gateCheckpointSchema,
+  subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
+  /** The attempt's verdict, which covers every check it ran. */
+  verdict: gateVerdictSchema,
+  mode: scenarioCheckModeSchema,
+  dryRun: z.boolean(),
+  status: scenarioStatusSchema,
+  failure: scenarioFailureView.nullable(),
+  undefined: z.array(z.string()),
+}).strict();
+export type ScenarioGateResult = z.infer<typeof scenarioGateResultSchema>;
+
+/**
+ * One tracked scenario as the run holds it now: its state, where it came
+ * from, what it belongs to, who owns it and in which file, and every gate
+ * attempt that ran it, in the order they were committed.
+ */
+export const scenarioViewSchema = z.object({
+  id: text,
+  kind: scenarioKindSchema,
+  name: z.string(),
+  state: trackedScenarioStateSchema,
+  origin: scenarioOriginViewSchema,
+  /** The entry capability; null for an integration scenario. */
+  entry: text.nullable(),
+  /** The integration scenario this one is a sub-scenario of. */
+  partOf: text.nullable(),
+  subScenarios: z.array(text),
+  /**
+   * The work item that binds it: its entry's, or for an integration scenario
+   * the integration work item, null until its sub-scenarios are implemented.
+   */
+  workItem: text.nullable(),
+  owner: text,
+  file: text,
+  /** The gate whose pass made it `implemented`; null while it is not. */
+  implementedBy: text.nullable(),
+  gates: z.array(scenarioGateResultSchema),
+}).strict();
+export type ScenarioView = z.infer<typeof scenarioViewSchema>;
+
+/**
+ * `GET /api/v1/plans/:planId/runs/:runId/scenarios`: every tracked scenario,
+ * at most 500, entry scenarios first, then integration scenarios. Empty until
+ * the analysis is accepted.
+ */
+export const scenarioListResponseSchema = z.object({
+  scenarios: z.array(scenarioViewSchema).max(runQueryLimits.scenarios),
+  total: count,
+}).strict();
+export type ScenarioListResponse = z.infer<typeof scenarioListResponseSchema>;
 
 export const metricStateSchema = z.enum(['measured', 'partial', 'unavailable', 'not-applicable']);
 export type MetricState = z.infer<typeof metricStateSchema>;

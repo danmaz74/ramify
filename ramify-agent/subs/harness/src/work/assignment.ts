@@ -6,6 +6,8 @@ import { planRefSchema } from '../run/records.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
 import { extraPurposeSchema } from './iterations.js';
+import { assignedScenarioErrors, type DeclarationContext } from './declarations.js';
+import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
 
 /*
@@ -106,6 +108,12 @@ export const assignmentBodySchema = z.object({
    * fills the revision: a submission never chooses one.
    */
   revisesContract: text.optional(),
+  /**
+   * The scenarios of this work item the iteration is expected to bind. It is
+   * informative: their text reaches the engineer under "Scenarios to bind",
+   * and the harness never requires that the engineer declare exactly these.
+   */
+  scenarios: z.array(text).optional(),
 }).strict();
 export type AssignmentBody = z.infer<typeof assignmentBodySchema>;
 
@@ -123,6 +131,13 @@ export interface AssignmentEvidence {
   readonly guardedPaths?: ReadonlySet<string> | undefined;
   /** Whether this submission carries an outline revision, which is what records an authorization. */
   readonly revising?: boolean | undefined;
+  /**
+   * For an integration work item: the scope its engineer works in, the
+   * ancestor with the children on the paths to the sub-scenarios' owners.
+   */
+  readonly integration?: IntegrationScope | undefined;
+  /** The work item's scenarios and the run's tracked ones, which `scenarios` is judged against. */
+  readonly scenarios?: DeclarationContext | undefined;
 }
 
 /** The registry entry that authorizes creating `module`, or undefined when none does. */
@@ -315,6 +330,37 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
         : `"${body.revisesContract}" is not an agreement this work item consumes`,
       expected: contracts.size === 0 ? 'no contract assignment' : `one of ${[...contracts].join(', ')}`,
     });
+  }
+
+  // An integration work item binds its scenario at the common ancestor, and
+  // its engineer needs every path down to the sub-scenarios' owners: their
+  // step files are what it imports, and their declarations are where the
+  // expose-test lines go.
+  const integration = evidence.integration;
+  if (integration !== undefined) {
+    const wanted = `the base { module: "${integration.module}", includedChildren: [${integration.includedChildren.map(child => `"${child}"`).join(', ')}] }`;
+    if (narrow === null || narrow.module !== integration.module) {
+      errors.push({
+        path: 'assignment.scope.base',
+        message: `An integration work item's engineer works at the common ancestor "${integration.module}" of its sub-scenarios' owners`,
+        expected: wanted,
+      });
+    } else {
+      const missing = integration.includedChildren.filter(child => !narrow.includedChildren.includes(child));
+      if (missing.length > 0) {
+        errors.push({
+          path: 'assignment.scope.base.includedChildren',
+          message: `The scope leaves out ${missing.map(child => `"${child}"`).join(', ')}, on the path to a sub-scenario's owner whose step files the scenario imports`,
+          expected: wanted,
+        });
+      }
+    }
+  }
+
+  // The scenarios named for the engineer are this work item's: an iteration
+  // binds nothing another work item owns.
+  if (body.scenarios !== undefined && body.scenarios.length > 0) {
+    errors.push(...assignedScenarioErrors(body.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
   }
 
   const stages = evidence.outline?.stages.length ?? 0;

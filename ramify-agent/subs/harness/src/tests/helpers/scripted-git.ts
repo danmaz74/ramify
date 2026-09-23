@@ -7,6 +7,15 @@ export interface GitCheckpoint {
   readonly changes: ReadonlyArray<{ status: string; path: string }>;
 }
 
+/**
+ * The commit that writes a run's feature files onto its branch, "Scenarios
+ * of <planId>". Agents that change no source still leave the tree changed
+ * by it, so it answers a revision: every file it adds is new.
+ */
+export function scenariosCommit(planId: string, commit = `scenarios-of-${planId}`, files: readonly string[] = []): GitCheckpoint {
+  return { subject: `Scenarios of ${planId}`, commit, changes: files.map(path => ({ status: 'A', path })) };
+}
+
 /** Canned external responses for a scenario, including unchanged checkpoints. */
 export interface GitScript {
   readonly head: string;
@@ -29,6 +38,8 @@ export interface ScriptedGit extends GitService {
  */
 export function scriptedGit(root: string, script: GitScript): ScriptedGit {
   let index = 0;
+  // Gate attempts after readiness's `ga-0001`; the scenarios commit is no gate's.
+  let gates = 0;
   let head = script.head;
   let branch: string | null = null;
   let pending: GitCheckpoint['changes'] = [];
@@ -61,6 +72,7 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
         expect(title === step!.subject || title.startsWith(`${step!.subject}:`), `expected checkpoint ${step!.subject}, got ${title}`).toBe(true);
       });
       index += 1;
+      if (!message.includes('\nRamify-Scenarios: ')) gates += 1;
       last = { from: head, to: step!.commit ?? head, changes: step!.changes };
       if (step!.commit !== null) { head = step!.commit; made.push({ id: head, message }); }
       pending = [];
@@ -70,7 +82,7 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
       check('findCommitByTrailers', project, () => {
         expect(trailers.map(trailer => trailer.key)).toEqual(['Ramify-Run', 'Ramify-Gate']);
         expect(trailers[0]!.value).toBe(branch?.slice('ramify-agent/run-'.length));
-        expect(trailers[1]!.value).toBe(`ga-${String(index + 2).padStart(4, '0')}`);
+        expect(trailers[1]!.value).toBe(`ga-${String(gates + 2).padStart(4, '0')}`);
       });
       return null; // This scenario has no recovered attempt.
     },

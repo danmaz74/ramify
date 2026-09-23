@@ -44,6 +44,8 @@ expose-sub apiPrefix, protocolPaths from harness to descendants
 expose-sub runIdSchema, RunId, roleSchema, Role, runAgentSchema, RunAgent from harness to descendants
 expose-sub startRunCommandSchema, StartRunCommand, runCommandSchema, RunCommand from harness to descendants
 expose-sub RunCommandType, runFailureReasonSchema, RunFailureReason from harness to descendants
+expose-sub approveAnalysisCommandSchema, ApproveAnalysisCommand, RunCommandInput from harness to descendants
+expose-sub runReviewSchema, RunReview from harness to descendants
 expose-sub runPhaseSchema, RunPhase, runQueryLimits, measurementPolicySchema from harness to descendants
 expose-sub kpiPolicySchema, lineagePolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
@@ -72,6 +74,12 @@ expose-sub MetricState, metricSchema, Metric, guardingViewSchema, GuardingView f
 expose-sub lineageMetricSchema, LineageMetric from harness to descendants
 expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to descendants
 expose-sub metricsResponseSchema, MetricsResponse from harness to descendants
+expose-sub scenarioKindSchema, ScenarioKind, scenarioOriginViewSchema, ScenarioOriginView from harness to descendants
+expose-sub trackedScenarioStateSchema, TrackedScenarioState, scenarioStatusSchema, ScenarioStatus from harness to descendants
+expose-sub scenarioCheckModeSchema, ScenarioCheckMode, scenarioWarningKindSchema, ScenarioWarningKind from harness to descendants
+expose-sub scenarioWarningViewSchema, ScenarioWarningView, analysisScenarioSchema, AnalysisScenario from harness to descendants
+expose-sub scenarioCheckViewSchema, ScenarioCheckView, scenarioGateResultSchema, ScenarioGateResult from harness to descendants
+expose-sub scenarioViewSchema, ScenarioView, scenarioListResponseSchema, ScenarioListResponse from harness to descendants
 
 // protocol/transcripts.ts
 expose-sub transcriptBodySchema, TranscriptBody, transcriptLineRangeSchema from harness to descendants

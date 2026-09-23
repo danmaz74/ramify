@@ -18,6 +18,10 @@ expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurem
 // and with a clean environment.
 expose-src CommandRunner, runCommand, CommandRequest, CommandRun, CommandOutcome, CommandOutput, childEnvironment, environmentNames, outputTailBytes from "run-command.ts" to parent
 
+// The target project's configuration for the harness, read as bytes; its
+// schema and what an invalid file means belong to the harness.
+expose-src projectConfigurationFile, ProjectConfigurationRead, readProjectConfiguration from "project-configuration.ts" to parent
+
 // The identity of the state the evidence describes.
 expose-src guardedFilesHash from "guarded-files.ts" to parent
 

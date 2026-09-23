@@ -72,6 +72,13 @@ const base = 'source-00';
 const source = (n: number) => `source-${String(n).padStart(2, '0')}`;
 /** A checkpoint over a tree with nothing to commit. */
 const unchanged = (against: string): CommitResponse => ({ commit: null, against });
+/**
+ * The harness's own commit of the feature files, once readiness has passed,
+ * in a run whose analysis has scenarios; later boundaries are asked
+ * against it.
+ */
+const materialized = 'scenarios-00';
+const materialize: CommitResponse = { commit: materialized, against: base, changes: [] };
 
 /**
  * The Git of each project this file drives, by that project's root: a
@@ -177,6 +184,9 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'session-finished': return types.includes('session-finished');
     case 'analysis-accepted': return types.includes('analysis-accepted');
     case 'readiness-attempted': return types.includes('readiness-passed') || types.includes('readiness-failed');
+    // The materialization's intent is in the log; its commit is made at the second.
+    case 'scenarios-materializing': case 'scenarios-committed': return types.includes('scenarios-materializing');
+    case 'scenarios-materialized': return types.includes('scenarios-materialized');
     case 'work-item-started': return types.includes('work-item-started');
     case 'hypotheses-delivered': return types.includes('hypotheses-delivered');
     case 'outline-revised': return types.includes('outline-revised');
@@ -370,7 +380,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash after placement-requested leaves the request, and no fork and no decision', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const agent = createScriptedAgent(byRole(placementPlan()));
     const { runId } = await crashAfter(root, 'placement-requested', false, undefined, undefined, agent);
     await rm(runPath(root, 'review-notes', runId, architectureLayout.request('pr-001')));
@@ -390,7 +400,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a fork interrupted mid-investigation leaves no decision, and its invocation is closed without an agent call', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     // The fork is still investigating when the harness stops: its session
     // never answers.
     const agent = createScriptedAgent(byRole({
@@ -420,7 +430,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash between an accepted decision and the parent append appends the brief once', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const brief = 'The note stays with the reviews module, which already holds a review run.';
     const agent = createScriptedAgent(byRole(placementPlan(brief)));
     const { runId } = await crashAfter(root, 'decision-accepted', false, undefined, undefined, agent);
@@ -447,7 +457,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('G4: a crash after the append and before its completion answers already-present, and one brief exists', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const brief = 'The note stays with the reviews module, which already holds a review run.';
     const agent = createScriptedAgent(byRole(placementPlan(brief)));
     const { runId } = await crashAfter(root, 'brief-appending', false, undefined, undefined, agent);
@@ -468,7 +478,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash after brief-appended delivers the decision once and starts nothing', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const agent = createScriptedAgent(byRole(placementPlan()));
     const { runId } = await crashAfter(root, 'brief-appended', false, undefined, undefined, agent);
 
@@ -575,7 +585,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash after work-item-started starts no second one and delivers nothing twice', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const { runId } = await crashAfter(root, 'work-item-started', false, oneWorkItem());
 
     const { service, recovery } = await reopen(root);
@@ -588,7 +598,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash after hypotheses-delivered re-materializes the work item and delivers nothing a second time', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const { runId } = await crashAfter(root, 'hypotheses-delivered', false, oneWorkItem());
     // The work item's file is removed, as a crash between the line and its file leaves it.
     await rm(runPath(root, 'review-notes', runId, workLayout.item('wi-001')));
@@ -605,7 +615,7 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a crash after outline-revised re-materializes the outline and writes no second revision', async () => {
-    const root = await target();
+    const root = await target([materialize], [], materialized);
     const { runId } = await crashAfter(root, 'outline-revised', false, oneWorkItem());
     await rm(runPath(root, 'review-notes', runId, workLayout.outline('wi-001', 1)));
 
@@ -621,7 +631,7 @@ describe('the recovery table', () => {
   test('a crash after work-item-completed leaves the item completed and starts it no second time', async () => {
     // Nothing was written, so the work-item checkpoint before the boundary
     // has nothing to commit.
-    const root = await target([unchanged(base)]);
+    const root = await target([materialize, unchanged(materialized)], [], materialized);
     const { runId } = await crashAfter(root, 'work-item-completed', false, oneWorkItem());
 
     const { service } = await reopen(root);
@@ -670,7 +680,7 @@ describe('the boundaries of an iteration', () => {
   const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
   /** A fixture copy with one module of this test's own and a runner that really runs its test. */
-  async function iterationTarget(commits: readonly CommitResponse[] = [], after = base) {
+  async function iterationTarget(commits: readonly CommitResponse[] = [], after = materialized) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await addModule(fixture.root, notesDirectory, 'notes', {
@@ -684,7 +694,7 @@ describe('the boundaries of an iteration', () => {
       ].join('\n'),
     });
     await installMiniRunner(fixture.root);
-    stateGit(fixture.root, commits, [], after);
+    stateGit(fixture.root, [materialize, ...commits], [], after);
     return fixture.root;
   }
 
@@ -811,9 +821,9 @@ describe('the boundaries of an iteration', () => {
     expect(events.at(-1)!.type).toBe('job-interrupted');
     expect(onlyRun(service, 'review-notes').state).toBe('interrupted');
     // Nothing was checked or committed against a tree the harness never saw
-    // settle into a proposal.
+    // settle into a proposal; the one commit is the feature files'.
     expect(events.some(event => event.type === 'gate-attempted')).toBe(false);
-    expect(commitCount(root)).toBe(0);
+    expect(commitCount(root)).toBe(1);
 
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost' });
@@ -827,7 +837,7 @@ describe('the boundaries of an iteration', () => {
 
   test('a crash after iteration-closed leaves the accepted iteration accepted and its one commit where it is', async () => {
     const root = await iterationTarget(
-      [{ commit: source(1), against: base, changes: untracked(`${notesDirectory}/src/store.ts`) }],
+      [{ commit: source(1), against: materialized, changes: untracked(`${notesDirectory}/src/store.ts`) }],
       source(1),
     );
     const { runId } = await crashAfter(root, 'iteration-closed', false, oneIteration(), treeInputs());
@@ -846,13 +856,14 @@ describe('the boundaries of an iteration', () => {
     expect(events.at(-1)!.type).toBe('job-interrupted');
     expect(events.some(event => event.type === 'work-item-completed')).toBe(false);
     expect(onlyRun(service, 'review-notes').state).toBe('interrupted');
-    expect(commitCount(root)).toBe(1);
+    // The feature files' commit and the iteration's.
+    expect(commitCount(root)).toBe(2);
   }, 180_000);
 
   test('an interrupted run leaves every completed work item completed, and starts none of them again', async () => {
     // The first work item is completed with nothing written, so its
     // checkpoint has nothing to commit.
-    const root = await iterationTarget([unchanged(base)]);
+    const root = await iterationTarget([unchanged(materialized)]);
     // Two entry capabilities: the first work item is closed before the crash.
     const script = byRole({
       'initial-architect': [submitStep(analysis([entry('review-note', notes), entry('review-note-two', notes)]))],
@@ -903,7 +914,7 @@ describe('the boundaries of a delegation', () => {
    */
   const contractCommit = (revision: number, agreement: Seam): CommitResponse => ({
     commit: source(revision),
-    against: revision === 1 ? base : source(revision - 1),
+    against: revision === 1 ? materialized : source(revision - 1),
     changes: [
       ...modified(paths(agreement).consumer),
       ...untracked(paths(agreement).fake, paths(agreement).contract, paths(agreement).conformance, paths(agreement).subjects),
@@ -911,7 +922,7 @@ describe('the boundaries of a delegation', () => {
   });
 
   /** A project with the consumer that needs the behavior and the owner that will provide it. */
-  async function delegationTarget(commits: readonly CommitResponse[] = [], after = base) {
+  async function delegationTarget(commits: readonly CommitResponse[] = [], after = materialized) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await addModule(fixture.root, consumerDirectory, 'notes', {
@@ -920,7 +931,7 @@ describe('the boundaries of a delegation', () => {
     });
     await addModule(fixture.root, providerDirectory, 'limits', {});
     await installMiniRunner(fixture.root);
-    stateGit(fixture.root, commits, [], after);
+    stateGit(fixture.root, [materialize, ...commits], [], after);
     return fixture.root;
   }
 

@@ -61,7 +61,7 @@ const diagram: DiagramSessions = { planId, runId, sessions: all };
 
 const capability = (id: string, extra: Partial<CapabilityProgress> = {}): CapabilityProgress => ({
   capability: id, owner: reviews, entry: false, tentative: false, state: 'working', reason: `${id} reason`,
-  dependsOn: [], workItems: [], evidence: [], ...extra,
+  dependsOn: [], workItems: [], evidence: [], scenarios: extra.entry === true ? { implemented: 0, total: 1 } : null, ...extra,
 });
 const capabilities = capabilityListResponseSchema.parse({
   capabilities: [
@@ -234,8 +234,8 @@ function snapshot(version: number): RunSnapshot {
   return runSnapshotSchema.parse({
     jobId: runId, planId, agent: 'scripted', version, state: 'running', phase: 'working', stopRequested: false,
     startedAt: at(0), updatedAt: at(0), endedAt: null, failure: null, current: null, waits: [],
-    counts: { workItems: 2, completedWorkItems: 0, openRequirements: 0, invocations: 4, readinessAttempts: 1, gateAttempts: 0, degradedStarts: 0 },
-    writer: { held: null, unsettled: null }, notices: [],
+    counts: { workItems: 2, completedWorkItems: 0, openRequirements: 0, invocations: 4, readinessAttempts: 1, gateAttempts: 0, scenarios: { pending: 0, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [],
   });
 }
 

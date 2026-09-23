@@ -26,6 +26,8 @@ export const protocolPaths = {
   runCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/capabilities`,
   /** The initial analysis's module associations beside the capabilities verified at their current owners. */
   runModuleCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/module-capabilities`,
+  /** Every tracked acceptance scenario with its state and the gates it ran in. */
+  runScenarios: (planId: string, runId: string): string => `${run(planId, runId)}/scenarios`,
   runGate: (planId: string, runId: string, gate: string): string => `${run(planId, runId)}/gates/${encodeURIComponent(gate)}`,
   runMetrics: (planId: string, runId: string): string => `${run(planId, runId)}/metrics`,
   /** Every session of the project, a page of at most 200 from `offset`. */

@@ -2,25 +2,31 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
-import { allProjectChecks, checkpointPolicies } from '../checks/checkpoint.js';
+import { allProjectChecks, checkpointPolicies, planScenarioCheck } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
-import type { GateAttempt } from '../checks/records.js';
+import type { GateAttempt, GateCommandRecord } from '../checks/records.js';
+import type { PlannedCheck } from '../checks/verify.js';
 import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
+import type { RunFailureReason } from '../interfaces/protocol/runs.js';
 import { discoverNestedPackages } from './policy.js';
+import { matchSupport, moduleTestAreas, scenarioModules, unresolvedCommands } from './project-config.js';
 import {
   readinessAttemptSchema, infrastructureRecoverySchema,
-  type InfrastructureRecovery, type ReadinessAttempt, type ReadinessStep, type RecoveryId, type RunPolicy,
+  type CapturedProjectConfig, type InfrastructureRecovery, type ReadinessAttempt, type ReadinessStep, type RecoveryId, type RunPolicy,
 } from './records.js';
 
 /*
  * Execution readiness. Before any work is assigned, the harness verifies the
  * project it will work in: that it is there, that it is a clean git
- * repository, that the compiler configuration, the test runner and the
- * independent nested packages are present and installed, that tests are
+ * repository, that the compiler configuration, the test runner, the
+ * project's configuration, its scenario harness and the independent nested
+ * packages are present and installed, that tests are
  * discovered, that Ramify answers, and that the project's own baseline
- * passes.
+ * passes: its tests, type check and Ramify check, its own scenarios in quick
+ * mode, and its full mode loaded or run.
  *
  * Missing dependencies or a nonexistent command are readiness failures, not
  * code-repair assignments. A failure that a bounded preparation can repair
@@ -43,6 +49,10 @@ export interface ReadinessRequest {
   readonly gateDirectory: string;
   readonly gateId: string;
   readonly policy: RunPolicy;
+  /** The project's configuration as `start-run` captured it. */
+  readonly projectConfig: CapturedProjectConfig;
+  /** The architect view that names the modules, or null where the run has none. */
+  readonly index?: ArchitectIndex | null | undefined;
   readonly ramify: RamifyCli;
   readonly git?: GitService | undefined;
   /** The commit readiness ran on. */
@@ -72,27 +82,39 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
   steps.push(await gitCleanStep(projectRoot, request.signal, request.git ?? gitService));
   steps.push(await compilerConfigStep(projectRoot));
   steps.push(await testRunnerStep(projectRoot));
+  steps.push(await projectConfigStep(projectRoot, request.projectConfig, request.index ?? null));
+  steps.push(await acceptanceRunnerStep(projectRoot, request.projectConfig));
 
   const nested = await discoverNestedPackages(projectRoot);
   steps.push(nestedPackagesStep(nested, policy));
   steps.push(await testDiscoveryStep(projectRoot));
   steps.push(await ramifyDaemonStep(request));
 
-  const baselineSteps: ReadinessStep[] = ['baseline-tests', 'baseline-type-check', 'baseline-ramify-check'];
   const blocked = steps.find(step => step.outcome !== 'passed');
   if (blocked !== undefined) {
-    for (const step of baselineSteps) {
+    for (const step of gateSteps) {
       steps.push({ step, outcome: 'not-verified', detail: `not reached: ${blocked.step} did not pass` });
     }
     return { attempt: attemptRecord(request, steps, nested, null), gate: null };
   }
+
+  // The scenario harness's baseline: the project's own scenarios in quick
+  // mode, and full mode loaded with `--dry-run` or, where the project asks,
+  // run. The plan's feature files are not written yet, and a pending one
+  // left by an earlier run is kept out, so this is the project's own
+  // regression acceptance. A step reached here has a valid configuration.
+  const acceptance = await acceptanceChecks(request);
+  const checks = [...allProjectChecks(policy.commands, checkpointPolicies.readiness)];
+  const acceptanceIndex = { quick: -1, full: -1 };
+  if (acceptance.quick !== null) acceptanceIndex.quick = checks.push(acceptance.quick) - 1;
+  if (acceptance.full !== null) acceptanceIndex.full = checks.push(acceptance.full) - 1;
 
   const gate = await runGate(execution, 'readiness', {
     id: request.gateId,
     projectRoot,
     directory: request.gateDirectory,
     head: request.head,
-    checks: allProjectChecks(policy.commands, checkpointPolicies.readiness),
+    checks,
     ...(request.signal === undefined ? {} : { signal: request.signal }),
   });
 
@@ -130,7 +152,52 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
     }
   }
 
+  steps.push(acceptanceStep('baseline-acceptance', gate.commands[acceptanceIndex.quick], acceptance.modules));
+  steps.push(acceptanceStep('acceptance-full', gate.commands[acceptanceIndex.full], acceptance.modules));
+
   return { attempt: attemptRecord(request, steps, nested, gate), gate };
+}
+
+/**
+ * The steps the baseline gate verifies, in the order the attempt records
+ * them. The two acceptance steps follow `acceptance-runner` in the step
+ * vocabulary, and are recorded here, where they are verified: a step not
+ * reached must never stand before the step that stopped the attempt.
+ */
+const gateSteps: readonly ReadinessStep[] = ['baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full'];
+
+/** Readiness's two scenario checks, or null for each when no module has feature files. */
+async function acceptanceChecks(request: ReadinessRequest): Promise<{ quick: PlannedCheck | null; full: PlannedCheck | null; modules: number }> {
+  const captured = request.projectConfig;
+  if ('invalid' in captured) return { quick: null, full: null, modules: 0 };
+  const modules = await scenarioModules(request.projectRoot, request.index ?? null);
+  const inputs = { harness: captured.config.acceptance, modules, scenarios: [] };
+  const quick = planScenarioCheck('readiness', inputs, { projectRoot: request.projectRoot });
+  const full = planScenarioCheck('readiness', inputs, {
+    projectRoot: request.projectRoot,
+    mode: 'full',
+    dryRun: captured.config.acceptance.modes.full.readiness === 'dry-run',
+  });
+  return { quick: 'check' in quick ? quick.check : null, full: 'check' in full ? full.check : null, modules: modules.length };
+}
+
+/** One acceptance step from its scenario command, or passed with nothing to run when no module has feature files. */
+function acceptanceStep(step: 'baseline-acceptance' | 'acceptance-full', record: GateCommandRecord | undefined, modules: number): StepResult {
+  if (modules === 0) {
+    return { step, outcome: 'passed', detail: 'no module has feature files, so there is no scenario to run' };
+  }
+  if (record === undefined) return { step, outcome: 'not-verified', detail: 'the gate ran no scenario check for this step' };
+  const summary = record.scenarios;
+  const label = step === 'baseline-acceptance' ? 'the project\'s own scenarios in quick mode' : summary?.dryRun ? 'full mode, loaded with --dry-run' : 'the project\'s own scenarios in full mode';
+  if (summary === undefined || record.outcome === 'not-verified') return { step, outcome: record.outcome, detail: describeCommand(label, record) };
+  const counts = `${summary.runs.length} run${summary.runs.length === 1 ? '' : 's'}; the project's own scenarios: ${summary.untracked.passed} passed, ${summary.untracked.skipped} skipped, ${summary.untracked.failed} failed`;
+  return {
+    step,
+    outcome: record.outcome,
+    detail: record.outcome === 'passed'
+      ? `${label}: passed in ${record.elapsedMs} ms over ${counts}`
+      : `${label}: ${summary.failures.slice(0, 5).join('; ')}${summary.failures.length > 5 ? `; and ${summary.failures.length - 5} more` : ''} (${counts})`,
+  };
 }
 
 function describeCommand(label: string, record: GateAttempt['commands'][number]): string {
@@ -149,7 +216,7 @@ function attemptRecord(
   nested: ReadonlyArray<{ directory: string; manifest: string; installed: boolean; testScript: string | null }>,
   gate: GateAttempt | null,
 ): ReadinessAttempt {
-  const baseline = new Set<string>(['baseline-tests', 'baseline-type-check', 'baseline-ramify-check']);
+  const baseline = new Set<string>(gateSteps);
   return readinessAttemptSchema.parse({
     schema: 'ramify-agent.readiness-attempt/1',
     attempt: request.attempt,
@@ -174,6 +241,17 @@ export function withRecovery(attempt: ReadinessAttempt, recovery: RecoveryId | n
 /** The first step that did not pass, which names the failure. */
 export function failingStep(attempt: ReadinessAttempt): ReadinessAttempt['steps'][number] | undefined {
   return attempt.steps.find(step => step.outcome !== 'passed');
+}
+
+/**
+ * The reason a run fails with when readiness ends at this step. The
+ * project's configuration and its scenario harness name their own; every
+ * other step is `readiness-failed`.
+ */
+export function readinessFailureReason(step: string | undefined): RunFailureReason {
+  if (step === 'project-config') return 'project-config-invalid';
+  if (step === 'acceptance-runner') return 'acceptance-harness-missing';
+  return 'readiness-failed';
 }
 
 // The steps.
@@ -219,6 +297,59 @@ async function testRunnerStep(projectRoot: string): Promise<StepResult> {
     return { step: 'test-runner', outcome: 'failed', detail: `\`test\` is \`${script}\`, and node_modules/.bin/vitest is not installed` };
   }
   return { step: 'test-runner', outcome: 'passed', detail: `\`test\` is \`${script}\`, with node_modules/.bin/vitest installed` };
+}
+
+/**
+ * `ramify-agent.json` validated at `start-run`, and every `support` entry
+ * matching at least one file, each inside a module's test area. A failure is
+ * not a code-repair assignment: the project's configuration is the person's.
+ */
+async function projectConfigStep(projectRoot: string, captured: CapturedProjectConfig, index: ArchitectIndex | null): Promise<StepResult> {
+  if ('invalid' in captured) return { step: 'project-config', outcome: 'failed', detail: captured.invalid };
+  const support = captured.config.acceptance.support;
+  const areas = await moduleTestAreas(projectRoot, index);
+  const matches = await matchSupport(projectRoot, support, areas);
+  const problems = matches.flatMap(match => [
+    ...(match.inside.length === 0 && match.outside.length === 0 ? [`\`${match.entry}\` matches no file`] : []),
+    ...(match.outside.length > 0 ? [`\`${match.entry}\` matches ${match.outside.slice(0, 3).join(', ')}${match.outside.length > 3 ? ', …' : ''} outside every module's test area`] : []),
+  ]);
+  if (problems.length > 0) {
+    return {
+      step: 'project-config',
+      outcome: 'failed',
+      detail: `${captured.path}: support code is testing source of the module whose test area holds it, its src/tests/ or a testing module's src/: ${problems.join('; ')}`,
+    };
+  }
+  const files = matches.flatMap(match => match.inside);
+  return {
+    step: 'project-config',
+    outcome: 'passed',
+    detail: `${captured.path} validates against ramify-agent.project/1; ${support.length === 0 ? 'it names no support code' : `its support code is ${files.join(', ')}`}; full mode's readiness is ${captured.config.acceptance.modes.full.readiness}`,
+  };
+}
+
+/**
+ * The scenario harness the configuration names: `cucumber-js` installed, and
+ * each mode's commands resolving. A missing runner is as unrecoverable here
+ * as a missing `vitest` is for `test-runner`.
+ */
+async function acceptanceRunnerStep(projectRoot: string, captured: CapturedProjectConfig): Promise<StepResult> {
+  if ('invalid' in captured) {
+    return { step: 'acceptance-runner', outcome: 'not-verified', detail: 'not reached: the project\'s configuration names no acceptance modes' };
+  }
+  const runner = join(projectRoot, 'node_modules', '.bin', 'cucumber-js');
+  const problems: string[] = [];
+  if (!(await isFile(runner))) problems.push('node_modules/.bin/cucumber-js is not installed');
+  for (const command of await unresolvedCommands(projectRoot, captured.config)) {
+    problems.push(`${command.mode} mode's ${command.role} \`${command.argv.join(' ')}\` does not resolve: ${command.reason}`);
+  }
+  if (problems.length > 0) return { step: 'acceptance-runner', outcome: 'failed', detail: problems.join('; ') };
+  const { quick, full } = captured.config.acceptance.modes;
+  return {
+    step: 'acceptance-runner',
+    outcome: 'passed',
+    detail: `node_modules/.bin/cucumber-js is installed; quick mode runs \`${quick.command.join(' ')}\`, full mode \`${full.command.join(' ')}\``,
+  };
 }
 
 function nestedPackagesStep(
@@ -314,7 +445,7 @@ export function recoveryFor(attempt: ReadinessAttempt, gate: GateAttempt | null)
     return missing.length === 0 ? null : { cause: 'infrastructure', action: 'reinstall-nested', directories: missing };
   }
   if (failing.step === 'ramify-daemon') return { cause: 'daemon-unavailable', action: 'restart-daemon', directories: [] };
-  if (!failing.step.startsWith('baseline-') || gate === null) return null;
+  if (!(gateSteps as readonly string[]).includes(failing.step) || gate === null) return null;
 
   const reasons = new Set(gate.commands.flatMap(command => (command.notVerified === undefined ? [] : [command.notVerified])));
   if (reasons.has('command-missing')) return null;

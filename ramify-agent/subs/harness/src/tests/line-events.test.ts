@@ -1,5 +1,5 @@
 import { mockGit } from './helpers/mock-git.js';
-import { scriptedGit } from './helpers/scripted-git.js';
+import { scenariosCommit, scriptedGit } from './helpers/scripted-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { LineChange } from '../kpi/lines.js';
 import { readFile } from 'node:fs/promises';
@@ -195,19 +195,21 @@ describe('a run captures each writer\'s line events when the observation happens
   test('the summary beside the invocation names what that invocation wrote', async () => {
     const root = await target();
     const git = scriptedGit(root, { head: 'base', checkpoints: [
+      scenariosCommit('review-notes'),
       { subject: 'wi-001.i01', commit: 'source-revision', changes: [
         { status: 'M', path: `${notesDirectory}/src/notes.ts` }, { status: 'A', path: `${notesDirectory}/src/store.ts` },
       ] },
       { subject: 'wi-001', commit: null, changes: [] },
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
     ] });
-    git.givenWrites();
     const counts = vi.spyOn(git, 'worktreeLineChanges')
       .mockResolvedValueOnce([]).mockResolvedValueOnce([
         lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 1),
       ]);
     const { service } = await openRuns(root, {
       git, readinessExecution: directReadinessExecution(),
+      // The engineer's writes are what Git reports once the feature files are committed.
+      afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
@@ -232,7 +234,7 @@ describe('a run captures each writer\'s line events when the observation happens
     ]);
     expect(summary.paths.every(path => path.owner === notes)).toBe(true);
     // The service requested both snapshots against the accepted boundary.
-    expect(counts.mock.calls).toEqual([[root, 'base'], [root, 'base']]);
+    expect(counts.mock.calls).toEqual([[root, 'scenarios-of-review-notes'], [root, 'scenarios-of-review-notes']]);
     expect(summary.paths.map(path => [path.added, path.deleted])).toEqual([[1, 1], [1, 0]]);
     git.assertComplete();
   }, 300_000);

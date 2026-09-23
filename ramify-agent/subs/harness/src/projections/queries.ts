@@ -2,7 +2,7 @@ import {
   runAgentSchema, runQueryLimits,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateResponse,
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunEventPage, type RunListResponse, type RunResponse,
-  type WorkItemListResponse, type WorkItemResponse,
+  type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../interfaces/protocol/runs.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
@@ -12,6 +12,7 @@ import { ProjectionError, readRunFile, runView, unservedRun, unservedRuns, type 
 import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
 import { capabilityProgressOf } from './progress.js';
+import { scenarioListOf } from './scenarios.js';
 import { snapshotOf } from './snapshot.js';
 import { currentModuleTree } from './tree.js';
 import { gateOf, workItemOf, workItemsOf } from './work.js';
@@ -96,6 +97,11 @@ export class RunQueries {
     const view = await this.view(planId, runId);
     const tree = await currentModuleTree(this.source.projectRoot);
     return moduleCapabilityComparisonOf(view, tree, await analysisCoverageLimits(view));
+  }
+
+  /** Every tracked acceptance scenario with its state, origin, owner, file and the gates that ran it. */
+  async scenarios(planId: string, runId: string): Promise<ScenarioListResponse> {
+    return scenarioListOf(await this.view(planId, runId));
   }
 
   async gate(planId: string, runId: string, gate: string): Promise<GateResponse> {

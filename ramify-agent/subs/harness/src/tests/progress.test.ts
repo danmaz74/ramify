@@ -18,7 +18,7 @@ import {
   at, constructedRun, forecast, hash, item, obligation, registered, requirement, reviews, type Line,
 } from './helpers/constructed.js';
 import { installTestRunner, runPath, startRun } from './helpers/runs.js';
-import { scriptedGit } from './helpers/scripted-git.js';
+import { scenariosCommit, scriptedGit } from './helpers/scripted-git.js';
 
 /*
  * Hypothesis, decision, work and progress records stay visibly distinct: each
@@ -277,6 +277,7 @@ describe('over a real run', () => {
       [hypothesis('note-storage', { involvedModules: [reviews] })],
     );
     const git = scriptedGit(fixture.root, { head: 'progress-base', checkpoints: [
+      scenariosCommit('review-notes'),
       { subject: 'wi-001', commit: null, changes: [] },
       { subject: 'wi-002', commit: null, changes: [] },
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },

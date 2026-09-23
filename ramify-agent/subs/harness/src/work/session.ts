@@ -6,6 +6,8 @@ import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
 import type { IterationApiViews } from './engineer.js';
+import type { IntegrationBriefing } from './integration.js';
+import { architectScenarioSection, type BriefedScenario } from './scenario-briefing.js';
 import type { WorkItem, WorkItemOutline } from './records.js';
 
 /*
@@ -124,6 +126,10 @@ export interface WorkItemBriefing {
    * with what that command reported.
    */
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
+  /** For an integration work item: its scenario, the sub-scenarios, their owners' step files and the engineer's scope. */
+  readonly integration?: IntegrationBriefing | undefined;
+  /** For an entry's work item: every scenario of its entry, with its state. */
+  readonly scenarios?: readonly BriefedScenario[] | undefined;
   /** The iteration this architect last assigned, as the harness closed it. */
   readonly lastIteration?: {
     readonly id: string;
@@ -133,6 +139,8 @@ export interface WorkItemBriefing {
     readonly commit: string | null;
     /** The gate that returned it, where one did, with what each failing command reported. */
     readonly gate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
+    /** The scenarios its passing gate ran, each with the step definitions that bound it. */
+    readonly scenarios?: readonly string[] | undefined;
   } | undefined;
 }
 
@@ -187,6 +195,8 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     '',
     'Tests that state the acceptance are part of the work.',
     '',
+    ...(briefing.integration === undefined ? [] : integrationSection(briefing.integration)),
+    ...architectScenarioSection(briefing.scenarios ?? []),
     '## Your module',
     '',
     `- Declared name: \`${item.module}\`.`,
@@ -301,7 +311,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   if (delegation?.blocked !== undefined && delegation.blocked.length > 0) {
     lines.push('## Completion was refused', '');
     for (const reason of delegation.blocked) lines.push(`- ${reason}`);
-    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider.', '');
+    lines.push('', 'Assign the work that discharges each of these, then request completion again. A requirement closes when a `verification` iteration has replaced its fake and passed; an obligation is discharged when the agreed suite has passed against the real provider; a scenario is implemented when a gate passes it after its declaration, so declare with the request the ones existing step definitions bind, and assign an iteration that writes the step definitions for the others.', '');
   }
 
   if (briefing.unresolvedRequest !== undefined) {
@@ -326,6 +336,11 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
       lines.push('', `Its gate \`${last.gate.id}\` did not pass${last.gate.cause === null ? '' : ` (${last.gate.cause})`}. What ran, and what it reported:`, '');
       lines.push(...last.gate.summary);
     }
+    if (last.scenarios !== undefined && last.scenarios.length > 0) {
+      lines.push('', 'The scenarios its gate passed, and the step definition that bound each step:', '');
+      lines.push(...last.scenarios);
+      lines.push('', 'A definition outside the owner\'s own step files reached the run through an import, which Ramify verified.');
+    }
     lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');
   }
 
@@ -340,6 +355,51 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
 
   lines.push('Read your module, decide, and submit.');
   return lines.join('\n');
+}
+
+/** The section of an integration work item's briefing: what it binds, from what, and how. */
+function integrationSection(integration: IntegrationBriefing): string[] {
+  const { scenario, scope } = integration;
+  const lines: string[] = [
+    `## The integration scenario ${scenario.id}: ${scenario.name}`,
+    '',
+    `This work item exists to bind one scenario of the plan, which combines several entries. Its owner is \`${scenario.owner}\`,`,
+    'the lowest common ancestor of its sub-scenarios\' owners, and every sub-scenario is implemented already.',
+    `The harness wrote it into \`${scenario.file}\`; no agent edits a feature file.`,
+    '',
+    '```gherkin',
+    ...scenario.source,
+    '```',
+    '',
+    '### Its sub-scenarios',
+    '',
+  ];
+  for (const sub of integration.subScenarios) {
+    lines.push(`- \`${sub.id}\` (${sub.name}), owned by \`${sub.owner}\`, in \`${sub.file}\`.${sub.bridging.length === 0
+      ? ''
+      : ` Its bridging Given${sub.bridging.length === 1 ? '' : 's'}, stating what another entry leaves instead of taking its action: ${sub.bridging.map(step => `"${step}"`).join(', ')}.`}`);
+  }
+  lines.push('', '### The step files of their owners', '');
+  for (const owner of integration.owners) {
+    lines.push(`- \`${owner.module}\`, in \`${owner.directory}/\`: ${owner.files.length === 0 ? 'none yet' : owner.files.map(file => `\`${file}\``).join(', ')}.`);
+  }
+  lines.push(
+    '',
+    '### How it is bound',
+    '',
+    `Assign an iteration whose scope base is \`${scope.module}\`${scope.includedChildren.length === 0
+      ? ''
+      : ` with the children ${scope.includedChildren.map(child => `\`${child}\``).join(', ')} included`}; the harness refuses any other base.`,
+    `Its engineer writes a step file in \`${scenario.steps}/\` that imports, by name, the step files above, adds the`,
+    '`expose-test` declarations along each path so this module receives them, defines no step of its own, and declares',
+    `\`${scenario.id}\` in its completion proposal. Its gate runs this module's feature files with the scenario selected by`,
+    'identity; a pass implements it, and this work item completes at its own work-item gate.',
+    '',
+    'When the scenario fails while its sub-scenarios pass, it is a composition failure: a bridging Given assumed what',
+    'the real behavior does not do. It is this work item\'s to resolve, through repair, placement and delegation, or `unresolved`.',
+    '',
+  );
+  return lines;
 }
 
 function refs(plan: string, list: ReadonlyArray<{ anchor?: string | undefined; lines?: readonly [number, number] | undefined }>): string {

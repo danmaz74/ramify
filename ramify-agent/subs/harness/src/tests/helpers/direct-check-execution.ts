@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
-import type { GateEvidence } from '../../checks/records.js';
+import type { GateEvidence, ScenarioCheckSummary } from '../../checks/records.js';
 import { checkOutputPath, inPlaceCheckExecution, type CheckExecutionContext, type CheckExecutionPort } from '../../checks/execution.js';
 import type { PlannedCheck } from '../../checks/verify.js';
 import { outputTailBytes, type CommandOutcome, type CommandRun } from '../../../subs/evidence/src/run-command.js';
+import { scenarioRunName } from '../../../subs/scenarios/src/profiles.js';
+import { identityTagOf, pendingTag } from '../../../subs/scenarios/src/rendering.js';
 
 /** One deterministic command result returned by the direct test executor. */
 export interface DirectCheckStep {
@@ -12,6 +16,8 @@ export interface DirectCheckStep {
   readonly stderr?: string | undefined;
   readonly elapsedMs?: number | undefined;
   readonly truncated?: boolean | undefined;
+  /** For a `scenarios` check: what its streams said. Omitted, the check passed with every selected scenario. */
+  readonly scenarios?: ScenarioCheckSummary | undefined;
 }
 
 /** Facts available when a scripted result is selected. */
@@ -55,7 +61,9 @@ export interface ScriptedCheckExecution extends CheckExecutionPort {
  * audit acceptance. Its evidence values are synthetic test records only.
  */
 export function createDirectCheckExecution(options: DirectCheckExecutionOptions): ScriptedCheckExecution {
-  const execution = directCheckExecution(invocation => scriptedStep(options.script, invocation), options.evidence);
+  // A sequential script names the commands a scenario states; a scenario
+  // check it does not name passes without consuming an entry.
+  const execution = directCheckExecution(invocation => scriptedStep(options.script, invocation), options.evidence, false);
   return {
     run: execution.port.run,
     assertComplete() {
@@ -73,7 +81,7 @@ export function createDirectCheckExecution(options: DirectCheckExecutionOptions)
  * each finite `run` request bounds the callback invocations for that gate.
  */
 export function createMappedCheckExecution(options: MappedCheckExecutionOptions): CheckExecutionPort {
-  return directCheckExecution(options.script, options.evidence).port;
+  return directCheckExecution(options.script, options.evidence, true).port;
 }
 
 /**
@@ -115,6 +123,7 @@ function scriptedStep(script: readonly DirectCheckStep[], invocation: DirectChec
 function directCheckExecution(
   select: DirectCheckScript,
   evidence: ((context: CheckExecutionContext) => GateEvidence) | undefined,
+  scriptsScenarios: boolean,
 ): { readonly port: CheckExecutionPort; readonly consumed: () => number } {
   let invocationIndex = 0;
   const port: CheckExecutionPort = {
@@ -133,6 +142,12 @@ function directCheckExecution(
           continue;
         }
 
+        if (check.kind === 'scenarios' && !scriptsScenarios) {
+          const run = await commandRun(outputFile, {}, invocationIndex);
+          commands.push(request.classify(check, run, outputFile, passingScenarioSummary(check)));
+          continue;
+        }
+
         const invocation: DirectCheckInvocation = {
           check,
           checkIndex,
@@ -144,7 +159,9 @@ function directCheckExecution(
         invocationIndex += 1;
         const step = request.signal.aborted ? { outcome: { kind: 'cancelled' } as const } : scripted;
         const run = await commandRun(outputFile, step, invocation.invocationIndex);
-        const record = request.classify(check, run, outputFile);
+        const record = check.kind === 'scenarios'
+          ? request.classify(check, run, outputFile, ('scenarios' in step ? step.scenarios : undefined) ?? passingScenarioSummary(check))
+          : request.classify(check, run, outputFile);
         commands.push(record);
         if (record.notVerified === 'interrupted') {
           interrupted = true;
@@ -189,4 +206,63 @@ function testEvidence(context: CheckExecutionContext): GateEvidence {
     reportCommit: `test-only-report-${identity}`,
     treeRef: `refs/test-only/audited-trees/${context.sourceCommit}`,
   };
+}
+
+/**
+ * What a scenario check that passed says, for a direct executor that runs
+ * nothing: every run exited 0, and every tracked scenario the selection
+ * reaches passed. An identity selection reaches the scenarios it names; a
+ * module's run without it reaches the tracked scenarios in that module's
+ * feature files as they stand on disk, all of them for `all` and those
+ * without the pending tag for `all-untagged`, as the runner itself would.
+ */
+export function passingScenarioSummary(check: PlannedCheck): ScenarioCheckSummary {
+  const plan = check.scenarios;
+  if (plan === undefined) throw new Error(`A ${check.kind} check carries no scenario plan`);
+  const files = new Map(plan.tracked.map(scenario => [scenario.id, scenario.file]));
+  const passed = (id: string, run: string) => ({
+    id, run, status: 'passed' as const, file: files.get(id) ?? '', line: 1, binding: [], undefined: [],
+  });
+  let excluded = 0;
+  const scenarios = plan.runs.flatMap(run => {
+    if (run.selection.kind === 'identity') return run.selection.scenarios.map(id => passed(id, run.module.module));
+    const area = `${run.module.dir === '' ? '' : `${run.module.dir}/`}${run.module.testing ? 'src/features' : 'src/tests/features'}/`;
+    return plan.tracked.filter(scenario => scenario.file.startsWith(area)).flatMap(scenario => {
+      const pending = tagLineOf(check.command.cwd, scenario.file, scenario.id)?.includes(pendingTag);
+      if (pending === undefined) return [];
+      if (pending && run.selection.kind === 'all-untagged') {
+        excluded += 1;
+        return [];
+      }
+      return [passed(scenario.id, run.module.module)];
+    });
+  });
+  return {
+    mode: plan.mode,
+    selection: plan.selection,
+    dryRun: plan.dryRun,
+    excluded,
+    setup: plan.setup === null ? null : { exit: 0 },
+    teardown: plan.teardown === null ? null : { exit: 0 },
+    runs: plan.runs.map(run => ({
+      module: run.module.module,
+      exit: 0,
+      profile: `scenarios/${scenarioRunName(run.module)}.profile.mjs`,
+      messages: `scenarios/${scenarioRunName(run.module)}.ndjson`,
+    })),
+    scenarios,
+    untracked: { passed: 0, skipped: 0, failed: 0 },
+    failures: [],
+  };
+}
+
+/** The tag line of one tracked scenario in its feature file on disk, or undefined where the file does not hold it. */
+function tagLineOf(projectRoot: string, file: string, id: string): string | undefined {
+  let text: string;
+  try {
+    text = readFileSync(join(projectRoot, file), 'utf8');
+  } catch {
+    return undefined;
+  }
+  return text.split('\n').find(line => line.trim().split(/\s+/u).includes(identityTagOf(id)));
 }

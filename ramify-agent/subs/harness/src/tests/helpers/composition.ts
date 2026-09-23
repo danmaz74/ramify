@@ -4,6 +4,7 @@ import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
+import { declaringScenarios } from './declarations.js';
 import type { RunEvent } from '../../run/log.js';
 import type { RunService, RunWrite } from '../../run/service.js';
 import type { CommandRunner } from '../../../subs/evidence/src/run-command.js';
@@ -20,6 +21,7 @@ import {
 } from './iterations.js';
 import { decision as decisionBody, forkDecision, forkPartial, localDecision, registryChange, requestPlacement } from './placement.js';
 import { commandResult } from './command-result.js';
+import { scriptedScenarioRun } from './project-config.js';
 import { directReadinessExecution } from './external-tools.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
 import {
@@ -123,6 +125,12 @@ export interface StatedCommand {
   readonly stdout?: string | undefined;
   /** What the command is stated to leave in the project. */
   readonly leaves?: ((root: string) => Promise<void>) | undefined;
+  /**
+   * A scenario run: `argv` is the mode's command, which `--config` and the
+   * profile the harness wrote follow, and the scripted runner answers it
+   * from that profile.
+   */
+  readonly scenarios?: boolean | undefined;
 }
 
 /**
@@ -143,8 +151,11 @@ export function statedCommands(root: string, commands: readonly StatedCommand[])
     const stated = commands[cursor];
     const expectedArgv = stated?.argv(root);
     const expectedCwd = stated?.cwd?.(root) ?? root;
+    const received = stated?.scenarios === true && request.argv.length === (expectedArgv?.length ?? 0) + 2 && request.argv.at(-2) === '--config'
+      ? request.argv.slice(0, -2)
+      : request.argv;
     if (stated === undefined || expectedArgv === undefined
-      || JSON.stringify(request.argv) !== JSON.stringify(expectedArgv) || request.cwd !== expectedCwd) {
+      || JSON.stringify(received) !== JSON.stringify(expectedArgv) || request.cwd !== expectedCwd) {
       const expected = stated === undefined
         ? `only ${commands.length} command response(s) were stated`
         : `expected \`${expectedArgv.join(' ')}\` in ${expectedCwd}`;
@@ -154,6 +165,7 @@ export function statedCommands(root: string, commands: readonly StatedCommand[])
     }
     cursor += 1;
     await stated.leaves?.(root);
+    if (stated.scenarios === true) return (await scriptedScenarioRun(request))!;
     return commandResult(request, {
       outcome: { kind: 'completed', exitCode: stated.exitCode ?? 0 },
       ...(stated.stdout === undefined ? {} : { stdout: stated.stdout }),
@@ -222,6 +234,19 @@ const base = source(0);
 const unchanged = (against: string) => ({ commit: null, against });
 
 /**
+ * The revision of the harness's own commit, "Scenarios of review-notes",
+ * which writes the run's feature files onto its branch once readiness has
+ * passed. Every scenario that passes readiness makes it before any gate.
+ */
+export const materialized = 'scenarios-00';
+
+/** The feature file of one entry, in its owner's test area, for this plan. */
+const featureOf = (ownerDirectory: string, capability: string) => `${ownerDirectory}/src/tests/features/${plan}/${capability}.feature`;
+
+/** The materialization commit over the tree readiness found: every feature file is new. */
+const materialize = (...files: string[]) => ({ commit: materialized, against: base, changes: untracked(...files) });
+
+/**
  * The engineer's own test run. The policy these scenarios capture answers it
  * with a cheap command of the run's own, and the scenarios stating it here
  * run no process for it.
@@ -229,6 +254,9 @@ const unchanged = (against: string) => ({ commit: null, against });
 const scopeTestRun = (...files: string[]): StatedCommand => ({
   argv: root => [join(root, 'node_modules', '.bin', 'vitest'), 'run', ...files],
 });
+
+/** The quick scenario run `run_scope_tests` makes beside the tests, with the fixture's configured command. */
+const scopeScenarioRun: StatedCommand = { argv: () => ['npm', 'run', 'acceptance:quick', '--'], scenarios: true };
 
 /** The command the iteration's engineer runs through the unguarded shell. */
 const shellCommand = `rm -r ${draftsDirectory} && printf "left by the shell\\n" > shell-note.txt`;
@@ -247,8 +275,12 @@ const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
 const iteration: Scenario = {
   name: 'iteration',
   commands: [
+    // Each call of the engineer's test tool runs the tests, then the scope's
+    // scenarios: the work item's pending one, selected by its identity.
     { ...scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`), exitCode: 1 },
+    scopeScenarioRun,
     scopeTestRun(`${notesDirectory}/src/tests/notes.test.ts`),
+    scopeScenarioRun,
     {
       // What the shell leaves: the child module gone, and a note outside
       // every module. It is stated here and written directly; no shell runs.
@@ -264,12 +296,13 @@ const iteration: Scenario = {
     after: source(1),
     recovered: [{ gate: 'ga-0002', answers: [null, source(1)] }],
     commits: [
+      materialize(featureOf(notesDirectory, 'review-note')),
       // The one committing iteration: the limit the engineer raised, the
       // child module its shell removed, and the note that shell left outside
       // every module.
       {
         commit: source(1),
-        against: base,
+        against: materialized,
         changes: [
           ...modified(`${notesDirectory}/src/notes.ts`),
           ...deleted(`${draftsDirectory}/README.md`, `${draftsDirectory}/module.ramify`),
@@ -362,9 +395,10 @@ const delegation: Scenario = {
     head: base,
     after: source(3),
     commits: [
+      materialize(featureOf(notesDirectory, 'review-notes')),
       // The contract iteration: the agreement's artifacts and the consumer
       // against its fake.
-      { commit: source(1), against: base, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
+      { commit: source(1), against: materialized, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
       // The provider's own iteration, and the work-item checkpoint over the
       // tree it left.
       { commit: source(2), against: source(1), changes: [...modified(paths(noteLimit).subjects), ...untracked(paths(noteLimit).real)] },
@@ -418,8 +452,12 @@ const delegation: Scenario = {
 const placement: Scenario = {
   name: 'placement',
   // Every iteration of this scenario is a placement request: nothing is
-  // written, so both checkpoints find nothing to commit.
-  git: { head: base, after: base, commits: [unchanged(base), unchanged(base)] },
+  // written, so both checkpoints find nothing to commit after the feature
+  // files are.
+  git: {
+    head: base, after: materialized,
+    commits: [materialize(featureOf('subs/workspace/subs/reviews', 'reviewer-note')), unchanged(materialized), unchanged(materialized)],
+  },
   exercises: 'placement requests, the view refresh, a partial fork, the decisions, the parent appends and the deliveries',
   ends: 'completed',
   target: () => fixtureWith([], 'exit-0'),
@@ -484,8 +522,9 @@ const access: Scenario = {
     head: base,
     after: source(2),
     commits: [
+      materialize(featureOf(notesDirectory, 'review-notes')),
       // Each access-only agreement is an exposure the provider declares.
-      { commit: source(1), against: base, changes: modified(`${limitsDirectory}/module.ramify`, `${notesDirectory}/src/notes.ts`) },
+      { commit: source(1), against: materialized, changes: modified(`${limitsDirectory}/module.ramify`, `${notesDirectory}/src/notes.ts`) },
       { commit: source(2), against: source(1), changes: modified(`${limitsDirectory}/module.ramify`) },
       unchanged(source(2)),
       unchanged(source(2)),
@@ -561,9 +600,10 @@ const breaking: Scenario = {
     head: base,
     after: source(2),
     commits: [
+      materialize(featureOf(notesDirectory, 'structured-limit')),
       // The compatible stage, then the breaking one, which moves the reader
       // in the same commit.
-      { commit: source(1), against: base, changes: modified(`${notesDirectory}/src/notes.ts`) },
+      { commit: source(1), against: materialized, changes: modified(`${notesDirectory}/src/notes.ts`) },
       {
         commit: source(2),
         against: source(1),
@@ -664,8 +704,8 @@ const failingNotes = {
 const repair: Scenario = {
   name: 'repair',
   // The engineer changes nothing, so the one checkpoint it reaches finds
-  // nothing to commit.
-  git: { head: base, after: base, commits: [unchanged(base)] },
+  // nothing to commit after the feature files.
+  git: { head: base, after: materialized, commits: [materialize(featureOf(notesDirectory, 'review-note')), unchanged(materialized)] },
   exercises: 'a failing gate, its repair rounds, exhaustion, and an architect that reports the request unresolved',
   ends: 'failed',
   target: () => fixtureWith([failingNotes]),
@@ -687,10 +727,16 @@ const repair: Scenario = {
  */
 const testless: Scenario = {
   name: 'testless',
+  // The engineer's test tool finds no test to run, and still runs the work
+  // item's pending scenario.
+  commands: [scopeScenarioRun],
   // The owner has no test of its own: its iteration checkpoint is not
   // verified and commits nothing, and neither checkpoint that follows has
-  // anything to commit.
-  git: { head: base, after: base, commits: [unchanged(base), unchanged(base)] },
+  // anything to commit after the feature files.
+  git: {
+    head: base, after: materialized,
+    commits: [materialize(featureOf(limitsDirectory, 'note-limits')), unchanged(materialized), unchanged(materialized)],
+  },
   exercises: 'an engineer that reports the goal outside its scope, and an empty required selection: not verified, never a pass, and back to the architect',
   ends: 'completed',
   target: () => fixtureWith([{ directory: limitsDirectory, name: 'limits', files: { 'src/limits.ts': 'export const limits = [];\n' } }]),
@@ -716,8 +762,9 @@ const revision: Scenario = {
     head: base,
     after: source(4),
     commits: [
+      materialize(featureOf(notesDirectory, 'review-notes')),
       // The agreement at its first revision, and the consumer against its fake.
-      { commit: source(1), against: base, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
+      { commit: source(1), against: materialized, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
       // The revised agreement.
       { commit: source(2), against: source(1), changes: modified(paths(relaxed).fake, paths(relaxed).contract) },
       // The provider implements the revised length.
@@ -780,8 +827,9 @@ const cycle: Scenario = {
     head: base,
     after: source(2),
     commits: [
+      materialize(featureOf(notesDirectory, 'review-notes')),
       // The first agreement, and then the one that closes the cycle.
-      { commit: source(1), against: base, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
+      { commit: source(1), against: materialized, changes: [...modified(paths(noteLimit).consumer), ...untracked(paths(noteLimit).fake, paths(noteLimit).contract, paths(noteLimit).conformance, paths(noteLimit).subjects)] },
       { commit: source(2), against: source(1), changes: [...modified(paths(backToNotes).consumer), ...untracked(paths(backToNotes).fake, paths(backToNotes).contract, paths(backToNotes).conformance, paths(backToNotes).subjects)] },
       unchanged(source(2)),
     ],
@@ -817,8 +865,9 @@ const cycle: Scenario = {
 /** A stop that arrives while an engineer holds the writer. */
 const stopping: Scenario = {
   name: 'stop',
-  // The stop arrives while the writer is held: no checkpoint is reached.
-  git: { head: base, after: base, commits: [] },
+  // The stop arrives while the writer is held: no checkpoint is reached,
+  // and the feature files were committed before the first work item.
+  git: { head: base, after: materialized, commits: [materialize(featureOf(notesDirectory, 'review-notes'))] },
   exercises: 'a stop while a writer is in flight: the invocation is superseded and the run stops',
   ends: 'stopped',
   target: () => fixtureWith([notesModule]),
@@ -855,6 +904,12 @@ const invalidAnalysis = failingAnalysis('invalid-analysis', 'an initial architec
 const overLimit: Scenario = {
   ...failingAnalysis('over-limit', 'a run whose policy allows fewer work items than its analysis assigns: limit-exceeded',
     submit(analysis([entry('review-notes', notes), entry('review-note-limit', notes)]))),
+  // The work items are counted after readiness, once the feature files
+  // are committed.
+  git: {
+    head: base, after: materialized,
+    commits: [materialize(featureOf(notesDirectory, 'review-note-limit'), featureOf(notesDirectory, 'review-notes'))],
+  },
   policy: projectRoot => {
     const policy = testPolicy(projectRoot);
     return { ...policy, limits: { ...policy.limits, maxWorkItems: 1 } };
@@ -872,7 +927,7 @@ export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
  */
 export async function runToEnd(scenario: Scenario, watch?: (service: RunService, runId: string) => Promise<void>) {
   const target = await scenario.target();
-  const agent = createScriptedAgent(scenario.script());
+  const agent = createScriptedAgent(declaringScenarios(scenario.script()));
   const git = scenarioGit(target.root, scenario.git);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let runId = '';
@@ -932,7 +987,7 @@ export interface CrashPoint {
 /** A scenario run up to one boundary and abandoned there, as a crash leaves it. */
 export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const target = await scenario.target();
-  const agent = createScriptedAgent(scenario.script());
+  const agent = createScriptedAgent(declaringScenarios(scenario.script()));
   const git = scenarioGit(target.root, scenario.git);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let resolveFrozen: (runId: string) => void = () => undefined;
@@ -1062,7 +1117,8 @@ export async function fileHashes(directory: string): Promise<Record<string, stri
 /**
  * The gates the run branch holds a commit for: one entry per commit Git
  * answered with a revision, named by the gate whose identity trailers the
- * harness looked the commit up by. A commit a restart found again rather
+ * harness looked the commit up by, or `scenarios` for the commit that
+ * materialized the feature files. A commit a restart found again rather
  * than made is already here, from the attempt that made it.
  */
 export function committedGates(git: ScenarioGit): string[] {
@@ -1079,6 +1135,7 @@ export function identityOf(event: RunEvent): string | null {
   const ref = (value: unknown) => (typeof value === 'object' && value !== null ? `${(value as { id: string }).id}@${(value as { revision: number }).revision}` : String(value));
   switch (event.type) {
     case 'job-started': case 'analysis-accepted': case 'job-completed': case 'job-failed': case 'job-stopped': case 'job-interrupted':
+    case 'scenarios-materializing': case 'scenarios-materialized':
       return event.type;
     case 'invocation-started': case 'invocation-ended': return `${event.type}:${String(data.invocation)}`;
     case 'session-opened': case 'session-finished': return `${event.type}:${String(data.session)}`;
@@ -1111,5 +1168,5 @@ export function identityOf(event: RunEvent): string | null {
  */
 export const recoveryCompletions: ReadonlySet<RunEvent['type']> = new Set([
   'invocation-ended', 'writer-released', 'gate-attempted', 'brief-appended', 'global-context-rebuilt',
-  'decision-delivered', 'session-finished', 'job-interrupted',
+  'decision-delivered', 'scenarios-materialized', 'session-finished', 'job-interrupted',
 ]);

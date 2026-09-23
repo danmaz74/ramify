@@ -10,16 +10,17 @@ import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
 import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
+import { ApproveForm, canApprove, reviewText, ReviewPanel, ScenarioCheckSummaryView, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
 import { SessionTimeline } from './session-timeline.js';
 
 /*
- * The Run page: one run, read-only, as the harness projects it. Its overview
- * shows notices first: every module created or removed, every detected
- * dependency cycle, resolved or not, during the run and after it, and every
- * degraded start. Start and Stop are the only commands, and Start is on the
- * Plan page. The connection to the harness is shown apart from the run's
- * state: losing it changes nothing in the run.
+ * The Run page: one run, as the harness projects it. Its overview shows
+ * notices first: every module created or removed, every detected dependency
+ * cycle, resolved or not, during the run and after it, and every degraded
+ * start. Stop and Approve are its commands; Start is on the Plan page. The
+ * connection to the harness is shown apart from the run's state: losing it
+ * changes nothing in the run.
  */
 
 const areas = [
@@ -27,6 +28,7 @@ const areas = [
   ['plan', 'Plan and entries'],
   ['decisions', 'Hypotheses and decisions'],
   ['work', 'Work items'],
+  ['scenarios', 'Scenarios'],
   ['checks', 'Checks'],
   ['progress', 'Progress'],
   ['sessions', 'Sessions'],
@@ -56,7 +58,7 @@ export function RunPage({ client, planId, runId, interval }: {
   readonly runId: string;
   readonly interval?: number;
 }) {
-  const { run, events, error } = useRunProgress(client, planId, runId, interval);
+  const { run, events, error, refresh } = useRunProgress(client, planId, runId, interval);
   const connection = useConnection(client);
   const [area, setArea] = useState<Area>('overview');
   const [workItem, setWorkItem] = useState<string | undefined>(undefined);
@@ -82,10 +84,11 @@ export function RunPage({ client, planId, runId, interval }: {
           <button key={id} type="button" role="tab" aria-selected={area === id} className={area === id ? 'tab tab-selected' : 'tab'} onClick={() => setArea(id)}>{label}</button>
         ))}
       </nav>
-      {run && area === 'overview' && <Overview client={client} run={run} events={events} />}
-      {area === 'plan' && <PlanAndEntries {...props} />}
+      {run && area === 'overview' && <Overview client={client} run={run} events={events} onApproved={refresh} />}
+      {area === 'plan' && <PlanAndEntries {...props} run={run} onApproved={refresh} />}
       {area === 'decisions' && <HypothesesAndDecisions {...props} />}
       {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} />}
+      {area === 'scenarios' && <Scenarios {...props} />}
       {area === 'checks' && <Checks {...props} events={events} />}
       {area === 'progress' && (
         <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
@@ -99,7 +102,12 @@ export function RunPage({ client, planId, runId, interval }: {
 
 // Overview
 
-function Overview({ client, run, events }: { readonly client: ProtocolClient; readonly run: RunSnapshot; readonly events: readonly ProjectedRunEvent[] }) {
+function Overview({ client, run, events, onApproved }: {
+  readonly client: ProtocolClient;
+  readonly run: RunSnapshot;
+  readonly events: readonly ProjectedRunEvent[];
+  readonly onApproved: () => void;
+}) {
   const [stop, setStop] = useState<{ status: 'idle' | 'sending' | 'sent' } | { status: 'failed'; message: string }>({ status: 'idle' });
   const stopRun = async () => {
     setStop({ status: 'sending' });
@@ -133,6 +141,8 @@ function Overview({ client, run, events }: { readonly client: ProtocolClient; re
           <div><dt>Open requirements</dt><dd>{run.counts.openRequirements}</dd></div>
           <div><dt>Invocations</dt><dd>{run.counts.invocations}</dd></div>
           <div><dt>Gate attempts</dt><dd>{run.counts.gateAttempts} (readiness attempts {run.counts.readinessAttempts})</dd></div>
+          <div><dt>Scenarios</dt><dd>{run.counts.scenarios.implemented} implemented, {run.counts.scenarios.declared} declared, {run.counts.scenarios.bound} bound, {run.counts.scenarios.pending} pending</dd></div>
+          <div><dt>Review</dt><dd>{reviewText(run.review)}</dd></div>
           <div><dt>Writer</dt><dd>{run.writer.held === null ? 'none held' : `held by ${run.writer.held}`}{run.writer.unsettled === null ? '' : `; ${run.writer.unsettled} was not confirmed settled`}</dd></div>
           <div><dt>Started</dt><dd>{run.startedAt}</dd></div>
           <div><dt>Ended</dt><dd>{run.endedAt ?? 'not ended'}</dd></div>
@@ -150,6 +160,7 @@ function Overview({ client, run, events }: { readonly client: ProtocolClient; re
           </div>
         )}
       </section>
+      <ReviewPanel client={client} run={run} onApproved={onApproved} />
       <section className="panel" aria-labelledby="events-heading">
         <h2 id="events-heading">Events</h2>
         <ol className="feed" aria-label="Run events">
@@ -262,7 +273,7 @@ function Loading<T>({ state, what, children }: {
   return <>{children(state.data)}</>;
 }
 
-function PlanAndEntries({ client, planId, runId, version }: AreaProps) {
+function PlanAndEntries({ client, planId, runId, version, run, onApproved }: AreaProps & { readonly run: RunSnapshot | undefined; readonly onApproved: () => void }) {
   const state = useRunQuery(`analysis:${runId}`, version, () => client.getAnalysis(planId, runId));
   return (
     <div className="area" aria-label="Plan and entries">
@@ -289,6 +300,17 @@ function PlanAndEntries({ client, planId, runId, version }: AreaProps) {
                   </table>
                 )}
             </section>
+            {data.analysis.status === 'accepted' && (
+              <section className="panel" aria-labelledby="scenario-review-heading">
+                <h2 id="scenario-review-heading">Review of the scenarios</h2>
+                <p className="muted">
+                  The acceptance scenarios the analysis froze, per entry, with where each comes from.
+                  {run ? ` ${reviewText(run.review)}.` : ''}
+                </p>
+                <ScenarioReview entries={data.analysis.entries} scenarios={data.analysis.scenarios} warnings={data.analysis.warnings} total={data.analysis.total.scenarios} />
+                {run && canApprove(run) && <ApproveForm client={client} run={run} onApproved={onApproved} label="Approve the reviewed analysis" />}
+              </section>
+            )}
             <section className="panel">
               <h2>The captured plan</h2>
               <p className="muted">As the run captured it, with SHA-256 <code>{data.plan.hash.slice(0, 16)}…</code></p>
@@ -487,6 +509,19 @@ function WorkItemDetail({ client, planId, runId, version, workItem }: AreaProps 
   );
 }
 
+// Scenarios
+
+function Scenarios({ client, planId, runId, version }: AreaProps) {
+  const state = useRunQuery(`scenarios:${runId}`, version, () => client.getScenarios(planId, runId));
+  return (
+    <div className="area" aria-label="Scenarios">
+      <Loading state={state} what="the scenarios">
+        {data => <ScenarioTable scenarios={data.scenarios} total={data.total} />}
+      </Loading>
+    </div>
+  );
+}
+
 // Checks
 
 function Checks({ client, planId, runId, version, events }: AreaProps & { readonly events: readonly ProjectedRunEvent[] }) {
@@ -540,6 +575,7 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
                 {command.selection && <p className="muted">Selection ({command.selection.policy}): {command.selection.resolved.length} files{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
+                {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>
               </div>
             ))}

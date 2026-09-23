@@ -7,7 +7,7 @@ import {
   addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs, write,
 } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
-import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
@@ -170,7 +170,7 @@ async function run(
   commits: readonly CommitResponse[],
   options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
 ) {
-  const git = answeredGit(root, { head: 'revision-00', commits });
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(), ...options,
   });
@@ -352,7 +352,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
 
     // The commands ran for real here; Git did not. Every answer this
     // scenario stated was used, and the run asked Git for nothing else.
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03']);
     git.assertAnswered();
   }, 120_000);
 });

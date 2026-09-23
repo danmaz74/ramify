@@ -4,6 +4,7 @@ import type { CommittedLine, CommittedRun } from '../../projections/inputs.js';
 import type { RunEvent } from '../../run/log.js';
 import type { RunRecord } from '../../run/records.js';
 import { workItemSchema, type WorkItem } from '../../work/records.js';
+import { minimalProjectConfig } from './project-config.js';
 
 /*
  * A run constructed line by line, for the projections' own tests: each line
@@ -32,7 +33,10 @@ export function constructedRecord(extra: Partial<RunRecord> = {}): RunRecord {
     },
     prompts: {},
     policy: {} as RunRecord['policy'],
+    projectConfig: { path: 'ramify-agent.json', hash, config: minimalProjectConfig },
     baseline: { unavailable: 'constructed' },
+    planScenarios: { scenarios: [], limitations: [] },
+    reviewStop: false,
     ...extra,
   };
 }

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
+import { declaringScenarios } from './declarations.js';
 import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
 import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
@@ -18,6 +19,7 @@ import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
+import { installScriptedCucumber } from './project-config.js';
 import {
   createDirectCheckExecution, createMappedCheckExecution, createPassingCheckExecution,
   type DirectCheckScript, type DirectCheckStep,
@@ -54,16 +56,20 @@ export async function initRepository(root: string): Promise<string> {
 }
 
 /**
- * The test runner readiness looks for. The fixture project carries no
- * `node_modules`, so a copy that a run works in is given the one binary the
- * `test-runner` step requires.
+ * The test runners readiness looks for. The fixture project carries no
+ * `node_modules`, so a copy that a run works in is given the two binaries the
+ * `test-runner` and `acceptance-runner` steps require. Neither runs anything:
+ * the commands a lifecycle test's gates run are its policy's, and the
+ * scenario runner is a scripted command wherever one runs, which writes a
+ * message stream of a successful run with no scenario in it.
  */
 export async function installTestRunner(root: string): Promise<void> {
   const directory = join(root, 'node_modules', '.bin');
   await mkdir(directory, { recursive: true });
-  const path = join(directory, 'vitest');
-  await writeFile(path, '#!/bin/sh\nexit 0\n');
-  await chmod(path, 0o755);
+  const vitest = join(directory, 'vitest');
+  await writeFile(vitest, '#!/bin/sh\nexit 0\n');
+  await chmod(vitest, 0o755);
+  await installScriptedCucumber(join(directory, 'cucumber-js'));
 }
 
 /** A command that runs for real and answers `code`. */
@@ -239,7 +245,7 @@ export type TestAgent = ScriptedAgent | undefined;
  */
 export async function openRuns(root: string, options: OpenRunsOptions) {
   const lock = await acquireProjectLock(root);
-  const scripted = options.script === undefined ? undefined : createScriptedAgent(options.script);
+  const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script));
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
   const { script: _script, checkScript, ...rest } = options;
@@ -265,8 +271,20 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
 
 let commandCount = 0;
 
-export function startRun(planId: string, agent: 'pi' | 'scripted' = 'scripted', commandId = `start-${++commandCount}`): RunCommand {
-  return { commandId, expectedVersion: 0, type: 'start-run', payload: { planId, agent } };
+export function startRun(planId: string, agent: 'pi' | 'scripted' = 'scripted', commandId = `start-${++commandCount}`, reviewStop = false): RunCommand {
+  return { commandId, expectedVersion: 0, type: 'start-run', payload: { planId, agent, reviewStop } };
+}
+
+/** A person's approval of a run's analysis, at the version the caller read. */
+export function approveRun(
+  planId: string,
+  jobId: string,
+  expectedVersion: number,
+  reviewer = 'reviewer@example.com',
+  note?: string,
+  commandId = `approve-${++commandCount}`,
+): RunCommand {
+  return { commandId, expectedVersion, type: 'approve-analysis', payload: { planId, jobId, reviewer, ...(note === undefined ? {} : { note }) } };
 }
 
 export function stopRun(planId: string, jobId: string, expectedVersion: number, commandId = `stop-${++commandCount}`): RunCommand {
@@ -275,7 +293,7 @@ export function stopRun(planId: string, jobId: string, expectedVersion: number, 
 
 /** A valid initial analysis with no entry capability: the smallest coherent run. */
 export function emptyAnalysis() {
-  return { entries: [], hypotheses: [], coverageLimits: [] };
+  return { entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [] };
 }
 
 /** The run's events as written in its `events.jsonl`, one to a ledger line. */

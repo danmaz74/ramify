@@ -10,7 +10,9 @@
     "build": "vite build",
     "type-check": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:cucumber": "NODE_OPTIONS='--import tsx' cucumber-js"
+    "test:cucumber": "NODE_OPTIONS='--import tsx' cucumber-js",
+    "acceptance:quick": "TEST_MODE=quick NODE_OPTIONS='--import tsx' cucumber-js",
+    "acceptance:full": "TEST_MODE=full NODE_OPTIONS='--import tsx' cucumber-js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

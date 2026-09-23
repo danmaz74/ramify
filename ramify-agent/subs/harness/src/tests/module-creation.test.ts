@@ -9,7 +9,7 @@ import { assign, byRole, completionProposed, installMiniRunner, outline, submit,
 import { forkDecision, registryChange, requestPlacement } from './helpers/placement.js';
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
 import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
-import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -45,6 +45,9 @@ const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 /** The revision the fixture is on before a run commits anything. */
 const base = 'revision-00';
+/** The harness's own commit of the run's feature files, made once readiness has passed. */
+const materialized = 'scenarios-00';
+const scenarios = scenariosCommit('review-notes', materialized, base);
 
 /** A boundary Git reports as unchanged, which commits nothing. */
 const unchanged: GateCommit = { commit: null };
@@ -96,7 +99,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     // not this test's to run: the runner answers for them, and what is being
     // proved is the rejection and the guard. Nothing the engineer wrote
     // reached the tree, so every boundary is an unchanged one.
-    const { root, scripted } = await target({ commits: [unchanged, unchanged, unchanged] }, { miniRunner: false });
+    const { root, scripted } = await target({ commits: [scenarios, unchanged, unchanged, unchanged] }, { miniRunner: false });
     const opened = await openRuns(root, {
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', reviews)]))],
@@ -143,16 +146,17 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     const closedEvents = events.filter(event => event.type === 'iteration-closed');
     expect((closedEvents[0]!.data as { notices: unknown[] }).notices).toEqual([]);
     await expect(readFile(join(root, notesDirectory, 'module.ramify'), 'utf8')).rejects.toThrow();
-    // Nothing was committed, so the run's accepted boundary never moved.
-    expect(scripted.revisions()).toEqual([]);
-    expect(scripted.head()).toBe(base);
+    // Nothing but the feature files was committed, so the run's accepted
+    // boundary stayed at their commit.
+    expect(scripted.revisions()).toEqual([materialized]);
+    expect(scripted.head()).toBe(materialized);
     scripted.assertComplete();
   }, 300_000);
 });
 
 describe('G10: global placement authorizes a new owner without claiming it exists', () => {
   test('a create decision and its registry proposal lead to a bootstrap assignment that passes its gate', async () => {
-    const { root, scripted } = await target({ commits: [created, unchanged, unchanged] });
+    const { root, scripted } = await target({ commits: [scenarios, created, unchanged, unchanged] });
     const proposal = {
       parent: reviews,
       directory: notesDirectory,

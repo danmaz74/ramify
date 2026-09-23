@@ -1,0 +1,13 @@
+{
+  "schema": "ramify-agent.project/1",
+  "acceptance": {
+    "support": [
+      "subs/integration-tests/src/support/world.ts",
+      "subs/integration-tests/src/support/hooks.ts"
+    ],
+    "modes": {
+      "quick": { "command": ["npm", "run", "acceptance:quick", "--"] },
+      "full": { "command": ["npm", "run", "acceptance:full", "--"], "readiness": "dry-run" }
+    }
+  }
+}

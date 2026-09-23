@@ -17,6 +17,7 @@ const capability = (id: string, extra: Partial<CapabilityProgress> = {}): Capabi
   dependsOn: [],
   workItems: [],
   evidence: [],
+  scenarios: null,
   ...extra,
 });
 const on = (...ids: string[]): Link[] => ids.map(id => ({ capability: id, tentative: false }));

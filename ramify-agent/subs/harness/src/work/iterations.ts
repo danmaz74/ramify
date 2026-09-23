@@ -129,6 +129,12 @@ export const iterationAssignmentSchema = z.object({
   requestedBy: text.optional(),
   /** A local architect may assign a contract revision directly. */
   revisesContract: recordRefSchema.optional(),
+  /**
+   * The scenarios the architect expects this iteration to bind, shown to the
+   * engineer under "Scenarios to bind". Informative: the engineer declares
+   * what its step definitions bind, and nothing requires exactly these.
+   */
+  scenarios: z.array(text).optional(),
 }).strict();
 export type IterationAssignment = z.infer<typeof iterationAssignmentSchema>;
 

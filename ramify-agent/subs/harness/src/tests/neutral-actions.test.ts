@@ -10,7 +10,8 @@ import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, read, submit, treeInputs, write } from './helpers/iterations.js';
-import { gateGit } from './helpers/gate-git.js';
+import { declaringScenarios } from './helpers/declarations.js';
+import { gateGit, scenariosCommit } from './helpers/gate-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
 
@@ -121,12 +122,14 @@ async function engineerRecord(naming: Naming) {
   const scripted = gateGit(root, {
     head: 'revision-00',
     commits: [
+      // The run's feature files, committed once readiness has passed.
+      scenariosCommit('review-notes', 'scenarios-00', 'revision-00'),
       { commit: 'revision-01', changes: [{ status: 'A', path: store }, { status: 'M', path: `${notesDirectory}/src/notes.ts` }] },
       { commit: null },
       { commit: null },
     ],
   });
-  const agent = createScriptedAgent(byRole({
+  const agent = createScriptedAgent(declaringScenarios(byRole({
     'initial-architect': [submit(analysis([entry('review-note', notes)]))],
     'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
     engineer: [submit(
@@ -141,7 +144,7 @@ async function engineerRecord(naming: Naming) {
       naming.write(store, 'export const store = new Map();\n'),
       naming.edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
     )],
-  }), naming.options);
+  })), naming.options);
   const { service } = await openRuns(root, {
     agent,
     inputs: treeInputs(),

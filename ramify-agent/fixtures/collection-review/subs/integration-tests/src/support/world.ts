@@ -2,34 +2,37 @@ import { World, setWorldConstructor } from '@cucumber/cucumber';
 
 import { createTestSystem } from '../../../../src/tests/setup.js';
 
+import { servedSystem, testMode } from './mode.js';
+
 /**
  * What one scenario works with: the assembled system, what it has read from it
  * so far, and the MCP sessions it has opened.
  *
  * The system is the same one every other test in this package uses. The root
- * defines `createTestSystem` in its `src/tests/` and exposes it to its
- * descendants; this module is a separate owner, so that exposure is its only
- * way in, and the symbol's `[testing, dispatch]` tags are why this module's
- * header carries both. The setup's own result types are not exposed, so they
- * are read off the exposed function below. A scenario therefore drives the
- * real tRPC client and the real MCP server rather than anything written for
- * Cucumber.
+ * defines `createTestSystem` and `startServedTestSystem` in its `src/tests/`
+ * and exposes them to its descendants; this module is a separate owner, so
+ * that exposure is its only way in, and the symbols' `[testing, dispatch]`
+ * tags are why this module's header carries both. The setup's own result
+ * types are read off the exposed functions below. A scenario therefore drives
+ * the real tRPC client and the real MCP server rather than anything written
+ * for Cucumber: in process in quick mode, over HTTP to the served listener in
+ * full mode.
  *
  * Sessions are kept so the `After` hook can close them. A scenario that leaves
  * one open would keep the runner's process alive after its last step.
  */
 
-/** The configured system, as the root's exposed setup hands it out. */
-type TestSystem = ReturnType<typeof createTestSystem>;
+/** What a scenario drives, in either mode: the typed client and MCP sessions. */
+type SystemDriver = Pick<ReturnType<typeof createTestSystem>, 'client' | 'connectMcpSession'>;
 
 /** One MCP session of that system. */
-export type McpSession = Awaited<ReturnType<TestSystem['connectMcpSession']>>;
+export type McpSession = Awaited<ReturnType<SystemDriver['connectMcpSession']>>;
 
 /** What `catalog.get` answers, as the typed client infers it. */
-type RecordSummary = Awaited<ReturnType<TestSystem['client']['catalog']['get']['query']>>;
+type RecordSummary = Awaited<ReturnType<SystemDriver['client']['catalog']['get']['query']>>;
 
 /** What `reviews.run` answers, likewise. */
-type ReviewOutcome = Awaited<ReturnType<TestSystem['client']['reviews']['run']['mutate']>>;
+type ReviewOutcome = Awaited<ReturnType<SystemDriver['client']['reviews']['run']['mutate']>>;
 
 /**
  * The revision scope a session is bound to, as a step states it. The neutral
@@ -43,18 +46,21 @@ export interface BoundScope {
 }
 
 export class CollectionReviewWorld extends World {
-  private assembled: TestSystem | null = null;
+  private assembled: SystemDriver | null = null;
   private lastSummaries: readonly RecordSummary[] = [];
   private lastReview: ReviewOutcome | null = null;
   private lastBinding: BoundScope | null = null;
   private readonly openedSessions: McpSession[] = [];
 
-  /** Assembles the system this scenario runs against. */
+  /**
+   * The system this scenario runs against: assembled in process in quick
+   * mode, the listener the hooks started in full mode.
+   */
   configure(): void {
-    this.assembled = createTestSystem();
+    this.assembled = testMode() === 'full' ? servedSystem() : createTestSystem();
   }
 
-  get system(): TestSystem {
+  get system(): SystemDriver {
     if (this.assembled === null) {
       throw new Error('This scenario has not configured the collection-review system yet.');
     }

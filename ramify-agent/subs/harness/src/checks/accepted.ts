@@ -19,19 +19,32 @@ export interface AcceptedBoundaryLine {
 }
 
 /**
- * The audited hash of the latest passed committing checkpoint, in committed
- * event order. The run's base is returned only until no such attempt exists.
+ * The audited hash of the latest passed committing checkpoint, or of the
+ * commit that materialized the feature files, in committed event order. The
+ * run's base is returned only until neither exists.
+ *
+ * A withdrawal commit ("Withdraw sc-NNN") is not an accepted boundary. It
+ * follows a gate that did not pass, whose own commit is not accepted either,
+ * and it restores the pending tags the accepted boundary already carried, so
+ * the next iteration's changes are still taken against that boundary.
  */
 export function acceptedCommit(entries: readonly AcceptedBoundaryLine[], base: string): string {
   let accepted = base;
   for (const entry of entries) {
     const event = entry.transaction.event;
+    if (event.type === 'scenarios-materialized') {
+      // The harness's own commit of the feature files is accepted as it is
+      // made: no gate runs over it, and the next iteration starts from it.
+      const commit = (event.data as { readonly commit?: unknown }).commit;
+      if (typeof commit === 'string') accepted = commit;
+      continue;
+    }
     if (event.type !== 'gate-attempted') continue;
     const data = event.data as { readonly gate?: unknown; readonly verdict?: unknown };
     if (data.verdict !== 'passed' || typeof data.gate !== 'string') continue;
     const record = entry.transaction.records.find(candidate => {
       const body = candidate.body as Partial<GateAttempt> | null;
-      return body?.schema === 'ramify-agent.gate-attempt/2' && body.id === data.gate;
+      return body?.schema === 'ramify-agent.gate-attempt/3' && body.id === data.gate;
     });
     const attempt = record?.body as Partial<GateAttempt> | null | undefined;
     if (attempt === null || attempt === undefined || attempt.checkpoint === undefined) continue;

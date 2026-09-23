@@ -3,7 +3,7 @@ import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.j
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
   AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
-  RunCommand, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
+  RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, ScenarioListResponse, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import type {
   RunSessionsResponse, SessionBodyResponse, SessionCursor, SessionListResponse, SessionRef, SessionTranscriptResponse,
@@ -25,6 +25,7 @@ export interface StubRun {
   capabilities?: CapabilityListResponse;
   moduleCapabilities?: ModuleCapabilityComparisonResponse;
   gates?: Record<string, GateView>;
+  scenarios?: ScenarioListResponse;
   metrics?: MetricsResponse;
 }
 
@@ -37,7 +38,7 @@ export class StubClient implements ProtocolClient {
   failure: ClientError | undefined;
   state: ConnectionState = 'connected';
   calls: string[] = [];
-  commands: RunCommand[] = [];
+  commands: RunCommandInput[] = [];
   receipt: Receipt = { commandId: 'c', jobId: '20260921T080000Z-c0ffee', sequence: 1, acceptedAt: '2026-09-21T08:00:00.000Z' };
   tree: ModuleTree = { status: 'unavailable', message: 'The architect view has not been materialized yet.' };
   sessionList: SessionListResponse = { sessions: [], total: 0, offset: 0, next: null, unserved: [] };
@@ -114,6 +115,7 @@ export class StubClient implements ProtocolClient {
   async getWorkItem(_planId: string, runId: string, workItem: string) { this.calls.push(`getWorkItem:${runId}:${workItem}`); return this.answer(runId, run => run.workItem?.[workItem], `work item ${workItem}`); }
   async getCapabilities(_planId: string, runId: string) { this.calls.push(`getCapabilities:${runId}`); return this.answer(runId, run => run.capabilities, 'capabilities'); }
   async getModuleCapabilities(_planId: string, runId: string) { this.calls.push(`getModuleCapabilities:${runId}`); return this.answer(runId, run => run.moduleCapabilities, 'module capabilities'); }
+  async getScenarios(_planId: string, runId: string) { this.calls.push(`getScenarios:${runId}`); return this.answer(runId, run => run.scenarios, 'scenarios'); }
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 
@@ -151,7 +153,7 @@ export class StubClient implements ProtocolClient {
     return found(this.failure, this.bodies.get(key), `body ${key}`);
   }
 
-  async sendCommand(command: RunCommand): Promise<Receipt> {
+  async sendCommand(command: RunCommandInput): Promise<Receipt> {
     this.calls.push(`sendCommand:${command.type}`);
     this.commands.push(command);
     if (this.failure) throw this.failure;

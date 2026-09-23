@@ -7,6 +7,9 @@ import type { LocalArchitectSubmission } from '../../work/submission.js';
  * judge, the same schema and the same rules an agent's would.
  */
 
+/** A plan reference as an entry or an architect scenario states it. */
+type PlanRef = { anchor?: string; lines?: [number, number] };
+
 /** A module an entry capability proposes, where its owner does not exist yet. */
 export interface ProposedModule {
   readonly parent: string;
@@ -21,8 +24,8 @@ export function entry(capability: string, owner: string, description = `The modu
     capability,
     description,
     owner,
-    requirementRefs: [{ anchor: 'Request' }],
-    acceptanceRefs: [{ anchor: 'Acceptance' }],
+    requirementRefs: [{ anchor: 'Request' }] as PlanRef[],
+    acceptanceRefs: [{ anchor: 'Acceptance' }] as PlanRef[],
     citations: [] as Array<{ module: string; file?: string; symbol?: string; note?: string }>,
     ...(proposed === undefined ? {} : { proposed: { ...proposed, tags: [...proposed.tags] } }),
   };
@@ -48,12 +51,51 @@ export function hypothesis(id: string, extra: Partial<InitialAnalysisSubmission[
   };
 }
 
+/**
+ * The one architect scenario every entry of a scripted analysis gets unless
+ * the test states its own: an abstract interaction named for the
+ * capability, citing each of the entry's acceptance references, as form
+ * rules 4 and 6 require.
+ */
+export function architectScenario(
+  subject: { readonly capability: string; readonly acceptanceRefs: ReadonlyArray<{ anchor?: string; lines?: readonly [number, number] }> },
+  key = `${subject.capability}-is-used`,
+): InitialAnalysisSubmission['scenarios'][number] {
+  return {
+    key,
+    entry: subject.capability,
+    origin: { kind: 'architect' },
+    refs: subject.acceptanceRefs.map(ref => ({
+      ...(ref.anchor === undefined ? {} : { anchor: ref.anchor }),
+      ...(ref.lines === undefined ? {} : { lines: [ref.lines[0], ref.lines[1]] as [number, number] }),
+    })),
+    gherkin: [
+      `Scenario: A person uses ${subject.capability}`,
+      '  Given the project as the plan finds it',
+      `  When the person uses ${subject.capability}`,
+      `  Then the outcome ${subject.capability} promises is shown`,
+    ].join('\n'),
+  };
+}
+
+/**
+ * An initial analysis as `initial-architect/2` states it. Unless the test
+ * gives its own scenarios, each entry has the one `architectScenario`.
+ */
 export function analysis(
   entries: ReadonlyArray<ReturnType<typeof entry>>,
   hypotheses: ReadonlyArray<ReturnType<typeof hypothesis>> = [],
   coverageLimits: readonly string[] = [],
+  scenarios: InitialAnalysisSubmission['scenarios'] = entries.map(one => architectScenario(one)),
+  integrationScenarios: InitialAnalysisSubmission['integrationScenarios'] = [],
 ): InitialAnalysisSubmission {
-  return { entries: [...entries], hypotheses: [...hypotheses], coverageLimits: [...coverageLimits] };
+  return {
+    entries: [...entries],
+    hypotheses: [...hypotheses],
+    coverageLimits: [...coverageLimits],
+    scenarios: [...scenarios],
+    integrationScenarios: [...integrationScenarios],
+  };
 }
 
 /** A local architect asking for completion with the smallest honest outline. */

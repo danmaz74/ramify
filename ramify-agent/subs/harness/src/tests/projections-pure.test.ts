@@ -65,6 +65,7 @@ describe('a projection never writes, and no query appends an event', () => {
       for (const item of workItems) await queries.workItem(plan, runId, item.id);
       await queries.capabilities(plan, runId);
       await queries.moduleCapabilities(plan, runId);
+      await queries.scenarios(plan, runId);
       await queries.metrics(plan, runId);
       const events = await queries.events(plan, runId, 0);
       for (const gate of new Set(events.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
@@ -97,6 +98,7 @@ describe('a projection never writes, and no query appends an event', () => {
         protocolPaths.runModuleCapabilities(plan, runId),
         protocolPaths.runModuleCapabilities(plan, '20990101T000000Z-000000'),
         protocolPaths.runMetrics(plan, runId),
+        protocolPaths.runScenarios(plan, runId),
         protocolPaths.runWorkItem(plan, runId, 'wi-999'),
         protocolPaths.runGate(plan, runId, 'ga-9999'),
         `${protocolPaths.run(plan, runId)}/events?after=not-a-number`,

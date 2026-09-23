@@ -87,7 +87,11 @@ describe('the run log', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
+      'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
+      'scenarios-materializing', 'scenarios-materialized',
+      'scenario-declared', 'scenario-due', 'scenario-implemented', 'scenario-bound-passed',
+      'scenarios-withdrawing', 'scenario-withdrawn',
       'work-item-started', 'hypotheses-delivered',
       'placement-requested', 'view-refreshed', 'fork-returned-partial', 'decision-accepted',
       'brief-appended', 'global-context-rebuilt', 'decision-delivered',
@@ -785,11 +789,11 @@ describe('the protocol vocabulary', () => {
 
   test('every failure reason and every phase is named', () => {
     expect(runFailureReasonSchema.options).toEqual([
-      'analysis-invalid', 'readiness-failed', 'agent-failed', 'invalid-submission', 'inputs-changed',
-      'dependency-cycle', 'unresolvable-requirement', 'repair-exhausted', 'recovery-exhausted',
-      'writer-unsettled', 'limit-exceeded', 'internal',
+      'analysis-invalid', 'readiness-failed', 'project-config-invalid', 'acceptance-harness-missing',
+      'agent-failed', 'invalid-submission', 'inputs-changed', 'dependency-cycle', 'unresolvable-requirement',
+      'repair-exhausted', 'acceptance-incomplete', 'recovery-exhausted', 'writer-unsettled', 'limit-exceeded', 'internal',
     ]);
-    expect(runPhaseSchema.options).toEqual(['analysis', 'readiness', 'working', 'final-verification', 'ended']);
+    expect(runPhaseSchema.options).toEqual(['analysis', 'awaiting-review', 'readiness', 'working', 'final-verification', 'ended']);
     expect(sessionModeSchema.options).toEqual(['fresh', 'continued', 'fork']);
   });
 
@@ -845,6 +849,7 @@ describe('the run protocol a client reads', () => {
       ['contract-registered', { contract: 'ct-001', revision: 1, mode: 'fake-backed', iteration: 'wi-001.i02', obligation: 'ob-ct-001', requirements: ['rq-001'], providerWorkItem: 'wi-002' }],
       ['invocation-started', { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' }],
       ['revision-needed', { obligation: r, iteration: 'wi-002.i01', consumerWorkItem: 'wi-001' }],
+      ['scenario-implemented', { scenario: 'sc-001', gate: 'ga-0003' }],
     ];
     const kinds = new Set(events.flatMap(([type, data], index) =>
       projectEvent(runEventSchema.parse({ sequence: index + 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type, data })).refs.map(ref => ref.kind)));
@@ -915,15 +920,26 @@ describe('the run protocol a client reads', () => {
 /** The smallest data each event type's schema accepts, for the projection's exhaustiveness. */
 function sampleData(type: RunEvent['type']): unknown {
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
+  const command = { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
     'session-opened': { session: 'ses-0001', role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null },
     'invocation-started': { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' },
     'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null, session: 'ses-0001', kept: false, finished: 'work-closed' },
     'session-finished': { session: 'ses-0001', reason: 'run-ended' },
     'analysis-accepted': { invocation: 'inv-0001', entries: 0, hypotheses: 0, registry: 0, workItems: 0 },
+    'review-requested': {},
+    'analysis-approved': { command, reviewer: 'r', note: null, duringRun: false },
     'readiness-passed': { attempt: 1, gate: 'ga-0001' },
     'readiness-failed': { attempt: 1, step: 'git-clean', detail: '', recovery: null, final: true },
-    'work-item-started': { workItem: 'wi-001', module: 'm' },
+    'scenarios-materializing': { files: ['src/tests/features/p/e.feature'] },
+    'scenarios-materialized': { commit: 'c', files: ['src/tests/features/p/e.feature'] },
+    'scenario-declared': { scenario: 'sc-001', by: 'inv-0003', state: 'bound' },
+    'scenario-due': { scenario: 'sc-001', cause: 'requirements-verified' },
+    'scenario-implemented': { scenario: 'sc-001', gate: 'ga-0004' },
+    'scenario-bound-passed': { scenario: 'sc-001', gate: 'ga-0003' },
+    'scenarios-withdrawing': { withdrawal: 1, workItem: 'wi-001', scenarios: ['sc-001'], reason: 'yielded' },
+    'scenario-withdrawn': { scenario: 'sc-001', reason: 'yielded', commit: 'c' },
+    'work-item-started': { workItem: 'wi-001', module: 'm', origin: 'integration', scenario: 'sc-003' },
     'hypotheses-delivered': { workItem: 'wi-001', refs: [r] },
     'placement-requested': { request: 'pr-001', workItem: 'wi-001', requester: 'm', capability: 'c' },
     'view-refreshed': { request: 'pr-001', attempt: 1, view: { status: 'placeholder' }, unavailable: null },
@@ -954,5 +970,5 @@ function sampleData(type: RunEvent['type']): unknown {
     'job-stopped': { settled: false },
     'job-interrupted': { message: 'm' },
   };
-  return samples[type] ?? { command: { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } } };
+  return samples[type] ?? { command };
 }

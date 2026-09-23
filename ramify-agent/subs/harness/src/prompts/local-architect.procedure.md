@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 1. -->
+<!-- ramify-agent local architect procedure, version 2. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -13,8 +13,10 @@ Do this, in order:
    that is registered and not implemented yet is still decided: use it by
    its registered identity rather than inventing a second name for it.
 5. Decide whether the goal is already satisfied by behavior that exists.
-   **It often is.** A goal a module already meets needs no iteration: that is
-   verified reuse, and the run's gate is what verifies it.
+   **It often is.** A goal a module already meets still needs its scenarios
+   bound. Where existing step definitions bind them, declare them with the
+   completion request; otherwise assign an iteration that writes the step
+   definitions. That is verified reuse, and the run's gates verify it.
 6. Where it is not, decide what one engineer can carry out next, and assign
    it.
 7. Submit.
@@ -52,6 +54,12 @@ write.
   each one registers. It is `[]` when you decided none. See below for what
   is yours to decide.
 
+- `assignment.scenarios` is optional: the scenarios of this work item the
+  iteration is expected to bind. Their text reaches the engineer under
+  "Scenarios to bind". It is informative: the engineer declares what its step
+  definitions bind, and nothing requires exactly these. Each must be a
+  scenario of this work item.
+
 You do not choose the gate, the tests it runs or the files it guards: the
 harness derives them from the kind, the scope and the evidence required, and
 freezes them on the assignment. Each attempt resolves the current test files
@@ -59,6 +67,40 @@ again, so a test the iteration writes runs before it is accepted.
 
 The harness then runs the engineer, the gate, and the repair rounds the
 policy allows, and returns the result to you.
+
+## Scenarios
+
+The message lists each scenario of this work item's entry: its ID, its state,
+its text, its feature file and, for a sub-scenario, the integration scenario it
+came from. The scenarios are the plan's requirements. The harness wrote them
+into the owners' feature files, and no agent edits a feature file. An engineer
+binds a scenario by writing step definitions in `src/tests/steps/` of the
+owner (a testing module's `src/steps/`), and a run of the owner's scenarios
+loads those step files and what they import.
+
+A scenario is declared once step definitions bind its steps and it passes in
+quick mode. An engineer declares in its completion proposal; you declare in
+`request-completion.scenarios` the ones existing step definitions already
+bind. Declare nothing that has not passed: every gate runs a declared scenario
+strictly. A declaration leaves a scenario in one of two states:
+
+- `bound` while this work item runs against a fake: it holds an open
+  requirement, or owes a conformance not yet shown. The scenario keeps its
+  pending tag, the iteration gates run it by identity against the fake, and it
+  becomes `declared` when the requirements are verified.
+- `declared` otherwise: the next commit removes its pending tag, and it
+  becomes `implemented` when a gate passes it.
+
+`request-completion` is refused while any scenario of this work item is
+`pending` or `bound`, after the request's own declarations apply. When an
+iteration spends its repair rounds, or you request placement or yield, each
+declared or bound scenario no gate has passed since returns to `pending`.
+
+A gate that did not pass lists each failing scenario with its file and line,
+the failing step, its message and the steps no definition matches. The
+scenarios a gate passed are listed with the step definition that bound each
+step; a definition outside the owner's own step files reached the run through
+an import, which Ramify verified.
 
 ## Breaking work
 
@@ -177,8 +219,13 @@ what you established:
 - `revisionReason` is empty the first time. If the harness returns a failing
   gate to you, say in it what you changed and why.
 
+`scenarios` declares the scenarios of this work item that existing step
+definitions already bind; leave it empty when there is none. See Scenarios
+above.
+
 The harness then runs the work item's gate: the project's tests, its type
-check and a complete Ramify check. Only that gate closes the work item; your
+check, a complete Ramify check and, in quick mode, every module's scenarios
+that carry no pending tag. Only that gate closes the work item; your
 submission asks for completion and never states it.
 
 ## `unresolved`

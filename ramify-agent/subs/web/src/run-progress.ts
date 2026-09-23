@@ -8,6 +8,8 @@ export interface RunProgress {
   readonly events: readonly ProjectedRunEvent[];
   /** The last failure to read the run; the last state read stays shown. */
   readonly error: Error | undefined;
+  /** Reads the run again now, as after a command this page sent to a run that no longer polls. */
+  readonly refresh: () => void;
 }
 
 /**
@@ -18,7 +20,9 @@ export interface RunProgress {
  */
 export function useRunProgress(client: ProtocolClient, planId: string, runId: string, interval = 1000): RunProgress {
   const key = `${planId}/${runId}`;
-  const [progress, setProgress] = useState<RunProgress & { key: string }>({ key: '', run: undefined, events: [], error: undefined });
+  const [generation, setGeneration] = useState(0);
+  const refresh = useCallback(() => setGeneration(value => value + 1), []);
+  const [progress, setProgress] = useState<Omit<RunProgress, 'refresh'> & { key: string }>({ key: '', run: undefined, events: [], error: undefined });
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -48,8 +52,8 @@ export function useRunProgress(client: ProtocolClient, planId: string, runId: st
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [client, planId, runId, interval, key]);
-  return progress.key === key ? progress : { run: undefined, events: [], error: undefined };
+  }, [client, planId, runId, interval, key, generation]);
+  return progress.key === key ? { ...progress, refresh } : { run: undefined, events: [], error: undefined, refresh };
 }
 
 /**

@@ -1,4 +1,4 @@
-import { allProjectChecks, checkpointPolicies, scopedChecks, type ResolvedTests } from '../checks/checkpoint.js';
+import { allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, type ResolvedTests, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
 import type { PreparedGate } from '../checks/gate.js';
@@ -56,6 +56,12 @@ export interface CheckpointRequest {
   readonly authorizations?: readonly { readonly path: string; readonly by: RecordReference }[] | undefined;
   /** Rules the harness verified over the tree itself, such as a contract gate's fake naming. */
   readonly rules?: readonly GateRuleRecord[] | undefined;
+  /**
+   * The project's scenario harness, the modules with feature files and the
+   * tracked scenarios, from which the checkpoint's scenario check is
+   * planned. A gate without them, such as a standalone session's, has none.
+   */
+  readonly scenarios?: ScenarioCheckInputs | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
@@ -79,9 +85,14 @@ function gateRequest(request: CheckpointRequest) {
   if (policy.selection !== 'all-project' && request.tests === undefined) {
     throw new Error(`The ${request.checkpoint} checkpoint requires an ${policy.selection} selection, and none was resolved`);
   }
+  const scenarios = request.scenarios === undefined ? undefined : planScenarioCheck(request.checkpoint, request.scenarios, {
+    projectRoot: request.projectRoot,
+    ...(request.tests === undefined ? {} : { scope: request.tests.selection }),
+  });
+  const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
   const checks = request.tests === undefined
-    ? allProjectChecks(request.policy.commands, policy, request.scopeProbe)
-    : scopedChecks(request.policy.commands, request.tests);
+    ? allProjectChecks(request.policy.commands, policy, request.scopeProbe, scenarioCheck)
+    : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
   return {
     id: request.id,
     ...(request.runId === undefined ? {} : { runId: request.runId }),
@@ -103,6 +114,7 @@ function gateRequest(request: CheckpointRequest) {
     ...(request.writeScope === undefined ? {} : { writeScope: request.writeScope }),
     ...(request.authorizations === undefined ? {} : { authorizations: request.authorizations }),
     ...(request.rules === undefined ? {} : { rules: request.rules }),
+    ...(scenarios !== undefined && 'none' in scenarios ? { scenarios: scenarios.none } : {}),
     limits: {
       repairRounds: request.checkpoint === 'work-item'
         ? request.policy.limits.repairRoundsPerWorkItemGate

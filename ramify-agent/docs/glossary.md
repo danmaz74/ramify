@@ -144,3 +144,73 @@ a consumer until the real provider exists.
 It replaces only what is missing; existing behavior stays real. The tests that
 pass against the fake must pass unchanged against the real provider, and the
 fake is then removed.
+
+## Scenario
+
+A **scenario** is one Gherkin `Scenario` or `Scenario Outline` the harness
+tracks as a requirement of a [plan](#plan).
+
+## Plan scenario
+
+A **plan scenario** is a [scenario](#scenario) written in the plan and
+extracted by the harness; its authority is the plan's.
+
+## Architect scenario
+
+An **architect scenario** is a [scenario](#scenario) the initial architect
+writes for one entry capability; its authority is the person's review.
+
+## Entry scenario
+
+An **entry scenario** is a [scenario](#scenario) assigned to exactly one
+entry capability: every architect scenario, and every plan scenario that is
+not an [integration scenario](#integration-scenario).
+
+## Integration scenario
+
+An **integration scenario** is a [plan scenario](#plan-scenario) that
+combines several entry capabilities and is bound by an integration work item
+at the common ancestor of its [sub-scenarios](#sub-scenario)' owners.
+
+## Sub-scenario
+
+A **sub-scenario** is an [entry scenario](#entry-scenario) the initial
+architect derived from an [integration scenario](#integration-scenario),
+ideally by picking its steps verbatim.
+
+## Bridging Given
+
+A **bridging Given** is a `Given` in a [sub-scenario](#sub-scenario) that
+states the result of another entry's action in place of the action.
+
+## Step definition
+
+A **step definition** is the TypeScript that Cucumber matches a step's text
+to.
+
+## Binding
+
+A scenario's **binding** is the set of [step definitions](#step-definition)
+a run matched to its steps, read from Cucumber's message stream.
+
+## Scenario harness
+
+The **scenario harness** is the target project's world, driver, hooks and
+the two commands that run scenarios in quick and full
+[execution mode](#execution-mode), declared in its `ramify-agent.json`.
+
+## Execution mode
+
+An **execution mode** is `quick` or `full`, fixed for one run of the scenario
+runner and never written into a scenario.
+
+## Identity tag
+
+An **identity tag** is `@ramify-sc-NNN`, the tag that names one tracked
+[scenario](#scenario) in its feature file.
+
+## Pending tag
+
+The **pending tag** is `@ramify-pending`, which the harness keeps on a
+[scenario](#scenario) while it is `pending` or `bound`, so that only a run
+that selects it by [identity tag](#identity-tag) runs it.

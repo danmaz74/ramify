@@ -16,7 +16,7 @@ import {
   onlyRun, openRuns, runEventsOnDisk, runPath, startRun,
 } from './helpers/runs.js';
 import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
-import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 
 /*
@@ -358,6 +358,13 @@ async function target(): Promise<string> {
 /** The revision the fixture is on before a run commits anything. */
 const base = 'revision-00';
 
+/**
+ * The harness's own commit of the run's one feature file, made once
+ * readiness has passed; every later boundary is asked against it.
+ */
+const materialized = 'scenarios-00';
+const scenarios = scenariosCommit(plan, materialized, base, [`${dirA}/src/tests/features/${plan}/reviewer-identity.feature`]);
+
 /** A boundary Git reports as unchanged, which commits nothing. */
 const unchanged: GateCommit = { commit: null };
 
@@ -509,6 +516,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
       // One revision for each accepted stage, then the work item's gate and
       // the run's own, each over a tree Git reports as unchanged.
       commits: [
+        scenarios,
         revision('revision-01', `${dirC}/src/outcome.ts`, `${dirC}/src/tests/outcome.test.ts`),
         revision('revision-02', `${dirC}/src/outcome.ts`, `${dirA}/src/adapters.ts`, `${dirP}/src/result.ts`, `${dirV}/src/panel.ts`),
         revision('revision-03', `${dirC}/src/outcome.ts`, `${dirA}/src/adapters.ts`),
@@ -539,8 +547,9 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
     }
 
     // Every accepted boundary: one breaking-iteration gate, passed, with the
-    // project's own tests, the type check, the complete Ramify check and the
-    // probe over this iteration's own modules, each of them run.
+    // project's own tests, the type check, the complete Ramify check, the
+    // project's untagged scenarios in quick mode and the probe over this
+    // iteration's own modules, each of them run.
     const attempts = await gates(root, runId);
     const breaking = attempts.filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking).toHaveLength(3);
@@ -548,7 +557,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
       expect(attempt.verdict).toBe('passed');
       expect(attempt.cause).toBeNull();
       expect(attempt.guardedChanges).toEqual([]);
-      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'tests']);
+      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'scenarios', 'tests']);
       for (const command of attempt.commands) expect(command.outcome).toBe('passed');
       // The last command is the probe: the files of this iteration's own
       // modules, resolved from the tree as it then stood and really run.
@@ -577,8 +586,8 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
     // Each accepted stage is its own revision, in order, and each attempt
     // stands on the one the stage before it accepted.
     expect(breaking.map(attempt => attempt.commit)).toEqual(['revision-01', 'revision-02', 'revision-03']);
-    expect(breaking.map(attempt => attempt.head)).toEqual([base, 'revision-01', 'revision-02']);
-    expect(scripted.revisions()).toEqual(['revision-01', 'revision-02', 'revision-03']);
+    expect(breaking.map(attempt => attempt.head)).toEqual([materialized, 'revision-01', 'revision-02']);
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01', 'revision-02', 'revision-03']);
     expect(scripted.branch()).toBe(`ramify-agent/run-${runId}`);
     scripted.assertComplete();
   }, 600_000);
@@ -617,15 +626,16 @@ describe('the breaking-iteration boundary is not green by default', () => {
       // The unadapted state is committed and audited as it stands; the
       // repair that follows is a revision of its own over it.
       commits: [
-        { ...revision('revision-01', `${dirC}/src/outcome.ts`, `${dirC}/src/tests/outcome.test.ts`), against: base },
+        scenarios,
+        { ...revision('revision-01', `${dirC}/src/outcome.ts`, `${dirC}/src/tests/outcome.test.ts`), against: materialized },
         // The repair is asked about the same accepted boundary: the refused
         // attempt committed, and accepted nothing.
-        { ...revision('revision-02', `${dirA}/src/adapters.ts`, `${dirP}/src/result.ts`, `${dirV}/src/panel.ts`), against: base },
+        { ...revision('revision-02', `${dirA}/src/adapters.ts`, `${dirP}/src/result.ts`, `${dirV}/src/panel.ts`), against: materialized },
         { commit: null, against: 'revision-02' },
         { commit: null, against: 'revision-02' },
       ],
       diffs: [{
-        from: base,
+        from: materialized,
         to: 'revision-02',
         changes: [{ status: 'M', path: `${dirC}/src/outcome.ts` }, { status: 'M', path: `${dirA}/src/adapters.ts` }],
       }],
@@ -660,7 +670,7 @@ describe('the broad scope is a planned exception', () => {
     const blank = assign(core, { kind: 'breaking', stage: 1, goal: 'Make the break.', scope: broadScope('   ') }, stagedOutline());
     // The engineer finishes nothing and the architect stops the run, so no
     // gate of this scenario's own reaches a commit boundary.
-    const scripted = gateGit(root, { head: base, commits: [] });
+    const scripted = gateGit(root, { head: base, commits: [scenarios] });
     const { service, runId, agent } = await openRuns(root, {
       inputs: treeInputs(),
       git: scripted.git,
@@ -692,8 +702,9 @@ describe('the broad scope is a planned exception', () => {
     const accepted = await readAssignment(root, runId, 'wi-001', 1);
     expect(accepted.scope.base).toMatchObject({ rationale: broadRationale });
     expect(existsSync(runPath(root, plan, runId, iterationLayout.assignment('wi-001', 2)))).toBe(false);
-    // A refused input and an unfinished iteration commit nothing at all.
-    expect(scripted.revisions()).toEqual([]);
+    // A refused input and an unfinished iteration commit nothing at all;
+    // the one revision is the feature files'.
+    expect(scripted.revisions()).toEqual([materialized]);
     scripted.assertComplete();
   }, 600_000);
 });
@@ -742,12 +753,13 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
       // Both iterations change the guarded file, so both reach a revision;
       // the work item's gate and the run's own find nothing changed.
       commits: [
+        scenarios,
         revision('revision-01', `${dirC}/src/outcome.ts`, `${dirC}/src/tests/outcome.test.ts`, 'vitest.config.ts'),
         revision('revision-02', 'vitest.config.ts'),
         unchanged,
         unchanged,
       ],
-      diffs: [{ from: base, to: 'revision-02', changes: [{ status: 'M', path: 'vitest.config.ts' }] }],
+      diffs: [{ from: materialized, to: 'revision-02', changes: [{ status: 'M', path: 'vitest.config.ts' }] }],
     });
 
     expect(onlyRun(service, plan).state).toBe('completed');
@@ -825,7 +837,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
     }, {
       // The one attempt commits what the iteration left, a deletion
       // included, and the run stops there.
-      commits: [{
+      commits: [scenarios, {
         commit: 'revision-01',
         changes: [
           { status: 'M', path: `${dirC}/src/outcome.ts` },
@@ -896,6 +908,7 @@ describe('a break discovered during work', () => {
       // The reported break closes its iteration without a gate, so the
       // restaged one is the only boundary that reaches a revision.
       commits: [
+        scenarios,
         revision('revision-01', `${dirC}/src/outcome.ts`, `${dirA}/src/adapters.ts`, `${dirP}/src/result.ts`, `${dirV}/src/panel.ts`),
         unchanged,
         unchanged,
@@ -931,9 +944,10 @@ describe('a break discovered during work', () => {
     expect('modules' in restaged.scope.base).toBe(true);
     expect((await readResult(root, runId, 'wi-001', 2)).outcome).toBe('accepted');
     // The iteration that reported the break asked Git for no commit; the
-    // restaged one is the only revision this run minted.
-    expect(scripted.revisions()).toEqual(['revision-01']);
-    expect(scripted.messages[0]).toContain('wi-001.i02');
+    // restaged one is the only revision this run minted beside the feature
+    // files'.
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
+    expect(scripted.messages[1]).toContain('wi-001.i02');
     scripted.assertComplete();
   }, 600_000);
 });

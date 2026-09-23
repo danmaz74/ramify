@@ -17,7 +17,7 @@ import type { ObservationLog } from '../run/observations.js';
 import type { TranscriptNotes } from '../transcripts/recorder.js';
 import { ToolInputJudge, validateAgainst } from '../run/submissions.js';
 import { createShellTool, shellInputSchema, shellToolName, type ShellTool } from '../tools/shell.js';
-import { createScopeTestsTool, scopeTestsInputSchema, scopeTestsToolName } from './engineer.js';
+import { createScopeTestsTool, scopeTestsInputSchema, scopeTestsToolName, type ScopeScenarioCheck } from './engineer.js';
 
 /*
  * The equipment of one implementation session: the shell, the scoped test
@@ -79,8 +79,18 @@ export interface EngineerEquipmentInputs {
   readonly scopeRevision: number;
   /** The tests the scoped test tool resolves on each call. */
   readonly tests: TestSelectionPolicy;
-  /** Where one invocation's numbered shell output or hook-check log is written. */
-  readonly outputPath: (kind: 'shell' | 'hook', invocation: string, number: number) => string;
+  /**
+   * The scenario check the scoped test tool runs beside the tests, where the
+   * session is given one: its planning and the scenarios' names. Absent, the
+   * tool runs the tests alone.
+   */
+  readonly scenarios?: Omit<ScopeScenarioCheck, 'directory'> | undefined;
+  /**
+   * Where one invocation's numbered shell output or hook-check log is
+   * written, or the directory of one scoped scenario check's profiles,
+   * streams and log.
+   */
+  readonly outputPath: (kind: 'shell' | 'hook' | 'scenarios', invocation: string, number: number) => string;
 }
 
 /**
@@ -180,6 +190,8 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       ended: async () => undefined,
     });
 
+    // Each call's scenario check keeps its profiles and streams apart.
+    let scenarioChecks = 0;
     toolJudge = new ToolInputJudge({
       tool: scopeTestsToolName,
       bound: inputs.bounds.rejectedToolInputsPerTurn,
@@ -196,6 +208,12 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         policy: inputs.tests,
         refresh: inputs.refresh,
         judge: input => toolJudge!.judge(input, session.callId(scopeTestsToolName)),
+        ...(inputs.scenarios === undefined ? {} : {
+          scenarios: {
+            ...inputs.scenarios,
+            directory: () => inputs.outputPath('scenarios', session.invocation, ++scenarioChecks),
+          },
+        }),
         observe: async observation => {
           await session.observations.record({
             type: 'scope-tests',
@@ -206,6 +224,13 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
               notVerified: observation.notVerified,
               exitCode: observation.exitCode,
               elapsedMs: observation.elapsedMs,
+              ...(observation.scenarios === undefined ? {} : {
+                scenarios: {
+                  selected: [...observation.scenarios.selected],
+                  passed: [...observation.scenarios.passed],
+                  failures: observation.scenarios.failures,
+                },
+              }),
             },
           });
         },

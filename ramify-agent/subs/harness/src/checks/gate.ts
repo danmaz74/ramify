@@ -6,7 +6,7 @@ import { checkOutputPath } from './execution.js';
 import type { CheckExecutionPort, CheckExecutionResult } from './execution.js';
 import type {
   AcceptedCommit, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
-  GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference,
+  GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference, ScenarioCheckSummary,
 } from './records.js';
 import { gateAttemptSchema } from './records.js';
 import { verifyChecks } from './verify.js';
@@ -64,6 +64,8 @@ export interface GateRequest {
   readonly rules?: readonly GateRuleRecord[] | undefined;
   /** The run's bounds, where the caller has them; without them no attempt is exhausted. */
   readonly limits?: { readonly repairRounds?: number; readonly infrastructureRetries?: number } | undefined;
+  /** `none-selected` when the checkpoint's scenario check had nothing to run, recorded on the attempt. */
+  readonly scenarios?: 'none-selected' | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
@@ -171,6 +173,7 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
     guardedChanges,
     ...(rules.length === 0 ? {} : { rules }),
     commands,
+    ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     verdict,
     cause,
     ...(attribution === null ? {} : { attribution }),
@@ -223,8 +226,12 @@ async function compareGuardedFiles(request: GateRequest): Promise<GateAttempt['g
  * One command's outcome, from how it ended and the code it chose, never from
  * what it printed. A Ramify check exiting 2 was not checked, which is never a
  * pass; `runnerError` stays null, because nothing the harness spawned failed.
+ *
+ * A scenario check that completed passes by its summary, which its message
+ * streams established: every run exited zero and every scenario passed. One
+ * without a summary was not established by anything, so it is not verified.
  */
-function classify(check: PlannedCheck, run: CommandRun, outputFile: string): GateCommandRecord {
+function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scenarios?: ScenarioCheckSummary): GateCommandRecord {
   const base = {
     kind: check.kind,
     command: check.command,
@@ -232,7 +239,17 @@ function classify(check: PlannedCheck, run: CommandRun, outputFile: string): Gat
     startedAt: run.startedAt,
     elapsedMs: run.elapsedMs,
     output: { path: outputFile, bytes: run.output.bytes, truncated: run.output.truncated, tail: run.output.tail },
+    ...(scenarios === undefined ? {} : { scenarios }),
   };
+  if (check.kind === 'scenarios' && run.outcome.kind === 'completed') {
+    if (scenarios === undefined) {
+      return {
+        ...base, exitCode: run.outcome.exitCode, outcome: 'not-verified', notVerified: 'runner-error',
+        runnerError: { kind: 'scenario-summary-missing', message: 'The scenario check answered no summary of its message streams' },
+      };
+    }
+    return { ...base, exitCode: run.outcome.exitCode, outcome: scenarios.failures.length === 0 ? 'passed' : 'failed', runnerError: null };
+  }
   switch (run.outcome.kind) {
     case 'cancelled':
       return { ...base, exitCode: null, outcome: 'not-verified', notVerified: 'interrupted', runnerError: null };

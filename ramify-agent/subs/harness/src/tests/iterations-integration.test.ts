@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
@@ -56,6 +56,12 @@ describe('G8: one small work item completes in one iteration', () => {
         '',
       ].join('\n'),
     });
+    // A suite beside the fixture's own, which no runner the harness knows
+    // selects. The fixture's Cucumber script is not one: its configuration
+    // names the acceptance modes.
+    const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    manifest.scripts['test:e2e'] = 'playwright test';
+    await writeFile(join(root, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     await installMiniRunner(root);
     await initRepository(root);
     const daemon = await realRamify();
@@ -141,14 +147,21 @@ describe('G8: one small work item completes in one iteration', () => {
     };
     expect(auditSummary.coverage.claim.owners).toEqual([`exact:${notes}`]);
 
-    // The fixture's Cucumber suite is outside the one runner this MVP
-    // selects. It is a coverage gap on the attempt, never an absence of
-    // tests, and it is read from the project's own manifest.
+    // A suite outside the one runner this MVP selects is a coverage gap on
+    // the attempt, never an absence of tests, and it is read from the
+    // project's own manifest. The fixture's Cucumber script is none, because
+    // its configuration names the acceptance modes that run its scenarios.
     const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations(result.invocations[0]!)), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as Observation)
       .filter((line): line is ObservationOf<'coverage-gap'> => line.type === 'coverage-gap');
     const unsupported = observations.filter(line => line.data.kind === 'unsupported-runner');
-    expect(unsupported).toHaveLength(1);
-    expect(unsupported[0]!.data.detail).toContain('test:cucumber');
+    expect(unsupported.map(line => line.data.detail)).toEqual([
+      'the project\'s "test:e2e" script is outside the one runner this MVP selects',
+    ]);
+
+    // Readiness judged the configuration's support code against the view.
+    const readiness = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.readiness(1)), 'utf8')) as { steps: Array<{ step: string; outcome: string }> };
+    expect(readiness.steps.filter(step => step.step === 'project-config' || step.step === 'acceptance-runner').map(step => step.outcome))
+      .toEqual(['passed', 'passed']);
   }, 300_000);
 });

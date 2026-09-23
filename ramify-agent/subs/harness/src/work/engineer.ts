@@ -1,3 +1,5 @@
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
@@ -5,14 +7,18 @@ import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ProjectCommands } from '../checks/checkpoint.js';
-import { scopedTestCheck } from '../checks/checkpoint.js';
+import { scopedTestCheck, type ScenarioCheckPlanning } from '../checks/checkpoint.js';
+import { describeScenarioCheck, scenarioCheckLines } from '../checks/diagnostics.js';
+import { runScenarioCheck, scenarioCheckPassed } from '../checks/scenario-check.js';
 import { checkCommandEnvironment } from '../checks/records.js';
 import type { TestSelectionPolicy } from '../checks/records.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
+import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IterationAssignment } from './iterations.js';
+import { engineerScenarioSection, type EngineerScenarios } from './scenario-briefing.js';
 import { scopePaths } from './scope.js';
 
 /*
@@ -62,6 +68,12 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     summary: text,
     findings: z.array(text),
     recommendation: text.optional(),
+    /**
+     * The scenarios of this work item's entry whose steps this iteration's
+     * step definitions bind and which pass in quick mode. A declaration is
+     * a claim: the next gate runs every one strictly.
+     */
+    scenarios: z.array(text).default([]),
   }).strict(),
   z.object({
     kind: z.literal('partial'),
@@ -143,6 +155,8 @@ export interface EngineerEvidence {
    * where the session can still act on it.
    */
   readonly openFindings?: readonly HookFinding[] | undefined;
+  /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
+  readonly scenarios?: DeclarationContext | undefined;
 }
 
 /**
@@ -219,6 +233,10 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
     });
   }
 
+  if (value.kind === 'completion-proposed' && value.scenarios.length > 0) {
+    errors.push(...declarationErrors(value.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
+  }
+
   if (value.kind === 'partial' && value.done.length === 0 && value.unfinished.length === 0) {
     errors.push({
       path: 'unfinished',
@@ -256,6 +274,8 @@ export interface ScopeTestsOptions {
    * whatever reaches it, so it never relies on that having happened.
    */
   readonly judge: (input: unknown) => Promise<{ readonly ok: true } | { readonly ok: false; readonly text: string }>;
+  /** The scenario check of this scope, where the run tracks scenarios; absent, the tool runs the tests alone. */
+  readonly scenarios?: ScopeScenarioCheck | undefined;
   /** Records what the run observed of the call. */
   readonly observe: (observation: {
     readonly resolved: readonly string[];
@@ -263,13 +283,40 @@ export interface ScopeTestsOptions {
     readonly notVerified: string | null;
     readonly exitCode: number | null;
     readonly elapsedMs: number;
+    /** What the scenario check ran and passed, where the tool ran one. */
+    readonly scenarios?: ScopeScenarioObservation | undefined;
   }) => Promise<void>;
 }
 
 /**
+ * The scenario check `run_scope_tests` runs beside the tests: in quick mode,
+ * the scope's scenarios selected by identity, the work item's pending ones
+ * included, so an engineer sees whether the scenarios it binds pass before
+ * it declares them.
+ */
+export interface ScopeScenarioCheck {
+  /** Plans the check anew for each call; undefined where the run tracks no scenario or has no scenario harness. */
+  readonly plan: () => Promise<ScenarioCheckPlanning | undefined>;
+  /** The directory of one call's profiles, streams and log, outside the worktree. */
+  readonly directory: () => string;
+  /** Each tracked scenario's name, for the result. */
+  readonly names?: ReadonlyMap<string, string> | undefined;
+}
+
+/** What one call's scenario check ran, as the run records it. */
+export interface ScopeScenarioObservation {
+  /** The scenarios it selected; empty where none was selected. */
+  readonly selected: readonly string[];
+  readonly passed: readonly string[];
+  /** How many reasons it did not pass. */
+  readonly failures: number;
+}
+
+/**
  * The engineer's own test run: the assignment's policy, resolved anew from
- * the current tree, run through the project's own runner. It proves nothing
- * — only a gate does — and it never narrows to the files that changed.
+ * the current tree, run through the project's own runner, and the scope's
+ * scenarios in quick mode. It proves nothing — only a gate does — and it
+ * never narrows to the files that changed.
  */
 export function createScopeTestsTool(options: ScopeTestsOptions): ToolDefinition {
   return {
@@ -278,58 +325,125 @@ export function createScopeTestsTool(options: ScopeTestsOptions): ToolDefinition
       'Runs the tests this iteration is judged on. It takes no arguments: the harness resolves the',
       'assignment\'s selection from the tree as it stands on every call, so a test you have just written',
       'runs. Its result is a diagnosis, never a verdict: only the gate accepts an iteration.',
+      ...(options.scenarios === undefined ? [] : [
+        'It also runs your scope\'s scenarios in quick mode, the declared ones and this work item\'s pending',
+        'ones, and reports each scenario\'s status, its failing step and the steps no definition matches.',
+      ]),
     ].join(' '),
     inputSchema: scopeTestsJsonSchema,
     mutating: false,
     async execute(input: unknown, signal: AbortSignal): Promise<ToolResult> {
       const judged = await options.judge(input);
       if (!judged.ok) return { isError: true, text: judged.text };
-      const index = await options.refresh();
-      const resolved = await resolveTestSelection({ projectRoot: options.projectRoot, index, policy: options.policy });
-      const check = scopedTestCheck(options.commands, resolved);
-      if (resolved.failure !== null) {
-        await options.observe({
-          resolved: resolved.selection.resolved, outcome: 'not-verified',
-          notVerified: resolved.failure.failed, exitCode: null, elapsedMs: 0,
-        });
-        return {
-          isError: true,
-          text: `The selection could not be resolved (${resolved.failure.failed}): ${resolved.failure.detail}. Nothing ran.`,
-        };
-      }
-      if (resolved.selection.resolved.length === 0) {
-        await options.observe({ resolved: [], outcome: 'not-verified', notVerified: 'empty-selection', exitCode: null, elapsedMs: 0 });
-        return {
-          isError: true,
-          text: 'The selection is empty: this assignment owns no test file yet. Writing the first one is part of the work.',
-        };
-      }
-      const run = await (options.commandExecution ?? runCommand)({
-        argv: check.command.argv,
-        cwd: check.command.cwd,
-        env: checkCommandEnvironment(check.command),
-        timeoutMs: check.command.timeoutMs,
-        ...(signal === undefined ? {} : { signal }),
-      });
-      const exitCode = run.outcome.kind === 'completed' ? run.outcome.exitCode : null;
-      const outcome = run.outcome.kind !== 'completed' ? 'not-verified' : exitCode === 0 ? 'passed' : 'failed';
-      await options.observe({
-        resolved: resolved.selection.resolved,
-        outcome,
-        notVerified: run.outcome.kind === 'completed' ? null : run.outcome.kind,
-        exitCode,
-        elapsedMs: run.elapsedMs,
-      });
+      const tests = await runScopeTestSelection(options, signal);
+      const scenarios = options.scenarios === undefined ? undefined : await runScopeScenarios(options, options.scenarios, signal);
+      await options.observe({ ...tests.observation, ...(scenarios?.observation === undefined ? {} : { scenarios: scenarios.observation }) });
+      const failed = tests.observation.outcome !== 'passed' || scenarios?.failed === true;
       return {
-        isError: outcome !== 'passed',
-        text: [
-          `${resolved.selection.resolved.length} test file(s): ${resolved.selection.resolved.join(', ')}`,
-          `Outcome: ${outcome}${exitCode === null ? '' : ` (exit ${exitCode})`}, ${(run.elapsedMs / 1000).toFixed(1)} s.`,
-          '',
-          run.output.tail,
-        ].join('\n'),
+        isError: failed,
+        text: scenarios === undefined ? tests.text : [tests.text, '', ...scenarios.lines].join('\n'),
       };
     },
+  };
+}
+
+/** The test half of one call: what it ran, what the run records, and what the engineer reads. */
+async function runScopeTestSelection(options: ScopeTestsOptions, signal: AbortSignal): Promise<{
+  readonly observation: {
+    readonly resolved: readonly string[];
+    readonly outcome: 'passed' | 'failed' | 'not-verified';
+    readonly notVerified: string | null;
+    readonly exitCode: number | null;
+    readonly elapsedMs: number;
+  };
+  readonly text: string;
+}> {
+  const index = await options.refresh();
+  const resolved = await resolveTestSelection({ projectRoot: options.projectRoot, index, policy: options.policy });
+  const check = scopedTestCheck(options.commands, resolved);
+  if (resolved.failure !== null) {
+    return {
+      observation: { resolved: resolved.selection.resolved, outcome: 'not-verified', notVerified: resolved.failure.failed, exitCode: null, elapsedMs: 0 },
+      text: `The selection could not be resolved (${resolved.failure.failed}): ${resolved.failure.detail}. Nothing ran.`,
+    };
+  }
+  if (resolved.selection.resolved.length === 0) {
+    return {
+      observation: { resolved: [], outcome: 'not-verified', notVerified: 'empty-selection', exitCode: null, elapsedMs: 0 },
+      text: 'The selection is empty: this assignment owns no test file yet. Writing the first one is part of the work.',
+    };
+  }
+  const run = await (options.commandExecution ?? runCommand)({
+    argv: check.command.argv,
+    cwd: check.command.cwd,
+    env: checkCommandEnvironment(check.command),
+    timeoutMs: check.command.timeoutMs,
+    ...(signal === undefined ? {} : { signal }),
+  });
+  const exitCode = run.outcome.kind === 'completed' ? run.outcome.exitCode : null;
+  const outcome = run.outcome.kind !== 'completed' ? 'not-verified' : exitCode === 0 ? 'passed' : 'failed';
+  return {
+    observation: {
+      resolved: resolved.selection.resolved,
+      outcome,
+      notVerified: run.outcome.kind === 'completed' ? null : run.outcome.kind,
+      exitCode,
+      elapsedMs: run.elapsedMs,
+    },
+    text: [
+      `${resolved.selection.resolved.length} test file(s): ${resolved.selection.resolved.join(', ')}`,
+      `Outcome: ${outcome}${exitCode === null ? '' : ` (exit ${exitCode})`}, ${(run.elapsedMs / 1000).toFixed(1)} s.`,
+      '',
+      run.output.tail,
+    ].join('\n'),
+  };
+}
+
+/**
+ * The scenario half of one call: the check planned for the scope, run in
+ * quick mode through the same runner a gate uses, and its result per
+ * scenario. Undefined where the run tracks nothing to say about.
+ */
+async function runScopeScenarios(options: ScopeTestsOptions, scenarios: ScopeScenarioCheck, signal: AbortSignal): Promise<{
+  readonly observation: ScopeScenarioObservation;
+  readonly failed: boolean;
+  readonly lines: string[];
+} | undefined> {
+  const planning = await scenarios.plan();
+  if (planning === undefined) return undefined;
+  if ('none' in planning) {
+    return {
+      observation: { selected: [], passed: [], failures: 0 },
+      failed: false,
+      lines: ['Scenarios: none of this scope is declared yet, and this work item has no pending one, so none ran.'],
+    };
+  }
+  const { check } = planning;
+  const plan = check.scenarios!;
+  const directory = scenarios.directory();
+  await mkdir(directory, { recursive: true });
+  const { summary } = await runScenarioCheck({
+    command: check.command,
+    plan,
+    projectRoot: options.projectRoot,
+    attemptDirectory: directory,
+    outputFile: join(directory, 'scenarios.log'),
+    signal,
+    ...(options.commandExecution === undefined ? {} : { runner: options.commandExecution }),
+  });
+  const passed = scenarioCheckPassed(summary);
+  const selected = plan.selection.kind === 'identity' ? plan.selection.scenarios : summary.scenarios.map(result => result.id);
+  return {
+    observation: {
+      selected: [...selected],
+      passed: summary.scenarios.filter(result => result.status === 'passed').map(result => result.id),
+      failures: summary.failures.length,
+    },
+    failed: !passed,
+    lines: [
+      `Scenarios: ${passed ? 'passed' : 'failed'}; ${describeScenarioCheck(summary)}.`,
+      ...scenarioCheckLines(summary, scenarios.names ?? new Map()),
+    ],
   };
 }
 
@@ -357,6 +471,8 @@ export interface IterationBriefing {
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
   /** What an earlier invocation of this iteration reported before it ran out of context. */
   readonly handoff?: { readonly done: readonly string[]; readonly unfinished: readonly string[]; readonly returns: number } | undefined;
+  /** The work item's scenarios; absent for a provider or follow-up work item, whose briefing says nothing of them. */
+  readonly scenarios?: EngineerScenarios | undefined;
 }
 
 /** The first user message of one engineer invocation. */
@@ -412,6 +528,14 @@ export function iterationMessage(briefing: IterationBriefing): string {
     'the project\'s type check and a complete Ramify check. Call `run_scope_tests` to run the same selection yourself.',
     '',
   );
+  if (briefing.scenarios !== undefined) {
+    lines.push(
+      'It also runs, in quick mode, every scenario of your scope that has been declared, selected by identity.',
+      '`run_scope_tests` runs those and this work item\'s pending ones.',
+      '',
+    );
+  }
+  lines.push(...engineerScenarioSection(briefing.scenarios, assignment.scenarios ?? []));
 
   if (assignment.externalCapabilities.length > 0) {
     lines.push('## Capabilities other modules own', '');

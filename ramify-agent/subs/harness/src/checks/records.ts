@@ -1,4 +1,6 @@
 import { childEnvironment, environmentNames } from '../../subs/evidence/src/run-command.js';
+import type { ScenarioMode, ScenarioSelection } from '../../subs/scenarios/src/profiles.js';
+import type { ScenarioRunResult } from '../../subs/scenarios/src/messages.js';
 
 /*
  * The gate's record and the shapes it is built from. Nothing here knows about
@@ -99,8 +101,8 @@ export interface TestSelection extends TestSelectionPolicy {
   readonly resolved: string[];
 }
 
-/** The four kinds of command a gate runs. */
-export type CheckCommandKind = 'ramify-check' | 'type-check' | 'tests' | 'conformance';
+/** The kinds of command a gate runs. `scenarios` is one Cucumber run per module, with the mode's setup and teardown around them. */
+export type CheckCommandKind = 'ramify-check' | 'type-check' | 'tests' | 'conformance' | 'scenarios';
 
 /**
  * Why a command was not verified. Every one of them means the command did not
@@ -168,6 +170,49 @@ export interface GateCommandRecord {
   readonly runnerError: { readonly kind: string; readonly message: string } | null;
   /** The complete output is a file beside the attempt; `tail` has a fixed bound. */
   readonly output: { readonly path: string; readonly bytes: number; readonly truncated: boolean; readonly tail: string };
+  /** For a `scenarios` command: what its message streams said. Its outcome is read from this, not from the exit codes alone. */
+  readonly scenarios?: ScenarioCheckSummary;
+}
+
+/** One Cucumber run of a scenario check: one module's step and feature files. */
+export interface ScenarioCheckRun {
+  /** The module's declared-name path. */
+  readonly module: string;
+  /** Null when the run did not complete, or was never started. */
+  readonly exit: number | null;
+  /** The profile it ran, relative to the attempt's directory. */
+  readonly profile: string;
+  /** Its message stream, relative to the attempt's directory. */
+  readonly messages: string;
+}
+
+/** One tracked scenario's result, with the run that executed it. */
+export interface ScenarioCheckResult extends ScenarioRunResult {
+  /** The module whose run executed it. */
+  readonly run: string;
+}
+
+/**
+ * What a `scenarios` command established, read from the runs' message
+ * streams. It passes only when every run exited zero, every selected tracked
+ * scenario passed and every one of the project's own scenarios passed; a dry
+ * run passes a scenario whose steps all have a definition.
+ */
+export interface ScenarioCheckSummary {
+  readonly mode: ScenarioMode;
+  readonly selection: ScenarioSelection;
+  readonly dryRun: boolean;
+  /** Tracked scenarios the runs' files held and the selection kept out. */
+  readonly excluded: number;
+  /** The mode's `setup` and `teardown`, where configured, by exit code. */
+  readonly setup: { readonly exit: number | null } | null;
+  readonly teardown: { readonly exit: number | null } | null;
+  readonly runs: readonly ScenarioCheckRun[];
+  readonly scenarios: readonly ScenarioCheckResult[];
+  /** The project's own scenarios, by count, over every run. */
+  readonly untracked: { readonly passed: number; readonly skipped: number; readonly failed: number };
+  /** Why the check did not pass, one line each; empty when it passed. */
+  readonly failures: readonly string[];
 }
 
 /** Published evidence that certifies the exact commit named by `audited`. */
@@ -179,7 +224,7 @@ export interface GateEvidence {
 
 /** One run of a checkpoint's commands over the working directory. */
 export interface GateAttempt {
-  readonly schema: 'ramify-agent.gate-attempt/2';
+  readonly schema: 'ramify-agent.gate-attempt/3';
   readonly id: GateAttemptId;
   readonly checkpoint: Checkpoint;
   /** Neither for readiness and final. */
@@ -200,6 +245,13 @@ export interface GateAttempt {
   /** Rules the harness verified itself. A checkpoint with none records none. */
   readonly rules?: GateRuleRecord[];
   readonly commands: GateCommandRecord[];
+  /**
+   * `none-selected` when the checkpoint's scenario check had nothing to run:
+   * no tracked scenario of the scope was past `pending`, or no module had
+   * feature files. That is not a failure. Absent where a scenario check ran,
+   * and for a gate without a project configuration.
+   */
+  readonly scenarios?: 'none-selected';
   readonly verdict: 'passed' | 'failed' | 'not-verified';
   readonly cause: GateCause | null;
   /** What the cause was read from, where a report of its own named the files. */
@@ -208,4 +260,4 @@ export interface GateAttempt {
 }
 
 /** The version this harness writes and reads. */
-export const gateAttemptSchema = 'ramify-agent.gate-attempt/2';
+export const gateAttemptSchema = 'ramify-agent.gate-attempt/3';

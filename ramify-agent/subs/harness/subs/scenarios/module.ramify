@@ -1,0 +1,41 @@
+ramify 1
+module scenarios
+
+// Acceptance scenarios as pure functions: plan extraction, the form rules of
+// the initial analysis, records and their numbering, the state reducer,
+// feature rendering, the per-module Cucumber profile and the reducer of a
+// run's message stream. The Gherkin parser and the message types stay
+// behind this boundary. Every named type a signature mentions is exposed
+// beside the symbol, so the parent can name what it receives.
+expose-src extractPlanScenarios, PlanScenario, planScenarioSchema from "extraction.ts" to parent
+expose-src PlanScenarioLimitation, planScenarioLimitationSchema from "extraction.ts" to parent
+expose-src PlanScenarioExtraction, planScenarioExtractionSchema from "extraction.ts" to parent
+
+expose-src validateScenarioForm, scenarioFormRules, ScenarioFormRule, ScenarioFormResult from "form.ts" to parent
+expose-src ScenarioFormSubmission, scenarioFormSubmissionSchema, ScenarioSubmission, scenarioSubmissionSchema from "form.ts" to parent
+expose-src IntegrationScenarioSubmission, integrationScenarioSubmissionSchema, scenarioOriginSubmissionSchema from "form.ts" to parent
+expose-src ScenarioPlanRef, scenarioPlanRefSchema, ScenarioFormEntry, ScenarioViewNames from "form.ts" to parent
+expose-src ScenarioWarning, ScenarioWarningKind, AcceptedScenarioForm, FormScenario, FormIntegration from "form.ts" to parent
+
+expose-src assignScenarioIds, AssignedScenarios, ScenarioIdContext, ScenarioModule from "records.ts" to parent
+expose-src ScenarioRecord, scenarioRecordSchema, ScenarioId, scenarioIdSchema from "records.ts" to parent
+expose-src scenarioSourceHash, scenarioIdOf, lowestCommonAncestor, featureDirectoryOf from "records.ts" to parent
+
+expose-src ScenarioState, scenarioStateSchema, ScenarioEvent, scenarioEventTypes from "states.ts" to parent
+expose-src scenarioDeclaredDataSchema, scenarioDueDataSchema from "states.ts" to parent
+expose-src scenarioImplementedDataSchema, scenarioWithdrawnDataSchema from "states.ts" to parent
+expose-src ScenarioStates, ScenarioTransition, initialScenarioStates, applyScenarioEvent from "states.ts" to parent
+expose-src reduceScenarioStates, countScenarioStates, carriesPendingTag from "states.ts" to parent
+
+expose-src renderFeatureFiles, FeatureRenderingRun, RenderedFeatureFile from "rendering.ts" to parent
+expose-src pendingTag, identityTagOf, scenarioIdOfTag from "rendering.ts" to parent
+
+expose-src buildScenarioProfile, ScenarioProfile, ScenarioProfileOptions, ScenarioRunConfig from "profiles.ts" to parent
+expose-src ScenarioMode, scenarioModeSchema, ScenarioSelection, scenarioSelectionSchema from "profiles.ts" to parent
+expose-src scenarioTagExpression, scenarioRunName from "profiles.ts" to parent
+
+expose-src summarizeScenarioRun, TrackedScenario, ScenarioRunSummary, scenarioRunSummarySchema from "messages.ts" to parent
+expose-src ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema from "messages.ts" to parent
+expose-src untrackedScenarioCountsSchema from "messages.ts" to parent
+
+expose-src compositionFailures, bridgingGivens, CompositionFailure, CompositionSuspect from "composition.ts" to parent

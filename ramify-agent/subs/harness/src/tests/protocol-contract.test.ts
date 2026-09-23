@@ -6,7 +6,10 @@ import { acceptedCommandSchema, activitySchema, apiViewEvidenceSchema, receiptSc
 import { citationSchema, inputManifestSchema, modulePathSchema, moduleTreeResponseSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
-import { moduleCapabilityComparisonResponseSchema, runEventRefKindSchema, runQueryLimits } from '../interfaces/protocol/runs.js';
+import {
+  analysisResponseSchema, capabilityProgressSchema, gateViewSchema, moduleCapabilityComparisonResponseSchema, projectedRunEventSchema,
+  runEventRefKindSchema, runQueryLimits, scenarioListResponseSchema, scenarioStatusSchema, trackedScenarioStateSchema,
+} from '../interfaces/protocol/runs.js';
 import {
   runSessionViewSchema, sessionBodyResponseSchema, sessionListEntrySchema, sessionQueryLimits, sessionRefSchema,
   sessionTranscriptResponseSchema, sessionUpdatesResponseSchema, standaloneSessionIdSchema,
@@ -258,6 +261,88 @@ describe('the module-capability comparison', () => {
     // And the schema refuses such a field where a client might look for it.
     expect(accepts({ ...valid, deployed: true })).toBe(false);
     expect(accepts(with_(response => { (response.modules[1]!.capabilities[0]! as Record<string, unknown>)['commit'] = 'abc'; }))).toBe(false);
+  });
+});
+
+describe('the acceptance scenarios a client reads', () => {
+  const plan = { kind: 'plan', planScenario: 'ps-01', lines: [12, 16] };
+  const gateResult = {
+    gate: 'ga-0004', checkpoint: 'iteration', subject: { workItem: 'wi-003', iteration: 'wi-003.i01' }, verdict: 'failed',
+    mode: 'quick', dryRun: false, status: 'failed', failure: { step: 'Then it is shown', message: 'expected one' }, undefined: [],
+  };
+  const scenario = {
+    id: 'sc-003', kind: 'integration', name: 'A note is shown with its tag', state: 'declared', origin: plan,
+    entry: null, partOf: null, subScenarios: ['sc-001', 'sc-002'], workItem: 'wi-003', owner: 'app/reviews',
+    file: 'subs/reviews/src/tests/features/p/integration.feature', implementedBy: null, gates: [gateResult],
+  };
+
+  test('the path, the bound and every state and status', () => {
+    expect(protocolPaths.runScenarios('p', 'r 1')).toBe('/api/v1/plans/p/runs/r%201/scenarios');
+    expect(runQueryLimits.scenarios).toBe(500);
+    expect(trackedScenarioStateSchema.options).toEqual(['pending', 'bound', 'declared', 'implemented']);
+    expect(scenarioStatusSchema.options).toEqual(['passed', 'failed', 'undefined', 'pending', 'ambiguous', 'skipped']);
+  });
+
+  test('the scenario list: a scenario with its origin, work item and gates, strictly', () => {
+    const list = { scenarios: [scenario], total: 1 };
+    expect(scenarioListResponseSchema.parse(list)).toEqual(list);
+    const architect = { ...scenario, kind: 'entry', entry: 'show-note', partOf: 'sc-005', subScenarios: [], origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }, { lines: [3, 4] }] } };
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [architect], total: 1 }).success).toBe(true);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, state: 'failed' }], total: 1 }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, extra: 1 }], total: 1 }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, gates: [{ ...gateResult, binding: [] }] }], total: 1 }).success).toBe(false);
+    expect(scenarioListResponseSchema.safeParse({ scenarios: Array.from({ length: 501 }, () => scenario), total: 501 }).success).toBe(false);
+  });
+
+  test('the review: the accepted analysis carries each scenario\'s text and the warnings, and counts the scenarios', () => {
+    const text = {
+      id: 'sc-003', kind: 'integration', entry: null, owner: 'app/reviews', origin: plan, partOf: null, subScenarios: ['sc-001'],
+      name: 'A note is shown', source: ['Scenario: A note is shown', '  Then it is shown'], file: 'subs/reviews/src/tests/features/p/integration.feature',
+    };
+    const warning = { kind: 'sub-scenario-shares-no-step', scenarios: ['sc-001'], message: 'sc-001 picks no step of sc-003' };
+    const accepted = {
+      plan: { markdown: '# P', hash: 'a'.repeat(64) },
+      analysis: { status: 'accepted', view: { status: 'placeholder' }, entries: [], hypotheses: [], scenarios: [text], warnings: [warning], total: { entries: 0, hypotheses: 0, scenarios: 1 } },
+    };
+    expect(analysisResponseSchema.parse(accepted)).toEqual(accepted);
+    expect(analysisResponseSchema.safeParse({ ...accepted, analysis: { ...accepted.analysis, warnings: [{ ...warning, kind: 'loud' }] } }).success).toBe(false);
+    expect(analysisResponseSchema.safeParse({ ...accepted, analysis: { ...accepted.analysis, total: { entries: 0, hypotheses: 0 } } }).success).toBe(false);
+  });
+
+  test('an entry counts its scenarios; any other capability has no count', () => {
+    const progress = { capability: 'show-note', owner: 'app', entry: true, tentative: false, state: 'working', reason: 'r', dependsOn: [], workItems: [], evidence: [] };
+    expect(capabilityProgressSchema.safeParse({ ...progress, scenarios: { implemented: 1, total: 2 } }).success).toBe(true);
+    expect(capabilityProgressSchema.safeParse({ ...progress, entry: false, scenarios: null }).success).toBe(true);
+    expect(capabilityProgressSchema.safeParse(progress).success).toBe(false);
+  });
+
+  test('a gate\'s scenario command carries its compact summary; the others carry none', () => {
+    const command = {
+      argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: '2026-09-23T08:00:00.000Z', elapsedMs: 5, exitCode: 1, outcome: 'failed',
+      notVerified: null, runnerError: null, selection: null, output: { path: 'gates/ga-0004/scenarios.log', bytes: 10, truncated: false, tail: 'failed' },
+    };
+    const summary = {
+      mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-003'] }, dryRun: false, excluded: 2,
+      runs: [{ module: 'app/reviews', exit: 1 }],
+      scenarios: [{ id: 'sc-003', run: 'app/reviews', status: 'undefined', file: 'f.feature', line: 3, failure: { step: 'Then it is shown', message: 'undefined' }, undefined: ['Then it is shown'] }],
+      untracked: { passed: 0, skipped: 0, failed: 0 },
+      failures: ['sc-003 undefined'],
+    };
+    const gate = {
+      id: 'ga-0004', checkpoint: 'iteration', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: 'a', commit: null, audited: null,
+      evidence: null, verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
+      commands: [{ kind: 'scenarios', ...command, scenarios: summary }, { kind: 'tests', ...command, scenarios: null }],
+    };
+    expect(gateViewSchema.parse(gate)).toEqual(gate);
+    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'tests', ...command }] }).success).toBe(false);
+    const withBinding = { ...summary, scenarios: [{ ...summary.scenarios[0], binding: [] }] };
+    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'scenarios', ...command, scenarios: withBinding }] }).success).toBe(false);
+    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'scenarios', ...command, scenarios: { ...summary, mode: 'slow' } }] }).success).toBe(false);
+  });
+
+  test('a projected event may refer to a scenario', () => {
+    const event = { sequence: 4, at: '2026-09-23T08:00:00.000Z', transition: 'scenario-implemented', summary: 'Scenario sc-001 is implemented', refs: [{ kind: 'scenario', id: 'sc-001' }, { kind: 'gate', id: 'ga-0003' }] };
+    expect(projectedRunEventSchema.parse(event)).toEqual(event);
   });
 });
 
