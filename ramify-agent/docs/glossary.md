@@ -88,6 +88,27 @@ Its kind states the scope: implement, for one subtree; contract, for one seam;
 integrate, for the subtree of a lowest common ancestor; architect, for the
 architect view.
 
+## Invocation
+
+An **invocation** is one wait by the harness for an agent's outcome, with one
+role, prompt and scope, ending with at most one accepted submission.
+
+## Session
+
+A **session** is the conversation that one or more
+[invocations](#invocation) share. A fresh or forked invocation opens a session;
+a continued invocation joins the session it continues. Each invocation is one
+contiguous segment of its session's history.
+
+The harness owns a session's identity and lifecycle. The agent's own session
+file is the implementation's record, not the session.
+
+## Session state
+
+A [session](#session) is **live** while the harness awaits one of its
+invocations, **suspended** while none is awaited and the harness keeps it for
+further use, and **finished** once the harness will not use it again.
+
 ## Vertical work
 
 **Vertical work** is work within one subtree: a module and its descendants.

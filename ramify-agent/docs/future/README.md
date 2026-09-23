@@ -64,6 +64,10 @@ these entries, and the harness runs the checks the entries make possible.
   each capability another module owns and says whether its module receives
   it, so it does not search that module's source.
 
+The [required capabilities analysis](../analysis/2026-09-23-capability-registry-analysis.md)
+revises the end-of-run rule: only required capabilities need an entry point,
+and every other capability is retired by deduction once the run completes.
+
 Today's run-scoped registry (`ramify-agent.capability/1`) records behavior,
 owner, origin and consumers, without entry points or a lifecycle, and keeps
 forecast capabilities apart as hypotheses. The

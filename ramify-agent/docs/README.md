@@ -24,6 +24,13 @@ Design documents for the separate agent harness:
   analysis brief for contract authority, dependency cost and cognitive complexity
 - [When should a contract be a module? Result](analysis/2026-09-20-contract-module-analysis-result.md),
   what that analysis established, what Plan 3 takes from it and what it did not record
+- [Session transcripts and live session views](analysis/2026-09-23-session-transcripts-live-view.md),
+  draft analysis: what is collected for a web view of agent sessions, the gaps,
+  and a harness-owned transcript designed for parallel sessions
+- [Required capabilities and retired forecasts](analysis/2026-09-23-capability-registry-analysis.md),
+  analysis for the capability registry: only top-level capabilities are
+  required, a forecast is retired by deduction when the run completes, and
+  early retirement is a placement decision
 - [Work-brief decomposition spike](spikes/work-brief-examples/README.md), isolated example requests and Sol planning runs
 - [Autonomous-loop initial capability and module hypothesis](spikes/autonomous-loop-initial-analysis/README.md),
   spike output and reusable input for the later implementation plan
@@ -65,6 +72,10 @@ Design documents for the separate agent harness:
 - [Plan 7: commit-audit integration](plans/07-commit-audit-integration/main-plan.md),
   implemented commit-then-audit gates with revision-bound evidence; its
   completion gate is verified, while run delivery or merge remains out of scope
+- [Plan 9: session model and transcripts](plans/09-session-model-and-transcripts/main-plan.md),
+  harness-owned sessions with lifecycle and lineage, a transcript per session,
+  the session list, live transcripts, diagram markers, a lineage timeline and
+  lineage measurements; proposed
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

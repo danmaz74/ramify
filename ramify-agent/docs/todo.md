@@ -124,3 +124,26 @@ prompt already has its own Ramify section; do the same for the other roles.
       the invocation ends as when the machine is slow, and make the scenario
       deterministic.
 
+
+## 6. Clean up raw run data
+
+**Why.** Raw output makes up most of a run's size and becomes irrelevant some
+time after its plan is done. The largest trial run on disk (32 invocations)
+held 62 MB. Post-write hook outputs took 28 MB and gate logs 25 MB. pi session
+files and shell outputs took about 3 MB each, and the structured records
+about 2 MB. Transcripts, once recorded, add about as much as pi's files. The
+[retention section](analysis/2026-09-23-session-transcripts-live-view.md#retention)
+of the session-transcripts analysis has the measurement and a proposal.
+
+- [ ] Decide the rule. Either by run, a week after a final run ended, or by
+      plan, a week after one of the plan's runs completes. The harness has no
+      plan-completed state, so the by-plan rule needs one defined.
+- [ ] Keep the structured records and prune only raw output: hook outputs,
+      gate logs, shell outputs, pi session files and transcripts. Touch only
+      final runs, and never a run holding a live or suspended session.
+- [ ] The harness prunes, as the only writer: when the server opens,
+      periodically while it serves, and through a command with a dry run.
+- [ ] Write a retention record per pruned run, so the web shows what was
+      pruned and when instead of a missing file. Allow a run to be kept.
+- [ ] Decide whether transcripts outlive the raw check output, and whether to
+      compress before deleting.
