@@ -1,7 +1,9 @@
 # Plan 8: Baseline repairs
 
-**Date:** 2026-09-22. **Status:** approved; review decisions settled. Execution
-has started. Revised after the Plan 7 merge (`80c9bb9`), which fixed the
+**Date:** 2026-09-22. **Status:** completed on 2026-09-23; see
+[results](results.md). Eight acceptance rows are met; BR02's second half, the
+four reference self-check instances, was deferred by decision and is
+unverified. Revised after the Plan 7 merge (`80c9bb9`), which fixed the
 harness side of the original baseline.
 
 At `6ebff8e`, the merge of the

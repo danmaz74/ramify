@@ -3,6 +3,10 @@
 **Date:** 2026-09-22. **Status:** diagnostic report; fixes are not part of
 Plan 7. **Merge consequence:** the Plan 7 acceptance suites pass, but the
 repository-wide test command is not green.
+**Resolved:** BF-1 to BF-5 were corrected in `d2fca15`, Plan 7's final commit.
+The ramify-audit run of that commit,
+`refs/audited/runs/2026-09-22T18-54-47Z-d2fca150e`, is the evidence: all five
+checks pass, `agent-vitest` among them. The diagnosis below stands as written.
 
 ## Evidence boundary
 

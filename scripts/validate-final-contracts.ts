@@ -340,6 +340,28 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // The toolkit's own inferred signatures, written out so its check reports
+  // complete coverage. Each declared type is a signature companion, so it is
+  // exposed wherever the symbol it accompanies is. Reviewed with the
+  // declarations themselves: `subs/presentation/subs/layout/src/geometry.ts`
+  // (`LayoutGeometry`), `subs/service-api/src/project-view.ts`
+  // (`ExplorerProjectionResult`) and `subs/service-api/src/router.ts`
+  // (`ExplorerProcedures`), whose identity is restated by
+  // `subs/service-api/src/tests/router-typing.test.ts`.
+  { plan: 'the declared toolkit signatures',
+    added: {
+      './': [
+        'expose-sub ExplorerProjectionResult, ExplorerProcedures from service-api to descendants',
+      ].join('\n'),
+      'subs/presentation/subs/layout/': [
+        'expose-src LayoutGeometry from "geometry.ts" to parent',
+      ].join('\n'),
+      'subs/service-api/': [
+        'expose-src ExplorerProjectionResult from "project-view.ts" to parent',
+        'expose-src ExplorerProcedures from "router.ts" to parent',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** The expected selections: the archived list, then each named layer in turn.
