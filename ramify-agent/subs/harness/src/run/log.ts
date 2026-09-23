@@ -6,6 +6,7 @@ import { runFailureReasonSchema } from '../interfaces/protocol/runs.js';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { recordRefSchema } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
+import { scenarioWarningSchema } from '../analysis/records.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 
 /*
@@ -46,8 +47,10 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }).strict()),
   /**
    * Commits `EntryAssignments`, every `Hypothesis` at revision 1, one
-   * `RegistryEntry` per entry capability and one `WorkItem` per entry
-   * capability. One event holds every record of the phase.
+   * `RegistryEntry` per entry capability, one `WorkItem` per entry
+   * capability and one `ScenarioRecord` per scenario, `sc-001` to
+   * `sc-<scenarios>`, every one `pending`. One event holds every record of
+   * the phase, and the warnings the scenarios' form rules gave.
    */
   event('analysis-accepted', z.object({
     invocation: text,
@@ -55,6 +58,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
     hypotheses: z.int().nonnegative(),
     registry: z.int().nonnegative(),
     workItems: z.int().nonnegative(),
+    scenarios: z.int().nonnegative(),
+    warnings: z.array(scenarioWarningSchema),
   }).strict()),
   /** Commits the readiness `GateAttempt` and the `ReadinessAttempt` that names it. */
   event('readiness-passed', z.object({ attempt: z.int().positive(), gate: text }).strict()),

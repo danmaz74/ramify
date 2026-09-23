@@ -196,6 +196,8 @@ export const runSnapshotSchema = z.object({
     invocations: count,
     readinessAttempts: count,
     gateAttempts: count,
+    /** The tracked acceptance scenarios in each state. */
+    scenarios: z.object({ pending: count, bound: count, declared: count, implemented: count }).strict(),
   }).strict(),
   /** The one writer: which invocation holds it, and an invocation whose release was not confirmed. */
   writer: z.object({ held: text.nullable(), unsettled: text.nullable() }).strict(),

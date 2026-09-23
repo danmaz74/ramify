@@ -207,7 +207,7 @@ function unionRoots(): Record<string, unknown> {
 }
 
 const submissionSchemas: Readonly<Record<string, unknown>> = {
-  'ramify-agent.initial-analysis/1': initialAnalysisSubmissionSchema,
+  'ramify-agent.initial-analysis/2': initialAnalysisSubmissionSchema,
   'ramify-agent.local-architect-submission/1': localArchitectSubmissionSchema,
   'ramify-agent.engineer-submission/1': engineerSubmissionSchema,
   'ramify-agent.fork-submission/1': forkSubmissionSchema,
@@ -341,6 +341,12 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'query runs.runs[].notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/run-protocol.test.ts', test: 'driven while only the file system is watched; read over HTTP, and again after two restarts' },
   { union: 'query work-items.workItems[].origin', values: ['verification'], file: 'subs/harness/src/tests/contract-revision-scripted.test.ts', test: 'two consumers complete revision 1, a third revises it, and the follow-ups finish the run' },
   { union: 'query metrics.baseline.state', values: ['measured'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'a run freezes B from its first snapshot, and job.json names it' },
+  // The composed runs work from plans without `gherkin` blocks, so their
+  // analyses hold architect scenarios only and give no warning.
+  { union: 'submission initial-analysis.scenarios[].origin.kind', values: ['plan'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
+  { union: 'record ramify-agent.scenario/1.kind', values: ['integration'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
+  { union: 'record ramify-agent.scenario/1.origin.kind', values: ['plan'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'analysis-accepted commits one pending scenario record per scenario, with IDs, owners, hashes and the integration owner' },
+  { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
 ];
 
 /**

@@ -33,6 +33,7 @@ export function constructedRecord(extra: Partial<RunRecord> = {}): RunRecord {
     prompts: {},
     policy: {} as RunRecord['policy'],
     baseline: { unavailable: 'constructed' },
+    planScenarios: { scenarios: [], limitations: [] },
     ...extra,
   };
 }

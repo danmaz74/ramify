@@ -275,7 +275,7 @@ export function stopRun(planId: string, jobId: string, expectedVersion: number, 
 
 /** A valid initial analysis with no entry capability: the smallest coherent run. */
 export function emptyAnalysis() {
-  return { entries: [], hypotheses: [], coverageLimits: [] };
+  return { entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [] };
 }
 
 /** The run's events as written in its `events.jsonl`, one to a ledger line. */

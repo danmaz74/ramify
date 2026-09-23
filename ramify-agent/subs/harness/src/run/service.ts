@@ -85,6 +85,7 @@ import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitec
 import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
+import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
@@ -677,6 +678,9 @@ export class RunService {
       prompts: Object.fromEntries([...packages].map(([role, loaded]) => [role, { package: loaded.package, hash: loaded.hash }])),
       policy,
       baseline: baseline.reference,
+      // The plan's own scenarios, extracted once from the captured bytes. A
+      // block that does not parse is a limitation, never a refusal.
+      planScenarios: extractPlanScenarios(new TextDecoder().decode(captured)),
     });
     await writeOnce(join(directory, runLayout.record), `${JSON.stringify(record, null, 2)}\n`);
 
@@ -1074,8 +1078,8 @@ export class RunService {
       toolName: initialAnalysisToolName,
       description: 'Submit the run\'s initial analysis. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
       inputSchema: initialAnalysisJsonSchema,
-      submissionSchema: 'ramify-agent.initial-analysis/1',
-      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape }),
+      submissionSchema: 'ramify-agent.initial-analysis/2',
+      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape, planScenarios: run.record.planScenarios.scenarios }),
       scope: {
         write: null,
         measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
@@ -1094,7 +1098,13 @@ export class RunService {
       return false;
     }
 
-    const accepted = acceptAnalysis(result.value, { invocation: result.id, view: run.record.manifest.architectView });
+    const accepted = acceptAnalysis(result.value, {
+      invocation: result.id,
+      view: run.record.manifest.architectView,
+      planId: run.record.planId,
+      planScenarios: run.record.planScenarios.scenarios,
+      index: run.index,
+    });
     await this.write(run, {
       type: 'analysis-accepted',
       data: {
@@ -1103,6 +1113,8 @@ export class RunService {
         hypotheses: accepted.hypotheses.length,
         registry: accepted.registry.length,
         workItems: accepted.workItems.length,
+        scenarios: accepted.scenarios.length,
+        warnings: [...accepted.warnings],
       },
     }, accepted.records);
     await this.afterWrite('analysis-accepted', run.record.jobId);
@@ -4289,6 +4301,7 @@ function analysisMessage(record: RunRecord, plan: string): string {
     plan.trim(),
     '</plan>',
     '',
+    ...planScenariosSection(record.planScenarios),
     '# This run\'s evidence',
     '',
     view.status === 'materialized'
@@ -4301,6 +4314,46 @@ function analysisMessage(record: RunRecord, plan: string): string {
     '',
     `Analyse the plan with the procedure above and submit with \`${initialAnalysisToolName}\`.`,
   ].join('\n');
+}
+
+/**
+ * The plan scenarios the harness extracted, by ID with their text and plan
+ * lines, and every `gherkin` block that did not parse. A plan without
+ * blocks is said to have none in one line.
+ */
+function planScenariosSection(extraction: PlanScenarioExtraction): string[] {
+  const lines = ['# The plan\'s scenarios', ''];
+  if (extraction.scenarios.length === 0 && extraction.limitations.length === 0) {
+    return [...lines, 'The plan has no `gherkin` block, so it states no scenario: write every entry\'s scenarios yourself.', ''];
+  }
+  if (extraction.scenarios.length === 0) {
+    lines.push('The plan states no scenario that could be extracted: write every entry\'s scenarios yourself.', '');
+  } else {
+    lines.push(
+      `The harness extracted ${extraction.scenarios.length === 1 ? 'one scenario' : `${extraction.scenarios.length} scenarios`} from the plan's \`gherkin\` blocks. Each appears exactly once in your submission: as the origin of one entry scenario, restating its text as written here, or as an integration scenario with its sub-scenarios.`,
+      '',
+    );
+    for (const scenario of extraction.scenarios) {
+      lines.push(
+        `## ${scenario.id}: ${scenario.name}`,
+        '',
+        `Plan lines ${scenario.lines[0]}–${scenario.lines[1]}${scenario.outline ? ', a Scenario Outline with its examples' : ''}.`,
+        '',
+        '```gherkin',
+        ...scenario.source,
+        '```',
+        '',
+      );
+    }
+  }
+  if (extraction.limitations.length > 0) {
+    lines.push('Blocks the harness could not parse. They are not plan scenarios; the plan is the person\'s and the harness never edits it, so state what they meant in your own scenarios where an entry needs it:', '');
+    for (const limitation of extraction.limitations) {
+      lines.push(`- Plan lines ${limitation.lines[0]}–${limitation.lines[1]}: ${limitation.message.replace(/\n/g, '; ')}`);
+    }
+    lines.push('');
+  }
+  return lines;
 }
 
 /** The commit the working directory is on, or the empty string outside git. */

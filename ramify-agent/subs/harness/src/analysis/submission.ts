@@ -5,17 +5,25 @@ import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import { moduleProposalSchema, planRefSchema } from '../run/records.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 import { hypothesisChangeSchema, slugSchema } from './records.js';
+import type { PlanScenario } from '../../subs/scenarios/src/extraction.js';
+import {
+  integrationScenarioSubmissionSchema, scenarioSubmissionSchema, validateScenarioForm,
+  type ScenarioFormResult, type ScenarioViewNames,
+} from '../../subs/scenarios/src/form.js';
 
 /*
- * The initial architect's submission: the entry capabilities of the plan and
- * the deeper hypotheses it forecasts. The two stay separate, and a
- * hypothesis never creates work, an obligation or a completion requirement.
+ * The initial architect's submission, `initial-architect/2`: the entry
+ * capabilities of the plan, the deeper hypotheses it forecasts, and the
+ * acceptance scenarios of every entry. Entries and hypotheses stay separate,
+ * and a hypothesis never creates work, an obligation or a completion
+ * requirement.
  *
  * Every rule the schema cannot hold is here: an owner the refreshed view has
  * or a valid proposal, slugs unique in the run, plan references inside the
  * captured plan, and citations whose module, file and symbol the cited view
  * actually records. A failure changes nothing and returns every error with
- * its path to the same session.
+ * its path to the same session. Only when all of those hold are the
+ * scenarios' form rules applied, and the first one broken is the answer.
  */
 
 const text = z.string().min(1);
@@ -49,11 +57,18 @@ const hypothesisSubmissionSchema = z.object({
   citations: z.array(citationSchema),
 }).strict();
 
-/** What the initial architect submits. The harness assigns every ID it knows already. */
+/**
+ * What the initial architect submits. The harness assigns every ID it knows
+ * already, the scenarios' `sc-NNN` included. `scenarios` and
+ * `integrationScenarios` are required: an analysis without them is the
+ * retired `initial-architect/1` and is not accepted.
+ */
 export const initialAnalysisSubmissionSchema = z.object({
   entries: z.array(entrySchema),
   hypotheses: z.array(hypothesisSubmissionSchema),
   coverageLimits: z.array(z.string()),
+  scenarios: z.array(scenarioSubmissionSchema),
+  integrationScenarios: z.array(integrationScenarioSubmissionSchema),
 }).strict();
 export type InitialAnalysisSubmission = z.infer<typeof initialAnalysisSubmissionSchema>;
 export type SubmittedEntry = InitialAnalysisSubmission['entries'][number];
@@ -102,7 +117,16 @@ export interface AnalysisEvidence {
   readonly index: ArchitectIndex | null;
   /** The captured plan, or null where it could not be read. */
   readonly plan?: CapturedPlanShape | null | undefined;
+  /** The plan scenarios captured with the plan; none when it has no `gherkin` block. */
+  readonly planScenarios?: readonly PlanScenario[] | undefined;
 }
+
+/**
+ * The capability slug an entry may not take: an integration scenario's
+ * feature file is `integration.feature` beside the entries' own, so an entry
+ * of that name could share its file.
+ */
+export const reservedCapabilitySlug = 'integration';
 
 /**
  * Validates one submission: the strict schema, then the rules the schema
@@ -112,7 +136,37 @@ export function validateInitialAnalysis(input: unknown, evidence: AnalysisEviden
   const shape = validateAgainst(initialAnalysisSubmissionSchema, input);
   if (!shape.ok) return shape;
   const errors = beyondTheSchema(shape.value, evidence);
-  return errors.length === 0 ? shape : { ok: false, errors };
+  if (errors.length > 0) return { ok: false, errors };
+  const form = scenarioFormOf(shape.value, evidence);
+  if (form.ok) return shape;
+  return {
+    ok: false,
+    errors: [{ path: form.path, message: form.message, expected: `a submission that keeps scenario form rule ${form.rule}` }],
+  };
+}
+
+/**
+ * The scenarios' form rules over one submission, and, when they hold, the
+ * accepted form and its warnings. Pure, so acceptance derives the same form
+ * the validation accepted.
+ */
+export function scenarioFormOf(submission: InitialAnalysisSubmission, evidence: AnalysisEvidence): ScenarioFormResult {
+  return validateScenarioForm(
+    { scenarios: submission.scenarios, integrationScenarios: submission.integrationScenarios },
+    evidence.planScenarios ?? [],
+    submission.entries.map(entry => ({ capability: entry.capability, acceptanceRefs: entry.acceptanceRefs })),
+    viewNamesOf(evidence.index),
+  );
+}
+
+/** The exported symbols and the files the architect view records, for the scenarios' first warning. */
+function viewNamesOf(index: ArchitectIndex | null): ScenarioViewNames {
+  if (index === null) return { symbols: [], files: [] };
+  const records = [...index.symbols.values()].flat();
+  return {
+    symbols: [...new Set(records.map(record => record.name))].sort(),
+    files: [...new Set(records.map(record => record.file))].sort(),
+  };
 }
 
 function beyondTheSchema(submission: InitialAnalysisSubmission, evidence: AnalysisEvidence): SubmissionError[] {
@@ -127,6 +181,13 @@ function beyondTheSchema(submission: InitialAnalysisSubmission, evidence: Analys
         path: `entries.${position}.capability`,
         message: `The capability slug "${entry.capability}" is used by an earlier entry; a slug is unique in the run`,
         expected: 'a slug no other entry uses',
+      });
+    }
+    if (entry.capability === reservedCapabilitySlug) {
+      errors.push({
+        path: `entries.${position}.capability`,
+        message: `The capability slug "${reservedCapabilitySlug}" is reserved: integration scenarios are written to integration.feature beside each entry's own <capability>.feature, so an entry of that name would share their file. Name the capability for its behavior`,
+        expected: `a slug other than "${reservedCapabilitySlug}"`,
       });
     }
     capabilities.add(entry.capability);
@@ -151,6 +212,11 @@ function beyondTheSchema(submission: InitialAnalysisSubmission, evidence: Analys
     hypothesis.citations.forEach((citation, index) => {
       errors.push(...citationErrors(citation, `hypotheses.${position}.citations.${index}`, evidence));
     });
+  });
+
+  // An architect scenario's references are plan references like an entry's.
+  submission.scenarios.forEach((scenario, position) => {
+    errors.push(...planRefErrors(scenario.refs ?? [], `scenarios.${position}.refs`, evidence));
   });
   return errors;
 }

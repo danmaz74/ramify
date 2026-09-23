@@ -212,7 +212,11 @@ hiding or measured complexity justifies it.
     name agrees with the owner and the declaration, plan references that lie
     inside the captured plan, and citations whose module, file and symbol the
     cited view records. A hypothesis alone gives no authority to create
-    anything, so nothing here reads one.
+    anything, so nothing here reads one. It is `initial-architect/2`: every
+    entry's acceptance scenarios and the plan's integration scenarios, whose
+    form rules the `scenarios` child applies after every other rule. The
+    capability slug `integration` is reserved for the integration
+    scenarios' feature file.
   - `records.ts`: the `Hypothesis` and the `RegistryEntry`. A hypothesis is a
     forecast and nothing more: it has no reference to a work item, and
     nothing references it but a decision and a local architect's input.
@@ -222,9 +226,11 @@ hiding or measured complexity justifies it.
     change symbols that already have consumers.
   - `accept.ts`: what one accepted analysis commits, in the single
     `analysis-accepted` transition: the entry assignments, every hypothesis
-    at revision 1, one registry entry per entry capability and one work item
-    per entry capability. It is a pure function of the submission, the view
-    identity and the invocation, so a repeat after a crash derives the same
+    at revision 1, one registry entry per entry capability, one work item
+    per entry capability and one `ScenarioRecord` per scenario, numbered by
+    the `scenarios` child, with the form rules' warnings on the event. It is
+    a pure function of the submission, the view, the captured plan
+    scenarios and the invocation, so a repeat after a crash derives the same
     records with the same IDs.
 - `architecture/`: capability identity and placement, resolved in sequential
   forks of one long-lived architect context. The initial analysis session
@@ -518,10 +524,12 @@ Neither child receives this module's vocabulary.
   `writer-acquired` before any writer starts, so a stop that arrives in
   between applies to a known invocation.
 - **The initial analysis.** One `initial-architect` invocation over the
-  captured plan, the refreshed architect view and the module-architect skill.
-  Its submission commits, in one `analysis-accepted` event, the entry
+  captured plan, the plan scenarios extracted from its `gherkin` blocks when
+  it was captured, the refreshed architect view and the module-architect
+  skill. Its submission commits, in one `analysis-accepted` event, the entry
   assignments, every hypothesis at revision 1, one registry entry per entry
-  capability and one work item per entry capability. A hypothesis creates
+  capability, one work item per entry capability and one `pending` scenario
+  record per scenario, whose text is frozen from then on. A hypothesis creates
   nothing: no work item, no obligation and no completion requirement is
   derived from one.
 - **A work item.** One is created per entry capability, always; its module is
@@ -702,6 +710,11 @@ The run's own tests are beside them.
   nothing changes, that every error carries its path, that a corrected input
   is accepted, and that the bound ends the invocation as
   `invalid-submission`.
+- `analysis-scenarios.test.ts` captures plans with and without `gherkin`
+  blocks and with one that does not parse, rejects a submission per form
+  rule through the real validation path and under the per-turn bound, and
+  follows acceptance to the scenario records, their IDs, owners, files,
+  hashes and warnings, and the snapshot's counts.
 - `progress.test.ts` covers the capability projection and shows the record
   kinds in distinct directories, a `Hypothesis` with no reference to a work
   item, and a projection that leaves every file and the log's version exactly

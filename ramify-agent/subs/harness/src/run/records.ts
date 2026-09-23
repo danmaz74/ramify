@@ -6,6 +6,8 @@ import { roleSchema, runAgentSchema, type Role } from '../interfaces/protocol/ru
 import { jobSchemaVersion, jobsDirectory } from '../jobs/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
+import { planScenarioExtractionSchema } from '../../subs/scenarios/src/extraction.js';
+import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
 
 /*
  * The durable records of one implementation run, and where each of them is
@@ -148,6 +150,12 @@ export const runRecordSchema = z.object({
     z.object({ measurement: recordRefSchema }).strict(),
     z.object({ unavailable: text }).strict(),
   ]),
+  /**
+   * The plan scenarios extracted from the captured plan's `gherkin` blocks,
+   * `ps-01`, … in document order, and every block that did not parse as a
+   * limitation. Captured with the plan and never revised.
+   */
+  planScenarios: planScenarioExtractionSchema,
 }).strict();
 export type RunRecord = z.infer<typeof runRecordSchema>;
 
@@ -542,6 +550,8 @@ export const runLayout = {
   events: 'events.jsonl',
   promptManifest: join('prompts', 'manifest.json'),
   entries: join('analysis', 'entries.json'),
+  /** One tracked scenario, `sc-001`, committed by `analysis-accepted` and immutable. */
+  scenario: (id: string): string => join('scenarios', `${id}.json`),
   readiness: (attempt: number): string => join('readiness', readinessDirectory(attempt), 'attempt.json'),
   readinessOutput: (attempt: number): string => join('readiness', readinessDirectory(attempt)),
   recovery: (id: RecoveryId): string => join('recoveries', `${id}.json`),
@@ -566,6 +576,7 @@ export const runSchemas = {
   run: { schema: jobSchemaVersion, body: runRecordSchema },
   promptManifest: { schema: 'ramify-agent.prompt-manifest/1', body: promptPackageManifestSchema },
   entries: { schema: 'ramify-agent.entry-assignments/1', body: entryAssignmentsSchema },
+  scenario: { schema: 'ramify-agent.scenario/1', body: scenarioRecordSchema },
   readiness: { schema: 'ramify-agent.readiness-attempt/1', body: readinessAttemptSchema },
   recovery: { schema: 'ramify-agent.infrastructure-recovery/1', body: infrastructureRecoverySchema },
   measurement: { schema: 'ramify-agent.measurement-snapshot/1', body: measurementSnapshotSchema },

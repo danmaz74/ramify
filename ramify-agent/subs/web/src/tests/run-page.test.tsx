@@ -23,7 +23,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     startedAt: at, updatedAt: at, endedAt: null, failure: null,
     current: { workItem: 'wi-002', iteration: 'wi-002.i01', role: 'engineer', invocation: 'inv-0006' },
     waits: [],
-    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3 },
+    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, declared: 0, implemented: 0 } },
     writer: { held: 'inv-0006', unsettled: null },
     notices: [
       {

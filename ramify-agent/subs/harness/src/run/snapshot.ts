@@ -2,6 +2,11 @@ import type { JobState } from '../interfaces/protocol/jobs.js';
 import type { Role, RunFailureReason, RunPhase } from '../interfaces/protocol/runs.js';
 import type { RunEvent } from './log.js';
 import type { RunRecord } from './records.js';
+import { scenarioIdOf } from '../../subs/scenarios/src/records.js';
+import {
+  applyScenarioEvent, countScenarioStates, initialScenarioStates, scenarioEventTypes,
+  type ScenarioEvent, type ScenarioState, type ScenarioStates,
+} from '../../subs/scenarios/src/states.js';
 
 /*
  * The run's projection. It is a pure function of the run's `job.json` and
@@ -30,6 +35,8 @@ export interface RunSnapshot {
     readonly invocations: number;
     readonly readinessAttempts: number;
     readonly gateAttempts: number;
+    /** The tracked scenarios in each state; all zero before the analysis is accepted. */
+    readonly scenarios: Readonly<Record<ScenarioState, number>>;
   };
   /** The writer's standing: whether one is held, and whether the last release was confirmed. */
   readonly writer: { readonly held: string | null; readonly unsettled: string | null };
@@ -95,6 +102,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
   const verifiedRequirements = new Set<string>();
   const notices: RunNotice[] = [];
   const completedItems = new Set<string>();
+  let scenarios: ScenarioStates = initialScenarioStates([]);
 
   for (const event of events) {
     switch (event.type) {
@@ -109,6 +117,8 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
         break;
       case 'analysis-accepted':
         workItems = event.data.workItems;
+        // Numbered sc-001 to sc-<count>, every one pending.
+        scenarios = initialScenarioStates(Array.from({ length: event.data.scenarios ?? 0 }, (_, index) => scenarioIdOf(index + 1)));
         phase = 'readiness';
         break;
       case 'work-item-started':
@@ -185,6 +195,13 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
         failure = { reason: event.data.reason, message: event.data.message, evidence: event.data.evidence };
         break;
       default:
+        // A scenario event moves one scenario by the events table. The
+        // harness commits no transition the table rejects, so one that is
+        // rejected here leaves the states as they were.
+        if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
+          const applied = applyScenarioEvent(scenarios, event as unknown as ScenarioEvent);
+          if (applied.ok) scenarios = applied.states;
+        }
         break;
     }
   }
@@ -227,6 +244,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
       invocations,
       readinessAttempts,
       gateAttempts,
+      scenarios: countScenarioStates(scenarios),
     },
     writer: { held: heldWriter, unsettled },
     notices: resolvedNotices,
