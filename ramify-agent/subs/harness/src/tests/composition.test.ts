@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { runEventSchema } from '../run/log.js';
 import { observationSchema } from '../run/observations.js';
 import { runSchemas } from '../run/records.js';
+import { reduceSessions } from '../run/sessions.js';
 import { analysisSchemas } from '../analysis/records.js';
 import { workSchemas } from '../work/records.js';
 import { iterationSchemas } from '../work/iterations.js';
@@ -122,12 +123,24 @@ describe('the composed runs', () => {
   });
 });
 
+describe('the sessions of the composed runs', () => {
+  test('every invocation belongs to a session the log derives, and no final run holds a live or suspended session', () => {
+    for (const [name, run] of finished) {
+      const events = run.service.events(plan, run.runId)!;
+      const sessions = [...reduceSessions(events).values()];
+      const started = events.flatMap(event => (event.type === 'invocation-started' ? [event.data.invocation] : []));
+      expect([name, sessions.flatMap(session => session.invocations).sort()]).toEqual([name, [...started].sort()]);
+      expect([name, sessions.filter(session => session.state !== 'finished').map(session => `${session.id} ${session.state}`)]).toEqual([name, []]);
+    }
+  });
+});
+
 describe('the recovery tables of the ten state machines', () => {
   test('there is a row for every durable boundary, every machine has rows, and the three recovery files run all of them', async () => {
     const rows = allRows();
     // `recoveryTable` is typed against the run service's own boundary union,
     // so a boundary without a row does not compile; this states the count.
-    expect(new Set(rows.map(row => row.write)).size).toBe(36);
+    expect(new Set(rows.map(row => row.write)).size).toBe(38);
     const machines = new Set(rows.flatMap(row => row.machines));
     expect([...machines].sort()).toEqual((Object.keys(machineNames) as Machine[]).sort());
 
@@ -282,12 +295,21 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
   { union: 'run log.type', values: ['global-context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
   { union: 'run log.type', values: ['job-interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after job.json, before the first event, leaves a run that loads and is interrupted' },
+  { union: 'run log[invocation-ended].data[false].finished', values: ['interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
+  { union: 'run log[invocation-ended].data[false].finished', values: ['lost'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
+  { union: 'run log[invocation-ended].data[false].finished', values: ['replaced'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a session the implementation can no longer read is reconstructed, and the counters are kept' },
+  { union: 'run log[session-opened].data.replaces.reason', values: ['reconstructed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a session the implementation can no longer read is reconstructed, and the counters are kept' },
+  { union: 'run log[session-opened].data.replaces.reason', values: ['context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['repair'], file: 'subs/harness/src/tests/session-lifecycle.test.ts', test: 'a continued local architect, a global fork, a contract sub-session and a repaired engineer derive the expected state after every event' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['completion-refused'], file: 'subs/harness/src/tests/requirement-verification.test.ts', test: 'a passing verification that left the fake in place closes nothing, and completion is refused until it is gone' },
+  { union: 'run log[invocation-ended].data[true].degraded.requested', values: ['continue', 'fork'], file: 'subs/harness/src/tests/placement.test.ts', test: 'is recorded at the invocation\'s end with what was requested, what was actual and the executor\'s reason' },
+  { union: 'run log[invocation-ended].data[true].degraded.actual', values: ['fresh'], file: 'subs/harness/src/tests/placement.test.ts', test: 'is recorded at the invocation\'s end with what was requested, what was actual and the executor\'s reason' },
   { union: 'run log[brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'G4: a crash after the append and before its completion answers already-present, and one brief exists' },
   { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation-integration.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
   { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
   { union: 'run log[job-failed].data.reason', values: ['project-config-invalid'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a project without the file starts, and fails readiness with project-config-invalid and no recovery' },
   { union: 'run log[job-failed].data.reason', values: ['acceptance-harness-missing'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a project without cucumber-js fails acceptance-runner with acceptance-harness-missing and no recovery' },
-  { union: 'record ramify-agent.job/2.projectConfig|0.config.acceptance.modes.full.readiness', values: ['run'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a configuration asking readiness to run full mode is captured with it' },
+  { union: 'record ramify-agent.job/3.projectConfig|0.config.acceptance.modes.full.readiness', values: ['run'], file: 'subs/harness/src/tests/project-config.test.ts', test: 'a configuration asking readiness to run full mode is captured with it' },
   { union: 'observation log[coverage-gap].data.kind', values: ['unsupported-runner'], file: 'subs/harness/src/tests/iterations-integration.test.ts', test: 'a local architect assigns it, an engineer works it, the gate accepts it and the harness commits' },
   { union: 'run log[job-failed].data.reason', values: ['repair-exhausted'], file: 'subs/harness/src/tests/work-items.test.ts', test: 'returns to the same local architect, which revises its outline, and exhausts deterministically' },
   { union: 'run log[job-failed].data.reason', values: ['recovery-exhausted'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a failure that keeps recurring ends the run once the bounded recoveries are spent' },
@@ -297,6 +319,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'observation log[hook-check].data.outcome', values: ['passed'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'a check that passed with nothing new tells the engineer nothing' },
   { union: 'observation log[hook-check].data.outcome', values: ['findings'], file: 'subs/harness/src/tests/hook-checks.test.ts', test: 'findings are reported with their count, and the same finding reported again is not new' },
   { union: 'observation log[coverage-gap].data.kind', values: ['observation-truncated'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after writer-released keeps what the shell wrote, closes the invocation and releases no second writer' },
+  { union: 'observation log[coverage-gap].data.kind', values: ['transcript-incomplete'], file: 'subs/harness/src/tests/transcript-run.test.ts', test: 'is a coverage gap in its invocation\'s observations, and the run completes' },
   { union: 'record ramify-agent.readiness-attempt/1.steps[].outcome', values: ['failed', 'not-verified'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a Ramify command line that does not answer is recovered by restarting the daemon, and the run ends when it still does not' },
   { union: 'record ramify-agent.readiness-attempt/1.verdict', values: ['failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
   { union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'missing nested dependencies consume a recovery attempt, and the run continues when it repairs them' },
@@ -418,7 +441,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'Written where the harness finds itself inconsistent: a prompt package that is not loaded, an assignment without an outline, a revision of an agreement the run never registered. No test builds any of those states, because the run service does not reach them from records it wrote itself.',
   },
   {
-    union: 'record ramify-agent.job/2.agent', values: ['pi'],
+    union: 'record ramify-agent.job/3.agent', values: ['pi'],
     reason: 'A run started on pi. No pi session ran in this environment: there is no pi login, so the real trial (T2) was not run and nothing produced it. It is produced only by a real `serve --agent pi` run.',
   },
   {
@@ -428,6 +451,10 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['reconstruct-session', 'none'],
     reason: 'Readiness plans only reinstall-nested, restart-daemon and rerun-command; an unrecoverable failure records no recovery at all (iteration 4, deviation 9), and session reconstruction is recorded on the invocation, not as a recovery.',
+  },
+  {
+    union: 'run log[invocation-ended].data[true].degraded.actual', values: ['continue', 'fork'],
+    reason: 'The agent port degrades a start it cannot honor to fresh, and both of its implementations do. The field takes the port\'s mode as it is answered, so an executor that answered another is recorded rather than refused.',
   },
   {
     union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['provider-error'],

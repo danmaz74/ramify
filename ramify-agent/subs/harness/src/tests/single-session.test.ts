@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -11,6 +12,10 @@ import {
 } from '../sessions/records.js';
 import { runSingleSession, sessionAcceptance, type SessionProgress, type SingleSessionOptions, type SingleSessionResult } from '../sessions/single.js';
 import { acquireProjectLock, lockPath } from '../store/lock.js';
+import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
+import type { TranscriptEntry } from '../interfaces/protocol/transcripts.js';
+import { readTranscript } from '../transcripts/writer.js';
+import { blobsIn } from './helpers/transcripts.js';
 import { copyFixture } from './helpers/fixture.js';
 import { addModule, completionProposed, edit, installMiniRunner, readDeclaredTree, shell, unsuitableScope, write } from './helpers/iterations.js';
 import { testPolicy } from './helpers/runs.js';
@@ -405,6 +410,8 @@ describe('the session\'s records', () => {
 
     const record = sessionRecordSchema.parse(JSON.parse(await readFile(join(records, 'session.json'), 'utf8')));
     expect(record).toMatchObject({ id: summary.session, module: notes, directory: notesDirectory, prompt: 'Raise the note limit to 500.', gate: true });
+    // The session records its executor and the model it was asked for: none, for the fake.
+    expect(record).toMatchObject({ schema: 'ramify-agent.session/2', agent: 'scripted', model: null });
     expect(record.scope.roots).toEqual([`${notesDirectory}/src`]);
 
     const observations = await observationsOf(records);
@@ -421,10 +428,85 @@ describe('the session\'s records', () => {
     const hooks = await readdir(join(records, 'hooks'));
     expect(hooks).toEqual(['001.json', '002.json', '003.json']);
     for (const hook of hooks) JSON.parse(await readFile(join(records, 'hooks', hook), 'utf8'));
+    // The executor's own session record, beside the harness's transcript.
     expect((await stat(join(records, 'session'))).isDirectory()).toBe(true);
+    expect((await stat(join(records, 'transcript.jsonl'))).isFile()).toBe(true);
 
     expect(summary.changed.filter(path => path.includes('plans/.harness'))).toEqual([]);
     expect(summary.changed).toEqual([notesSource]);
     expect(git.commitAccepted).not.toHaveBeenCalled();
+  }, 120_000);
+
+  test('its transcript is transcript.jsonl: the start before the model call, the harness\'s decisions, and the shell\'s log by reference', async () => {
+    const root = await project();
+    const outside = 'subs/workspace/subs/reviews/src/stray.ts';
+    const commandExecution: CommandRunner = request => commandResult(request, { stdout: 'checking\n' });
+    const scripted = createScriptedAgent([
+      shell('echo checking'),
+      write(outside, 'export const stray = 1;\n'),
+      edit(notesSource, 'noteLimit = 400', 'noteLimit = 500'),
+      { kind: 'submit', input: completionProposed('The limit is 500.') },
+    ]);
+    // What the transcript held when the session was started.
+    let atStart: TranscriptEntry[] | undefined;
+    const agent: AgentPort = {
+      name: scripted.name,
+      support: scripted.support,
+      appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
+      startSession(spec) {
+        const path = join(spec.sessionDirectory, '..', 'transcript.jsonl');
+        atStart = existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as TranscriptEntry) : [];
+        return scripted.startSession(spec);
+      },
+    };
+    const { result } = await session(root, [], { agent }, {
+      changed: [notesSource],
+      ramify: [checked('complete'), checked('changed'), checked('changed')],
+      commandExecution,
+    });
+
+    const summary = finished(result);
+    expect(summary.ended).toBe('submitted');
+    const id = summary.session;
+    expect(atStart?.map(entry => entry.type)).toEqual(['started']);
+
+    const read = await readTranscript(join(summary.records, 'transcript.jsonl'));
+    expect([read.discardedPartial, read.unreadable]).toEqual([false, []]);
+    const entries = read.entries;
+    expect(entries.map(entry => entry.n)).toEqual(entries.map((_, index) => index + 1));
+    // The session is its own one invocation, so its identifier names both.
+    expect(entries.every(entry => entry.invocation === id)).toBe(true);
+    expect(entries[0]).toMatchObject({
+      type: 'started', role: 'engineer', work: {}, start: 'opened', requested: 'fresh', executor: 'scripted', model: null,
+      continues: null, fork: null, systemPrompt: { stored: 'blob' },
+    });
+    expect(entries.slice(-2)).toEqual([
+      expect.objectContaining({ type: 'ended', ended: 'submitted', interruption: null, error: null, actual: { mode: 'fresh', degradedReason: null } }),
+      expect.objectContaining({ type: 'point', point: { session: id, invocation: id } }),
+    ]);
+    expect(await blobsIn(join(summary.records, 'blobs'))).toHaveLength(1);
+
+    // The shell's result is what the agent saw, and names the complete output.
+    const shellResult = entries.find(entry => entry.type === 'message' && entry.role === 'tool-result' && entry.tool === 'shell');
+    expect(shellResult).toMatchObject({ output: { stored: 'file', path: 'shell/001.log', bytes: 9 } });
+
+    const decisions = entries.flatMap(entry => (entry.type === 'harness' ? [entry.decision] : []));
+    expect(decisions.map(decision => decision.kind)).toEqual([
+      'post-write-check', 'guard-denied', 'post-write-check', 'post-write-check', 'submission-verdict',
+    ]);
+    // The shell's changed set is unknown, so its check is a complete one, whose log the entry names.
+    expect(decisions[0]).toMatchObject({
+      callId: 'call-1', atCompletion: false,
+      checks: [{ mode: 'changed', outcome: 'not-checked', log: null }, { mode: 'complete', log: { stored: 'file', path: 'hooks/001.json' } }],
+    });
+    expect(decisions[1]).toMatchObject({ callId: 'call-2', tool: 'write', verdict: 'blocked-scope', requested: outside });
+    expect(decisions[3]).toMatchObject({ atCompletion: true, callId: null, checks: [{ mode: 'changed' }] });
+    expect(decisions[4]).toMatchObject({
+      callId: 'call-4', verdict: 'accepted', text: { stored: 'inline', text: sessionAcceptance('completion-proposed', false) },
+    });
+    // The records hold none of it.
+    const recordText = await readFile(join(summary.records, 'session.json'), 'utf8') + await readFile(join(summary.records, 'outcome.json'), 'utf8')
+      + await readFile(join(summary.records, 'observations.jsonl'), 'utf8');
+    expect(recordText).not.toContain(sessionAcceptance('completion-proposed', false));
   }, 120_000);
 });

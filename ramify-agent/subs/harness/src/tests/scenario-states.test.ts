@@ -536,12 +536,13 @@ describe('§7: withdrawal', () => {
       'withdrawing sc-001 (repair-exhausted)', 'withdrawn sc-001 (repair-exhausted) at revision-02',
       'declared sc-001 declared', 'implemented sc-001',
     ]);
-    // The iteration closed exhausted, and the withdrawal followed before the
-    // local architect's next turn.
+    // The iteration closed exhausted, its engineer's session was finished,
+    // and the withdrawal followed before the local architect's next turn.
     const closed = at(log, 'iteration-closed', data => data.iteration === 'wi-001.i01');
     expect((log[closed]!.data as { outcome: string }).outcome).toBe('exhausted');
-    expect(at(log, 'scenarios-withdrawing')).toBe(closed + 1);
-    expect(log[closed + 3]!.type).toBe('invocation-started');
+    expect(log[closed + 1]).toMatchObject({ type: 'session-finished', data: { reason: 'work-closed' } });
+    expect(at(log, 'scenarios-withdrawing')).toBe(closed + 2);
+    expect(log[closed + 4]!.type).toBe('invocation-started');
     expect(log[at(log, 'scenarios-withdrawing')]!.data).toEqual({ withdrawal: 1, workItem: 'wi-001', scenarios: ['sc-001'], reason: 'repair-exhausted' });
 
     // The commit: its own subject, the file, the run's trailer and the

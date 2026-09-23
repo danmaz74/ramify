@@ -17,7 +17,7 @@ import { roles, runPolicySchema, type RunPolicy } from './records.js';
  */
 
 /** The version this policy is recorded under. */
-export const runPolicyVersion = 'run-policy/1';
+export const runPolicyVersion = 'run-policy/2';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {
@@ -55,6 +55,12 @@ export const defaultContextPolicies: Record<Role, RunPolicy['context'][Role]> = 
   engineer: { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
   'contract-engineer': { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
 };
+
+/**
+ * The transcript policy. A body larger than this is stored once in the
+ * content store and named by its hash; a smaller one stays in its entry.
+ */
+export const defaultTranscriptPolicy: RunPolicy['transcript'] = { inlineBodyBytes: 8 * 1024 };
 
 /** The timeouts of the main plan's command table. */
 export const commandTimeouts = {
@@ -182,6 +188,7 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
     version: runPolicyVersion,
     limits: defaultLimits,
     context,
+    transcript: defaultTranscriptPolicy,
     commands: {
       typeCheck: npmCommand(projectRoot, ['run', 'type-check'], commandTimeouts.typeCheck),
       allTests: npmCommand(projectRoot, ['test'], commandTimeouts.allTests),

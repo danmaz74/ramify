@@ -1138,6 +1138,7 @@ export function identityOf(event: RunEvent): string | null {
     case 'scenarios-materializing': case 'scenarios-materialized':
       return event.type;
     case 'invocation-started': case 'invocation-ended': return `${event.type}:${String(data.invocation)}`;
+    case 'session-opened': case 'session-finished': return `${event.type}:${String(data.session)}`;
     case 'writer-acquired': case 'writer-released': return `${event.type}:${String(data.invocation)}`;
     case 'readiness-passed': case 'readiness-failed': return `${event.type}:${String(data.attempt)}`;
     case 'work-item-started': case 'work-item-completed': return `${event.type}:${String(data.workItem)}`;
@@ -1167,5 +1168,5 @@ export function identityOf(event: RunEvent): string | null {
  */
 export const recoveryCompletions: ReadonlySet<RunEvent['type']> = new Set([
   'invocation-ended', 'writer-released', 'gate-attempted', 'brief-appended', 'global-context-rebuilt',
-  'decision-delivered', 'scenarios-materialized', 'job-interrupted',
+  'decision-delivered', 'scenarios-materialized', 'session-finished', 'job-interrupted',
 ]);

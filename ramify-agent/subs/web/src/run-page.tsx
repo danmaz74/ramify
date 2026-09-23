@@ -1,24 +1,26 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type {
-  DecisionView, GateView, HypothesisView, InvocationEvaluation, Metric, MetricsResponse,
+  DecisionView, GateView, HypothesisView, LineageMetric, Metric, MetricsResponse,
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
 import { Markdown } from './markdown.js';
-import { routeHref } from './routes.js';
+import { chapterHref, routeHref } from './routes.js';
 import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
 import { ApproveForm, canApprove, reviewText, ReviewPanel, ScenarioCheckSummaryView, ScenarioReview, ScenarioTable } from './run-scenarios.js';
+import type { DiagramSessions } from './session-marks.js';
+import { SessionTimeline } from './session-timeline.js';
 
 /*
  * The Run page: one run, as the harness projects it. Its overview shows
- * notices first: every module created or removed, and every detected
- * dependency cycle, resolved or not, during the run and after it. Stop and
- * Approve are its commands; Start is on the Plan page. The connection to the
- * harness is shown apart from the run's state: losing it changes nothing in
- * the run.
+ * notices first: every module created or removed, every detected dependency
+ * cycle, resolved or not, during the run and after it, and every degraded
+ * start. Stop and Approve are its commands; Start is on the Plan page. The
+ * connection to the harness is shown apart from the run's state: losing it
+ * changes nothing in the run.
  */
 
 const areas = [
@@ -29,6 +31,7 @@ const areas = [
   ['scenarios', 'Scenarios'],
   ['checks', 'Checks'],
   ['progress', 'Progress'],
+  ['sessions', 'Sessions'],
   ['measurements', 'Measurements'],
 ] as const;
 type Area = typeof areas[number][0];
@@ -91,6 +94,7 @@ export function RunPage({ client, planId, runId, interval }: {
         <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
           onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
       )}
+      {area === 'sessions' && <RunSessions {...props} />}
       {area === 'measurements' && <Measurements {...props} />}
     </section>
   );
@@ -117,7 +121,7 @@ function Overview({ client, run, events, onApproved }: {
   const running = run.state === 'running';
   return (
     <div className="area" aria-label="Overview">
-      <Notices run={run} />
+      <Notices client={client} run={run} />
       <section className="panel" aria-labelledby="state-heading">
         <header className="page-header">
           <h2 id="state-heading">State</h2>
@@ -183,16 +187,56 @@ function currentText(current: NonNullable<RunSnapshot['current']>): string {
   return parts.join(', ');
 }
 
-/** What the person must be told, first: modules created or removed, then every dependency cycle. */
-function Notices({ run }: { readonly run: RunSnapshot }) {
+/**
+ * What the person must be told, first: modules created or removed, then
+ * every dependency cycle, then the run's degraded starts, where it has any.
+ */
+function Notices({ client, run }: { readonly client: ProtocolClient; readonly run: RunSnapshot }) {
   const ended = run.state !== 'running';
+  const degraded = run.counts.degradedStarts;
   return (
     <section className="panel notices" aria-labelledby="notices-heading">
       <h2 id="notices-heading">Notices</h2>
-      {run.notices.length === 0
+      {run.notices.length === 0 && degraded === 0
         ? <p className="muted">{ended ? 'No module was created or removed, and no dependency cycle was detected.' : 'None so far: no module created or removed, and no dependency cycle detected.'}</p>
-        : <ul className="notice-list">{run.notices.map(notice => <Notice key={`${notice.kind}-${notice.sequence}-${'module' in notice ? notice.module : notice.cycle.join()}`} notice={notice} />)}</ul>}
+        : (
+          <ul className="notice-list">
+            {run.notices.map(notice => <Notice key={`${notice.kind}-${notice.sequence}-${'module' in notice ? notice.module : notice.cycle.join()}`} notice={notice} />)}
+            {degraded > 0 && <DegradedStartsNotice client={client} run={run} />}
+          </ul>
+        )}
     </section>
+  );
+}
+
+/**
+ * The run's degraded starts: counted by its snapshot, and read from its
+ * sessions, which are asked for only when there is one, to link each to
+ * its chapter.
+ */
+function DegradedStartsNotice({ client, run }: { readonly client: ProtocolClient; readonly run: RunSnapshot }) {
+  const { planId, jobId: runId, version } = run;
+  const state = useRunQuery(`degraded-starts:${runId}`, version, () => client.getRunSessions(planId, runId));
+  const count = run.counts.degradedStarts;
+  const starts = state.status === 'ready'
+    ? state.data.sessions.flatMap(session => session.invocations.flatMap(invocation => invocation.degraded === null ? [] : [{ session, invocation: invocation.invocation, ...invocation.degraded }]))
+    : [];
+  return (
+    <li className="notice notice-degraded-start">
+      <strong>{count === 1 ? 'A degraded start' : `${count} degraded starts`}</strong>
+      <p>The executor was asked to continue or fork a session's conversation and started a fresh one instead, without its history.</p>
+      {state.status === 'failed' && <p className="muted">The sessions could not be read to name them: {state.error.message}</p>}
+      {starts.length > 0 && (
+        <ul>
+          {starts.map(({ session, invocation, requested, actual, reason }) => (
+            <li key={invocation}>
+              <a href={chapterHref({ source: 'run', planId, runId, session: session.session }, invocation)}>{session.session} {session.role}, {invocation}</a>
+              : {requested} was requested and {actual} was made{reason ? ` (${reason})` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
@@ -555,6 +599,11 @@ type ProgressView = typeof progressViews[number][0];
  * mounted, so the page never loads both large visualizations at once. By
  * module is the default: it answers the run's initial-versus-current
  * placement question.
+ *
+ * Both are marked with the run's sessions. They are read again whenever the
+ * run's version moves, which the run's own poll reads, and every change of a
+ * session's state is an event of the run: a mark changes within one poll of
+ * the change. Without them the diagrams are drawn unmarked, and say so.
  */
 function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }: AreaProps & {
   readonly onOpenWorkItem: (workItem: string) => void;
@@ -562,6 +611,9 @@ function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }:
   readonly onSelectModule: (selection: ModuleCapabilitySelection | null) => void;
 }) {
   const [view, setView] = useState<ProgressView>('module');
+  const { client, planId, runId, version } = props;
+  const state = useRunQuery(`progress-sessions:${runId}`, version, () => client.getRunSessions(planId, runId));
+  const sessions: DiagramSessions | undefined = state.status === 'ready' ? { planId, runId, sessions: state.data.sessions } : undefined;
   return (
     <div className="area area-wide" aria-label="Progress">
       <nav className="tabs progress-views" aria-label="Progress views">
@@ -569,38 +621,62 @@ function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }:
           <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? 'tab tab-selected' : 'tab'} onClick={() => setView(id)}>{label}</button>
         ))}
       </nav>
-      {view === 'module' && <ByModule {...props} selection={moduleSelection} onSelect={onSelectModule} />}
-      {view === 'dependencies' && <Dependencies {...props} onOpenWorkItem={onOpenWorkItem} />}
+      {state.status === 'failed' && <p className="warn" role="status">The sessions are not marked: {state.error.message}</p>}
+      {view === 'module' && <ByModule {...props} sessions={sessions} selection={moduleSelection} onSelect={onSelectModule} />}
+      {view === 'dependencies' && <Dependencies {...props} sessions={sessions} onOpenWorkItem={onOpenWorkItem} />}
     </div>
   );
 }
 
 /** The module-capability comparison on the shared module tree, or the condition that stands in for it. */
-function ByModule({ client, planId, runId, version, selection, onSelect }: AreaProps & {
+function ByModule({ client, planId, runId, version, selection, onSelect, sessions }: AreaProps & {
   readonly selection: ModuleCapabilitySelection | null;
   readonly onSelect: (selection: ModuleCapabilitySelection | null) => void;
+  readonly sessions: DiagramSessions | undefined;
 }) {
   const state = useRunQuery(`module-capabilities:${runId}`, version, () => client.getModuleCapabilities(planId, runId));
   return (
     <section className="progress-view" aria-label="By module">
       {state.status === 'loading' && <p className="muted" role="status">Loading the module comparison…</p>}
       {state.status === 'failed' && <p className="failure" role="alert">The module comparison is unavailable: {state.error.message}</p>}
-      {state.status === 'ready' && <CapabilityModuleTree comparison={state.data} selection={selection} onSelect={onSelect} />}
+      {state.status === 'ready' && <CapabilityModuleTree comparison={state.data} selection={selection} onSelect={onSelect} sessions={sessions} />}
     </section>
   );
 }
 
 /** The dependency graph, or the condition that stands in for it: never a `todo` in place of an answer. */
-function Dependencies({ client, planId, runId, version, onOpenWorkItem }: AreaProps & { readonly onOpenWorkItem: (workItem: string) => void }) {
+function Dependencies({ client, planId, runId, version, onOpenWorkItem, sessions }: AreaProps & {
+  readonly onOpenWorkItem: (workItem: string) => void;
+  readonly sessions: DiagramSessions | undefined;
+}) {
   const state = useRunQuery(`capabilities:${runId}`, version, () => client.getCapabilities(planId, runId));
   return (
     <section className="progress-view" aria-label="Dependencies">
       {state.status === 'loading' && <p className="muted" role="status">Loading the capability progress…</p>}
       {state.status === 'failed' && <p className="failure" role="alert">The capability progress is unavailable: {state.error.message}</p>}
       {state.status === 'ready' && (
-        <CapabilityDependencyGraph capabilities={state.data.capabilities} total={state.data.total} onOpenWorkItem={onOpenWorkItem} />
+        <CapabilityDependencyGraph capabilities={state.data.capabilities} total={state.data.total} onOpenWorkItem={onOpenWorkItem} sessions={sessions} />
       )}
     </section>
+  );
+}
+
+// Sessions
+
+/*
+ * The run's sessions as a lineage timeline. It is read again whenever the
+ * run's version moves, so a live session's segments grow as the run does.
+ */
+function RunSessions({ client, planId, runId, version }: AreaProps) {
+  const state = useRunQuery(`sessions:${runId}`, version, () => client.getRunSessions(planId, runId));
+  return (
+    <div className="area area-wide" aria-label="Sessions">
+      <Loading state={state} what="the sessions">
+        {data => data.sessions.length === 0
+          ? <p className="muted">No session has been opened yet.</p>
+          : <SessionTimeline planId={planId} runId={runId} answer={data} />}
+      </Loading>
+    </div>
   );
 }
 
@@ -631,10 +707,11 @@ function Measurements({ client, planId, runId, version }: AreaProps) {
               </table>
             </section>
             <section className="panel">
-              <h2>Sessions</h2>
-              <table className="table" aria-label="Sessions">
-                <thead><tr><th>Invocation</th><th>Role</th><th>Ended</th><th>Guarding</th><th>Hook checks</th><th>Reads outside</th><th>Lines</th><th>Tokens</th></tr></thead>
-                <tbody>{data.evaluation.invocations.map(invocation => <SessionRow key={invocation.invocation} invocation={invocation} />)}</tbody>
+              <h2>Lineage</h2>
+              <p className="muted">Lineage measurements {data.lineage.policyVersion}. Each segment counts as the start its executor made: a fork or continuation it made fresh is measured as a fresh start and counted as degraded. Forks are grouped by the context generation they forked.</p>
+              <table className="table metrics" aria-label="Lineage measurements">
+                <thead><tr><th>Measurement</th><th>State</th><th>Value</th><th>Numerator</th><th>Denominator</th><th>Coverage</th><th>Note</th></tr></thead>
+                <tbody>{data.lineage.metrics.map(metric => <MetricRow key={metric.id} metric={metric} />)}</tbody>
               </table>
             </section>
           </>
@@ -644,7 +721,7 @@ function Measurements({ client, planId, runId, version }: AreaProps) {
   );
 }
 
-function MetricRow({ metric }: { readonly metric: Metric }) {
+function MetricRow({ metric }: { readonly metric: Metric | LineageMetric }) {
   return (
     <tr className={`metric metric-${metric.state}`} data-metric={metric.id}>
       <td><code>{metric.id}</code><div className="muted">{metric.unit}</div></td>
@@ -654,24 +731,6 @@ function MetricRow({ metric }: { readonly metric: Metric }) {
       <td>{figure(metric.denominator)}</td>
       <td>{metric.coverage ? `${metric.coverage.covered} of ${metric.coverage.total}` : '—'}</td>
       <td>{metric.note ?? ''}{metric.evidence.length > 0 && <details><summary>evidence</summary><ul>{metric.evidence.map(item => <li key={item}>{item}</li>)}</ul></details>}</td>
-    </tr>
-  );
-}
-
-function SessionRow({ invocation }: { readonly invocation: InvocationEvaluation }) {
-  const usage = 'unavailable' in invocation.usage
-    ? `unavailable: ${invocation.usage.unavailable}`
-    : `in ${invocation.usage.input} · cache read ${invocation.usage.cacheRead} · cache write ${invocation.usage.cacheWrite} · out ${invocation.usage.output}`;
-  return (
-    <tr>
-      <td>{invocation.invocation}{invocation.iteration ? <div className="muted">{invocation.iteration}</div> : null}</td>
-      <td>{invocation.role}</td>
-      <td>{invocation.ended ?? 'running'}</td>
-      <td>{invocation.guarding.complete ? 'complete' : 'partial'}{invocation.outsideScope.length > 0 ? <div className="warn">outside scope: {invocation.outsideScope.join(', ')}</div> : null}</td>
-      <td>{invocation.hookChecks.passed} passed, {invocation.hookChecks.findings} with findings, {invocation.hookChecks.notChecked} not checked</td>
-      <td>{invocation.excursions.join(', ') || '—'}</td>
-      <td>{invocation.lines === null ? '—' : `+${invocation.lines.added} −${invocation.lines.deleted} (${invocation.lines.coverage})`}</td>
-      <td>{usage}</td>
     </tr>
   );
 }

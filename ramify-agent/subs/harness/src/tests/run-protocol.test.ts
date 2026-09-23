@@ -541,7 +541,7 @@ describe('a record of an unsupported version', () => {
     cleanups.push(target.remove);
     const runId = '20990101T000000Z-abcdef';
     await mkdir(runPath(target.root, plan, runId), { recursive: true });
-    await writeFile(runPath(target.root, plan, runId, 'job.json'), `${JSON.stringify({ schema: 'ramify-agent.job/3', kind: 'implementation', jobId: runId, planId: plan })}\n`);
+    await writeFile(runPath(target.root, plan, runId, 'job.json'), `${JSON.stringify({ schema: 'ramify-agent.job/4', kind: 'implementation', jobId: runId, planId: plan })}\n`);
 
     const server = await serve(target.root);
     cleanups.push(() => server.close());
@@ -551,7 +551,7 @@ describe('a record of an unsupported version', () => {
     expect(status).toBe(422);
     const error = errorResponseSchema.parse(body).error;
     expect(error.code).toBe('unsupported-version');
-    expect(error.evidence).toEqual([`plans/${plan}/.harness/jobs/${runId}/job.json`, 'declares ramify-agent.job/3']);
+    expect(error.evidence).toEqual([`plans/${plan}/.harness/jobs/${runId}/job.json`, 'declares ramify-agent.job/4']);
     for (const path of [protocolPaths.runEvents(plan, runId, 0), protocolPaths.runMetrics(plan, runId), protocolPaths.runGate(plan, runId, 'ga-0001')]) {
       expect(errorResponseSchema.parse((await get(server, path)).body).error.code).toBe('unsupported-version');
     }
@@ -559,7 +559,7 @@ describe('a record of an unsupported version', () => {
     const list = runListResponseSchema.parse((await get(server, protocolPaths.runs(plan))).body);
     expect(list.unserved).toEqual([{
       jobId: runId, path: `plans/${plan}/.harness/jobs/${runId}/job.json`, code: 'unsupported-version',
-      message: expect.stringContaining('ramify-agent.job/3'),
+      message: expect.stringContaining('ramify-agent.job/4'),
     }]);
 
     // A run that does not exist is `not-found`; the difference is the point.

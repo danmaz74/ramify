@@ -6,8 +6,11 @@ import type {
   AgentPort,
   AgentSession,
   ContextPolicy,
+  GuardedCall,
   SessionSpec,
+  SettledMutation,
   SubmissionVerdict,
+  ToolAction,
   ToolDefinition,
 } from '../../../../../src/interfaces/port.js';
 import { createPiAgentOn } from '../../pi-agent.js';
@@ -37,8 +40,8 @@ export interface PiHarness {
   readonly spec: SessionSpec;
   readonly events: AgentEvent[];
   readonly judged: unknown[];
-  readonly guarded: Array<{ readonly callId: string; readonly tool: string; readonly input: unknown }>;
-  readonly settledMutations: Array<{ readonly callId: string; readonly tool: string; readonly failed: boolean }>;
+  readonly guarded: Array<{ readonly callId: string; readonly tool: string; readonly input: unknown; readonly action: ToolAction }>;
+  readonly settledMutations: Array<{ readonly callId: string; readonly tool: string; readonly action: ToolAction; readonly failed: boolean }>;
   readonly scripted: ScriptedProvider;
   readonly workingDirectory: string;
   readonly sessionDirectory: string;
@@ -67,11 +70,15 @@ export interface PiOptions {
   /** pi's own compaction thresholds. */
   readonly compaction?: { readonly reserveTokens?: number | undefined; readonly keepRecentTokens?: number | undefined } | undefined;
   readonly settleMs?: number | undefined;
+  /** pi's first delay before it retries a failed model call. */
+  readonly retryDelayMs?: number | undefined;
+  /** The scripted model's rates per million tokens. */
+  readonly cost?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number } | undefined;
   /** Tool names the guard denies, with the text the denial returns. */
   readonly deny?: Record<string, string> | undefined;
   readonly guard?: boolean | undefined;
   /** A guard of the caller's own, which decides each call however it likes. */
-  readonly decide?: ((call: { readonly callId: string; readonly tool: string; readonly input: unknown }) => Promise<{ readonly allow: true } | { readonly allow: false; readonly text: string }>) | undefined;
+  readonly decide?: ((call: GuardedCall) => Promise<{ readonly allow: true } | { readonly allow: false; readonly text: string }>) | undefined;
   /** The text `afterMutation` appends to a settled call's result. */
   readonly hookCheck?: string | undefined;
   /** Reuses an existing working and session directory, for a second session over the same files. */
@@ -101,6 +108,7 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
   const scripted = scriptedProvider(steps, {
     ...(options.contextWindow === undefined ? {} : { contextWindow: options.contextWindow }),
     ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
+    ...(options.cost === undefined ? {} : { cost: options.cost }),
   });
   const isolated = await scriptedRuntime(scripted);
   cleanups.push(isolated.remove);
@@ -109,6 +117,7 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     model: options.model ?? 'scripted/scripted-1',
     settleMs: options.settleMs ?? 5_000,
     compaction: options.compaction,
+    retryDelayMs: options.retryDelayMs,
     runtime: async () => isolated.runtime,
   });
 
@@ -139,8 +148,8 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     sessionDirectory: places.sessionDirectory,
     ...(options.guard === true || options.decide !== undefined || Object.keys(deny).length > 0
       ? {
-          guard: async (call: { callId: string; tool: string; input: unknown }) => {
-            guarded.push({ callId: call.callId, tool: call.tool, input: call.input });
+          guard: async (call: GuardedCall) => {
+            guarded.push({ callId: call.callId, tool: call.tool, input: call.input, action: call.action });
             if (options.decide !== undefined) return options.decide(call);
             const text = deny[call.tool];
             return text === undefined ? { allow: true as const } : { allow: false as const, text };
@@ -150,8 +159,8 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     ...(options.hookCheck === undefined
       ? {}
       : {
-          afterMutation: async (call: { callId: string; tool: string; failed: boolean }) => {
-            settledMutations.push({ callId: call.callId, tool: call.tool, failed: call.failed });
+          afterMutation: async (call: SettledMutation) => {
+            settledMutations.push({ callId: call.callId, tool: call.tool, action: call.action, failed: call.failed });
             return { text: options.hookCheck as string };
           },
         }),

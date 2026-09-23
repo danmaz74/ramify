@@ -123,6 +123,11 @@ export function createShellTool(options: ShellOptions): ShellTool {
     ].join(' '),
     inputSchema: shellJsonSchema,
     mutating: true,
+    // A shell call is a command; its text is the one field of the input read.
+    action: input => {
+      const command = typeof input === 'object' && input !== null ? (input as { readonly command?: unknown }).command : undefined;
+      return { kind: 'command', command: typeof command === 'string' ? command : null };
+    },
     async execute(input: unknown, signal: AbortSignal): Promise<ToolResult> {
       const judged = await options.judge(input);
       if (!judged.ok) return { isError: true, text: judged.text };

@@ -174,6 +174,8 @@ export const runQueryLimits = {
 export const measurementPolicySchema = z.literal('scope-size/1');
 /** The version of the KPI projection, versioned apart from the measurement policy. */
 export const kpiPolicySchema = z.literal('kpi/1');
+/** The version of the lineage measurements, versioned apart from the KPIs. */
+export const lineagePolicySchema = z.literal('lineage/1');
 
 const moduleNotice = <K extends 'module-created' | 'module-removed'>(kind: K) => z.object({
   kind: z.literal(kind),
@@ -251,6 +253,8 @@ export const runSnapshotSchema = z.object({
     gateAttempts: count,
     /** The tracked acceptance scenarios in each state. */
     scenarios: z.object({ pending: count, bound: count, declared: count, implemented: count }).strict(),
+    /** Invocations whose executor started otherwise than the harness asked: a continuation or fork made fresh. */
+    degradedStarts: count,
   }).strict(),
   /** The one writer: which invocation holds it, and an invocation whose release was not confirmed. */
   writer: z.object({ held: text.nullable(), unsettled: text.nullable() }).strict(),
@@ -288,6 +292,7 @@ export type RunResponse = z.infer<typeof runResponseSchema>;
 export const runEventRefKindSchema = z.enum([
   'work-item', 'iteration', 'invocation', 'gate', 'decision', 'request',
   'contract', 'obligation', 'requirement', 'capability', 'commit', 'scenario',
+  'session',
 ]);
 export type RunEventRefKind = z.infer<typeof runEventRefKindSchema>;
 
@@ -1002,15 +1007,15 @@ export const metricStateSchema = z.enum(['measured', 'partial', 'unavailable', '
 export type MetricState = z.infer<typeof metricStateSchema>;
 
 /**
- * One KPI. A missing observation is `unavailable`, never zero; a zero
- * denominator is `not-applicable`; a whole-run ratio over partial coverage
- * is `partial`, with the covered numerator and denominator shown instead of
- * a value. Only a `measured` metric has a value.
+ * One measurement under a policy. A missing observation is `unavailable`,
+ * never zero; a zero denominator is `not-applicable`; a whole-run ratio over
+ * partial coverage is `partial`, with the covered numerator and denominator
+ * shown instead of a value. Only a `measured` metric has a value.
  */
-export const metricSchema = z.object({
+const measurementSchema = <P extends z.ZodLiteral<string>>(policy: P) => z.object({
   id: text,
   unit: text,
-  policyVersion: kpiPolicySchema,
+  policyVersion: policy,
   /** The measurement policy of the sizes it reads, where it reads any. */
   measurementPolicy: measurementPolicySchema.nullable(),
   state: metricStateSchema,
@@ -1027,7 +1032,18 @@ export const metricSchema = z.object({
   message: 'Only a measured metric has a value; any other state has none',
   path: ['value'],
 });
+
+/** One KPI, under `kpi/1`. */
+export const metricSchema = measurementSchema(kpiPolicySchema);
 export type Metric = z.infer<typeof metricSchema>;
+
+/**
+ * One lineage measurement, under `lineage/1`: a comparison of segments by
+ * the start each one made, or a count of lineage relations. It reads no
+ * scope size, so its `measurementPolicy` is null.
+ */
+export const lineageMetricSchema = measurementSchema(lineagePolicySchema);
+export type LineageMetric = z.infer<typeof lineageMetricSchema>;
 
 const verdictCounts = z.object({ allowed: count, 'blocked-scope': count, 'blocked-unresolved': count }).strict();
 
@@ -1079,7 +1095,8 @@ export type InvocationEvaluation = z.infer<typeof invocationEvaluationSchema>;
 
 /**
  * `GET /api/v1/plans/:planId/runs/:runId/metrics`: the KPIs with their
- * policy versions and coverage, and the evaluation evidence beside them:
+ * policy versions and coverage, the lineage measurements, and the
+ * evaluation evidence beside them:
  * what was guarded, and every change outside a recorded write scope.
  */
 export const metricsResponseSchema = z.object({
@@ -1091,6 +1108,14 @@ export const metricsResponseSchema = z.object({
     z.object({ state: z.literal('unavailable'), reason: text, subtotal: count.nullable() }).strict(),
   ]),
   metrics: z.array(metricSchema),
+  /**
+   * The lineage measurements: forks, continuations, repairs, degraded starts
+   * and replacements, each segment classified by the start it made.
+   */
+  lineage: z.object({
+    policyVersion: lineagePolicySchema,
+    metrics: z.array(lineageMetricSchema),
+  }).strict(),
   evaluation: z.object({
     guarding: guardingViewSchema,
     outsideScope: z.array(z.object({ invocation: text, role: roleSchema, workItem: text.nullable(), iteration: text.nullable(), path: text }).strict()),

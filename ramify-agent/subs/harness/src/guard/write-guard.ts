@@ -1,8 +1,9 @@
+import type { ToolAction } from '../../subs/agent/src/interfaces/port.js';
 import { isContained, resolveRealTarget } from './resolve-contained-path.js';
 
 /*
- * The write guard. `edit` and `write` are intercepted before they execute:
- * the target is resolved against the invocation's working directory, then
+ * The write guard. A write is intercepted before it executes: the target its
+ * action names is resolved against the invocation's working directory, then
  * against the real filesystem, and only then checked against the write scope
  * the assignment recorded.
  *
@@ -44,15 +45,17 @@ export interface GuardDecisionRecord {
   readonly denied?: true | undefined;
 }
 
-/** The field a mutating built-in names its target in. */
-function targetOf(input: unknown): string | null {
-  if (typeof input !== 'object' || input === null) return null;
-  const record = input as Record<string, unknown>;
-  for (const field of ['path', 'file_path', 'filePath']) {
-    const value = record[field];
-    if (typeof value === 'string' && value.trim() !== '') return value;
-  }
-  return null;
+/**
+ * The one target a write names, or why there is none. The guard judges one
+ * target per call, so a write that names several cannot be judged and is
+ * blocked as unresolved; no executor's write names several today.
+ */
+function targetOf(action: ToolAction): { readonly target: string } | { readonly reason: string } {
+  if (action.kind !== 'write') return { reason: 'the call is not a write, so it names no path to write' };
+  const paths = action.paths.filter(path => path.trim() !== '');
+  if (paths.length === 0) return { reason: 'the call names no path to write' };
+  if (paths.length > 1) return { reason: `the call names ${paths.length} paths to write, and the guard judges one target per call` };
+  return { target: paths[0]! };
 }
 
 /**
@@ -64,12 +67,13 @@ function targetOf(input: unknown): string | null {
 export async function decideWrite(
   scope: GuardedScope,
   workingDirectory: string,
-  input: unknown,
+  action: ToolAction,
 ): Promise<GuardDecisionRecord> {
-  const requested = targetOf(input);
-  if (requested === null) {
-    return { verdict: 'blocked-unresolved', requested: '', resolved: null, reason: 'the call names no path to write' };
+  const named = targetOf(action);
+  if (!('target' in named)) {
+    return { verdict: 'blocked-unresolved', requested: '', resolved: null, reason: named.reason };
   }
+  const requested = named.target;
   const target = await resolveRealTarget(workingDirectory, requested);
   if (!target.ok) {
     return { verdict: 'blocked-unresolved', requested, resolved: null, reason: target.reason };

@@ -56,12 +56,14 @@ describe('an implementation run with no entry capabilities', () => {
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started',
+      'session-opened',
       'invocation-started',
       'invocation-ended',
       'analysis-accepted',
       'readiness-passed',
       'gate-committing',
       'gate-attempted',
+      'session-finished',
       'job-completed',
     ]);
 
@@ -80,7 +82,7 @@ describe('an implementation run with no entry capabilities', () => {
 
     // Every record of the run is a file beneath it.
     const record = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.record), 'utf8')) as Record<string, unknown>;
-    expect(record['schema']).toBe('ramify-agent.job/2');
+    expect(record['schema']).toBe('ramify-agent.job/3');
     expect(record['kind']).toBe('implementation');
     const entries = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.entries), 'utf8')) as { entries: unknown[] };
     expect(entries.entries).toEqual([]);
@@ -138,8 +140,8 @@ describe('an implementation run with no entry capabilities', () => {
 
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'gate-committing', 'gate-attempted', 'job-failed',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-failed',
     ]);
     // The unchanged tree needs no new commit, but its current revision was
     // audited and the failing attempt records that identity and evidence.

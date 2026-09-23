@@ -1,5 +1,9 @@
 import { useId, useMemo, useState } from 'react';
 import type { CapabilityListResponse, CapabilityProgress } from '../../harness/src/interfaces/protocol/runs.js';
+import type { RunSessionView } from '../../harness/src/interfaces/protocol/sessions.js';
+import {
+  capabilityOf, ElementSessions, marksText, RunSessionStrip, SessionMarks, SessionMarksLegend, sessionsBy, type DiagramSessions,
+} from './session-marks.js';
 
 /*
  * Progress → Dependencies: every capability the harness returned, once, with
@@ -23,12 +27,16 @@ const graphBottom = 24;
 // Room above a cycle's first member for its label, which wraps to two lines at the node width.
 const cycleHeader = 40;
 const cyclePadding = 9;
+/** The line every node keeps for its session marks when the graph is given the run's sessions, so a mark never moves a node. */
+export const sessionMarksHeight = 24;
 
 export interface CapabilityDependencyGraphProps {
   readonly capabilities: CapabilityListResponse['capabilities'];
   readonly total: CapabilityListResponse['total'];
   /** Opens one work item's history; without it, work items are listed as text. */
   readonly onOpenWorkItem?: ((workItem: string) => void) | undefined;
+  /** The run's sessions: each node is marked with those that reach its capability. */
+  readonly sessions?: DiagramSessions | undefined;
 }
 
 export interface CapabilityGraphNode {
@@ -72,7 +80,7 @@ export interface CapabilityGraphLayout {
 export const ownerLabel = (capability: Pick<CapabilityProgress, 'tentative'>): string =>
   capability.tentative ? 'suggested owner' : 'current owner';
 
-function nodeHeight(capability: CapabilityProgress): number {
+function nodeHeight(capability: CapabilityProgress, marksHeight: number): number {
   const segments = capability.owner.split('/').map((segment, index, all) => `${segment}${index < all.length - 1 ? '/' : ''}`);
   let ownerLines = 1;
   let lineLength = 0;
@@ -85,7 +93,7 @@ function nodeHeight(capability: CapabilityProgress): number {
     ownerLines += segmentLines - 1;
     lineLength = segment.length % ownerCharactersPerLine;
   }
-  return baseNodeHeight + (ownerLines - 1) * ownerLineHeight;
+  return baseNodeHeight + (ownerLines - 1) * ownerLineHeight + marksHeight;
 }
 
 function ModulePath({ module }: { readonly module: string }) {
@@ -103,8 +111,9 @@ function ModulePath({ module }: { readonly module: string }) {
  * consumers are left of their dependencies and direct links may skip
  * columns. Strongly connected capabilities form one group in one column,
  * outlined with their internal edges, rather than an implied order.
+ * `marksHeight` is added to every node, for its session marks.
  */
-export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[]): CapabilityGraphLayout {
+export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[], marksHeight = 0): CapabilityGraphLayout {
   const byId = new Map(capabilities.map(capability => [capability.capability, capability]));
   const order = new Map(capabilities.map((capability, index) => [capability.capability, index]));
   const dependencies = new Map(capabilities.map(capability => [
@@ -213,7 +222,7 @@ export function layoutCapabilityGraph(capabilities: readonly CapabilityProgress[
       if (cycle) y += cycleHeader;
       for (const id of components[component]!) {
         const capability = byId.get(id)!;
-        const height = nodeHeight(capability);
+        const height = nodeHeight(capability, marksHeight);
         nodes.push({ capability, component, column: columnIndex, row, x, y, height });
         row += 1;
         y += height + rowGap;
@@ -274,12 +283,20 @@ function edgePath(from: CapabilityGraphNode, to: CapabilityGraphNode): string {
   return `M ${fromX} ${fromY} C ${middle} ${fromY}, ${middle} ${toY}, ${toX} ${toY}`;
 }
 
-function nodeName(capability: CapabilityProgress): string {
-  return `${capability.capability}, ${capability.state}${capability.entry ? ', entry' : ''}${capability.tentative ? ', forecast only' : ''}`;
+function nodeName(capability: CapabilityProgress, sessions: readonly RunSessionView[] | undefined): string {
+  const marks = marksText(sessions);
+  return `${capability.capability}, ${capability.state}${capability.entry ? ', entry' : ''}${capability.tentative ? ', forecast only' : ''}${marks ? `, sessions: ${marks}` : ''}`;
 }
 
-export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem }: CapabilityDependencyGraphProps) {
-  const layout = useMemo(() => layoutCapabilityGraph(capabilities), [capabilities]);
+export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem, sessions }: CapabilityDependencyGraphProps) {
+  const marked = sessions !== undefined;
+  const layout = useMemo(() => layoutCapabilityGraph(capabilities, marked ? sessionMarksHeight : 0), [capabilities, marked]);
+  const byCapability = useMemo(() => sessionsBy(sessions?.sessions ?? [], capabilityOf), [sessions]);
+  const drawn = new Set(capabilities.map(capability => capability.capability));
+  const runLevel = (sessions?.sessions ?? []).filter(session => {
+    const capability = capabilityOf(session.reaches);
+    return capability === null || !drawn.has(capability);
+  });
   const markerPrefix = useId().replaceAll(':', '');
   const confirmedMarker = `${markerPrefix}-confirmed-arrow`;
   const tentativeMarker = `${markerPrefix}-tentative-arrow`;
@@ -351,7 +368,9 @@ export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem 
         <span><i className="legend-node legend-entry" /> entry</span>
         <span><i className="legend-node legend-forecast" /> forecast only</span>
         <span><i className="legend-cycle" /> dependency cycle</span>
+        {marked && <SessionMarksLegend />}
       </div>
+      {sessions && <RunSessionStrip diagram={sessions} sessions={runLevel} />}
       <div className="capability-graph-scroll" tabIndex={0} aria-label="Scrollable capability dependency graph">
         <div className="capability-graph-surface" style={{ width: layout.width, height: layout.height }} role="group" aria-label={`${capabilities.length} capabilities in ${layout.columns} dependency depth columns`}>
           {Array.from({ length: layout.columns }, (_, column) => (
@@ -399,7 +418,7 @@ export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem 
                 className={`capability-node capability-node-${capability.state}${capability.tentative ? ' capability-node-tentative' : ''}${isSelected ? ' capability-node-selected' : ''}`}
                 style={{ left: node.x, top: node.y, width: nodeWidth, height: node.height }}
                 aria-pressed={isSelected}
-                aria-label={nodeName(capability)}
+                aria-label={nodeName(capability, byCapability.get(capability.capability))}
                 onClick={() => setSelectedId(capability.capability)}
               >
                 <span className="capability-node-title"><code>{capability.capability}</code></span>
@@ -411,13 +430,15 @@ export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem 
                   {capability.tentative && <span className="badge tentative">forecast only</span>}
                 </span>
                 <span className="capability-node-meta">{capability.workItems.length} work item{capability.workItems.length === 1 ? '' : 's'} · {capability.evidence.length} evidence</span>
+                {marked && <span className="capability-node-sessions" style={{ height: sessionMarksHeight }}><SessionMarks sessions={byCapability.get(capability.capability)} /></span>}
               </button>
             );
           })}
         </div>
       </div>
       {selected
-        ? <CapabilityDetail capability={selected} capabilities={capabilities} omitted={omitted} onOpenWorkItem={onOpenWorkItem} />
+        ? <CapabilityDetail capability={selected} capabilities={capabilities} omitted={omitted} onOpenWorkItem={onOpenWorkItem}
+          sessions={sessions} of={byCapability.get(selected.capability)} />
         : <p className="capability-detail muted">No capability is selected.</p>}
       <details className="capability-dependency-list">
         <summary>Dependency list</summary>
@@ -445,11 +466,14 @@ export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem 
   );
 }
 
-function CapabilityDetail({ capability, capabilities, omitted, onOpenWorkItem }: {
+function CapabilityDetail({ capability, capabilities, omitted, onOpenWorkItem, sessions, of }: {
   readonly capability: CapabilityProgress;
   readonly capabilities: readonly CapabilityProgress[];
   readonly omitted: ReadonlySet<string>;
   readonly onOpenWorkItem: ((workItem: string) => void) | undefined;
+  readonly sessions: DiagramSessions | undefined;
+  /** The sessions that reach this capability. */
+  readonly of: readonly RunSessionView[] | undefined;
 }) {
   const dependents = capabilities.filter(other => other.dependsOn.some(link => link.capability === capability.capability));
   return (
@@ -501,6 +525,7 @@ function CapabilityDetail({ capability, capabilities, omitted, onOpenWorkItem }:
           <div><dt>Acceptance scenarios</dt><dd>{capability.scenarios.implemented} of {capability.scenarios.total} implemented</dd></div>
         )}
       </dl>
+      {sessions && <ElementSessions diagram={sessions} sessions={of} element={capability.capability} />}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import type { Metric } from '../interfaces/protocol/runs.js';
 import type { Role } from '../interfaces/protocol/runs.js';
-import type { Observation } from '../run/observations.js';
+import { rawOutputGapKinds, type Observation } from '../run/observations.js';
 import type { InvocationOutcome, LineEventSummary, ScopeSize } from '../run/records.js';
 import { roles } from '../run/records.js';
 
@@ -34,8 +34,14 @@ export interface InvocationFacts {
   readonly iteration: string | null;
   readonly request: string | null;
   readonly writer: boolean;
-  /** The session this invocation belongs to: a continued session keeps its ref. */
+  /** The harness session this invocation belongs to, which each invocation of a continued session shares. */
   readonly session: string;
+  /**
+   * The model context it ran in, where that is not its session's first:
+   * a continued start the executor made fresh begins another within the
+   * same session. Absent means the session's own.
+   */
+  readonly history?: string | undefined;
   /** Null while the invocation has not ended. */
   readonly outcome: Pick<InvocationOutcome, 'ended' | 'usage' | 'outsideScope'> | null;
   /** `S_s` as captured when the invocation started; null when none was taken. */
@@ -188,14 +194,29 @@ function sessionsOf(inputs: MetricInputs): Map<string, InvocationFacts[]> {
 }
 
 /**
+ * The model contexts: each session's invocations, split where a continued
+ * start the executor made fresh began another context.
+ */
+function historiesOf(inputs: MetricInputs): Map<string, InvocationFacts[]> {
+  const histories = new Map<string, InvocationFacts[]>();
+  for (const facts of inputs.invocations) {
+    const key = facts.history ?? facts.session;
+    histories.set(key, [...(histories.get(key) ?? []), facts]);
+  }
+  return histories;
+}
+
+/**
  * `sum(S_s / B)` over every session, a continued session counting each
- * component once at the largest value it was observed at.
+ * component once at the largest value it was observed at. A continued
+ * start the executor made fresh loaded its scope into a new context, so
+ * from there on its session counts again as a term of its own.
  */
 function sessionWeightedTotal(inputs: MetricInputs): Metric {
   const id = 'session-weighted-total';
   const unit = 'baselines';
   const common = { measurementPolicy: measurementPolicyVersion };
-  const sessions = sessionsOf(inputs);
+  const sessions = historiesOf(inputs);
   let total = 0;
   const missing: string[] = [];
   let covered = 0;
@@ -221,15 +242,17 @@ function sessionWeightedTotal(inputs: MetricInputs): Metric {
     total += [...largest.values()].reduce<number>((sum, bytes) => sum + (bytes ?? 0), 0);
   }
   const coverage = { covered, total: sessions.size };
+  // The contexts a degraded continuation began, each a term beside its session's first.
+  const restarted = [...sessions].filter(([key, list]) => key !== list[0]!.session).map(([key]) => `${key}: a continued start the executor made fresh counts as a term of its own`);
   if (sessions.size === 0) return metric({ id, unit, state: 'not-applicable', coverage, note: 'No session ran', ...common });
   if (missing.length > 0) {
-    return metric({ id, unit, state: 'unavailable', subtotal: covered > 0 ? total : null, coverage, evidence: missing, note: 'A session\'s scope size is missing a component, so the total is unknown; the known subtotal in bytes is shown', ...common });
+    return metric({ id, unit, state: 'unavailable', subtotal: covered > 0 ? total : null, coverage, evidence: [...missing, ...restarted], note: 'A session\'s scope size is missing a component, so the total is unknown; the known subtotal in bytes is shown', ...common });
   }
   if ('unavailable' in inputs.baseline) {
-    return metric({ id, unit, state: 'unavailable', subtotal: total, coverage, evidence: [`baseline: ${inputs.baseline.unavailable}`], note: 'The frozen baseline B is unavailable; the sum of S_s in bytes is shown', ...common });
+    return metric({ id, unit, state: 'unavailable', subtotal: total, coverage, evidence: [`baseline: ${inputs.baseline.unavailable}`, ...restarted], note: 'The frozen baseline B is unavailable; the sum of S_s in bytes is shown', ...common });
   }
   if (inputs.baseline.bytes === 0) return metric({ id, unit, state: 'not-applicable', numerator: total, denominator: 0, coverage, note: 'The frozen baseline B is zero bytes', ...common });
-  return metric({ id, unit, state: 'measured', value: total / inputs.baseline.bytes, numerator: total, denominator: inputs.baseline.bytes, coverage, ...common });
+  return metric({ id, unit, state: 'measured', value: total / inputs.baseline.bytes, numerator: total, denominator: inputs.baseline.bytes, coverage, evidence: restarted, ...common });
 }
 
 const categories = [
@@ -357,11 +380,20 @@ function blockedWrites(inputs: MetricInputs, statement: string, complete: boolea
   return [overall];
 }
 
-/** `coverage-gap` observations by kind, beside the invocations they qualify. */
+/** A gap in an invocation's observations; a raw-output gap is not one. */
+function isObservationGap(line: Observation): line is Extract<Observation, { type: 'coverage-gap' }> {
+  return line.type === 'coverage-gap' && !rawOutputGapKinds.has(line.data.kind);
+}
+
+/**
+ * `coverage-gap` observations by kind, beside the invocations they qualify.
+ * A raw-output gap, such as a transcript entry that could not be written,
+ * leaves the observations complete and is left out of both.
+ */
 function observationCoverage(inputs: MetricInputs): Metric[] {
   const logs = inputs.invocations.map(facts => ({ facts, log: readable(facts) }));
   const read = logs.filter(entry => entry.log !== null);
-  const withGap = read.filter(entry => entry.log!.some(line => line.type === 'coverage-gap'));
+  const withGap = read.filter(entry => entry.log!.some(isObservationGap));
   const unreadable = logs.filter(entry => entry.log === null).map(entry => `${entry.facts.id}: ${(entry.facts.observations as { unavailable: string }).unavailable}`);
   const total = inputs.invocations.length;
   const covered = read.length - withGap.length;
@@ -376,7 +408,7 @@ function observationCoverage(inputs: MetricInputs): Metric[] {
   const kinds = new Map<string, string[]>();
   for (const entry of read) {
     for (const line of entry.log!) {
-      if (line.type === 'coverage-gap') kinds.set(line.data.kind, [...(kinds.get(line.data.kind) ?? []), entry.facts.id]);
+      if (isObservationGap(line)) kinds.set(line.data.kind, [...(kinds.get(line.data.kind) ?? []), entry.facts.id]);
     }
   }
   return [

@@ -116,6 +116,8 @@ export const observationSchema = z.discriminatedUnion('type', [
       'observation-truncated',
       /** A suite of the project that the MVP's one supported runner does not select. */
       'unsupported-runner',
+      /** An entry of the session's transcript could not be written; the session went on without it. */
+      'transcript-incomplete',
     ]),
     detail: z.string(),
   }).strict()),
@@ -123,6 +125,15 @@ export const observationSchema = z.discriminatedUnion('type', [
 export type Observation = z.infer<typeof observationSchema>;
 export type ObservationType = Observation['type'];
 export type ObservationOf<T extends ObservationType> = Extract<Observation, { type: T }>;
+export type CoverageGapKind = ObservationOf<'coverage-gap'>['data']['kind'];
+
+/**
+ * The gap kinds that name missing raw output rather than missing
+ * observations. The invocation's observations are complete, so these do not
+ * count against `observation-coverage`; the invocation's evaluation still
+ * lists them.
+ */
+export const rawOutputGapKinds: ReadonlySet<CoverageGapKind> = new Set<CoverageGapKind>(['transcript-incomplete']);
 
 /** An observation to record: its type, its data, and the call it belongs to where it has one. */
 export type ObservationInput = { [T in ObservationType]: { readonly type: T; readonly data: ObservationOf<T>['data'] } }[ObservationType];

@@ -105,7 +105,7 @@ describe('an implementation that cannot start a session', () => {
     const scripted = createScriptedAgent([{ kind: 'submit', input: analysis([]) }]);
     const broken: AgentPort = {
       name: scripted.name,
-      observations: scripted.observations,
+      support: scripted.support,
       startSession: () => { throw new Error('the adapter could not build a session'); },
       appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
     };
@@ -148,7 +148,7 @@ describe('the bounds on the whole run', () => {
     }));
     const timed: AgentPort = {
       name: scripted.name,
-      observations: scripted.observations,
+      support: scripted.support,
       appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
       startSession: spec => {
         const session = scripted.startSession(spec);

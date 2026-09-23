@@ -24,7 +24,9 @@ afterEach(async () => {
 describe('the captured commands', () => {
   test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
-    expect(policy.version).toBe('run-policy/1');
+    expect(policy.version).toBe('run-policy/2');
+    // The transcript's inline body limit is a recorded policy value.
+    expect(policy.transcript).toEqual({ inlineBodyBytes: 8192 });
     expect(policy.commands.typeCheck.argv).toEqual(['npm', 'run', 'type-check']);
     expect(policy.commands.allTests.argv).toEqual(['npm', 'test']);
     expect(policy.commands.ramifyCheck.argv).toEqual([ramifyExecutable, 'check', '--batch', '--root', '/project', '--format', 'json']);

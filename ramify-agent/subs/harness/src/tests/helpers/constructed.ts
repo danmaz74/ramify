@@ -20,7 +20,7 @@ export const hash = 'a'.repeat(64);
 /** The record of a constructed run: only what the projections read of it. */
 export function constructedRecord(extra: Partial<RunRecord> = {}): RunRecord {
   return {
-    schema: 'ramify-agent.job/2',
+    schema: 'ramify-agent.job/3',
     jobId: runId,
     planId: 'review-notes',
     kind: 'implementation',

@@ -17,11 +17,16 @@ import {
   metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
+import {
+  runSessionIdSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionQueryLimits,
+  sessionTranscriptResponseSchema, sessionUpdatesResponseSchema, standaloneSessionResponseSchema, type SessionCursor,
+} from '../interfaces/protocol/sessions.js';
 import { CommandRejection } from '../jobs/commands.js';
 import { discoverPlans, readPlan } from '../plans/discover.js';
 import { ProjectionError } from '../projections/inputs.js';
 import { currentModuleTree } from '../projections/tree.js';
 import { RunQueries } from '../projections/queries.js';
+import { SessionQueries } from '../projections/session-queries.js';
 import type { RunService } from '../run/service.js';
 
 export interface AppOptions {
@@ -49,6 +54,10 @@ type PlanRequest = Request<{ planId: string }>;
 type RunRequest = Request<{ planId: string; runId: string }>;
 type WorkItemRequest = Request<{ planId: string; runId: string; workItem: string }>;
 type GateRequest = Request<{ planId: string; runId: string; gate: string }>;
+type RunSessionRequest = Request<{ planId: string; runId: string; session: string }>;
+type BodyRequest = Request<{ planId: string; runId: string; hash: string }>;
+type StandaloneRequest = Request<{ session: string }>;
+type StandaloneBodyRequest = Request<{ session: string; hash: string }>;
 
 /**
  * The Express application: the protocol's queries and commands under
@@ -63,6 +72,7 @@ type GateRequest = Request<{ planId: string; runId: string; gate: string }>;
 export function createApp(options: AppOptions): express.Express {
   const { projectRoot, runs } = options;
   const queries = new RunQueries(runs);
+  const sessions = new SessionQueries(runs);
   const app = express();
   app.disable('x-powered-by');
 
@@ -150,6 +160,58 @@ export function createApp(options: AppOptions): express.Express {
     send(response, metricsResponseSchema, await projected(() => queries.metrics(request.params.planId, request.params.runId)));
   });
 
+  // Sessions: the project's, a run's, their transcripts and bodies. Every
+  // one of these is a projection too.
+
+  app.get(`${apiPrefix}/sessions`, async (request, response) => {
+    send(response, sessionListResponseSchema, await projected(() => sessions.list(counter(request.query['offset'], 'offset'))));
+  });
+
+  app.get(`${apiPrefix}/sessions/standalone/:session`, async (request: StandaloneRequest, response) => {
+    send(response, standaloneSessionResponseSchema, await projected(() => sessions.standaloneSession(request.params.session)));
+  });
+
+  app.get(`${apiPrefix}/sessions/standalone/:session/transcript`, async (request: StandaloneRequest, response) => {
+    const after = counter(request.query['after'], 'after');
+    send(response, sessionTranscriptResponseSchema, await projected(() => sessions.transcript({ source: 'standalone', session: request.params.session }, after)));
+  });
+
+  app.get(`${apiPrefix}/sessions/standalone/:session/bodies/:hash`, async (request: StandaloneBodyRequest, response) => {
+    send(response, sessionBodyResponseSchema, await projected(() => sessions.standaloneBody(request.params.session, request.params.hash)));
+  });
+
+  app.get(`${apiPrefix}/sessions/standalone/:session/files`, async (request: StandaloneRequest, response) => {
+    const path = filePath(request.query['path']);
+    send(response, sessionBodyResponseSchema, await projected(() => sessions.standaloneFile(request.params.session, path)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/sessions`, async (request: RunRequest, response) => {
+    send(response, runSessionsResponseSchema, await projected(() => sessions.runSessions(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/sessions/updates`, async (request: RunRequest, response) => {
+    const version = counter(request.query['version'], 'version');
+    const cursors = sessionCursors(request.query['cursors']);
+    send(response, sessionUpdatesResponseSchema, await projected(() => sessions.updates(request.params.planId, request.params.runId, version, cursors)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/sessions/:session/transcript`, async (request: RunSessionRequest, response) => {
+    const after = counter(request.query['after'], 'after');
+    const { planId, runId, session } = request.params;
+    if (!runSessionIdSchema.safeParse(session).success) throw new ProtocolFailure('not-found', `Run ${runId} has no session ${session}`);
+    send(response, sessionTranscriptResponseSchema, await projected(() => sessions.transcript({ source: 'run', planId, runId, session }, after)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/sessions/:session/files`, async (request: RunSessionRequest, response) => {
+    const path = filePath(request.query['path']);
+    const { planId, runId, session } = request.params;
+    send(response, sessionBodyResponseSchema, await projected(() => sessions.runFile(planId, runId, session, path)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/bodies/:hash`, async (request: BodyRequest, response) => {
+    send(response, sessionBodyResponseSchema, await projected(() => sessions.runBody(request.params.planId, request.params.runId, request.params.hash)));
+  });
+
   // The one route that changes anything: a command, through the run service.
 
   app.post(protocolPaths.commands, express.json({ limit: '64kb' }), async (request, response) => {
@@ -199,6 +261,36 @@ export function createApp(options: AppOptions): express.Express {
   });
 
   return app;
+}
+
+/** A count the query names, such as a cursor; absent, it is 0. */
+function counter(value: unknown, name: string): number {
+  const given = value ?? '0';
+  if (typeof given !== 'string' || !/^\d{1,15}$/.test(given)) throw new ProtocolFailure('invalid-request', `"${name}" must be a count`);
+  return Number(given);
+}
+
+/** A poll's cursors: `<session>:<after>`, comma-separated, each session once, at most 50. */
+function sessionCursors(value: unknown): SessionCursor[] {
+  if (value === undefined || value === '') return [];
+  if (typeof value !== 'string') throw new ProtocolFailure('invalid-request', '"cursors" must be <session>:<after>, comma-separated');
+  const cursors: SessionCursor[] = [];
+  for (const part of value.split(',')) {
+    const match = /^(ses-\d{4,}):(\d{1,15})$/.exec(part);
+    if (match === null) throw new ProtocolFailure('invalid-request', `"${part}" is not a cursor: <session>:<after>`);
+    if (cursors.some(cursor => cursor.session === match[1])) throw new ProtocolFailure('invalid-request', `Session ${match[1]} is followed twice`);
+    cursors.push({ session: match[1]!, after: Number(match[2]) });
+  }
+  if (cursors.length > sessionQueryLimits.pollSessions) {
+    throw new ProtocolFailure('invalid-request', `A poll follows at most ${sessionQueryLimits.pollSessions} sessions`);
+  }
+  return cursors;
+}
+
+/** A file body's path, relative to the transcript's directory. */
+function filePath(value: unknown): string {
+  if (typeof value !== 'string' || value === '') throw new ProtocolFailure('invalid-request', '"path" must name a file the transcript names');
+  return value;
 }
 
 /** Runs one projection, reporting a record it cannot read with the protocol's code and its evidence. */

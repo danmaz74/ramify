@@ -320,7 +320,7 @@ describe('a rejected submission in a run', () => {
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
     const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.map(event => event.type)).toEqual(['job-started', 'invocation-started', 'invocation-ended', 'job-failed']);
+    expect(events.map(event => event.type)).toEqual(['job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'job-failed']);
   }, 180_000);
 
   test('a duplicate capability slug is rejected, and three of them end the invocation', async () => {

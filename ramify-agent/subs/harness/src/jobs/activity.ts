@@ -2,40 +2,45 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Activity } from '../interfaces/protocol/jobs.js';
 import type { AgentEvent } from '../../subs/agent/src/interfaces/port.js';
 
-const searchTools = new Set(['grep', 'find', 'ls']);
-
 /**
  * The activity an agent event shows, or `undefined` when it shows nothing
- * worth recording, such as a tool that finished without error. Paths are
- * resolved against the session's working directory and shown relative to
- * the project root when they lie inside it.
+ * worth recording, such as a tool that finished without error. What a call
+ * did is read from its action, never from the executor's tool or argument
+ * names; the tool's name is kept for display. Paths are resolved against the
+ * session's working directory and shown relative to the project root when
+ * they lie inside it.
  */
 export function activityOf(event: AgentEvent, workingDirectory: string, projectRoot: string): Activity | undefined {
   switch (event.type) {
     case 'tool-started': {
-      const input = (typeof event.input === 'object' && event.input !== null ? event.input : {}) as Record<string, unknown>;
-      const text = (key: string): string | undefined => (typeof input[key] === 'string' ? input[key] as string : undefined);
+      const { action } = event;
       const shown = (path: string) => display(path, workingDirectory, projectRoot);
-      if (event.tool === 'read') return { kind: 'read', callId: event.callId, path: shown(text('path') ?? '') };
-      if (searchTools.has(event.tool)) {
-        const path = text('path');
-        const pattern = text('pattern');
-        const query = event.tool === 'ls'
-          ? shown(path ?? '.')
-          : `${pattern ?? ''}${path ? ` in ${shown(path)}` : ''}${text('glob') ? ` (${text('glob')})` : ''}`;
-        return { kind: 'search', callId: event.callId, tool: event.tool, query };
+      switch (action.kind) {
+        case 'read':
+          return { kind: 'read', callId: event.callId, path: shown(action.path) };
+        case 'search': {
+          // A listing shows its directory; a search, its pattern and where.
+          const query = action.pattern === null
+            ? shown(action.path ?? '.')
+            : `${action.pattern}${action.path ? ` in ${shown(action.path)}` : ''}${action.glob ? ` (${action.glob})` : ''}`;
+          return { kind: 'search', callId: event.callId, tool: event.tool, query };
+        }
+        case 'command':
+          // A command is recorded as its text, and nothing else of the input.
+          return { kind: 'tool', callId: event.callId, tool: event.tool, ...(action.command === null ? {} : { command: action.command }) };
+        default:
+          return { kind: 'tool', callId: event.callId, tool: event.tool };
       }
-      // A tool that runs a command records it: the harness's shell is the
-      // one that does, and nothing of the input is read beyond that field.
-      const command = text('command');
-      return { kind: 'tool', callId: event.callId, tool: event.tool, ...(command === undefined ? {} : { command }) };
     }
     case 'tool-finished':
       return event.isError
         ? { kind: 'tool-error', callId: event.callId, tool: event.tool, error: shorten(event.errorText ?? 'The tool reported an error', 2000) }
         : undefined;
     case 'message':
-      return { kind: 'message', text: shorten(event.text, 500), usage: event.usage ?? null };
+      // The assistant's words; the prompt and tool results are not activity.
+      return event.role === 'assistant' ? { kind: 'message', text: shorten(event.text, 500), usage: event.usage } : undefined;
+    default:
+      return undefined;
   }
 }
 

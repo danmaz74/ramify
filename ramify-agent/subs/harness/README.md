@@ -35,6 +35,9 @@ signatures name, and the `session` command's entry with the types it names:
     evaluation evidence beside them, with the limit of each list. Each answer
     is a projection; the durable records and the internal event union stay
     private, so the log can change without changing the wire.
+  - `transcripts.ts` holds the entry schema of a session's transcript: its
+    numbered entries, each block's header and body, and where a body is
+    stored. It is not exposed yet; the session queries will expose it.
 
 Every export of those files is a Zod schema, a type inferred from one, or a
 constant. They import nothing but `zod` and each other, so every export
@@ -86,7 +89,9 @@ hiding or measured complexity justifies it.
     compare, and `CommandRejection` carries the protocol's error code.
   - `mutex.ts`: the one serialization primitive the run's writes use.
   - `activity.ts` turns agent events into the observed activity an
-    invocation's observation log records.
+    invocation's observation log records. It reads each call's neutral
+    action, never the executor's tool or argument names, which it keeps
+    for display only.
 - `checks/`: the check engine, which knows nothing of runs.
   - `records.ts`: the `GateAttempt` record and the shapes it is built from:
     a `Checkpoint`, a `CheckCommand`, and a `TestSelectionPolicy` with the
@@ -168,13 +173,24 @@ hiding or measured complexity justifies it.
     schemas are here and not beside the types they mirror, because
     persisting a record is the run's concern.
   - `policy.ts`: the hardcoded policy a run captures, its bounds, each role's
-    context policy and every command it reaches the project through, each
+    context policy, the transcript's inline body limit (8 KiB) and every
+    command it reaches the project through, each
     naming the environment the harness built for it. `job.json` holds those
     names and the harness's own settings, never a value of this process's
     environment; a run recorded before that is read as the names its map
     held. It also walks the project for independent nested packages.
   - `log.ts`: the run log and its events, from `job-started` through
     readiness to the terminal event. Nothing follows a terminal event.
+  - `sessions.ts`: the run's sessions, derived from its log by a pure
+    reducer: `session-opened`, the invocations each session awaits, the
+    briefs appended to it and `session-finished`. A session is live,
+    suspended or finished, and an event that is not a transition of the
+    session it names is rejected with its sequence. Its lineage names
+    harness points, the end of an invocation or an append, never an
+    executor's ref: a continuation continues from its session's latest
+    point, a fork names the point it was taken from, a replacement the
+    session it takes the place of, and a request the invocation that asked
+    for it.
   - `observations.ts`: one invocation's observation log. It is canonical for
     what was observed and for nothing else, so it does not go through the
     ledger; a replayed `(invocation, callId, type)` is dropped.
@@ -204,7 +220,14 @@ hiding or measured complexity justifies it.
     their recovery and the queries that read them. One invocation goes
     through one path, whatever its role: the record is committed before
     `startSession`, the judge is the one answer to an invalid submission, and
-    the closing event is the last write of the invocation.
+    the closing event is the last write of the invocation. A fresh or forked
+    invocation opens a session and a continued one joins the session its
+    loop kept; each end records whether the session is kept or finished, and
+    run end and recovery finish every session still kept. Each start that is
+    not fresh records its point and its reason, and each end a start the
+    executor could not honor. Each invocation writes its session's
+    transcript beside its observations: its start before the session
+    starts, and its end and point after the log's.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
     guard saw; comparing it with the write scope fills `outsideScope`, and
@@ -418,8 +441,9 @@ hiding or measured complexity justifies it.
   (`GET .../runs/:runId/scenarios`) with each scenario's state, origin, work
   item, owner, file, implementing gate and every gate attempt whose scenario
   check ran it, with its status there read from that attempt's summary;
-  `metrics.ts` the KPIs and the evaluation evidence; `queries.ts` the one
-  entry point the HTTP adapter calls. A projected scenario event refers to
+  `metrics.ts` the KPIs and the evaluation evidence, with invocations grouped
+  into sessions by the harness session each one started in; `queries.ts` the
+  one entry point the HTTP adapter calls. A projected scenario event refers to
   its scenario.
 - `prompts/`: one prompt package per role, versioned and hashed into the
   run's `prompts/manifest.json`. `submissionKinds` names the union members a
@@ -428,8 +452,8 @@ hiding or measured complexity justifies it.
   contents. The contract package is an engineer's with the contract skill
   beside the module architect's: the role is an engineer, and the skill is
   what makes the invocation a contract iteration.
-- `guard/`: the write guard. `edit` and `write` are intercepted before they
-  execute: the target is resolved against the invocation's working directory
+- `guard/`: the write guard. A write is intercepted before it executes: the
+  one target its action names is resolved against the invocation's working directory
   and then against the real filesystem — an existing path is its own real
   path, and a new one is its nearest existing ancestor with the remaining
   components appended — and only then checked against the write scope the
@@ -438,8 +462,12 @@ hiding or measured complexity justifies it.
   cannot be resolved at all is its own verdict, distinct from a proven scope
   violation. Nothing here stores what a call proposed to write.
 
-  What it does not cover is stated rather than implied: the `shell` tool
-  names no target to judge, so its writes pass no guard at all. They are
+  A call that names no path, or several, cannot be judged and is blocked as
+  unresolved.
+
+  What it does not cover is stated rather than implied: the `shell` tool's
+  action is a command, which names no target to judge, so its writes pass no
+  guard at all. They are
   seen afterwards, in the tree and in `outsideScope`, and every invocation
   that used the shell carries the `unguarded-shell` coverage gap.
 - `tools/`: the harness's own tools that are not one role's. `shell.ts` is
@@ -511,6 +539,21 @@ hiding or measured complexity justifies it.
   it. The agent is pi, the scripted fake chosen explicitly as `fake` (an
   analysis with no entry capability), or an implementation a test supplies
   through `startServerWith`, which stays internal with the run settings.
+- `transcripts/`: the harness's transcript of each session, which is raw
+  output and never a record.
+  - `writer.ts`: one session's file, `transcripts/<session>.jsonl` in a run
+    and `transcript.jsonl` in a standalone session. Each entry is one synced
+    line numbered one above the last, so a crash keeps every earlier entry,
+    a torn last line is discarded, and a number is never reset. A body over
+    the policy's inline limit goes to the content store.
+  - `store.ts`: the content store, `blobs/<sha256>`, which stores a body
+    once however many entries name it.
+  - `recorder.ts`: what one invocation writes: its start, every message,
+    compaction and retry the port reports, the harness's own decisions
+    (guard denials, submission verdicts, post-write checks, read reminders,
+    appends and the budget), its end and its point. A failed write is one
+    coverage gap in the invocation's observations and never fails the
+    session.
 - `sessions/`: one engineer session on one module, from a prompt a person
   writes, outside any run; the root's `session` command runs it.
   - `single.ts`: `runSingleSession` takes the project lock, resolves the
@@ -525,8 +568,12 @@ hiding or measured complexity justifies it.
   - `records.ts`: the session's plain files under
     `plans/.harness/sessions/<session-id>/`: `session.json`,
     `observations.jsonl` with the run's observation schema, `submission.json`,
-    `outcome.json`, the shell and hook outputs, the implementation's
-    transcript under `session/`, and the gate attempt under `gate/`.
+    `outcome.json`, the shell and hook outputs, the harness's
+    `transcript.jsonl` and its `blobs/`, the executor's own record under
+    `session/`, and the gate attempt under `gate/`. The session is its own
+    one invocation, so its identifier names both.
+    `session.json` names the executor and the model it was asked for; a
+    session with an outcome is finished, and one without was interrupted.
   - `command.ts`: `runSessionCommand`, the command's entry. It builds the
     agent, pi after its readiness unless the person chose the scripted fake
     with a JSON script file, and a private Ramify daemon, and disposes of both. The
@@ -1000,6 +1047,11 @@ The run's own tests are beside them.
   answers it chooses: findings, a deadline that expires, a configuration
   file that falls back to a complete check, and a mutation whose changed set
   is unknown. `read-excursions.test.ts` covers the soft read boundary.
+- `neutral-actions.test.ts` shows that activity is read from each call's
+  action, and runs one engineer turn twice: once with the port's own tool
+  names and once as an executor whose read tool is `Read` with `file_path`
+  and whose write tools are named otherwise again. Both leave the same
+  reads, searches, excursions, guard decisions and mutations.
 - `unguarded-write.test.ts` is the guard this plan names: a write through
   the shell outside the scope appears in `git status` when the writer
   settles and in `outsideScope`, reported and not blocked, beside the

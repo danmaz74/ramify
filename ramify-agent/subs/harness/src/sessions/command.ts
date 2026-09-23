@@ -35,7 +35,7 @@ export interface SessionCommandOptions {
   readonly signal?: AbortSignal | undefined;
 }
 
-const stepKinds = new Set(['tool', 'message', 'context', 'compaction', 'wait', 'stall', 'hang', 'submit', 'fail', 'end']);
+const stepKinds = new Set(['tool', 'message', 'retry', 'context', 'compaction', 'wait', 'stall', 'hang', 'submit', 'fail', 'end']);
 
 /** Runs one engineer session on the chosen agent. An agent that cannot start is a session that could not start. */
 export async function runSessionCommand(options: SessionCommandOptions): Promise<SingleSessionResult> {
@@ -49,6 +49,7 @@ export async function runSessionCommand(options: SessionCommandOptions): Promise
       module: options.module,
       prompt: options.prompt,
       agent: chosen.agent,
+      model: chosen.model,
       ramify,
       write: options.write,
       gate: options.gate,
@@ -60,13 +61,15 @@ export async function runSessionCommand(options: SessionCommandOptions): Promise
   }
 }
 
-type BuiltAgent = { readonly ok: true; readonly agent: AgentPort; readonly description: string } | { readonly ok: false; readonly reason: string };
+type BuiltAgent =
+  | { readonly ok: true; readonly agent: AgentPort; readonly model?: string | undefined; readonly description: string }
+  | { readonly ok: false; readonly reason: string };
 
 async function buildAgent(choice: SessionAgentChoice): Promise<BuiltAgent> {
   if (choice.name === 'pi') {
     const readiness = await piReadiness({ model: choice.model });
     if (!readiness.ready) return { ok: false, reason: `pi cannot run: ${readiness.reason}` };
-    return { ok: true, agent: createPiAgent({ model: choice.model }), description: `pi, model ${readiness.model}` };
+    return { ok: true, agent: createPiAgent({ model: choice.model }), model: readiness.model, description: `pi, model ${readiness.model}` };
   }
   const path = resolve(choice.script);
   let parsed: unknown;

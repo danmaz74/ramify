@@ -35,6 +35,12 @@ expose-src * from "interfaces/protocol/paths.ts" tagged [browser] to parent
 // commands, the queries and every projection a client reads of a run.
 expose-src * from "interfaces/protocol/runs.ts" tagged [browser] to parent
 
+// The session protocol: the entries of a transcript as the harness writes
+// them, and the queries that list sessions, follow their transcripts and
+// fetch their bodies.
+expose-src * from "interfaces/protocol/transcripts.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/sessions.ts" tagged [browser] to parent
+
 // The audit child proves conformance against commits made by the harness and
 // verifies that publication does not disturb repository cleanliness. The git
 // behavior and process execution remain owned by evidence; harness relays the

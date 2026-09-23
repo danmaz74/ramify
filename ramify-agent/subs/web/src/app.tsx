@@ -4,7 +4,9 @@ import { ConnectionStatus } from './connection.js';
 import { PlanPage } from './plan-page.js';
 import { PlansPage } from './plans-page.js';
 import { RunPage } from './run-page.js';
-import { parseRoute, routeHref } from './routes.js';
+import { parseRoute, routeHref, sessionKey } from './routes.js';
+import { SessionPage } from './session-page.js';
+import { SessionsPage } from './sessions-page.js';
 import { useQuery } from './use-query.js';
 
 function useHash(): string {
@@ -35,12 +37,18 @@ export function App({ client }: { readonly client: ProtocolClient }) {
       <header className="app-header">
         <a className="brand" href={routeHref({ page: 'plans' })}>ramify-agent</a>
         <span className="project" title={projectInfo?.root}>{projectInfo?.name ?? ''}</span>
+        <nav className="app-nav" aria-label="Pages">
+          <a href={routeHref({ page: 'plans' })} aria-current={route.page === 'plans' ? 'page' : undefined}>Plans</a>
+          <a href={routeHref({ page: 'sessions' })} aria-current={route.page === 'sessions' ? 'page' : undefined}>Sessions</a>
+        </nav>
         <ConnectionStatus client={client} />
       </header>
       <main className={`route-${route.page}`}>
         {route.page === 'plans' && <PlansPage client={client} project={projectInfo} />}
         {route.page === 'plan' && <PlanPage client={client} planId={route.planId} />}
         {route.page === 'run' && <RunPage key={`${route.planId}/${route.runId}`} client={client} planId={route.planId} runId={route.runId} />}
+        {route.page === 'sessions' && <SessionsPage client={client} />}
+        {route.page === 'session' && <SessionPage key={sessionKey(route.session)} client={client} session={route.session} anchor={route.anchor} />}
       </main>
     </div>
   );

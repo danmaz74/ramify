@@ -1,0 +1,218 @@
+{
+  "schema": "ramify-agent.session-browser-evidence/1",
+  "date": "2026-09-23",
+  "plan": "Plan 9 session model and transcripts, iteration 11 (acceptance)",
+  "browser": "Chromium 151.0.7922.173 via playwright-core",
+  "server": "subs/harness/src/tests/helpers/serve-progress-fixture.ts, serving dist/web",
+  "viewports": {
+    "desktop": {
+      "width": 1440,
+      "height": 1000
+    },
+    "narrow": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "console": {
+    "errors": [],
+    "warnings": [],
+    "pageErrors": []
+  },
+  "captures": [
+    {
+      "file": "sessions-page-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/sessions",
+      "pageWidth": 1440,
+      "liveAndSuspended": 3,
+      "total": "27 sessions."
+    },
+    {
+      "file": "transcript-block-open-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/review-notes/runs/20260923T071314Z-d3b134/sessions/ses-0001",
+      "pageWidth": 1440,
+      "session": "lineage ses-0001",
+      "opened": "System prompt",
+      "bodyRequests": 1
+    },
+    {
+      "file": "live-transcript-before-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27/sessions/ses-0004",
+      "pageWidth": 1440,
+      "entries": 5
+    },
+    {
+      "file": "live-transcript-after-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27/sessions/ses-0004",
+      "pageWidth": 1440,
+      "entries": 7,
+      "stepsReleased": 2
+    },
+    {
+      "file": "progress-by-module-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 1440,
+      "marked": "collection-review/workspace/shared-ui, 2 capability rows, sessions: 1 live (engineer), 1 suspended",
+      "strip": "ses-0001 suspended"
+    },
+    {
+      "file": "progress-by-module-panel-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 1440,
+      "sessions": [
+        "ses-0004 engineer live awaiting inv-0005",
+        "ses-0002 local-architect suspended"
+      ]
+    },
+    {
+      "file": "progress-dependencies-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 1440,
+      "marked": "badge-tone, working, entry, sessions: 1 live (engineer), 1 suspended"
+    },
+    {
+      "file": "progress-dependencies-panel-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 1440,
+      "sessions": [
+        "ses-0004 engineer live awaiting inv-0005",
+        "ses-0002 local-architect suspended",
+        "ses-0003 global-fork finished not-kept"
+      ]
+    },
+    {
+      "file": "timeline-lineage-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/review-notes/runs/20260923T071314Z-d3b134",
+      "pageWidth": 1440,
+      "lanes": 10,
+      "segments": 14,
+      "appends": 1,
+      "forks": 1,
+      "replacements": 1,
+      "requests": 1,
+      "degraded": 1
+    },
+    {
+      "file": "timeline-lineage-replacement-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/review-notes/runs/20260923T071314Z-d3b134",
+      "pageWidth": 1440,
+      "from": 1696,
+      "scrollLeft": 1238
+    },
+    {
+      "file": "timeline-live-desktop.png",
+      "viewport": "desktop",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 1440,
+      "lanes": 4,
+      "awaited": "Chapter 1 of ses-0004: inv-0005, opened fresh, awaited, from event 25"
+    },
+    {
+      "file": "sessions-page-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/sessions",
+      "pageWidth": 390,
+      "liveAndSuspended": 3,
+      "total": "27 sessions."
+    },
+    {
+      "file": "transcript-block-open-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/review-notes/runs/20260923T071314Z-d3b134/sessions/ses-0001",
+      "pageWidth": 390,
+      "session": "lineage ses-0001",
+      "opened": "System prompt",
+      "bodyRequests": 1
+    },
+    {
+      "file": "live-transcript-before-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27/sessions/ses-0004",
+      "pageWidth": 390,
+      "entries": 7
+    },
+    {
+      "file": "live-transcript-after-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27/sessions/ses-0004",
+      "pageWidth": 390,
+      "entries": 10,
+      "stepsReleased": 4
+    },
+    {
+      "file": "progress-by-module-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 390,
+      "marked": "collection-review/workspace/shared-ui, 2 capability rows, sessions: 1 live (engineer), 1 suspended",
+      "strip": "ses-0001 suspended"
+    },
+    {
+      "file": "progress-by-module-panel-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 390,
+      "sessions": [
+        "ses-0004 engineer live awaiting inv-0005",
+        "ses-0002 local-architect suspended"
+      ]
+    },
+    {
+      "file": "progress-dependencies-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 390,
+      "marked": "badge-tone, working, entry, sessions: 1 live (engineer), 1 suspended"
+    },
+    {
+      "file": "progress-dependencies-panel-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 390,
+      "sessions": [
+        "ses-0004 engineer live awaiting inv-0005",
+        "ses-0002 local-architect suspended",
+        "ses-0003 global-fork finished not-kept"
+      ]
+    },
+    {
+      "file": "timeline-lineage-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/review-notes/runs/20260923T071314Z-d3b134",
+      "pageWidth": 390,
+      "lanes": 10,
+      "segments": 14,
+      "appends": 1,
+      "forks": 1,
+      "replacements": 1,
+      "requests": 1,
+      "degraded": 1
+    },
+    {
+      "file": "timeline-lineage-replacement-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/review-notes/runs/20260923T071314Z-d3b134",
+      "pageWidth": 390,
+      "from": 1696,
+      "scrollLeft": 1581
+    },
+    {
+      "file": "timeline-live-narrow.png",
+      "viewport": "narrow",
+      "url": "/#/plans/status-badge-tone/runs/20260923T071317Z-465d27",
+      "pageWidth": 390,
+      "lanes": 4,
+      "awaited": "Chapter 1 of ses-0004: inv-0005, opened fresh, awaited, from event 25"
+    }
+  ]
+}

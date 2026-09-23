@@ -64,6 +64,10 @@ these entries, and the harness runs the checks the entries make possible.
   each capability another module owns and says whether its module receives
   it, so it does not search that module's source.
 
+The [required capabilities analysis](../analysis/2026-09-23-capability-registry-analysis.md)
+revises the end-of-run rule: only required capabilities need an entry point,
+and every other capability is retired by deduction once the run completes.
+
 Today's run-scoped registry (`ramify-agent.capability/1`) records behavior,
 owner, origin and consumers, without entry points or a lifecycle, and keeps
 forecast capabilities apart as hypotheses. The
@@ -100,12 +104,25 @@ richer user-facing projection over it.
 
 ### Agent session explorer
 
-**Maturity:** Captured.
+**Maturity:** Delivered in part by
+[Plan 9](../plans/09-session-model-and-transcripts/results.md); search remains
+captured, and retention and redaction are pending.
 
 Let a person inspect activity and logs for every running and past agent
 invocation. Preserve the distinction between normalized harness events and raw
 pi transcripts. A design must settle live streaming, search, retention,
 redaction and behavior when a raw transcript is unavailable.
+
+Plan 9 delivered the Sessions page, a transcript per session in the harness's
+own format, a live transcript that follows complete entries, a missing
+transcript shown as missing, session marks on the progress diagrams and the
+lineage timeline. What remains:
+
+- **Search** across sessions and within transcripts; the list has no filter.
+- **Retention** of transcripts and stored bodies, item 6 of the
+  [to-do list](../todo.md).
+- **Redaction** of secret-looking values, not decided.
+- **Streaming text** within an entry, which the entry numbers leave room for.
 
 ## Quality review
 

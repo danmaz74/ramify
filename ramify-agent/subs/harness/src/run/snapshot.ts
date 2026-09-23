@@ -37,6 +37,8 @@ export interface RunSnapshot {
     readonly gateAttempts: number;
     /** The tracked scenarios in each state; all zero before the analysis is accepted. */
     readonly scenarios: Readonly<Record<ScenarioState, number>>;
+    /** Invocations whose `invocation-ended` records a degraded start. */
+    readonly degradedStarts: number;
   };
   /** The writer's standing: whether one is held, and whether the last release was confirmed. */
   readonly writer: { readonly held: string | null; readonly unsettled: string | null };
@@ -97,6 +99,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
   let invocations = 0;
   let readinessAttempts = 0;
   let gateAttempts = 0;
+  let degradedStarts = 0;
   let workItems = 0;
   let completedWorkItems = 0;
   /** Each requirement at its latest committed revision, and the ones verified there. */
@@ -117,6 +120,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
       case 'invocation-ended':
         currentInvocation = undefined;
         currentRole = undefined;
+        if (event.data.degraded !== undefined) degradedStarts += 1;
         break;
       case 'analysis-accepted':
         workItems = event.data.workItems;
@@ -257,6 +261,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
       readinessAttempts,
       gateAttempts,
       scenarios: countScenarioStates(scenarios),
+      degradedStarts,
     },
     writer: { held: heldWriter, unsettled },
     review,

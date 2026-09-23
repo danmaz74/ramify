@@ -1,8 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import { metricSchema, type Metric } from '../interfaces/protocol/runs.js';
 import { kpiMetrics, type InvocationFacts, type MetricInputs } from '../kpi/metrics.js';
+import { runView } from '../projections/inputs.js';
+import { metricsOf } from '../projections/metrics.js';
 import type { Observation } from '../run/observations.js';
-import type { LineEventSummary, ScopeSize } from '../run/records.js';
+import {
+  invocationOutcomeSchema, invocationSchema, runLayout, type ContinueRelation, type LineEventSummary, type ScopeSize,
+} from '../run/records.js';
+import { constructedRun, hash, type Line } from './helpers/constructed.js';
 
 /*
  * M4: KPI projections retain their numerators, denominators, revision and
@@ -11,6 +16,8 @@ import type { LineEventSummary, ScopeSize } from '../run/records.js';
  * The inputs are constructed invocations, each as the records and the
  * observation log would describe it. Every metric is validated against the
  * protocol's schema, which refuses a value on anything but `measured`.
+ * The last test builds the inputs from a run's records through the
+ * projection, so the grouping of invocations into sessions is exercised too.
  */
 
 const guarded = { statement: 'Every observed mutation passed the guard (edit).', complete: true };
@@ -162,10 +169,105 @@ describe('M4: every metric keeps its numerator, denominator, version and coverag
     expect(find(metrics, 'blocked-write-attempts')).toMatchObject({ state: 'partial', value: null });
   });
 
+  test('a transcript entry that could not be written is raw output: it lowers no observation coverage', () => {
+    const gap = (kind: 'transcript-incomplete' | 'usage-unavailable'): Observation => ({
+      n: 1, at: '2026-09-23T08:00:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' },
+    });
+    const metrics = computed(inputs([
+      writer('inv-0002', { observations: [gap('transcript-incomplete')] }),
+      writer('inv-0003', { observations: [gap('usage-unavailable'), gap('transcript-incomplete')] }),
+      writer('inv-0004'),
+    ]));
+    expect(find(metrics, 'observation-coverage')).toMatchObject({ state: 'measured', numerator: 2, denominator: 3, evidence: ['inv-0003'] });
+    expect(find(metrics, 'observation-coverage.usage-unavailable')).toMatchObject({ value: 1, evidence: ['inv-0003'] });
+    expect(metrics.some(metric => metric.id === 'observation-coverage.transcript-incomplete')).toBe(false);
+  });
+
   test('no writer session: the change-weighted metrics are not-applicable, never zero', () => {
     const metrics = computed(inputs([], { gateAttempts: [], acceptedIterations: [] }));
     expect(find(metrics, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'not-applicable', value: null });
     expect(find(metrics, 'gate-attempts-per-accepted-iteration')).toMatchObject({ state: 'not-applicable', value: null, denominator: 0 });
     expect(find(metrics, 'session-count')).toMatchObject({ state: 'measured', value: 0 });
+  });
+});
+
+describe('ST04: the projection groups invocations by the session they started in', () => {
+  const work = { workItem: 'wi-001', iteration: 'wi-001.i01' };
+
+  /** One invocation's three lines: its start with its record, and its end with its outcome, ending at an executor ref of its own. */
+  function invocationLines(id: string, session: string, bytes: number, ref: string, continues?: ContinueRelation): Line[] {
+    const invocation = invocationSchema.parse({
+      schema: 'ramify-agent.invocation/1', id, role: 'engineer', work, attempt: 1,
+      session: continues === undefined ? { requested: 'fresh', actual: 'fresh', ref: '' } : { requested: 'continued', actual: 'continued', ref: 'scripted-1@4#0', from: 'scripted-1@4#0' },
+      prompt: { package: 'engineer', hash, inputsHash: hash },
+      scope: { write: null, measurement: null, size: size(bytes) },
+      writer: false, base: 'abc', startedAt: '2026-09-21T08:00:00.000Z',
+    });
+    const outcome = invocationOutcomeSchema.parse({
+      schema: 'ramify-agent.invocation-outcome/1', invocation: id, ended: 'submitted', rejectedSubmissions: 0, disposition: 'applied',
+      session: { ref, mode: continues === undefined ? 'fresh' : 'continued' }, submission: null,
+      settled: { confirmed: true, at: '2026-09-21T08:00:00.000Z', groupsKilled: 0, lateWrites: [] },
+      outsideScope: [], usage, elapsedMs: 1,
+    });
+    return [
+      {
+        type: 'invocation-started',
+        data: { invocation: id, role: 'engineer', session, work, start: continues === undefined ? 'opened' : 'continued', ...(continues === undefined ? {} : { continues }) },
+        records: [{ path: runLayout.invocation(id), body: invocation }],
+      },
+      { type: 'invocation-ended', data: { invocation: id, ended: 'submitted', submission: null, session, kept: true }, records: [{ path: runLayout.outcome(id), body: outcome }] },
+    ];
+  }
+
+  const opened = (session: string): Line => ({ type: 'session-opened', data: { session, role: 'engineer', work, executor: 'scripted', model: null } });
+
+  test('a continued session counts once in session-weighted-total, at its largest size, although each invocation ends at another ref', async () => {
+    const run = constructedRun([
+      { type: 'job-started', data: {} },
+      opened('ses-0001'),
+      ...invocationLines('inv-0001', 'ses-0001', 1000, 'scripted-1@4#0'),
+      // The same session, continued for a repair, measured larger, and ending
+      // at a ref of its own: a ref names a point, not a session.
+      ...invocationLines('inv-0002', 'ses-0001', 3000, 'scripted-1@9#0', { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'repair', briefs: [] }),
+      opened('ses-0002'),
+      ...invocationLines('inv-0003', 'ses-0002', 500, 'scripted-2@3#0'),
+    ]);
+    const response = await metricsOf(runView(run));
+    for (const metric of response.metrics) metricSchema.parse(metric);
+
+    expect(find(response.metrics, 'session-count')).toMatchObject({
+      state: 'measured', value: 2,
+      evidence: ['ses-0001: inv-0001 submitted, inv-0002 submitted', 'ses-0002: inv-0003 submitted'],
+    });
+    // The constructed run froze no baseline, so the total is unavailable and
+    // the sum of S_s is its subtotal: ses-0001 at 3000, not 1000 + 3000,
+    // and ses-0002 at 500.
+    expect(find(response.metrics, 'session-weighted-total')).toMatchObject({
+      state: 'unavailable', value: null, subtotal: 3500, coverage: { covered: 2, total: 2 },
+    });
+  });
+
+  test('a continued start the executor made fresh stays in its session, and counts again in session-weighted-total', async () => {
+    const [started, ended] = invocationLines('inv-0002', 'ses-0001', 3000, 'scripted-1@9#0', { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'repair', briefs: [] });
+    const run = constructedRun([
+      { type: 'job-started', data: {} },
+      opened('ses-0001'),
+      ...invocationLines('inv-0001', 'ses-0001', 1000, 'scripted-1@4#0'),
+      // The executor could not continue, so inv-0002 began a new context:
+      // its scope was loaded again, and the session's later segments run in
+      // that context.
+      started!,
+      { ...ended!, data: { ...(ended!.data as object), degraded: { requested: 'continue', actual: 'fresh', reason: 'the session file is gone' } } },
+      ...invocationLines('inv-0003', 'ses-0001', 2000, 'scripted-1@12#0', { from: { session: 'ses-0001', invocation: 'inv-0002' }, reason: 'repair', briefs: [] }),
+    ]);
+    const response = await metricsOf(runView(run));
+
+    expect(find(response.metrics, 'session-count')).toMatchObject({ state: 'measured', value: 1 });
+    // ses-0001 at 1000 until the degraded start, then its new context at its
+    // largest, 3000: 4000 rather than 3000.
+    expect(find(response.metrics, 'session-weighted-total')).toMatchObject({
+      state: 'unavailable', subtotal: 4000, coverage: { covered: 2, total: 2 },
+      evidence: ['baseline: constructed', 'ses-0001 from inv-0002: a continued start the executor made fresh counts as a term of its own'],
+    });
   });
 });

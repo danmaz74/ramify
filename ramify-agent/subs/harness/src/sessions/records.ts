@@ -11,7 +11,9 @@ import { testSelectionPolicySchema } from '../work/iterations.js';
  *
  * A session is not a job: it has no ledger, no run log and no events, and
  * nothing replays these files. They are plain files written once each. The
- * observation log has the run's schema, so the same readers work on it.
+ * observation log and the transcript have the run's schemas, so the same
+ * readers work on them. The session is its own one invocation, so its
+ * identifier names both.
  */
 
 const text = z.string().min(1);
@@ -26,8 +28,12 @@ export const sessionLayout = {
   observations: 'observations.jsonl',
   submission: 'submission.json',
   outcome: 'outcome.json',
-  /** The implementation's own transcript, such as pi's. */
-  transcript: 'session',
+  /** The executor's own session record, such as pi's, which only it reads. */
+  executorSession: 'session',
+  /** The harness's transcript of the session: raw output, never a record. */
+  transcript: 'transcript.jsonl',
+  /** The content store the transcript names bodies in, `blobs/<sha256>`. */
+  blobs: 'blobs',
   shellOutput: (call: number): string => join('shell', `${String(call).padStart(3, '0')}.log`),
   hookOutput: (check: number): string => join('hooks', `${String(check).padStart(3, '0')}.json`),
   gate: join('gate', 'attempt.json'),
@@ -36,7 +42,7 @@ export const sessionLayout = {
 
 /** What a session was started with, written before the agent starts. */
 export const sessionRecordSchema = z.object({
-  schema: z.literal('ramify-agent.session/1'),
+  schema: z.literal('ramify-agent.session/2'),
   id: text,
   role: z.literal('engineer'),
   module: modulePathSchema,
@@ -44,7 +50,10 @@ export const sessionRecordSchema = z.object({
   directory: z.string(),
   /** The person's prompt, which is the iteration's goal. */
   prompt: text,
+  /** The executor that runs it, by the agent port's name. */
   agent: text,
+  /** The model the executor was asked to run; null where it chose its own. */
+  model: text.nullable(),
   startedAt: timestamp,
   /** The commit the session started from; `''` outside git. */
   base: z.string(),
@@ -110,3 +119,15 @@ export const sessionOutcomeSchema = z.object({
   finishedAt: timestamp,
 }).strict();
 export type SessionOutcomeRecord = z.infer<typeof sessionOutcomeSchema>;
+
+/**
+ * A standalone session's state, as a reader derives it from its records. It
+ * holds the project lock for its whole life, so a reader that can read it
+ * never sees it running: with its outcome it is finished, and without one it
+ * was interrupted.
+ */
+export type StandaloneSessionState = 'finished' | 'interrupted';
+
+export function standaloneSessionState(outcome: SessionOutcomeRecord | null): StandaloneSessionState {
+  return outcome === null ? 'interrupted' : 'finished';
+}

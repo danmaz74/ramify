@@ -19,6 +19,7 @@ the intrinsic difficulty of a plan or the efficiency of its solution.
 | [Terminology map](terminology.md) | Concepts, metrics and measurements, connected to existing names and implementation usage. |
 | [Measurement principles](measurement-principles.md) | Scope, comparison reasoning, limitations and deferred approaches. |
 | [Token efficiency](token-efficiency.md) | The initial formulas, counting rules, examples and evidence requirements. |
+| [Lineage measurements](lineage.md) | `lineage/1`: forks, continuations, repairs, degraded starts and replacements, by the start each segment made. |
 
 The [earlier measurements and KPIs document](../measurements-and-kpis.md)
 describes broader scope-size, session, adaptation and mutation-event measures.

@@ -2,13 +2,16 @@ import { readJsonLines } from '../../subs/ledger/src/jsonl.js';
 import type { InvocationEvaluation, MetricsResponse } from '../interfaces/protocol/runs.js';
 import { baselineScope, rootModuleOfSnapshot, scopeSize } from '../kpi/capture.js';
 import { guardingReport } from '../kpi/guarding.js';
+import { lineageMetrics, lineagePolicyVersion } from '../kpi/lineage.js';
 import { kpiMetrics, kpiPolicyVersion, measurementPolicyVersion, type InvocationFacts } from '../kpi/metrics.js';
 import { observationSchema, type Observation } from '../run/observations.js';
+import { invocationSessions } from '../run/sessions.js';
 import {
   lineEventSummarySchema, measurementSnapshotSchema, runLayout,
-  type Invocation, type LineEventSummary, type MeasurementSnapshot,
+  type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot,
 } from '../run/records.js';
 import { readRunFile, unsupportedVersion, type RunView } from './inputs.js';
+import { lineageInputsOf, modelHistories } from './lineage.js';
 
 /*
  * The KPIs and the evaluation evidence beside them, read from the run's own
@@ -44,9 +47,14 @@ async function baselineOf(view: RunView): Promise<MetricsResponse['baseline']> {
   return { state: 'measured', bytes: size.bytes, snapshot: snapshot.id };
 }
 
-async function observationsOf(view: RunView, id: string): Promise<readonly Observation[] | { unavailable: string }> {
+/**
+ * An observation log, or why it cannot be read. `shown` names it in the
+ * reason: the path relative to the run's or the standalone session's
+ * directory.
+ */
+export async function readObservationLog(path: string, shown: string): Promise<readonly Observation[] | { unavailable: string }> {
   try {
-    const loaded = await readJsonLines(`${view.directory}/${runLayout.observations(id)}`);
+    const loaded = await readJsonLines(path);
     const lines: Observation[] = [];
     let invalid = 0;
     for (const record of loaded.records) {
@@ -54,11 +62,15 @@ async function observationsOf(view: RunView, id: string): Promise<readonly Obser
       if (parsed.success) lines.push(parsed.data);
       else invalid += 1;
     }
-    if (invalid > 0) return { unavailable: `${runLayout.observations(id)} has ${invalid} line(s) this harness does not read` };
+    if (invalid > 0) return { unavailable: `${shown} has ${invalid} line(s) this harness does not read` };
     return lines;
   } catch (error) {
-    return { unavailable: `${runLayout.observations(id)} cannot be read: ${error instanceof Error ? error.message : String(error)}` };
+    return { unavailable: `${shown} cannot be read: ${error instanceof Error ? error.message : String(error)}` };
   }
+}
+
+function observationsOf(view: RunView, id: string): Promise<readonly Observation[] | { unavailable: string }> {
+  return readObservationLog(`${view.directory}/${runLayout.observations(id)}`, runLayout.observations(id));
 }
 
 async function linesOf(view: RunView, invocation: Invocation): Promise<InvocationFacts['lines']> {
@@ -126,17 +138,25 @@ function scoped(invocation: string, observations: readonly Observation[]): Obser
   });
 }
 
-/** The KPIs of a run with their policy versions and coverage, and its evaluation evidence. */
+/** The KPIs and lineage measurements of a run with their policy versions and coverage, and its evaluation evidence. */
 export async function metricsOf(view: RunView): Promise<MetricsResponse> {
   const baseline = await baselineOf(view);
   const adaptations = adaptationsOf(view);
+  // Invocations are grouped into sessions by the harness session each one
+  // started in, never by an executor's ref: a ref names a point in the
+  // history, and each invocation of a continued session ends at another.
+  const sessions = invocationSessions(view.events);
+  const logs = new Map<string, readonly Observation[] | { unavailable: string }>();
+  for (const invocation of view.records.invocations.values()) logs.set(invocation.id, await observationsOf(view, invocation.id));
+  const lineage = lineageInputsOf(view, logs);
+  const histories = modelHistories(lineage);
   const facts: InvocationFacts[] = [];
   const evaluations: InvocationEvaluation[] = [];
   const merged: Observation[] = [];
 
   for (const invocation of view.records.invocations.values()) {
     const outcome = view.records.outcomes.get(invocation.id) ?? null;
-    const observations = await observationsOf(view, invocation.id);
+    const observations = logs.get(invocation.id)!;
     const lines = await linesOf(view, invocation);
     facts.push({
       id: invocation.id,
@@ -145,7 +165,10 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
       iteration: invocation.work.iteration ?? null,
       request: invocation.work.request ?? null,
       writer: invocation.writer,
-      session: outcome?.session?.ref ?? invocation.session.ref,
+      // Its `invocation-started` commits the invocation record, so every
+      // record has a session; the fallback only keeps the type total.
+      session: sessions.get(invocation.id) ?? invocation.id,
+      history: histories.get(invocation.id),
       outcome,
       size: invocation.scope.size,
       lines,
@@ -153,44 +176,8 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
       adaptation: adaptations.get(invocation.id) ?? null,
     });
 
-    const log = Array.isArray(observations) ? observations as readonly Observation[] : [];
-    if (Array.isArray(observations)) merged.push(...scoped(invocation.id, log));
-    const report = guardingReport(log);
-    const hooks = log.filter((line): line is Extract<Observation, { type: 'hook-check' }> => line.type === 'hook-check');
-    evaluations.push({
-      invocation: invocation.id,
-      role: invocation.role,
-      workItem: invocation.work.workItem ?? null,
-      iteration: invocation.work.iteration ?? null,
-      request: invocation.work.request ?? null,
-      ended: outcome?.ended ?? null,
-      writer: invocation.writer,
-      guarding: Array.isArray(observations)
-        ? { guarded: [...report.guarded], unguarded: [...report.unguarded], verdicts: { ...report.verdicts }, complete: report.complete, statement: report.statement }
-        : {
-            guarded: [], unguarded: [], verdicts: { allowed: 0, 'blocked-scope': 0, 'blocked-unresolved': 0 }, complete: false,
-            statement: `What this invocation did is not known: ${(observations as { unavailable: string }).unavailable}. No count of blocked calls is evidence about its writes.`,
-          },
-      outsideScope: [...(outcome?.outsideScope ?? [])],
-      hookChecks: {
-        passed: hooks.filter(line => line.data.outcome === 'passed').length,
-        findings: hooks.filter(line => line.data.outcome === 'findings').length,
-        notChecked: hooks.filter(line => line.data.outcome === 'not-checked').length,
-        newFindings: hooks.reduce((total, line) => total + line.data.newFindings, 0),
-      },
-      excursions: [...report.excursions],
-      gaps: report.gaps.map(gap => ({ kind: gap.kind, count: gap.count })),
-      lines: lines === null
-        ? null
-        : 'unavailable' in lines
-          ? { coverage: 'partial', paths: 0, added: 0, deleted: 0, gaps: [lines.unavailable] }
-          : summaryOf(lines),
-      usage: outcome === null
-        ? { unavailable: 'the invocation has not ended' }
-        : 'unavailable' in outcome.usage
-          ? { unavailable: outcome.usage.unavailable }
-          : { input: outcome.usage.input, cacheRead: outcome.usage.cacheRead, cacheWrite: outcome.usage.cacheWrite, output: outcome.usage.output },
-    });
+    if (Array.isArray(observations)) merged.push(...scoped(invocation.id, observations as readonly Observation[]));
+    evaluations.push(evaluationOf({ invocation, outcome, observations, lines }));
   }
 
   // One report over every invocation's observations: the tools guarded,
@@ -225,6 +212,7 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
     measurementPolicy: measurementPolicyVersion,
     baseline,
     metrics,
+    lineage: { policyVersion: lineagePolicyVersion, metrics: lineageMetrics(lineage) },
     evaluation: {
       guarding,
       outsideScope: evaluations.flatMap(evaluation => evaluation.outsideScope.map(path => ({
@@ -233,6 +221,69 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
       invocations: evaluations,
     },
   };
+}
+
+/** What one invocation's evaluation is computed from. */
+export interface EvaluationInputs {
+  readonly invocation: Pick<Invocation, 'id' | 'role' | 'work' | 'writer'>;
+  readonly outcome: Pick<InvocationOutcome, 'ended' | 'outsideScope' | 'usage'> | null;
+  readonly observations: readonly Observation[] | { unavailable: string };
+  /** Its line events; null for an invocation that held no writer. */
+  readonly lines: InvocationFacts['lines'];
+}
+
+/**
+ * One invocation's evaluation evidence: guarding, what changed outside its
+ * scope, hook checks, reads outside it, lines and tokens. It is pure.
+ */
+export function evaluationOf({ invocation, outcome, observations, lines }: EvaluationInputs): InvocationEvaluation {
+  const log = Array.isArray(observations) ? observations as readonly Observation[] : [];
+  const report = guardingReport(log);
+  const hooks = log.filter((line): line is Extract<Observation, { type: 'hook-check' }> => line.type === 'hook-check');
+  return {
+    invocation: invocation.id,
+    role: invocation.role,
+    workItem: invocation.work.workItem ?? null,
+    iteration: invocation.work.iteration ?? null,
+    request: invocation.work.request ?? null,
+    ended: outcome?.ended ?? null,
+    writer: invocation.writer,
+    guarding: Array.isArray(observations)
+      ? { guarded: [...report.guarded], unguarded: [...report.unguarded], verdicts: { ...report.verdicts }, complete: report.complete, statement: report.statement }
+      : {
+          guarded: [], unguarded: [], verdicts: { allowed: 0, 'blocked-scope': 0, 'blocked-unresolved': 0 }, complete: false,
+          statement: `What this invocation did is not known: ${(observations as { unavailable: string }).unavailable}. No count of blocked calls is evidence about its writes.`,
+        },
+    outsideScope: [...(outcome?.outsideScope ?? [])],
+    hookChecks: {
+      passed: hooks.filter(line => line.data.outcome === 'passed').length,
+      findings: hooks.filter(line => line.data.outcome === 'findings').length,
+      notChecked: hooks.filter(line => line.data.outcome === 'not-checked').length,
+      newFindings: hooks.reduce((total, line) => total + line.data.newFindings, 0),
+    },
+    excursions: [...report.excursions],
+    gaps: report.gaps.map(gap => ({ kind: gap.kind, count: gap.count })),
+    lines: lines === null
+      ? null
+      : 'unavailable' in lines
+        ? { coverage: 'partial', paths: 0, added: 0, deleted: 0, gaps: [lines.unavailable] }
+        : summaryOf(lines),
+    usage: outcome === null
+      ? { unavailable: 'the invocation has not ended' }
+      : 'unavailable' in outcome.usage
+        ? { unavailable: outcome.usage.unavailable }
+        : { input: outcome.usage.input, cacheRead: outcome.usage.cacheRead, cacheWrite: outcome.usage.cacheWrite, output: outcome.usage.output },
+  };
+}
+
+/** One invocation's evaluation, read from its observation log, its line events and its outcome. */
+export async function invocationEvaluation(view: RunView, invocation: Invocation): Promise<InvocationEvaluation> {
+  return evaluationOf({
+    invocation,
+    outcome: view.records.outcomes.get(invocation.id) ?? null,
+    observations: await observationsOf(view, invocation.id),
+    lines: await linesOf(view, invocation),
+  });
 }
 
 function summaryOf(lines: LineEventSummary): NonNullable<InvocationEvaluation['lines']> {

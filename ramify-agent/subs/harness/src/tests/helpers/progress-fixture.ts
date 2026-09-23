@@ -312,8 +312,12 @@ function assertFakeRamifyComplete(name: FixtureRun, root: string, ramify: FakeRa
   }
 }
 
-/** Writes exactly the module documents the projection reader consumes. */
-async function writeArchitectTreeFixture(root: string): Promise<void> {
+/**
+ * Writes exactly the module documents the projection reader consumes, from
+ * the project's current declarations. A fixture that adds modules writes
+ * them again.
+ */
+export async function writeArchitectTreeFixture(root: string): Promise<void> {
   const tree = await readDeclaredTree(root);
   const directory = join(root, '.ramify-architect');
   await mkdir(directory, { recursive: true });

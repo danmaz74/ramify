@@ -14,6 +14,7 @@ import { startServerWith, type RunningServer } from '../http/server.js';
 import { RunQueries } from '../projections/queries.js';
 import { RunLog } from '../run/log.js';
 import { runLayout } from '../run/records.js';
+import { reduceSessions } from '../run/sessions.js';
 import type { RunService } from '../run/service.js';
 import { analysis, entry } from './helpers/analysis.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
@@ -104,8 +105,8 @@ describe('a run started with the review stop', () => {
     expect(done).toMatchObject({ state: 'completed', phase: 'ended', review: { reviewer: 'dana@example.com', at: approved.acceptedAt, duringRun: false } });
     const events = await runEventsOnDisk(root, plan, receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
-      'readiness-passed', 'gate-committing', 'gate-attempted', 'job-completed',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
+      'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
     ]);
     expect(events.find(event => event.type === 'analysis-approved')!.data).toMatchObject({
       reviewer: 'dana@example.com', note: 'The scenarios match the plan.', duringRun: false, command: { receipt: approved },
@@ -125,8 +126,12 @@ describe('a run started with the review stop', () => {
 
     expect(onlyRun(service, plan)).toMatchObject({ state: 'stopped', phase: 'ended', review: 'not-reviewed' });
     expect(await types(root, receipt.jobId)).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'stop-requested', 'job-stopped',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'stop-requested',
+      'session-finished', 'job-stopped',
     ]);
+    // The architect's session, kept through the stop, is finished as the run ends.
+    expect([...reduceSessions(await runEventsOnDisk(root, plan, receipt.jobId)).values()].map(one => [one.id, one.state, one.finished]))
+      .toEqual([['ses-0001', 'finished', 'run-ended']]);
     const stopped = (await runEventsOnDisk(root, plan, receipt.jobId)).at(-1)!;
     expect(stopped).toMatchObject({ type: 'job-stopped', data: { settled: true } });
     // The scripted Git was asked for no branch and no commit, and made none.
@@ -147,7 +152,10 @@ describe('a run started with the review stop', () => {
     await until(() => phaseOf(first.service, receipt.jobId) === 'awaiting-review');
     // The waiting driver is woken by close, so the service quiesces at once.
     await first.service.close();
-    expect(await types(root, receipt.jobId)).toEqual(['job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested']);
+    expect(await types(root, receipt.jobId)).toEqual(['job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested']);
+    // At the stop the architect's session is kept: suspended, to be continued after the approval.
+    expect([...reduceSessions(await runEventsOnDisk(root, plan, receipt.jobId)).values()].map(one => [one.id, one.state]))
+      .toEqual([['ses-0001', 'suspended']]);
 
     const second = await openRuns(root, { script: [] });
     cleanups.push(() => second.service.close());
@@ -170,7 +178,8 @@ describe('a run started with the review stop', () => {
     expect(restarted.recovery.interrupted).toEqual([`${plan}/${receipt.jobId}`]);
     expect(restarted.recovery.invocations).toEqual([]);
     expect(await types(root, receipt.jobId)).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'job-interrupted',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested',
+      'session-finished', 'job-interrupted',
     ]);
     expect(restarted.agent!.sessions).toHaveLength(0);
     expect(onlyRun(restarted.service, plan)).toMatchObject({ state: 'interrupted', review: 'not-reviewed' });
@@ -311,7 +320,7 @@ describe('the run budget', () => {
     }));
     const timed: AgentPort = {
       name: scripted.name,
-      observations: scripted.observations,
+      support: scripted.support,
       appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
       startSession: spec => {
         const session = scripted.startSession(spec);

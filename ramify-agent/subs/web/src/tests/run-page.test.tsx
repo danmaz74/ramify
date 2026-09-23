@@ -7,6 +7,7 @@ import {
 } from '../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
+import { architect, globalFork, liveEngineer } from './helpers/sessions.js';
 import { StubClient, type StubRun } from './helpers/stub-client.js';
 
 // Progress → By module draws the packaged React Flow canvas, which jsdom cannot measure.
@@ -24,7 +25,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     startedAt: at, updatedAt: at, endedAt: null, failure: null,
     current: { workItem: 'wi-002', iteration: 'wi-002.i01', role: 'engineer', invocation: 'inv-0006' },
     waits: [],
-    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, declared: 0, implemented: 0 } },
+    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
     writer: { held: 'inv-0006', unsettled: null },
     review: 'not-reviewed',
     notices: [
@@ -190,6 +191,15 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         { id: 'scope-bytes-per-changed-line', unit: 'bytes per changed line', policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1', state: 'unavailable', value: null, numerator: null, denominator: 13, subtotal: 10000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006: owned-source unknown'], note: 'A size component is missing' },
         { id: 'session-count', unit: 'sessions', policyVersion: 'kpi/1', measurementPolicy: null, state: 'measured', value: 6, numerator: 6, denominator: null, subtotal: null, coverage: { covered: 6, total: 6 }, evidence: [], note: null },
       ],
+      lineage: {
+        policyVersion: 'lineage/1',
+        metrics: [
+          { id: 'fork.generation-1.start-context', unit: 'tokens per segment', policyVersion: 'lineage/1', measurementPolicy: null, state: 'measured', value: 25000, numerator: 50000, denominator: 2, subtotal: null, coverage: { covered: 2, total: 2 }, evidence: ['inv-0002 (ses-0002): 24000', 'inv-0003 (ses-0003): 26000'], note: null },
+          { id: 'fresh-fork.start-context', unit: 'tokens per segment', policyVersion: 'lineage/1', measurementPolicy: null, state: 'not-applicable', value: null, numerator: null, denominator: null, subtotal: null, coverage: { covered: 0, total: 0 }, evidence: [], note: 'No global fork started fresh' },
+          { id: 'continuation-growth', unit: 'tokens per continuation', policyVersion: 'lineage/1', measurementPolicy: null, state: 'unavailable', value: null, numerator: null, denominator: null, subtotal: 3000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006 (ses-0005): it recorded no context observation', 'inv-0005 (ses-0004): 3000'], note: 'A segment lacks this input, so the mean is unknown; the known subtotal is shown' },
+          { id: 'degraded-starts', unit: 'degraded starts per requested start', policyVersion: 'lineage/1', measurementPolicy: null, state: 'partial', value: null, numerator: 1, denominator: 3, subtotal: null, coverage: { covered: 3, total: 4 }, evidence: ['continue made fresh: the session file is gone (inv-0006)'], note: 'Counted over 3 of 4 requested starts whose start is known' },
+        ],
+      },
       evaluation: {
         guarding: { guarded: ['edit'], unguarded: ['shell'], verdicts: { allowed: 1, 'blocked-scope': 0, 'blocked-unresolved': 0 }, complete: false, statement: 'Guarded: edit. Not guarded: shell. A count of blocked calls is not evidence that every write respected its scope; what an unguarded tool wrote is seen only in the tree afterwards.' },
         outsideScope: [{ invocation: 'inv-0004', role: 'engineer', workItem: 'wi-001', iteration: 'wi-001.i01', path: 'subs/reviews/src/outside.ts' }],
@@ -221,6 +231,28 @@ test('the overview shows notices first: the module created, then every cycle, re
   expect(notices[0]!.textContent).toContain('Module created: shop/notes/drafts');
   expect(notices[0]!.textContent).toContain('No placement decision proposed it.');
   expect(notices[1]!.textContent).toContain('resolved');
+});
+
+test('a run with a degraded start notices it with its count and a link to its chapter; a run without one asks for no sessions', async () => {
+  const counts = { ...snapshot().counts, degradedStarts: 1 };
+  const client = clientWith(stubRun({ counts, notices: [] }));
+  client.runSessions.set(runId, { version: 12, sessions: [architect, liveEngineer(), globalFork], total: 3 });
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  const overview = await screen.findByLabelText('Overview');
+  const link = await within(overview).findByRole('link', { name: 'ses-0003 global-fork, inv-0003' });
+  expect(link.getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0003/chapters/inv-0003`);
+  const notice = link.closest('.notice')!;
+  expect(notice.className).toBe('notice notice-degraded-start');
+  expect(notice.textContent).toContain('A degraded start');
+  expect(notice.textContent).toContain('fork was requested and fresh was made (the source session file is gone)');
+  expect(within(overview).queryByText(/No module was created or removed/)).toBeNull();
+  cleanup();
+
+  const quiet = clientWith(stubRun());
+  render(<RunPage client={quiet} planId="review-notes" runId={runId} interval={60_000} />);
+  await screen.findByLabelText('Overview');
+  expect(document.querySelector('.notice-degraded-start')).toBeNull();
+  expect(quiet.calls.filter(call => call.startsWith('getRunSessions'))).toEqual([]);
 });
 
 test('after the run ends the notices stay, and an empty list says that nothing was created', async () => {
@@ -655,4 +687,45 @@ test('a gate\'s scenario check shows each scenario\'s status and failure', async
     .toBe('sc-001 failed in shop/notes, subs/notes/src/tests/features/review-notes/review-note.feature:4Then the note is listed: expected one note, got none');
   expect(within(check).getByLabelText('Why the scenario check did not pass').textContent).toBe('sc-001 failed at "Then the note is listed": expected one note, got none');
   expect(within(gate).getAllByLabelText('Scenario check')).toHaveLength(1);
+});
+
+test('the lineage measurements show their values, coverage and reasons; an unavailable one reads unavailable, never zero', async () => {
+  render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Measurements' }));
+  const table = await screen.findByLabelText('Lineage measurements');
+  const cells = (id: string) => [...table.querySelector(`[data-metric="${id}"]`)!.querySelectorAll('td')].map(cell => cell.textContent);
+  expect(screen.getByText(/Lineage measurements lineage\/1/)).toBeTruthy();
+
+  const fork = cells('fork.generation-1.start-context');
+  expect(fork[0]).toContain('tokens per segment');
+  expect(fork.slice(1, 6)).toEqual(['measured', '25000', '50000', '2', '2 of 2']);
+
+  const growth = cells('continuation-growth');
+  expect(growth[1]).toBe('unavailable');
+  expect(growth[2]).toBe('unavailableknown subtotal 3000');
+  expect(growth[5]).toBe('1 of 2');
+  expect(growth[6]).toContain('the known subtotal is shown');
+  expect(within(table.querySelector('[data-metric="continuation-growth"]')! as HTMLElement).getByText('inv-0006 (ses-0005): it recorded no context observation')).toBeTruthy();
+
+  expect(cells('fresh-fork.start-context').slice(1, 3)).toEqual(['not-applicable', 'not-applicable']);
+  expect(cells('fresh-fork.start-context')[6]).toBe('No global fork started fresh');
+  const degraded = cells('degraded-starts');
+  expect(degraded.slice(1, 6)).toEqual(['partial', 'partial', '1', '3', '3 of 4']);
+});
+
+test('Run → Sessions draws the timeline, each segment opening its chapter; Measurements no longer lists invocations', async () => {
+  const client = clientWith(stubRun());
+  client.runSessions.set(runId, { version: 12, sessions: [architect, liveEngineer()], total: 2 });
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Sessions' }));
+  const area = await screen.findByLabelText('Sessions');
+  const engineer = await within(area).findByRole('group', { name: 'ses-0002 engineer, live' });
+  expect(within(engineer).getByRole('link', { name: 'ses-0002' }).getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0002`);
+  expect(within(engineer).getByRole('link', { name: /^Chapter 2 of ses-0002: inv-0004/ }).getAttribute('href')).toBe(`#/plans/review-notes/runs/${runId}/sessions/ses-0002/chapters/inv-0004`);
+  expect(engineer.querySelector('.session-state')!.textContent).toBe('live');
+  expect(within(area).getByRole('group', { name: 'ses-0001 initial-architect, finished' })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Measurements' }));
+  await screen.findByLabelText('Metrics');
+  expect(screen.queryByRole('table', { name: 'Sessions' })).toBeNull();
 });

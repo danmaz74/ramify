@@ -19,6 +19,13 @@ import {
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
+import {
+  runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionTranscriptResponseSchema,
+  sessionUpdatesResponseSchema, standaloneSessionResponseSchema,
+  type RunSessionsResponse, type SessionBodyResponse, type SessionCursor, type SessionListResponse, type SessionRef,
+  type SessionTranscriptResponse, type SessionUpdatesResponse, type StandaloneSessionResponse,
+} from '../../harness/src/interfaces/protocol/sessions.js';
+import type { TranscriptBody } from '../../harness/src/interfaces/protocol/transcripts.js';
 
 export type ProjectInfo = ProjectResponse['project'];
 
@@ -67,6 +74,18 @@ export interface ProtocolClient {
   getScenarios(planId: string, runId: string): Promise<ScenarioListResponse>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
+  /** Every session of the project, live and suspended first; a page of at most 200 from `offset`. */
+  listSessions(offset?: number): Promise<SessionListResponse>;
+  /** One standalone session: its summary, prompt, outcome and evaluation. */
+  getStandaloneSession(session: string): Promise<StandaloneSessionResponse>;
+  /** A run's sessions, with their invocations, lineage and the diagram elements each reaches. */
+  getRunSessions(planId: string, runId: string): Promise<RunSessionsResponse>;
+  /** A session's transcript entries after entry `after`. */
+  getTranscript(session: SessionRef, after: number): Promise<SessionTranscriptResponse>;
+  /** One poll of a run: the sessions changed after `version`, and each followed session's entries after its cursor. */
+  pollSessions(planId: string, runId: string, version: number, cursors: readonly SessionCursor[]): Promise<SessionUpdatesResponse>;
+  /** A block's body: an inline one as it is, a stored one or a file the transcript names from the harness. */
+  getBody(session: SessionRef, body: TranscriptBody): Promise<SessionBodyResponse>;
   /**
    * Sends a command and returns its receipt. When the harness does not
    * answer, the identical command is sent again, which is safe: a retry
@@ -142,6 +161,22 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getScenarios: (planId, runId) => get(protocolPaths.runScenarios(planId, runId), scenarioListResponseSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
+    listSessions: (offset = 0) => get(protocolPaths.sessions(offset), sessionListResponseSchema),
+    getStandaloneSession: session => get(protocolPaths.standaloneSession(session), standaloneSessionResponseSchema),
+    getRunSessions: (planId, runId) => get(protocolPaths.runSessions(planId, runId), runSessionsResponseSchema),
+    getTranscript: (session, after) => get(session.source === 'run'
+      ? protocolPaths.runSessionTranscript(session.planId, session.runId, session.session, after)
+      : protocolPaths.standaloneTranscript(session.session, after), sessionTranscriptResponseSchema),
+    pollSessions: (planId, runId, version, cursors) => get(protocolPaths.runSessionUpdates(planId, runId, version, cursors), sessionUpdatesResponseSchema),
+    getBody: async (session, body) => {
+      if (body.stored === 'inline') return { content: body.text, bytes: body.bytes, truncated: false };
+      const path = body.stored === 'blob'
+        ? (session.source === 'run' ? protocolPaths.runBody(session.planId, session.runId, body.hash) : protocolPaths.standaloneBody(session.session, body.hash))
+        : (session.source === 'run'
+            ? protocolPaths.runSessionFile(session.planId, session.runId, session.session, body.path)
+            : protocolPaths.standaloneFile(session.session, body.path));
+      return get(path, sessionBodyResponseSchema);
+    },
     sendCommand: async command => {
       const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(command) };
       for (let attempt = 1; ; attempt++) {

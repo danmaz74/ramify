@@ -14,6 +14,7 @@ import {
 } from '../hooks/post-write.js';
 import { ownerOf } from '../kpi/lines.js';
 import type { ObservationLog } from '../run/observations.js';
+import type { TranscriptNotes } from '../transcripts/recorder.js';
 import { ToolInputJudge, validateAgainst } from '../run/submissions.js';
 import { createShellTool, shellInputSchema, shellToolName, type ShellTool } from '../tools/shell.js';
 import { createScopeTestsTool, scopeTestsInputSchema, scopeTestsToolName, type ScopeScenarioCheck } from './engineer.js';
@@ -38,6 +39,8 @@ export interface EquipContext {
    * mutating call and through nothing else, so a reminder waits for one.
    */
   readonly reminders: () => string[];
+  /** The invocation's transcript, told what the harness decides and where a call's complete output is. */
+  readonly transcript?: TranscriptNotes | undefined;
 }
 
 /** The tools and the guard of one invocation. */
@@ -170,7 +173,10 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       // the command runs. What is added here is the gap that qualifies
       // every later count: this invocation wrote through a tool no
       // guard judged.
-      starting: async () => {
+      starting: async call => {
+        // The complete output is a file of the invocation, which the
+        // call's result in the transcript names rather than copies.
+        session.transcript?.output(session.callId(shellToolName), call.outputFile);
         if (shellGapRecorded) return;
         shellGapRecorded = true;
         await session.observations.record({
@@ -230,14 +236,14 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         },
       })],
       guard: async call => {
-        if (call.tool === shellToolName) {
+        if (call.action.kind === 'command') {
           // The shell declares itself mutating so that the hook check
-          // runs after it, but it names no target to judge: its writes
-          // are unguarded by design, seen afterwards in the tree and
-          // reported in `outsideScope`. Nothing here prevents them.
+          // runs after it, but a command names no target to judge: its
+          // writes are unguarded by design, seen afterwards in the tree
+          // and reported in `outsideScope`. Nothing here prevents them.
           return { allow: true };
         }
-        const decision = await decideWrite(inputs.guarded, projectRoot, call.input);
+        const decision = await decideWrite(inputs.guarded, projectRoot, call.action);
         await session.observations.record({
           type: 'guard',
           data: {
@@ -254,15 +260,19 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         if (decision.verdict === 'allowed' && decision.resolved !== null) {
           mutated.set(call.callId, [relative(projectRoot, decision.resolved)]);
         }
-        return decision.verdict === 'allowed'
-          ? { allow: true }
-          : { allow: false, text: blockExplanation(decision, inputs.guarded) };
+        if (decision.verdict === 'allowed') return { allow: true };
+        const text = blockExplanation(decision, inputs.guarded);
+        session.transcript?.note({
+          kind: 'guard-denied', callId: call.callId, tool: call.tool, verdict: decision.verdict,
+          requested: decision.requested, reason: decision.reason, text,
+        });
+        return { allow: false, text };
       },
       afterMutation: async call => {
         // The mutation is observed whether the tool succeeded or not.
         // The shell's changed set is unknown, which is a different
         // thing from an empty one and is recorded as such.
-        const paths = call.tool === shellToolName ? null : mutated.get(call.callId) ?? null;
+        const paths = call.action.kind === 'command' ? null : mutated.get(call.callId) ?? null;
         await session.observations.record({
           type: 'mutation',
           data: {
@@ -296,7 +306,13 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
           await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths] } });
         }
         for (const gap of hook.gaps) await session.observations.record({ type: 'coverage-gap', data: gap });
-        const text = [hook.text, ...session.reminders()].filter(line => line !== null && line !== '').join('\n\n');
+        const reminders = session.reminders();
+        session.transcript?.note({
+          kind: 'post-write-check', callId: call.callId, atCompletion: false, checks: hook.checks,
+          text: hook.text === null || hook.text === '' ? null : hook.text,
+        });
+        for (const reminder of reminders) session.transcript?.note({ kind: 'read-reminder', callId: call.callId, text: reminder });
+        const text = [hook.text, ...reminders].filter(line => line !== null && line !== '').join('\n\n');
         return text === '' ? null : { text };
       },
     };
@@ -320,6 +336,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       readonly newFindings: number; readonly log: string | null;
     }) => {
       await session.observations.record({ type: 'hook-check', data: { ...check, paths: [...check.paths], atCompletion: true } });
+      session.transcript?.note({ kind: 'post-write-check', callId: null, atCompletion: true, checks: [check], text: null });
     };
     const notChecked = async (reason: string): Promise<readonly HookFinding[]> => {
       completion = { kind: 'not-checked', reason };

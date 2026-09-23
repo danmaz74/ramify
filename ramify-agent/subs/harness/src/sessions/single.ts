@@ -24,6 +24,9 @@ import { gateAttemptId, gateAttemptSchema, type InvocationOutcome, type RunPolic
 import { SubmissionJudge } from '../run/submissions.js';
 import { WriterOwnership } from '../run/writer.js';
 import { acquireProjectLock, ProjectLockError, type ProjectLock } from '../store/lock.js';
+import { InvocationTranscript, verdictNote } from '../transcripts/recorder.js';
+import { ContentStore } from '../transcripts/store.js';
+import { TranscriptWriter } from '../transcripts/writer.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
 import {
   engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
@@ -49,7 +52,8 @@ import {
  * option the iteration checkpoint runs over the module afterwards, and its
  * verdict is recorded; the changes stay in the working tree either way.
  *
- * Its records are plain files under `plans/.harness/sessions/<id>/`.
+ * Its records are plain files under `plans/.harness/sessions/<id>/`, and
+ * its transcript is `transcript.jsonl` beside them, written as a run's is.
  */
 
 /** What starts one single engineer session. */
@@ -60,6 +64,8 @@ export interface SingleSessionOptions {
   /** The person's prompt, which becomes the iteration's goal. */
   readonly prompt: string;
   readonly agent: AgentPort;
+  /** The model the agent was asked to run, which the session records; without one, the agent chose its own. */
+  readonly model?: string | undefined;
   /** The Ramify command line the hook check and the API views use. */
   readonly ramify: RamifyCli;
   /** Git observations. Tests inject scenario answers; production uses Git. */
@@ -272,7 +278,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);
   const at = (path: string) => join(records, path);
-  await mkdir(at(sessionLayout.transcript), { recursive: true });
+  await mkdir(at(sessionLayout.executorSession), { recursive: true });
 
   // The prompt is the goal; what the person did not give reads "not stated".
   const assignment: IterationAssignment = {
@@ -298,13 +304,14 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const shown = scopePaths(projectRoot, scope);
 
   const record: SessionRecord = sessionRecordSchema.parse({
-    schema: 'ramify-agent.session/1',
+    schema: 'ramify-agent.session/2',
     id,
     role: 'engineer',
     module: entry.module,
     directory: entry.dir,
     prompt: options.prompt.trim(),
     agent: agent.name,
+    model: options.model ?? null,
     startedAt: new Date().toISOString(),
     base: head,
     scope: { roots: shown.roots, files: shown.files, extra },
@@ -318,6 +325,16 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   progress({ type: 'started', session: id, module: entry.module, directory: entry.dir, records, scope: shown, message: prompt });
 
   const observations = await ObservationLog.open(at(sessionLayout.observations));
+  // The session is its own one invocation, so its identifier names both.
+  const transcript = new InvocationTranscript(new TranscriptWriter({
+    session: id,
+    path: at(sessionLayout.transcript),
+    root: records,
+    store: new ContentStore(at(sessionLayout.blobs)),
+    inlineBytes: policy.transcript.inlineBodyBytes,
+  }), id, async detail => {
+    await observations.record({ type: 'coverage-gap', data: { kind: 'transcript-incomplete', detail } });
+  });
   const tools = engineerEquipment({
     commandExecution: options.commandExecution,
     projectRoot,
@@ -357,13 +374,14 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   const excursions = new ExcursionWatcher({ projectRoot, index: initial, scope: guarded });
   const context = policy.context.engineer;
-  const recorder = new PortEventRecorder({ projectRoot, observations, judge, excursions, context });
+  const recorder = new PortEventRecorder({ projectRoot, observations, judge, excursions, context, transcript });
   const bounds = new InvocationBounds(limits);
   const equipment = tools.equip({
     invocation: id,
     observations,
     callId: tool => recorder.callId(tool),
     reminders: () => excursions.takeReminders(),
+    transcript,
   });
   const { guard, afterMutation } = equipment;
 
@@ -396,6 +414,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
       inputSchema: engineerJsonSchema,
       accept: async input => {
         const verdict = await judge.judge(input);
+        transcript.note(verdictNote(recorder.callId(engineerToolName), engineerToolName, verdict));
         progress({
           type: 'submission',
           input,
@@ -405,14 +424,15 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         return verdict;
       },
     },
-    sessionDirectory: at(sessionLayout.transcript),
+    sessionDirectory: at(sessionLayout.executorSession),
     onEvent: event => {
       bounds.touch();
       if (event.type === 'tool-started' && event.tool !== engineerToolName) {
         progress({ type: 'tool-call', callId: event.callId, tool: event.tool, input: event.input });
       } else if (event.type === 'tool-finished' && event.isError && event.tool !== engineerToolName) {
         progress({ type: 'tool-error', callId: event.callId, tool: event.tool, text: event.errorText ?? '' });
-      } else if (event.type === 'message' && event.text.trim() !== '') {
+      } else if (event.type === 'message' && event.role === 'assistant' && event.blocks.some(block => block.type === 'text' && block.text.trim() !== '')) {
+        // The assistant's own text; its tool calls are shown as calls.
         progress({ type: 'message', text: event.text });
       }
       void recorder.record(event).catch(() => undefined);
@@ -423,6 +443,11 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   // harness's own observation: the session idle and the tree read around it.
   const writer = new WriterOwnership({ settleMs: limits.writerSettleMs, tree: { changed: () => git.changedPaths(projectRoot).catch(() => []) } });
   writer.acquire(id);
+  // The start holds the prompts and is written before the model is called.
+  await transcript.started({
+    role: 'engineer', work: {}, start: 'opened', requested: 'fresh',
+    executor: agent.name, model: options.model ?? null, systemPrompt, prompt,
+  });
   const started = Date.now();
   let agentSession: AgentSession;
   try {
@@ -430,6 +455,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   } catch (error) {
     const settled = await writer.release(id);
     const reason = `The agent session could not start: ${message(error)}`;
+    await transcript.end({ ended: 'failed', interruption: 'adapter-fault', error: reason, actual: null });
     await writeOutcome(at(sessionLayout.outcome), {
       session: id, ended: 'failed', interruption: 'adapter-fault', error: reason, submission: null, rejectedSubmissions: 0,
       standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, outsideScope: [],
@@ -465,6 +491,15 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     ? `No port event for ${limits.invocationIdleMs} ms`
     : bounds.interruption === 'absolute-timeout' ? `The session ran for ${limits.invocationAbsoluteMs} ms, its absolute bound` : undefined;
   const submission: EngineerSubmission | null = ended === 'submitted' ? accepted : null;
+  if (outcome.kind === 'context-budget-reached') {
+    transcript.note({ kind: 'budget-reached', tokens: outcome.tokens, threshold: context.budgetTokens, reportDelivered: outcome.report !== undefined });
+  }
+  await transcript.end({
+    ended,
+    interruption: interruption ?? null,
+    error: error ?? null,
+    actual: { mode: agentSession.start.mode, degradedReason: agentSession.start.degradedReason ?? null },
+  });
 
   // The gate: the iteration checkpoint over the tree the session left,
   // with the module's own tests resolved anew and the guarded files as

@@ -75,7 +75,7 @@ Freeze a run baseline before its first architect session. Later planning or
 engineering attempts retain a current pre-attempt measurement snapshot after
 previous tools settle. Refresh after module/source changes and retain end-state
 measurements for new/deleted-file attribution. Associate every attempt with its
-brief, pi session, baseline, snapshot and metric-policy version. Recovery never
+brief, harness session, baseline, snapshot and metric-policy version. Recovery never
 relabels old attempts with new scopes or newer measurements.
 
 A legitimate unavailable bucket may permit planning with explicit uncertainty,
@@ -156,28 +156,30 @@ No extra human confirmation or numerical planning optimizer is introduced.
 
 For change-weighted arithmetic, index each attributable mutation event e with
 weight `w_e` (nonmechanical added/deleted text lines) and the enclosing attempt's
-declared scope bytes `S_e`. For session-weighted arithmetic use distinct pi
-sessions s.
+declared scope bytes `S_e`. For session-weighted arithmetic use the model
+context histories s of the harness sessions.
 The included session/attempt set covers initial architecture, later architects,
 contract/engineering/integration work and failures/retries linked to this run.
-An explicitly linked initial planning job is counted once. A resumed pi session
-retains its session identity; fresh model context has a new session identity.
+An explicitly linked initial planning job is counted once. A continued
+invocation joins its harness session, whose identity is the harness's, never an
+executor's ref. A continued start the executor made fresh stays in its session
+but begins a new model context history, which is a term of its own.
 Report session count and attempt count separately. SDK request retries and
-compaction alone do not create a new pi session.
+compaction alone do not create a new session or history.
 
 | KPI | Definition |
 | --- | --- |
 | Mean declared scope bytes per cumulative edit line | `sum(w_e * S_e) / sum(w_e)` |
 | Declared-scope ratio (`scope-size-ratio`) | Mean declared scope bytes per cumulative edit line divided by frozen B |
 | Inverse declared-scope ratio (`reduction-factor`) | `1 / scope-size ratio`, only when defined and positive |
-| Session count | Distinct pi sessions in the included run, including no-change/failed sessions |
-| Session-weighted total | `sum(S_s / B)` over included pi sessions |
+| Session count | Distinct harness sessions in the included run, including no-change/failed sessions |
+| Session-weighted total | `sum(S_s / B)` over the model context histories of the included sessions |
 | Adaptation session share | Distinct sessions caused by a recorded adaptation / all included sessions |
 | Adaptation usage share | Provider-reported usage for adaptation sessions / corresponding total usage, by compatible usage category |
 
 These preserve the earlier search-space formulas while naming the inventory
 proxy and its changed coverage. Values depend on the declared scopes, not on
-bytes actually read. For a single persistent session continued across attempts,
+bytes actually read. For one model context history continued across attempts,
 use the union of its recorded scope components for session-weighted size,
 counting each component once at its largest observed byte value. This explicit
 conservative resume policy avoids counting one continued session twice; it is

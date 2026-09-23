@@ -3,6 +3,7 @@ import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { resolveContainedPath, resolveRealTarget } from '../guard/resolve-contained-path.js';
+import type { ToolAction } from '../../subs/agent/src/interfaces/port.js';
 import { blockExplanation, decideWrite, type GuardedScope } from '../guard/write-guard.js';
 import { deniedFiles, guardedScopeOf, resolveWriteScope } from '../work/scope.js';
 import { temporaryDirectory } from './helpers/fixture.js';
@@ -88,6 +89,11 @@ async function scopeOf(root: string, index: ReturnType<typeof architectIndex>, o
   return guardedScopeOf(scope);
 }
 
+/** A write of the paths given, as any executor's write tool is classified. */
+function writing(...paths: string[]): ToolAction {
+  return { kind: 'write', paths };
+}
+
 /** Every file of the project, with its contents, so that a denial can be shown to have changed nothing. */
 async function contentsOf(root: string): Promise<Record<string, string>> {
   const paths = [
@@ -134,7 +140,7 @@ describe('X3: allowed and denied targets', () => {
     ];
 
     for (const row of table) {
-      const decision = await decideWrite(scope, root, row.target === '' ? {} : { path: row.target });
+      const decision = await decideWrite(scope, root, row.target === '' ? writing() : writing(row.target));
       expect(`${row.what}: ${decision.verdict}`).toBe(`${row.what}: ${row.verdict}`);
       expect(`${row.what}: ${decision.resolved}`).toBe(`${row.what}: ${row.resolved}`);
       expect(decision.reason).not.toBe('');
@@ -152,11 +158,11 @@ describe('X3: allowed and denied targets', () => {
     const without = await scopeOf(root, index);
     const withChild = await scopeOf(root, index, { includedChildren: ['shop/orders/pricing'] });
 
-    const target = { path: 'subs/orders/subs/pricing/src/price.ts' };
+    const target = writing('subs/orders/subs/pricing/src/price.ts');
     expect((await decideWrite(without, root, target)).verdict).toBe('blocked-scope');
     expect((await decideWrite(withChild, root, target)).verdict).toBe('allowed');
     // The child's own declaration is inside the subtree, and outside it when the subtree is not included.
-    const declaration = { path: 'subs/orders/subs/pricing/module.ramify' };
+    const declaration = writing('subs/orders/subs/pricing/module.ramify');
     expect((await decideWrite(without, root, declaration)).verdict).toBe('blocked-scope');
     expect((await decideWrite(withChild, root, declaration)).verdict).toBe('allowed');
   });
@@ -166,12 +172,12 @@ describe('X3: allowed and denied targets', () => {
     const scope = await scopeOf(root, index, { bootstrap: [{ directory: 'subs/orders/subs/notes' }] });
 
     for (const target of ['subs/orders/subs/notes/module.ramify', 'subs/orders/subs/notes/README.md', 'subs/orders/subs/notes/src/notes.ts', 'subs/orders/subs/notes/src/tests/notes.test.ts']) {
-      const decision = await decideWrite(scope, root, { path: target });
+      const decision = await decideWrite(scope, root, writing(target));
       expect(`${target}: ${decision.verdict}`).toBe(`${target}: allowed`);
       expect(decision.resolved).toBe(join(root, target));
     }
     // The parent's own `subs/` is not authorized, and neither is a second module beside the one proposed.
-    expect((await decideWrite(scope, root, { path: 'subs/orders/subs/other/module.ramify' })).verdict).toBe('blocked-scope');
+    expect((await decideWrite(scope, root, writing('subs/orders/subs/other/module.ramify'))).verdict).toBe('blocked-scope');
     expect(existsSync(join(root, 'subs/orders/subs/notes'))).toBe(false);
   });
 });
@@ -195,16 +201,16 @@ describe('the files only the harness writes', () => {
     const scope = guardedScopeOf(resolved, denied);
 
     for (const target of [feature, 'ramify-agent.json', `./subs/orders/src/tests/features/notes/../notes/add-note.feature`]) {
-      const decision = await decideWrite(scope, root, { path: target });
+      const decision = await decideWrite(scope, root, writing(target));
       expect(decision).toMatchObject({ verdict: 'blocked-scope', denied: true, reason: expect.stringContaining('is written by the harness alone') });
       expect(blockExplanation(decision, scope)).toContain('which only the harness writes. Nothing was written.');
     }
     // A file beside them in the same directory stays the scope's to allow.
-    expect((await decideWrite(scope, root, { path: 'subs/orders/src/tests/steps/add-note.steps.ts' })).verdict).toBe('allowed');
+    expect((await decideWrite(scope, root, writing('subs/orders/src/tests/steps/add-note.steps.ts'))).verdict).toBe('allowed');
     expect(await readFile(join(root, feature), 'utf8')).toBe('Feature: add-note\n');
     expect(await readFile(join(root, 'ramify-agent.json'), 'utf8')).toBe('{}\n');
     // Without the denial the same scope allows both.
-    expect((await decideWrite(guardedScopeOf(resolved), root, { path: feature })).verdict).toBe('allowed');
+    expect((await decideWrite(guardedScopeOf(resolved), root, writing(feature))).verdict).toBe('allowed');
   });
 });
 
@@ -213,8 +219,8 @@ describe('X5: a resolution failure is not a scope violation', () => {
     const { root, index } = await project();
     const scope = await scopeOf(root, index);
 
-    const unresolved = await decideWrite(scope, root, { path: 'subs/orders/src/note.ts/child.ts' });
-    const violation = await decideWrite(scope, root, { path: 'subs/billing/src/billing.ts' });
+    const unresolved = await decideWrite(scope, root, writing('subs/orders/src/note.ts/child.ts'));
+    const violation = await decideWrite(scope, root, writing('subs/billing/src/billing.ts'));
 
     expect(unresolved.verdict).toBe('blocked-unresolved');
     expect(violation.verdict).toBe('blocked-scope');
@@ -226,13 +232,29 @@ describe('X5: a resolution failure is not a scope violation', () => {
     expect(violation.resolved).toBe(join(root, 'subs/billing/src/billing.ts'));
   });
 
+  test('a call that is not one write of one path is unresolved, whatever its tool is called', async () => {
+    const { root, index } = await project();
+    const scope = await scopeOf(root, index);
+    const several = await decideWrite(scope, root, writing('subs/orders/src/orders.ts', 'subs/orders/src/note.ts'));
+    const notAWrite = await decideWrite(scope, root, { kind: 'command', command: 'touch subs/orders/src/orders.ts' });
+    const blank = await decideWrite(scope, root, writing('  '));
+
+    for (const decision of [several, notAWrite, blank]) {
+      expect(decision.verdict).toBe('blocked-unresolved');
+      expect(decision.resolved).toBeNull();
+    }
+    expect(several.reason).toContain('one target per call');
+    expect(notAWrite.reason).toContain('not a write');
+    expect(blank.reason).toBe('the call names no path to write');
+  });
+
   test('a symlink loop cannot be resolved, and is not reported as a scope violation', async () => {
     const { root, index } = await project();
     await symlink(join(root, 'loop-b'), join(root, 'loop-a'));
     await symlink(join(root, 'loop-a'), join(root, 'loop-b'));
     const scope = await scopeOf(root, index);
 
-    const decision = await decideWrite(scope, root, { path: 'loop-a' });
+    const decision = await decideWrite(scope, root, writing('loop-a'));
     expect(decision.verdict).toBe('blocked-unresolved');
     expect(decision.resolved).toBeNull();
     expect(decision.reason).toContain('ELOOP');
@@ -243,7 +265,7 @@ describe('what a block tells the agent', () => {
   test('it names the target and the scope, and directs the engineer to report rather than retry', async () => {
     const { root, index } = await project();
     const scope = await scopeOf(root, index);
-    const decision = await decideWrite(scope, root, { path: 'subs/billing/src/billing.ts' });
+    const decision = await decideWrite(scope, root, writing('subs/billing/src/billing.ts'));
     const text = blockExplanation(decision, scope);
 
     expect(text).toContain('subs/billing/src/billing.ts');

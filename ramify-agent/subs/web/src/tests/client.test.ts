@@ -84,3 +84,43 @@ test('reads the scenario list at its path and validates it', async () => {
   await expect(client.getScenarios('p', 'r 1')).rejects.toMatchObject({ kind: 'invalid-response' });
   expect(urls).toEqual(['http://h/api/v1/plans/p/runs/r%201/scenarios', 'http://h/api/v1/plans/p/runs/r%201/scenarios']);
 });
+
+test('the session queries: each path, and a body fetched only when it is not inline', async () => {
+  const urls: string[] = [];
+  const answer = (url: string): unknown => {
+    if (url.includes('/transcript')) return { session: { source: 'standalone', session: 's1' }, page: { file: 'missing', entries: [], cursor: 0, more: false, partial: false, unreadable: [] } };
+    if (url.includes('/bodies/') || url.includes('/files?')) return { content: 'checking\n', bytes: 9, truncated: false };
+    if (url.includes('/updates?')) return { version: 4, sessions: [], transcripts: [] };
+    if (url.endsWith('/sessions')) return { version: 4, sessions: [], total: 0 };
+    return { sessions: [], total: 0, offset: 0, next: null, unserved: [] };
+  };
+  const client = createProtocolClient('http://h', async input => {
+    urls.push(String(input));
+    return new Response(JSON.stringify(answer(String(input))), { status: 200 });
+  });
+  const run = { source: 'run', planId: 'p', runId: 'r', session: 'ses-0001' } as const;
+  const standalone = { source: 'standalone', session: 's1' } as const;
+  const hash = 'a'.repeat(64);
+
+  expect((await client.listSessions()).total).toBe(0);
+  expect((await client.getRunSessions('p', 'r')).version).toBe(4);
+  expect((await client.getTranscript(standalone, 0)).page.file).toBe('missing');
+  await client.getTranscript(run, 7);
+  expect((await client.pollSessions('p', 'r', 4, [{ session: 'ses-0001', after: 7 }])).version).toBe(4);
+  expect(await client.getBody(run, { stored: 'inline', text: 'short', bytes: 5 })).toEqual({ content: 'short', bytes: 5, truncated: false });
+  expect((await client.getBody(run, { stored: 'blob', hash, bytes: 9, preview: 'checking' })).content).toBe('checking\n');
+  await client.getBody(standalone, { stored: 'blob', hash, bytes: 9, preview: 'checking' });
+  await client.getBody(run, { stored: 'file', path: 'invocations/inv-0001/shell/001.log', bytes: 9 });
+  await client.getBody(standalone, { stored: 'file', path: 'shell/001.log', bytes: 9 });
+  expect(urls).toEqual([
+    'http://h/api/v1/sessions?offset=0',
+    'http://h/api/v1/plans/p/runs/r/sessions',
+    'http://h/api/v1/sessions/standalone/s1/transcript?after=0',
+    'http://h/api/v1/plans/p/runs/r/sessions/ses-0001/transcript?after=7',
+    'http://h/api/v1/plans/p/runs/r/sessions/updates?version=4&cursors=ses-0001%3A7',
+    `http://h/api/v1/plans/p/runs/r/bodies/${hash}`,
+    `http://h/api/v1/sessions/standalone/s1/bodies/${hash}`,
+    'http://h/api/v1/plans/p/runs/r/sessions/ses-0001/files?path=invocations%2Finv-0001%2Fshell%2F001.log',
+    'http://h/api/v1/sessions/standalone/s1/files?path=shell%2F001.log',
+  ]);
+});

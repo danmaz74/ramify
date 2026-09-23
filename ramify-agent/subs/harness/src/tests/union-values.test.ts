@@ -16,6 +16,7 @@ import { constructedRun } from './helpers/constructed.js';
 import {
   infrastructureRecoverySchema, invocationOutcomeSchema, measurementSnapshotSchema, readinessSteps,
   gateRuleSchema, runLayout, runSchemas, sessionModeSchema,
+  continueReasonSchema, degradeRelationSchema, forkReasonSchema, replaceReasonSchema, requestReasonSchema, sessionPointSchema,
 } from '../run/records.js';
 import { defaultContextPolicies } from '../run/policy.js';
 import { analysisLayout, analysisSchemas, hypothesisChangeSchema, hypothesisSchema, registryEntrySchema } from '../analysis/records.js';
@@ -85,7 +86,7 @@ describe('the run log', () => {
   test('every event type is written and read back, and the terminal ones are named', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
-      'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
       'scenarios-materializing', 'scenarios-materialized',
@@ -106,6 +107,43 @@ describe('the run log', () => {
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
+  });
+
+  test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
+    expect(forkReasonSchema.options).toEqual(['placement-request']);
+    expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
+    expect(requestReasonSchema.options).toEqual(['contract-needed']);
+    expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
+
+    const base = { jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z' };
+    const end = { session: 'ses-0001', invocation: 'inv-0001' };
+    const append = { session: 'ses-0001', append: 4 };
+    const lines = [
+      { sequence: 1, type: 'session-opened', data: {
+        session: 'ses-0002', role: 'global-fork', work: { workItem: 'wi-001', request: 'pr-001' }, executor: 'scripted', model: null,
+        fork: { from: append, reason: 'placement-request', generation: 2, briefs: ['gd-001'] },
+        replaces: { session: 'ses-0001', reason: 'context-rebuilt' },
+        requestedBy: { invocation: 'inv-0001', reason: 'contract-needed' },
+      } },
+      { sequence: 2, type: 'invocation-started', data: {
+        invocation: 'inv-0002', role: 'engineer', session: 'ses-0001', work: {}, start: 'continued',
+        continues: { from: end, reason: 'repair', briefs: [] },
+      } },
+      { sequence: 3, type: 'invocation-ended', data: {
+        invocation: 'inv-0002', ended: 'submitted', submission: null, session: 'ses-0001', kept: true,
+        degraded: { requested: 'continue', actual: 'fresh', reason: null },
+      } },
+      { sequence: 4, type: 'invocation-ended', data: {
+        invocation: 'inv-0003', ended: 'failed', submission: null, session: 'ses-0002', kept: false, finished: 'not-kept',
+        degraded: { requested: 'fork', actual: 'fresh', reason: 'The session is not known.' },
+      } },
+    ];
+    for (const line of lines) expect(runEventSchema.parse({ ...base, ...line })).toEqual({ ...base, ...line });
+    // A point is a harness session with an invocation or an append, never an executor's ref.
+    expect(sessionPointSchema.safeParse({ session: 'scripted-1@3#1', invocation: 'inv-0001' }).success).toBe(false);
+    expect(sessionPointSchema.safeParse({ session: 'ses-0001', ref: 'scripted-1@3#1' }).success).toBe(false);
+    expect(sessionPointSchema.safeParse({ ...end, append: 4 }).success).toBe(false);
   });
 
   test('an event of an unknown type is refused', () => {
@@ -234,7 +272,7 @@ describe('the observation log', () => {
     ]);
     const kinds = [
       'unguarded-shell', 'changed-paths-unknown', 'usage-unavailable', 'context-unavailable',
-      'observation-truncated', 'unsupported-runner',
+      'observation-truncated', 'unsupported-runner', 'transcript-incomplete',
     ];
     for (const kind of kinds) {
       expect(observationSchema.safeParse({ n: 1, at: '2026-09-20T10:15:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' } }).success).toBe(true);
@@ -809,7 +847,7 @@ describe('the run protocol a client reads', () => {
       ['decision-accepted', { request: 'pr-001', decision: 'gd-001', workItem: 'wi-001', invocation: 'inv-0002', registry: 0, hypotheses: 0 }],
       ['iteration-closed', { workItem: 'wi-001', iteration: 'wi-001.i01', outcome: 'accepted', gate: 'ga-0001', commit: 'abc', notices: [] }],
       ['contract-registered', { contract: 'ct-001', revision: 1, mode: 'fake-backed', iteration: 'wi-001.i02', obligation: 'ob-ct-001', requirements: ['rq-001'], providerWorkItem: 'wi-002' }],
-      ['invocation-started', { invocation: 'inv-0001', role: 'engineer' }],
+      ['invocation-started', { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' }],
       ['revision-needed', { obligation: r, iteration: 'wi-002.i01', consumerWorkItem: 'wi-001' }],
       ['scenario-implemented', { scenario: 'sc-001', gate: 'ga-0003' }],
     ];
@@ -884,8 +922,10 @@ function sampleData(type: RunEvent['type']): unknown {
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
   const command = { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
-    'invocation-started': { invocation: 'inv-0001', role: 'engineer' },
-    'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null },
+    'session-opened': { session: 'ses-0001', role: 'engineer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null },
+    'invocation-started': { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' },
+    'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null, session: 'ses-0001', kept: false, finished: 'work-closed' },
+    'session-finished': { session: 'ses-0001', reason: 'run-ended' },
     'analysis-accepted': { invocation: 'inv-0001', entries: 0, hypotheses: 0, registry: 0, workItems: 0 },
     'review-requested': {},
     'analysis-approved': { command, reviewer: 'r', note: null, duringRun: false },
@@ -905,7 +945,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'view-refreshed': { request: 'pr-001', attempt: 1, view: { status: 'placeholder' }, unavailable: null },
     'fork-returned-partial': { request: 'pr-001', invocation: 'inv-0002', retry: 1 },
     'decision-accepted': { request: 'pr-001', decision: 'gd-001', workItem: 'wi-001', invocation: 'inv-0002', registry: 0, hypotheses: 0 },
-    'brief-appended': { decision: 'gd-001', generation: 1, session: 's', outcome: 'appended' },
+    'brief-appended': { decision: 'gd-001', generation: 1, session: 'ses-0001', ref: 's', outcome: 'appended' },
     'global-context-rebuilt': { generation: 2, reason: 'lost' },
     'decision-delivered': { decision: 'gd-001', workItem: 'wi-001' },
     'outline-revised': { workItem: 'wi-001', revision: 1, invocation: 'inv-0002' },
