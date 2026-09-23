@@ -27,3 +27,18 @@ Give the badge a tone.
 - A badge given a tone carries that tone in its markup.
 - A badge given no tone carries `neutral`.
 - The badge's existing tests still pass, and the tone has tests of its own.
+
+The first two, as scenarios:
+
+```gherkin
+Scenario: A badge given a tone carries that tone in its markup
+  Given a badge for a passed review with the tone "warning"
+  When the badge is rendered
+  Then its markup carries the tone "warning"
+  And it still reads "Passed"
+
+Scenario: A badge given no tone carries neutral
+  Given a badge for a failed review with no tone
+  When the badge is rendered
+  Then its markup carries the tone "neutral"
+```

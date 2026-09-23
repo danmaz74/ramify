@@ -154,16 +154,29 @@ describe('extracting plan scenarios', () => {
 describe('the collection-review plans', () => {
   const plans = readdirSync(collectionReview);
 
-  test('are all read, and state no gherkin block yet', () => {
+  test('are all read; status-badge-tone states its first two acceptance bullets as scenarios, the others state none', () => {
     expect(plans.length).toBeGreaterThan(0);
     for (const name of plans) {
       const extraction = extractPlanScenarios(readFileSync(join(collectionReview, name, 'plan.md'), 'utf8'));
+      if (name === 'status-badge-tone') continue;
       expect(extraction, name).toEqual({ scenarios: [], limitations: [] });
     }
+    const badge = extractPlanScenarios(readFileSync(join(collectionReview, 'status-badge-tone', 'plan.md'), 'utf8'));
+    expect(badge.limitations).toEqual([]);
+    expect(badge.scenarios.map(scenario => [scenario.id, scenario.name, scenario.lines, scenario.anchors])).toEqual([
+      ['ps-01', 'A badge given a tone carries that tone in its markup', [34, 38], ['a-tone-for-the-status-badge', 'acceptance']],
+      ['ps-02', 'A badge given no tone carries neutral', [40, 43], ['a-tone-for-the-status-badge', 'acceptance']],
+    ]);
+    expect(badge.scenarios[1]!.source).toEqual([
+      'Scenario: A badge given no tone carries neutral',
+      '  Given a badge for a failed review with no tone',
+      '  When the badge is rendered',
+      '  Then its markup carries the tone "neutral"',
+    ]);
   });
 
   test('gain their scenarios when a gherkin block is added to one', () => {
-    const text = readFileSync(join(collectionReview, 'status-badge-tone', 'plan.md'), 'utf8');
+    const text = readFileSync(join(collectionReview, 'revision-diff', 'plan.md'), 'utf8');
     const extended = `${text}\n\`\`\`gherkin\nScenario: The badge shows its tone\n  Given a review in state approved\n  When the reviewer opens it\n  Then the badge is green\n\`\`\`\n`;
     const extraction = extractPlanScenarios(extended);
     const lines = text.split('\n').length;

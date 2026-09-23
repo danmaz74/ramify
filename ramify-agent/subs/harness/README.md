@@ -917,6 +917,19 @@ The run's own tests are beside them.
   completion and gives the tree to the installed Ramify, which accepts the
   ancestor's named imports of both step files and refuses one once its
   `expose-test` is removed. Both share `helpers/integration-scenario.ts`.
+- `acceptance-trial.test.ts` is the scripted acceptance trial: one run on
+  the fixture through every stage, the review stop and its approval, the
+  four acceptance readiness steps, materialization, a declaration while a
+  requirement is open (`bound`), a withdrawal by a yield and one by
+  exhaustion with its commit, `scenario-due`, an integration work item and
+  the final gate in full mode, with its event sequence and final states. A
+  second run binds the fixture plan `status-badge-tone`'s two scenarios in
+  `shared-ui` with a step file that renders the badge and needs no World
+  (`helpers/badge-scenarios.ts`). The final gate runs its commands in the
+  project through the fixture's `acceptance:full` script: with the scripted
+  `cucumber-js` by default, and with the real one, over the step files the
+  engineers wrote, when `RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1` installs the
+  fixture's toolchain.
 - `scenario-briefings.test.ts` covers what the agents are told of
   scenarios: the local architect's section per scenario, the engineer's
   "Scenarios to bind", other unimplemented scenarios and rules, the

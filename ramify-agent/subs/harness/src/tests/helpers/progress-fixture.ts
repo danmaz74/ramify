@@ -29,12 +29,15 @@ import { createPassingCheckExecution } from './direct-check-execution.js';
  *   run failure that is reported at run level only.
  * - `capabilityBound` (reviewer-identity, completed): more capabilities than
  *   the 500 either query returns.
- * - `rowBound` (status-badge-tone, completed): fewer capabilities than that,
+ * - `rowBound` (reviewer-identity, completed): fewer capabilities than that,
  *   and more module-capability rows than the comparison's 2,000.
- * - `sixtyRows` (status-badge-tone, completed): one module with 60 rows.
+ * - `sixtyRows` (reviewer-identity, completed): one module with 60 rows.
  *
  * The query bounds are protocol constants, so the fixture reaches them by
- * size. Hypotheses create no work, which keeps the large runs cheap.
+ * size. Hypotheses create no work, which keeps the large runs cheap. The
+ * three forecast runs share a plan without scenarios: an analysis with no
+ * entry cannot assign a plan scenario, so `status-badge-tone`, whose plan
+ * states two, would be rejected by form rule 3.
  */
 
 export const R = 'collection-review';
@@ -58,8 +61,8 @@ export const fixturePlans = {
   placements: 'revision-diff',
   proposed: 'review-notes',
   capabilityBound: 'reviewer-identity',
-  rowBound: 'status-badge-tone',
-  sixtyRows: 'status-badge-tone',
+  rowBound: 'reviewer-identity',
+  sixtyRows: 'reviewer-identity',
 } as const;
 
 export type FixtureRun = keyof typeof fixturePlans;
@@ -238,8 +241,8 @@ const checkpoints: Record<FixtureRun, ReadonlyArray<string | GitCheckpoint>> = {
   placements: [scenariosCommit('revision-diff'), 'wi-001', 'wi-002', 'final verification of plan "revision-diff"'],
   proposed: [scenariosCommit('review-notes')],
   capabilityBound: ['final verification of plan "reviewer-identity"'],
-  rowBound: ['final verification of plan "status-badge-tone"'],
-  sixtyRows: ['final verification of plan "status-badge-tone"'],
+  rowBound: ['final verification of plan "reviewer-identity"'],
+  sixtyRows: ['final verification of plan "reviewer-identity"'],
 };
 
 export interface ProgressFixture {

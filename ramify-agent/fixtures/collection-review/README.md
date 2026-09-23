@@ -100,6 +100,17 @@ harness collects: a module's `src/tests/steps/` and `src/tests/features/`, or,
 for a testing module such as `integration-tests`, its `src/steps/` and
 `src/features/`.
 
+The World and the hooks stay in `integration-tests`, and a module that is
+not `dispatch`-tagged cannot import them: they are built on
+`createTestSystem`, whose `[testing, dispatch]` tags they carry. A step file
+that does not drive the system needs neither. The plan `status-badge-tone`
+states its first two acceptance bullets as scenarios, owned by `shared-ui`,
+whose test area is `[testing, ui]`; their step file renders the badge with
+`react-dom/server`, as the badge's unit tests do, and keeps what it rendered
+in its own scope. Cucumber still constructs the World for each scenario,
+since the support files load in every run, and its constructor starts
+nothing.
+
 ## The ownership tree
 
 Every module owns the `src/` beside its `module.ramify`, with children only

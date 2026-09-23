@@ -13,6 +13,7 @@ import { workLayout, type WorkItemOutline } from '../work/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { assign, byRole, completionProposed, outline, runScopeTests, submit, viewedInputs, write } from './helpers/iterations.js';
 import { git, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { badgeAnalysis, badgeImplementation, badgeStepFile, badgeSteps } from './helpers/badge-scenarios.js';
 import { gitService as productionGit } from '../../subs/evidence/src/git.js';
 
 /*
@@ -205,9 +206,12 @@ function expectRealGatePassed(attempt: GateAttempt, checkpoint: GateAttempt['che
 
 describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone trial on the real fixture toolchain', () => {
   test('one work item, one iteration: the outline records single-iteration and one accepted iteration completes it', async () => {
-    const [stage] = await stages('status-badge-tone');
+    // Plan 3's recorded stage, with the tone type exposed beside the props.
+    const stage = await badgeImplementation();
     await trial('status-badge-tone', {
-      'initial-architect': [submit(analysis([entry('status-badge-tone', sharedUi)]))],
+      // The plan's two scenarios, assigned to its one entry and bound by a
+      // step file in the badge's own test area.
+      'initial-architect': [submit(await badgeAnalysis())],
       'local-architect': [
         submit(assign(sharedUi, { goal: 'Give the status badge a tone, with tests of its own.' }, outline({
           changes: 'The badge takes an optional tone and carries it as data-tone; it reads as neutral without one.',
@@ -215,7 +219,10 @@ describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone tr
         }))),
         submit(requestCompletion({ changes: 'The tone is there and its tests pass.', revisionReason: 'The one iteration is accepted.' })),
       ],
-      engineer: [submit(completionProposed('The badge carries its tone, neutral by default, with its own tests.'), ...writes(stage!), runScopeTests())],
+      engineer: [submit(
+        completionProposed('The badge carries its tone, neutral by default, with its own tests; both scenarios bind to its step file.', { scenarios: ['sc-001', 'sc-002'] }),
+        ...writes(stage), write(badgeSteps, badgeStepFile), runScopeTests(),
+      )],
     }, async result => {
       expect(result.snapshot.state).toBe('completed');
       const types = result.events.map(event => event.type);
@@ -223,6 +230,7 @@ describe.runIf(selected.includes('status-badge-tone'))('the status-badge-tone tr
       expect((await result.outline(1)).decomposition.kind).toBe('single-iteration');
       expect((await result.result(1)).outcome).toBe('accepted');
       expect(types.filter(type => type === 'work-item-completed')).toHaveLength(1);
+      expect(types.filter(type => type === 'scenario-implemented')).toHaveLength(2);
       const readiness = result.events.find(event => event.type === 'readiness-passed')!.data as { gate: string };
       expectRealGatePassed(await result.gate(readiness.gate), 'readiness');
       const final = result.events.find(event => event.type === 'job-completed')!.data as { gate: string };
