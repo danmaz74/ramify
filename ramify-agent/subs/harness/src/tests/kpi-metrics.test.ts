@@ -169,6 +169,20 @@ describe('M4: every metric keeps its numerator, denominator, version and coverag
     expect(find(metrics, 'blocked-write-attempts')).toMatchObject({ state: 'partial', value: null });
   });
 
+  test('a transcript entry that could not be written is raw output: it lowers no observation coverage', () => {
+    const gap = (kind: 'transcript-incomplete' | 'usage-unavailable'): Observation => ({
+      n: 1, at: '2026-09-23T08:00:00.000Z', type: 'coverage-gap', data: { kind, detail: 'why' },
+    });
+    const metrics = computed(inputs([
+      writer('inv-0002', { observations: [gap('transcript-incomplete')] }),
+      writer('inv-0003', { observations: [gap('usage-unavailable'), gap('transcript-incomplete')] }),
+      writer('inv-0004'),
+    ]));
+    expect(find(metrics, 'observation-coverage')).toMatchObject({ state: 'measured', numerator: 2, denominator: 3, evidence: ['inv-0003'] });
+    expect(find(metrics, 'observation-coverage.usage-unavailable')).toMatchObject({ value: 1, evidence: ['inv-0003'] });
+    expect(metrics.some(metric => metric.id === 'observation-coverage.transcript-incomplete')).toBe(false);
+  });
+
   test('no writer session: the change-weighted metrics are not-applicable, never zero', () => {
     const metrics = computed(inputs([], { gateAttempts: [], acceptedIterations: [] }));
     expect(find(metrics, 'scope-bytes-per-changed-line')).toMatchObject({ state: 'not-applicable', value: null });

@@ -115,6 +115,15 @@ export const observationSchema = z.discriminatedUnion('type', [
 export type Observation = z.infer<typeof observationSchema>;
 export type ObservationType = Observation['type'];
 export type ObservationOf<T extends ObservationType> = Extract<Observation, { type: T }>;
+export type CoverageGapKind = ObservationOf<'coverage-gap'>['data']['kind'];
+
+/**
+ * The gap kinds that name missing raw output rather than missing
+ * observations. The invocation's observations are complete, so these do not
+ * count against `observation-coverage`; the invocation's evaluation still
+ * lists them.
+ */
+export const rawOutputGapKinds: ReadonlySet<CoverageGapKind> = new Set<CoverageGapKind>(['transcript-incomplete']);
 
 /** An observation to record: its type, its data, and the call it belongs to where it has one. */
 export type ObservationInput = { [T in ObservationType]: { readonly type: T; readonly data: ObservationOf<T>['data'] } }[ObservationType];

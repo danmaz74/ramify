@@ -1,6 +1,6 @@
 import type { Metric } from '../interfaces/protocol/runs.js';
 import type { Role } from '../interfaces/protocol/runs.js';
-import type { Observation } from '../run/observations.js';
+import { rawOutputGapKinds, type Observation } from '../run/observations.js';
 import type { InvocationOutcome, LineEventSummary, ScopeSize } from '../run/records.js';
 import { roles } from '../run/records.js';
 
@@ -380,11 +380,20 @@ function blockedWrites(inputs: MetricInputs, statement: string, complete: boolea
   return [overall];
 }
 
-/** `coverage-gap` observations by kind, beside the invocations they qualify. */
+/** A gap in an invocation's observations; a raw-output gap is not one. */
+function isObservationGap(line: Observation): line is Extract<Observation, { type: 'coverage-gap' }> {
+  return line.type === 'coverage-gap' && !rawOutputGapKinds.has(line.data.kind);
+}
+
+/**
+ * `coverage-gap` observations by kind, beside the invocations they qualify.
+ * A raw-output gap, such as a transcript entry that could not be written,
+ * leaves the observations complete and is left out of both.
+ */
 function observationCoverage(inputs: MetricInputs): Metric[] {
   const logs = inputs.invocations.map(facts => ({ facts, log: readable(facts) }));
   const read = logs.filter(entry => entry.log !== null);
-  const withGap = read.filter(entry => entry.log!.some(line => line.type === 'coverage-gap'));
+  const withGap = read.filter(entry => entry.log!.some(isObservationGap));
   const unreadable = logs.filter(entry => entry.log === null).map(entry => `${entry.facts.id}: ${(entry.facts.observations as { unavailable: string }).unavailable}`);
   const total = inputs.invocations.length;
   const covered = read.length - withGap.length;
@@ -399,7 +408,7 @@ function observationCoverage(inputs: MetricInputs): Metric[] {
   const kinds = new Map<string, string[]>();
   for (const entry of read) {
     for (const line of entry.log!) {
-      if (line.type === 'coverage-gap') kinds.set(line.data.kind, [...(kinds.get(line.data.kind) ?? []), entry.facts.id]);
+      if (isObservationGap(line)) kinds.set(line.data.kind, [...(kinds.get(line.data.kind) ?? []), entry.facts.id]);
     }
   }
   return [

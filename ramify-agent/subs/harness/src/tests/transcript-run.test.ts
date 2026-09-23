@@ -4,6 +4,8 @@ import { basename, dirname, join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { AgentEvent, AgentPort } from '../../subs/agent/src/interfaces/port.js';
 import type { TranscriptBody, TranscriptEntry } from '../interfaces/protocol/transcripts.js';
+import { runView } from '../projections/inputs.js';
+import { metricsOf } from '../projections/metrics.js';
 import { observationSchema } from '../run/observations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
@@ -258,5 +260,15 @@ describe('a transcript that cannot be written', () => {
     const gaps = observations.filter(line => line.type === 'coverage-gap' && line.data.kind === 'transcript-incomplete');
     expect(gaps).toHaveLength(1);
     expect(gaps[0]!.data).toMatchObject({ detail: expect.stringContaining('the started entry of ses-0001\'s transcript could not be written') });
+
+    // The gap is raw output: the observations are complete, so it lowers no
+    // observation coverage, and the invocation's evaluation still names it.
+    // The scripted executor reports no usage or context, which are
+    // observation gaps.
+    const metrics = await metricsOf(runView(service.committed('review-notes', receipt.jobId)!));
+    expect(metrics.metrics.filter(metric => metric.id.startsWith('observation-coverage.')).map(metric => metric.id))
+      .toEqual(['observation-coverage.context-unavailable', 'observation-coverage.usage-unavailable']);
+    const evaluation = metrics.evaluation.invocations.find(entry => entry.invocation === 'inv-0001');
+    expect(evaluation?.gaps).toContainEqual({ kind: 'transcript-incomplete', count: 1 });
   }, 180_000);
 });
