@@ -5,7 +5,7 @@ import { copyFixture } from './fixture.js';
 import { byRole, readDeclaredTree, submit, treeInputs } from './iterations.js';
 import { forkDecision, registryChange, requestPlacement } from './placement.js';
 import { installTestRunner, openRuns, startRun } from './runs.js';
-import { scriptedGit } from './scripted-git.js';
+import { scenariosCommit, scriptedGit, type GitCheckpoint } from './scripted-git.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { directReadinessExecution } from './external-tools.js';
 import { createPassingCheckExecution } from './direct-check-execution.js';
@@ -230,10 +230,13 @@ const scripts: Record<FixtureRun, () => ReturnType<typeof byRole>> = {
   sixtyRows: sixtyRowsScript,
 };
 
-/** The unchanged commit boundaries each scripted run reaches. */
-const checkpoints: Record<FixtureRun, readonly string[]> = {
-  placements: ['wi-001', 'wi-002', 'final verification of plan "revision-diff"'],
-  proposed: [],
+/**
+ * The commit boundaries each scripted run reaches: the feature files' commit
+ * of a run with scenarios, then unchanged checkpoints.
+ */
+const checkpoints: Record<FixtureRun, ReadonlyArray<string | GitCheckpoint>> = {
+  placements: [scenariosCommit('revision-diff'), 'wi-001', 'wi-002', 'final verification of plan "revision-diff"'],
+  proposed: [scenariosCommit('review-notes')],
   capabilityBound: ['final verification of plan "reviewer-identity"'],
   rowBound: ['final verification of plan "status-badge-tone"'],
   sixtyRows: ['final verification of plan "status-badge-tone"'],
@@ -260,7 +263,7 @@ export async function progressFixture(): Promise<ProgressFixture> {
       const planId = fixturePlans[name];
       const git = scriptedGit(fixture.root, {
         head: `progress-fixture-${name}`,
-        checkpoints: checkpoints[name].map(subject => ({ subject, commit: null, changes: [] })),
+        checkpoints: checkpoints[name].map(step => (typeof step === 'string' ? { subject: step, commit: null, changes: [] } : step)),
       });
       const ramify = new FakeRamifyCli();
       const opened = await openRuns(fixture.root, {

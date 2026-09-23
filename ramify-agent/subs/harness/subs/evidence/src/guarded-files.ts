@@ -4,9 +4,12 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /*
  * The identity of the files whose change could weaken a check: the test
- * runner's configuration, the compiler's, the package manifests, and the
- * contract artifacts an assignment requires. The identity is one hash per
- * file, not one hash over the set, so that what changed is named.
+ * runner's configuration, the compiler's, the package manifests, the
+ * project's configuration for the harness, and whatever else a caller
+ * names, such as the contract artifacts an assignment requires, the
+ * scenario harness's support files and the tracked feature files. The
+ * identity is one hash per file, not one hash over the set, so that what
+ * changed is named.
  *
  * Nothing here compares: a caller captures hashes once and asks again later.
  * The working tree's own identity is never taken. A change to a file outside
@@ -15,7 +18,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /**
  * The configuration and manifests guarded in every project, relative to its
- * root. A project that does not have one of them records it as absent.
+ * root, `ramify-agent.json` among them. A project that does not have one of them records it as absent.
  */
 export const guardedConfigurationFiles: readonly string[] = [
   'package.json',
@@ -27,6 +30,7 @@ export const guardedConfigurationFiles: readonly string[] = [
   'vite.config.ts',
   'vite.config.js',
   'vite.config.mts',
+  'ramify-agent.json',
 ];
 
 /**

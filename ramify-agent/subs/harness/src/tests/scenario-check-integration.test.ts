@@ -15,6 +15,9 @@ import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { testPolicy } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
+import { expectedFeatureFiles } from '../run/feature-files.js';
+import { scenarioRecordSchema, scenarioSourceHash } from '../../subs/scenarios/src/records.js';
+import { initialScenarioStates } from '../../subs/scenarios/src/states.js';
 
 /*
  * The scenario check with the real cucumber-js 13.2.1, in each runner, over a
@@ -176,6 +179,36 @@ describe.each([
     expect(command.scenarios!.scenarios).toMatchObject([{ id: 'sc-001', status: 'undefined', undefined: ['the shelf is dusted'] }]);
     expect(command.scenarios!.failures).toContain('sc-001 undefined: no step definition matches "the shelf is dusted"');
     expect(command.output.tail).toContain('- sc-001 undefined');
+  }, 60_000);
+});
+
+describe('a materialized feature file with the real cucumber-js', () => {
+  test('its pending scenarios are kept out of the work-item gate by the pending tag, although no definition binds their steps', async () => {
+    // The file exactly as the harness materializes it: the scenario is
+    // pending, and its last step has no definition, so a run that selected
+    // it would fail as undefined.
+    const source = ['Scenario: A shelved book is dusted', '  Given an empty shelf', '  When the user shelves "Dune"', '  Then the shelf is dusted'];
+    const record = scenarioRecordSchema.parse({
+      schema: 'ramify-agent.scenario/1', id: 'sc-001', kind: 'entry', entry: 'shelf-books', owner: 'demo/shelf',
+      origin: { kind: 'architect', refs: [] }, partOf: null, subScenarios: [], name: 'A shelved book is dusted',
+      source, hash: scenarioSourceHash(source), file: featureFile,
+    });
+    const [rendered] = expectedFeatureFiles(
+      { records: [record], states: initialScenarioStates(['sc-001']), entries: [{ capability: 'shelf-books', description: 'Books are shelved.' }] },
+      { planId: 'demo-plan', runId: 'run-scenario-integration' },
+    );
+    expect(rendered!.content).toContain('@ramify-sc-001 @ramify-pending');
+    const fixture = await project('Then the shelf is dusted', { [featureFile]: rendered!.content });
+
+    const attemptDirectory = await directory('ramify-agent-scenario-attempt-');
+    const planned = planScenarioCheck('work-item', inputs('pending'), { projectRoot: fixture.root });
+    if (!('check' in planned)) throw new Error('A scenario check was expected');
+    const attempt = await runGate(inPlaceCheckExecution, 'work-item', {
+      id: 'ga-0003', runId: 'run-scenario-integration', projectRoot: fixture.root, directory: attemptDirectory, head: fixture.commit, checks: [planned.check],
+    });
+    const command = attempt.commands[0]!;
+    expect(command.scenarios).toMatchObject({ selection: { kind: 'all-untagged' }, excluded: 1, scenarios: [], untracked: { passed: 1, skipped: 0, failed: 0 }, failures: [] });
+    expect(attempt.verdict).toBe('passed');
   }, 60_000);
 });
 

@@ -1,4 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { scenariosCommit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -42,7 +43,7 @@ describe('compaction during a run', () => {
       const submitted = analysis([entry('reviewer-note', reviews)]);
 
     const { service } = await openRuns(fixture.root, {
-      unchangedCheckpoints: ['wi-001', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'],
       script: (spec: SessionSpec) => (spec.role === 'initial-architect'
         ? [
           { kind: 'context' as const, tokens: 90_000, window: 200_000 },

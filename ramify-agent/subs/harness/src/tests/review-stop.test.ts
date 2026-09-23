@@ -24,6 +24,7 @@ import {
   approveRun, emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until,
 } from './helpers/runs.js';
 import { unchangedGit } from './helpers/unchanged-run.js';
+import { scenariosCommit } from './helpers/scripted-git.js';
 
 /*
  * The review stop, architecture §3. A run started with `reviewStop` waits
@@ -190,6 +191,7 @@ describe('approve-analysis in a run without the stop', () => {
         'local-architect': [[{ kind: 'wait', ms: 60_000 }]],
       }),
       inputs: treeInputs(),
+      unchangedCheckpoints: [scenariosCommit(plan)],
     });
     cleanups.push(() => service.close());
 
@@ -320,6 +322,7 @@ describe('the run budget', () => {
     const opened = await openRuns(root, {
       agent: timed,
       now: () => current,
+      unchangedCheckpoints: [scenariosCommit(plan)],
       inputs: treeInputs(),
       policy: projectRoot => {
         const policy = testPolicy(projectRoot);

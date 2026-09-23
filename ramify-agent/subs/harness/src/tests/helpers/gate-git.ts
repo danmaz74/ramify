@@ -41,6 +41,15 @@ export interface GateCommit {
   readonly subject?: string | undefined;
 }
 
+/**
+ * The commit that writes the run's feature files onto its branch, before
+ * the first work item: "Scenarios of <planId>", made over the tree
+ * readiness found, adding each feature file.
+ */
+export function scenariosCommit(planId: string, commit: string, against: string, files: readonly string[] = []): GateCommit {
+  return { commit, against, subject: `Scenarios of ${planId}`, changes: files.map(path => ({ status: 'A', path })) };
+}
+
 /** One commit Git answers for an exact conjunction of identity trailers. */
 export interface TrailedCommit {
   readonly trailers: ReadonlyArray<{ readonly key: string; readonly value: string }>;

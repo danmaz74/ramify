@@ -5,7 +5,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
-import { scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
+import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from './helpers/external-tools.js';
 import {
   consumerAgainstFake, consumerAgainstReal, consumerStub, consumerTest, contractNeeded, contractWrites,
@@ -80,7 +80,10 @@ const trimming: Seam = {
 const c = paths(forNotes);
 const modified = (...paths: string[]) => paths.map(path => ({ status: 'M', path }));
 const added = (...paths: string[]) => paths.map(path => ({ status: 'A', path }));
+/** The harness's own commit of the run's feature files, before the first work item. */
+const materialized = 'scenarios-00';
 const checkpoints: readonly GitCheckpoint[] = [
+  scenariosCommit('review-notes', materialized),
   { subject: 'wi-001.i02', commit: 'revision-01', changes: [...added(c.contract, c.fake, c.subjects, c.conformance), ...modified(c.consumer)] },
   { subject: 'wi-004.i01', commit: 'revision-02', changes: [...added(c.real), ...modified(c.subjects)] },
   { subject: 'wi-004', commit: null, changes: [] },
@@ -397,16 +400,18 @@ describe('P3: a contract revision reschedules current evidence without resetting
     const attempts = await Promise.all(log.filter(event => event.type === 'gate-attempted')
       .map(event => readJson<GateAttempt>(root, runId, runLayout.gate(event.data.gate))));
     const committing = attempts.filter(attempt => attempt.commit !== null);
-    const scripted = git.commits().map(commit => commit.id);
+    // The first commit is the feature files', which no gate made.
+    expect(git.commits()[0]!.id).toBe(materialized);
+    const scripted = git.commits().slice(1).map(commit => commit.id);
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
     expect(committing.map(attempt => attempt.commit)).toEqual(scripted);
     expect(committing.map(attempt => attempt.audited)).toEqual(scripted);
-    expect(committing.map(attempt => attempt.head)).toEqual([base, ...scripted.slice(0, -1)]);
+    expect(committing.map(attempt => attempt.head)).toEqual([materialized, ...scripted.slice(0, -1)]);
     // Every revision the script minted was minted for one attempt, each
     // attempt is a gate of its own, and the first commit of the run is the
     // iteration that established the agreement.
     expect(git.operations().commitAccepted).toBe(checkpoints.length);
-    expect(attempts.map(attempt => attempt.commit)).toEqual(checkpoints.map(step => step.commit));
+    expect(attempts.map(attempt => attempt.commit)).toEqual(checkpoints.slice(1).map(step => step.commit));
     expect(attempts.filter(attempt => attempt.commit === null)).toHaveLength(8);
     git.assertComplete();
     expect(new Set(committing.map(attempt => attempt.id)).size).toBe(committing.length);

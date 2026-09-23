@@ -123,7 +123,9 @@ hiding or measured complexity justifies it.
     use the audit executor in `subs/audit`; readiness and the standalone
     session's optional gate use the in-place executor because they do not
     commit. The guarded set is the configuration, the
-    manifests and the contract artifacts in force; a change no record the
+    manifests, `ramify-agent.json`, the support files it names, the contract
+    artifacts in force and every tracked feature file at the hash of its
+    expected rendering; a change no record the
     assignment names authorized is `guarded-change`, never a pass, and a
     deletion is `after: null`. An outcome comes from how the command ended and
     the code it chose, never from what it printed; a Ramify check exiting 2
@@ -657,6 +659,26 @@ Neither child receives this module's vocabulary.
   code-repair assignment. A missing or invalid file never refuses
   `start-run`. Once the configuration names the acceptance modes, a `test:`
   script that runs `cucumber-js` is no longer an unsupported runner.
+- **The feature files.** Once readiness has passed and the run branch
+  exists, and before the first local architect starts, the harness renders
+  every tracked feature file from the scenario records and their states
+  (`run/feature-files.ts`, with the `scenarios` child's
+  `renderFeatureFiles`), writes it and commits it as "Scenarios of
+  <planId>" with the `Ramify-Run` trailer, `Ramify-Scenarios: materialized`
+  and no `Ramify-Gate`. The commit is the ledger's external effect:
+  `scenarios-materializing { files }` is its intent and
+  `scenarios-materialized { commit, files }` its completion, and the commit
+  is an accepted boundary, so the first iteration starts from it. A recovery
+  re-renders the files and finds the commit by its two trailers before it
+  makes one. A re-rendering (`rerenderFeatureFiles`) writes only the files
+  whose content differs from the rendering of the current states and
+  reports whether a commit is needed; every gate's commit re-renders before
+  it commits, after the guarded comparison. The files join every
+  assignment's guarded list with the hash of their expected rendering, so a
+  file that differs at a gate is `guarded-change`, and the write guard
+  refuses an agent's edit or write of a feature file or of
+  `ramify-agent.json` outright, whatever the scope contains; no
+  authorization names either.
 - **The scenario check.** Every gate of a run with a valid configuration
   plans a `scenarios` command (`checks/checkpoint.ts`) per the architecture's
   table: `iteration` and `contract` select by identity tag the scope owners'
@@ -776,6 +798,16 @@ The run's own tests are beside them.
   nothing changes, that every error carries its path, that a corrected input
   is accepted, and that the bound ends the invocation as
   `invalid-submission`.
+- `materialization.test.ts` drives a run that commits its feature files once
+  readiness has passed, with the commit's content, subject, trailers and
+  call arguments through the scripted Git, and whose work-item gates pass
+  with every scenario pending; re-rendering and its idempotence; the
+  commit's lookup on recovery; the guarded list; a feature file that differs
+  at a gate as a guarded change; and an engineer whose edits of a feature
+  file and of `ramify-agent.json` are refused, whose shell change is a
+  guarded change, and whose file the gate's commit restores. The crash
+  between the commit and its record is the recovery table's
+  `scenarios-committed` row.
 - `analysis-scenarios.test.ts` captures plans with and without `gherkin`
   blocks and with one that does not parse, rejects a submission per form
   rule through the real validation path and under the per-turn bound, and

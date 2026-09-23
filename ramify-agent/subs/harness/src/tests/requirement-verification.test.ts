@@ -5,7 +5,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
-import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -221,7 +221,7 @@ const seam = {
 };
 
 async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits });
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
   });
@@ -307,7 +307,7 @@ describe('a requirement whose fake is still injected is not verified', () => {
     // wrote: nothing is rewound, and the requirement closed over the commit
     // that followed it.
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04']);
     git.assertAnswered();
   }, 60_000);
 });
@@ -430,15 +430,15 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
 
     // Exactly one of the three attempts at the agreement changed the tree,
     // and the two that repeated it audited the revision it made.
-    expect(git.minted()).toEqual(['revision-01', 'revision-02']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02']);
     expect(contractGates.map(attempt => attempt.commit)).toEqual(['revision-01', null, null]);
     expect(contractGates.slice(1).map(attempt => attempt.head)).toEqual(['revision-01', 'revision-01']);
     // No attempt at the agreement was ever accepted, so every observation
-    // the run made was taken against the revision it started from: a failed
-    // attempt's commit is not a boundary.
-    expect([...new Set(git.bases('changedPaths'))]).toEqual(['revision-00']);
-    expect([...new Set(git.bases('changedEntries'))]).toEqual(['revision-00']);
-    expect(git.bases('diffNameStatus')).toEqual(['revision-00']);
+    // the run made was taken against the feature files' commit it worked
+    // from: a failed attempt's commit is not a boundary.
+    expect([...new Set(git.bases('changedPaths'))]).toEqual(['scenarios-of-review-notes']);
+    expect([...new Set(git.bases('changedEntries'))]).toEqual(['scenarios-of-review-notes']);
+    expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes']);
     git.assertAnswered();
   }, 60_000);
 });

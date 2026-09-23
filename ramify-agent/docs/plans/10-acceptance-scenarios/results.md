@@ -650,3 +650,156 @@ rules.
 - `scenarioInputs` replays the ledger at every committing gate; iteration 7,
   which adds the scenario events to the log's schema, may keep the states
   beside the snapshot instead.
+
+## Iteration 6: Materialization and guarded files
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **The feature files** (`run/feature-files.ts`, new). `trackedScenarios(lines)`
+  replays the ledger into the scenario records, their states (every one
+  `pending` at `analysis-accepted`, then each scenario event, as the snapshot
+  applies them) and the entries' capabilities and descriptions from the
+  `ramify-agent.entry-assignments/1` record. `expectedFeatureFiles(tracked,
+  { planId, runId })` renders every tracked file with the `scenarios` child's
+  `renderFeatureFiles`. `rerenderFeatureFiles(root, expected)` is the general
+  re-render: it writes each file whose content differs from its expected
+  rendering, and nothing else, and answers `{ files, written, commitNeeded }`
+  (`commitNeeded` is `written.length > 0`); a path outside the project is
+  refused before any file is written. `contentHash`, `expectedFeatureHashes`,
+  `materializationMessage` and `commitForMaterialization` (live: commit at
+  once; recovering: look the commit up by `Ramify-Run` and
+  `Ramify-Scenarios: materialized` first) complete it. `scenarioInputs` in
+  the service now uses `trackedScenarios`.
+- **Materialization** (`run/service.ts`). After `readiness-passed` and
+  `createBranch`, before the first work item, `materializeScenarios` renders,
+  writes and commits the files through the evidence module's `GitService`
+  (`commitAccepted`; the tree is clean after readiness). The commit is the
+  ledger effect keyed `scenarios-materialize`: intent
+  `scenarios-materializing { files }`, completion `scenarios-materialized
+  { commit, files }`. Its message is `Scenarios of <planId>`, a line on the
+  scenarios, the files, then `Ramify-Run: <runId>` and
+  `Ramify-Scenarios: materialized`, and no `Ramify-Gate`. A run without
+  scenario records records neither event and commits nothing.
+- **The accepted boundary** (`checks/accepted.ts`). A `scenarios-materialized`
+  commit is an accepted boundary, so the first iteration's invocations, the
+  changed paths, the line snapshots and the module notices are taken against
+  it rather than against the run's base.
+- **Recovery.** `completeEffects` performs a pending `scenarios-materializing`
+  again: it re-renders from the ledger and finds the commit by its trailers
+  before it makes one. `RunWrite` gains `scenarios-materializing` (intent
+  durable, nothing written), `scenarios-committed` (commit made, completion
+  not) and `scenarios-materialized`; the recovery table has a row for each.
+- **The gate commit** (`commitGate`). Its effect re-renders the feature files
+  from the current states before it commits, after the guarded comparison
+  that ran at preparation. States do not change until iteration 7, so today
+  it writes only a file an agent changed, which the gate has already found.
+- **Guarded files.** `ramify-agent.json` joins `guardedConfigurationFiles` in
+  `work/scope.ts` and in `subs/evidence/src/guarded-files.ts`.
+  `captureGuardedFiles(root, artifacts, { support, expected })` adds the
+  files the captured `acceptance.support` names (`supportFiles` in
+  `run/project-config.ts` expands the globs) hashed as they stand, and every
+  tracked feature file with the hash of its expected rendering, whatever the
+  tree holds. Every ordinary and contract assignment captures them once the
+  files are materialized. The set a local architect may authorize excludes
+  the feature files and `ramify-agent.json`.
+- **The write guard** (`guard/write-guard.ts`). `GuardedScope.denied` lists
+  canonical files refused whatever the roots and files contain; the decision
+  is `blocked-scope` with `denied: true` and the reason "written by the
+  harness alone", and `blockExplanation` says what to do instead.
+  `deniedFiles(root, featureFiles)` (`work/scope.ts`) resolves
+  `ramify-agent.json` and the tracked feature files; `guardedScopeOf(scope,
+  denied)` carries them. Every engineer and contract engineer of a run is
+  given both; the single session denies the configuration.
+- **Log and projection.** The two events in `runEventSchema` and in
+  `projections/events.ts`.
+- **Test helpers.** Every Git double knows the commit: `scenariosCommit` in
+  `helpers/scripted-git.ts` (its gate lookups count gates, not checkpoints)
+  and `helpers/gate-git.ts`, `scenariosCommitted` in
+  `helpers/contracts-git.ts`, and `helpers/recovery-git.ts` recognizes the
+  commit by its trailer, names it `scenarios` in `commits()` and answers a
+  recovery lookup of it from `recovered`. `unchangedCheckpoints` accepts a
+  stated checkpoint beside a subject. The composition's scenarios state
+  `materialized` (`scenarios-00`) as their first commit and the boundary the
+  first gate is asked against.
+- **Tests.** A new `materialization.test.ts` (12 tests); a real-runner case
+  in `scenario-check-integration.test.ts`; a denial case in
+  `write-guard.test.ts`; three recovery rows. Every lifecycle test whose run
+  passes readiness with scenarios states the commit in its Git table, and
+  its assertions on revisions, heads, audited commits, bases and message
+  indices now count it: `accepted-commit`, `analysis-scenarios`,
+  `breaking-work`, `compaction`, `contract-delegation(-integration)`,
+  `contract-revision(-scripted)`, `contract-scheduling`,
+  `engineer-submission`, `gate-diagnostics`, `iteration-gate`, `iterations`,
+  `line-events`, `local-architect-submission`, `local-authority`,
+  `module-creation(-integration)`, `no-rewind`, `placement`, `progress`,
+  `requirement-verification`, `review-stop`, `run-bounds`, `run-protocol`,
+  `run-recovery`, `work-items`, the composition and the progress fixture.
+  `union-values` names the two events and `composition` counts 36
+  boundaries. The harness and evidence READMEs describe the change.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/materialization.test.ts` | 12 passed: a scripted run over the fixture (`review-notes`, two entries) records `readiness-passed`, `scenarios-materializing`, `scenarios-materialized`, `work-item-started` in that order, as intent and completion of the effect `scenarios-materialize`; `commitAccepted` is called first with the project root and exactly the message (subject `Scenarios of review-notes`, both files, `Ramify-Run: <runId>`, `Ramify-Scenarios: materialized`, no `Ramify-Gate`); only the gates look commits up; the files carry `@ramify-sc-00N @ramify-pending` and the header; the first local architect's base is the commit; both work-item gates plan `all-untagged` over both owners and pass, and the run completes. A run without scenarios writes and commits nothing. Re-rendering writes both files, then nothing, then only a drifted one; a state change writes only its file with the pending tag removed; a path outside the project is refused. The commit: live without lookup, recovery found by both trailers, recovery made when none is found. The guarded list holds the configuration, the support file and each feature file at its rendering's hash although the tree differs; a changed feature file at a gate is `guarded-change` with `before` the rendering's hash. An engineer's `write` of its own feature file and of `ramify-agent.json` are refused (`blocked-scope`, "written by the harness alone") although the first lies in its scope; its stated shell change is `guarded-change` at the iteration gate; the gate's commit restores the file, and the next assignment's gate passes with no guarded change |
+| `npx vitest run subs/harness/src/tests/scenario-check-integration.test.ts` | 8 passed, the new one with the real `cucumber-js`: a file rendered with its scenario `pending`, whose last step no definition binds, is excluded by the work-item gate's `not @ramify-pending` (`excluded: 1`) and the check passes on the project's own scenario |
+| `npx vitest run subs/harness/src/tests/composition-recovery.test.ts` | 22 passed, the three new rows among them: `scenarios-materializing` (recovery re-renders, finds nothing by the trailers, makes the commit once and records it), `scenarios-committed` (the crash between the commit and its record: recovery finds the commit by `Ramify-Run` and `Ramify-Scenarios` and makes no second one) and `scenarios-materialized`; each also restarts a second time and changes nothing |
+| `npx vitest run` over the 65 files that open runs, use a changed helper or name a changed module (the list of iteration 5's grep, plus every importer of the Git doubles, the run helpers, `work/scope`, the write guard, `checks/accepted`, the log, the projected events, the single session and the project configuration) | 62 passed, 2 skipped (`fixture-trials`, `fixture-acceptance`, conditional), 1 failed: `iterations-integration` (real Git and the real Ramify daemon) failed under the concurrent load of the batch; alone it passed three times in about 34 s |
+| `npx vitest run` over `scenario-check`, `tree-identity`, `readiness`, `gate-not-verified`, `audit-check-execution`, `hooks` and the `audit`, `scenarios` and `evidence` children | 19 files, 229 passed |
+| `npx vitest run subs/web` with `run-projections`, `protocol-contract`, `projections-pure`, `http` | 17 files, 140 passed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits, as in iteration 5 |
+
+No test makes a model call or runs Git except the integration tests that
+did before. The full suite was not run, per the plan's rules.
+
+### Deviations
+
+- **The live materialization commits without a lookup.** Its intent was
+  appended a moment before in the same process, so no commit of it can
+  exist; only a recovery looks it up by `Ramify-Run` and
+  `Ramify-Scenarios: materialized`. The gates keep looking up first. This
+  also keeps the lookup out of every lifecycle test's Git double.
+- **A second trailer, `Ramify-Scenarios: materialized`.** `Ramify-Run`
+  alone would also find the run's gate commits, so the commit needs an
+  identity of its own; it still carries no `Ramify-Gate`.
+- **The commit is an accepted boundary.** The plan does not say; without it
+  the first iteration's changed paths, scope observations, line snapshots
+  and module notices would include the feature files, as if the engineer
+  had written them.
+- **`commitNeeded` is `written.length > 0`.** A re-rendering does not ask
+  Git; a caller recovering a crash commits regardless, since the crashed
+  attempt may have written the files already, and `commitAccepted` answers
+  `null` over an unchanged tree.
+- **The write guard also refuses `ramify-agent.json`**, as the brief asks,
+  in runs and in the single session, and no architect authorization may
+  name it or a feature file. The support files are guarded, not refused:
+  they are ordinary testing source an authorized iteration may change.
+- **The gate's commit restores a feature file an agent changed**, since it
+  re-renders before it commits. The guarded comparison before the effect
+  still records the change and fails the attempt as `guarded-change`.
+- **The work-item and final gates carry no guarded list**, as before; a
+  feature file is compared at iteration and contract gates, whose
+  assignments capture it, and the re-rendering at every gate's commit
+  writes back any drift.
+- **Three `RunWrite` boundaries**, `scenarios-materializing`,
+  `scenarios-committed` and `scenarios-materialized`, each with a recovery
+  row, rather than a focused crash test of its own.
+
+### Open items
+
+- Iteration 7: declarations change states between an assignment's capture
+  and its gate. The iteration gate's comparison stays right (the tree holds
+  the rendering the assignment captured), and the gate's commit re-renders.
+  A withdrawal commit needs a trailer value of its own per withdrawal, and
+  `acceptedCommit` counts only `scenarios-materialized` today.
+- A proposed owner's feature file is written before the module exists
+  (`module-creation-integration`, the progress fixture's `proposed` run);
+  its bootstrap iteration then creates the module around it. Nothing
+  rejects this, and no test found a consequence.
+- `iterations-integration` failed once under the concurrent load of a
+  65-file batch and passed alone three times.

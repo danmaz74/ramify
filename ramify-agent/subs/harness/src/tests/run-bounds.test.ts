@@ -1,3 +1,4 @@
+import { scenariosCommit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
@@ -36,7 +37,7 @@ const reviews = 'collection-review/workspace/reviews';
 async function run(
   script: Script,
   limits: Partial<RunPolicy['limits']>,
-  unchangedCheckpoints: readonly string[] = [],
+  unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
 ) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
@@ -127,7 +128,7 @@ describe('the bounds on the whole run', () => {
     const { root, runId, service } = await run(byRole({
       'initial-architect': [submit(analysis([entry('reviewer-note', reviews)]))],
       'local-architect': [submit(requestCompletion())],
-    }), { maxInvocationsPerRun: 1 });
+    }), { maxInvocationsPerRun: 1 }, [scenariosCommit(plan)]);
     const snapshot = onlyRun(service, plan);
     expect(snapshot.failure?.reason).toBe('limit-exceeded');
     expect(snapshot.failure?.message).toBe('The run has made 1 invocations; the policy allows 1');
@@ -157,6 +158,7 @@ describe('the bounds on the whole run', () => {
     };
     const opened = await openRuns(fixture.root, {
       agent: timed,
+      unchangedCheckpoints: [scenariosCommit(plan)],
       now: () => current,
       policy: projectRoot => {
         const policy = testPolicy(projectRoot);

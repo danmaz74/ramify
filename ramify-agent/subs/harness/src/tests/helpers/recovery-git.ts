@@ -47,6 +47,7 @@ export interface CommitResponse {
  * crash left a commit behind; nothing here deduces that a commit exists.
  */
 export interface RecoveredCommit {
+  /** The gate, or `scenarios` for the commit that materialized the feature files. */
   readonly gate: string;
   /** Exact answers for successive lookups of this gate; `null` means not found. */
   readonly answers: readonly (string | null)[];
@@ -59,7 +60,11 @@ export interface GitResponses {
   readonly commits: readonly CommitResponse[];
   /** The accepted boundary after the last supplied commit response is consumed. */
   readonly after?: string | undefined;
-  /** Commits a restart finds, stated by the exact gate trailer it asks for. */
+  /**
+   * Commits a restart finds, stated by the exact gate trailer it asks for,
+   * or by `scenarios` for a lookup of the materialization commit, which
+   * carries the run's `Ramify-Scenarios` trailer instead of a gate's.
+   */
   readonly recovered?: readonly RecoveredCommit[] | undefined;
   /**
    * The lines the working directory changed, where the scenario states them.
@@ -71,7 +76,11 @@ export interface GitResponses {
 
 /** One commit the run asked for, and the answer it was given. */
 export interface CommitCall {
-  /** The gate the commit was made for, taken from the identity lookup that precedes it. */
+  /**
+   * The gate the commit was made for, taken from the identity lookup that
+   * precedes it, or `scenarios` for the commit that materialized the
+   * feature files, which the message's own trailer names.
+   */
   readonly gate: string | null;
   readonly commit: string | null;
 }
@@ -103,6 +112,9 @@ export interface ScenarioGit extends GitService {
 
 const runTrailer = 'Ramify-Run';
 const gateTrailer = 'Ramify-Gate';
+const scenariosTrailer = 'Ramify-Scenarios';
+/** How a scenario names the materialization commit where it names a gate's. */
+export const scenariosCommitName = 'scenarios';
 
 /**
  * A scenario's Git, as answers. `responses.commits` is consumed in order:
@@ -172,13 +184,16 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
       // The identity a repeat is asked for: this run, and one gate of it.
       // Both halves are matched, so a commit stated for one run or one gate
       // is never answered for another.
+      // The materialization commit is looked up by the run and its own
+      // trailer, and never beside a gate's.
+      const scenarios = trailers[1]?.key === scenariosTrailer;
       check(() => {
-        expect(trailers.map(trailer => trailer.key)).toEqual([runTrailer, gateTrailer]);
-        expect(trailers[1]!.value).toMatch(/^ga-\d{4}$/u);
+        expect(trailers.map(trailer => trailer.key)).toEqual([runTrailer, scenarios ? scenariosTrailer : gateTrailer]);
+        expect(trailers[1]!.value).toMatch(scenarios ? /^materialized$/u : /^ga-\d{4}$/u);
         expect(branch, 'a recovery lookup was made before the run branch was created').not.toBeNull();
         expect(trailers[0]!.value, 'the recovery lookup carried another run').toBe(branch!.slice('ramify-agent/run-'.length));
       });
-      lastGate = trailers[1]!.value;
+      lastGate = scenarios ? scenariosCommitName : trailers[1]!.value;
       const stated = responses.recovered?.find(entry => entry.gate === lastGate);
       if (stated === undefined) return null;
       const lookup = lookupCursors.get(lastGate) ?? 0;
@@ -197,14 +212,23 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
       }
       // The message the harness wrote carries the identity the lookup just
       // asked for, so a commit and the repeat that finds it name one attempt.
+      // The materialization commit is named by its own trailer. The live
+      // attempt makes it without a lookup, since its intent was appended a
+      // moment before; only a restart looks it up first.
+      const scenarios = message.includes(`\n${scenariosTrailer}: materialized\n`);
       check(() => {
         expect(branch, 'a commit was made before the run branch was created').not.toBeNull();
         expect(message).toContain(`${runTrailer}: ${branch!.slice('ramify-agent/run-'.length)}`);
-        expect(lastGate, 'a commit was made without first looking up its gate identity').not.toBeNull();
-        expect(message).toContain(`${gateTrailer}: ${lastGate!}`);
+        if (scenarios) {
+          expect(message.split('\n')[0]).toMatch(/^Scenarios of /u);
+          expect(message).not.toContain(`${gateTrailer}:`);
+        } else {
+          expect(lastGate, 'a commit was made without first looking up its gate identity').not.toBeNull();
+          expect(message).toContain(`${gateTrailer}: ${lastGate!}`);
+        }
       });
       cursor += 1;
-      made.push({ gate: lastGate, commit: response.commit });
+      made.push({ gate: scenarios ? scenariosCommitName : lastGate, commit: response.commit });
       if (response.commit !== null) head = response.commit;
       return response.commit;
     },

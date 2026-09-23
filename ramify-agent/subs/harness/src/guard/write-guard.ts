@@ -6,6 +6,10 @@ import { isContained, resolveRealTarget } from './resolve-contained-path.js';
  * against the real filesystem, and only then checked against the write scope
  * the assignment recorded.
  *
+ * A few files are refused outright, whatever the scope contains: the tracked
+ * feature files and the project's configuration for the harness. Only the
+ * harness writes them, so no scope and no authorization reaches them.
+ *
  * A block makes no mutation, does not end the session, does not request
  * approval and does not widen the scope. Only a recorded assignment changes
  * write authority: a retry or a successful read does not.
@@ -21,6 +25,8 @@ export interface GuardedScope {
   readonly roots: readonly string[];
   /** Canonical single files the assignment may write, such as a declaration or a contract. */
   readonly files: readonly string[];
+  /** Canonical files refused outright, whatever the roots and files contain. */
+  readonly denied?: readonly string[] | undefined;
 }
 
 /** What the guard decided about one call. */
@@ -34,6 +40,8 @@ export interface GuardDecisionRecord {
   /** What it resolved to, or null when it could not be resolved. */
   readonly resolved: string | null;
   readonly reason: string;
+  /** Set when the target is one of the files only the harness writes. */
+  readonly denied?: true | undefined;
 }
 
 /** The field a mutating built-in names its target in. */
@@ -66,6 +74,15 @@ export async function decideWrite(
   if (!target.ok) {
     return { verdict: 'blocked-unresolved', requested, resolved: null, reason: target.reason };
   }
+  if (scope.denied?.includes(target.resolved) === true) {
+    return {
+      verdict: 'blocked-scope',
+      requested,
+      resolved: target.resolved,
+      reason: `${target.resolved} is written by the harness alone; no agent edits it`,
+      denied: true,
+    };
+  }
   if (scope.files.includes(target.resolved)) {
     return { verdict: 'allowed', requested, resolved: target.resolved, reason: 'the write scope names this file' };
   }
@@ -91,6 +108,15 @@ export function blockExplanation(decision: GuardDecisionRecord, scope: GuardedSc
     ...scope.files.map(file => file),
   ];
   const where = locations.length === 0 ? '  (this assignment may write nothing)' : locations.map(line => `  ${line}`).join('\n');
+  if (decision.denied === true) {
+    return [
+      `The target "${decision.requested}" resolves to ${decision.resolved ?? 'nothing'}, which only the harness writes. Nothing was written.`,
+      '',
+      'A feature file is rendered by the harness from the plan\'s scenarios: bind its steps with step definitions in a module\'s steps directory instead.',
+      'The project\'s configuration for the harness, ramify-agent.json, is captured when the run starts and no agent changes it.',
+      'Do not retry the same target, and do not write it another way: a change to it fails the gate as a guarded change.',
+    ].join('\n');
+  }
   const head = decision.verdict === 'blocked-unresolved'
     ? `The target "${decision.requested}" could not be resolved: ${decision.reason}. Nothing was written.`
     : `The target "${decision.requested}" resolves to ${decision.resolved ?? 'nothing'}, which is outside this iteration's write scope. Nothing was written.`;

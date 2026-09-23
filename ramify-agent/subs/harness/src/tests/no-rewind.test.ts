@@ -11,7 +11,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
 import { createMappedCheckExecution, type DirectCheckInvocation, type DirectCheckStep } from './helpers/direct-check-execution.js';
-import { accepted, answeredGit, modified, unchanged } from './helpers/contracts-git.js';
+import { accepted, answeredGit, modified, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -187,6 +187,7 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
     const git = answeredGit(root, {
       head: 'revision-00',
       commits: [
+        scenariosCommitted('review-notes'),
         accepted('wi-001.i01', 'revision-01', modified(`${notesDirectory}/src/notes.ts`, `${notesDirectory}/src/tests/notes.test.ts`)),
         // The work-item gate that failed outside the assignment wrote
         // nothing of its own, and neither did the one that passed after the
@@ -255,14 +256,14 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
 
     // The attempt that failed outside the assignment still committed what
     // the assignment wrote, and the repair was a commit of its own over it.
-    expect(git.minted()).toEqual(['revision-01', 'revision-02']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02']);
     expect(returned.commit).toBeNull();
     expect(returned.head).toBe('revision-01');
 
     // The boundary the run observed against moved when the iteration was
     // accepted, and not when the work-item gate failed over it.
-    expect(git.bases('changedEntries')).toEqual(['revision-00', 'revision-01']);
-    expect(git.bases('diffNameStatus')).toEqual(['revision-00', 'revision-01']);
+    expect(git.bases('changedEntries')).toEqual(['scenarios-of-review-notes', 'revision-01']);
+    expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes', 'revision-01']);
     expect(git.bases('changedPaths').at(-1)).toBe('revision-01');
     git.assertAnswered();
   }, 60_000);
@@ -290,6 +291,7 @@ describe('adding work leaves every completed piece completed', () => {
     const git = answeredGit(root, {
       head: 'revision-00',
       commits: [
+        scenariosCommitted('review-notes'),
         // The failed attempt's own commit, the repaired attempt beside it,
         // and the second iteration after them.
         accepted('wi-001.i01', 'revision-01', modified(`${notesDirectory}/src/notes.ts`)),
@@ -369,16 +371,16 @@ describe('adding work leaves every completed piece completed', () => {
     expect(committed.filter(message => message.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
     expect(committed.filter(message => message.includes('Ramify-Iteration: wi-001.i02'))).toHaveLength(1);
     expect(committed.every(message => message.includes(`Ramify-Run: ${runId}`))).toBe(true);
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03']);
     expect((await readResult(root, runId, 'wi-001', 1)).commit).toBe('revision-02');
 
     // The failed attempt's own revision never became the boundary: every
-    // observation was taken against the revision the run started from until
+    // observation was taken against the feature files' commit until
     // the repaired attempt was accepted, and against that one afterwards.
     expect(git.bases('changedPaths')).not.toContain('revision-01');
     expect(git.bases('changedPaths').at(-1)).toBe('revision-02');
-    expect(git.bases('changedEntries')).toEqual(['revision-00', 'revision-00', 'revision-02']);
-    expect(git.bases('diffNameStatus')).toEqual(['revision-00', 'revision-02']);
+    expect(git.bases('changedEntries')).toEqual(['scenarios-of-review-notes', 'scenarios-of-review-notes', 'revision-02']);
+    expect(git.bases('diffNameStatus')).toEqual(['scenarios-of-review-notes', 'revision-02']);
     git.assertAnswered();
 
     // The work item that was closed first stays closed while the second runs.

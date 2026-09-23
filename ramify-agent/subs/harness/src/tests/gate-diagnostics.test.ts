@@ -187,15 +187,18 @@ describe('a module violation at the iteration gate, over a run', () => {
       isCleanRepository: async () => true,
       createRunBranch: async (_root, runId) => ({ branch: `ramify-agent/run-${runId}`, created: true }),
       findCommitByTrailers: async () => null,
-      changedPaths: async (_root, accepted) => accepted === 'base' ? [source] : [],
-      changedEntries: async (_root, accepted) => accepted === 'base' ? [{ status: 'M', path: source }] : [],
+      // The feature files' commit is the boundary the engineer's change is asked against.
+      changedPaths: async (_root, accepted) => accepted === 'scenarios' ? [source] : [],
+      changedEntries: async (_root, accepted) => accepted === 'scenarios' ? [{ status: 'M', path: source }] : [],
       diffNameStatus: async (_root, from, to) => {
-        expect([from, to]).toEqual(['base', 'repaired-source']);
+        expect([from, to]).toEqual(['scenarios', 'repaired-source']);
         return [{ status: 'M', path: source }];
       },
       worktreeLineChanges: async () => { throw new Error('Line metrics not scripted in diagnostic scenario'); },
     });
-    git.commitAccepted.mockImplementationOnce(async () => { head = 'repaired-source'; return head; }).mockResolvedValue(null);
+    git.commitAccepted
+      .mockImplementationOnce(async (_root, message) => { expect(message).toMatch(/^Scenarios of /u); head = 'scenarios'; return head; })
+      .mockImplementationOnce(async () => { head = 'repaired-source'; return head; }).mockResolvedValue(null);
     const opened = await openRuns(root, {
       inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
       checkScript: ({ check, context }) => check.kind === 'ramify-check' && context.attemptId === 'ga-0002'
@@ -250,7 +253,7 @@ describe('a module violation at the iteration gate, over a run', () => {
     expect(briefing).toContain('- `ramify-check`: failed, exit 1, 1 finding:');
     expect(briefing).toContain(`${notesDirectory}/src/notes.ts:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`)`);
     expect(briefing).toContain('submit `request-placement` where another owner would have to expose a symbol');
-    expect(git.commitAccepted).toHaveBeenCalledTimes(4);
+    expect(git.commitAccepted).toHaveBeenCalledTimes(5);
     expect(git.unexpected).toEqual([]);
   }, 300_000);
 });

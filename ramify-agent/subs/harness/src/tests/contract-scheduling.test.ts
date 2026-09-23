@@ -4,7 +4,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
-import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -61,7 +61,7 @@ const tagLimit: Seam = { ...noteLimit, consumerDirectory: tagsDirectory, consume
  * attempts it reports as an unchanged tree.
  */
 async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits });
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
   });
@@ -183,7 +183,7 @@ describe('P5: a shared obligation runs its provider once and each consumer verif
     // The run committed on its own branch, once for each gate, and recorded
     // the revisions Git reported for the five that changed the tree.
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
     git.assertAnswered();
   }, 60_000);
 });
@@ -288,7 +288,7 @@ describe('P5: a chain of changes back through a module that has yielded is not a
 
     // Each provider and each consumer committed once, in the order the chain
     // completed, and the gates between them changed nothing.
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
     git.assertAnswered();
   }, 60_000);
 });
@@ -371,7 +371,7 @@ describe('P5: a capability that transitively depends on itself', () => {
 
     // The run that failed on the cycle still committed what each agreement
     // established, and its repeat of the same agreement committed nothing.
-    expect(git.minted()).toEqual(['revision-01', 'revision-02']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02']);
     expect(git.subjects().at(-1)).toContain('wi-002.i04');
     git.assertAnswered();
   }, 60_000);

@@ -5,9 +5,10 @@ import { expect } from 'vitest';
 import type { RunEvent } from '../../run/log.js';
 import type { RunWrite } from '../../run/service.js';
 import {
-  crashAt, committedGates, fileHashes, identityOf, logLines, plan, recordText, recoveryCompletions, removeRecordFiles,
+  crashAt, committedGates, fileHashes, identityOf, logLines, materialized, plan, recordText, recoveryCompletions, removeRecordFiles,
   runDirectory, scenarios, source, statedCommands, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
 } from './composition.js';
+import { scenariosCommitName, type GitResponses } from './recovery-git.js';
 import { directReadinessExecution } from './external-tools.js';
 import { onlyRun, openRuns } from './runs.js';
 
@@ -69,7 +70,19 @@ export interface RecoveryRow {
    * behind, and it says so here rather than leaving Git to deduce it.
    */
   readonly at?: { readonly gate: string; readonly revision: string } | undefined;
+  /**
+   * What Git answers this row beyond its scenario's own answers, where the
+   * row's crash decides it: whether the restart's lookup of the
+   * materialization commit finds one.
+   */
+  readonly git?: ((responses: GitResponses) => GitResponses) | undefined;
 }
+
+/** The scenario's answers, with what a restart's lookup of the materialization commit finds. */
+const scenariosLookup = (answer: string | null) => (responses: GitResponses): GitResponses => ({
+  ...responses,
+  recovered: [...(responses.recovered ?? []), { gate: scenariosCommitName, answers: [answer] }],
+});
 
 const interrupted: RunEvent['type'][] = ['job-interrupted'];
 
@@ -94,6 +107,22 @@ export const recoveryTable = {
   'readiness-attempted': {
     machines: ['SM1', 'SM7'], scenario: 'iteration', appended: interrupted,
     stated: 'Re-materializes the readiness attempt and its gate; readiness does not run again',
+  },
+  'scenarios-materializing': {
+    machines: ['SM1'], scenario: 'iteration', appended: ['scenarios-materialized', 'job-interrupted'],
+    effect: /the materialization of the feature files/, commits: { before: 0, after: 1 }, recovery: 'makes-the-commit',
+    at: { gate: scenariosCommitName, revision: materialized }, git: scenariosLookup(null),
+    stated: 'The intent is durable and no file is committed: recovery re-renders the feature files, finds no commit by its trailers, makes it once and records it',
+  },
+  'scenarios-committed': {
+    machines: ['SM1'], scenario: 'iteration', appended: ['scenarios-materialized', 'job-interrupted'],
+    effect: /the materialization of the feature files/, commits: { before: 1, after: 1 }, recovery: 'finds-the-commit',
+    at: { gate: scenariosCommitName, revision: materialized }, git: scenariosLookup(materialized),
+    stated: 'The commit is made and not recorded: recovery re-renders nothing new, finds the commit by its run and scenario trailers, and records it without a second commit',
+  },
+  'scenarios-materialized': {
+    machines: ['SM1'], scenario: 'iteration', appended: interrupted, commits: { before: 1, after: 1 },
+    stated: 'The materialization and its one commit stand; nothing is written or committed again',
   },
   'work-item-started': {
     machines: ['SM4'], scenario: 'iteration', appended: interrupted,
@@ -121,18 +150,18 @@ export const recoveryTable = {
   },
   'gate-attempted': {
     machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
-    effect: /the commit and audit of gate ga-\d+/, commits: { before: 0, after: 1 }, recovery: 'makes-the-commit',
+    effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 2 }, recovery: 'makes-the-commit',
     at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The verified operation is durable and the commit is not made: recovery makes and audits one commit, then writes the complete attempt once',
   },
   'gate-committing': {
     machines: ['SM7', 'SM5'], scenario: 'iteration', appended: ['gate-attempted', 'job-interrupted'],
-    effect: /the commit and audit of gate ga-\d+/, commits: { before: 1, after: 1 }, recovery: 'finds-the-commit',
+    effect: /the commit and audit of gate ga-\d+/, commits: { before: 2, after: 2 }, recovery: 'finds-the-commit',
     at: { gate: 'ga-0002', revision: source(1) },
     stated: 'The commit is made and the audit is not complete: recovery finds and re-audits that commit, then writes one complete attempt',
   },
   'gate-committed': {
-    machines: ['SM7'], scenario: 'iteration', appended: interrupted, commits: { before: 1, after: 1 },
+    machines: ['SM7'], scenario: 'iteration', appended: interrupted, commits: { before: 2, after: 2 },
     stated: 'Leaves the complete attempt and its one commit alone and appends the interruption only',
   },
   'iteration-closed': {
@@ -243,6 +272,7 @@ const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   ...Object.fromEntries(Object.keys(recoveryTable).map(write => [write, write])) as Record<RunWrite, RunEvent['type']>,
   'job-created': 'job-started',
   'readiness-attempted': 'readiness-passed',
+  'scenarios-committed': 'scenarios-materializing',
   'gate-attempted': 'gate-committing',
   'gate-committing': 'gate-committing',
   'gate-committed': 'gate-attempted',
@@ -259,7 +289,8 @@ export function allRows(): Array<RecoveryRow & { readonly name: string; readonly
 
 /** Crashes one row's scenario at its boundary, restarts twice, and holds the recovered state to every check. */
 export async function verifyRow(row: RecoveryRow & { readonly name: string; readonly write: RunWrite }): Promise<void> {
-  const scenario = scenarios[row.scenario];
+  const stated = scenarios[row.scenario];
+  const scenario = row.git === undefined ? stated : { ...stated, git: row.git(stated.git) };
   const crashed = await crashAt(scenario, { write: row.write, when: row.when });
   const { root, runId, agent, git } = crashed;
   const reopened: Array<{ close(): Promise<void> }> = [];
@@ -276,7 +307,9 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
 
     // The attempt the boundary is about is the one the log names, and the
     // row states which it is.
-    if (row.at !== undefined) {
+    if (row.at !== undefined && row.at.gate === scenariosCommitName) {
+      expect(frozen.map(line => line.event.type), `the materialization the crash at ${row.name} landed in`).toContain('scenarios-materializing');
+    } else if (row.at !== undefined) {
       const boundary = frozen.map(line => line.event).filter(event => event.type === 'gate-committing').at(-1);
       expect(boundary?.data.gate, `the gate the crash at ${row.name} landed in`).toBe(row.at.gate);
     }
@@ -321,6 +354,9 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
         case 'gate-attempted':
           expect(frozenEvents.some(e => e.type === 'gate-committing' && e.data.gate === data.gate)).toBe(true);
           break;
+        case 'scenarios-materialized':
+          expect(frozenEvents.some(e => e.type === 'scenarios-materializing')).toBe(true);
+          break;
         case 'brief-appended': case 'global-context-rebuilt':
           expect(frozenEvents.some(e => e.type === 'decision-accepted')).toBe(true);
           break;
@@ -358,7 +394,11 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
       const body = record.body as { schema?: unknown; commit?: unknown } | null;
       return body?.schema === 'ramify-agent.gate-attempt/3' && typeof body.commit === 'string' ? [body.commit] : [];
     }));
-    expect(attempts).toEqual(git.accepted());
+    expect(attempts).toEqual(git.commits().flatMap(call => (call.commit === null || call.gate === scenariosCommitName ? [] : [call.commit])));
+    // The materialization the log records names the commit Git answered.
+    const recorded = recovered.map(line => line.event).find(event => event.type === 'scenarios-materialized');
+    const made = git.commits().filter(call => call.gate === scenariosCommitName);
+    expect(recorded?.data.commit ?? null).toBe(recorded === undefined ? null : made[0]?.commit ?? null);
     expect(new Set(committed).size).toBe(committed.length);
 
     // Every record file the log commits is there again, byte for byte, and

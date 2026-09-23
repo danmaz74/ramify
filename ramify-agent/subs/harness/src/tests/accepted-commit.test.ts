@@ -12,7 +12,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
-import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { RunQueries } from '../projections/queries.js';
 import {
@@ -55,6 +55,9 @@ const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 /** The revision the fixture is on before a run commits anything. */
 const base = 'revision-00';
+/** The harness's own commit of the run's feature files, made once readiness has passed. */
+const materialized = 'scenarios-00';
+const scenarios = scenariosCommit('review-notes', materialized, base);
 
 /** A boundary Git reports as unchanged, which commits nothing. */
 const unchanged: GateCommit = { commit: null };
@@ -114,6 +117,7 @@ describe('a change to the working directory blocks nothing', () => {
     const scripted = gateGit(root, {
       head: base,
       commits: [
+        scenarios,
         {
           commit: 'revision-01',
           changes: [{ status: 'A', path: storePath }, { status: 'A', path: latePath }],
@@ -145,16 +149,18 @@ describe('a change to the working directory blocks nothing', () => {
     expect(result.outcome).toBe('accepted');
     expect(result.commit).toBe('revision-01');
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(result.gate!)), 'utf8')) as GateAttempt;
-    expect(attempt).toMatchObject({ verdict: 'passed', head: base, commit: 'revision-01', audited: 'revision-01' });
+    expect(attempt).toMatchObject({ verdict: 'passed', head: materialized, commit: 'revision-01', audited: 'revision-01' });
 
     // One commit for the iteration, and the late write really happened
     // before the harness asked for it: the ledger of what the run asked Git
     // puts the mark between the verification and the commit.
     const ledger = scripted.calls.map(call => `${call.operation}${call.operation === 'mark' ? `:${call.detail}` : ''}`);
-    expect(ledger.filter(operation => operation === 'commitAccepted')).toHaveLength(3);
+    // The first commit is the feature files', made before the iteration.
+    const commits = ledger.flatMap((operation, index) => (operation === 'commitAccepted' ? [index] : []));
+    expect(commits).toHaveLength(4);
     expect(ledger.indexOf('mark:the late write')).toBeGreaterThan(-1);
-    expect(ledger.indexOf('mark:the late write')).toBeLessThan(ledger.indexOf('commitAccepted'));
-    expect(scripted.messages[0]).toContain('Ramify-Iteration: wi-001.i01');
+    expect(ledger.indexOf('mark:the late write')).toBeLessThan(commits[1]!);
+    expect(scripted.messages[1]).toContain('Ramify-Iteration: wi-001.i01');
     // Both files are really in the tree the commit boundary was reached over.
     expect(await readFile(join(root, storePath), 'utf8')).toBe('export const store = new Map();\n');
     expect(await readFile(join(root, latePath), 'utf8')).toBe('export const late = true;\n');
@@ -186,7 +192,7 @@ describe('a change to the working directory blocks nothing', () => {
       const root = await target();
       const crashedGit = gateGit(root, {
         head: base,
-        commits: [{ commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }],
+        commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }],
       });
       const crashed = await openRuns(root, {
         script: byRole(onePass([storeWrite])),
@@ -204,7 +210,8 @@ describe('a change to the working directory blocks nothing', () => {
       await until(async () => {
         const text = await readFile(events, 'utf8').catch(() => '');
         if (!text.includes('"gate-committing"')) return false;
-        return crashedGit.calls.filter(call => call.operation === 'commitAccepted').length === row.committed;
+        // The feature files' commit precedes the gate's.
+        return crashedGit.calls.filter(call => call.operation === 'commitAccepted').length === row.committed + 1;
       }, 60_000);
       await staleCrashLock(root);
 
@@ -218,7 +225,7 @@ describe('a change to the working directory blocks nothing', () => {
       // one, and nothing where the only commit at that gate id belongs to
       // another run.
       const recoveryGit = gateGit(root, {
-        head: row.committed === 0 ? base : 'revision-01',
+        head: row.committed === 0 ? materialized : 'revision-01',
         commits: row.committed === 0 ? [{ commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }] : [],
         trailed: row.trailed.map(known => ({
           trailers: [
@@ -251,7 +258,8 @@ describe('a change to the working directory blocks nothing', () => {
       ]]);
       const asked = crashedGit.calls.filter(call => call.operation === 'commitAccepted').length
         + recoveryGit.calls.filter(call => call.operation === 'commitAccepted').length;
-      expect(`${row.name}: ${asked}`).toBe(`${row.name}: 1`);
+      // The feature files' commit, and the gate's once.
+      expect(`${row.name}: ${asked}`).toBe(`${row.name}: 2`);
 
       const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(gate)), 'utf8')) as GateAttempt;
       expect(attempt.verdict).toBe('passed');
@@ -267,6 +275,7 @@ describe('a change to the working directory blocks nothing', () => {
     const scripted = gateGit(root, {
       head: base,
       commits: [
+        scenarios,
         { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] },
         unchanged,
         unchanged,
@@ -291,7 +300,7 @@ describe('a change to the working directory blocks nothing', () => {
     await writeFile(join(root, notesDirectory, 'src', 'notes.ts'), 'export const noteLimit = 1;\n');
     expect(await readFile(join(root, notesDirectory, 'src', 'notes.ts'), 'utf8')).toBe('export const noteLimit = 1;\n');
     expect(scripted.calls).toHaveLength(settled);
-    expect(scripted.revisions()).toEqual(['revision-01']);
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
     const reloaded = await readResult(root, receipt.jobId, 1);
     expect(reloaded).toEqual(result);
     scripted.assertComplete();
@@ -304,15 +313,16 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
     const scripted = gateGit(root, {
       head: base,
       commits: [
+        scenarios,
         // The attempt whose audit could not run still committed what the
         // engineer wrote, including the declaration of the new module.
-        { commit: 'revision-01', changes: moduleEntries, against: base, subject: 'wi-001.i01' },
+        { commit: 'revision-01', changes: moduleEntries, against: materialized, subject: 'wi-001.i01' },
         // The retry finds the same files still standing against the
         // accepted boundary, which has not moved, and a tree Git reports as
         // unchanged against the commit the first attempt made. The work
         // item's gate and the run's own gate then stand on that accepted
         // revision, with nothing changed against it.
-        { commit: null, changes: moduleEntries, against: base },
+        { commit: null, changes: moduleEntries, against: materialized },
         { commit: null, against: 'revision-01' },
         { commit: null, against: 'revision-01' },
       ],
@@ -396,10 +406,10 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       kind: 'module-created', module: notes, declaration: `${notesDirectory}/module.ramify`,
       commit: accepted, iteration: 'wi-001.i01', decision: null,
     }]);
-    // Exactly one revision was ever minted, and the three boundaries that
-    // followed it were each told the tree was unchanged.
-    expect(scripted.revisions()).toEqual([accepted]);
-    expect(attempts.map(attempt => attempt.head)).toEqual([base, base, accepted, accepted, accepted]);
+    // Exactly one revision was ever minted after the feature files', and the
+    // three boundaries that followed it were each told the tree was unchanged.
+    expect(scripted.revisions()).toEqual([materialized, accepted]);
+    expect(attempts.map(attempt => attempt.head)).toEqual([base, materialized, accepted, accepted, accepted]);
 
     const queries = new RunQueries(opened.service);
     const metrics = await queries.metrics('review-notes', receipt.jobId);

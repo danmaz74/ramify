@@ -187,6 +187,15 @@ export function accepted(subject: string, commit: string, changes: readonly GitC
   return { subject, commit, changes };
 }
 
+/**
+ * The harness's own commit of the run's feature files, "Scenarios of
+ * <planId>", made once readiness has passed and before the first work item.
+ * It adds every feature file, so Git reports a revision.
+ */
+export function scenariosCommitted(planId: string, commit = `scenarios-of-${planId}`, files: readonly string[] = []): CommitResponse {
+  return accepted(`Scenarios of ${planId}`, commit, added(...files));
+}
+
 /** A commit attempt Git reports as an unchanged tree. */
 export function unchanged(subject: string): CommitResponse {
   return { subject, commit: null, changes: [] };

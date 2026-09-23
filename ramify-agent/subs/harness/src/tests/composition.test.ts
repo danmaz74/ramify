@@ -126,7 +126,7 @@ describe('the recovery tables of the ten state machines', () => {
     const rows = allRows();
     // `recoveryTable` is typed against the run service's own boundary union,
     // so a boundary without a row does not compile; this states the count.
-    expect(new Set(rows.map(row => row.write)).size).toBe(33);
+    expect(new Set(rows.map(row => row.write)).size).toBe(36);
     const machines = new Set(rows.flatMap(row => row.machines));
     expect([...machines].sort()).toEqual((Object.keys(machineNames) as Machine[]).sort());
 

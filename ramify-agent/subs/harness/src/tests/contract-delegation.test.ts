@@ -7,7 +7,7 @@ import {
   addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs, write,
 } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
-import { accepted, added, answeredGit, modified, unchanged, type CommitResponse } from './helpers/contracts-git.js';
+import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
@@ -174,7 +174,7 @@ async function run(
   commits: readonly CommitResponse[],
   options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
 ) {
-  const git = answeredGit(root, { head: 'revision-00', commits });
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
   const opened = await openRuns(root, {
     script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(), ...options,
   });
@@ -383,7 +383,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
     // The run committed on its own branch: the agreement, the real provider
     // and the verification, in that order, each over the one before it.
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(git.minted()).toEqual(['revision-01', 'revision-02', 'revision-03']);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03']);
     git.assertAnswered();
   }, 60_000);
 
@@ -448,8 +448,8 @@ describe('X1b: a contract sub-session that returns incomplete registers nothing'
 
     // One commit, for the work its caller carried: a session that registered
     // nothing has no gate and no commit of its own.
-    expect(git.minted()).toEqual(['revision-01']);
-    expect(git.subjects()).toHaveLength(3);
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01']);
+    expect(git.subjects()).toHaveLength(4);
     git.assertAnswered();
   }, 60_000);
 });

@@ -19,13 +19,21 @@ export interface AcceptedBoundaryLine {
 }
 
 /**
- * The audited hash of the latest passed committing checkpoint, in committed
- * event order. The run's base is returned only until no such attempt exists.
+ * The audited hash of the latest passed committing checkpoint, or of the
+ * commit that materialized the feature files, in committed event order. The
+ * run's base is returned only until neither exists.
  */
 export function acceptedCommit(entries: readonly AcceptedBoundaryLine[], base: string): string {
   let accepted = base;
   for (const entry of entries) {
     const event = entry.transaction.event;
+    if (event.type === 'scenarios-materialized') {
+      // The harness's own commit of the feature files is accepted as it is
+      // made: no gate runs over it, and the next iteration starts from it.
+      const commit = (event.data as { readonly commit?: unknown }).commit;
+      if (typeof commit === 'string') accepted = commit;
+      continue;
+    }
     if (event.type !== 'gate-attempted') continue;
     const data = event.data as { readonly gate?: unknown; readonly verdict?: unknown };
     if (data.verdict !== 'passed' || typeof data.gate !== 'string') continue;

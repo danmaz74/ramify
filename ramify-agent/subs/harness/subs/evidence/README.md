@@ -101,8 +101,9 @@ unavailable with that reason, never a zero.
 
 `guarded-files.ts` holds `guardedFilesHash`: the SHA-256 of each file whose
 change could weaken a check, which is the test runner's and the compiler's
-configuration, the package manifests and the contract artifacts an assignment
-names. It is one hash per file rather than one over the set, so a change
+configuration, the package manifests, `ramify-agent.json`, and whatever the
+caller names, such as the contract artifacts an assignment requires and the
+scenario harness's support files. It is one hash per file rather than one over the set, so a change
 names the file that changed, and a file that is not there is `null`. It
 compares nothing, and no identity of the working tree is taken anywhere.
 

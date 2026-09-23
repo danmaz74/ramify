@@ -149,6 +149,10 @@ function describe(event: RunEvent): [string, Ref[]] {
         event.data.confirmed ? `Session ${event.data.invocation} released the writer` : `Session ${event.data.invocation}'s release was not confirmed; no writer or gate may follow`,
         ref('invocation', event.data.invocation),
       ];
+    case 'scenarios-materializing':
+      return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are being written onto the run branch`, []];
+    case 'scenarios-materialized':
+      return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are on the run branch`, ref('commit', event.data.commit)];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-attempted':

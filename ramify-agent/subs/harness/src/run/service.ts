@@ -4,6 +4,7 @@ import { join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
 import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
@@ -75,7 +76,8 @@ import {
 } from '../work/iterations.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  captureGuardedFiles, checkpointOf, guardedScopeOf, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
+  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
+  type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
@@ -86,14 +88,17 @@ import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
-import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
-import { applyScenarioEvent, initialScenarioStates, scenarioEventTypes, type ScenarioEvent, type ScenarioStates } from '../../subs/scenarios/src/states.js';
+import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
 import type { ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
 import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
-import { captureProjectConfig, scenarioModules } from './project-config.js';
+import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
+import {
+  commitForMaterialization, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles, trackedScenarios,
+  type FeatureRerendering,
+} from './feature-files.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
@@ -137,6 +142,9 @@ export type RunWrite =
   | 'invocation-ended'
   | 'analysis-accepted'
   | 'readiness-attempted'
+  | 'scenarios-materializing'
+  | 'scenarios-committed'
+  | 'scenarios-materialized'
   | 'work-item-started'
   | 'hypotheses-delivered'
   | 'placement-requested'
@@ -459,9 +467,10 @@ export class RunService {
 
   /**
    * Every external effect whose intent has no completion, performed again
-   * under its key. The one effect of this iteration is the commit a passing
-   * gate makes: a repeat finds it by its `Ramify-Gate` trailer and makes no
-   * second commit.
+   * under its key: the parent append of a decision, the commit a gate makes,
+   * which a repeat finds by its `Ramify-Gate` trailer, and the commit that
+   * materializes the feature files, which a repeat finds by its
+   * `Ramify-Scenarios` trailer. None makes a second commit.
    */
   private async completeEffects(run: Run): Promise<string[]> {
     const performed: string[] = [];
@@ -483,6 +492,13 @@ export class RunService {
         }
         await this.appendBrief(run, agent, decision, null);
         performed.push(`the parent append of decision ${decision.id}`);
+        continue;
+      }
+      if (event.type === 'scenarios-materializing') {
+        // The files are re-rendered from the ledger, and the commit is found
+        // by its trailers where the interrupted attempt made it.
+        await this.performMaterialization(run, true);
+        performed.push('the materialization of the feature files');
         continue;
       }
       if (event.type !== 'gate-committing') {
@@ -882,6 +898,9 @@ export class RunService {
 
     const ready = await this.reachReadiness(run);
     if (!ready || this.ignoring(run)) return;
+
+    await this.materializeScenarios(run);
+    if (this.ignoring(run)) return;
 
     const worked = await this.takeWorkItems(run, agent, packages, baseline);
     if (!worked || this.ignoring(run)) return;
@@ -1460,11 +1479,16 @@ export class RunService {
       const outlines = current.outlines.get(item.id) ?? [];
       const open = this.openRequirementsOf(run, current, item.id);
       // The guarded paths as they stand: an authorization may name one of
-      // these and nothing else, because a gate compares nothing else.
+      // these and nothing else, because a gate compares nothing else. The
+      // configuration and the feature files are the harness's alone, so no
+      // authorization names them.
+      const scenarioFiles = await this.guardedScenarioFiles(run);
+      const harnessOnly = new Set([projectConfigurationFile, ...(scenarioFiles.expected ?? []).map(file => file.path)]);
       const guarded = new Set((await captureGuardedFiles(
         this.projectRoot,
         this.requiredArtifacts(current).map(artifact => artifact.path),
-      )).map(file => file.path));
+        scenarioFiles,
+      )).map(file => file.path).filter(path => !harnessOnly.has(path)));
       const conformed = new Set(run.log.all('provider-conformed').map(event => conformanceKey(event.data.obligation, event.data.revision)));
       // A provider's report reaches this architect once, here, even while
       // this work item is yielded: what blocks it is the agreement.
@@ -2254,7 +2278,7 @@ export class RunService {
       completionEvidence: body.completionEvidence,
       evidenceObligations,
       gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations) },
-      guarded: await captureGuardedFiles(this.projectRoot, artifacts.map(artifact => artifact.path)),
+      guarded: await captureGuardedFiles(this.projectRoot, artifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run)),
       authorizations,
       ...(revised === undefined ? {} : { revisesContract: refOf(revised.id, revised.revision, revised) }),
     } satisfies IterationAssignment);
@@ -2418,7 +2442,7 @@ export class RunService {
 
       attempt += 1;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope);
+      const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
@@ -2808,7 +2832,7 @@ export class RunService {
       completionEvidence: `${item.module}'s own tests pass against the fake, and the fake passes the conformance suite.`,
       evidenceObligations: [],
       gate: { checkpoint: 'contract', tests: testPolicyOf('contract', base, []) },
-      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path)),
+      guarded: await captureGuardedFiles(this.projectRoot, subArtifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run)),
       authorizations: subArtifacts.map(artifact => ({
         path: artifact.path,
         rationale: `The agreement ${artifact.contract.id} is this iteration's to write.`,
@@ -2915,7 +2939,7 @@ export class RunService {
       if (this.ignoring(run)) return null;
       attempt += 1;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      const guarded = guardedScopeOf(assignment.scope);
+      const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
         guarded,
@@ -4037,6 +4061,10 @@ export class RunService {
       },
       perform: async () => {
         await this.afterWrite('gate-attempted', run.record.jobId);
+        // The feature files go into the gate's commit as the states now
+        // render them; the guarded comparison before this effect judged the
+        // tree against the rendering the assignment captured.
+        await this.rerenderScenarios(run);
         const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
@@ -4069,21 +4097,7 @@ export class RunService {
   private async scenarioInputs(run: Run): Promise<ScenarioCheckInputs | undefined> {
     const captured = run.record.projectConfig;
     if ('invalid' in captured) return undefined;
-    const records = [];
-    let states: ScenarioStates = initialScenarioStates([]);
-    for (const entry of run.log.ledger.replay()) {
-      for (const record of entry.transaction.records) {
-        if ((record.body as { schema?: unknown } | null)?.schema === 'ramify-agent.scenario/1') records.push(scenarioRecordSchema.parse(record.body));
-      }
-      const event = entry.transaction.event as { type: string };
-      if (event.type === 'analysis-accepted') states = initialScenarioStates(records.map(record => record.id));
-      // The harness commits no transition the events table rejects, so a
-      // rejected one leaves the states as they were, as in the snapshot.
-      if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
-        const applied = applyScenarioEvent(states, event as unknown as ScenarioEvent);
-        if (applied.ok) states = applied.states;
-      }
-    }
+    const { records, states } = trackedScenarios(run.log.ledger.replay());
     return {
       harness: captured.config.acceptance,
       modules: await scenarioModules(this.projectRoot, run.index),
@@ -4108,6 +4122,77 @@ export class RunService {
       if (!(error instanceof GitError)) throw error;
       this.warn(`Run ${run.record.jobId}: the run branch could not be created: ${error.message}`);
     }
+  }
+
+  /**
+   * Writes the tracked feature files onto the run branch and commits them as
+   * "Scenarios of <planId>", once readiness has passed and the branch
+   * exists, before the first local architect starts. The commit is an
+   * external effect of the ledger: `scenarios-materializing` is its intent
+   * and `scenarios-materialized` its completion, and a crash between them
+   * is recovered by re-rendering and by the commit's trailers. A run without
+   * scenarios has no file to write and records nothing.
+   */
+  private async materializeScenarios(run: Run): Promise<void> {
+    if (run.log.find('scenarios-materialized') !== undefined) return;
+    if (this.expectedFeatures(run).length === 0) return;
+    run.writer.requireSettled('The feature files cannot be written');
+    await this.performMaterialization(run, false);
+    await this.afterWrite('scenarios-materialized', run.record.jobId);
+  }
+
+  /** The materialization effect, from its intent or, on recovery, from the intent the log holds. */
+  private async performMaterialization(run: Run, recovering: boolean): Promise<{ commit: string | null; files: string[] }> {
+    const expected = this.expectedFeatures(run);
+    const files = expected.map(file => file.path);
+    return run.mutex.run(() => run.log.ledger.effect<{ commit: string | null; files: string[] }>({
+      key: 'scenarios-materialize',
+      intent: { event: run.log.next({ type: 'scenarios-materializing', data: { files } }), records: [] },
+      perform: async () => {
+        await this.afterWrite('scenarios-materializing', run.record.jobId);
+        await rerenderFeatureFiles(this.projectRoot, expected);
+        const message = materializationMessage({
+          planId: run.record.planId, runId: run.record.jobId, files, scenarios: trackedScenarios(run.log.ledger.replay()).records.length,
+        });
+        const commit = await commitForMaterialization(this.projectRoot, run.record.jobId, message, recovering, this.git);
+        await this.afterWrite('scenarios-committed', run.record.jobId);
+        return { commit, files };
+      },
+      complete: result => ({ event: run.log.next({ type: 'scenarios-materialized', data: result }), records: [] }),
+    }));
+  }
+
+  /** Every tracked feature file's expected content under the states the ledger holds now. */
+  private expectedFeatures(run: Run): RenderedFeatureFile[] {
+    return expectedFeatureFiles(trackedScenarios(run.log.ledger.replay()), { planId: run.record.planId, runId: run.record.jobId });
+  }
+
+  /**
+   * Re-renders the tracked feature files once they are materialized: writes
+   * those that differ from the states' rendering and reports whether a
+   * commit is needed. Before materialization it writes nothing.
+   */
+  private async rerenderScenarios(run: Run): Promise<FeatureRerendering> {
+    if (run.log.find('scenarios-materialized') === undefined) return { files: [], written: [], commitNeeded: false };
+    return rerenderFeatureFiles(this.projectRoot, this.expectedFeatures(run));
+  }
+
+  /**
+   * What an assignment guards of the scenarios: the support files the
+   * captured configuration names, and every tracked feature file with the
+   * hash of its expected rendering once the files are materialized.
+   */
+  private async guardedScenarioFiles(run: Run): Promise<GuardedScenarioFiles> {
+    const captured = run.record.projectConfig;
+    const support = 'invalid' in captured ? [] : await supportFiles(this.projectRoot, captured.config.acceptance.support);
+    const expected = run.log.find('scenarios-materialized') === undefined ? [] : expectedFeatureHashes(this.expectedFeatures(run));
+    return { support, expected };
+  }
+
+  /** The canonical files the write guard refuses every agent of this run: the configuration and the tracked feature files. */
+  private async deniedFiles(run: Run): Promise<string[]> {
+    const features = trackedScenarios(run.log.ledger.replay()).records.map(record => record.file);
+    return deniedFiles(this.projectRoot, features);
   }
 
   private async readGate(run: Run, id: string): Promise<GateAttempt | null> {

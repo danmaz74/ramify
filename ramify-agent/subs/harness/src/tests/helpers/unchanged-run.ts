@@ -1,20 +1,25 @@
 import { directReadinessExecution } from './external-tools.js';
 import { openRuns, type OpenRunsOptions } from './runs.js';
-import { scriptedGit, type ScriptedGit } from './scripted-git.js';
+import { scriptedGit, type GitCheckpoint, type ScriptedGit } from './scripted-git.js';
 
 const scripts: ScriptedGit[] = [];
 
 export interface UnchangedRunsOptions extends Omit<OpenRunsOptions, 'git'> {
-  /** Passing gate checkpoints in exact order; omission explicitly declares none. */
-  readonly unchangedCheckpoints?: readonly string[] | undefined;
+  /**
+   * Passing gate checkpoints in exact order; omission explicitly declares
+   * none. A subject is a checkpoint over an unchanged tree; a checkpoint
+   * stated in full, such as the harness's own `scenariosCommit`, answers
+   * what it states.
+   */
+  readonly unchangedCheckpoints?: ReadonlyArray<string | GitCheckpoint> | undefined;
 }
 
 /** Explicit fixture for scenarios whose agents never change project source. */
-export function unchangedGit(root: string, checkpoints: readonly string[] = []): ScriptedGit {
+export function unchangedGit(root: string, checkpoints: ReadonlyArray<string | GitCheckpoint> = []): ScriptedGit {
   const head = 'unchanged-fixture-revision';
   const git = scriptedGit(root, {
     head,
-    checkpoints: checkpoints.map(subject => ({ subject, commit: null, changes: [] })),
+    checkpoints: checkpoints.map(checkpoint => (typeof checkpoint === 'string' ? { subject: checkpoint, commit: null, changes: [] } : checkpoint)),
   });
   scripts.push(git);
   return git;

@@ -1,4 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -122,7 +123,7 @@ describe('plan capture', () => {
     const plan = await planWithScenarios(project);
     const { service, agent } = await openRuns(project, {
       script: script(scenarioAnalysis(plan)),
-      unchangedCheckpoints: ['wi-001', 'wi-002', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -154,7 +155,7 @@ describe('plan capture', () => {
     const project = await target();
     const { service, agent } = await openRuns(project, {
       script: script(analysis([entry('reviewer-note', reviews)])),
-      unchangedCheckpoints: ['wi-001', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -174,7 +175,7 @@ describe('acceptance', () => {
     const plan = await planWithScenarios(project);
     const { service } = await openRuns(project, {
       script: script(scenarioAnalysis(plan)),
-      unchangedCheckpoints: ['wi-001', 'wi-002', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -258,7 +259,7 @@ describe('acceptance', () => {
     const { service } = await openRuns(project, {
       inputs: { ...shapeOnlyInputs, index: async () => index },
       script: script(submitted),
-      unchangedCheckpoints: ['wi-001', 'wi-002', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));

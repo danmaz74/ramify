@@ -1,4 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { scenariosCommit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -305,7 +306,7 @@ describe('the rules an assignment must satisfy', () => {
 describe('a rejected submission in a run', () => {
   const reviews = 'collection-review/workspace/reviews';
 
-  async function run(inputs: readonly unknown[], unchangedCheckpoints: readonly string[] = []) {
+  async function run(inputs: readonly unknown[], unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = []) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
@@ -325,7 +326,7 @@ describe('a rejected submission in a run', () => {
   test('a broken schema returns every error to the same session, and a corrected input is accepted', async () => {
     const { root, runId, service, agent } = await run(
       [{ kind: 'request-completion', summary: 'done' }, requestCompletion()],
-      ['wi-001', 'final verification of plan "review-notes"'],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'],
     );
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
@@ -348,7 +349,7 @@ describe('a rejected submission in a run', () => {
 
   test('a rule the schema cannot hold is answered the same way, and the bound ends the invocation', async () => {
     const broken = requestCompletion({ decomposition: { kind: 'staged', rationale: 'It is big.' }, stages: [] });
-    const { root, runId, service, agent } = await run([broken, broken, broken, broken]);
+    const { root, runId, service, agent } = await run([broken, broken, broken, broken], [scenariosCommit('review-notes')]);
 
     const snapshot = onlyRun(service, 'review-notes');
     expect(snapshot.state).toBe('failed');

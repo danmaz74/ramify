@@ -9,7 +9,7 @@ import { assign, byRole, completionProposed, installMiniRunner, outline, submit,
 import { forkDecision, registryChange, requestPlacement } from './helpers/placement.js';
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
 import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
-import { gateGit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -37,6 +37,9 @@ const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 /** The revision the fixture is on before a run commits anything. */
 const base = 'revision-00';
+/** The harness's own commit of the run's feature files, made once readiness has passed. */
+const materialized = 'scenarios-00';
+const scenarios = scenariosCommit('review-notes', materialized, base);
 
 /** A boundary Git reports as unchanged, which commits nothing. */
 const unchanged: GateCommit = { commit: null };
@@ -84,7 +87,7 @@ async function readResult(root: string, runId: string, number: number): Promise<
 
 describe('G9: an accepted proposed entry owner reaches implementation', () => {
   test('a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit', async () => {
-    const { root, scripted } = await target({ commits: [created, unchanged, unchanged] });
+    const { root, scripted } = await target({ commits: [scenarios, created, unchanged, unchanged] });
     // This scenario keeps the real architect view: what it proves is that
     // the module the engineer created is in the refreshed view before its
     // own gate can pass.
@@ -147,8 +150,8 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
 
     // The message the harness asked Git to commit names the module it
     // created, and the files it created really are on disk.
-    expect(scripted.messages[0]).toContain('Ramify-Iteration: wi-001.i01');
-    expect(scripted.messages[0]).toContain(`Modules created: ${notes} (${notesDirectory}/module.ramify)`);
+    expect(scripted.messages[1]).toContain('Ramify-Iteration: wi-001.i01');
+    expect(scripted.messages[1]).toContain(`Modules created: ${notes} (${notesDirectory}/module.ramify)`);
     expect(await readFile(join(root, notesDirectory, 'module.ramify'), 'utf8')).toBe('ramify 1\nmodule notes\n');
     scripted.assertComplete();
   }, 300_000);

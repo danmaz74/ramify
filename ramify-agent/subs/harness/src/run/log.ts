@@ -94,6 +94,19 @@ export const runEventSchema = z.discriminatedUnion('type', [
     recovery: z.string().nullable(),
     final: z.boolean(),
   }).strict()),
+  /**
+   * The durable intent of the materialization effect: the tracked feature
+   * files about to be written onto the run branch and committed as
+   * "Scenarios of <planId>". A crash before its completion is recovered by
+   * re-rendering and by the commit's trailers.
+   */
+  event('scenarios-materializing', z.object({ files: z.array(text) }).strict()),
+  /**
+   * The feature files are on the run branch: the commit that holds them, or
+   * null where the tree already held them, and every tracked file. It
+   * precedes the first work item, and the commit is an accepted boundary.
+   */
+  event('scenarios-materialized', z.object({ commit: z.string().nullable(), files: z.array(text) }).strict()),
   /** The work item's turn begins; it licenses its local architect. */
   event('work-item-started', z.object({ workItem: text, module: text }).strict()),
   /**

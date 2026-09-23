@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect } from 'vitest';
-import { scriptedGit } from './scripted-git.js';
+import { scenariosCommit, scriptedGit } from './scripted-git.js';
 import { commandResult } from './command-result.js';
 import { createMappedCheckExecution } from './direct-check-execution.js';
 import { directReadinessExecution } from './external-tools.js';
@@ -12,6 +12,7 @@ import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 /** External responses for the two-work-item HTTP fixture. HTTP itself stays real. */
 export function protocolPorts(root: string) {
   const git = scriptedGit(root, { head: 'protocol-base', checkpoints: [
+    scenariosCommit('review-notes', 'scenarios-revision'),
     { subject: 'wi-001.i01', commit: 'notes-revision', changes: [
       { status: 'M', path: `${notesDirectory}/src/notes.ts` }, { status: 'A', path: outsidePath },
     ] },

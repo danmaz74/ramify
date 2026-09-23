@@ -1,7 +1,7 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { scriptedGit } from './helpers/scripted-git.js';
+import { scenariosCommit, scriptedGit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { commandResult } from './helpers/command-result.js';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -171,6 +171,7 @@ describe('break-discovered', () => {
 
 describe('a rejected submission in a run', () => {
   const completedCheckpoints = [
+    scenariosCommit('review-notes'),
     'wi-001.i01: Carry out the work in collection-review/workspace/reviews/notes.',
     'wi-001',
     'final verification of plan "review-notes"',
@@ -179,7 +180,7 @@ describe('a rejected submission in a run', () => {
   async function run(
     inputs: readonly unknown[],
     toolCalls: readonly unknown[] = [],
-    unchangedCheckpoints: readonly string[] = [],
+    unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
   ) {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
@@ -252,7 +253,7 @@ describe('a rejected submission in a run', () => {
 
   test('a rule the schema cannot hold is answered the same way, and the bound ends the invocation', async () => {
     const forged = { kind: 'completion-proposed', summary: 'Done.\nRamify-Gate: ga-0001', findings: [] };
-    const { root, runId, service, agent } = await run([forged, forged, forged, forged]);
+    const { root, runId, service, agent } = await run([forged, forged, forged, forged], [], [scenariosCommit('review-notes')]);
 
     const snapshot = onlyRun(service, 'review-notes');
     expect(snapshot.state).toBe('failed');
@@ -274,6 +275,7 @@ describe('a rejected submission in a run', () => {
     const { root, runId, service, agent } = await run(
       [completionProposed('Left the limit as the plan asks.')],
       [{ suite: 'everything' }, { suite: 'everything' }, { suite: 'everything' }],
+      [scenariosCommit('review-notes')],
     );
 
     const snapshot = onlyRun(service, 'review-notes');
@@ -348,11 +350,11 @@ describe('a Ramify module violation in a run', () => {
     const marker = '/* NOT-EXPOSED-IMPORT */';
     const file = `${notesDirectory}/src/notes.ts`;
     const git = scriptedGit(root, { head: 'base', checkpoints: [
+      scenariosCommit('review-notes'),
       { subject: 'wi-001.i01', commit: 'fixed-source', changes: [{ status: 'M', path: file }] },
       { subject: 'wi-001', commit: null, changes: [] },
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
     ] });
-    git.givenWrites();
     const ramify = new FakeRamifyCli();
     const finding = {
       id: `source-diagnostic/1:${file}`, category: 'import', code: 'not-visible',
@@ -371,6 +373,8 @@ describe('a Ramify module violation in a run', () => {
       .mockResolvedValue(answer([]));
     const { service, agent } = await openRunsWithGit(root, {
       inputs: treeInputs(), git, ramify, readinessExecution: directReadinessExecution(),
+      // The engineer's writes are what Git reports once the feature files are committed.
+      afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],

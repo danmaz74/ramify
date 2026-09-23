@@ -1,4 +1,5 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
+import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -42,7 +43,7 @@ afterEach(async () => {
 
 const core = 'collection-review/workspace/catalog/core';
 const panel = 'collection-review/workspace/catalog/ui';
-const unchangedPlacementCheckpoints = ['wi-001', 'wi-002', 'final verification of plan "revision-diff"'] as const;
+const unchangedPlacementCheckpoints = [scenariosCommit('revision-diff'), 'wi-001', 'wi-002', 'final verification of plan "revision-diff"'] as const;
 
 /** A copy of the fixture project, made a git repository with the runner readiness looks for. */
 async function target(): Promise<string> {
@@ -521,7 +522,7 @@ describe('a fork whose submissions are invalid', () => {
         { kind: 'submit', input: broken },
       ]],
     }));
-    const opened = await openRuns(project, { agent, inputs: treeInputs() });
+    const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit('revision-diff')] });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
     await opened.service.settled('revision-diff', receipt.jobId);

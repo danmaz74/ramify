@@ -1,3 +1,4 @@
+import type { GitCheckpoint } from './helpers/scripted-git.js';
 import { protocolPorts } from './helpers/protocol-ports.js';
 import { openUnchangedRuns, unchangedGit, assertUnchangedGit, type UnchangedRunsOptions } from './helpers/unchanged-run.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
@@ -117,7 +118,7 @@ async function everyAnswer(server: RunningServer, runId: string): Promise<Record
 async function serve(
   root: string,
   extra: Partial<Parameters<typeof startServerWith>[0]> = {},
-  unchangedCheckpoints: readonly string[] = [],
+  unchangedCheckpoints: ReadonlyArray<string | GitCheckpoint> = [],
 ): Promise<RunningServer> {
   const ports = fixtures.get(root);
   return startServerWith({

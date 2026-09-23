@@ -182,6 +182,16 @@ export async function matchSupport(projectRoot: string, support: readonly string
   });
 }
 
+/**
+ * Every file the `support` entries name, project-relative and ordered: what
+ * a run guards of the scenario harness beside its configuration.
+ */
+export async function supportFiles(projectRoot: string, support: readonly string[]): Promise<string[]> {
+  if (support.length === 0) return [];
+  const matched = await matchSupport(projectRoot, support, []);
+  return [...new Set(matched.flatMap(entry => [...entry.inside, ...entry.outside]))].sort();
+}
+
 /** Every file beneath the root, project-relative, skipping `node_modules` and dot-directories. */
 async function projectFiles(projectRoot: string): Promise<string[]> {
   const found: string[] = [];

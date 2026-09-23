@@ -10,7 +10,7 @@ import { assign, byRole, completionProposed, outline, submit, treeInputs } from 
 import { localDecision, registryChange, requestPlacement } from './helpers/placement.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
-import { answeredGit, unchanged } from './helpers/contracts-git.js';
+import { answeredGit, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -142,6 +142,7 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
     const git = answeredGit(project, {
       head: 'revision-00',
       commits: [
+        scenariosCommitted('revision-diff'),
         unchanged('wi-001.i01'), unchanged('wi-001'),
         unchanged('wi-002.i01'), unchanged('wi-002'),
         unchanged('wi-003.i01'), unchanged('wi-003'),
@@ -157,12 +158,13 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
     const runId = receipt.jobId;
     expect(onlyRun(opened.service, 'revision-diff').state).toBe('completed');
 
-    // What the run asked Git: its own branch, one commit for each gate, and
-    // no revision, because nothing in the tree changed. Every answer this
-    // scenario stated was used and nothing else was asked of Git.
+    // What the run asked Git: its own branch, the feature files' commit, one
+    // commit for each gate, and no other revision, because nothing else in
+    // the tree changed. Every answer this scenario stated was used and
+    // nothing else was asked of Git; only the gates' commits are looked up.
     expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(git.minted()).toEqual([]);
-    expect(git.lookups()).toHaveLength(git.messages().length);
+    expect(git.minted()).toEqual(['scenarios-of-revision-diff']);
+    expect(git.lookups()).toHaveLength(git.messages().length - 1);
     git.assertAnswered();
 
 

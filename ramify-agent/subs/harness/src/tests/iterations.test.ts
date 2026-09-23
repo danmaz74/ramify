@@ -10,7 +10,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
   addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write,
 } from './helpers/iterations.js';
-import { gateGit, operationsOf, type GateCommit } from './helpers/gate-git.js';
+import { gateGit, scenariosCommit, operationsOf, type GateCommit } from './helpers/gate-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -52,6 +52,9 @@ const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 /** The revision the fixture is on before a run commits anything. */
 const base = 'revision-00';
+/** The harness's own commit of the run's feature files, made once readiness has passed. */
+const materialized = 'scenarios-00';
+const scenarios = scenariosCommit('review-notes', materialized, base);
 
 /** A boundary Git reports as unchanged, which is what a passing gate over an unchanged tree records. */
 const unchanged: GateCommit = { commit: null };
@@ -83,7 +86,8 @@ async function target(options: { readonly notes?: boolean } = {}) {
 
 /** Opens a run over `root` with the scripted fake and the stated Git answers. */
 async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly GateCommit[]) {
-  const scripted = gateGit(root, { head: base, commits });
+  // The feature files' commit comes before every boundary a scenario states.
+  const scripted = gateGit(root, { head: base, commits: [scenarios, ...commits] });
   const opened = await openRuns(root, {
     script: byRole(plan),
     inputs: treeInputs(),
@@ -177,12 +181,12 @@ describe('G8: a work item revised across several iterations keeps every obligati
         .map(id => readGate(root, runId, id)));
     expect(attempts.map(attempt => attempt.commit)).toEqual(['revision-01', null, null, null, null]);
     expect(attempts.map(attempt => attempt.audited)).toEqual(['revision-01', 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
-    expect(attempts.map(attempt => attempt.head)).toEqual([base, 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
-    expect(scripted.revisions()).toEqual(['revision-01']);
+    expect(attempts.map(attempt => attempt.head)).toEqual([materialized, 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
+    expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
     expect(scripted.branch()).toBe(`ramify-agent/run-${runId}`);
-    expect(scripted.messages).toHaveLength(5);
-    expect(scripted.messages[0]).toContain('Ramify-Iteration: wi-001.i01');
-    expect(scripted.messages[0]).toContain('Added the note store.');
+    expect(scripted.messages).toHaveLength(6);
+    expect(scripted.messages[1]).toContain('Ramify-Iteration: wi-001.i01');
+    expect(scripted.messages[1]).toContain('Added the note store.');
     // The store the first iteration wrote is really on disk, whatever Git
     // was told to answer about it.
     expect(await readFile(join(root, notesDirectory, 'src', 'store.ts'), 'utf8')).toBe('export const store = new Map();\n');
@@ -239,10 +243,10 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
     expect(second.scope.resolved.roots.some(path => path.endsWith('subs/workspace/subs/reviews/subs/core'))).toBe(true);
 
     // An accepted iteration over a tree Git reports unchanged commits
-    // nothing and keeps the boundary the run started from.
-    expect(firstGate).toMatchObject({ commit: null, audited: base, verdict: 'passed' });
-    expect(secondGate).toMatchObject({ commit: null, audited: base, verdict: 'passed' });
-    expect(scripted.revisions()).toEqual([]);
+    // nothing and keeps the boundary the feature files' commit set.
+    expect(firstGate).toMatchObject({ commit: null, audited: materialized, verdict: 'passed' });
+    expect(secondGate).toMatchObject({ commit: null, audited: materialized, verdict: 'passed' });
+    expect(scripted.revisions()).toEqual([materialized]);
     // No external tool was started for any of this.
     expectNoProcesses();
     scripted.assertComplete();

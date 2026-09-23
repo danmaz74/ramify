@@ -30,7 +30,7 @@ import {
   type EngineerSubmission,
 } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
-import { captureGuardedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
+import { captureGuardedFiles, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
 import { iterationApiViews } from '../work/session.js';
 import {
   sessionLayout, sessionOutcomeSchema, sessionRecordSchema, sessionsDirectory,
@@ -254,7 +254,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     if (!list.includes(target.resolved)) list.push(target.resolved);
   }
   const scope = { ...own, resolved: { ...own.resolved, roots, files } };
-  const guarded: GuardedScope = guardedScopeOf(scope);
+  // The project's configuration for the harness is never an agent's to write.
+  const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
   const tests = testPolicyOf('ordinary', base, []);
 
   const policy = options.policy ?? defaultRunPolicy({ projectRoot, nested: await discoverNestedPackages(projectRoot) });
