@@ -31,6 +31,16 @@ Design documents for the separate agent harness:
   analysis for the capability registry: only top-level capabilities are
   required, a forecast is retired by deduction when the run completes, and
   early retirement is a placement decision
+- [Acceptance scenarios](analysis/2026-09-23-acceptance-scenarios.md),
+  analysis recording Dan's decision that Gherkin scenarios are the plan's main
+  acceptance gate: their origin and review, matching to entries, late binding,
+  quick and full modes, and Cucumber runs scoped to the module tree
+- [Acceptance scenarios: the v1 architecture](architecture/acceptance-scenarios.md),
+  proposed design for the first step, with Dan's decisions of 2026-09-23: plan
+  scenarios extracted at capture, frozen at analysis, a review stop,
+  harness-materialized feature files, four scenario states, declarations
+  verified by every gate, one Cucumber run per owner module read from its
+  message stream, and an integration work item at the common ancestor
 - [Work-brief decomposition spike](spikes/work-brief-examples/README.md), isolated example requests and Sol planning runs
 - [Autonomous-loop initial capability and module hypothesis](spikes/autonomous-loop-initial-analysis/README.md),
   spike output and reusable input for the later implementation plan
