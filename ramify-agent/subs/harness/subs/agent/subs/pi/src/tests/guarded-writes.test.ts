@@ -58,7 +58,7 @@ describe('the write built-ins and the guard', () => {
     });
     await expect(harness.session.outcome).resolves.toMatchObject({ kind: 'submitted' });
     expect(readFileSync(join(harness.workingDirectory, 'allowed.ts'), 'utf8')).toBe('export const ok = 1;\n');
-    expect(harness.settledMutations).toEqual([{ callId: 'c-1', tool: 'write', failed: false }]);
+    expect(harness.settledMutations).toEqual([{ callId: 'c-1', tool: 'write', action: { kind: 'write', paths: ['allowed.ts'] }, failed: false }]);
     expect(harness.requestText(1)).toContain('RAMIFY-HOOK-CHECK');
   });
 
@@ -90,7 +90,7 @@ describe('the write built-ins and the guard', () => {
       hookCheck: 'RAMIFY-HOOK-CHECK: the tree is dirty.',
     });
     await harness.session.outcome;
-    expect(harness.settledMutations).toEqual([{ callId: 'c-1', tool: 'write', failed: true }]);
+    expect(harness.settledMutations).toEqual([{ callId: 'c-1', tool: 'write', action: { kind: 'write', paths: ['a-directory/impossible'] }, failed: true }]);
     const finished = harness.events.filter(event => event.type === 'tool-finished' && event.callId === 'c-1');
     expect(finished[0]).toMatchObject({ isError: true, reachedTool: true });
   });
@@ -111,7 +111,7 @@ describe('the write built-ins and the guard', () => {
 
     expect(applied).toEqual([{ path: 'a.ts' }]);
     expect(harness.guarded.map(guarded => guarded.tool)).toEqual(['apply_patch']);
-    expect(harness.settledMutations).toEqual([{ callId: 'c-1', tool: 'apply_patch', failed: false }]);
+    expect(harness.settledMutations).toEqual([{ callId: 'c-1', tool: 'apply_patch', action: { kind: 'harness' }, failed: false }]);
     // pi's own shell is withheld: it is not offered and the call has no effect.
     expect(harness.toolNames(0)).not.toContain('bash');
     expect(harness.events).toContainEqual(expect.objectContaining({ type: 'tool-finished', callId: 'c-shell', isError: true }));

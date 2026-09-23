@@ -14,20 +14,25 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { contextBudgetReached } from '../../../src/interfaces/port.js';
+import { assistantText, contextBudgetReached } from '../../../src/interfaces/port.js';
 import type {
   ActualStart,
   AgentEvent,
   AgentPort,
   AgentSession,
   AppendOutcome,
+  AssistantBlock,
+  ContentBlock,
+  ExecutorSupport,
   JsonSchema,
-  PortObservations,
+  MessageDetail,
   SessionOutcome,
   SessionRef,
   SessionSpec,
+  StopReason,
   SubmissionTool,
   TokenUsage,
+  ToolAction,
   ToolDefinition,
 } from '../../../src/interfaces/port.js';
 
@@ -47,6 +52,10 @@ import type {
  *   after-mutation hook are all port policy here. None of them is prompt
  *   text, and pi's session files, SDK objects and login stay behind this
  *   module.
+ * - Every message reaches the port from pi's events, never from its session
+ *   file: the first prompt, which pi reports before the model call, each
+ *   assistant message and each tool result. Opaque provider data, such as
+ *   thinking signatures, stays in pi's file for continuation.
  */
 
 /** pi's only mutating built-ins once the shell is withheld. */
@@ -56,14 +65,27 @@ const mutatingBuiltins = new Set<string>(['edit', 'write']);
 const briefType = 'ramify-brief';
 
 /**
- * What this adapter observes. pi reports all three; the limitations are in
- * the values, not in their absence: the context size is always an estimate
- * and is null after a compaction until the next assistant reply.
+ * What this adapter supports: everything the port declares. The limitations
+ * of its observations are in the values, not in their absence: the context
+ * size is always an estimate and is null after a compaction until the next
+ * assistant reply. A fork branches at the entry its ref names, so it forks
+ * at any point. pi reports thinking text without saying whether the provider
+ * summarized it, so a thinking block is `unmarked` unless pi marks it
+ * redacted.
  */
-const piObservations: PortObservations = {
+const piSupport: ExecutorSupport = {
   usage: { available: true },
   context: { available: true },
   compaction: { available: true },
+  thinking: { available: true },
+  retries: { available: true },
+  continue: { available: true },
+  fork: { available: true },
+  forkAtPoint: { available: true },
+  appendContext: { available: true },
+  exactSystemPrompt: { available: true },
+  guard: { available: true },
+  afterMutation: { available: true },
 };
 
 type PiToolDefinition = Parameters<typeof defineTool>[0];
@@ -100,6 +122,8 @@ export interface PiRuntimeSource {
   readonly model?: string | undefined;
   readonly settleMs?: number | undefined;
   readonly compaction?: PiAgentOptions['compaction'];
+  /** pi's first delay before it retries a failed model call; default pi's own. Tests shorten it. */
+  readonly retryDelayMs?: number | undefined;
   runtime(): Promise<ModelRuntime>;
 }
 
@@ -143,7 +167,7 @@ export function createPiAgentOn(source: PiRuntimeSource): AgentPort {
   const live = new Map<string, PiSession>();
   return {
     name: 'pi',
-    observations: piObservations,
+    support: piSupport,
     startSession: spec => startPiSession(spec, source, live),
     appendContext: (ref, key, text) => appendPiContext(live, ref, key, text),
   };
@@ -269,6 +293,14 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
     ...spec.builtinTools.filter(tool => mutatingBuiltins.has(tool)),
     ...spec.tools.filter(tool => tool.mutating === true).map(tool => tool.name),
   ]);
+  const harnessTools = new Map(spec.tools.map(tool => [tool.name, tool]));
+  /** What one call does: a harness tool's declared action, or pi's own tool classified. */
+  const actionOf = (tool: string, input: unknown): ToolAction => {
+    if (tool === spec.submission.name) return { kind: 'harness' };
+    const harness = harnessTools.get(tool);
+    if (harness !== undefined) return harness.action?.(input) ?? { kind: 'harness' };
+    return builtinAction(tool, input);
+  };
 
   // The session manager is resolved before anything runs, so `ref` and the
   // mode that was actual are readable from the moment the session starts.
@@ -312,7 +344,7 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
     const runtime = await source.runtime();
     const { model, thinkingLevel } = await chooseModel(runtime, source.model);
     const settingsManager = SettingsManager.inMemory({
-      retry: { enabled: true, maxRetries: 2 },
+      retry: { enabled: true, maxRetries: 2, ...(source.retryDelayMs === undefined ? {} : { baseDelayMs: source.retryDelayMs }) },
       ...(source.compaction === undefined ? {} : { compaction: source.compaction }),
     });
     const loader = new DefaultResourceLoader({
@@ -334,7 +366,9 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
           api.on('tool_call', async event => {
             validated.add(event.toolCallId);
             if (!mutatingTools.has(event.toolName) || spec.guard === undefined) return undefined;
-            const decision = await spec.guard({ callId: event.toolCallId, tool: event.toolName, input: event.input });
+            const decision = await spec.guard({
+              callId: event.toolCallId, tool: event.toolName, input: event.input, action: actionOf(event.toolName, event.input),
+            });
             if (decision.allow) return undefined;
             denied.add(event.toolCallId);
             // The reason becomes the call's error result; nothing is mutated.
@@ -350,7 +384,9 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
       const base: PiToolResult | undefined = rejectedCalls.has(event.toolCallId) ? { isError: true } : undefined;
       if (!mutatingTools.has(event.toolName) || spec.afterMutation === undefined) return base;
       if (denied.has(event.toolCallId)) return base;
-      const observed = await spec.afterMutation({ callId: event.toolCallId, tool: event.toolName, failed: event.isError === true });
+      const observed = await spec.afterMutation({
+        callId: event.toolCallId, tool: event.toolName, action: actionOf(event.toolName, event.input), failed: event.isError === true,
+      });
       if (observed === null) return base;
       return { ...(base ?? {}), content: [...event.content, { type: 'text', text: observed.text }] };
     };
@@ -383,7 +419,9 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
     session.setAutoCompactionEnabled(spec.context.compaction === 'allowed');
     if (stopped) return { kind: 'stopped' };
     session.subscribe(event => translate(event, emit, {
+      priced: priced(model),
       mutating: tool => mutatingTools.has(tool),
+      action: actionOf,
       reachedTool: callId => validated.has(callId),
       observeContext,
       onTurnEnd: () => {
@@ -403,7 +441,7 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
     if (accepted) return { kind: 'submitted', input: accepted.input };
     if (budget) return { kind: 'context-budget-reached', tokens: budget.tokens, report: session.getLastAssistantText() };
     if (finalErrors) return { kind: 'ended', message: finalErrors.join('\n') };
-    const last = [...session.messages].reverse().find(entry => (entry as { role?: string }).role === 'assistant') as AssistantLike | undefined;
+    const last = [...session.messages].reverse().find(entry => (entry as { role?: string }).role === 'assistant') as PiMessage | undefined;
     if (last?.stopReason === 'error' || last?.stopReason === 'aborted') {
       return { kind: 'failed', error: last.errorMessage ?? `The model's reply ended with ${last.stopReason}` };
     }
@@ -559,35 +597,79 @@ function unwrapStringifiedFields(params: unknown, schema: JsonSchema): unknown {
   return result;
 }
 
-interface AssistantLike {
-  readonly role: 'assistant';
-  readonly content: ReadonlyArray<{ readonly type: string; readonly text?: string; readonly name?: string }>;
-  readonly usage?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number; readonly totalTokens: number };
-  readonly stopReason?: string;
-  readonly errorMessage?: string;
+/** One content block of a pi message, as far as this adapter reads it. */
+interface PiBlock {
+  readonly type: string;
+  readonly text?: string;
+  readonly thinking?: string;
+  readonly redacted?: boolean;
+  readonly id?: string;
+  readonly name?: string;
+  readonly arguments?: unknown;
+  readonly mimeType?: string;
+  readonly data?: string;
 }
 
-function textOf(message: AssistantLike): string {
-  return message.content.filter(block => block.type === 'text' && typeof block.text === 'string').map(block => block.text).join('\n').trim();
+/**
+ * A pi message, as far as this adapter reads it: a user, assistant or tool
+ * result message, or one of pi's own roles, such as `custom`.
+ */
+interface PiMessage {
+  readonly role: string;
+  readonly content?: string | readonly PiBlock[];
+  readonly usage?: {
+    readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number; readonly totalTokens: number;
+    /** The part of `cacheWrite` written with long retention, when the provider reports the split. */
+    readonly cacheWrite1h?: number;
+    /** The part of `output` spent reasoning, when the provider reports it. */
+    readonly reasoning?: number;
+    readonly cost?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number; readonly total: number };
+  };
+  readonly provider?: string;
+  readonly model?: string;
+  readonly responseModel?: string;
+  readonly providerThinkingLevel?: string;
+  readonly stopReason?: string;
+  readonly errorMessage?: string;
+  readonly toolCallId?: string;
+  readonly toolName?: string;
+  readonly isError?: boolean;
+}
+
+function textOf(message: PiMessage): string {
+  const content = Array.isArray(message.content) ? message.content as readonly PiBlock[] : [];
+  return content.filter(block => block.type === 'text' && typeof block.text === 'string').map(block => block.text).join('\n').trim();
+}
+
+/** Whether pi prices this model's messages. For a model without rates it reports a cost of zero whatever was used. */
+function priced(model: PiModel): boolean {
+  return [model.cost.input, model.cost.output, model.cost.cacheRead, model.cost.cacheWrite].some(rate => rate > 0);
 }
 
 /** What the adapter must answer while translating one of pi's events. */
 interface Translation {
+  /** Whether a message's cost is a price, or pi's zero for a model it has no rates for. */
+  readonly priced: boolean;
   mutating(tool: string): boolean;
+  action(tool: string, input: unknown): ToolAction;
   reachedTool(callId: string): boolean;
   observeContext(): void;
   onTurnEnd(): void;
 }
 
 /**
- * pi's events as port events: tool calls by call ID, each assistant message
- * with its token usage, the context after every model and tool boundary, and
- * compaction with its reason and its sizes.
+ * pi's events as port events: tool calls by call ID, every message with its
+ * blocks and, for an assistant message, its usage and detail; the context
+ * after every model and tool boundary; compaction with its reason and its
+ * sizes; and pi's own retries.
  */
 function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, to: Translation): void {
   switch (event.type) {
     case 'tool_execution_start':
-      emit({ type: 'tool-started', callId: event.toolCallId, tool: event.toolName, input: event.args, mutating: to.mutating(event.toolName) });
+      emit({
+        type: 'tool-started', callId: event.toolCallId, tool: event.toolName, input: event.args,
+        action: to.action(event.toolName, event.args), mutating: to.mutating(event.toolName),
+      });
       return;
     case 'tool_execution_end': {
       const content = (event.result as { content?: ReadonlyArray<{ type: string; text?: string }> } | undefined)?.content ?? [];
@@ -602,12 +684,10 @@ function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, 
       return;
     }
     case 'message_end': {
-      const message = event.message as unknown as AssistantLike;
-      if (message.role !== 'assistant') return;
-      const calls = message.content.filter(block => block.type === 'toolCall').map(block => block.name ?? '?');
-      const text = textOf(message) || (calls.length ? `(calls ${calls.join(', ')})` : '');
-      emit({ type: 'message', text, usage: usageOf(message) });
-      to.observeContext();
+      // pi reports the first prompt this way before it calls the model.
+      const message = event.message as unknown as PiMessage;
+      emit(messageOf(message, to));
+      if (message.role === 'assistant') to.observeContext();
       return;
     }
     case 'compaction_start':
@@ -618,11 +698,20 @@ function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, 
       // compaction and the next assistant reply.
       emit({
         type: 'compaction', phase: 'ended', reason: event.reason,
-        tokensBefore: event.result?.tokensBefore,
-        tokensAfter: event.result?.estimatedTokensAfter,
+        tokensBefore: event.result?.tokensBefore ?? null,
+        tokensAfter: event.result?.estimatedTokensAfter ?? null,
         aborted: event.aborted,
-        errorText: event.errorMessage,
+        errorText: event.errorMessage ?? null,
       });
+      return;
+    case 'auto_retry_start':
+      emit({
+        type: 'retry', phase: 'started', attempt: event.attempt,
+        maxAttempts: event.maxAttempts, delayMs: event.delayMs, errorText: event.errorMessage,
+      });
+      return;
+    case 'auto_retry_end':
+      emit({ type: 'retry', phase: 'ended', attempt: event.attempt, succeeded: event.success, errorText: event.finalError ?? null });
       return;
     case 'turn_end':
       to.onTurnEnd();
@@ -632,10 +721,138 @@ function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, 
   }
 }
 
-function usageOf(message: AssistantLike): TokenUsage | undefined {
+/**
+ * pi's own tools as port actions, from pi's names and inputs: `read` with
+ * `path`, `offset` and `limit`; `grep` and `find` with `pattern`, `path` and
+ * `glob`; `ls` with `path`; `edit` and `write` with `path`. This is the one
+ * place those names are read. A read that names no path, and any other
+ * tool, is `other`; a write that names none has no paths. Exported for this
+ * module's tests.
+ */
+export function builtinAction(tool: string, input: unknown): ToolAction {
+  const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+  const text = (key: string): string | null => (typeof record[key] === 'string' ? record[key] as string : null);
+  const count = (key: string): number | null => (typeof record[key] === 'number' ? record[key] as number : null);
+  const path = text('path');
+  switch (tool) {
+    case 'read': {
+      if (path === null) return { kind: 'other' };
+      const start = count('offset');
+      const lines = count('limit');
+      return { kind: 'read', path, range: start === null && lines === null ? null : { start, count: lines } };
+    }
+    case 'grep':
+    case 'find':
+      return { kind: 'search', pattern: text('pattern'), path, glob: text('glob') };
+    case 'ls':
+      return { kind: 'search', pattern: null, path, glob: null };
+    case 'edit':
+    case 'write':
+      return { kind: 'write', paths: path === null ? [] : [path] };
+    default:
+      return { kind: 'other' };
+  }
+}
+
+/**
+ * One pi message as a port message. pi's `custom` messages, such as an
+ * appended brief, reach the model as the user's, and so does any other role
+ * pi adds; a role the port does not map is one `other` block, never dropped.
+ */
+function messageOf(message: PiMessage, to: Translation): AgentEvent {
+  switch (message.role) {
+    case 'assistant': {
+      const content = Array.isArray(message.content) ? message.content as readonly PiBlock[] : [];
+      const blocks = content.map(block => assistantBlock(block, to));
+      return {
+        type: 'message', role: 'assistant', blocks, text: assistantText(blocks),
+        usage: usageOf(message), detail: detailOf(message, to.priced),
+      };
+    }
+    case 'toolResult':
+      return {
+        type: 'message', role: 'tool-result', callId: message.toolCallId ?? '', tool: message.toolName ?? '',
+        isError: message.isError === true, blocks: contentBlocks(message.content),
+      };
+    case 'user':
+    case 'custom':
+      return { type: 'message', role: 'user', blocks: contentBlocks(message.content) };
+    default:
+      return {
+        type: 'message', role: 'user',
+        blocks: [{ type: 'other', kind: message.role, description: `a pi message of role "${message.role}", which the port does not map` }],
+      };
+  }
+}
+
+/** An assistant block. Signatures and other opaque provider data are left out. */
+function assistantBlock(block: PiBlock, to: Translation): AssistantBlock {
+  switch (block.type) {
+    case 'text':
+      return { type: 'text', text: block.text ?? '' };
+    case 'thinking':
+      // A redacted block's text is a placeholder, and its payload is opaque.
+      return block.redacted === true
+        ? { type: 'thinking', visibility: 'redacted', text: '' }
+        : { type: 'thinking', visibility: 'unmarked', text: block.thinking ?? '' };
+    case 'toolCall': {
+      const tool = block.name ?? '';
+      const input = block.arguments ?? {};
+      return { type: 'tool-call', callId: block.id ?? '', tool, input, action: to.action(tool, input) };
+    }
+    default:
+      return otherBlock(block);
+  }
+}
+
+/** The content of a user message or a tool result: a string, or text and image blocks. */
+function contentBlocks(content: PiMessage['content']): ContentBlock[] {
+  if (typeof content === 'string') return [{ type: 'text', text: content }];
+  return (content ?? []).map(block => (block.type === 'text' ? { type: 'text', text: block.text ?? '' } : otherBlock(block)));
+}
+
+/** Content the port does not map, by its kind; an image is described, not carried. */
+function otherBlock(block: PiBlock): ContentBlock & { readonly type: 'other' } {
+  if (block.type === 'image') {
+    const bytes = Math.floor(((block.data ?? '').length * 3) / 4);
+    return { type: 'other', kind: 'image', description: `an image, ${block.mimeType ?? 'of unknown type'}, about ${bytes} bytes` };
+  }
+  return { type: 'other', kind: block.type, description: `a pi "${block.type}" block, which the port does not map` };
+}
+
+function usageOf(message: PiMessage): TokenUsage | null {
   const usage = message.usage;
-  if (!usage) return undefined;
+  if (!usage) return null;
   return { input: usage.input, output: usage.output, cacheRead: usage.cacheRead, cacheWrite: usage.cacheWrite, total: usage.totalTokens };
+}
+
+/** An assistant message's optional detail; what pi did not report is null. */
+function detailOf(message: PiMessage, isPriced: boolean): MessageDetail {
+  const usage = message.usage;
+  const answered = message.responseModel ?? message.model;
+  const long = usage?.cacheWrite1h;
+  return {
+    model: answered === undefined ? null : message.provider === undefined ? answered : `${message.provider}/${answered}`,
+    thinkingLevel: message.providerThinkingLevel ?? null,
+    stopReason: message.stopReason === undefined ? null : stopReasonOf(message.stopReason),
+    error: message.errorMessage ?? null,
+    reasoningTokens: usage?.reasoning ?? null,
+    cost: isPriced && usage?.cost !== undefined
+      ? { input: usage.cost.input, output: usage.cost.output, cacheRead: usage.cost.cacheRead, cacheWrite: usage.cost.cacheWrite, total: usage.cost.total }
+      : null,
+    cacheWrites: usage === undefined || long === undefined ? null : { short: usage.cacheWrite - long, long },
+  };
+}
+
+function stopReasonOf(reason: string): StopReason {
+  switch (reason) {
+    case 'stop': return 'end';
+    case 'toolUse': return 'tool-use';
+    case 'length': return 'length';
+    case 'error': return 'error';
+    case 'aborted': return 'aborted';
+    default: return 'other';
+  }
 }
 
 function message(error: unknown): string {

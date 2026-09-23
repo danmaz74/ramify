@@ -22,13 +22,36 @@ type Context = Parameters<StreamFunction>[1];
 type StreamOptions = Parameters<StreamFunction>[2];
 type EventStream = ReturnType<StreamFunction>;
 
-/** What one scripted reply holds. */
+/** What one scripted reply holds. A thinking block's signature is the opaque data a provider returns with it. */
 export type ReplyBlock =
   | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'thinking'; readonly thinking: string; readonly signature?: string; readonly redacted?: boolean }
   | { readonly type: 'toolCall'; readonly name: string; readonly arguments: Record<string, unknown>; readonly id?: string };
 
+/** The usage a reply reports. The optional fields are left out of pi's usage unless given, as a provider that does not report them does. */
+export interface ReplyUsage {
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead?: number;
+  readonly cacheWrite?: number;
+  /** The part of `cacheWrite` written with long retention. */
+  readonly cacheWrite1h?: number;
+  readonly reasoning?: number;
+  /** The cost in US dollars; without it pi's usage reports zero. */
+  readonly cost?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number; readonly total: number };
+}
+
+/** Message fields a provider may report beside the content. */
+export interface ReplyDetail {
+  readonly responseModel?: string;
+  readonly providerThinkingLevel?: string;
+}
+
 export type Reply =
-  | { readonly kind: 'reply'; readonly blocks: readonly ReplyBlock[]; readonly usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number } | undefined }
+  | {
+      readonly kind: 'reply'; readonly blocks: readonly ReplyBlock[];
+      readonly usage?: ReplyUsage | undefined; readonly detail?: ReplyDetail | undefined;
+    }
   /** Streams nothing until the request is aborted, like a model that is still thinking. */
   | { readonly kind: 'hold' }
   /** The provider reports an error. */
@@ -69,6 +92,8 @@ export interface ScriptedOptions {
   readonly maxTokens?: number;
   /** Whether the model supports thinking; pi clamps a requested level to `off` for one that does not. */
   readonly reasoning?: boolean;
+  /** The model's rates per million tokens; default none, which pi prices at zero. */
+  readonly cost?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number };
 }
 
 export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedOptions = {}): ScriptedProvider {
@@ -76,7 +101,7 @@ export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedO
   const requests: Request[] = [];
   const model = {
     id: 'scripted-1', name: 'Scripted', api: 'scripted', provider: 'scripted', baseUrl: 'http://localhost:0',
-    reasoning: options.reasoning ?? false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    reasoning: options.reasoning ?? false, input: ['text'], cost: options.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: options.contextWindow ?? 200_000, maxTokens: options.maxTokens ?? 16_384,
   } as unknown as Model;
 
@@ -122,16 +147,33 @@ export async function scriptedRuntime(scripted: ScriptedProvider): Promise<{ run
 
 type AssistantMessage = {
   role: 'assistant';
-  content: Array<{ type: 'text'; text: string } | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }>;
+  content: Array<
+    | { type: 'text'; text: string }
+    | { type: 'thinking'; thinking: string; thinkingSignature?: string; redacted?: boolean }
+    | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }
+  >;
   api: string; provider: string; model: string;
-  usage: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number } };
+  responseModel?: string;
+  providerThinkingLevel?: string;
+  usage: {
+    input: number; output: number; cacheRead: number; cacheWrite: number; cacheWrite1h?: number; reasoning?: number; totalTokens: number;
+    cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+  };
   stopReason: string;
   errorMessage?: string;
   timestamp: number;
 };
 
 async function play(events: ReplyStream, reply: Reply, model: Model, signal: AbortSignal | undefined): Promise<void> {
-  const usage = (input = 0, output = 0, cacheRead = 0, cacheWrite = 0) => ({ input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
+  const usage = (given?: ReplyUsage): AssistantMessage['usage'] => {
+    const { input = 0, output = 0, cacheRead = 0, cacheWrite = 0 } = given ?? {};
+    return {
+      input, output, cacheRead, cacheWrite, totalTokens: input + output + cacheRead + cacheWrite,
+      ...(given?.cacheWrite1h === undefined ? {} : { cacheWrite1h: given.cacheWrite1h }),
+      ...(given?.reasoning === undefined ? {} : { reasoning: given.reasoning }),
+      cost: given?.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
+  };
   const message = (content: AssistantMessage['content'], stopReason: string, extra: Partial<AssistantMessage> = {}): AssistantMessage => ({
     role: 'assistant', content, api: model.api, provider: model.provider, model: model.id, usage: usage(), stopReason, timestamp: Date.now(), ...extra,
   });
@@ -155,21 +197,32 @@ async function play(events: ReplyStream, reply: Reply, model: Model, signal: Abo
     });
     return aborted();
   }
-  const content: AssistantMessage['content'] = reply.blocks.map(block => (block.type === 'text'
-    ? { type: 'text', text: block.text }
-    : { type: 'toolCall', id: block.id ?? `scripted-call-${++callCount}`, name: block.name, arguments: block.arguments }));
+  const content: AssistantMessage['content'] = reply.blocks.map((block): AssistantMessage['content'][number] => {
+    if (block.type === 'text') return { type: 'text', text: block.text };
+    if (block.type === 'thinking') {
+      return {
+        type: 'thinking', thinking: block.thinking,
+        ...(block.signature === undefined ? {} : { thinkingSignature: block.signature }),
+        ...(block.redacted === undefined ? {} : { redacted: block.redacted }),
+      };
+    }
+    return { type: 'toolCall', id: block.id ?? `scripted-call-${++callCount}`, name: block.name, arguments: block.arguments };
+  });
   const partial = message([], 'pending');
   content.forEach((block, index) => {
     partial.content = content.slice(0, index + 1);
     if (block.type === 'text') {
       events.push({ type: 'text_start', contentIndex: index, partial: { ...partial } });
       events.push({ type: 'text_end', contentIndex: index, content: block.text, partial: { ...partial } });
+    } else if (block.type === 'thinking') {
+      events.push({ type: 'thinking_start', contentIndex: index, partial: { ...partial } });
+      events.push({ type: 'thinking_end', contentIndex: index, content: block.thinking, partial: { ...partial } });
     } else {
       events.push({ type: 'toolcall_start', contentIndex: index, partial: { ...partial } });
       events.push({ type: 'toolcall_end', contentIndex: index, toolCall: block, partial: { ...partial } });
     }
   });
-  const final = message(content, content.some(block => block.type === 'toolCall') ? 'toolUse' : 'stop', { usage: usage(reply.usage?.input, reply.usage?.output, reply.usage?.cacheRead, reply.usage?.cacheWrite) });
+  const final = message(content, content.some(block => block.type === 'toolCall') ? 'toolUse' : 'stop', { usage: usage(reply.usage), ...reply.detail });
   events.push({ type: 'done', reason: final.stopReason, message: final });
   events.end(final);
 }

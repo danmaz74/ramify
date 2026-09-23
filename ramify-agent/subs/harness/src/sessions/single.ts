@@ -414,7 +414,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         progress({ type: 'tool-call', callId: event.callId, tool: event.tool, input: event.input });
       } else if (event.type === 'tool-finished' && event.isError && event.tool !== engineerToolName) {
         progress({ type: 'tool-error', callId: event.callId, tool: event.tool, text: event.errorText ?? '' });
-      } else if (event.type === 'message' && event.text.trim() !== '') {
+      } else if (event.type === 'message' && event.role === 'assistant' && event.blocks.some(block => block.type === 'text' && block.text.trim() !== '')) {
+        // The assistant's own text; its tool calls are shown as calls.
         progress({ type: 'message', text: event.text });
       }
       void recorder.record(event).catch(() => undefined);

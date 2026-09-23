@@ -35,7 +35,7 @@ export interface SessionCommandOptions {
   readonly signal?: AbortSignal | undefined;
 }
 
-const stepKinds = new Set(['tool', 'message', 'context', 'compaction', 'wait', 'stall', 'hang', 'submit', 'fail', 'end']);
+const stepKinds = new Set(['tool', 'message', 'retry', 'context', 'compaction', 'wait', 'stall', 'hang', 'submit', 'fail', 'end']);
 
 /** Runs one engineer session on the chosen agent. An agent that cannot start is a session that could not start. */
 export async function runSessionCommand(options: SessionCommandOptions): Promise<SingleSessionResult> {

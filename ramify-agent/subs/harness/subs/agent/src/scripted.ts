@@ -1,35 +1,65 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { contextBudgetReached } from './interfaces/port.js';
+import { assistantText, contextBudgetReached, noMessageDetail } from './interfaces/port.js';
 import type {
   ActualStart,
   AgentPort,
+  AssistantBlock,
   AgentSession,
   AppendOutcome,
-  PortObservations,
+  BuiltinTool,
+  ExecutorSupport,
+  MessageDetail,
   SessionOutcome,
   SessionRef,
   SessionSpec,
   TokenUsage,
+  ToolAction,
+  ToolCallBlock,
+  WriteTool,
 } from './interfaces/port.js';
 
 /**
  * One step of a scripted session. The fake runs the steps in order and
- * checks for Stop before each one.
+ * checks for Stop before each one. Before the first step it reports the
+ * spec's prompt as the user message, as an executor does before its first
+ * model call. Each tool call and submission is reported as an assistant
+ * message holding the call, and its result as a tool-result message.
  */
 export type ScriptStep =
   /**
    * Calls a tool: a harness tool runs for real; a built-in one only reports
-   * its call. `mutating` overrides what the tool declares, so a script can
-   * exercise the guard over any name; `edit` and `write` are mutating by
-   * default. `reachedTool: false` is a call the implementation itself
-   * rejected before the tool ran.
+   * its call, except that the write built-ins really write. `mutating`
+   * overrides what the tool declares, so a script can exercise the guard
+   * over any name; the write built-ins are mutating by default.
+   * `reachedTool: false` is a call the implementation itself rejected before
+   * the tool ran. `action` is what the call does; without it a harness tool's
+   * declared action is used, and a built-in's is classified from the input
+   * the port's names take (`path`, `pattern`, `glob`, `offset`, `limit`).
    */
   | {
       readonly kind: 'tool'; readonly tool: string; readonly input: unknown;
+      readonly action?: ToolAction | undefined;
       readonly mutating?: boolean | undefined; readonly reachedTool?: boolean | undefined;
     }
-  | { readonly kind: 'message'; readonly text: string; readonly usage?: TokenUsage | undefined }
+  /**
+   * An assistant message: `blocks`, such as thinking, and then `text` as a
+   * text block unless it is empty. Detail the step leaves out is reported
+   * absent, so a script chooses what its executor reports.
+   */
+  | {
+      readonly kind: 'message'; readonly text: string; readonly usage?: TokenUsage | undefined;
+      readonly blocks?: readonly AssistantBlock[] | undefined; readonly detail?: Partial<MessageDetail> | undefined;
+    }
+  /**
+   * The executor retries a failed model call on its own: the failed
+   * assistant message, then the retry's start and end. `succeeded: false`
+   * is a retry that gave up; the script goes on either way.
+   */
+  | {
+      readonly kind: 'retry'; readonly errorText: string; readonly attempt?: number | undefined;
+      readonly maxAttempts?: number | undefined; readonly delayMs?: number | undefined; readonly succeeded?: boolean | undefined;
+    }
   /** Observes the context after a boundary. `tokens: null` is unknown, never room. */
   | { readonly kind: 'context'; readonly tokens: number | null; readonly window: number | null }
   /** Compacts, unless the session's policy forbids it, in which case the step is suppressed and counted. */
@@ -100,17 +130,39 @@ export interface ScriptedAgent extends AgentPort {
 export interface ScriptedAgentOptions {
   /** How long `settled()` waits before answering `timed-out`. */
   readonly settleMs?: number | undefined;
+  /**
+   * The fake's own names for the port's built-in tools, so a script can be
+   * an executor whose tools are named otherwise, such as `Read`. Default:
+   * the port's names.
+   */
+  readonly toolNames?: { readonly [tool in BuiltinTool | WriteTool]?: string } | undefined;
+  /**
+   * What the fake declares it lacks. A `continue` or `fork` it lacks degrades
+   * to `fresh` with the declared reason; without `thinking` its messages hold
+   * no thinking blocks, and without `retries` it reports no retry events.
+   * Default: it supports everything.
+   */
+  readonly support?: Partial<ExecutorSupport> | undefined;
 }
 
 const never = new Promise<never>(() => undefined);
 
-const writeTools = new Set(['edit', 'write']);
+const portTools: ReadonlyArray<BuiltinTool | WriteTool> = ['read', 'grep', 'ls', 'find', 'edit', 'write'];
 
-/** What the fake observes; it emits all three, so the core's tests never depend on pi. */
-const scriptedObservations: PortObservations = {
+/** What the fake supports: everything, so the core's tests never depend on pi. */
+const scriptedSupport: ExecutorSupport = {
   usage: { available: true },
   context: { available: true },
   compaction: { available: true },
+  thinking: { available: true },
+  retries: { available: true },
+  continue: { available: true },
+  fork: { available: true },
+  forkAtPoint: { available: true },
+  appendContext: { available: true },
+  exactSystemPrompt: { available: true },
+  guard: { available: true },
+  afterMutation: { available: true },
 };
 
 /**
@@ -121,12 +173,15 @@ const scriptedObservations: PortObservations = {
  *
  * It implements every port behavior the real implementation does: session
  * modes, appended context, the guard and the after-mutation hook, usage,
- * context observations, compaction under its policy, settlement and the
- * context budget.
+ * context observations, compaction under its policy, retries, every message
+ * of the conversation, settlement and the context budget.
  */
 export function createScriptedAgent(script: Script, options: ScriptedAgentOptions = {}): ScriptedAgent {
   const sessions: ScriptedSessionRecord[] = [];
   const settleMs = options.settleMs ?? 30_000;
+  const support: ExecutorSupport = { ...scriptedSupport, ...options.support };
+  /** The port's built-in each of the fake's own tool names stands for. */
+  const builtinOf = new Map(portTools.map(tool => [options.toolNames?.[tool] ?? tool, tool]));
   /** Appended context per scripted session, which a continue inherits and a fork inherits up to its point. */
   const histories = new Map<string, Array<{ readonly key: string; readonly text: string }>>();
   let sessionCount = 0;
@@ -135,7 +190,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
 
   return {
     name: 'scripted',
-    observations: scriptedObservations,
+    support,
     sessions,
 
     forget(ref) {
@@ -153,7 +208,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
     },
 
     startSession(spec: SessionSpec): AgentSession {
-      const { id, start, inherited } = beginSession(spec, histories, () => `scripted-${++sessionCount}`);
+      const { id, start, inherited } = beginSession(spec, histories, () => `scripted-${++sessionCount}`, support);
       let stepsRun = 0;
       const record: ScriptedSessionRecord = {
         spec, verdicts: [], start, inherited, results: [], denied: [],
@@ -170,6 +225,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
       const run = async (): Promise<SessionOutcome> => {
         const steps = typeof script === 'function' ? script(spec) : script;
         let report: string | undefined;
+        spec.onEvent({ type: 'message', role: 'user', blocks: [{ type: 'text', text: spec.prompt }] });
         for (const step of steps) {
           if (controller.signal.aborted && !deaf) return { kind: 'stopped' };
           stepsRun += 1;
@@ -180,13 +236,36 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             continue;
           }
           switch (step.kind) {
-            case 'message':
-              spec.onEvent({ type: 'message', text: step.text, usage: step.usage });
+            case 'message': {
+              // An executor that declares no thinking reports none.
+              const given = (step.blocks ?? []).filter(block => block.type !== 'thinking' || support.thinking.available);
+              const blocks: AssistantBlock[] = [...given, ...(step.text === '' ? [] : [{ type: 'text' as const, text: step.text }])];
+              spec.onEvent({
+                type: 'message', role: 'assistant', blocks, text: assistantText(blocks),
+                usage: step.usage ?? null, detail: { ...noMessageDetail, ...step.detail },
+              });
               if (budgetTokens !== undefined) {
                 report = step.text;
                 return { kind: 'context-budget-reached', tokens: budgetTokens, report };
               }
               break;
+            }
+            case 'retry': {
+              const attempt = step.attempt ?? 1;
+              spec.onEvent({
+                type: 'message', role: 'assistant', blocks: [], text: '', usage: null,
+                detail: { ...noMessageDetail, stopReason: 'error', error: step.errorText },
+              });
+              // An executor that declares no retries retries silently.
+              if (!support.retries.available) break;
+              spec.onEvent({
+                type: 'retry', phase: 'started', attempt,
+                maxAttempts: step.maxAttempts ?? null, delayMs: step.delayMs ?? null, errorText: step.errorText,
+              });
+              const succeeded = step.succeeded ?? true;
+              spec.onEvent({ type: 'retry', phase: 'ended', attempt, succeeded, errorText: succeeded ? null : step.errorText });
+              break;
+            }
             case 'context': {
               spec.onEvent({ type: 'context-observed', tokens: step.tokens, window: step.window });
               if (contextBudgetReached(spec.context, step.tokens, step.window)) budgetTokens = step.tokens;
@@ -200,8 +279,8 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
               spec.onEvent({ type: 'compaction', phase: 'started', reason: step.reason });
               spec.onEvent({
                 type: 'compaction', phase: 'ended', reason: step.reason,
-                tokensBefore: step.tokensBefore, tokensAfter: step.tokensAfter,
-                aborted: step.aborted, errorText: step.errorText,
+                tokensBefore: step.tokensBefore ?? null, tokensAfter: step.tokensAfter ?? null,
+                aborted: step.aborted === true, errorText: step.errorText ?? null,
               });
               break;
             case 'wait':
@@ -221,15 +300,20 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             case 'tool': {
               const callId = nextCallId();
               const tool = spec.tools.find(candidate => candidate.name === step.tool);
-              const mutating = step.mutating ?? tool?.mutating ?? writeTools.has(step.tool);
-              spec.onEvent({ type: 'tool-started', callId, tool: step.tool, input: step.input, mutating });
+              const builtin = tool === undefined ? builtinOf.get(step.tool) : undefined;
+              const writer = builtin === 'edit' || builtin === 'write' ? builtin : undefined;
+              const action: ToolAction = step.action
+                ?? (tool !== undefined ? tool.action?.(step.input) ?? { kind: 'harness' } : builtinAction(builtin, step.input));
+              const mutating = step.mutating ?? tool?.mutating ?? writer !== undefined;
+              announceCall(spec, { type: 'tool-call', callId, tool: step.tool, input: step.input, action });
+              spec.onEvent({ type: 'tool-started', callId, tool: step.tool, input: step.input, action, mutating });
               if (step.reachedTool === false) {
                 // The implementation rejected the input against the tool's schema; the tool never ran.
                 finish(spec, record, { callId, tool: step.tool, text: `The input for ${step.tool} was rejected before the tool ran.`, isError: true }, false);
                 break;
               }
               if (mutating && spec.guard) {
-                const decision = await spec.guard({ callId, tool: step.tool, input: step.input });
+                const decision = await spec.guard({ callId, tool: step.tool, input: step.input, action });
                 if (!decision.allow) {
                   record.denied.push(callId);
                   // A denied call executed nothing, so `afterMutation` is not called for it.
@@ -243,19 +327,19 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
                 const result = await tool.execute(step.input, controller.signal);
                 text = result.text;
                 isError = result.isError === true;
-              } else if (!(spec.builtinTools as readonly string[]).includes(step.tool)) {
+              } else if (builtin === undefined || !spec.builtinTools.includes(builtin)) {
                 text = `Tool ${step.tool} not found`;
                 isError = true;
-              } else if (writeTools.has(step.tool)) {
+              } else if (writer !== undefined) {
                 // The write built-ins really write, as the implementation's
                 // own do. A scripted repair is a repair, and a call the guard
                 // allowed changes the tree the gate then checks.
-                const result = await performWrite(spec.scope.workingDirectory, step.tool, step.input);
+                const result = await performWrite(spec.scope.workingDirectory, writer, step.tool, action, step.input);
                 text = result.text;
                 isError = result.isError;
               }
               if (mutating && spec.afterMutation) {
-                const extra = await spec.afterMutation({ callId, tool: step.tool, failed: isError });
+                const extra = await spec.afterMutation({ callId, tool: step.tool, action, failed: isError });
                 if (extra) text = text === '' ? extra.text : `${text}\n${extra.text}`;
               }
               finish(spec, record, { callId, tool: step.tool, text, isError }, true);
@@ -263,7 +347,8 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             }
             case 'submit': {
               const callId = nextCallId();
-              spec.onEvent({ type: 'tool-started', callId, tool: spec.submission.name, input: step.input, mutating: false });
+              announceCall(spec, { type: 'tool-call', callId, tool: spec.submission.name, input: step.input, action: { kind: 'harness' } });
+              spec.onEvent({ type: 'tool-started', callId, tool: spec.submission.name, input: step.input, action: { kind: 'harness' }, mutating: false });
               const verdict = await spec.submission.accept(step.input, controller.signal);
               record.verdicts.push(verdict);
               const text = verdict.accepted ? verdict.text ?? 'The submission was accepted.' : verdict.errors.join('\n');
@@ -310,18 +395,54 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
 }
 
 /**
+ * A built-in call's action, classified from the input the port's names take,
+ * as an implementation classifies its own tools. An unknown tool, or a read
+ * that names no path, is `other`; a write that names none has no paths.
+ */
+function builtinAction(builtin: BuiltinTool | WriteTool | undefined, input: unknown): ToolAction {
+  const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+  const text = (key: string): string | null => (typeof record[key] === 'string' ? record[key] as string : null);
+  const count = (key: string): number | null => (typeof record[key] === 'number' ? record[key] as number : null);
+  const path = text('path');
+  switch (builtin) {
+    case 'read': {
+      if (path === null) return { kind: 'other' };
+      const range = { start: count('offset'), count: count('limit') };
+      return { kind: 'read', path, range: range.start === null && range.count === null ? null : range };
+    }
+    case 'grep':
+    case 'find':
+      return { kind: 'search', pattern: text('pattern'), path, glob: text('glob') };
+    case 'ls':
+      return { kind: 'search', pattern: null, path, glob: null };
+    case 'edit':
+    case 'write':
+      return { kind: 'write', paths: path === null ? [] : [path] };
+    default:
+      return { kind: 'other' };
+  }
+}
+
+/**
  * The write built-ins, as the implementation provides them: `write` replaces
  * a file's contents, creating the directories it needs, and `edit` replaces
- * text that is there. A call that cannot be carried out fails like any other
- * tool, so the after-mutation hook still sees it.
+ * text that is there. The target is the one path the action names. A call
+ * that cannot be carried out fails like any other tool, so the
+ * after-mutation hook still sees it.
  */
-async function performWrite(workingDirectory: string, tool: string, input: unknown): Promise<{ text: string; isError: boolean }> {
+async function performWrite(
+  workingDirectory: string,
+  writer: WriteTool,
+  tool: string,
+  action: ToolAction,
+  input: unknown,
+): Promise<{ text: string; isError: boolean }> {
   const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
-  const requested = typeof record['path'] === 'string' ? record['path'] : '';
+  const requested = action.kind === 'write' && action.paths.length === 1 ? action.paths[0]! : '';
   if (requested === '') return { text: `${tool} needs a path`, isError: true };
   const path = isAbsolute(requested) ? requested : resolve(workingDirectory, requested);
   try {
-    if (tool === 'write') {
+    if (writer === 'write') {
       const content = typeof record['content'] === 'string' ? record['content'] : '';
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, content);
@@ -345,12 +466,21 @@ async function performWrite(workingDirectory: string, tool: string, input: unkno
   }
 }
 
-/** Reports one tool result, both as the port event and as what the agent saw. */
+/** Reports the assistant message that makes one call, before the call starts. Its detail is absent. */
+function announceCall(spec: SessionSpec, call: ToolCallBlock): void {
+  spec.onEvent({ type: 'message', role: 'assistant', blocks: [call], text: assistantText([call]), usage: null, detail: noMessageDetail });
+}
+
+/** Reports one tool result: the port event, then the tool-result message, and what the agent saw. */
 function finish(spec: SessionSpec, record: ScriptedSessionRecord, result: ScriptedToolResult, reachedTool: boolean): void {
   record.results.push(result);
   spec.onEvent({
     type: 'tool-finished', callId: result.callId, tool: result.tool,
     isError: result.isError, errorText: result.isError ? result.text : undefined, reachedTool,
+  });
+  spec.onEvent({
+    type: 'message', role: 'tool-result', callId: result.callId, tool: result.tool, isError: result.isError,
+    blocks: result.text === '' ? [] : [{ type: 'text', text: result.text }],
   });
 }
 
@@ -362,8 +492,12 @@ function beginSession(
   spec: SessionSpec,
   histories: Map<string, Array<{ readonly key: string; readonly text: string }>>,
   fresh: () => string,
+  support: ExecutorSupport,
 ): { readonly id: string; readonly start: ActualStart; readonly inherited: readonly string[] } {
   const start = spec.session;
+  // A start the fake declares it lacks degrades with the reason it declared.
+  const declared = start.mode === 'fresh' ? undefined : support[start.mode];
+  if (declared !== undefined && !declared.available) return degrade(histories, fresh, declared.reason);
   if (start.mode === 'continue') {
     const id = sessionOf(start.ref);
     const history = id === undefined ? undefined : histories.get(id);

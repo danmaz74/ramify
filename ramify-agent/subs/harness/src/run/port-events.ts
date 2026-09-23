@@ -54,7 +54,7 @@ export class PortEventRecorder {
 
   /** Records one event. What is counted is counted before its ordered durable write. */
   record(event: AgentEvent): Promise<void> {
-    if (event.type === 'message' && event.usage) {
+    if (event.type === 'message' && event.role === 'assistant' && event.usage) {
       this.usageObserved = true;
       for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part];
     }
@@ -119,9 +119,9 @@ export class PortEventRecorder {
         type: 'coverage-gap',
         data: {
           kind: 'context-unavailable',
-          detail: agent.observations.context.available
+          detail: agent.support.context.available
             ? 'the session reported no context size at all, so no threshold could fire'
-            : agent.observations.context.reason,
+            : agent.support.context.reason,
         },
       });
     }
@@ -130,7 +130,7 @@ export class PortEventRecorder {
         type: 'coverage-gap',
         data: {
           kind: 'usage-unavailable',
-          detail: agent.observations.usage.available ? 'the session reported no usage' : agent.observations.usage.reason,
+          detail: agent.support.usage.available ? 'the session reported no usage' : agent.support.usage.reason,
         },
       });
     }
@@ -140,7 +140,7 @@ export class PortEventRecorder {
   outcomeUsage(agent: AgentPort): InvocationOutcome['usage'] {
     return this.usageObserved
       ? { ...this.usage }
-      : { unavailable: agent.observations.usage.available ? 'the session reported no usage' : agent.observations.usage.reason };
+      : { unavailable: agent.support.usage.available ? 'the session reported no usage' : agent.support.usage.reason };
   }
 }
 

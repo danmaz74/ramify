@@ -56,8 +56,9 @@ describe('compaction is port policy', () => {
     const events = compactions(session.events);
     expect(events.map(event => [event.phase, event.reason])).toEqual([['started', 'threshold'], ['ended', 'threshold']]);
     const ended = events[1]!;
+    if (ended.phase !== 'ended') throw new Error('the second compaction event is not its end');
     expect(ended.aborted).toBe(false);
-    expect(ended.errorText).toBeUndefined();
+    expect(ended.errorText).toBeNull();
     // The sizes come from the event: the session reports none between a
     // compaction and the next assistant reply.
     expect(typeof ended.tokensBefore).toBe('number');

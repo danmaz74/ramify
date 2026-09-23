@@ -86,7 +86,9 @@ hiding or measured complexity justifies it.
     compare, and `CommandRejection` carries the protocol's error code.
   - `mutex.ts`: the one serialization primitive the run's writes use.
   - `activity.ts` turns agent events into the observed activity an
-    invocation's observation log records.
+    invocation's observation log records. It reads each call's neutral
+    action, never the executor's tool or argument names, which it keeps
+    for display only.
 - `checks/`: the check engine, which knows nothing of runs.
   - `records.ts`: the `GateAttempt` record and the shapes it is built from:
     a `Checkpoint`, a `CheckCommand`, and a `TestSelectionPolicy` with the
@@ -403,8 +405,8 @@ hiding or measured complexity justifies it.
   contents. The contract package is an engineer's with the contract skill
   beside the module architect's: the role is an engineer, and the skill is
   what makes the invocation a contract iteration.
-- `guard/`: the write guard. `edit` and `write` are intercepted before they
-  execute: the target is resolved against the invocation's working directory
+- `guard/`: the write guard. A write is intercepted before it executes: the
+  one target its action names is resolved against the invocation's working directory
   and then against the real filesystem — an existing path is its own real
   path, and a new one is its nearest existing ancestor with the remaining
   components appended — and only then checked against the write scope the
@@ -413,8 +415,12 @@ hiding or measured complexity justifies it.
   cannot be resolved at all is its own verdict, distinct from a proven scope
   violation. Nothing here stores what a call proposed to write.
 
-  What it does not cover is stated rather than implied: the `shell` tool
-  names no target to judge, so its writes pass no guard at all. They are
+  A call that names no path, or several, cannot be judged and is blocked as
+  unresolved.
+
+  What it does not cover is stated rather than implied: the `shell` tool's
+  action is a command, which names no target to judge, so its writes pass no
+  guard at all. They are
   seen afterwards, in the tree and in `outsideScope`, and every invocation
   that used the shell carries the `unguarded-shell` coverage gap.
 - `tools/`: the harness's own tools that are not one role's. `shell.ts` is
@@ -768,6 +774,11 @@ The run's own tests are beside them.
   answers it chooses: findings, a deadline that expires, a configuration
   file that falls back to a complete check, and a mutation whose changed set
   is unknown. `read-excursions.test.ts` covers the soft read boundary.
+- `neutral-actions.test.ts` shows that activity is read from each call's
+  action, and runs one engineer turn twice: once with the port's own tool
+  names and once as an executor whose read tool is `Read` with `file_path`
+  and whose write tools are named otherwise again. Both leave the same
+  reads, searches, excursions, guard decisions and mutations.
 - `unguarded-write.test.ts` is the guard this plan names: a write through
   the shell outside the scope appears in `git status` when the writer
   settles and in `outsideScope`, reported and not blocked, beside the
