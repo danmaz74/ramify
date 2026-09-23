@@ -61,6 +61,17 @@ describe('useAutoFit', () => {
     expect(fitView).toHaveBeenCalledTimes(2);
   });
 
+  it('stops fitting after a move the canvas makes on the viewer\'s behalf', () => {
+    let current!: AutoFit<FitTarget>;
+    const fitView = vi.fn(async () => true);
+    render(<Harness nodes={3} capture={fit => { current = fit; }} />);
+    act(() => current.onInit({ fitView }));
+    expect(fitView).toHaveBeenCalledTimes(1);
+    act(() => current.markMoved());
+    resize();
+    expect(fitView).toHaveBeenCalledTimes(1);
+  });
+
   it('never fits while disabled', () => {
     let current!: AutoFit<FitTarget>;
     const fitView = vi.fn(async () => true);

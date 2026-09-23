@@ -1,0 +1,107 @@
+{
+  "schema": "ramify-agent.capability-progress-browser-evidence/1",
+  "date": "2026-09-22",
+  "plan": "Plan 8 baseline repairs, iteration 5 (By-module layout)",
+  "browser": "Chromium via the Playwright MCP server",
+  "server": "subs/harness/src/tests/helpers/serve-progress-fixture.ts on 127.0.0.1:4190, serving ramify-agent/dist/web",
+  "build": "npm install and npm run build at the worktree root, npm --prefix ramify-agent ci, then npm run build:web",
+  "fixture": {
+    "placements": { "plan": "revision-diff", "state": "completed", "modules": 15, "rows": 12 },
+    "sixtyRows": { "plan": "status-badge-tone", "state": "completed", "modules": 15, "rows": 61 }
+  },
+  "viewports": { "desktop": [1440, 1000], "narrow": [390, 844] },
+  "console": {
+    "session": "0 messages of any level for the whole session (browser_console_messages level=debug all=true)",
+    "errors": 0,
+    "warnings": 0
+  },
+  "shell": {
+    "mainClass": "route-run",
+    "runPageWidth": { "desktop": 1392, "narrow": 342 },
+    "proseMeasure": { "desktop": 832, "narrow": 342 },
+    "wideAreaWidth": { "desktop": 1392 },
+    "note": "main.route-run lifts the 52rem cap; .run-page > * keeps the 52rem measure and only .area-wide (Progress) uses the full width."
+  },
+  "placements": {
+    "treeBounds": { "width": 2174, "height": 677 },
+    "desktop": {
+      "layout": "detail panel beside the canvas",
+      "canvas": { "width": 992, "height": 778, "contentWidth": 990 },
+      "detailPanelWidth": 384,
+      "fittedZoom": 0.4066,
+      "minimap": "shown, 15 marks",
+      "recordedBefore": 0.1766,
+      "ratioToRecorded": 2.302
+    },
+    "narrow": {
+      "layout": "detail panel stacked below the canvas",
+      "canvas": { "width": 342, "height": 494, "contentWidth": 340 },
+      "fittedZoom": 0.1398,
+      "minimap": "hidden below 480px of canvas width, by the canvas's own container query",
+      "recordedBefore": 0.1398,
+      "pageScrollWidth": 390
+    }
+  },
+  "sixtyRows": {
+    "treeBounds": { "width": 2024, "height": 2853 },
+    "desktop": { "canvas": { "width": 992, "height": 778 }, "fittedZoom": 0.2433, "recordedBefore": 0.1897 },
+    "narrow": { "canvas": { "width": 342, "height": 494 }, "fittedZoom": 0.1502 },
+    "focusedRow": {
+      "desktop": {
+        "zoom": 1.0459,
+        "beforeFocus": { "leftOfViewport": 1109, "topOfViewport": 1714, "inside": false },
+        "afterFocus": { "leftOfViewport": 396, "topOfViewport": 369, "inside": true },
+        "zoomAfterFocus": 1.0459,
+        "canvasViewport": { "width": 990, "height": 776 }
+      },
+      "narrow": {
+        "zoom": 0.93,
+        "beforeFocus": { "leftOfViewport": 716, "topOfViewport": 1421, "inside": false },
+        "afterFocus": { "leftOfViewport": 82, "topOfViewport": 229, "inside": true },
+        "canvasViewport": { "width": 340, "height": 492 }
+      },
+      "note": "Focus reached check-060 with a focus ring after a real Tab press set the keyboard modality. The canvas pans at the current zoom, which is unchanged by the pan."
+    }
+  },
+  "breakpointSweep": {
+    "tree": "placements, 2174 x 677",
+    "note": "Fitted zoom of the same tree with the detail panel beside the canvas and stacked below it, at a 1000px viewport height. 0.354 is twice the 0.177 the capability plan recorded.",
+    "rows": [
+      { "viewport": 1440, "besideCanvasWidth": 992, "besideZoom": 0.4066, "stackedCanvasWidth": 1392, "stackedZoom": 0.5713 },
+      { "viewport": 1344, "besideCanvasWidth": 896, "besideZoom": 0.368 },
+      { "viewport": 1313, "besideCanvasWidth": 865, "besideZoom": 0.3546 },
+      { "viewport": 1312, "besideCanvasWidth": 864, "besideZoom": 0.3542, "stackedCanvasWidth": 1264, "stackedZoom": 0.5189 },
+      { "viewport": 1024, "besideCanvasWidth": 576, "besideZoom": 0.2364, "stackedCanvasWidth": 976, "stackedZoom": 0.4002 },
+      { "viewport": 928, "besideCanvasWidth": 480, "besideZoom": 0.1969, "besideMinimap": "hidden", "stackedCanvasWidth": 880, "stackedZoom": 0.3606 },
+      { "viewport": 832, "besideCanvasWidth": 384, "besideZoom": 0.1573, "besideMinimap": "hidden", "stackedCanvasWidth": 784, "stackedZoom": 0.322 }
+    ],
+    "chosen": "82rem (1312px): the panel stacks below at and under it, and stays beside the canvas above it."
+  },
+  "canvasHeightSweep": {
+    "tree": "sixtyRows, 2024 x 2853, canvas 1392 wide at a 1000px viewport height",
+    "rows": [
+      { "height": "38rem (the replaced fixed value)", "canvasHeight": 610, "fittedZoom": 0.1907 },
+      { "height": "calc(100vh - 21rem)", "canvasHeight": 666, "fittedZoom": 0.2082 },
+      { "height": "calc(100vh - 14rem)", "canvasHeight": 778, "fittedZoom": 0.2433 },
+      { "height": "calc(100vh - 8rem)", "canvasHeight": 874, "fittedZoom": 0.2734 }
+    ],
+    "chosen": "calc(100vh - 14rem), min-height 26rem"
+  },
+  "canvasFocusDefect": {
+    "found": "Chromium scrolls React Flow's own element to reveal a focused row (measured offsets 564 left, 1108 top) and React Flow resets that scroll a moment later.",
+    "effect": "The canvas measured the revealed box, read the row as already in view, and never panned. jsdom applies no such scroll, so iteration 4's unit tests passed.",
+    "correction": "ModuleTreeCanvas undoes the ancestor scroll before it measures.",
+    "owner": "Ramify presentation/project-view"
+  },
+  "screenshots": {
+    "run-overview-measure-desktop.png": "Run page Overview at 1440x1000: the shell is 1392 wide and the prose keeps its 52rem measure",
+    "placements-by-module-page-desktop.png": "placements, By module at 1440x1000",
+    "placements-by-module-canvas-fit-desktop.png": "the 992 x 778 canvas at its fitted 0.4066",
+    "placements-by-module-header-narrow.png": "placements, By module at 390x844, page top",
+    "placements-by-module-canvas-narrow.png": "the 342 x 494 canvas at its fitted 0.1398",
+    "sixty-rows-fit-desktop.png": "the 61-row tree fitted at 0.2433 at 1440x1000",
+    "sixty-rows-focused-check-060-desktop.png": "check-060 focused at zoom 1.0459, centred in the canvas viewport",
+    "sixty-rows-by-module-narrow.png": "the 61-row tree fitted at 0.1502 at 390x844",
+    "sixty-rows-focused-check-060-narrow.png": "check-060 focused at zoom 0.93 at 390x844, centred in the canvas viewport"
+  }
+}

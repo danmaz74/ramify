@@ -3,9 +3,9 @@ module service-api tagged [dispatch]
 
 expose-src * from "interfaces/explorer-service.ts" to parent
 expose-src * from "interfaces/explorer-dependencies.ts" to parent
-expose-src createProjectExplorerModel from "project-view.ts" to parent
+expose-src createProjectExplorerModel, ExplorerProjectionResult from "project-view.ts" to parent
 expose-src DependencyViews, DependencyViewsStatus, DependencyViewCounters from "dependency-view.ts" to parent
-expose-src createExplorerRouter, ExplorerRouter, ExplorerRouterOptions from "router.ts" to parent
+expose-src createExplorerRouter, ExplorerRouter, ExplorerProcedures, ExplorerRouterOptions from "router.ts" to parent
 expose-src startExplorerWebProcess, ExplorerWebProcess, ExplorerWebProcessOptions from "web-process.ts" to parent
 expose-src selectExplorerEndpoint, readExplorerProcessRecord, reusableExplorerProcess, probeExplorerReadiness, explorerProjectUrl, explorerProjectKey, ExplorerEndpointSelection from "web-discovery.ts" to parent
 expose-src ensureExplorerWebProcess, ExplorerLaunchOptions, ExplorerProcessLaunch from "web-launcher.ts" to parent

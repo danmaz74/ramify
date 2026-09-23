@@ -25,6 +25,24 @@ import type { HarnessRuntime, InstanceHandler } from './runner.js';
  */
 
 type Identity = Awaited<ReturnType<typeof executionIdentity>>;
+// The reviewed eight package entries, and the recorded additions beside them:
+// the module-tree canvas entry and its stylesheet, a string export target that
+// is resolved and read but never imported. `relocation.ts` holds the same form.
+const reviewedEntryMap: readonly string[] = ['.', './analysis', './analysis/inventory', './model', './presentation', './cli', './layout', './client'];
+const recordedEntryAdditions: readonly string[] = ['./module-tree'];
+const recordedStylesheetAdditions: readonly string[] = ['./module-tree.css'];
+// Plan 2A's implementation base, its completion commit, and the changes to
+// Plan 3's package that later plans reviewed. Plan 2A has no authority over a
+// later plan, so its claim is bounded by its own completion; every commit that
+// touched the package afterwards is named here with the decision behind it.
+const plan3Directory = 'docs/plans/iteration-3-project-inspection';
+const plan3Base = '71643d5';
+const plan2aCompletion = 'd5c2498';
+const reviewedPlan3Changes: readonly { readonly commit: string; readonly decision: string }[] = [
+  { commit: '14c5c2a81962ecd52dbb0f655b21f4948958aaf9',
+    decision: 'Measurement sampling is decent rather than exaggerated: the planned inspect heap plateau takes 40 answers instead of 200.' },
+];
+
 const identityFields = ['sourceSha256', 'buildSha256', 'packageVersion', 'nodeVersion', 'typescriptVersion'] as const;
 const sameInputs = (a: Identity, b: Identity) => identityFields.every(field => a[field] === b[field]);
 
@@ -205,13 +223,21 @@ export const plan2aCompletionHandlers: ReadonlyMap<string, InstanceHandler> = ne
     recordObservation('plan2a-final-contracts-process', result);
     a.equal('the strict final-contract process accepts the real package', [result.code, result.signal, result.error], [0, null, null]);
     const value = object(JSON.parse(result.stdout));
-    a.equal('eleven declarations and eight package entries validated', [value.owners, value.packageEntries], [11, 8]);
+    // The eleven archived declarations, the four owners Plan 6 added as a named
+    // layer, and the eight reviewed package entries the validator returns.
+    a.equal('fifteen layered declarations and eight reviewed package entries validated', [value.owners, value.packageEntries], [15, 8]);
     a.ok('real exposures were linked', Number(value.expandedStatements) > 0);
     const pkg = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8')) as
       { readonly dependencies?: Record<string, string>; readonly devDependencies?: Record<string, string>; readonly exports: Record<string, unknown>; readonly bin: unknown };
     const allDependencies = { ...pkg.dependencies, ...pkg.devDependencies };
     a.equal('no MCP dependency appears anywhere in package.json', Object.keys(allDependencies).some(name => /model-context-protocol|modelcontextprotocol/i.test(name)), false);
-    a.equal('no twelfth owner: exactly eight package export entries', Object.keys(pkg.exports).length, 8);
+    const entryKeys = Object.keys(pkg.exports);
+    a.equal('the reviewed eight package export entries are unchanged', entryKeys.filter(key => reviewedEntryMap.includes(key)), reviewedEntryMap);
+    a.equal('the only other export entries are the recorded additions',
+      entryKeys.filter(key => !reviewedEntryMap.includes(key)), [...recordedEntryAdditions, ...recordedStylesheetAdditions]);
+    // A stylesheet entry is a string target: one packed file, read and never imported.
+    a.equal('every recorded stylesheet addition is a string file target',
+      recordedStylesheetAdditions.map(key => typeof pkg.exports[key]), recordedStylesheetAdditions.map(() => 'string'));
     a.equal('the installed launcher target is unchanged', pkg.bin, { ramify: 'dist/src/ramify' });
   } }],
 
@@ -229,9 +255,18 @@ export const plan2aCompletionHandlers: ReadonlyMap<string, InstanceHandler> = ne
   } }],
 
   ['I2A-13:plan3-preserved', { kind: 'memory', run: async ({ assertions: a }) => {
-    const status = await command(repositoryRoot, 'git', ['status', '--porcelain', '--', 'docs/plans/iteration-3-project-inspection']);
+    const status = await command(repositoryRoot, 'git', ['status', '--porcelain', '--', plan3Directory]);
     a.equal('no working-tree change under the Plan 3 directory', status.stdout.trim(), '');
-    const diff = await command(repositoryRoot, 'git', ['diff', '--quiet', '71643d5', '--', 'docs/plans/iteration-3-project-inspection']);
-    a.equal('the Plan 3 tree equals its implementation-base Git tree byte-for-byte', diff.code, 0);
+    // Plan 2A's exit criterion 8 asks whether Plan 2A replaced or edited
+    // Plan 3's package. That is settled at Plan 2A's own completion and does
+    // not change afterwards. Comparing the working tree answered it only while
+    // Plan 2A was the tip, which it was when this case was written.
+    const diff = await command(repositoryRoot, 'git', ['diff', '--quiet', plan3Base, plan2aCompletion, '--', plan3Directory]);
+    a.equal('the Plan 3 tree at Plan 2A completion equals its implementation-base Git tree byte-for-byte', diff.code, 0);
+    // Nothing is loosened: a later change to Plan 3's package still fails
+    // unless it is one of the recorded approved decisions.
+    const later = await command(repositoryRoot, 'git', ['log', '--format=%H', `${plan2aCompletion}..HEAD`, '--', plan3Directory]);
+    a.equal('every later change to the Plan 3 tree is a recorded approved decision',
+      later.stdout.trim().split('\n').filter(Boolean), reviewedPlan3Changes.map(item => item.commit));
   } }],
 ]);

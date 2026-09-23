@@ -16,6 +16,16 @@ export type Plan1GateArtifact = VerificationReport & {
 const identityFields = ['sourceSha256', 'buildSha256', 'packageVersion', 'nodeVersion', 'typescriptVersion'] as const;
 const sameInputs = (a: Identity, b: Identity) => identityFields.every(field => a[field] === b[field]);
 const revised = new Set(['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package']);
+// Ramify Plan 8's `ff01212` restated this record's text when the reference
+// example declared its signatures, so the archived definition and the current
+// inventory differ for it alone. The archived evidence stays as it is; this
+// names the one record the byte-identity rule no longer covers.
+const restatedByPlan8 = new Set(['I1-09:signature-only-type']);
+/** Records a later plan revised, by expectation or by restated definition. */
+const revisedDefinitions = new Set([...revised, ...restatedByPlan8]);
+/** 308 records, less the three Plan 2 expectation revisions and Plan 8's one restatement. */
+export const unchangedRecordCount = 304;
+export const restatedRecordIds = [...restatedByPlan8];
 const owners = ['ramify', 'ramify/analysis', 'ramify/analysis/descriptions', 'ramify/analysis/model',
   'ramify/analysis/project', 'ramify/analysis/typescript', 'ramify/cli', 'ramify/daemon', 'ramify/daemon/contexts',
   'ramify/presentation', 'ramify/presentation/layout'];
@@ -26,8 +36,39 @@ const entries = {
   'ramify.ts/cli': 'runCli', 'ramify.ts/client': 'connectDaemon',
 };
 
+// Named revisions of the records above. Each names the plan that reviewed it
+// and keeps the archived expectation beside it, so a renamed assertion or an
+// added entry is accepted as a reviewed change and never as an unchanged
+// record. The tables above stay exactly as Plan 1 recorded them.
+export const revisedAssertionNames = [
+  { plan: 'Plan 6 (project explorer)', archived: 'exact eleven implemented owners', revised: 'exact fifteen implemented owners' },
+  { plan: 'the module-tree canvas entry', archived: 'all eight actual package entry imports executed',
+    revised: 'every actual package entry import executed' },
+] as const;
+/** The four owners Plan 6 added below the archived eleven. */
+export const revisedOwners = [...owners, 'ramify/explorer', 'ramify/integration-tests',
+  'ramify/presentation/project-view', 'ramify/service-api'].sort();
+/** The canvas entry added beside the archived eight, in the position the installed manifest resolves it. */
+const addedEntries = [{ plan: 'the module-tree canvas entry', entry: 'ramify.ts/module-tree',
+  callable: 'ModuleTreeCanvas', after: 'ramify.ts/presentation' }] as const;
+/** Its stylesheet is a string export target: resolved to its packed file, never imported. */
+export const revisedStylesheets = ['ramify.ts/module-tree.css'];
+export function revisedEntries(): Array<[string, string]> {
+  const list = Object.entries(entries);
+  for (const addition of addedEntries) {
+    const at = list.findIndex(([entry]) => entry === addition.after);
+    assert.ok(at >= 0, `${addition.plan} adds after an entry the archive does not hold: ${addition.after}`);
+    list.splice(at + 1, 0, [addition.entry, addition.callable]);
+  }
+  return list;
+}
+/** The name a record carries today: the archived name, or its named revision. */
+export function revisedName(archived: string): string {
+  return revisedAssertionNames.find(item => item.archived === archived)?.revised ?? archived;
+}
+
 /** Accept a complete process gate, not its summary counters alone. The frozen
- * archive supplies the 305 unaffected record definitions, never current success. */
+ * archive supplies the 304 unaffected record definitions, never current success. */
 export function assertPlan1Regression(report: Plan1GateArtifact, identity: Identity, archivedRecords: typeof plan1Instances): void {
   assert.ok(sameInputs(report.evidence.identity, identity), 'Plan 1 evidence is for different source, build or runtime inputs');
   assert.deepEqual([report.schemaVersion, report.plan, report.mode, report.iteration, report.passed, report.planComplete],
@@ -36,10 +77,10 @@ export function assertPlan1Regression(report: Plan1GateArtifact, identity: Ident
   assert.deepEqual(report.inventoryIssues, []);
   assert.deepEqual(report.summary, { required: 308, passed: 308, failed: 0, notExecuted: 0 });
   assert.deepEqual(report.evidence.instances, plan1Instances, 'Every execution record must match the current reviewed inventory');
-  const unaffected = (records: typeof plan1Instances) => records.filter(item => !revised.has(item.id));
-  assert.equal(unaffected(archivedRecords).length, 305);
+  const unaffected = (records: typeof plan1Instances) => records.filter(item => !revisedDefinitions.has(item.id));
+  assert.equal(unaffected(archivedRecords).length, unchangedRecordCount);
   assert.equal(JSON.stringify(unaffected(report.evidence.instances)), JSON.stringify(unaffected(archivedRecords)),
-    'The 305 unaffected Plan 1 record definitions must remain byte-identical');
+    `The ${unchangedRecordCount} unaffected Plan 1 record definitions must remain byte-identical`);
   assert.deepEqual(report.instances.map(item => item.id), plan1Instances.map(item => item.id), 'All 308 unique execution slots are required');
   for (const item of report.instances) {
     assert.ok(item.required === true && item.status === 'passed' && item.reason === undefined && item.error === undefined,
@@ -50,17 +91,23 @@ export function assertPlan1Regression(report: Plan1GateArtifact, identity: Ident
   }
   for (const id of ['I1-27:self-check', 'I1-27:self-negative']) {
     const item = report.instances.find(item => item.id === id)!;
-    assert.ok([...item.baselineAssertions, ...item.assertions].some(a => a.name === 'exact eleven implemented owners'), `${id}: old owner expectation`);
+    assert.ok([...item.baselineAssertions, ...item.assertions].some(a => a.name === revisedName('exact eleven implemented owners')), `${id}: old owner expectation`);
     const inventories = item.observations?.filter(o => o.kind === 'toolkit-scope') ?? [];
     assert.ok(inventories.length > 0, `${id}: missing toolkit observations`);
-    for (const observation of inventories) assert.deepEqual((observation.data as { owners: unknown }).owners, owners);
+    for (const observation of inventories) assert.deepEqual((observation.data as { owners: unknown }).owners, revisedOwners);
   }
   const relocation = report.instances.find(item => item.id === 'I1-28:relocated-package')!;
-  assert.ok([...relocation.baselineAssertions, ...relocation.assertions].some(a => a.name === 'all eight actual package entry imports executed'),
-    'Relocation must execute the eight-entry expectation');
+  const relocationAssertions = [...relocation.baselineAssertions, ...relocation.assertions];
+  assert.ok(relocationAssertions.some(a => a.name === revisedName('all eight actual package entry imports executed')),
+    'Relocation must execute the revised entry expectation');
+  assert.ok(relocationAssertions.some(a => a.name === 'every stylesheet entry resolves to its packed file'),
+    'Relocation must execute the stylesheet-file expectation');
   const imports = relocation.observations?.filter(o => o.kind === 'relocation-installed-entries') ?? [];
   assert.equal(imports.length, 1, 'Exactly one installed entry observation is required');
-  assert.deepEqual((imports[0].data as Array<{ entry: string; callable: string }>).map(item => [item.entry, item.callable]), Object.entries(entries));
+  assert.deepEqual((imports[0].data as Array<{ entry: string; callable: string }>).map(item => [item.entry, item.callable]), revisedEntries());
+  const stylesheets = relocation.observations?.filter(o => o.kind === 'relocation-installed-stylesheets') ?? [];
+  assert.equal(stylesheets.length, 1, 'Exactly one installed stylesheet observation is required');
+  assert.deepEqual((stylesheets[0].data as Array<{ entry: string }>).map(item => item.entry), revisedStylesheets);
 }
 
 /** Inspect the most recent report for these inputs. A failed matching report
@@ -87,7 +134,8 @@ export async function readPlan1Regression(directory: string, identity: Identity,
     if (!sameInputs(report.evidence.identity, identity)) continue;
     assertPlan1Regression(report, identity, archivedRecords);
     return { file: file.name, sha256: createHash('sha256').update(raw).digest('hex'), identity: report.evidence.identity,
-      summary: report.summary, unchangedRecords: 305, revisedExpectationRecords: [...revised] };
+      summary: report.summary, unchangedRecords: unchangedRecordCount,
+      revisedExpectationRecords: [...revised], restatedRecords: restatedRecordIds };
   }
   throw new Error('No full Plan 1 gate for the current source/build/runtime. Run npm run reference:verify -- --plan 1 through the authorized regression runner first.');
 }

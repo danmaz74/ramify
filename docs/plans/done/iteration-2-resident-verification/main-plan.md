@@ -583,7 +583,7 @@ socket and the compiled entries and is never replaced by a quick run.
 | I2-27 | PC04, ML07, QT05, ML03, DA17 | `watch-exit-releases`, `command-exit-releases`, `idle-disposal-releases`, `eviction-under-many-contexts`, `reconnect-after-crash-live`. |
 | I2-28 | harness discipline (Plan 1 `I1-30:harness-required` analogue) | `required-membership`, `removed-record-fails`, `failing-assertion-fails`, `iteration-filter`. |
 | I2-29 | DA17, ML01–ML04, ML06, QT07 | `entry-footprints`, `cold-warm-broad-reference`, `cold-warm-broad-hundred`, `repeated-edit-plateau`, `many-contexts`, `slow-consumer`, `synthetic-500`, `synthetic-1000`, `publication-peak`. |
-| I2-30 | DA18, PC01, QT05 | `self-check-eleven`, `self-negative-contexts`, `declarations-final`, `package-entries`, `relocated-resident`, `plan1-regression`. |
+| I2-30 | DA18, PC01, QT05 | `self-check-fifteen`, `self-negative-contexts`, `declarations-final`, `package-entries`, `relocated-resident`, `plan1-regression`. |
 
 The matrix exercises only the stated portions of each family. PC07 covers the
 local service and the direct client, not tRPC or MCP; PC06 and PC10 cover the

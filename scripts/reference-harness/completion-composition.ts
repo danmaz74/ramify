@@ -5,7 +5,7 @@ import { gunzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
 import { executionIdentity } from './artifact.js';
 import { plan1Instances } from './cases.js';
-import { assertPlan1Regression } from './completion-regression.js';
+import { assertPlan1Regression, restatedRecordIds, unchangedRecordCount } from './completion-regression.js';
 import type { Plan1GateArtifact } from './completion-regression.js';
 import { assertReviewedTransition, captureSourceTransition, reusePolicy, sha256 } from './evidence-reuse.js';
 import type { EvidenceIdentity, SourceTransition } from './evidence-reuse.js';
@@ -117,8 +117,9 @@ export async function readPlan1Composition(directory: string, file: string, curr
   const migration = composition.focusedTransition ? await referenced<SourceTransition>(directory, composition.focusedTransition) : undefined;
   assertPlan1Composition(composition, baseline, focused, reviewed, actual, current, archivedRecords,
     migration ? { reviewed: migration, actual: await captureSourceTransition(migration.baselineRevision) } : undefined);
-  return { file, sha256: sha256(raw), identity: current, summary: composition.summary, unchangedRecords: 305,
+  return { file, sha256: sha256(raw), identity: current, summary: composition.summary, unchangedRecords: unchangedRecordCount,
     revisedExpectationRecords: ['I1-27:self-check', 'I1-27:self-negative', 'I1-28:relocated-package'],
+    restatedRecords: restatedRecordIds,
     acceptance: 'composed' as const, policy: composition.policy, baseline: composition.baseline, rerun: composition.rerun,
     reviewedTransition: composition.reviewedTransition, focusedTransition: composition.focusedTransition, reusedExecutions: 299, rerunExecutions: focusedPlan1Ids.length };
 }

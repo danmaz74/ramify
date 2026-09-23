@@ -18,8 +18,8 @@ import type { Anchor, ViewRect } from './interfaces/layout.js';
  * Zoom limits. 1 is "the whole diagram fills the container"; below 0.5 the
  * labels stop being readable, and above 4 a single node fills the screen.
  */
-export const MIN_SCALE = 0.5;
-export const MAX_SCALE = 4;
+export const MIN_SCALE: 0.5 = 0.5;
+export const MAX_SCALE: 4 = 4;
 
 
 /** The centre of the viewport - the anchor the +/- buttons zoom about. */
@@ -111,10 +111,10 @@ export function normalizeWheelDelta(deltaY: number, deltaMode: number): number {
 }
 
 /** One wheel notch as a gentle, symmetric zoom step. */
-export function wheelFactor(deltaY: number, deltaMode = 0): number {
+export function wheelFactor(deltaY: number, deltaMode: number = 0): number {
   const pixels = normalizeWheelDelta(deltaY, deltaMode);
   return Math.exp(-clamp(pixels, -240, 240) * 0.0025);
 }
 
 /** How far a pointer may travel and still count as a click, not a drag. */
-export const DRAG_THRESHOLD = 5;
+export const DRAG_THRESHOLD: 5 = 5;

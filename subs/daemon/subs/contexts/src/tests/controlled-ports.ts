@@ -22,7 +22,7 @@ function duration(value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError('Time must be a nonnegative safe integer');
 }
 
-export function createControlledClock(initialTime = 0): ControlledClock {
+export function createControlledClock(initialTime: number = 0): ControlledClock {
   duration(initialTime);
   let current = initialTime;
   let nextId = 0;

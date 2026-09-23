@@ -398,3 +398,27 @@ test('the tab rows wrap, so Progress stays reachable at a narrow width', () => {
   const styles = webFiles.find(file => file.path === 'styles.css')!.text;
   expect(/^\.tabs \{[^}]*flex-wrap: wrap;/m.test(styles)).toBe(true);
 });
+
+// KI-8: `main { max-width: 52rem }` capped the canvas, because the earlier `.run-page main`
+// named the Run page's parent and matched nothing. The route class on <main> lifts the cap
+// for the Run route alone, and the page keeps the same measure on all but its wide area.
+test('the Run route lifts the shell width cap and keeps a reading measure on its prose', () => {
+  const styles = webFiles.find(file => file.path === 'styles.css')!.text;
+  expect(styles).not.toMatch(/^\.run-page main/m);
+  expect(styles).toMatch(/^main\.route-run \{ max-width: none; \}$/m);
+  expect(styles).toMatch(/^\.run-page > \* \{ max-width: 52rem; \}$/m);
+  expect(styles).toMatch(/^\.run-page > \.area-wide \{ max-width: none; \}$/m);
+  expect(webFiles.find(file => file.path === 'run-page.tsx')!.text)
+    .toMatch(/className="area area-wide" aria-label="Progress"/);
+});
+
+// The fitted zoom is what makes rows readable, so the canvas takes the viewport height and,
+// under 82rem, the whole page width with the detail panel stacked below it.
+test('the canvas takes the viewport height, and the detail panel stacks below 82rem', () => {
+  const styles = webFiles.find(file => file.path === 'styles.css')!.text;
+  expect(styles).not.toMatch(/height: 38rem/);
+  expect(styles).toMatch(/\.capability-module-canvas \{\n\s*height: calc\(100vh - 14rem\); min-height: 26rem;/);
+  const narrow = styles.slice(styles.indexOf('@media (max-width: 82rem)'));
+  expect(narrow).toMatch(/\.capability-module-layout \{ grid-template-columns: 1fr; \}/);
+  expect(narrow).toMatch(/\.capability-module-canvas \{ height: calc\(100vh - 22rem\); \}/);
+});

@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import {
   ModuleTreeCanvas,
   type ModuleTreeCanvasNode,
@@ -17,7 +17,13 @@ import {
 import { indexHierarchy, layoutModuleTree, PROJECT_NODE_ID, TREE_NODE_HEIGHT, TREE_NODE_WIDTH } from '../module-tree.js';
 
 const flowProps: Array<Record<string, any>> = [];
-const instance = vi.hoisted(() => ({ fitView: vi.fn(async () => true), setCenter: vi.fn(async () => true) }));
+const instance = vi.hoisted(() => ({
+  fitView: vi.fn(async () => true),
+  setCenter: vi.fn(async () => true),
+  getZoom: vi.fn(() => 0.25),
+  // A recognisable mapping, so a centre asserted below is the focused box's own centre.
+  screenToFlowPosition: vi.fn(({ x, y }: { x: number; y: number }) => ({ x: x * 2, y: y * 3 })),
+}));
 
 vi.mock('@xyflow/react', async () => {
   const { useEffect } = await import('react');
@@ -67,6 +73,8 @@ beforeEach(() => {
   flowProps.length = 0;
   instance.fitView.mockClear();
   instance.setCenter.mockClear();
+  instance.getZoom.mockClear();
+  instance.screenToFlowPosition.mockClear();
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
   vi.stubGlobal('cancelAnimationFrame', () => {});
 });
@@ -272,6 +280,108 @@ describe('ModuleTreeCanvas interaction', () => {
     expect(onSelectNode).not.toHaveBeenCalled();
   });
 
+  it('pans to a keyboard-focused element outside the viewport, at the current zoom, and stops fitting', () => {
+    const observers: ResizeObserverCallback[] = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) { observers.push(callback); }
+      observe() {}
+      disconnect() {}
+    });
+    render(<ModuleTreeCanvas {...props({ nodes: mixedNodes(), renderNodeBody: controlBody })} />);
+    expect(instance.fitView).toHaveBeenCalledTimes(1);
+    stubRect(screen.getByRole('tree', { name: 'Test tree' }), { left: 0, top: 0, width: 400, height: 300 });
+    // A row low in the tall B1 node: its own box lies outside the viewport, where its node starts inside it.
+    const row = within(screen.getByTestId('node-b1')).getByRole('button', { name: 'row B1' });
+    stubRect(row, { left: 120, top: 900, width: 160, height: 20 });
+    stubFocusRing(row, true);
+    row.focus();
+    expect(instance.setCenter).toHaveBeenCalledTimes(1);
+    // The focused element's own centre, at the zoom the viewer is already looking at.
+    expect(instance.setCenter).toHaveBeenCalledWith(200 * 2, 910 * 3, { zoom: 0.25 });
+    expect(instance.setCenter).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), { zoom: 1 });
+    // A focus pan is a viewer move: the canvas stops fitting itself afterwards.
+    act(() => { for (const observer of observers) observer([], {} as ResizeObserver); });
+    expect(instance.fitView).toHaveBeenCalledTimes(1);
+    // A shell the viewer tabs to, off to the right of the viewport, is centred the same way.
+    const shell = screen.getByRole('treeitem', { name: 'Beta' });
+    stubRect(shell, { left: 500, top: 40, width: 220, height: 90 });
+    stubFocusRing(shell, true);
+    shell.focus();
+    expect(instance.setCenter).toHaveBeenLastCalledWith(610 * 2, 85 * 3, { zoom: 0.25 });
+    expect(instance.setCenter).toHaveBeenCalledTimes(2);
+    // Already within the viewport: nothing moves.
+    const inside = within(screen.getByTestId('node-a')).getByRole('button', { name: 'row Alpha' });
+    stubRect(inside, { left: 10, top: 20, width: 100, height: 20 });
+    stubFocusRing(inside, true);
+    inside.focus();
+    expect(instance.setCenter).toHaveBeenCalledTimes(2);
+    // Focus without a ring, as a pointer leaves it: outside the viewport, and still nothing moves.
+    const pointed = within(screen.getByTestId('node-b1')).getByRole('link', { name: 'link B1' });
+    stubRect(pointed, { left: 900, top: 900, width: 80, height: 20 });
+    stubFocusRing(pointed, false);
+    pointed.focus();
+    expect(instance.setCenter).toHaveBeenCalledTimes(2);
+  });
+
+  // Found by the browser evidence of Plan 8 iteration 5: Chromium scrolls React Flow's own
+  // element to reveal the focused row, and React Flow resets that scroll a moment later. The
+  // canvas read the revealed box, decided the row was already in view, and never panned.
+  it('undoes the scroll a browser applies to reveal the focused element, then pans to it', () => {
+    render(<ModuleTreeCanvas {...props({ nodes: mixedNodes(), renderNodeBody: controlBody })} />);
+    stubRect(screen.getByRole('tree', { name: 'Test tree' }), { left: 0, top: 0, width: 400, height: 300 });
+    const row = within(screen.getByTestId('node-b1')).getByRole('button', { name: 'row B1' });
+    // The browser has scrolled an ancestor between the row and the canvas viewport, as
+    // Chromium scrolls React Flow's own element.
+    const scrolled = screen.getByTestId('mock-reactflow');
+    stubScroll(scrolled, { top: 800, left: 60 });
+    // Where the row is drawn once that scroll is undone, and where the browser briefly put it.
+    stubRect(row, () => scrolled.scrollTop === 0 && scrolled.scrollLeft === 0
+      ? { left: 120, top: 900, width: 160, height: 20 }
+      : { left: 60, top: 100, width: 160, height: 20 });
+    stubFocusRing(row, true);
+    row.focus();
+    expect([scrolled.scrollTop, scrolled.scrollLeft]).toEqual([0, 0]);
+    expect(instance.setCenter).toHaveBeenCalledTimes(1);
+    expect(instance.setCenter).toHaveBeenCalledWith(200 * 2, 910 * 3, { zoom: 0.25 });
+  });
+
+  it('keeps Space on a body control off React Flow\'s pan-activation key, and leaves the shell\'s Space alone', () => {
+    const panKey = vi.fn();
+    document.addEventListener('keydown', panKey);
+    const controlKey = vi.fn();
+    const body = (node: ModuleTreeCanvasNode) => (
+      <button type="button" onKeyDown={controlKey} onKeyUp={controlKey}>row {node.name}</button>
+    );
+    try {
+      const onSelectNode = vi.fn();
+      render(<ModuleTreeCanvas {...props({ nodes: mixedNodes(), onSelectNode, renderNodeBody: body })} />);
+      const control = within(screen.getByTestId('node-a')).getByRole('button', { name: 'row Alpha' });
+      // Not prevented, so the browser still turns the control's Space into its own click.
+      expect(fireEvent.keyDown(control, { key: ' ', code: 'Space' })).toBe(true);
+      expect(fireEvent.keyUp(control, { key: ' ', code: 'Space' })).toBe(true);
+      expect(controlKey).toHaveBeenCalledTimes(2);
+      expect(panKey).not.toHaveBeenCalled();
+      expect(onSelectNode).not.toHaveBeenCalled();
+      // The shell and the pane keep their Space behavior.
+      fireEvent.keyDown(screen.getByRole('treeitem', { name: 'Alpha' }), { key: ' ', code: 'Space' });
+      expect(panKey).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(screen.getByTestId('mock-pane'), { key: ' ', code: 'Space' });
+      expect(panKey).toHaveBeenCalledTimes(2);
+    } finally {
+      document.removeEventListener('keydown', panKey);
+    }
+  });
+
+  it('is a size container that hides the minimap below a 480 px canvas width', () => {
+    render(<ModuleTreeCanvas {...props()} />);
+    expect(screen.getByTestId('mock-minimap')).toBeInTheDocument();
+    const css = readFileSync(sibling('module-tree-canvas.css'), 'utf8');
+    expect(rule(css, '.module-tree__canvas')).toMatch(/container-type:\s*inline-size/);
+    const query = css.slice(css.indexOf('@container'), css.indexOf('@container') + 200);
+    expect(css).toContain('@container (width < 480px)');
+    expect(query).toMatch(/\.module-tree__canvas \.react-flow__minimap\s*\{[^}]*display:\s*none/);
+  });
+
   it('handles Enter, arrows and o on the shell, and opens by double-click', () => {
     const onSelectNode = vi.fn();
     const onToggleCollapsed = vi.fn();
@@ -347,6 +457,37 @@ function flowNodes(): Map<string, Record<string, any>> {
 /** A source file of the owner. */
 function sibling(file: string): string {
   return join(dirname(fileURLToPath(import.meta.url)), '..', file);
+}
+
+/**
+ * States whether the element carries a focus ring. jsdom answers `:focus-visible` from its own
+ * record of the interactions that led to the focus; the rule under test is what the canvas does
+ * with the answer.
+ */
+function stubFocusRing(element: HTMLElement, visible: boolean): void {
+  const matches = element.matches.bind(element);
+  element.matches = ((selectors: string) => selectors === ':focus-visible' ? visible
+    : matches(selectors)) as Element['matches'];
+}
+
+interface Box { left: number; top: number; width: number; height: number }
+
+/** Fixes an element's box, which jsdom otherwise reports as empty; a function follows the layout. */
+function stubRect(element: Element, box: Box | (() => Box)): void {
+  element.getBoundingClientRect = () => {
+    const at = typeof box === 'function' ? box() : box;
+    return {
+      x: at.left, y: at.top, left: at.left, top: at.top,
+      right: at.left + at.width, bottom: at.top + at.height, width: at.width, height: at.height,
+      toJSON: () => ({}),
+    };
+  };
+}
+
+/** Gives an element scroll offsets, which jsdom keeps at zero for want of a layout. */
+function stubScroll(element: Element, at: { top: number; left: number }): void {
+  Object.defineProperty(element, 'scrollTop', { value: at.top, writable: true, configurable: true });
+  Object.defineProperty(element, 'scrollLeft', { value: at.left, writable: true, configurable: true });
 }
 
 function rule(css: string, selector: string): string {

@@ -940,20 +940,30 @@ export async function apiViewIdentity(): Promise<ApiIdentityEvidence> {
 
 export interface EntryEvidence {
   readonly packageEntries: number;
-  readonly manifest: { readonly exports: readonly string[]; readonly baselineExports: readonly string[]; readonly equalToBaseline: boolean };
+  readonly manifest: { readonly exports: readonly string[]; readonly baselineExports: readonly string[];
+    /** Entry keys beyond the reviewed baseline, and those of them whose target is a string file. */
+    readonly additions: readonly string[]; readonly stylesheetAdditions: readonly string[];
+    readonly equalToBaseline: boolean };
   readonly client: { readonly code: number | null; readonly closure: readonly string[]; readonly assertions: number };
   readonly cli: { readonly code: number | null; readonly closure: readonly string[]; readonly forbidden: readonly string[];
     /** Process or socket activity of the import: spawns, launches, connections, listeners and binds. */
     readonly activity: number };
 }
 
+// The recorded additions beyond the reviewed baseline: the module-tree canvas
+// entry and its stylesheet. `relocation.ts` holds the same separation of entry
+// imports from stylesheet files.
+const recordedEntryAdditions: readonly string[] = ['./module-tree'];
+const recordedStylesheetAdditions: readonly string[] = ['./module-tree.css'];
+
 /** Any analysis source, the retained session and its worker, or the compiler package. */
 export const excludedFromEntries = /(?:dist\/subs\/analysis\/|node_modules\/(?:typescript|@typescript)\/)/;
 
 /**
- * AV34's package-entry and closure cases: the eight entries validate against
- * the reviewed Plan 1 and Plan 2 metadata and equal the manifest at `577b980`,
- * the plan's inventory commit; importing `./client` loads only its reviewed
+ * AV34's package-entry and closure cases: the eight reviewed entries validate
+ * against the reviewed Plan 1 and Plan 2 metadata and equal the manifest at
+ * `577b980`, the plan's inventory commit, and the only other keys are the
+ * recorded additions; importing `./client` loads only its reviewed
  * closure and importing `./cli` loads no analysis, session, worker or
  * compiler module. The imports run in a private npm prefix under the process probe.
  */
@@ -964,8 +974,17 @@ export async function entryClosures(): Promise<EntryEvidence> {
   const packageEntries = await validatePackageEntries(repositoryRoot, expected);
   const current = JSON.parse(await read('package.json')) as Record<string, unknown>;
   const baseline = JSON.parse((await git(repositoryRoot, ['show', '577b980:package.json'])).toString('utf8')) as Record<string, unknown>;
-  const fields = ['type', 'main', 'types', 'bin', 'exports'] as const;
-  const equalToBaseline = fields.every(field => JSON.stringify(current[field]) === JSON.stringify(baseline[field]));
+  const fields = ['type', 'main', 'types', 'bin'] as const;
+  const currentExports = current.exports as Record<string, unknown>, baselineExports = baseline.exports as Record<string, unknown>;
+  const reviewedKeys = Object.keys(baselineExports);
+  const additions = Object.keys(currentExports).filter(key => !reviewedKeys.includes(key));
+  const stylesheetAdditions = additions.filter(key => typeof currentExports[key] === 'string');
+  // The reviewed entries still equal the `577b980` baseline, and the only other
+  // keys are the recorded additions: the module-tree canvas entry and its
+  // stylesheet, a string target resolved and read but never imported.
+  const equalToBaseline = fields.every(field => JSON.stringify(current[field]) === JSON.stringify(baseline[field]))
+    && reviewedKeys.every(key => JSON.stringify(currentExports[key]) === JSON.stringify(baselineExports[key]))
+    && JSON.stringify(additions) === JSON.stringify([...recordedEntryAdditions, ...recordedStylesheetAdditions]);
   return withSequenceProcess(async processes => {
     const consumer = await realpath(join(dirname(dirname(dirname(processes.executable))), '..', '..'));
     const traced = async (specifier: string) => {
@@ -984,7 +1003,7 @@ export async function entryClosures(): Promise<EntryEvidence> {
       .map(path => relative(repositoryRoot, path));
     return {
       packageEntries,
-      manifest: { exports: Object.keys(current.exports as object), baselineExports: Object.keys(baseline.exports as object), equalToBaseline },
+      manifest: { exports: Object.keys(currentExports), baselineExports: reviewedKeys, additions, stylesheetAdditions, equalToBaseline },
       client: { code: client.result.code, closure: [...closure].sort(), assertions: assertions.finish().length },
       cli: { code: cli.result.code, closure: [...cliFiles].sort(),
         forbidden: cliFiles.filter(path => excludedFromEntries.test(path) || sessionModulePattern.test(path)),

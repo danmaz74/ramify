@@ -1,11 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { initTRPC } from '@trpc/server';
+import {
+  initTRPC,
+  type TRPCBuiltRouter,
+  type TRPCDecorateCreateRouterOptions,
+  type TRPCDefaultErrorShape,
+  type TRPCQueryProcedure,
+} from '@trpc/server';
 import { z } from 'zod';
+import type { SymbolDetail } from '../../analysis/subs/typescript/src/interfaces/source.js';
+import type { ContextRevision, ContextStatus } from '../../daemon/subs/contexts/src/interfaces/contexts.js';
 import { createDependencyViews, type DependencyViews } from './dependency-view.js';
 import type { DependencyViewResult } from './interfaces/explorer-dependencies.js';
 import type { ServerStatusResult } from './interfaces/explorer-service.js';
 import { unavailableReason, type ProjectBinding } from './project-binding.js';
-import { createProjectExplorerModel } from './project-view.js';
+import { createProjectExplorerModel, type ExplorerProjectionResult } from './project-view.js';
 
 const revision = z.string().regex(/^rev\/1:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[1-9][0-9]*$/);
 const canonical = z.string().min(1).refine(value => !/[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(value));
@@ -24,6 +32,45 @@ export interface ExplorerRouterOptions {
   readonly dependencyViews?: DependencyViews;
 }
 
+/**
+ * The browser's four query procedures, written out: each one's parsed input and
+ * its answer. A procedure's contract is stated here rather than left to the
+ * inference of the factory below, so the router type travels with it.
+ */
+export type ExplorerProcedures = {
+  serverStatus: TRPCQueryProcedure<{ input: undefined; output: ServerStatusResult; meta: object }>;
+  projectView: TRPCQueryProcedure<{
+    input: { revision?: string | undefined };
+    output: ExplorerProjectionResult | { status: 'pending'; current: ContextStatus };
+    meta: object;
+  }>;
+  explorerDetails: TRPCQueryProcedure<{
+    input: {
+      revision: string;
+      requests: {
+        original: { kind: 'code' | 'resource'; owner: string; file: string; binding: string };
+        exportName: string;
+      }[];
+    };
+    output:
+      | { status: 'superseded'; reason: string }
+      | { status: 'unavailable'; reason: string; revision?: undefined; details?: undefined }
+      | { reason?: undefined; status: 'ready'; revision: ContextRevision; details: readonly SymbolDetail[] };
+    meta: object;
+  }>;
+  dependencyView: TRPCQueryProcedure<{ input: { revision: string }; output: DependencyViewResult; meta: object }>;
+};
+
+/**
+ * The browser's router: the configured runtime's root types over the procedure
+ * record above. It is the declared result of `createExplorerRouter`, and the
+ * name the browser client is typed by.
+ */
+export type ExplorerRouter = TRPCBuiltRouter<
+  { ctx: object; meta: object; errorShape: TRPCDefaultErrorShape; transformer: false },
+  TRPCDecorateCreateRouterOptions<ExplorerProcedures>
+>;
+
 const reason = (value: unknown): string => value instanceof Error ? value.message : String(value);
 
 /** `rev/1:<uuid>:<sequence>` belongs to generation `gen/1:<uuid>`. */
@@ -31,7 +78,7 @@ const generationOf = (id: string): string => `gen/1:${id.slice('rev/1:'.length, 
 
 /** The browser's procedures. No input carries a token: every request reads
  * the server's project binding, and every fact comes from its resident service. */
-export function createExplorerRouter(options: ExplorerRouterOptions) {
+export function createExplorerRouter(options: ExplorerRouterOptions): ExplorerRouter {
   const t = initTRPC.create();
   const { binding } = options;
   const requestId = options.requestId ?? randomUUID;
@@ -103,4 +150,3 @@ export function createExplorerRouter(options: ExplorerRouterOptions) {
   });
 }
 
-export type ExplorerRouter = ReturnType<typeof createExplorerRouter>;

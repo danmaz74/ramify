@@ -108,7 +108,7 @@ const seeds: readonly InstanceSeed[] = [
   ["I2A-13:predecessor-regressions", 10, ['DA18', 'PC01', 'QT05'], 'final-declarations', 'P', '', 'Plan 1 passes; Plan 2/5 match their recorded closure baselines with no new failure and no old waiver relabelled.', null, null, { selection: 'P/R,T', evidence: 'process' }],
   ["I2A-13:declarations-package", 10, ['DA18', 'PC01', 'QT05'], 'final-declarations', 'P', '', 'Eleven declarations and eight package entries validate; client/CLI remain lightweight and no MCP/new owner appears.', null, null, { selection: 'P/T', evidence: 'process' }],
   ["I2A-13:documents-handoff", 10, ['DA18', 'PC01', 'QT05'], 'final-declarations', 'T', '', 'Architecture, roadmap and guides state implemented behavior/limits; completion report gives Plan 3 provider and remaining-scope handoff.', null, null, { selection: 'T', evidence: 'document' }],
-  ["I2A-13:plan3-preserved", 10, ['DA18', 'PC01', 'QT05'], 'final-declarations', 'T', '', 'The Plan 3 directory tree equals its implementation-base Git tree byte-for-byte; Plan 2A did not replace or edit it.', null, null, { selection: 'T', evidence: 'unit' }],
+  ["I2A-13:plan3-preserved", 10, ['DA18', 'PC01', 'QT05'], 'final-declarations', 'T', '', 'The Plan 3 directory tree at Plan 2A completion equals its implementation-base Git tree byte-for-byte, so Plan 2A did not replace or edit it; every later change to that tree is a recorded approved decision.', null, null, { selection: 'T', evidence: 'unit' }],
 ];
 
 export const plan2aInstances: readonly ReferenceInstance[] = seeds.map(instanceFromSeed);

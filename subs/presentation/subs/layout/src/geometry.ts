@@ -12,7 +12,87 @@
 
 import type { Point } from './interfaces/layout.js';
 
-export const LAYOUT = {
+/**
+ * The layout budget's written-out type. It states exactly the literal types the
+ * constants below carry, so `LAYOUT` declares its signature instead of leaving
+ * it to inference.
+ */
+export interface LayoutGeometry {
+  readonly margin: 26;
+  readonly node: {
+    readonly minWidth: 150;
+    readonly charWidth: 7;
+    readonly paddingX: 11;
+    readonly paddingBottom: 9;
+    readonly headerHeight: 24;
+    readonly rowHeight: 18;
+    readonly compartmentTitleHeight: 16;
+    readonly whatIfLineHeight: 13;
+    readonly cornerRadius: 5;
+    readonly markerGlyphWidth: 10;
+    readonly nameCharWidth: 7.5;
+    readonly annotationCharWidth: 5.9;
+    readonly annotationGap: 6;
+    readonly tagCharWidth: 5.9;
+  };
+  readonly levelGap: 112;
+  readonly busFraction: 0.52;
+  readonly siblingGap: 92;
+  readonly branchGap: 118;
+  readonly minLevelClearance: 84;
+  readonly lane: {
+    readonly offset: 7;
+    readonly step: 7;
+    readonly strokeWidth: 1.6;
+    readonly dotRadius: 3.2;
+    readonly chipFontSize: 9.5;
+    readonly chipCharWidth: 5.3;
+    readonly chipMaxLines: 2;
+  };
+  readonly edge: {
+    readonly strokeWidth: 1;
+  };
+  readonly chord: {
+    readonly topGap: 44;
+    readonly rowHeight: 22;
+    readonly strokeWidth: 1.25;
+    readonly gap: 13;
+    readonly stopBarHalfWidth: 7;
+    readonly badgeRadius: 8;
+    readonly labelFontSize: 9.5;
+    readonly labelCharWidth: 5.3;
+    readonly endpointSpread: 11;
+    readonly haloWidth: 5;
+  };
+  readonly legend: {
+    readonly topGap: 30;
+    readonly columnGap: 20;
+    readonly titleHeight: 19;
+    readonly rowHeight: 16;
+    readonly glyphWidth: 50;
+    readonly fontSize: 10.5;
+    readonly charWidth: 5.3;
+    readonly noteFontSize: 10;
+  };
+  readonly title: {
+    readonly fontSize: 14;
+    readonly height: 26;
+  };
+  readonly header: {
+    readonly captionHeight: 27;
+    readonly rowHeight: 26;
+    readonly fontSize: 18;
+    readonly charWidth: 9.9;
+    readonly captionFontSize: 18;
+    readonly swatchWidth: 39;
+    readonly swatchGap: 10.5;
+    readonly swatchLift: 1.5;
+    readonly bottomGap: 21;
+    readonly toggleWidth: 84;
+  };
+}
+
+export const LAYOUT: LayoutGeometry = {
   /** Page margin around the whole drawing. */
   margin: 26,
 
@@ -215,7 +295,7 @@ export function rowLabelDx(marker: string | undefined): number {
  * Greedy word wrap to at most `maxChars` per line and at most `maxLines` lines.
  * A word longer than the limit gets its own line rather than being broken.
  */
-export function wrapText(text: string, maxChars: number, maxLines = Number.POSITIVE_INFINITY): string[] {
+export function wrapText(text: string, maxChars: number, maxLines: number = Number.POSITIVE_INFINITY): string[] {
   const words = text.split(/\s+/u).filter((word) => word.length > 0);
   const lines: string[] = [];
   let current = '';
