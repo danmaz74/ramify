@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-23. **Status:** complete. **Branch:**
 `feat/plan8-baseline-repairs`, iterations 1 to 5 merged at `1945eaa` and this
-iteration's work on top.
+iteration's work at `871b35b`, the audited commit.
 
 The plan set out to make Ramify's own check complete again, bring the frozen
 gates up to date as reviewed layers, guard the fixture, fix the layout defects,
@@ -15,14 +15,14 @@ were deferred by explicit decision and remain unverified.
 | ID | Required result | Iteration | Commit | Observed |
 | --- | --- | ---: | --- | --- |
 | BR01 | Ramify's batch check on itself reports `coverage: complete` with no analysis limit, and no signature's type changed | 1 | `3328923` | **Met.** Re-run at this commit: `Execution: completed; check: passed; coverage: complete`, `0 errors, 0 warnings, 0 analysis limits; 4569 allowed, 0 denied, 2004 external`, over 15 owners and 438 source files. |
-| BR02 | BD24 passes with its `complete` expectations restored and no hard-coded limit list; the four reference self-check instances pass | 1, 6 | `3328923` | **First half met, second half unverified.** BD24 passes with both `complete` expectations and no limit list. The four instances were deferred; see [BR02's second half](#br02s-second-half-the-four-reference-self-check-instances). |
+| BR02 | BD24 passes with its `complete` expectations restored and no hard-coded limit list; the four reference self-check instances pass | 1, 6 | `3328923` | **First half met, second half unverified.** BD24 passes with both `complete` expectations and no limit list, in iteration 1's run and again as the ramify-audit request's `parent-daemon-test` at `871b35b`. The four instances were deferred; see [BR02's second half](#br02s-second-half-the-four-reference-self-check-instances). |
 | BR03 | The final-contract gate exits 0; frozen tables are unchanged and the additions are named reviewed layers | 2 | `33b1de4`, `4ab6a9e`, `e609c4d`, and this iteration | **Met, after one repair here.** The gate exits 0 with `{"owners":15,"files":455,"expandedStatements":164,"packageEntries":8,"bin":"dist/src/ramify"}`. Merging iterations 1 and 2 reintroduced drift in three declarations, which this iteration closed with one more named layer; see [the gate repair](#the-gate-repair-at-integration). |
 | BR04 | String export targets are accepted by every package gate without being imported | 2 | `33b1de4` | **Met.** `PackageMetadata.exports` admits a string target, `./module-tree.css` is resolved under the `import` and `types` conditions and read with `statSync`, and `final-contracts.test.ts` proves it through a fixture stylesheet that throws on import. That test passes here. |
 | BR05 | A test in the ordinary suite checks a fresh fixture copy with the real checker and requires zero errors | 3 | `dda60ac` | **Met.** `subs/harness/src/tests/fixture-check.test.ts` runs `ramify check --batch` over a fresh `copyFixture()` copy and requires 0 errors and 0 denied. Its warning set is frozen rather than empty; see [the fixture's two warnings](#the-fixtures-two-standing-warnings). |
 | BR06 | Keyboard focus brings an off-screen row or shell into view, and Space on a body control does not arm pan | 4, 5 | `d527588`, `00f8c7b` | **Met for focus, by iteration 5's browser evidence; met for Space by unit test only.** See [BR06's two halves](#br06s-two-halves). |
 | BR07 | The minimap follows review decision 2; MT01–MT07 and MT14 are unchanged, and `ModuleTreeCanvasProps` is unchanged | 4 | `d527588` | **Met.** `module-tree-canvas.css` makes the canvas a size container and hides `.react-flow__minimap` below 480 px of canvas width. `npm run measure:project-explorer -- --only tree` reported `{"status":"passed","passed":true,"failures":[]}`, with MT14's 15 nodes and 15 minimap marks at 1031 px and 691 px. `ModuleTreeCanvasProps` is unchanged, so the web module's call site needed no edit. |
 | BR08 | The By module fitted zoom at 1440×1000 is at least twice 0.177, with browser evidence at both widths | 5 | `00f8c7b` | **Met.** 0.4066, 2.30 times 0.177, on a 992 × 778 canvas. Narrow evidence at 390 × 844 records 0.1398, unchanged because the width cap never bound there. 0 console messages at any level. The evidence is a Chromium session, not a test command; see [what is not repeatable](#what-is-not-repeatable-by-a-command). |
-| BR09 | The root audit and the recorded ramify-audit request pass on the same commit | 6 | this commit | See [the two audits](#the-two-audits). |
+| BR09 | The root audit and the recorded ramify-audit request pass on the same commit | 6 | `871b35b` | **Met.** Both PASS on `871b35b`: `refs/audited/runs/2026-09-23T00-14-33Z-871b35b` and `refs/audited/runs/2026-09-23T00-16-56Z-871b35bf9`. See [the two audits](#the-two-audits). |
 
 ## Runnable outcome, line by line
 
@@ -30,8 +30,8 @@ The plan's opening block, read against what this commit produces.
 
 | Line | Holds? |
 | --- | --- |
-| `cucumber-viz audit, repository root -> PASS (static, regression)` | See [the two audits](#the-two-audits). |
-| `ramify-audit of ramify-agent, same commit -> PASS, request recorded` | The request is recorded at [`ramify-agent/audit/ramify-agent-suite.request.json`](../../../audit/ramify-agent-suite.request.json) with its [README](../../../audit/README.md). The run is in [the two audits](#the-two-audits). |
+| `cucumber-viz audit, repository root -> PASS (static, regression)` | **Holds.** PASS at `871b35b`; both scopes pass. |
+| `ramify-audit of ramify-agent, same commit -> PASS, request recorded` | **Holds.** PASS at `871b35b`, all five checks. The request is recorded at [`ramify-agent/audit/ramify-agent-suite.request.json`](../../../audit/ramify-agent-suite.request.json) with its [README](../../../audit/README.md). |
 | `npx tsx scripts/validate-final-contracts.ts -> exit 0` | **Holds.** Exit 0, after this iteration's added layer. |
 | `ramify check --batch on Ramify -> coverage: complete` | **Holds.** 0 analysis limits, 15 owners. |
 | `Run page, Progress -> By module at 1440x1000 -> rows readable at the fitted zoom` | **Holds on iteration 5's browser evidence,** which records every capability identifier in the fitted canvas as legible without zooming. It is a recorded session, not a command this commit can re-run. |
@@ -41,9 +41,76 @@ Note that the block's fourth line is about Ramify's own check. ramify-agent's
 
 ## The two audits
 
-Both audits ran on this commit, with the tree clean.
+**BR09 is met.** Both audits ran on commit `871b35b`, tree
+`b75d1000008168b6861305733d026c92aee36c23`, with the tree clean. This document
+records their refs, which is why it is the one change in the commit that
+follows `871b35b`; nothing that either audit ran was touched.
 
-<!-- AUDIT-EVIDENCE -->
+### The root cucumber-viz audit — PASS
+
+`mcp__cucumber-viz__audit_commit` with `sourceMode: use_existing_head` and
+`workingDirectory: /tmp/ramify-plan8-integration`. Test mode `full` (npm).
+
+```text
+Audit Report - 871b35b
+Overall: PASS (3:04)
+regression: PASS (2:44); vitest: PASS
+static: PASS (0:15); worktree-dependencies: PASS; type-check: PASS
+sealedFiles: PASS (0:00); skipped for checkPhase not provided
+```
+
+```text
+ Test Files  169 passed (169)
+      Tests  2260 passed (2260)
+   Duration  163.69s
+```
+
+Report ref: `refs/audited/runs/2026-09-23T00-14-33Z-871b35b`.
+
+This is Ramify's audit. Its `vitest.config.ts` includes `src/tests/**` and
+`subs/**/src/**` only, so the reference harness under `scripts/` is not in it;
+those gates are run directly, above.
+
+**The first attempt failed.** The audit of `071c126`, the same work before the
+parser-fixture correction, reported `regression: FAIL` on three cases in
+`subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`
+(`refs/audited/runs/2026-09-23T00-10-39Z-071c126`). The correction is recorded
+[above](#the-reviewed-parser-fixtures-found-by-the-first-root-audit), and the
+commit was amended and re-audited rather than the failure being set aside.
+
+### The recorded ramify-audit request — PASS
+
+```sh
+ramify-agent/node_modules/.bin/ramify-audit audit   --request ramify-agent/audit/ramify-agent-suite.request.json --cwd .
+```
+
+```text
+Audit PASS (a4b83ad9-8d06-4916-a8b8-f5b5d690b28b)
+Source: 871b35bf9359ea65aaf35671111b5c287439e7f4
+```
+
+Universe `ramify-external-tool-fake-rollout`, claim
+`{"scope":"repository","change":"plan8-baseline-repairs","validation":"post-commit"}`,
+123.67 s in all:
+
+| Check | Test unit | Result |
+| --- | --- | --- |
+| `patch-integrity` | `git-diff-check` | PASS, 0.005 s |
+| `agent-typecheck` | `agent-typecheck` | PASS, 2.291 s |
+| `agent-tests` | `agent-vitest` | PASS, 95.766 s — 112 files passed, 1 skipped; 808 tests passed, 2 skipped |
+| `agent-structure` | `agent-check-self` | PASS, 9.126 s — `check: passed; coverage: partial`, `0 errors, 0 warnings, 87 analysis limits` |
+| `parent-daemon-test` | `dependency-diagram-daemon` | PASS, 16.455 s — 1 file, 1 test, BD24 |
+
+Report ref: `refs/audited/runs/2026-09-23T00-16-56Z-871b35bf9`.
+
+Both tools publish their note under `refs/notes/audit`, so the note on
+`871b35b` carries the later of the two runs, the ramify-audit one. The two run
+refs above are the durable evidence, and each is retrievable on its own:
+
+```sh
+git show refs/audited/runs/2026-09-23T00-14-33Z-871b35b:reports/audit/summary.json
+git show refs/audited/runs/2026-09-23T00-16-56Z-871b35bf9:reports/audit/summary.json
+```
 
 ## Frozen gates
 
