@@ -27,7 +27,7 @@ file, run by explicit path (see [Verification](#verification)).
 | ST01 | Passed | `c755b54`. [session-reducer.test.ts](../../../subs/harness/src/tests/session-reducer.test.ts) (12 tests) takes five states by seven events: the eight valid transitions reach their states, and the other 27 pairs are rejected with the event's sequence. [session-lifecycle.test.ts](../../../subs/harness/src/tests/session-lifecycle.test.ts) (2) states the sessions after each of the scripted run's 44 session events. [composition.test.ts](../../../subs/harness/src/tests/composition.test.ts) (6) derives every session of the 14 composed runs: every invocation belongs to one. |
 | ST02 | Passed | `c755b54`. [run-recovery.test.ts](../../../subs/harness/src/tests/run-recovery.test.ts) (31) finishes an interrupted invocation's session and a session opened without an invocation as `interrupted`, and a kept session as `run-ended`. The three `composition-recovery*` files hold all 35 crash rows to that rule. No composed run, completed, failed or stopped, holds a live or suspended session. |
 | ST03 | Passed | `523d925`. `session-lifecycle.test.ts` checks that every `continued` start names `continues` from its own session's latest point, that a fork names its source point, generation and briefs, and that none of the run's executor refs appears in any relation. `iteration-gate.test.ts` and `placement.test.ts` cover `reconstructed`, `context-rebuilt` and degraded starts; `session-reducer.test.ts` rejects stale and unreached points. |
-| ST04 | Passed | `523d925`, `64c27bf`. [kpi-metrics.test.ts](../../../subs/harness/src/tests/kpi-metrics.test.ts) (13) builds a run's records and reads them through `metricsOf`: a continued session counts once in `session-weighted-total`, at its largest size, although each invocation ends at another ref; with the old grouping the same test fails with three sessions. See [the grouping](#session-weighted-total-and-st04) for how a degraded continuation counts. |
+| ST04 | Passed | `523d925`, `64c27bf`. `session-weighted-total` groups by session, except that a continuation its executor started fresh (a degraded start, an anomaly) counts its fresh context as a second term, named in the metric's evidence. [kpi-metrics.test.ts](../../../subs/harness/src/tests/kpi-metrics.test.ts) (13) builds a run's records and reads them through `metricsOf`: a continued session counts once, at its largest size, although each invocation ends at another ref, and with the old grouping the same test fails with three sessions; a degraded continuation adds its second term. See [the grouping](#session-weighted-total-and-st04). |
 | ST05 | Passed | `a72e21c`. [neutral-actions.test.ts](../../../subs/harness/src/tests/neutral-actions.test.ts) (4) runs one engineer turn with pi's tool names and again with `Read` (`file_path`), `Grep`, `CreateFile` and `ReplaceText`: the same reads, searches, excursion, guard decisions and mutations. The agent and pi `tool-actions.test.ts` (4 each), [write-guard.test.ts](../../../subs/harness/src/tests/write-guard.test.ts) (9) and [read-excursions.test.ts](../../../subs/harness/src/tests/read-excursions.test.ts) (6) cover the classification and its consumers. |
 | ST06 | Passed | `9243bc0`. [pi transcript-content.test.ts](../../../subs/harness/subs/agent/subs/pi/src/tests/transcript-content.test.ts) (2) runs a real pi session on pi's scripted provider: the first prompt before the first model request, every assistant block, thinking `unmarked` and `redacted`, tool results paired by call ID, every optional field pi supplied, a retry, and `null` for each field a reply leaves out. The [agent's test](../../../subs/harness/subs/agent/src/tests/transcript-content.test.ts) (6) covers the scripted fake. The [development pi check](#development-pi-check) confirmed it with a real model. |
 | ST07 | Passed | `11dd329`, corrected by `1a49f13`. [transcript-writer.test.ts](../../../subs/harness/src/tests/transcript-writer.test.ts) (8) keeps every entry before a crash, discards a torn last line and numbers on. [transcript-run.test.ts](../../../subs/harness/src/tests/transcript-run.test.ts) (2) shows each invocation's `started` entry was the last entry when `startSession` was called, and that a transcript that cannot be written is one `transcript-incomplete` gap while the run completes; since `1a49f13` that gap no longer lowers `observation-coverage`. |
@@ -115,15 +115,19 @@ Each is recorded, with its reason, in the iteration note named.
 #### `session-weighted-total` and ST04
 
 ST04 asks that `session-weighted-total` group by session. It groups by the
-harness session, never by an executor's ref (iteration 2). Iteration 10 then
-refined the term the metric sums: a **model context history**. A session
-has one, and each continued start the executor made fresh adds another,
-because the continuation loaded its scope into a new model context. So a
-session continued normally counts once, at its largest size, as ST04
-requires, and a session with a degraded continuation contributes a second
-term. `session-count` and the adaptation share still count harness sessions,
-and the metric's evidence names each extra context. `kpi/1` keeps its
+harness session, never by an executor's ref (iteration 2), and a session
+continued normally counts once, at its largest size. The exception is a
+degraded start: a continuation its executor started fresh loaded its scope
+into a new model context, which the metric counts as a second term, a
+**model context history** (iteration 10), named in its evidence. The
+degraded invocation stays in its harness session, so `session-count` and
+the adaptation share still count harness sessions. `kpi/1` keeps its
 version: the formula is unchanged, and only its grouping was corrected.
+
+This is the settled decision. With pi, a start degrades only when pi's own
+session file is missing or cannot be opened, so a degraded start is an
+anomaly, not normal operation. The web flags it where sessions are listed
+([below](#degraded-starts-flagged)) rather than regrouping the metric.
 
 ### The port (iterations 3 and 4)
 
@@ -349,6 +353,51 @@ clean worktree. This section was recorded in a later documentation commit.
 Retrieve either summary with
 `git show <run ref>:reports/audit/summary.json`, and the commit's notes with
 `git notes --ref=audit show 0a6d192`.
+
+## Degraded starts flagged
+
+A follow-up on `feat/plan9-degraded-start-notice` shows every degraded start
+where sessions are listed, so a person notices it without opening a
+session's chapters. The recording is unchanged: `invocation-ended.degraded`
+in the run log.
+
+| Where | What it shows |
+| --- | --- |
+| Protocol | `SessionListEntry.degradedStarts`, the session's invocations whose end records a degraded start; 0 for a standalone session, which starts fresh. `RunSnapshot.counts.degradedStarts`, the run's. |
+| Sessions page | A `degraded start` badge, or `N degraded starts`, on each affected entry. Its accessible name and title say that the executor was asked to continue or fork the conversation and started a fresh one. |
+| Session page | A notice above the facts listing each degraded start, `requested → made` with the executor's reason, each linked to its chapter. |
+| Run overview | A notice among the Notices with the count and a link to each affected chapter. It reads the run's sessions only when the snapshot counts one, and is absent otherwise. |
+
+The projected events have no severity field, so the event feed's sentence
+is unchanged, as are the diagram marks, which mark only sessions that are
+not finished. The glossary's existing **Degraded start** in the
+[metrics glossary](../../metrics/glossary.md#degraded-start) covers the
+term the web uses.
+
+Evidence, from `ramify-agent/`: [lineage-metrics.test.ts](../../../subs/harness/src/tests/lineage-metrics.test.ts)
+counts the constructed run's two degraded starts on its sessions' list
+entries and on its snapshot, and [session-fixture.test.ts](../../../subs/harness/src/tests/session-fixture.test.ts)
+reads the same counts over HTTP. The run-page, session-page and
+sessions-page tests cover each notice or badge, present and absent.
+
+```sh
+npx vitest run subs/harness/src/tests/session-queries.test.ts \
+  subs/harness/src/tests/protocol-contract.test.ts subs/harness/src/tests/lineage-metrics.test.ts \
+  subs/harness/src/tests/session-fixture.test.ts subs/harness/src/tests/run-projections.test.ts \
+  subs/harness/src/tests/run.test.ts subs/harness/src/tests/run-protocol.test.ts \
+  subs/harness/src/tests/union-values.test.ts subs/harness/src/tests/kpi-metrics.test.ts
+# 9 files, 122 tests passed
+npx vitest run subs/web/src/tests
+# 11 files, 108 tests passed
+npm run type-check     # passed
+npm run build:web      # built
+npm run check:self
+# Execution: completed; check: passed; coverage: partial
+# Findings: 0 errors, 0 warnings, 132 analysis limits
+```
+
+The browser evidence was not captured again; its screenshots predate the
+badge and notices.
 
 ## Open items
 
