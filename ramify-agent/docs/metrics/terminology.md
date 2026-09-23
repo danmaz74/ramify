@@ -109,6 +109,18 @@ The collector's existing field names remain compatibility identifiers. New
 prose should state what it actually observes, even where an older name suggests
 a more complete measurement.
 
+## Sessions and lineage
+
+| Preferred term | Existing evidence | Distinction |
+| --- | --- | --- |
+| Session | `ses-0001` and the session events of the run log | The harness's conversation, which `session-count` counts; not an executor's ref, which names one point of its history. |
+| Model context history | A session's segments, split at each degraded continuation | What `session-weighted-total` sums once; equal to the session unless a continuation was made fresh. |
+| Starting context size | The first `context` observation of an invocation | An estimate after the first model call; not the source point's size. |
+| Segment cost profile | `outcome.json` usage and the starting context size | Categories stay separate; no total or price. |
+| Degraded start | `degraded` on `invocation-ended`, and `outcome.session.degradedReason` | The executor's answer; a reconstruction is a replacement, decided by the harness, not a degraded start. |
+
+The [lineage policy](lineage.md) names the `lineage/1` measurement IDs.
+
 ## Cohesion and coupling
 
 Cohesion and coupling are architectural concepts. Boundary locality, internal

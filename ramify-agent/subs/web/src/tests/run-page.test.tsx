@@ -134,6 +134,15 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         { id: 'scope-bytes-per-changed-line', unit: 'bytes per changed line', policyVersion: 'kpi/1', measurementPolicy: 'scope-size/1', state: 'unavailable', value: null, numerator: null, denominator: 13, subtotal: 10000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006: owned-source unknown'], note: 'A size component is missing' },
         { id: 'session-count', unit: 'sessions', policyVersion: 'kpi/1', measurementPolicy: null, state: 'measured', value: 6, numerator: 6, denominator: null, subtotal: null, coverage: { covered: 6, total: 6 }, evidence: [], note: null },
       ],
+      lineage: {
+        policyVersion: 'lineage/1',
+        metrics: [
+          { id: 'fork.generation-1.start-context', unit: 'tokens per segment', policyVersion: 'lineage/1', measurementPolicy: null, state: 'measured', value: 25000, numerator: 50000, denominator: 2, subtotal: null, coverage: { covered: 2, total: 2 }, evidence: ['inv-0002 (ses-0002): 24000', 'inv-0003 (ses-0003): 26000'], note: null },
+          { id: 'fresh-fork.start-context', unit: 'tokens per segment', policyVersion: 'lineage/1', measurementPolicy: null, state: 'not-applicable', value: null, numerator: null, denominator: null, subtotal: null, coverage: { covered: 0, total: 0 }, evidence: [], note: 'No global fork started fresh' },
+          { id: 'continuation-growth', unit: 'tokens per continuation', policyVersion: 'lineage/1', measurementPolicy: null, state: 'unavailable', value: null, numerator: null, denominator: null, subtotal: 3000, coverage: { covered: 1, total: 2 }, evidence: ['inv-0006 (ses-0005): it recorded no context observation', 'inv-0005 (ses-0004): 3000'], note: 'A segment lacks this input, so the mean is unknown; the known subtotal is shown' },
+          { id: 'degraded-starts', unit: 'degraded starts per requested start', policyVersion: 'lineage/1', measurementPolicy: null, state: 'partial', value: null, numerator: 1, denominator: 3, subtotal: null, coverage: { covered: 3, total: 4 }, evidence: ['continue made fresh: the session file is gone (inv-0006)'], note: 'Counted over 3 of 4 requested starts whose start is known' },
+        ],
+      },
       evaluation: {
         guarding: { guarded: ['edit'], unguarded: ['shell'], verdicts: { allowed: 1, 'blocked-scope': 0, 'blocked-unresolved': 0 }, complete: false, statement: 'Guarded: edit. Not guarded: shell. A count of blocked calls is not evidence that every write respected its scope; what an unguarded tool wrote is seen only in the tree afterwards.' },
         outsideScope: [{ invocation: 'inv-0004', role: 'engineer', workItem: 'wi-001', iteration: 'wi-001.i01', path: 'subs/reviews/src/outside.ts' }],
@@ -444,4 +453,28 @@ test('an unavailable metric reads unavailable with its known subtotal, never zer
   expect(cells[5]).toBe('1 of 2');
   expect(screen.getByText(/A count of blocked calls is not evidence/)).toBeTruthy();
   expect(within(screen.getByLabelText('Outside the write scope')).getByText('subs/reviews/src/outside.ts')).toBeTruthy();
+});
+
+test('the lineage measurements show their values, coverage and reasons; an unavailable one reads unavailable, never zero', async () => {
+  render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Measurements' }));
+  const table = await screen.findByLabelText('Lineage measurements');
+  const cells = (id: string) => [...table.querySelector(`[data-metric="${id}"]`)!.querySelectorAll('td')].map(cell => cell.textContent);
+  expect(screen.getByText(/Lineage measurements lineage\/1/)).toBeTruthy();
+
+  const fork = cells('fork.generation-1.start-context');
+  expect(fork[0]).toContain('tokens per segment');
+  expect(fork.slice(1, 6)).toEqual(['measured', '25000', '50000', '2', '2 of 2']);
+
+  const growth = cells('continuation-growth');
+  expect(growth[1]).toBe('unavailable');
+  expect(growth[2]).toBe('unavailableknown subtotal 3000');
+  expect(growth[5]).toBe('1 of 2');
+  expect(growth[6]).toContain('the known subtotal is shown');
+  expect(within(table.querySelector('[data-metric="continuation-growth"]')! as HTMLElement).getByText('inv-0006 (ses-0005): it recorded no context observation')).toBeTruthy();
+
+  expect(cells('fresh-fork.start-context').slice(1, 3)).toEqual(['not-applicable', 'not-applicable']);
+  expect(cells('fresh-fork.start-context')[6]).toBe('No global fork started fresh');
+  const degraded = cells('degraded-starts');
+  expect(degraded.slice(1, 6)).toEqual(['partial', 'partial', '1', '3', '3 of 4']);
 });

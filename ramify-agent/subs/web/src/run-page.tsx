@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import type {
-  DecisionView, GateView, HypothesisView, InvocationEvaluation, Metric, MetricsResponse,
+  DecisionView, GateView, HypothesisView, InvocationEvaluation, LineageMetric, Metric, MetricsResponse,
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
@@ -595,6 +595,14 @@ function Measurements({ client, planId, runId, version }: AreaProps) {
               </table>
             </section>
             <section className="panel">
+              <h2>Lineage</h2>
+              <p className="muted">Lineage measurements {data.lineage.policyVersion}. Each segment counts as the start its executor made: a fork or continuation it made fresh is measured as a fresh start and counted as degraded. Forks are grouped by the context generation they forked.</p>
+              <table className="table metrics" aria-label="Lineage measurements">
+                <thead><tr><th>Measurement</th><th>State</th><th>Value</th><th>Numerator</th><th>Denominator</th><th>Coverage</th><th>Note</th></tr></thead>
+                <tbody>{data.lineage.metrics.map(metric => <MetricRow key={metric.id} metric={metric} />)}</tbody>
+              </table>
+            </section>
+            <section className="panel">
               <h2>Sessions</h2>
               <table className="table" aria-label="Sessions">
                 <thead><tr><th>Invocation</th><th>Role</th><th>Ended</th><th>Guarding</th><th>Hook checks</th><th>Reads outside</th><th>Lines</th><th>Tokens</th></tr></thead>
@@ -608,7 +616,7 @@ function Measurements({ client, planId, runId, version }: AreaProps) {
   );
 }
 
-function MetricRow({ metric }: { readonly metric: Metric }) {
+function MetricRow({ metric }: { readonly metric: Metric | LineageMetric }) {
   return (
     <tr className={`metric metric-${metric.state}`} data-metric={metric.id}>
       <td><code>{metric.id}</code><div className="muted">{metric.unit}</div></td>

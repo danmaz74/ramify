@@ -2,6 +2,7 @@ import { readJsonLines } from '../../subs/ledger/src/jsonl.js';
 import type { InvocationEvaluation, MetricsResponse } from '../interfaces/protocol/runs.js';
 import { baselineScope, rootModuleOfSnapshot, scopeSize } from '../kpi/capture.js';
 import { guardingReport } from '../kpi/guarding.js';
+import { lineageMetrics, lineagePolicyVersion } from '../kpi/lineage.js';
 import { kpiMetrics, kpiPolicyVersion, measurementPolicyVersion, type InvocationFacts } from '../kpi/metrics.js';
 import { observationSchema, type Observation } from '../run/observations.js';
 import { invocationSessions } from '../run/sessions.js';
@@ -10,6 +11,7 @@ import {
   type Invocation, type LineEventSummary, type MeasurementSnapshot,
 } from '../run/records.js';
 import { readRunFile, unsupportedVersion, type RunView } from './inputs.js';
+import { lineageInputsOf, modelHistories } from './lineage.js';
 
 /*
  * The KPIs and the evaluation evidence beside them, read from the run's own
@@ -127,7 +129,7 @@ function scoped(invocation: string, observations: readonly Observation[]): Obser
   });
 }
 
-/** The KPIs of a run with their policy versions and coverage, and its evaluation evidence. */
+/** The KPIs and lineage measurements of a run with their policy versions and coverage, and its evaluation evidence. */
 export async function metricsOf(view: RunView): Promise<MetricsResponse> {
   const baseline = await baselineOf(view);
   const adaptations = adaptationsOf(view);
@@ -135,13 +137,17 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
   // started in, never by an executor's ref: a ref names a point in the
   // history, and each invocation of a continued session ends at another.
   const sessions = invocationSessions(view.events);
+  const logs = new Map<string, readonly Observation[] | { unavailable: string }>();
+  for (const invocation of view.records.invocations.values()) logs.set(invocation.id, await observationsOf(view, invocation.id));
+  const lineage = lineageInputsOf(view, logs);
+  const histories = modelHistories(lineage);
   const facts: InvocationFacts[] = [];
   const evaluations: InvocationEvaluation[] = [];
   const merged: Observation[] = [];
 
   for (const invocation of view.records.invocations.values()) {
     const outcome = view.records.outcomes.get(invocation.id) ?? null;
-    const observations = await observationsOf(view, invocation.id);
+    const observations = logs.get(invocation.id)!;
     const lines = await linesOf(view, invocation);
     facts.push({
       id: invocation.id,
@@ -153,6 +159,7 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
       // Its `invocation-started` commits the invocation record, so every
       // record has a session; the fallback only keeps the type total.
       session: sessions.get(invocation.id) ?? invocation.id,
+      history: histories.get(invocation.id),
       outcome,
       size: invocation.scope.size,
       lines,
@@ -232,6 +239,7 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
     measurementPolicy: measurementPolicyVersion,
     baseline,
     metrics,
+    lineage: { policyVersion: lineagePolicyVersion, metrics: lineageMetrics(lineage) },
     evaluation: {
       guarding,
       outsideScope: evaluations.flatMap(evaluation => evaluation.outsideScope.map(path => ({
