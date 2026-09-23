@@ -21,13 +21,14 @@ import type {
   AgentPort,
   AgentSession,
   AppendOutcome,
+  ExecutorSupport,
   JsonSchema,
-  PortObservations,
   SessionOutcome,
   SessionRef,
   SessionSpec,
   SubmissionTool,
   TokenUsage,
+  ToolAction,
   ToolDefinition,
 } from '../../../src/interfaces/port.js';
 
@@ -56,14 +57,23 @@ const mutatingBuiltins = new Set<string>(['edit', 'write']);
 const briefType = 'ramify-brief';
 
 /**
- * What this adapter observes. pi reports all three; the limitations are in
- * the values, not in their absence: the context size is always an estimate
- * and is null after a compaction until the next assistant reply.
+ * What this adapter supports: everything the port declares. The limitations
+ * of its observations are in the values, not in their absence: the context
+ * size is always an estimate and is null after a compaction until the next
+ * assistant reply. A fork branches at the entry its ref names, so it forks
+ * at any point.
  */
-const piObservations: PortObservations = {
+const piSupport: ExecutorSupport = {
   usage: { available: true },
   context: { available: true },
   compaction: { available: true },
+  continue: { available: true },
+  fork: { available: true },
+  forkAtPoint: { available: true },
+  appendContext: { available: true },
+  exactSystemPrompt: { available: true },
+  guard: { available: true },
+  afterMutation: { available: true },
 };
 
 type PiToolDefinition = Parameters<typeof defineTool>[0];
@@ -143,7 +153,7 @@ export function createPiAgentOn(source: PiRuntimeSource): AgentPort {
   const live = new Map<string, PiSession>();
   return {
     name: 'pi',
-    observations: piObservations,
+    support: piSupport,
     startSession: spec => startPiSession(spec, source, live),
     appendContext: (ref, key, text) => appendPiContext(live, ref, key, text),
   };
@@ -269,6 +279,14 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
     ...spec.builtinTools.filter(tool => mutatingBuiltins.has(tool)),
     ...spec.tools.filter(tool => tool.mutating === true).map(tool => tool.name),
   ]);
+  const harnessTools = new Map(spec.tools.map(tool => [tool.name, tool]));
+  /** What one call does: a harness tool's declared action, or pi's own tool classified. */
+  const actionOf = (tool: string, input: unknown): ToolAction => {
+    if (tool === spec.submission.name) return { kind: 'harness' };
+    const harness = harnessTools.get(tool);
+    if (harness !== undefined) return harness.action?.(input) ?? { kind: 'harness' };
+    return builtinAction(tool, input);
+  };
 
   // The session manager is resolved before anything runs, so `ref` and the
   // mode that was actual are readable from the moment the session starts.
@@ -334,7 +352,9 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
           api.on('tool_call', async event => {
             validated.add(event.toolCallId);
             if (!mutatingTools.has(event.toolName) || spec.guard === undefined) return undefined;
-            const decision = await spec.guard({ callId: event.toolCallId, tool: event.toolName, input: event.input });
+            const decision = await spec.guard({
+              callId: event.toolCallId, tool: event.toolName, input: event.input, action: actionOf(event.toolName, event.input),
+            });
             if (decision.allow) return undefined;
             denied.add(event.toolCallId);
             // The reason becomes the call's error result; nothing is mutated.
@@ -350,7 +370,9 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
       const base: PiToolResult | undefined = rejectedCalls.has(event.toolCallId) ? { isError: true } : undefined;
       if (!mutatingTools.has(event.toolName) || spec.afterMutation === undefined) return base;
       if (denied.has(event.toolCallId)) return base;
-      const observed = await spec.afterMutation({ callId: event.toolCallId, tool: event.toolName, failed: event.isError === true });
+      const observed = await spec.afterMutation({
+        callId: event.toolCallId, tool: event.toolName, action: actionOf(event.toolName, event.input), failed: event.isError === true,
+      });
       if (observed === null) return base;
       return { ...(base ?? {}), content: [...event.content, { type: 'text', text: observed.text }] };
     };
@@ -384,6 +406,7 @@ function startPiSession(spec: SessionSpec, source: PiRuntimeSource, live: Map<st
     if (stopped) return { kind: 'stopped' };
     session.subscribe(event => translate(event, emit, {
       mutating: tool => mutatingTools.has(tool),
+      action: actionOf,
       reachedTool: callId => validated.has(callId),
       observeContext,
       onTurnEnd: () => {
@@ -574,6 +597,7 @@ function textOf(message: AssistantLike): string {
 /** What the adapter must answer while translating one of pi's events. */
 interface Translation {
   mutating(tool: string): boolean;
+  action(tool: string, input: unknown): ToolAction;
   reachedTool(callId: string): boolean;
   observeContext(): void;
   onTurnEnd(): void;
@@ -587,7 +611,10 @@ interface Translation {
 function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, to: Translation): void {
   switch (event.type) {
     case 'tool_execution_start':
-      emit({ type: 'tool-started', callId: event.toolCallId, tool: event.toolName, input: event.args, mutating: to.mutating(event.toolName) });
+      emit({
+        type: 'tool-started', callId: event.toolCallId, tool: event.toolName, input: event.args,
+        action: to.action(event.toolName, event.args), mutating: to.mutating(event.toolName),
+      });
       return;
     case 'tool_execution_end': {
       const content = (event.result as { content?: ReadonlyArray<{ type: string; text?: string }> } | undefined)?.content ?? [];
@@ -629,6 +656,39 @@ function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, 
       return;
     default:
       return;
+  }
+}
+
+/**
+ * pi's own tools as port actions, from pi's names and inputs: `read` with
+ * `path`, `offset` and `limit`; `grep` and `find` with `pattern`, `path` and
+ * `glob`; `ls` with `path`; `edit` and `write` with `path`. This is the one
+ * place those names are read. A read that names no path, and any other
+ * tool, is `other`; a write that names none has no paths. Exported for this
+ * module's tests.
+ */
+export function builtinAction(tool: string, input: unknown): ToolAction {
+  const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+  const text = (key: string): string | null => (typeof record[key] === 'string' ? record[key] as string : null);
+  const count = (key: string): number | null => (typeof record[key] === 'number' ? record[key] as number : null);
+  const path = text('path');
+  switch (tool) {
+    case 'read': {
+      if (path === null) return { kind: 'other' };
+      const start = count('offset');
+      const lines = count('limit');
+      return { kind: 'read', path, range: start === null && lines === null ? null : { start, count: lines } };
+    }
+    case 'grep':
+    case 'find':
+      return { kind: 'search', pattern: text('pattern'), path, glob: text('glob') };
+    case 'ls':
+      return { kind: 'search', pattern: null, path, glob: null };
+    case 'edit':
+    case 'write':
+      return { kind: 'write', paths: path === null ? [] : [path] };
+    default:
+      return { kind: 'other' };
   }
 }
 

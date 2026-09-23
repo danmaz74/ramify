@@ -14,10 +14,14 @@ implementations beneath this module receive it:
 
 - `AgentPort.startSession(spec)` returns an `AgentSession` at once. A failure
   to start is reported through its `outcome`, never thrown.
-- `AgentPort.observations` says what the implementation can observe. Usage,
-  context size and compaction are port events; an implementation that lacks
-  one reports it unavailable with a reason, which the harness records as a
-  coverage gap. Silence is never read as an empty context.
+- `AgentPort.support` is the `ExecutorSupport` the implementation declares:
+  each entry available, or unavailable with a reason. Usage, context size
+  and compaction are port events; one an implementation cannot observe is
+  recorded as a coverage gap, and silence is never read as an empty
+  context. The rest are session control: `continue`, `fork`, `forkAtPoint`
+  (a fork from any ref, not only a latest one), `appendContext`,
+  `exactSystemPrompt`, `guard` and `afterMutation`. A start the executor
+  lacks degrades to `fresh` with the declared reason.
 - `SessionSpec` holds the role, the scope (the working directory), the
   complete system prompt, the first user message, and the built-in tools to
   enable, which may include `edit` and `write` but never a shell. It also
@@ -49,7 +53,15 @@ implementations beneath this module receive it:
   implementation's own belief, which the harness uses as evidence and never
   relies on: the harness confirms settlement itself, by process group and a
   stable tree.
-- Events are `tool-started`, carrying `mutating`, and `tool-finished`,
+- Every tool call carries a neutral `ToolAction`: a `read` of a path and a
+  `LineRange`, a `search` (a pattern, where, and a glob; no pattern for a
+  listing), a `write` of `paths`, a `command`, a `harness` tool, or `other`.
+  The implementation classifies its own tools from their names and inputs;
+  a harness tool declares its action through `ToolDefinition.action`, and
+  the default is `harness`. `tool-started`, `GuardedCall` and
+  `SettledMutation` carry it beside the executor's own tool name and input,
+  which are for display. Nothing above the port reads a call otherwise.
+- Events are `tool-started`, carrying `action` and `mutating`, and `tool-finished`,
   matched by `callId` and carrying `reachedTool`, which is false when the
   implementation rejected the input before the tool ran; `message` with token
   usage where the agent reports it; `context-observed` with the estimated
@@ -75,10 +87,13 @@ implementations beneath this module receive it:
 `createScriptedAgent(script)` replays steps in order and checks for Stop
 before each one:
 
-- `tool` calls a harness tool for real, or only reports a built-in one.
+- `tool` calls a harness tool for real, or only reports a built-in one; the
+  write built-ins really write, to the one path their action names.
   `mutating` overrides what the tool declares, so a script can exercise the
   guard over any name, and `reachedTool: false` is a call the implementation
-  itself rejected before the tool ran.
+  itself rejected before the tool ran. `action` is the call's action; without
+  it a harness tool's declared action is used, and a built-in's is
+  classified from the input the port's names take.
 - `message` reports a message, with optional usage.
 - `context` observes the context after a boundary, and reaches the budget
   when the policy says so.
@@ -91,6 +106,8 @@ before each one:
 - `hang` never settles.
 - `fail` crashes the session; `end` stops without a submission.
 
+`toolNames` gives the port's built-ins other names, so a script can play an
+executor whose read tool is `Read`; `support` declares what the fake lacks.
 A script may be a function of the session's spec. `sessions` records each
 spec, verdict and outcome for tests, along with the mode that was actual,
 the appended context the session started with, every tool result the agent

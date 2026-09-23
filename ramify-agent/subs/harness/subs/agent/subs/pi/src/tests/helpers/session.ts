@@ -6,8 +6,11 @@ import type {
   AgentPort,
   AgentSession,
   ContextPolicy,
+  GuardedCall,
   SessionSpec,
+  SettledMutation,
   SubmissionVerdict,
+  ToolAction,
   ToolDefinition,
 } from '../../../../../src/interfaces/port.js';
 import { createPiAgentOn } from '../../pi-agent.js';
@@ -37,8 +40,8 @@ export interface PiHarness {
   readonly spec: SessionSpec;
   readonly events: AgentEvent[];
   readonly judged: unknown[];
-  readonly guarded: Array<{ readonly callId: string; readonly tool: string; readonly input: unknown }>;
-  readonly settledMutations: Array<{ readonly callId: string; readonly tool: string; readonly failed: boolean }>;
+  readonly guarded: Array<{ readonly callId: string; readonly tool: string; readonly input: unknown; readonly action: ToolAction }>;
+  readonly settledMutations: Array<{ readonly callId: string; readonly tool: string; readonly action: ToolAction; readonly failed: boolean }>;
   readonly scripted: ScriptedProvider;
   readonly workingDirectory: string;
   readonly sessionDirectory: string;
@@ -71,7 +74,7 @@ export interface PiOptions {
   readonly deny?: Record<string, string> | undefined;
   readonly guard?: boolean | undefined;
   /** A guard of the caller's own, which decides each call however it likes. */
-  readonly decide?: ((call: { readonly callId: string; readonly tool: string; readonly input: unknown }) => Promise<{ readonly allow: true } | { readonly allow: false; readonly text: string }>) | undefined;
+  readonly decide?: ((call: GuardedCall) => Promise<{ readonly allow: true } | { readonly allow: false; readonly text: string }>) | undefined;
   /** The text `afterMutation` appends to a settled call's result. */
   readonly hookCheck?: string | undefined;
   /** Reuses an existing working and session directory, for a second session over the same files. */
@@ -139,8 +142,8 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     sessionDirectory: places.sessionDirectory,
     ...(options.guard === true || options.decide !== undefined || Object.keys(deny).length > 0
       ? {
-          guard: async (call: { callId: string; tool: string; input: unknown }) => {
-            guarded.push({ callId: call.callId, tool: call.tool, input: call.input });
+          guard: async (call: GuardedCall) => {
+            guarded.push({ callId: call.callId, tool: call.tool, input: call.input, action: call.action });
             if (options.decide !== undefined) return options.decide(call);
             const text = deny[call.tool];
             return text === undefined ? { allow: true as const } : { allow: false as const, text };
@@ -150,8 +153,8 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     ...(options.hookCheck === undefined
       ? {}
       : {
-          afterMutation: async (call: { callId: string; tool: string; failed: boolean }) => {
-            settledMutations.push({ callId: call.callId, tool: call.tool, failed: call.failed });
+          afterMutation: async (call: SettledMutation) => {
+            settledMutations.push({ callId: call.callId, tool: call.tool, action: call.action, failed: call.failed });
             return { text: options.hookCheck as string };
           },
         }),

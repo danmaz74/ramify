@@ -60,7 +60,12 @@ none can run yet.
   - Final: an error result that ends the loop; the outcome is `ended`.
 - **Events.** `tool_execution_start` and `tool_execution_end` become
   `tool-started` and `tool-finished`, by call ID. `tool-started` carries
-  `mutating`, which this adapter declares; `tool-finished` carries
+  `mutating`, which this adapter declares, and the call's action: pi's
+  `read` (`path`, `offset`, `limit`), `grep` and `find` (`pattern`, `path`,
+  `glob`), `ls` (`path`), and `edit` and `write` (`path`) are classified
+  here, the one place their names are read; a harness tool's action is its
+  declaration, and anything else is `other`. The guard and `afterMutation`
+  receive the same action; `tool-finished` carries
   `reachedTool`, which is false for a call pi's own validation rejected, so
   every such rejection is counted without reading pi's message text. Each
   assistant message becomes `message`, with its text (or the tools it called)
@@ -78,6 +83,11 @@ none can run yet.
   stable tree.
 - **Session record.** pi writes its own `.jsonl` into the job's `session/`
   directory, starting with the first assistant message.
+- **Support.** The adapter declares every entry of the port's
+  `ExecutorSupport` available: pi observes usage, context and compaction,
+  continues and forks a session at the entry a ref names, appends without a
+  model call, sends the exact system prompt, and runs the guard and the
+  after-mutation hook.
 - **Model and login.** Credentials are pi's own, in `auth.json` of pi's agent
   directory (`~/.pi/agent`, or `PI_CODING_AGENT_DIR`). The model is the one
   given as `provider/model`, or else the first model pi has credentials for.
@@ -91,8 +101,10 @@ model provider (`tests/helpers/scripted-provider.ts`); `tests/helpers/session.ts
 starts one. `pi-agent.test.ts` covers the prompt, the tools, the submission
 and stop; `session-modes.test.ts` the modes and appended context;
 `guarded-writes.test.ts` the write built-ins, the guard, the after-mutation
-hook and settlement; `compaction-policy.test.ts` the compaction policy; and
-`context-budget.test.ts` the context observations and the budget. The provider
+hook and settlement; `compaction-policy.test.ts` the compaction policy;
+`context-budget.test.ts` the context observations and the budget; and
+`tool-actions.test.ts` the classification of pi's tools as actions and the
+declared support. The provider
 is written against the interface pi's `ModelRuntime.registerNativeProvider`
 publishes, so the tests import nothing but pi's public package: pi keeps
 pi-ai, which holds its own faux provider, private. The runtime lives in a

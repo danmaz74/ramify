@@ -8,7 +8,11 @@
 /** A JSON Schema object describing a tool's input. The implementation validates against it or leaves validation to the tool. */
 export type JsonSchema = { readonly [key: string]: unknown };
 
-/** The read and search tools an implementation provides itself. */
+/**
+ * The read and search tools an implementation provides itself, by the port's
+ * names. Each implementation enables its own tool for each, under whatever
+ * name and input that tool has, and classifies its calls as `ToolAction`s.
+ */
 export type BuiltinTool = 'read' | 'grep' | 'ls' | 'find';
 
 /**
@@ -75,11 +79,45 @@ export function contextBudgetReached(policy: ContextPolicy, tokens: number | nul
   return tokens + policy.reportReserveTokens >= budget;
 }
 
+/** The lines a read asks for: `start` is the first, counted from 1; `count` the most it returns. Null leaves either open. */
+export interface LineRange {
+  readonly start: number | null;
+  readonly count: number | null;
+}
+
+/**
+ * What a tool call does, in the port's terms rather than an executor's. The
+ * implementation classifies its own tools, and a harness tool declares its
+ * action. Everything above the port that reads a call reads this, never the
+ * executor's tool or argument names; those stay for display. Paths are as
+ * the agent wrote them, relative to the working directory or absolute.
+ */
+export type ToolAction =
+  /** A read of one file; `range` is null when the call asks for all of it. */
+  | { readonly kind: 'read'; readonly path: string; readonly range: LineRange | null }
+  /**
+   * A search or a listing. `pattern` is what is searched for, null for a
+   * listing; `path` is where, null for the working directory; `glob`
+   * narrows the files searched.
+   */
+  | { readonly kind: 'search'; readonly pattern: string | null; readonly path: string | null; readonly glob: string | null }
+  /** A write of the files it names. A call that names none has an empty list. */
+  | { readonly kind: 'write'; readonly paths: readonly string[] }
+  /** A command to run; `command` is null when the call names none. */
+  | { readonly kind: 'command'; readonly command: string | null }
+  /** A harness tool whose action is its own, such as a submission. */
+  | { readonly kind: 'harness' }
+  /** A call the implementation cannot classify. */
+  | { readonly kind: 'other' };
+
 /** What a `guard` is asked about, before the call executes. */
 export interface GuardedCall {
   readonly callId: string;
+  /** The executor's own name for the tool, for display. */
   readonly tool: string;
   readonly input: unknown;
+  /** What the call does; the guard judges this, never the tool's name or input. */
+  readonly action: ToolAction;
 }
 
 /** A guard's answer. A denial's `text` becomes the tool's error result. */
@@ -91,24 +129,43 @@ export type GuardDecision =
 export interface SettledMutation {
   readonly callId: string;
   readonly tool: string;
+  readonly action: ToolAction;
   readonly failed: boolean;
 }
 
-/** Whether an implementation can observe one of the port's observations. */
+/** Whether an implementation supports one thing it declares. */
 export type Availability =
   | { readonly available: true }
   | { readonly available: false; readonly reason: string };
 
 /**
- * What an implementation can observe. Usage, context size and compaction are
- * port events; an implementation that cannot observe one says so with a
- * reason, which the harness records as a coverage gap rather than treating
- * the silence as room.
+ * What an executor declares it supports. Each entry is available, or
+ * unavailable with a reason; what is missing degrades with that reason and
+ * never silently.
+ *
+ * - Usage, context size and compaction are port events. One the executor
+ *   cannot observe is recorded as a coverage gap, never read as room.
+ * - `continue`, `fork` and `forkAtPoint` are session starts; a start the
+ *   executor lacks degrades to `fresh` with the declared reason, as
+ *   `ActualStart` reports. `forkAtPoint` is a fork from any ref, not only
+ *   from a session's latest one.
+ * - `appendContext` stores text without a model call.
+ * - `exactSystemPrompt` sends the spec's prompt with nothing of the
+ *   executor's own added.
+ * - `guard` asks the spec's guard before a mutating call executes, and
+ *   `afterMutation` tells the spec after one settles.
  */
-export interface PortObservations {
+export interface ExecutorSupport {
   readonly usage: Availability;
   readonly context: Availability;
   readonly compaction: Availability;
+  readonly continue: Availability;
+  readonly fork: Availability;
+  readonly forkAtPoint: Availability;
+  readonly appendContext: Availability;
+  readonly exactSystemPrompt: Availability;
+  readonly guard: Availability;
+  readonly afterMutation: Availability;
 }
 
 /** What a tool returns to the agent. An error result lets the agent correct itself in the same session. */
@@ -128,6 +185,11 @@ export interface ToolDefinition {
    * guarded and observed after it settles. Default: false.
    */
   readonly mutating?: boolean | undefined;
+  /**
+   * What a call of this tool does, declared by the tool's author from its
+   * own input. A shell declares a command. Default: `harness`.
+   */
+  readonly action?: ((input: unknown) => ToolAction) | undefined;
   /** Runs the tool. It must end promptly once `signal` is aborted. */
   execute(input: unknown, signal: AbortSignal): Promise<ToolResult>;
 }
@@ -207,12 +269,15 @@ export interface TokenUsage {
 
 /**
  * Observed activity. Tool calls are matched by `callId`, since parallel
- * calls may finish in any order. Paths in `input` are as the agent wrote
- * them, relative to the working directory or absolute.
+ * calls may finish in any order. `tool` and `input` are the executor's own,
+ * for display; what the call does is its `action`.
  */
 export type AgentEvent =
-  /** `mutating` is declared by the implementation or by the tool's author, never inferred from the name. */
-  | { readonly type: 'tool-started'; readonly callId: string; readonly tool: string; readonly input: unknown; readonly mutating: boolean }
+  /** `mutating` and `action` are declared by the implementation or by the tool's author, never inferred from the name. */
+  | {
+      readonly type: 'tool-started'; readonly callId: string; readonly tool: string; readonly input: unknown;
+      readonly action: ToolAction; readonly mutating: boolean;
+    }
   | {
       readonly type: 'tool-finished'; readonly callId: string; readonly tool: string;
       readonly isError: boolean; readonly errorText?: string | undefined;
@@ -285,8 +350,8 @@ export interface AgentSession {
 export interface AgentPort {
   /** A short name recorded with each job, such as `pi` or `scripted`. */
   readonly name: string;
-  /** What this implementation can observe, and the reason for anything it cannot. */
-  readonly observations: PortObservations;
+  /** What this implementation supports, and the reason for anything it does not. */
+  readonly support: ExecutorSupport;
   /** Starts a session. Failures to start are reported through `outcome`, not thrown. */
   startSession(spec: SessionSpec): AgentSession;
   /**

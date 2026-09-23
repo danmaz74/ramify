@@ -205,14 +205,14 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         },
       })],
       guard: async call => {
-        if (call.tool === shellToolName) {
+        if (call.action.kind === 'command') {
           // The shell declares itself mutating so that the hook check
-          // runs after it, but it names no target to judge: its writes
-          // are unguarded by design, seen afterwards in the tree and
-          // reported in `outsideScope`. Nothing here prevents them.
+          // runs after it, but a command names no target to judge: its
+          // writes are unguarded by design, seen afterwards in the tree
+          // and reported in `outsideScope`. Nothing here prevents them.
           return { allow: true };
         }
-        const decision = await decideWrite(inputs.guarded, projectRoot, call.input);
+        const decision = await decideWrite(inputs.guarded, projectRoot, call.action);
         await session.observations.record({
           type: 'guard',
           data: {
@@ -237,7 +237,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         // The mutation is observed whether the tool succeeded or not.
         // The shell's changed set is unknown, which is a different
         // thing from an empty one and is recorded as such.
-        const paths = call.tool === shellToolName ? null : mutated.get(call.callId) ?? null;
+        const paths = call.action.kind === 'command' ? null : mutated.get(call.callId) ?? null;
         await session.observations.record({
           type: 'mutation',
           data: {

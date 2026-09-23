@@ -141,7 +141,7 @@ describe('a run whose invocation is not confirmed settled', () => {
     const scripted = createScriptedAgent(script);
     return {
       name: scripted.name,
-      observations: scripted.observations,
+      support: scripted.support,
       appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
       startSession(spec: SessionSpec): AgentSession {
         const started = scripted.startSession(spec);

@@ -116,9 +116,15 @@ describe('the pi adapter', () => {
 
     const started = harness.events.filter(event => event.type === 'tool-started');
     expect(started).toEqual([
-      { type: 'tool-started', callId: 'c-read', tool: 'read', input: { path: 'module.ramify' }, mutating: false },
-      { type: 'tool-started', callId: 'c-grep', tool: 'grep', input: { pattern: 'expose-sub', path: 'subs' }, mutating: false },
-      { type: 'tool-started', callId: 'c-echo', tool: 'echo', input: { word: 'hello' }, mutating: false },
+      {
+        type: 'tool-started', callId: 'c-read', tool: 'read', input: { path: 'module.ramify' },
+        action: { kind: 'read', path: 'module.ramify', range: null }, mutating: false,
+      },
+      {
+        type: 'tool-started', callId: 'c-grep', tool: 'grep', input: { pattern: 'expose-sub', path: 'subs' },
+        action: { kind: 'search', pattern: 'expose-sub', path: 'subs', glob: null }, mutating: false,
+      },
+      { type: 'tool-started', callId: 'c-echo', tool: 'echo', input: { word: 'hello' }, action: { kind: 'harness' }, mutating: false },
     ]);
     const finished = harness.events.filter(event => event.type === 'tool-finished');
     expect(finished.map(event => [event.callId, event.isError]).sort()).toEqual([['c-echo', false], ['c-grep', false], ['c-read', false]]);

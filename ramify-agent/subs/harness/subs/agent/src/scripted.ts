@@ -6,11 +6,14 @@ import type {
   AgentPort,
   AgentSession,
   AppendOutcome,
-  PortObservations,
+  BuiltinTool,
+  ExecutorSupport,
   SessionOutcome,
   SessionRef,
   SessionSpec,
   TokenUsage,
+  ToolAction,
+  WriteTool,
 } from './interfaces/port.js';
 
 /**
@@ -20,13 +23,17 @@ import type {
 export type ScriptStep =
   /**
    * Calls a tool: a harness tool runs for real; a built-in one only reports
-   * its call. `mutating` overrides what the tool declares, so a script can
-   * exercise the guard over any name; `edit` and `write` are mutating by
-   * default. `reachedTool: false` is a call the implementation itself
-   * rejected before the tool ran.
+   * its call, except that the write built-ins really write. `mutating`
+   * overrides what the tool declares, so a script can exercise the guard
+   * over any name; the write built-ins are mutating by default.
+   * `reachedTool: false` is a call the implementation itself rejected before
+   * the tool ran. `action` is what the call does; without it a harness tool's
+   * declared action is used, and a built-in's is classified from the input
+   * the port's names take (`path`, `pattern`, `glob`, `offset`, `limit`).
    */
   | {
       readonly kind: 'tool'; readonly tool: string; readonly input: unknown;
+      readonly action?: ToolAction | undefined;
       readonly mutating?: boolean | undefined; readonly reachedTool?: boolean | undefined;
     }
   | { readonly kind: 'message'; readonly text: string; readonly usage?: TokenUsage | undefined }
@@ -100,17 +107,35 @@ export interface ScriptedAgent extends AgentPort {
 export interface ScriptedAgentOptions {
   /** How long `settled()` waits before answering `timed-out`. */
   readonly settleMs?: number | undefined;
+  /**
+   * The fake's own names for the port's built-in tools, so a script can be
+   * an executor whose tools are named otherwise, such as `Read`. Default:
+   * the port's names.
+   */
+  readonly toolNames?: { readonly [tool in BuiltinTool | WriteTool]?: string } | undefined;
+  /**
+   * What the fake declares it lacks. A `continue` or `fork` it lacks degrades
+   * to `fresh` with the declared reason. Default: it supports everything.
+   */
+  readonly support?: Partial<ExecutorSupport> | undefined;
 }
 
 const never = new Promise<never>(() => undefined);
 
-const writeTools = new Set(['edit', 'write']);
+const portTools: ReadonlyArray<BuiltinTool | WriteTool> = ['read', 'grep', 'ls', 'find', 'edit', 'write'];
 
-/** What the fake observes; it emits all three, so the core's tests never depend on pi. */
-const scriptedObservations: PortObservations = {
+/** What the fake supports: everything, so the core's tests never depend on pi. */
+const scriptedSupport: ExecutorSupport = {
   usage: { available: true },
   context: { available: true },
   compaction: { available: true },
+  continue: { available: true },
+  fork: { available: true },
+  forkAtPoint: { available: true },
+  appendContext: { available: true },
+  exactSystemPrompt: { available: true },
+  guard: { available: true },
+  afterMutation: { available: true },
 };
 
 /**
@@ -127,6 +152,9 @@ const scriptedObservations: PortObservations = {
 export function createScriptedAgent(script: Script, options: ScriptedAgentOptions = {}): ScriptedAgent {
   const sessions: ScriptedSessionRecord[] = [];
   const settleMs = options.settleMs ?? 30_000;
+  const support: ExecutorSupport = { ...scriptedSupport, ...options.support };
+  /** The port's built-in each of the fake's own tool names stands for. */
+  const builtinOf = new Map(portTools.map(tool => [options.toolNames?.[tool] ?? tool, tool]));
   /** Appended context per scripted session, which a continue inherits and a fork inherits up to its point. */
   const histories = new Map<string, Array<{ readonly key: string; readonly text: string }>>();
   let sessionCount = 0;
@@ -135,7 +163,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
 
   return {
     name: 'scripted',
-    observations: scriptedObservations,
+    support,
     sessions,
 
     forget(ref) {
@@ -153,7 +181,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
     },
 
     startSession(spec: SessionSpec): AgentSession {
-      const { id, start, inherited } = beginSession(spec, histories, () => `scripted-${++sessionCount}`);
+      const { id, start, inherited } = beginSession(spec, histories, () => `scripted-${++sessionCount}`, support);
       let stepsRun = 0;
       const record: ScriptedSessionRecord = {
         spec, verdicts: [], start, inherited, results: [], denied: [],
@@ -221,15 +249,19 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             case 'tool': {
               const callId = nextCallId();
               const tool = spec.tools.find(candidate => candidate.name === step.tool);
-              const mutating = step.mutating ?? tool?.mutating ?? writeTools.has(step.tool);
-              spec.onEvent({ type: 'tool-started', callId, tool: step.tool, input: step.input, mutating });
+              const builtin = tool === undefined ? builtinOf.get(step.tool) : undefined;
+              const writer = builtin === 'edit' || builtin === 'write' ? builtin : undefined;
+              const action: ToolAction = step.action
+                ?? (tool !== undefined ? tool.action?.(step.input) ?? { kind: 'harness' } : builtinAction(builtin, step.input));
+              const mutating = step.mutating ?? tool?.mutating ?? writer !== undefined;
+              spec.onEvent({ type: 'tool-started', callId, tool: step.tool, input: step.input, action, mutating });
               if (step.reachedTool === false) {
                 // The implementation rejected the input against the tool's schema; the tool never ran.
                 finish(spec, record, { callId, tool: step.tool, text: `The input for ${step.tool} was rejected before the tool ran.`, isError: true }, false);
                 break;
               }
               if (mutating && spec.guard) {
-                const decision = await spec.guard({ callId, tool: step.tool, input: step.input });
+                const decision = await spec.guard({ callId, tool: step.tool, input: step.input, action });
                 if (!decision.allow) {
                   record.denied.push(callId);
                   // A denied call executed nothing, so `afterMutation` is not called for it.
@@ -243,19 +275,19 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
                 const result = await tool.execute(step.input, controller.signal);
                 text = result.text;
                 isError = result.isError === true;
-              } else if (!(spec.builtinTools as readonly string[]).includes(step.tool)) {
+              } else if (builtin === undefined || !spec.builtinTools.includes(builtin)) {
                 text = `Tool ${step.tool} not found`;
                 isError = true;
-              } else if (writeTools.has(step.tool)) {
+              } else if (writer !== undefined) {
                 // The write built-ins really write, as the implementation's
                 // own do. A scripted repair is a repair, and a call the guard
                 // allowed changes the tree the gate then checks.
-                const result = await performWrite(spec.scope.workingDirectory, step.tool, step.input);
+                const result = await performWrite(spec.scope.workingDirectory, writer, step.tool, action, step.input);
                 text = result.text;
                 isError = result.isError;
               }
               if (mutating && spec.afterMutation) {
-                const extra = await spec.afterMutation({ callId, tool: step.tool, failed: isError });
+                const extra = await spec.afterMutation({ callId, tool: step.tool, action, failed: isError });
                 if (extra) text = text === '' ? extra.text : `${text}\n${extra.text}`;
               }
               finish(spec, record, { callId, tool: step.tool, text, isError }, true);
@@ -263,7 +295,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             }
             case 'submit': {
               const callId = nextCallId();
-              spec.onEvent({ type: 'tool-started', callId, tool: spec.submission.name, input: step.input, mutating: false });
+              spec.onEvent({ type: 'tool-started', callId, tool: spec.submission.name, input: step.input, action: { kind: 'harness' }, mutating: false });
               const verdict = await spec.submission.accept(step.input, controller.signal);
               record.verdicts.push(verdict);
               const text = verdict.accepted ? verdict.text ?? 'The submission was accepted.' : verdict.errors.join('\n');
@@ -310,18 +342,54 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
 }
 
 /**
+ * A built-in call's action, classified from the input the port's names take,
+ * as an implementation classifies its own tools. An unknown tool, or a read
+ * that names no path, is `other`; a write that names none has no paths.
+ */
+function builtinAction(builtin: BuiltinTool | WriteTool | undefined, input: unknown): ToolAction {
+  const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+  const text = (key: string): string | null => (typeof record[key] === 'string' ? record[key] as string : null);
+  const count = (key: string): number | null => (typeof record[key] === 'number' ? record[key] as number : null);
+  const path = text('path');
+  switch (builtin) {
+    case 'read': {
+      if (path === null) return { kind: 'other' };
+      const range = { start: count('offset'), count: count('limit') };
+      return { kind: 'read', path, range: range.start === null && range.count === null ? null : range };
+    }
+    case 'grep':
+    case 'find':
+      return { kind: 'search', pattern: text('pattern'), path, glob: text('glob') };
+    case 'ls':
+      return { kind: 'search', pattern: null, path, glob: null };
+    case 'edit':
+    case 'write':
+      return { kind: 'write', paths: path === null ? [] : [path] };
+    default:
+      return { kind: 'other' };
+  }
+}
+
+/**
  * The write built-ins, as the implementation provides them: `write` replaces
  * a file's contents, creating the directories it needs, and `edit` replaces
- * text that is there. A call that cannot be carried out fails like any other
- * tool, so the after-mutation hook still sees it.
+ * text that is there. The target is the one path the action names. A call
+ * that cannot be carried out fails like any other tool, so the
+ * after-mutation hook still sees it.
  */
-async function performWrite(workingDirectory: string, tool: string, input: unknown): Promise<{ text: string; isError: boolean }> {
+async function performWrite(
+  workingDirectory: string,
+  writer: WriteTool,
+  tool: string,
+  action: ToolAction,
+  input: unknown,
+): Promise<{ text: string; isError: boolean }> {
   const record = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
-  const requested = typeof record['path'] === 'string' ? record['path'] : '';
+  const requested = action.kind === 'write' && action.paths.length === 1 ? action.paths[0]! : '';
   if (requested === '') return { text: `${tool} needs a path`, isError: true };
   const path = isAbsolute(requested) ? requested : resolve(workingDirectory, requested);
   try {
-    if (tool === 'write') {
+    if (writer === 'write') {
       const content = typeof record['content'] === 'string' ? record['content'] : '';
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, content);
@@ -362,8 +430,12 @@ function beginSession(
   spec: SessionSpec,
   histories: Map<string, Array<{ readonly key: string; readonly text: string }>>,
   fresh: () => string,
+  support: ExecutorSupport,
 ): { readonly id: string; readonly start: ActualStart; readonly inherited: readonly string[] } {
   const start = spec.session;
+  // A start the fake declares it lacks degrades with the reason it declared.
+  const declared = start.mode === 'fresh' ? undefined : support[start.mode];
+  if (declared !== undefined && !declared.available) return degrade(histories, fresh, declared.reason);
   if (start.mode === 'continue') {
     const id = sessionOf(start.ref);
     const history = id === undefined ? undefined : histories.get(id);
