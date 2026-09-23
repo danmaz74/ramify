@@ -1489,3 +1489,231 @@ rules.
   attempts.
 - The scenario list cannot open a gate's detail in the Checks area; it
   names the gate.
+
+## Iteration 11: Trial, documents and audits
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+Implementation commit `d888635`.
+
+### What changed
+
+- **The fixture plan's scenarios.** `plans/status-badge-tone/plan.md` keeps
+  its prose and gains, under Acceptance, a `gherkin` block stating the first
+  two bullets: "A badge given a tone carries that tone in its markup" (a
+  passed badge with the tone `warning` carries it and still reads
+  `Passed`) and "A badge given no tone carries neutral". Extraction finds
+  them as `ps-01` (lines 34–38) and `ps-02` (lines 40–43), both under the
+  Acceptance anchor.
+- **The badge needs no World** (iteration 4's open item). The World and hooks
+  stay in `integration-tests`, built on `createTestSystem` and so tagged
+  `[testing, dispatch]`; `shared-ui`'s test area is `[testing, ui]` and
+  cannot import them. The badge's step file renders the badge with
+  `react-dom/server` and `createElement`, as its unit tests do, and keeps the
+  props and markup in its own module scope, which each scenario's first step
+  replaces. Cucumber still constructs the configured World for each
+  scenario, because the support files load in every module's run; its
+  constructor starts nothing. No separate World without `dispatch` was
+  added. The fixture README records the decision.
+- **`helpers/badge-scenarios.ts`** (new): the plan's analysis
+  (`badgeAnalysis`, one entry at `shared-ui` whose two scenarios restate the
+  plan's with the plan as origin), the step file, and `badgeImplementation`,
+  Plan 3's recorded stage plus `shared-ui`'s `module.ramify` exposing
+  `StatusBadgeTone` beside `StatusBadgeProps`. Plan 3's stage alone now fails
+  the Ramify check with `exposed-without-companion`, which Plan 8 introduced
+  after the stage was recorded.
+- **The scripted acceptance trial** (`acceptance-trial.test.ts`, new). One
+  run of `review-notes` on a fixture copy with `notes`, `tags` and `limits`
+  added and the plan given one integration scenario over two entries
+  (`helpers/integration-scenario.ts`). It starts with `reviewStop`, waits at
+  `awaiting-review` with no branch and no commit, and is approved. It then
+  passes the four acceptance readiness steps and materializes the feature
+  files. The note's work item (`wi-001`) registers a contract for the limit
+  and declares its sub-scenario while `rq-001` is open (`bound`). Its
+  iteration gate fails the scenario, the iteration closes `partial`, and
+  the yield withdraws the bound scenario with no commit. The provider
+  (`wi-003`) conforms. The verification declares the scenario again, which
+  passes against the real provider (`scenario-bound-passed`); then
+  `requirement-verified`, `scenario-due`, and the work-item gate implements
+  it. The tags' item (`wi-002`) exhausts its repair rounds, and "Withdraw
+  sc-002" is committed with `Ramify-Scenarios: withdrawn-1`; a second
+  iteration binds and implements the scenario. That implementation creates
+  the integration item `wi-004` at `reviews`, which binds `sc-003` through
+  `expose-test`. The final gate runs in full mode. The test asserts the
+  course of the run as a list of 35 events (below), the readiness steps, the
+  materialization and withdrawal commits, the snapshot's counts, the
+  scenario list query, the feature files without a pending tag, and the
+  final summary.
+- **Gates of the trial.** Every gate but the final one uses the direct
+  executor, with scripted failures. The final gate runs its commands in the
+  project through `createLocalCommandCheckExecution`, so the scenario check
+  runs `npm run acceptance:full -- --config <profile>` per module. By
+  default `cucumber-js` is the scripted runner and the trial takes about 3 s.
+  With `RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1`, `npm ci` installs the fixture's
+  toolchain once, each copy links its `node_modules`, and the real
+  `cucumber-js` 13.2.1 runs the step files the engineers wrote. The fixture's
+  own scenario runs beside them over HTTP.
+- **A second run** in the same file binds `status-badge-tone`'s two
+  scenarios in `shared-ui`, with the review stop, one iteration declaring
+  both, and the final gate in full mode. With the real toolchain, both
+  scenarios bind to the badge's step file only.
+- **Updated tests.** `extraction.test.ts` reads the badge plan's two
+  scenarios and appends its sample block to `revision-diff`.
+  `helpers/progress-fixture.ts` moves the `rowBound` and `sixtyRows`
+  forecast runs from `status-badge-tone` to `reviewer-identity`: an analysis
+  with no entry cannot assign a plan scenario, so form rule 3 rejected it and
+  the progress fixture failed. `fixture-trials.test.ts`'s `status-badge-tone`
+  trial submits `badgeAnalysis()`, writes `badgeImplementation()` and the
+  step file, and declares both scenarios. `plans.test.ts`, `http.test.ts` and
+  `scripts/composition-gate.ts` name the plan by ID and title only and
+  needed no change. The harness README lists the trial.
+
+### The course of the run
+
+`course(log)` in the trial, asserted in both variants:
+
+```text
+analysis-accepted 3 scenarios
+review-requested
+analysis-approved by dana@example.com
+readiness-passed
+scenarios-materialized
+work-item-started wi-001 (entry)
+iteration-closed wi-001.i01 partial
+contract-registered rq-001 (provider wi-003)
+scenario-declared sc-001 bound
+iteration-closed wi-001.i03 partial
+scenario-withdrawn sc-001 (yielded)
+work-item-yielded wi-001
+work-item-started wi-003 (obligation)
+provider-conformed wi-003
+work-item-completed wi-003
+work-item-resumed wi-001
+scenario-declared sc-001 bound
+scenario-bound-passed sc-001
+requirement-verified rq-001
+scenario-due sc-001 (requirements-verified)
+scenario-implemented sc-001
+work-item-completed wi-001
+work-item-started wi-002 (entry)
+scenario-declared sc-002 declared
+iteration-closed wi-002.i01 exhausted
+scenarios-withdrawing sc-002 (repair-exhausted)
+scenario-withdrawn sc-002 (repair-exhausted)
+scenario-declared sc-002 declared
+scenario-implemented sc-002
+work-item-completed wi-002
+work-item-started wi-004 (integration sc-003)
+scenario-declared sc-003 declared
+scenario-implemented sc-003
+work-item-completed wi-004
+job-completed
+```
+
+Final states: the run `completed` with no failure and `review { reviewer:
+dana@example.com, duringRun: false }`; `counts.scenarios` `{ pending: 0,
+bound: 0, declared: 0, implemented: 3 }`; the scenario list `sc-001` and
+`sc-002` entry scenarios implemented by `wi-001` and `wi-002`, `sc-003`
+integration implemented by `wi-004` at `reviews`. The final gate's summary
+is `full`, `all`, not a dry run, no exclusion and no failure, with four runs
+(`integration-tests`, `reviews`, `notes`, `tags`) exiting 0 and all three
+scenarios passed. With the real runner, the summary shows `sc-001` bound to
+`review-note.steps.ts`, `sc-002` to `review-tags.steps.ts`, and `sc-003` to
+both through the ancestor's imports. The project's own scenario passed
+(`untracked { passed: 1, skipped: 0, failed: 0 }`).
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/acceptance-trial.test.ts` | 2 passed, 2 skipped (the real-runner variants), about 5 s |
+| `RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1 npx vitest run subs/harness/src/tests/acceptance-trial.test.ts` | 4 passed in 18.3 s on `d888635`, `npm ci` of the fixture included: both runs with the scripted runner, and both with the real `cucumber-js` in full mode |
+| `RAMIFY_AGENT_TRIAL=status-badge-tone npx vitest run subs/harness/src/tests/fixture-trials.test.ts` | 1 passed in 61 s (the trial copy prepared by `scripts/live-trial.ts`, a private Ramify daemon, `verify` with no defect), 1 skipped (`reviewer-identity`, not selected) |
+| `npx vitest run subs/harness/subs/scenarios/src/tests/extraction.test.ts` | 11 passed |
+| `npx vitest run` over `progress-fixture`, `plans`, `http` | 3 files, 23 passed; `progress-fixture` failed before its update (every test skipped after the fixture's `rowBound` run was rejected) |
+| `npx vitest run` over `composition`, `union-values`, `analysis-scenarios` and `subs/harness/subs/scenarios` | 11 files, 176 passed |
+| A fixture copy with `npm ci`, `badgeImplementation()` and the step file | `npm run type-check` passed; `npx vitest run` 21 files, 80 passed; `ramify check --batch` passed with 0 errors and the two configuration warnings. With Plan 3's stage alone it fails with one `exposed-without-companion` (`StatusBadgeTone`) |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 122 analysis limits, as in iteration 10 |
+
+No test makes a model call.
+
+### Deviations
+
+- **Two runs, not one.** The trial is the `review-notes` run with the
+  integration scenario. The badge plan's scenarios have their own smaller
+  run, since that plan has one entry and could not hold an integration
+  scenario without changing its text.
+- **Two withdrawals.** The plan names one. The yield withdraws a bound
+  scenario and commits nothing; the exhaustion commits "Withdraw sc-002".
+  The trial covers both.
+- **The final gate runs for real in both variants.** Only its scenario runner
+  differs. The gates before it use the direct executor. The real runner runs
+  only in the environment-gated variant, as in `fixture-acceptance.test.ts`,
+  since it needs the fixture's installed dependencies.
+- **Plan 3's recorded badge stage is amended** with the `StatusBadgeTone`
+  exposure where a run writes it, rather than re-recorded, since the stage
+  is Plan 3's evidence.
+- **The progress fixture's forecast runs changed plan**, because the plan
+  they used now has scenarios that an analysis without entries cannot
+  assign.
+
+### The ramify-agent suite audit
+
+The request `audit/ramify-agent-suite.request.json`, run per
+[its README](../../../audit/README.md) on the implementation commit
+`d888635` as HEAD with a clean tree, after `npm ci` of
+`examples/collection-review` and `site` (the root was built and the root
+`node_modules` is the main checkout's):
+
+| Field | Value |
+| --- | --- |
+| Overall | `pass`, 155.8 s, audited 2026-09-23T15:01:27Z |
+| Source commit | `d8886357a47acdd7fc574051337ec6d3129d3766`, tree `b4da21da04ce01984d70394c45da22658e4aa864` |
+| Run ref | `refs/audited/runs/2026-09-23T15-01-27Z-d8886357a` |
+| Report commit | `bc172549bf9c3afcd44547ddf10ff1dc987b087a` |
+| Note | `git notes --ref=audit show d8886357a47acdd7fc574051337ec6d3129d3766` |
+
+| Check | Outcome |
+| --- | --- |
+| `patch-integrity` (`git diff --check HEAD^ HEAD`) | pass, no output |
+| `agent-typecheck` | pass, 2.4 s |
+| `agent-tests` (`npm test -- --maxWorkers=4`) | pass, 126.5 s: 133 files passed and 2 skipped (`fixture-trials`, `fixture-acceptance`), 1,094 tests passed and 7 skipped. The acceptance trial's two real-runner tests are among the skipped. |
+| `agent-structure` (`check:self`) | pass, 10.9 s: 0 errors, 0 warnings, 122 analysis limits |
+| `parent-daemon-test` | pass, 16.0 s, 1 test |
+
+No check failed, so no fix commit followed. `iterations-integration`, which
+failed once under load in iteration 6, passed in the suite's run.
+
+### Open items
+
+- The real pi run on `status-badge-tone` waits for Dan's go-ahead.
+- The repository root cucumber-viz audit is the orchestrator's; AS12 waits
+  for it.
+- The `reviewer-identity` fixture trial was not re-run; its plan is
+  unchanged.
+- The analysis's "What this changes" says the local architect can no longer
+  complete a work item with no iteration. Decision 2 of the architecture
+  lets it declare scenarios that existing step definitions bind, and the
+  implementation follows it, so no document was changed for that line.
+  Toolkit documents outside `ramify-agent/` were not edited.
+
+## Acceptance
+
+The plan's [acceptance](main-plan.md#acceptance) criteria and their evidence.
+
+| ID | Criterion | Evidence | Status |
+| --- | --- | --- | --- |
+| AS01 | Plan scenarios are extracted, and form rules 1–6 reject with the rule named | Iteration 1's `extraction` and `form` tests, iteration 2's `analysis-scenarios` (one rejection per rule); iteration 11's extraction of the fixture plan | met |
+| AS02 | Scenario records are committed at acceptance and never change afterwards | Iteration 2's acceptance tests (one transaction); the trial's records, read back by the scenario list after completion | met |
+| AS03 | The review stop holds the lock, leaves the tree untouched and subtracts its time | Iteration 3's `review-stop` (busy while waiting, no branch or commit, the budget with the injected clock); the trial's wait with no branch and no commit | met |
+| AS04 | Readiness fails a project without a valid configuration or scenario harness, and passes the fixture | Iteration 4's `project-config`, iteration 5's `scenario-check-integration` and gated `fixture-acceptance`; the trial's four passed steps | met |
+| AS05 | Each gate plans the scenario check of the architecture's table and passes only by the message stream's strict result | Iteration 5's `scenario-check` and `scenario-check-integration` | met |
+| AS06 | Feature files are rendered purely, committed once, re-rendered idempotently, and guarded | Iteration 6's `materialization`, rendering golden files and recovery rows | met |
+| AS07 | Every state transition of the events table, and no other, occurs at its event | Iteration 1's `states`, iteration 7's `scenario-states`; the trial's course | met |
+| AS08 | An integration scenario is bound by an integration work item through `expose-test`, accepted by the real checker | Iteration 8's `integration-scenarios-integration`; the trial's `wi-004`, bound with the real runner in the gated variant | met |
+| AS09 | Briefings and diagnostics carry what §6 and the scenario check specify | Iteration 9's `scenario-briefings` | met |
+| AS10 | The scenario list, the review section and the approve action are served and shown | Iteration 10's `scenario-projections`, `protocol-contract` and the web tests | met |
+| AS11 | A scripted run on the fixture completes with every scenario `implemented` and passing in full mode | The trial: three scenarios implemented and passed at the full-mode final gate, with the scripted runner by default and the real `cucumber-js` in the gated variant (4 passed); the `status-badge-tone` run and fixture trial | met |
+| AS12 | Both audits pass on one commit | The ramify-agent suite audit passed on `d888635`; the root cucumber-viz audit is pending | pending |

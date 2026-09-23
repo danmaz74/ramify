@@ -222,6 +222,18 @@ Explicit names make fakes recognizable in source and generated architectural
 evidence. A contract and fake can establish a capability's intended placement;
 their presence does not establish that its real implementation is ready.
 
+### A Plan's Acceptance Is Its Scenarios
+
+A plan's acceptance is a set of Gherkin scenarios: the plan's own, and those
+the initial architect writes for each entry capability. Their text is frozen
+when the analysis is accepted. Agents bind them late, with step definitions,
+and never change them; only the harness writes a feature file or moves a
+scenario's state.
+
+A scenario that passes against a fake is bound, not done, as a delegation is.
+A plan is finished when every scenario passes in full mode at the final
+gate.
+
 ### Work Starts at the Consumer; Integration Happens on the Return
 
 Work begins at the highest consumer of the feature. It writes its behavioral

@@ -1,6 +1,6 @@
 # Plan 10: Acceptance scenarios
 
-**Date:** 2026-09-23. **Status:** proposed.
+**Date:** 2026-09-23. **Status:** implemented on 2026-09-23; see [results](results.md).
 
 The harness declares a plan done when its tests, its type check and a
 complete Ramify check pass. None of those says whether the behavior the

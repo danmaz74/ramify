@@ -1,6 +1,30 @@
 # Acceptance scenarios: the v1 architecture
 
-**Date:** 2026-09-23. **Status:** proposed. Nothing here is implemented.
+**Date:** 2026-09-23. **Status:** implemented by
+[Plan 10](../plans/10-acceptance-scenarios/main-plan.md); see its
+[results](../plans/10-acceptance-scenarios/results.md).
+
+**Where the implementation differs from this text.** The results record
+every deviation; these change what the document says:
+
+- The log has three events beyond the events table:
+  `scenarios-materializing` and `scenarios-withdrawing`, the intents of the
+  harness's own commits, and `scenario-bound-passed { scenario, gate }`, a
+  bound scenario's pass against its fakes, which changes no state.
+- The harness's own commits carry `Ramify-Scenarios` beside `Ramify-Run`:
+  `materialized` on the feature files' commit, `withdrawn-<n>` on the run's
+  nth withdrawal. The materialization commit is an accepted boundary; a
+  withdrawal commit is not, and a withdrawal of bound scenarios alone makes
+  no commit.
+- The integration work item is committed with the `scenario-implemented`
+  that makes it due; `work-item-started` marks its turn and carries its
+  `origin` and `scenario`.
+- `acceptance-incomplete` is a run failure checked before the final gate,
+  not a rule of the final attempt.
+- The untracked counts are `{ passed, skipped, failed }`.
+- The run's `review` is derived from `analysis-approved`, not stored in
+  `job.json`; an approval is refused twice, or after a failure, a stop or an
+  interruption.
 
 This document turns the
 [acceptance scenarios analysis](../analysis/2026-09-23-acceptance-scenarios.md)
@@ -71,7 +95,7 @@ and `unresolved` run states do not exist there yet.
 
 ## Terms
 
-These belong in the [glossary](../glossary.md) once the design is accepted.
+They are defined in the [glossary](../glossary.md).
 
 | Term | Definition |
 | --- | --- |
