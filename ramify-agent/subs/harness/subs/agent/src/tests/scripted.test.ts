@@ -92,6 +92,26 @@ describe('the scripted agent', () => {
     expect(await session.outcome).toEqual({ kind: 'stopped' });
   });
 
+  test('an await step holds the script until its test releases it, and Stop ends it', async () => {
+    let release: () => void = () => undefined;
+    const { spec: s, events } = spec();
+    const session = createScriptedAgent([
+      { kind: 'message', text: 'before' },
+      { kind: 'await', until: () => new Promise<void>(resolve => { release = resolve; }) },
+      { kind: 'message', text: 'after' },
+      { kind: 'await', until: () => new Promise(() => undefined) },
+      { kind: 'submit', input: 1 },
+    ]).startSession(s);
+    const texts = () => events.flatMap(event => (event.type === 'message' && event.role === 'assistant' ? [event.text] : []));
+    await delay(20);
+    expect(texts()).toEqual(['before']);
+    release();
+    await delay(20);
+    expect(texts()).toEqual(['before', 'after']);
+    await session.stop();
+    expect(await session.outcome).toEqual({ kind: 'stopped' });
+  });
+
   test('a hang ignores Stop and never settles', async () => {
     const session = createScriptedAgent([{ kind: 'hang' }]).startSession(spec().spec);
     const settled = await Promise.race([session.stop().then(() => 'stopped'), delay(50).then(() => 'still running')]);

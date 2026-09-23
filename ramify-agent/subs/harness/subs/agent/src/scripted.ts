@@ -70,6 +70,8 @@ export type ScriptStep =
     }
   /** Waits, ending early on Stop. */
   | { readonly kind: 'wait'; readonly ms: number }
+  /** Waits until `until` settles, ending early on Stop: a script its test paces, one step at a time. */
+  | { readonly kind: 'await'; readonly until: () => Promise<unknown> }
   /**
    * Waits, ignoring Stop, like a tool that does not honor its signal. With
    * `thenIgnoreStop` the session also keeps running the rest of its script
@@ -285,6 +287,9 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
               break;
             case 'wait':
               await delay(step.ms, controller.signal);
+              break;
+            case 'await':
+              await settledOrAborted(step.until(), controller.signal);
               break;
             case 'stall':
               await delay(step.ms);
@@ -542,6 +547,19 @@ function pointOf(ref: SessionRef, fallback = 0): number {
   const after = ref.split('#')[1];
   const parsed = after === undefined ? Number.NaN : Number.parseInt(after, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+/** Settles when `pending` does, or on abort, whichever is first; a rejection counts as settling. */
+function settledOrAborted(pending: Promise<unknown>, signal: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    if (signal.aborted) return resolve();
+    const done = () => {
+      signal.removeEventListener('abort', done);
+      resolve();
+    };
+    signal.addEventListener('abort', done, { once: true });
+    pending.then(done, done);
+  });
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {

@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import type { AgentPort } from '../../../subs/agent/src/interfaces/port.js';
-import { createScriptedAgent, type Script, type ScriptStep } from '../../../subs/agent/src/scripted.js';
+import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { Role } from '../../interfaces/protocol/runs.js';
 import type { RunEvent } from '../../run/log.js';
 import type { RunService } from '../../run/service.js';
@@ -8,7 +8,7 @@ import { analysis, entry, requestCompletion } from './analysis.js';
 import { copyFixture } from './fixture.js';
 import { decision as decisionBody, forkDecision, localDecision, registryChange, requestPlacement } from './placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write, type Turn } from './iterations.js';
-import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './runs.js';
+import { openRuns, runEventsOnDisk, runPath, startRun } from './runs.js';
 import { accepted, added, answeredGit, modified, unchanged } from './contracts-git.js';
 import { directReadinessExecution } from './external-tools.js';
 
@@ -129,13 +129,18 @@ const placeTheLimit = localDecision(
   [registryChange({ capability: 'note-limit', owner: provider, behavior: 'A note of at most 500 characters is within the limit.' })],
 );
 
-async function target(cleanup: (step: () => Promise<void>) => void) {
-  const fixture = await copyFixture();
-  cleanup(fixture.remove);
-  await addModule(fixture.root, consumerDirectory, 'notes', { 'src/notes.ts': stub, 'src/tests/notes.test.ts': consumerTest });
-  await addModule(fixture.root, providerDirectory, 'limits', {});
-  await installMiniRunner(fixture.root);
-  return fixture.root;
+/** The consumer and provider modules, in `root` or in a fresh copy of the fixture. */
+async function target(cleanup: (step: () => Promise<void>) => void, given?: string) {
+  let root = given;
+  if (root === undefined) {
+    const fixture = await copyFixture();
+    cleanup(fixture.remove);
+    root = fixture.root;
+  }
+  await addModule(root, consumerDirectory, 'notes', { 'src/notes.ts': stub, 'src/tests/notes.test.ts': consumerTest });
+  await addModule(root, providerDirectory, 'limits', {});
+  await installMiniRunner(root);
+  return root;
 }
 
 
@@ -145,7 +150,13 @@ export interface SessionScenarioOptions {
   /** Steps each named role takes before its first turn's own. */
   readonly before?: Partial<Record<Role, readonly ScriptStep[]>> | undefined;
   /** The port the run drives, built around the scenario's scripted fake. */
-  readonly port?: ((scripted: AgentPort) => AgentPort) | undefined;
+  readonly port?: ((scripted: ScriptedAgent) => AgentPort) | undefined;
+  /**
+   * A copy of the fixture to add the scenario's modules to and run it in,
+   * beside the runs it already holds. Default: a fresh copy, removed by
+   * `cleanup`.
+   */
+  readonly root?: string | undefined;
 }
 
 export interface SessionScenario {
@@ -159,7 +170,7 @@ export interface SessionScenario {
 
 /** Runs the scenario to completion and answers its log. */
 export async function runSessionScenario(options: SessionScenarioOptions): Promise<SessionScenario> {
-  const root = await target(options.cleanup);
+  const root = await target(options.cleanup, options.root);
   const git = answeredGit(root, {
     head: 'revision-00',
     commits: [
@@ -227,7 +238,7 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
   options.cleanup(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
-  expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
+  expect(opened.service.getRun('review-notes', receipt.jobId)?.state).toBe('completed');
   git.assertAnswered();
   return {
     root,
