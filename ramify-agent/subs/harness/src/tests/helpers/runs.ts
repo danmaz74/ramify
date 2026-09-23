@@ -265,8 +265,20 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
 
 let commandCount = 0;
 
-export function startRun(planId: string, agent: 'pi' | 'scripted' = 'scripted', commandId = `start-${++commandCount}`): RunCommand {
-  return { commandId, expectedVersion: 0, type: 'start-run', payload: { planId, agent } };
+export function startRun(planId: string, agent: 'pi' | 'scripted' = 'scripted', commandId = `start-${++commandCount}`, reviewStop = false): RunCommand {
+  return { commandId, expectedVersion: 0, type: 'start-run', payload: { planId, agent, reviewStop } };
+}
+
+/** A person's approval of a run's analysis, at the version the caller read. */
+export function approveRun(
+  planId: string,
+  jobId: string,
+  expectedVersion: number,
+  reviewer = 'reviewer@example.com',
+  note?: string,
+  commandId = `approve-${++commandCount}`,
+): RunCommand {
+  return { commandId, expectedVersion, type: 'approve-analysis', payload: { planId, jobId, reviewer, ...(note === undefined ? {} : { note }) } };
 }
 
 export function stopRun(planId: string, jobId: string, expectedVersion: number, commandId = `stop-${++commandCount}`): RunCommand {

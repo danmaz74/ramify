@@ -86,6 +86,7 @@ describe('the run log', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
       'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
       'work-item-started', 'hypotheses-delivered',
       'placement-requested', 'view-refreshed', 'fork-returned-partial', 'decision-accepted',
@@ -751,7 +752,7 @@ describe('the protocol vocabulary', () => {
       'dependency-cycle', 'unresolvable-requirement', 'repair-exhausted', 'recovery-exhausted',
       'writer-unsettled', 'limit-exceeded', 'internal',
     ]);
-    expect(runPhaseSchema.options).toEqual(['analysis', 'readiness', 'working', 'final-verification', 'ended']);
+    expect(runPhaseSchema.options).toEqual(['analysis', 'awaiting-review', 'readiness', 'working', 'final-verification', 'ended']);
     expect(sessionModeSchema.options).toEqual(['fresh', 'continued', 'fork']);
   });
 
@@ -877,10 +878,13 @@ describe('the run protocol a client reads', () => {
 /** The smallest data each event type's schema accepts, for the projection's exhaustiveness. */
 function sampleData(type: RunEvent['type']): unknown {
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
+  const command = { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
     'invocation-started': { invocation: 'inv-0001', role: 'engineer' },
     'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null },
     'analysis-accepted': { invocation: 'inv-0001', entries: 0, hypotheses: 0, registry: 0, workItems: 0 },
+    'review-requested': {},
+    'analysis-approved': { command, reviewer: 'r', note: null, duringRun: false },
     'readiness-passed': { attempt: 1, gate: 'ga-0001' },
     'readiness-failed': { attempt: 1, step: 'git-clean', detail: '', recovery: null, final: true },
     'work-item-started': { workItem: 'wi-001', module: 'm' },
@@ -914,5 +918,5 @@ function sampleData(type: RunEvent['type']): unknown {
     'job-stopped': { settled: false },
     'job-interrupted': { message: 'm' },
   };
-  return samples[type] ?? { command: { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } } };
+  return samples[type] ?? { command };
 }

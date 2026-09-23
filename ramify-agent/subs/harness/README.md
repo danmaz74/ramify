@@ -514,9 +514,22 @@ Neither child receives this module's vocabulary.
 
 ## The run
 
-- **Commands.** `start-run` carries the plan and the agent, and nothing the
-  harness executes. Plan 1's three rules hold unchanged, and a second run
-  while one is active is `busy`. `stop-job` is Plan 1's.
+- **Commands.** `start-run` carries the plan, the agent and `reviewStop`,
+  `false` by default and recorded in `job.json`, and nothing the harness
+  executes. Plan 1's three rules hold unchanged, and a second run while one
+  is active is `busy`. `stop-job` is Plan 1's. `approve-analysis { reviewer,
+  note? }` records `analysis-approved`, once, with the command and whether
+  the run was working when it was given (`duringRun`); it is refused before
+  the analysis is accepted, during the final verification and for a run that
+  failed, stopped or was interrupted, and accepted after completion, the one
+  event that may follow `job-completed`.
+- **The review stop.** With `reviewStop`, `analysis-accepted` is followed by
+  `review-requested` and the phase `awaiting-review`. The run stays
+  `running` and keeps the project, starts no session and writes nothing to
+  the tree: the approval continues it to readiness, a stop ends it with no
+  branch and no commit, and a restart marks it interrupted like any other
+  phase. The wait is not counted against `runAbsoluteMs`. The snapshot
+  reports `review`: `not-reviewed`, or who approved, when and `duringRun`.
 - **The phases.** One invocation of the initial architect, then readiness,
   then the work items, then the final gate. The frontier is read again on
   every round, because a delegation creates work items while the run runs.
@@ -722,7 +735,8 @@ The run's own tests are beside them.
 - `compaction.test.ts` compacts during an initial analysis and during a local
   architect session and reads the observations back.
 - `run-commands.test.ts` covers the three command rules for `start-run` and
-  `stop-job`; `readiness.test.ts` builds one fixture per failing step and
+  `stop-job`; `review-stop.test.ts` covers the stop, its approval, a stop and
+  a crash during it, approvals without it, their refusals and the budget; `readiness.test.ts` builds one fixture per failing step and
   separates the failures a preparation can repair from the ones it cannot;
   `run-recovery.test.ts` forces a restart after every durable boundary of the
   run log and compares what recovery did; `writer-settlement.test.ts` kills

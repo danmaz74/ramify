@@ -16,7 +16,7 @@ import {
   metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   workItemListResponseSchema, workItemResponseSchema,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
-  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommand, type RunEventPage, type RunListResponse, type RunSnapshot,
+  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
   type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 
@@ -70,7 +70,7 @@ export interface ProtocolClient {
    * answer, the identical command is sent again, which is safe: a retry
    * returns the original receipt.
    */
-  sendCommand(command: RunCommand): Promise<Receipt>;
+  sendCommand(command: RunCommandInput): Promise<Receipt>;
   connection(): ConnectionState;
   /** Calls `listener` on every change of connection state; returns the unsubscribe. */
   onConnectionChange(listener: (state: ConnectionState) => void): () => void;

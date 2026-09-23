@@ -306,6 +306,8 @@ class Run {
   /** The writer of the run; one at a time, and the log says which. */
   readonly writer: WriterOwnership;
   index: ArchitectIndex | null = null;
+  /** Wakes a driver waiting at the review stop, to read the log again. */
+  private wake: (() => void) | undefined;
 
   constructor(
     readonly record: RunRecord,
@@ -320,6 +322,17 @@ class Run {
 
   get key(): string {
     return key(this.record.planId, this.record.jobId);
+  }
+
+  /** Settles at the next `notify`: an approval, a stop or the service closing. */
+  changed(): Promise<void> {
+    return new Promise(resolve => { this.wake = resolve; });
+  }
+
+  notify(): void {
+    const wake = this.wake;
+    this.wake = undefined;
+    wake?.();
   }
 
   /** An absolute path beneath the run's directory, from a layout path. */
@@ -377,11 +390,11 @@ export class RunService {
    * and two writes can never disagree about it. A terminal log accepts
    * nothing more: the event that ends a run is its last write.
    */
-  private write(run: Run, input: RunEventInput, records: readonly CommitRecord[] = []): Promise<'committed' | 'already-committed' | 'ended'> {
+  private write(run: Run, input: RunEventInput, records: readonly CommitRecord[] = [], at?: Date): Promise<'committed' | 'already-committed' | 'ended'> {
     return run.mutex.run(async () => {
       if (run.log.terminal) return 'ended';
       if (records.length === 0) {
-        await run.log.append(input);
+        await run.log.append(input, at);
         return 'committed';
       }
       return commitRecord(run.log.ledger, { event: run.log.next(input), records: [...records] });
@@ -432,7 +445,9 @@ export class RunService {
       }
 
       for (const event of run.log.events) {
-        if (event.type === 'job-started' || event.type === 'stop-requested') this.commands.remember(event.data.command);
+        if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved') {
+          this.commands.remember(event.data.command);
+        }
       }
     }
     return report;
@@ -626,12 +641,13 @@ export class RunService {
       switch (command.type) {
         case 'start-run': return this.start(command, admitted.contentHash);
         case 'stop-job': return this.stop(command, admitted.contentHash);
+        case 'approve-analysis': return this.approve(command, admitted.contentHash);
       }
     });
   }
 
   private async start(command: Extract<RunCommand, { type: 'start-run' }>, contentHash: string): Promise<Receipt> {
-    const { planId, agent: requested } = command.payload;
+    const { planId, agent: requested, reviewStop } = command.payload;
     this.commands.requireVersion(command, 0, 'A start creates a run, whose version is 0');
     const agent = this.options.agent;
     if (!agent) throw new CommandRejection('unavailable', 'No agent is configured, so no run can start');
@@ -681,6 +697,7 @@ export class RunService {
       // The plan's own scenarios, extracted once from the captured bytes. A
       // block that does not parse is a limitation, never a refusal.
       planScenarios: extractPlanScenarios(new TextDecoder().decode(captured)),
+      reviewStop,
     });
     await writeOnce(join(directory, runLayout.record), `${JSON.stringify(record, null, 2)}\n`);
 
@@ -772,6 +789,9 @@ export class RunService {
       this.commands.remember(accepted);
       return accepted.receipt;
     });
+    // A driver waiting at the review stop has no session to stop; it reads
+    // the stop and returns, and the run is stopped with nothing written.
+    run.notify();
     const driving = run.done;
     const stopping = this.endStopped(run).catch(error => this.warn(`Run ${jobId}: ${message(error)}`));
     run.done = Promise.all([driving, stopping]).then(() => undefined);
@@ -803,6 +823,39 @@ export class RunService {
     await this.write(run, { type: 'job-stopped', data: { settled } });
   }
 
+  /**
+   * A person's approval of the accepted analysis. At the review stop it
+   * wakes the driver, which goes on to readiness; in any other run it is
+   * recorded and changes nothing else. It is decided under the run's lock,
+   * against the log as it stands, like a stop.
+   */
+  private async approve(command: Extract<RunCommand, { type: 'approve-analysis' }>, contentHash: string): Promise<Receipt> {
+    const { planId, jobId, reviewer, note } = command.payload;
+    const run = this.runs.get(key(planId, jobId));
+    if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
+    const receipt = await run.mutex.run(async () => {
+      this.commands.requireVersion(command, run.log.version);
+      const snapshot = runSnapshot(run.record, run.log.events);
+      const refusal = approvalRefusal(run, snapshot);
+      if (refusal !== null) throw new CommandRejection('conflict', refusal);
+      const at = this.now();
+      const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
+      await run.log.append({
+        type: 'analysis-approved',
+        data: {
+          command: accepted,
+          reviewer,
+          note: note ?? null,
+          duringRun: snapshot.state === 'running' && snapshot.phase !== 'awaiting-review',
+        },
+      }, at);
+      this.commands.remember(accepted);
+      return accepted.receipt;
+    });
+    run.notify();
+    return receipt;
+  }
+
   // The run itself
 
   private ignoring(run: Run): boolean {
@@ -816,6 +869,9 @@ export class RunService {
     if (this.ignoring(run)) return;
     const accepted = await this.analyse(run, agent, packages, baseline);
     if (!accepted || this.ignoring(run)) return;
+
+    const approved = await this.awaitReview(run);
+    if (!approved || this.ignoring(run)) return;
 
     const ready = await this.reachReadiness(run);
     if (!ready || this.ignoring(run)) return;
@@ -842,7 +898,9 @@ export class RunService {
     // an invocation already running is bounded by its own limits below.
     const limits = run.record.policy.limits;
     const invocations = run.log.count('invocation-started');
-    const age = this.now().getTime() - Date.parse(run.record.createdAt);
+    // The time the run waited for a person at its review stop is not its own.
+    const now = this.now().getTime();
+    const age = now - Date.parse(run.record.createdAt) - reviewPauseMs(run.log.events, now);
     if (invocations + 1 > limits.maxInvocationsPerRun || age > limits.runAbsoluteMs) {
       await this.fail(run, 'limit-exceeded', invocations + 1 > limits.maxInvocationsPerRun
         ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
@@ -1119,6 +1177,24 @@ export class RunService {
     }, accepted.records);
     await this.afterWrite('analysis-accepted', run.record.jobId);
     return true;
+  }
+
+  /**
+   * The review stop. A run started with it records `review-requested` once
+   * the analysis is accepted and waits, holding the project and starting no
+   * session, until the log holds `analysis-approved` or the run is stopped
+   * or the service closes. Nothing is written to the tree before readiness,
+   * so a stop here leaves the repository as the run found it.
+   */
+  private async awaitReview(run: Run): Promise<boolean> {
+    if (!run.record.reviewStop) return true;
+    if (run.log.find('review-requested') === undefined) {
+      if (await this.write(run, { type: 'review-requested', data: {} }, [], this.now()) === 'ended') return false;
+    }
+    // The log is read and the wait registered in one turn, so an approval
+    // or stop that lands between them still wakes it.
+    while (run.log.find('analysis-approved') === undefined && !this.ignoring(run)) await run.changed();
+    return !this.ignoring(run);
   }
 
   // Work items
@@ -4019,7 +4095,10 @@ export class RunService {
     await this.commandMutex.run(async () => {
       const drivers = [...this.runs.values()];
       const active = drivers.filter(run => !run.log.terminal);
-      for (const run of active) void run.session?.stop().catch(() => undefined);
+      for (const run of active) {
+        void run.session?.stop().catch(() => undefined);
+        run.notify();
+      }
 
       if (drivers.length > 0) {
         const bound = Math.max(...drivers.map(run => run.record.policy.limits.stopSettleMs));
@@ -4273,6 +4352,39 @@ function analysisFailure(ended: InvocationOutcome['ended'], kind: string): strin
     case 'stopped': return 'The initial architect\'s session stopped without a stop request';
     default: return `The initial architect ended without an accepted analysis (${kind})`;
   }
+}
+
+/**
+ * Why an approval of the run's analysis is refused, or null when it is
+ * accepted: once only, never before the analysis is accepted or during the
+ * final verification, and never for a run that did not complete.
+ */
+function approvalRefusal(run: Run, snapshot: RunSnapshot): string | null {
+  const earlier = run.log.find('analysis-approved');
+  if (earlier !== undefined) return `The analysis was already approved by ${earlier.data.reviewer} at ${earlier.at}`;
+  switch (snapshot.state) {
+    case 'failed': return 'The run failed; the analysis of a failed run is not approved';
+    case 'stopped': return 'The run was stopped; the analysis of a stopped run is not approved';
+    case 'interrupted': return 'The run was interrupted; the analysis of an interrupted run is not approved';
+    case 'completed': return null;
+    case 'running': break;
+  }
+  if (run.stopRequested) return 'A stop was accepted for this run; its analysis is not approved';
+  if (run.log.find('analysis-accepted') === undefined) return 'The run has no accepted analysis yet';
+  if (snapshot.phase === 'final-verification') return 'The run is in its final verification; approve its analysis once it has completed';
+  return null;
+}
+
+/**
+ * How long the run waited at its review stop: from `review-requested` to
+ * `analysis-approved`, or to `now` while it still waits. A run bound reads
+ * its age without it.
+ */
+function reviewPauseMs(events: readonly RunEvent[], now: number): number {
+  const requested = events.find(event => event.type === 'review-requested');
+  if (requested === undefined) return 0;
+  const approved = events.find(event => event.type === 'analysis-approved');
+  return Math.max(0, (approved === undefined ? now : Date.parse(approved.at)) - Date.parse(requested.at));
 }
 
 /** The outcome of an invocation whose session never ran: stopped, with nothing observed. */

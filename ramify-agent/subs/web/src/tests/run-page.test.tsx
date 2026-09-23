@@ -25,6 +25,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     waits: [],
     counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, declared: 0, implemented: 0 } },
     writer: { held: 'inv-0006', unsettled: null },
+    review: 'not-reviewed',
     notices: [
       {
         kind: 'module-created', at, sequence: 9, summary: 'Module created: shop/notes/drafts (subs/drafts/module.ramify) in wi-002.i01, commit abc. No placement decision proposed it.',

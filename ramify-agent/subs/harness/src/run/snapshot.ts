@@ -1,5 +1,5 @@
 import type { JobState } from '../interfaces/protocol/jobs.js';
-import type { Role, RunFailureReason, RunPhase } from '../interfaces/protocol/runs.js';
+import type { Role, RunFailureReason, RunPhase, RunReview } from '../interfaces/protocol/runs.js';
 import type { RunEvent } from './log.js';
 import type { RunRecord } from './records.js';
 import { scenarioIdOf } from '../../subs/scenarios/src/records.js';
@@ -40,6 +40,8 @@ export interface RunSnapshot {
   };
   /** The writer's standing: whether one is held, and whether the last release was confirmed. */
   readonly writer: { readonly held: string | null; readonly unsettled: string | null };
+  /** `not-reviewed` until a person approves the analysis; then who, when, and whether the run was working. */
+  readonly review: RunReview;
   /** Things the person must be told, kept for the whole run and after it, resolved or not. */
   readonly notices: readonly RunNotice[];
 }
@@ -103,6 +105,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
   const notices: RunNotice[] = [];
   const completedItems = new Set<string>();
   let scenarios: ScenarioStates = initialScenarioStates([]);
+  let review: RunReview = 'not-reviewed';
 
   for (const event of events) {
     switch (event.type) {
@@ -120,6 +123,15 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
         // Numbered sc-001 to sc-<count>, every one pending.
         scenarios = initialScenarioStates(Array.from({ length: event.data.scenarios ?? 0 }, (_, index) => scenarioIdOf(index + 1)));
         phase = 'readiness';
+        break;
+      case 'review-requested':
+        phase = 'awaiting-review';
+        break;
+      // At the stop the approval continues the run to readiness; during a
+      // run, or after it, it changes nothing but the review.
+      case 'analysis-approved':
+        review = { reviewer: event.data.reviewer, at: event.at, duringRun: event.data.duringRun };
+        if (phase === 'awaiting-review') phase = 'readiness';
         break;
       case 'work-item-started':
         phase = 'working';
@@ -247,6 +259,7 @@ export function runSnapshot(record: RunRecord, events: readonly RunEvent[]): Run
       scenarios: countScenarioStates(scenarios),
     },
     writer: { held: heldWriter, unsettled },
+    review,
     notices: resolvedNotices,
   };
 }

@@ -212,3 +212,109 @@ From `ramify-agent/`:
 - The scenario records carry no `revision` field; a placement revision that
   moves an entry (architecture, Ramify and the module tree) will need one,
   or a new file, when it is implemented.
+
+## Iteration 3: The review stop
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **Protocol** (`interfaces/protocol/runs.ts`). `start-run`'s payload gains
+  `reviewStop: z.boolean().default(false)`. A new command
+  `approve-analysis { planId, jobId, reviewer, note? }`
+  (`approveAnalysisCommandSchema`, reviewer 1–200 characters, note at most
+  4,000) joins `runCommandSchema`. `RunCommand` is the parsed command, with
+  the default applied; the new `RunCommandInput` is what a client may send.
+  `runPhaseSchema` gains `awaiting-review` after `analysis`. The new
+  `runReviewSchema` is `'not-reviewed' | { reviewer, at, duringRun }`, and
+  `runSnapshotSchema` gains `review`. The root's `module.ramify` re-exposes
+  the five new names to the web.
+- **Records.** `RunRecord.reviewStop: boolean`, required, recorded from the
+  command.
+- **Log** (`run/log.ts`). Two events after `analysis-accepted`:
+  `review-requested {}` and `analysis-approved { command, reviewer, note:
+  string | null, duringRun }`. `analysis-approved` is the one event that may
+  follow `job-completed`, on append and on load; no event follows any other
+  terminal event.
+- **Service** (`run/service.ts`). After an accepted analysis, a run with the
+  stop writes `review-requested` and waits, starting no session and holding
+  the project, until the log holds `analysis-approved`, a stop is accepted
+  or the service closes. `approve-analysis` is decided under the run's lock
+  like `stop-job`: the expected version, then the refusals, then the event,
+  and it wakes the waiting driver. `duringRun` is true when the run was
+  running and not at its stop. A stop wakes the driver too; `job-stopped`
+  follows with nothing written to the tree. `close` wakes it, so a service
+  closes at once while a run waits. The run-age bound subtracts the time from
+  `review-requested` to `analysis-approved` (to now while it still waits);
+  the two review events take their time from the service's clock, so the
+  injected `now` governs both sides.
+- **Snapshot** (`run/snapshot.ts`, `projections/snapshot.ts`).
+  `review-requested` sets `awaiting-review`; `analysis-approved` sets
+  `review` and, at the stop, the phase `readiness`. The projected events
+  describe both.
+- **HTTP.** `http/app.ts` is unchanged: its command route already parses the
+  whole `runCommandSchema` union and answers a rejection with its code, so
+  `approve-analysis` is accepted exactly as `stop-job` is.
+- **Web.** `client.ts`'s `sendCommand` and the stub client take
+  `RunCommandInput`, so the plan page still sends `start-run` without
+  `reviewStop`; the run page's test fixture gains `review`. No UI.
+- **Tests.** A new `review-stop.test.ts` (12 tests). `helpers/runs.ts`:
+  `startRun(planId, agent, commandId, reviewStop = false)` and
+  `approveRun(planId, jobId, expectedVersion, reviewer?, note?, commandId?)`.
+  `helpers/constructed.ts`'s record has `reviewStop: false`.
+  `run-commands.test.ts` and `union-values.test.ts` name the new command,
+  events, phase and default; `composition.test.ts` names the producers of
+  the new union values. The harness README describes the stop.
+
+### Recovery
+
+A run interrupted while it waits at `awaiting-review` is recovered as every
+other phase is: the restart finds no terminal event, closes nothing (no
+invocation is open), appends `job-interrupted` and calls no agent. The run
+is not resumed at its stop, since the service resumes no phase; a later
+approval is refused because the run was interrupted. A clean `close` during
+the wait writes nothing, and the next start interrupts the run the same way.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/review-stop.test.ts` | 12 passed: the stop and approval (busy while waiting, no branch before approval, the event sequence, the receipt on retry, `review`); a stop at the stop with a scripted Git asked for no `createRunBranch` or `commitAccepted` and no commit made; `close` while waiting; a crash while waiting (interrupted, no agent call, approval refused); approval while a run without the stop works (`duringRun: true`, nothing else in the snapshot changes, a second approval refused); approval after completion (after `job-completed`, reloaded, retried, refused twice, read through the query); refusals before the analysis, during the final verification, at a stale version, for a failed run and an unknown run; the budget with the injected clock (a 10,000 ms pause does not fail a 1,000 ms bound; the age reported is 1,100 ms of 11,100 elapsed); both commands over HTTP with a malformed approval refused; the log's terminal rule; the schema |
+| `npx vitest run` over 22 files: the new one, `run-commands`, `union-values`, `run-protocol`, `http`, `run-projections`, `protocol-contract`, `projections-pure`, `run`, `run-recovery`, `stop-before-start`, `run-bounds`, `late-writes`, `analysis-scenarios`, `composition` and the web's seven test files | 22 files, 240 tests passed. `run-commands` and `union-values` failed on the command list, the default, the event list and the phase list before their update; `composition` failed on four values without a producer before they were named |
+| `npx vitest run` over the 47 further files that import the run helpers, the run log or snapshot, the projections or the run protocol | 46 passed, 1 skipped (`fixture-trials`, conditional); 281 tests passed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits: iteration 2's 108 and two more `signature-inferred` on the new exposed schema constants `approveAnalysisCommandSchema` and `runReviewSchema` |
+
+### Deviations
+
+- **`review` is reported by the snapshot, not stored in `job.json`.** The
+  plan says the run record reports it, but `job.json` is written once,
+  before the first event, and status lives in the log. `RunRecord` carries
+  `reviewStop`; the review is the `analysis-approved` event, and the
+  snapshot (internal and protocol) derives `review` from it.
+- **`analysis-approved` also carries the accepted command**, as
+  `stop-requested` does, so a retry after a restart returns its receipt.
+- **More refusals than the plan names**, each `conflict` with its reason:
+  before the analysis is accepted (nothing to approve), during
+  `final-verification` (the architecture's "before `final-verification`"),
+  for an interrupted run as for a failed or stopped one, and once a stop was
+  accepted.
+- **`duringRun` is false at the stop and after completion.** The
+  architecture's case for the flag is a review given while the run works;
+  a person who approves a completed run did not review while it worked.
+  `reviewStop` in the record and `at` against `endedAt` tell the two apart.
+- **No `RunWrite` boundary for `review-requested`.** Adding one would add a
+  row to the composition recovery table; the crash at the stop is tested in
+  `review-stop.test.ts` by abandoning the waiting service instead.
+- **An approval during a committing gate waits for the run's lock**, as a
+  stop does, because the gate's commit and audit hold it; the approval is
+  then judged against the log as it stands, usually as a stale version.
+
+### Open items
+
+- The web's `Approve` action, the `reviewStop` option on `start-run` and
+  the review section of the analysis page are iteration 10's.
+- The snapshot does not report `reviewStop` itself; a client reads the
+  phase. Iteration 10 may add it if the page needs it before the stop.

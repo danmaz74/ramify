@@ -47,6 +47,7 @@ export function snapshotOf(view: RunView): RunSnapshot {
     waits,
     counts: { ...internal.counts },
     writer: { ...internal.writer },
+    review: internal.review === 'not-reviewed' ? 'not-reviewed' : { ...internal.review },
     notices: orderedNotices(internal.notices.map(notice => withDecisionStatement(notice))),
   };
 }

@@ -61,6 +61,25 @@ export const runEventSchema = z.discriminatedUnion('type', [
     scenarios: z.int().nonnegative(),
     warnings: z.array(scenarioWarningSchema),
   }).strict()),
+  /**
+   * The run was started with its review stop: after the analysis is
+   * accepted it waits, holding the project, for `analysis-approved` or a
+   * stop. Nothing is written to the tree before one of them.
+   */
+  event('review-requested', z.object({}).strict()),
+  /**
+   * A person approved the accepted analysis, holding the command. At the
+   * review stop it continues the run to readiness; otherwise it changes
+   * nothing but the run's review. `duringRun` says the run was working when
+   * it was given, rather than waiting at the stop or complete. It is the one
+   * event that may follow `job-completed`.
+   */
+  event('analysis-approved', z.object({
+    command: acceptedCommandSchema,
+    reviewer: text,
+    note: z.string().nullable(),
+    duringRun: z.boolean(),
+  }).strict()),
   /** Commits the readiness `GateAttempt` and the `ReadinessAttempt` that names it. */
   event('readiness-passed', z.object({ attempt: z.int().positive(), gate: text }).strict()),
   /**
@@ -317,10 +336,18 @@ export type RunEvent = z.infer<typeof runEventSchema>;
 export type RunEventType = RunEvent['type'];
 export type RunEventOf<T extends RunEventType> = Extract<RunEvent, { type: T }>;
 
-/** The event types that end a run. Nothing follows one. */
+/**
+ * The event types that end a run. Nothing follows one, except that a person
+ * may approve the analysis of a run that completed.
+ */
 export const terminalRunEvents = ['job-completed', 'job-failed', 'job-stopped', 'job-interrupted'] as const satisfies readonly RunEventType[];
 
 const terminal = new Set<string>(terminalRunEvents);
+
+/** Whether an event of `type` may follow the run's terminal event. */
+function mayFollow(ended: RunEvent, type: RunEventType): boolean {
+  return ended.type === 'job-completed' && type === 'analysis-approved';
+}
 
 /** An event to append: its type and data. The log assigns the sequence and time. */
 export type RunEventInput = { [T in RunEventType]: { readonly type: T; readonly data: RunEventOf<T>['data'] } }[RunEventType];
@@ -363,7 +390,7 @@ export class RunLog {
       if (current.sequence !== index + 1) throw new CorruptRunLogError(path, index + 1, `sequence ${current.sequence}, expected ${index + 1}`);
       if (current.jobId !== runId) throw new CorruptRunLogError(path, index + 1, `event of run ${current.jobId}`);
       const ended = terminalOf(events.slice(0, index));
-      if (ended) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
+      if (ended && !mayFollow(ended, current.type)) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
     });
     return new RunLog(path, runId, ledger);
   }
@@ -417,7 +444,7 @@ export class RunLog {
   /** The event a caller is about to commit with its records, refused after a terminal event. */
   next(input: RunEventInput, at: Date = new Date()): RunEvent {
     const ended = this.terminal;
-    if (ended) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
+    if (ended && !mayFollow(ended, input.type)) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
     return runEvent(this.runId, this.nextSequence, input, at);
   }
 }

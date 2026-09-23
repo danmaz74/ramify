@@ -42,23 +42,49 @@ export type RunAgent = z.infer<typeof runAgentSchema>;
 
 /**
  * Starts an implementation run for a plan. It creates the run, so it expects
- * version 0. It carries nothing the harness will execute.
+ * version 0. It carries nothing the harness will execute. With `reviewStop`
+ * the run waits after its analysis is accepted until a person approves it or
+ * stops the run; without it, which is the default, the run goes on.
  */
 export const startRunCommandSchema = z.object({
   commandId: commandIdSchema,
   expectedVersion: jobVersionSchema,
   type: z.literal('start-run'),
-  payload: z.object({ planId: planIdSchema, agent: runAgentSchema }).strict(),
+  payload: z.object({ planId: planIdSchema, agent: runAgentSchema, reviewStop: z.boolean().default(false) }).strict(),
 }).strict();
 export type StartRunCommand = z.infer<typeof startRunCommandSchema>;
+
+/**
+ * A person approves the run's accepted analysis. At the review stop the run
+ * goes on to readiness. Any other run records the approval and changes
+ * nothing else: it is accepted before `final-verification` and after the run
+ * completed, and refused a second time, before the analysis is accepted, and
+ * for a run that failed, stopped or was interrupted. It expects the run's
+ * current version.
+ */
+export const approveAnalysisCommandSchema = z.object({
+  commandId: commandIdSchema,
+  expectedVersion: jobVersionSchema,
+  type: z.literal('approve-analysis'),
+  payload: z.object({
+    planId: planIdSchema,
+    jobId: jobIdSchema,
+    reviewer: z.string().min(1).max(200),
+    note: z.string().max(4000).optional(),
+  }).strict(),
+}).strict();
+export type ApproveAnalysisCommand = z.infer<typeof approveAnalysisCommandSchema>;
 
 /**
  * The commands a run serves. `stop-job` is Plan 1's, unchanged: a run is a
  * job, and it takes over that lifecycle of commands, receipts, versions and
  * stop.
  */
-export const runCommandSchema = z.discriminatedUnion('type', [startRunCommandSchema, stopJobCommandSchema]);
+export const runCommandSchema = z.discriminatedUnion('type', [startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema]);
+/** A command as the harness receives it, with every default applied. */
 export type RunCommand = z.infer<typeof runCommandSchema>;
+/** A command as a client may send it: a field with a default may be left out. */
+export type RunCommandInput = z.input<typeof runCommandSchema>;
 export type RunCommandType = RunCommand['type'];
 
 /**
@@ -93,8 +119,11 @@ export const runFailureReasonSchema = z.enum([
 ]);
 export type RunFailureReason = z.infer<typeof runFailureReasonSchema>;
 
-/** Which part of a run's lifecycle it has reached. */
-export const runPhaseSchema = z.enum(['analysis', 'readiness', 'working', 'final-verification', 'ended']);
+/**
+ * Which part of a run's lifecycle it has reached. `awaiting-review` is the
+ * review stop: the analysis is accepted, and the run waits for a person.
+ */
+export const runPhaseSchema = z.enum(['analysis', 'awaiting-review', 'readiness', 'working', 'final-verification', 'ended']);
 export type RunPhase = z.infer<typeof runPhaseSchema>;
 
 // The answers a client reads. Each one is a projection, never a record.
@@ -102,6 +131,17 @@ export type RunPhase = z.infer<typeof runPhaseSchema>;
 const text = z.string().min(1);
 const timestamp = z.iso.datetime();
 const count = z.int().nonnegative();
+
+/**
+ * Whether a person approved the run's analysis: `not-reviewed` until then,
+ * and afterwards who approved it, when, and whether the run was working
+ * while they did, rather than waiting at its review stop or complete.
+ */
+export const runReviewSchema = z.union([
+  z.literal('not-reviewed'),
+  z.object({ reviewer: text, at: timestamp, duringRun: z.boolean() }).strict(),
+]);
+export type RunReview = z.infer<typeof runReviewSchema>;
 
 /** The most items each list query answers with, and the bound on a gate command's output tail. */
 export const runQueryLimits = {
@@ -201,6 +241,7 @@ export const runSnapshotSchema = z.object({
   }).strict(),
   /** The one writer: which invocation holds it, and an invocation whose release was not confirmed. */
   writer: z.object({ held: text.nullable(), unsettled: text.nullable() }).strict(),
+  review: runReviewSchema,
   /** Module notices first, then cycles, each in the order the log established them. */
   notices: z.array(runNoticeSchema),
 }).strict();

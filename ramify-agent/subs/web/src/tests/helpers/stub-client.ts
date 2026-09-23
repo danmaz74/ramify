@@ -3,7 +3,7 @@ import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.j
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
   AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
-  RunCommand, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
+  RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, type ConnectionState, type ProjectInfo, type ProtocolClient } from '../../client.js';
 
@@ -32,7 +32,7 @@ export class StubClient implements ProtocolClient {
   failure: ClientError | undefined;
   state: ConnectionState = 'connected';
   calls: string[] = [];
-  commands: RunCommand[] = [];
+  commands: RunCommandInput[] = [];
   receipt: Receipt = { commandId: 'c', jobId: '20260921T080000Z-c0ffee', sequence: 1, acceptedAt: '2026-09-21T08:00:00.000Z' };
   tree: ModuleTree = { status: 'unavailable', message: 'The architect view has not been materialized yet.' };
   private listeners = new Set<(state: ConnectionState) => void>();
@@ -101,7 +101,7 @@ export class StubClient implements ProtocolClient {
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 
-  async sendCommand(command: RunCommand): Promise<Receipt> {
+  async sendCommand(command: RunCommandInput): Promise<Receipt> {
     this.calls.push(`sendCommand:${command.type}`);
     this.commands.push(command);
     if (this.failure) throw this.failure;

@@ -156,6 +156,12 @@ export const runRecordSchema = z.object({
    * limitation. Captured with the plan and never revised.
    */
   planScenarios: planScenarioExtractionSchema,
+  /**
+   * Whether the run waits at its review stop after the analysis is accepted,
+   * as `start-run` asked. The review itself is a transition of the log,
+   * `analysis-approved`, never a field here: this record is written once.
+   */
+  reviewStop: z.boolean(),
 }).strict();
 export type RunRecord = z.infer<typeof runRecordSchema>;
 

@@ -33,6 +33,13 @@ function describe(event: RunEvent): [string, Ref[]] {
         `The initial analysis was accepted: ${counted(event.data.entries, 'entry capability', 'entry capabilities')}, ${counted(event.data.hypotheses, 'hypothesis', 'hypotheses')}, ${counted(event.data.workItems, 'work item', 'work items')}`,
         ref('invocation', event.data.invocation),
       ];
+    case 'review-requested':
+      return ['The run waits for a person to approve its analysis', []];
+    case 'analysis-approved':
+      return [
+        `${event.data.reviewer} approved the analysis${event.data.duringRun ? ' while the run was working' : ''}${event.data.note === null ? '' : `: ${event.data.note}`}`,
+        [],
+      ];
     case 'readiness-passed':
       return [`Readiness passed at attempt ${event.data.attempt}`, ref('gate', event.data.gate)];
     case 'readiness-failed':

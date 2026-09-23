@@ -34,6 +34,7 @@ export function constructedRecord(extra: Partial<RunRecord> = {}): RunRecord {
     policy: {} as RunRecord['policy'],
     baseline: { unavailable: 'constructed' },
     planScenarios: { scenarios: [], limitations: [] },
+    reviewStop: false,
     ...extra,
   };
 }
