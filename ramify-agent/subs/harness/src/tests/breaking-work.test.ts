@@ -539,8 +539,9 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
     }
 
     // Every accepted boundary: one breaking-iteration gate, passed, with the
-    // project's own tests, the type check, the complete Ramify check and the
-    // probe over this iteration's own modules, each of them run.
+    // project's own tests, the type check, the complete Ramify check, the
+    // project's untagged scenarios in quick mode and the probe over this
+    // iteration's own modules, each of them run.
     const attempts = await gates(root, runId);
     const breaking = attempts.filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking).toHaveLength(3);
@@ -548,7 +549,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
       expect(attempt.verdict).toBe('passed');
       expect(attempt.cause).toBeNull();
       expect(attempt.guardedChanges).toEqual([]);
-      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'tests']);
+      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'scenarios', 'tests']);
       for (const command of attempt.commands) expect(command.outcome).toBe('passed');
       // The last command is the probe: the files of this iteration's own
       // modules, resolved from the tree as it then stood and really run.

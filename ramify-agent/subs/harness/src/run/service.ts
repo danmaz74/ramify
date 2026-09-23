@@ -86,11 +86,14 @@ import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
 import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/scenarios/src/extraction.js';
+import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
+import { applyScenarioEvent, initialScenarioStates, scenarioEventTypes, type ScenarioEvent, type ScenarioStates } from '../../subs/scenarios/src/states.js';
+import type { ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
 import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
-import { captureProjectConfig } from './project-config.js';
+import { captureProjectConfig, scenarioModules } from './project-config.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
@@ -564,7 +567,7 @@ export class RunService {
       for (const stored of entry.transaction.records) {
         const body = stored.body as { readonly schema?: unknown; readonly base?: unknown; readonly head?: unknown } | null;
         if (body?.schema === 'ramify-agent.invocation/1' && typeof body.base === 'string') return body.base;
-        if (body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.head === 'string') return body.head;
+        if (body?.schema === 'ramify-agent.gate-attempt/3' && typeof body.head === 'string') return body.head;
       }
     }
     return this.git.currentHead(this.projectRoot);
@@ -3984,7 +3987,8 @@ export class RunService {
     modules?: readonly ModuleNotice[],
     goal?: string,
   ): Promise<GateAttempt> {
-    const prepared = await prepareCheckpoint(request);
+    const scenarios = await this.scenarioInputs(run);
+    const prepared = await prepareCheckpoint(scenarios === undefined ? request : { ...request, scenarios });
     if ('schema' in prepared) {
       await this.write(run, {
         type: 'gate-attempted',
@@ -4053,6 +4057,38 @@ export class RunService {
         records: [{ path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: attempt }],
       }),
     }));
+  }
+
+  /**
+   * What a checkpoint's scenario check is planned from: the captured scenario
+   * harness, the modules of the current view that have feature files, and
+   * every tracked scenario with its owner, file and state as the ledger and
+   * the log hold them. A run past readiness has a valid configuration; one
+   * without it plans no scenario check.
+   */
+  private async scenarioInputs(run: Run): Promise<ScenarioCheckInputs | undefined> {
+    const captured = run.record.projectConfig;
+    if ('invalid' in captured) return undefined;
+    const records = [];
+    let states: ScenarioStates = initialScenarioStates([]);
+    for (const entry of run.log.ledger.replay()) {
+      for (const record of entry.transaction.records) {
+        if ((record.body as { schema?: unknown } | null)?.schema === 'ramify-agent.scenario/1') records.push(scenarioRecordSchema.parse(record.body));
+      }
+      const event = entry.transaction.event as { type: string };
+      if (event.type === 'analysis-accepted') states = initialScenarioStates(records.map(record => record.id));
+      // The harness commits no transition the events table rejects, so a
+      // rejected one leaves the states as they were, as in the snapshot.
+      if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
+        const applied = applyScenarioEvent(states, event as unknown as ScenarioEvent);
+        if (applied.ok) states = applied.states;
+      }
+    }
+    return {
+      harness: captured.config.acceptance,
+      modules: await scenarioModules(this.projectRoot, run.index),
+      scenarios: records.map(record => ({ id: record.id, owner: record.owner, file: record.file, state: states.get(record.id) ?? 'pending' })),
+    };
   }
 
   /** The count of committed gate attempts: every readiness and every checkpoint. */
@@ -4243,7 +4279,7 @@ function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
   for (const entry of run.log.ledger.replay()) {
     for (const record of entry.transaction.records) {
       const body = record.body as { schema?: unknown; id?: unknown };
-      if (body?.schema === 'ramify-agent.gate-attempt/2' && body.id === id) return record.body as GateAttempt;
+      if (body?.schema === 'ramify-agent.gate-attempt/3' && body.id === id) return record.body as GateAttempt;
     }
   }
   return undefined;
@@ -4266,7 +4302,7 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       head: request.head,
       checks: request.checks.map(({ discovery: _discovery, ...check }) => ({
         ...check,
-        kind: check.kind as 'ramify-check' | 'type-check' | 'tests',
+        kind: check.kind as 'ramify-check' | 'type-check' | 'tests' | 'scenarios',
       })),
       selection: {
         policy: request.selection?.policy ?? 'all-project',
@@ -4283,6 +4319,7 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
         repairRounds: request.limits?.repairRounds ?? 1,
         infrastructureRetries: request.limits?.infrastructureRetries ?? 1,
       },
+      ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     },
     guardedChanges: [...prepared.guardedChanges],
     rules: prepared.rules.map(rule => ({ ...rule, violations: rule.violations.map(violation => ({ ...violation })) })),

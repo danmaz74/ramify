@@ -14,6 +14,14 @@ receives the intended temporary directory and worktree path, repository and
 process identities, source commit, run and attempt. Plan 7 iteration 4 owns
 the concrete durable record and cleanup lifecycle.
 
+A `scenarios` check runs through the harness's `runScenarioCheck`, as the
+in-place runner runs it, with the audit's path mapping: the runs start in the
+worktree, the configured commands' paths are rebased into it, the profiles
+and message streams stay in the attempt's directory outside it, and printed
+worktree paths are restored. ramify-audit's own Cucumber summary
+(`CUCUMBER_SUMMARY_FILE`) is not used; the check's outcome is the harness's
+reduction of the message streams, and the audit records its summary.
+
 ## Why it is separate
 
 An audit is one implementation of the harness's gate-execution port. Correctly

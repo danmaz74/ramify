@@ -480,3 +480,173 @@ From `ramify-agent/`:
   is still reported.
 - iteration 11: whether the badge's step definitions need a World without
   `dispatch` (see "The World's placement").
+
+## Iteration 5: The scenarios check kind
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **Records** (`checks/records.ts`, `run/records.ts`). `CheckCommandKind`
+  gains `scenarios`. `GateAttempt` is `ramify-agent.gate-attempt/3`; every
+  reader (`checks/accepted.ts`, `projections/inputs.ts`, `run/service.ts`,
+  `runSchemas.gate`) requires `/3`, and an older attempt is unsupported.
+  `GateCommandRecord.scenarios?: ScenarioCheckSummary` holds `mode`,
+  `selection`, `dryRun`, `excluded` (a count), `setup` and `teardown`
+  (`{ exit } | null`), `runs[]` (`module`, `exit`, `profile`, `messages`,
+  both paths relative to the attempt's directory), `scenarios[]`
+  (`ScenarioRunResult` plus `run`, the module that executed it), `untracked`
+  (`{ passed, skipped, failed }`) and `failures[]`, one line per reason the
+  check did not pass. `GateAttempt.scenarios?: 'none-selected'`. The reader
+  schema is `scenarioCheckSummarySchema`; the gate operation's planned checks
+  accept `scenarios` with its plan, and its request carries `scenarios:
+  'none-selected'` too. The protocol's gate view accepts the kind; the
+  summary itself is not projected yet (iteration 10).
+- **Planning** (`checks/checkpoint.ts`). `CheckpointPolicy.scenarios`
+  `{ mode, selection, strict: true }` per the architecture's table.
+  `planScenarioCheck(checkpoint, inputs, options)` answers `{ check }` or
+  `{ none: 'none-selected' }`. `ScenarioCheckInputs` is `{ harness, modules,
+  scenarios }`: the captured `acceptance` section, the modules with feature
+  files, and every tracked scenario with owner, file and state. `identity`
+  (iteration, contract) selects the scope owners' (exact owners, and every
+  module of a subtree) scenarios in `bound`, `declared` or `implemented`,
+  one run per owner with that owner's IDs; an owner not among the modules
+  with feature files is placed by its scenario's file. `all-untagged` and
+  `all` run every module with feature files, and answer `none-selected`
+  when there is none. The check's attribution is `in-scope` for identity and
+  `project` otherwise, so it is routed exactly as the tests of that
+  checkpoint are. `allProjectChecks` and `scopedChecks` take the planned
+  check after the Ramify check and before the scope probe, which stays last.
+  `run/gates.ts`'s `CheckpointRequest.scenarios` feeds it.
+- **The plan and the runner** (`checks/scenario-check.ts`, new).
+  `ScenarioCheckPlan` (mode, selection, `strict: true`, `dryRun`, support,
+  runs of `{ module, selection }`, setup and teardown as `CheckCommand`s or
+  null, `runTimeoutMs`, `tracked`) rides on `PlannedCheck.scenarios`; the
+  check's `command` is the mode's configured command with the whole check's
+  bound as its timeout. `runScenarioCheck(execution)` makes the attempt's
+  `scenarios/` directory, runs setup, then per module builds the profile with
+  `buildScenarioProfile` (project root = where the runs start), writes it,
+  removes a stale stream, runs the argv through the evidence module's
+  `runCommand` (or an injected `CommandRunner`), reads the stream with
+  `summarizeScenarioRun`; then teardown with a bound of its own, after a
+  failure or a cancellation too. A failed setup starts no run; a run that
+  does not complete (timeout, cancellation, runner error) ends the runs; a
+  run that exits non-zero does not. It answers the combined `CommandRun`
+  (cancellation, then timeout, then runner error, then the first non-zero
+  exit) and the summary, and writes one log ending in the verdict and the
+  failure lines. `scenarioTimeouts`: quick 600 s, full 1,800 s, setup and
+  teardown 600 s each; `scenarioCheckTimeoutMs` is the sum, which the gate's
+  bound adds up as for every command.
+- **The pass rule.** Every run, setup and teardown exited 0; every stream is
+  present, finished and wholly JSON; every tracked scenario the runs
+  executed passed (in a dry run, `passed` or `skipped`); every scenario an
+  identity selection names was executed; the project's own scenarios have
+  none failed and, outside a dry run, none skipped; and a run the runner
+  itself reported unsuccessful fails even when nothing else explains it.
+- **Both runners.** `inPlaceCheckExecution` runs a check with a plan through
+  `runScenarioCheck`; the audit's registered executor does the same in its
+  worktree, rebasing each argument with `rebaseProjectArgument`, restoring
+  printed worktree paths, and keeping profiles and streams in the attempt's
+  directory outside the worktree. The audit's registered result details
+  carry a digest of the summary. `CUCUMBER_SUMMARY_FILE` is not used.
+  `CheckExecutionRequest.classify` takes an optional fourth argument, the
+  summary.
+- **The verdict** (`checks/gate.ts`). A completed `scenarios` command passes
+  exactly when its summary has no failure; one without a summary is
+  `not-verified` `runner-error` (`scenario-summary-missing`). Otherwise it is
+  classified and routed as tests are: a failure is `in-scope` and goes to
+  `repair`, or `outside-assignment` where the probe passed, and its output's
+  tail ends with the failure lines, which the repair briefing quotes.
+  `GateRequest.scenarios` puts `none-selected` on the attempt.
+- **Gates in a run** (`run/service.ts`). `committingCheckpoint` computes
+  `scenarioInputs(run)` for every committing gate: the captured harness (none
+  for an invalid configuration), `scenarioModules(projectRoot, run.index)`,
+  and every `ramify-agent.scenario/1` record of the ledger with its state
+  from the scenario events of the log, as the snapshot derives it.
+- **Modules with feature files** (`run/project-config.ts`).
+  `scenarioModules(root, index)`: every module of the view, or of the
+  `module.ramify` headers on disk with declared-name paths joined from the
+  root's, whose `src/tests/features/` (a testing module's `src/features/`)
+  holds a `.feature` file, ordered by directory. `moduleTestAreas` is
+  unchanged in behavior and shares the walk.
+- **Readiness** (`run/readiness.ts`, `run/records.ts`). `readinessSteps`
+  gains `baseline-acceptance` and `acceptance-full` after
+  `acceptance-runner`. The readiness gate, through the in-place runner (or
+  the service's `readinessExecution`), runs after the three baseline
+  commands a quick check (`all-untagged`) and a full one (`all-untagged`,
+  `--dry-run` unless `readiness: run`, and then with setup and teardown).
+  Each step reads its command's summary; with no module with feature files
+  both pass with that said. Both carry the gate's ID, fail as
+  `baseline-tests` fails (`readiness-failed`), and are recoverable exactly
+  when a baseline is (a timeout or runner error reruns).
+- **Test helpers.** `installTestRunner` and `installMiniRunner` install
+  `scriptedCucumber` (`helpers/project-config.ts`): given `--config`, it
+  writes the stream of a finished, successful run with no scenario where the
+  profile asks, and exits 0. The direct check executors answer a
+  `scenarios` check with `passingScenarioSummary(check)` (every run exited
+  0, every scenario an identity selection names passed); a sequential script
+  does not consume an entry for it, and a mapped script may answer
+  `DirectCheckStep.scenarios`.
+- **Exposure.** The harness exposes to descendants `ScenarioCheckSummary`,
+  `ScenarioCheckRun`, `ScenarioCheckResult`, `runScenarioCheck` and its
+  types, `CommandRunner`, and re-exposes the `scenarios` child's
+  `ScenarioMode`, `ScenarioSelection`, `ScenarioModule`, `ScenarioRunResult`,
+  `ScenarioRunStatus`, `TrackedScenario` and their schemas.
+- **Documents.** The harness README (readiness, the scenario check, the
+  tests) and the audit child's README.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/scenario-check.test.ts` | 34 passed: planning per checkpoint (readiness, breaking-iteration, work-item, final; full mode's setup, teardown and bound; quick's bound; a dry run without setup; `none-selected` for iteration and contract; the identity selection by state and scope with an owner placed by its file; no module with feature files); an iteration gate recording `none-selected` with no scenario command; a work-item gate with and without a harness; execution over the recordings (passing with its profile and argv, failing, undefined, ambiguous, pending, a failing outline example, a bound scenario by identity, a selected scenario not executed, all-untagged with the project's own, a dry run, a missing stream, a non-zero exit); setup and teardown order and bounds, teardown after a failed run, a failed setup, a timed-out run, a failing teardown, the gate's bound; the verdict (repair like tests with the failure in the tail, a pass, a missing summary) |
+| `npx vitest run subs/harness/src/tests/scenario-check-integration.test.ts` | 7 passed in about 9 s with the real `cucumber-js` 13.2.1 over a written, committed project: in the in-place runner (work-item, `all-untagged`) and in the audit's executor (iteration, identity, audited commit and evidence), a bound scenario passes with its binding and an undefined step fails naming it; readiness with `dry-run` (four acceptance steps pass, setup not run), with `run` (setup and teardown run, full mode executes) and with a dry run that finds an undefined step (`acceptance-full` fails, no recovery) |
+| `RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1 npx vitest run subs/harness/src/tests/fixture-acceptance.test.ts` | 3 passed: on a copy of `collection-review` with `npm ci`, readiness passes `project-config`, `acceptance-runner`, `baseline-acceptance` (1 own scenario passed) and `acceptance-full` (1 skipped in the dry run), and the work-item gate (quick) and final gate (full, over HTTP) each run the fixture's existing scenario, passed. This is the exit criterion; without the variable the file is skipped |
+| `npx vitest run` over the 77 files that open runs, run readiness or gates, construct attempts or name the policy, the composition, the protocol or the configuration, the new ones included | 75 passed, 2 skipped (`fixture-trials`, `fixture-acceptance`), 591 tests. Before their update `readiness.test.ts` and `run.test.ts` failed on the step lists, `run-policy.test.ts` on the policy objects, `breaking-work.test.ts` on the command kinds (and on the probe no longer being last, which the planning now keeps last), and `composition.test.ts` on seven union values, now named with their producing tests |
+| `npx vitest run` over `contract-submission`, `lock` and `test-selection` | 3 files, 28 passed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits, as in iteration 4 |
+
+No test makes a model call. The full suite was not run, per the plan's
+rules.
+
+### Deviations
+
+- **The readiness attempt records the two acceptance steps after
+  `baseline-ramify-check`**, beside the other steps the baseline gate
+  verifies, though `readinessSteps` lists them after `acceptance-runner`.
+  A step recorded as not reached before the step that stopped the attempt
+  would name the wrong failure and recovery.
+- **`acceptance-full` selects `all-untagged`**, as `baseline-acceptance`
+  does. The architecture names no selection for it; a pending scenario left
+  by an earlier run would otherwise fail its dry run as undefined.
+- **Setup and teardown are bounded at 600 s each.** The architecture adds
+  them to the attempt's bound without naming a figure.
+- **`none-selected` is also recorded by a work-item, breaking-iteration or
+  final gate when no module has feature files**, and readiness passes both
+  acceptance steps then, saying so. After iteration 6 every run has feature
+  files at its gates.
+- **The summary has more than the architecture's example**: `dryRun`,
+  `setup`, `teardown`, `untracked.skipped` (iteration 1's) and `failures`,
+  the minimal failure summary until iteration 9's diagnostics.
+- **`classify` takes the summary as a fourth argument**, and a scenario check
+  without one is `not-verified`, so an executor that forgets the streams can
+  never pass it.
+- **Module names without a view** are declared-name paths joined from the
+  root's (`collection-review/integration-tests`), as the view names them;
+  `moduleTestAreas` keeps its header names.
+- **`checks/verify.ts` verifies setup and teardown** beside the command, so
+  a missing executable is `command-missing` before anything runs.
+
+### Open items
+
+- The gate view of the protocol does not carry the summary; iteration 10's
+  scenario query and web read it from the attempt.
+- The fixture test is conditional because it installs the fixture's
+  toolchain; the fixture trials (`fixture-trials.test.ts`) now also run the
+  scenario check at every gate, which was not re-run here.
+- `scenarioInputs` replays the ledger at every committing gate; iteration 7,
+  which adds the scenario events to the log's schema, may keep the states
+  beside the snapshot instead.

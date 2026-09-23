@@ -90,6 +90,7 @@ describe('an implementation run with no entry capabilities', () => {
     expect(attempt.steps.map(step => step.step)).toEqual([
       'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
       'nested-packages', 'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+      'baseline-acceptance', 'acceptance-full',
     ]);
   }, 120_000);
 

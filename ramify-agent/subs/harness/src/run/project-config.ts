@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { delimiter, isAbsolute, join, matchesGlob, relative, sep } from 'node:path';
 import { readProjectConfiguration } from '../../subs/evidence/src/project-configuration.js';
 import { isTestingModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
+import type { ScenarioModule } from '../../subs/scenarios/src/records.js';
 import {
   capturedProjectConfigSchema, projectConfigSchema,
   type AcceptanceMode, type CapturedProjectConfig, type ProjectConfig,
@@ -60,20 +61,69 @@ export interface TestArea {
  * where Ramify's layout allows them: the root and beneath each `subs/`.
  */
 export async function moduleTestAreas(projectRoot: string, index: ArchitectIndex | null): Promise<TestArea[]> {
-  const areas: TestArea[] = [];
+  const modules = await declaredModules(projectRoot, index);
+  return modules
+    .map(module => ({ module: index === null ? module.name : module.module, area: areaOf(module.dir, module.testing) }))
+    .sort((a, b) => (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
+}
+
+/**
+ * Every module whose feature directory holds a `.feature` file: its
+ * `src/tests/features/`, or a testing module's `src/features/`. The view
+ * names the modules where the run has one; without it the declarations on
+ * disk do, with declared-name paths joined from the root's. Ordered by
+ * directory, which is the order the scenario check's runs go in.
+ */
+export async function scenarioModules(projectRoot: string, index: ArchitectIndex | null): Promise<ScenarioModule[]> {
+  const modules = await declaredModules(projectRoot, index);
+  const found: ScenarioModule[] = [];
+  for (const module of modules) {
+    if (await holdsFeatureFile(join(projectRoot, areaOf(module.dir, module.testing), 'features'), 0)) {
+      found.push({ module: module.module, dir: module.dir, testing: module.testing });
+    }
+  }
+  return found.sort((a, b) => (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0));
+}
+
+async function holdsFeatureFile(directory: string, depth: number): Promise<boolean> {
+  if (depth > moduleDepth) return false;
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  if (entries.some(entry => entry.isFile() && entry.name.endsWith('.feature'))) return true;
+  for (const entry of entries) {
+    if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules' && await holdsFeatureFile(join(directory, entry.name), depth + 1)) return true;
+  }
+  return false;
+}
+
+/** One declared module: its declared-name path, its header's own name, its directory and whether it is testing. */
+interface DeclaredModule {
+  readonly module: string;
+  readonly name: string;
+  readonly dir: string;
+  readonly testing: boolean;
+}
+
+async function declaredModules(projectRoot: string, index: ArchitectIndex | null): Promise<DeclaredModule[]> {
+  const modules: DeclaredModule[] = [];
   if (index !== null) {
     for (const entry of index.modules.values()) {
-      areas.push({ module: entry.module, area: areaOf(entry.dir, isTestingModule(entry)) });
+      modules.push({ module: entry.module, name: entry.module.split('/').at(-1) ?? entry.module, dir: entry.dir, testing: isTestingModule(entry) });
     }
-  } else {
-    await walk('', 0);
+    return modules;
   }
-  return areas.sort((a, b) => (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
+  await walk('', null, 0);
+  return modules;
 
-  async function walk(directory: string, depth: number): Promise<void> {
+  async function walk(directory: string, parent: string | null, depth: number): Promise<void> {
     if (depth > moduleDepth) return;
     const header = await moduleHeader(join(projectRoot, directory, 'module.ramify'));
-    if (header !== null) areas.push({ module: header.name, area: areaOf(directory, header.tags.includes('testing')) });
+    const path = header === null ? parent : parent === null ? header.name : `${parent}/${header.name}`;
+    if (header !== null) modules.push({ module: path!, name: header.name, dir: directory, testing: header.tags.includes('testing') });
     let children;
     try {
       children = await readdir(join(projectRoot, directory, 'subs'), { withFileTypes: true });
@@ -81,7 +131,7 @@ export async function moduleTestAreas(projectRoot: string, index: ArchitectIndex
       return;
     }
     for (const child of children) {
-      if (child.isDirectory()) await walk(directory === '' ? `subs/${child.name}` : `${directory}/subs/${child.name}`, depth + 1);
+      if (child.isDirectory()) await walk(directory === '' ? `subs/${child.name}` : `${directory}/subs/${child.name}`, path, depth + 1);
     }
   }
 }

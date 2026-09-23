@@ -18,6 +18,7 @@ import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
+import { installScriptedCucumber } from './project-config.js';
 import {
   createDirectCheckExecution, createMappedCheckExecution, createPassingCheckExecution,
   type DirectCheckScript, type DirectCheckStep,
@@ -58,16 +59,16 @@ export async function initRepository(root: string): Promise<string> {
  * `node_modules`, so a copy that a run works in is given the two binaries the
  * `test-runner` and `acceptance-runner` steps require. Neither runs anything:
  * the commands a lifecycle test's gates run are its policy's, and the
- * scenario runner is a scripted command wherever one runs.
+ * scenario runner is a scripted command wherever one runs, which writes a
+ * message stream of a successful run with no scenario in it.
  */
 export async function installTestRunner(root: string): Promise<void> {
   const directory = join(root, 'node_modules', '.bin');
   await mkdir(directory, { recursive: true });
-  for (const name of ['vitest', 'cucumber-js']) {
-    const path = join(directory, name);
-    await writeFile(path, '#!/bin/sh\nexit 0\n');
-    await chmod(path, 0o755);
-  }
+  const vitest = join(directory, 'vitest');
+  await writeFile(vitest, '#!/bin/sh\nexit 0\n');
+  await chmod(vitest, 0o755);
+  await installScriptedCucumber(join(directory, 'cucumber-js'));
 }
 
 /** A command that runs for real and answers `code`. */

@@ -42,7 +42,7 @@ describe('the event page', () => {
 describe('a gate attempt', () => {
   function attempt(tail: string): GateAttempt {
     return {
-      schema: 'ramify-agent.gate-attempt/2', id: 'ga-0001', checkpoint: 'final', subject: {}, proposedBy: null,
+      schema: 'ramify-agent.gate-attempt/3', id: 'ga-0001', checkpoint: 'final', subject: {}, proposedBy: null,
       repairRound: 0, infrastructureAttempt: 0, head: 'abc', commit: null, audited: 'abc', evidence: null, guardedChanges: [],
       commands: [{
         kind: 'tests', command: { argv: ['npm', 'test'], cwd: '/p', env: ['PATH', 'SECRET_NAME'], envAdditions: { RAMIFY_ENDPOINT_DIR: '/not/for/the/client' }, timeoutMs: 1000 },

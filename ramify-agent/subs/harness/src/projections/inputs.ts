@@ -94,7 +94,7 @@ const supported: Readonly<Record<string, string>> = Object.fromEntries([
   'ramify-agent.work-item-outline/1', 'ramify-agent.iteration-assignment/1', 'ramify-agent.iteration-result/1',
   'ramify-agent.invocation/1', 'ramify-agent.invocation-outcome/1', 'ramify-agent.placement-request/1',
   'ramify-agent.placement-decision/1', 'ramify-agent.contract/1', 'ramify-agent.provider-obligation/1',
-  'ramify-agent.consumer-requirement/1', 'ramify-agent.gate-attempt/2', 'ramify-agent.entry-assignments/1',
+  'ramify-agent.consumer-requirement/1', 'ramify-agent.gate-attempt/3', 'ramify-agent.entry-assignments/1',
   'ramify-agent.readiness-attempt/1', 'ramify-agent.infrastructure-recovery/1', 'ramify-agent.measurement-snapshot/1',
   'ramify-agent.line-events/1',
 ].map(schema => [familyOf(schema), schema]));
@@ -132,7 +132,7 @@ export function runView(run: CommittedRun): RunView {
       }
       const at = { path: record.path, sequence: line.sequence, at: line.at };
       switch (declared) {
-        case 'ramify-agent.gate-attempt/2': {
+        case 'ramify-agent.gate-attempt/3': {
           const body = parse(gateAttemptSchema, record.body, run, record.path);
           gates.delete(body.id);
           gates.set(body.id, { body, ...at });
@@ -190,7 +190,7 @@ export function runView(run: CommittedRun): RunView {
 
 function firstSequence(run: CommittedRun, gate: string): number {
   for (const line of run.entries) {
-    if (line.transaction.records.some(record => (record.body as { schema?: unknown; id?: unknown } | null)?.schema === 'ramify-agent.gate-attempt/2'
+    if (line.transaction.records.some(record => (record.body as { schema?: unknown; id?: unknown } | null)?.schema === 'ramify-agent.gate-attempt/3'
       && (record.body as { id?: unknown }).id === gate)) return line.sequence;
   }
   return Number.MAX_SAFE_INTEGER;

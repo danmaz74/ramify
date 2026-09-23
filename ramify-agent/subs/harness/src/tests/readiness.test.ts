@@ -185,7 +185,8 @@ describe('the three causes a readiness failure can have', () => {
     expect(attempts).toHaveLength(1);
     // Nothing ran: the attempt could not run what the checkpoint requires.
     const attempt = attempts[0]!;
-    expect(attempt.steps.filter(step => step.step.startsWith('baseline-')).map(step => step.outcome)).toEqual(['not-verified', 'not-verified', 'not-verified']);
+    expect(attempt.steps.filter(step => step.step.startsWith('baseline-') || step.step === 'acceptance-full').map(step => step.outcome))
+      .toEqual(['not-verified', 'not-verified', 'not-verified', 'not-verified', 'not-verified']);
     expect(attempt.steps.find(step => step.step === 'baseline-type-check')!.detail).toContain('command-missing');
   }, 180_000);
 
@@ -283,7 +284,7 @@ describe('the structural steps', () => {
     expect(attempt.steps.find(step => step.step === 'test-discovery')!.detail).toMatch(/^\d+ test files discovered/);
     expect(attempt.steps.find(step => step.step === 'ramify-daemon')!.detail).toContain('answers');
     expect(attempt.steps.filter(step => step.gate !== undefined).map(step => step.step)).toEqual([
-      'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+      'baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full',
     ]);
   }, 180_000);
 });

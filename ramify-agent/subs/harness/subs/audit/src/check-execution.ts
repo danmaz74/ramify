@@ -25,6 +25,7 @@ import { checkOutputPath } from '../../../src/checks/execution.js';
 import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/checks/execution.js';
 import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
+import { runScenarioCheck } from '../../../src/checks/scenario-check.js';
 import type { PlannedCheck } from '../../../src/checks/verify.js';
 
 const executorId = 'ramify-agent.gate-check';
@@ -116,6 +117,27 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           const [index, check] = planned;
           const outputFile = checkOutputPath(request.directory, index, check);
           const auditedProjectRoot = mapping.projectRootIn(registered.workingDirectory);
+          if (check.scenarios !== undefined) {
+            // The profiles and streams go into the attempt's directory,
+            // outside the worktree; the runs start in the worktree, and the
+            // configured commands' paths are rebased into it.
+            const outcome = await runScenarioCheck({
+              command: check.command,
+              plan: check.scenarios,
+              projectRoot: auditedProjectRoot,
+              attemptDirectory: request.directory,
+              outputFile,
+              rebase: argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot),
+              restore: text => mapping.restoreText(text, registered.workingDirectory),
+              signal,
+            });
+            const record = request.classify(check, outcome.run, outputFile, outcome.summary);
+            records.set(registered.checkId, record);
+            if (outcome.run.outcome.kind === 'cancelled') {
+              return { status: 'cancelled', reason: 'Gate execution was interrupted' };
+            }
+            return { status: 'completed', result: auditSummary(record, outcome.run) };
+          }
           const command = {
             ...check.command,
             cwd: mapping.rebaseProjectPath(check.command.cwd, auditedProjectRoot),
@@ -578,6 +600,16 @@ function auditSummary(record: GateCommandRecord, run: CommandRun): AuditCheckSum
       kind: record.kind,
       exitCode: record.exitCode,
       notVerified: record.notVerified ?? null,
+      ...(record.scenarios === undefined ? {} : {
+        scenarios: {
+          mode: record.scenarios.mode,
+          selection: record.scenarios.selection.kind,
+          runs: record.scenarios.runs.length,
+          scenarios: record.scenarios.scenarios.map(result => ({ id: result.id, status: result.status })),
+          untracked: { ...record.scenarios.untracked },
+          failures: [...record.scenarios.failures],
+        },
+      }),
     },
     outputBytes: record.output.bytes,
     outputTruncated: record.output.truncated,

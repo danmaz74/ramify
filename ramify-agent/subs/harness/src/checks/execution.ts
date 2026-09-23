@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
-import type { Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy } from './records.js';
+import type { Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
+import { runScenarioCheck } from './scenario-check.js';
 import type { PlannedCheck } from './verify.js';
 
 /*
@@ -15,8 +16,12 @@ import type { PlannedCheck } from './verify.js';
 export interface CheckExecutionRequest {
   /** Where complete command output is written, beside the attempt record. */
   readonly directory: string;
-  /** The gate's policy for turning one harness command run into its record. */
-  readonly classify: (check: PlannedCheck, run: CommandRun, outputFile: string) => GateCommandRecord;
+  /**
+   * The gate's policy for turning one harness command run into its record.
+   * A `scenarios` check passes its summary too, since its outcome is read
+   * from the message streams and not from the exit codes alone.
+   */
+  readonly classify: (check: PlannedCheck, run: CommandRun, outputFile: string, scenarios?: ScenarioCheckSummary) => GateCommandRecord;
   /** The revision and gate-specific facts an isolated executor must bind. */
   readonly context: CheckExecutionContext;
   /** Every gate execution is bounded, including time spent waiting for an audit lease. */
@@ -85,6 +90,21 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
       if (interrupted) {
         await writeFile(outputFile, '');
         commands.push(notRun(check, outputFile, startedAt));
+        continue;
+      }
+
+      if (check.scenarios !== undefined) {
+        const outcome = await runScenarioCheck({
+          command: check.command,
+          plan: check.scenarios,
+          projectRoot: check.command.cwd,
+          attemptDirectory: request.directory,
+          outputFile,
+          signal: request.signal,
+        });
+        const record = request.classify(check, outcome.run, outputFile, outcome.summary);
+        commands.push(record);
+        if (record.notVerified === 'interrupted') interrupted = true;
         continue;
       }
 

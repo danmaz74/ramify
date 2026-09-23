@@ -638,8 +638,14 @@ Neither child receives this module's vocabulary.
   configuration, the test runner, the project's configuration, its scenario
   harness, the independent nested packages, test discovery, the Ramify
   command line, and then the project's own baseline:
-  its tests, its type check and a complete Ramify check, as one gate
-  attempt. The run branch, `ramify-agent/run-<run-id>`, is created once a
+  its tests, its type check, a complete Ramify check and two scenario
+  checks, as one gate attempt through the in-place runner.
+  `baseline-acceptance` runs every module with feature files in quick mode
+  with `not @ramify-pending`; `acceptance-full` loads full mode with
+  `--dry-run` and fails on an `undefined` or `ambiguous` step, or, with the
+  configuration's `readiness: run`, executes it between its `setup` and
+  `teardown`. Both fail as `baseline-tests` fails, and the attempt records
+  them beside the other baseline steps, where they are verified. The run branch, `ramify-agent/run-<run-id>`, is created once a
   clean repository has been established. Agents never commit, and the harness
   never resets or reverts. `project-config` fails a run whose captured
   `ramify-agent.json` is missing or invalid, or names support code outside
@@ -651,8 +657,26 @@ Neither child receives this module's vocabulary.
   code-repair assignment. A missing or invalid file never refuses
   `start-run`. Once the configuration names the acceptance modes, a `test:`
   script that runs `cucumber-js` is no longer an unsupported runner.
-- **The work-item and final gates.** All project tests, the type check and a
-  complete Ramify check, on the current tree. `work-item-completed` requires
+- **The scenario check.** Every gate of a run with a valid configuration
+  plans a `scenarios` command (`checks/checkpoint.ts`) per the architecture's
+  table: `iteration` and `contract` select by identity tag the scope owners'
+  scenarios past `pending`, and with none record `scenarios: none-selected`
+  and run nothing; `breaking-iteration` and `work-item` run every module with
+  feature files in quick mode with `not @ramify-pending`; `final` runs them
+  all in full mode. Both runners execute it with `runScenarioCheck`
+  (`checks/scenario-check.ts`): the mode's `setup`, one Cucumber run per
+  module in sequence with a profile from the `scenarios` module written into
+  the attempt's directory outside the worktree, then `teardown`, even after
+  a failure. A run is bounded at 600 s in quick mode and 1,800 s in full
+  mode, and the check at their sum plus setup and teardown. The check passes
+  by its message streams, reduced by the `scenarios` module: every run
+  exited 0, every selected tracked scenario and every one of the project's
+  own passed; `undefined`, `pending` and `ambiguous` fail it. Its
+  `ScenarioCheckSummary` is on the command record of the
+  `ramify-agent.gate-attempt/3`, whose output ends with the failures, and a
+  failure is repaired like failing tests.
+- **The work-item and final gates.** All project tests, the type check, a
+  complete Ramify check and the scenario check, on the current tree. `work-item-completed` requires
   a passing `work-item` attempt and is the only thing that closes a work
   item; `job-completed` requires a passing `final` attempt, and an empty work
   queue alone never satisfies it. A change to the working
@@ -715,6 +739,19 @@ a variable set in this process reaches neither the policy `job.json`
 captures, nor a gate attempt, nor the environment a gate command prints of
 itself, while the names a command received are recorded and a run written
 before the names is still read.
+
+`scenario-check.test.ts` covers the scenario check: what each checkpoint
+plans, `none-selected`, and execution with a scripted runner that copies the
+`scenarios` module's recorded message streams where each profile asks, with
+setup and teardown ordering, a teardown after a failed run, the timeouts and
+the verdict. `scenario-check-integration.test.ts` starts the real
+`cucumber-js` over a project it writes, in the in-place runner and in the
+audit's executor, and runs readiness's two acceptance steps over it with
+`dry-run` and `run`. `fixture-acceptance.test.ts`, run with
+`RAMIFY_AGENT_FIXTURE_ACCEPTANCE=1` because it installs the fixture's
+toolchain, runs the fixture's own scenario at readiness and at the work-item
+and final gates. Lifecycle tests reach a scripted `cucumber-js` that writes
+the stream of a successful run with nothing in it.
 
 `gate-not-verified.test.ts` and `tree-identity.test.ts` cover the check
 engine on commands of their own: every reason a check can record for not

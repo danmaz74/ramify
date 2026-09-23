@@ -9,6 +9,7 @@ import { architectRunInputs, type RunInputs } from '../../run/inputs.js';
 import type { AssignmentBody } from '../../work/assignment.js';
 import type { EngineerSubmission } from '../../work/engineer.js';
 import type { LocalArchitectSubmission } from '../../work/submission.js';
+import { installScriptedCucumber } from './project-config.js';
 
 /*
  * What a test needs to drive an iteration: the submissions a local architect
@@ -166,11 +167,9 @@ export async function installMiniRunner(root: string): Promise<void> {
   const executable = join(bin, 'vitest');
   await writeFile(executable, `#!/bin/sh\nshift\nexec node "${join(bin, 'mini-runner.mjs')}" "$@"\n`);
   await chmod(executable, 0o755);
-  // The scenario runner readiness's `acceptance-runner` step looks for. No
-  // gate runs it before the scenarios check kind exists.
-  const cucumber = join(bin, 'cucumber-js');
-  await writeFile(cucumber, '#!/bin/sh\nexit 0\n');
-  await chmod(cucumber, 0o755);
+  // The scenario runner readiness's `acceptance-runner` step looks for, and
+  // every scenario check runs: scripted, it executes no scenario.
+  await installScriptedCucumber(join(bin, 'cucumber-js'));
 }
 
 const SHIM = `export const __queue = [];

@@ -373,7 +373,7 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
     const committed = opened.service.committed('review-notes', receipt.jobId)!;
     const attempts = committed.entries.flatMap(line => line.transaction.records)
       .map(record => record.body as Partial<GateAttempt>)
-      .filter((body): body is GateAttempt => body.schema === 'ramify-agent.gate-attempt/2');
+      .filter((body): body is GateAttempt => body.schema === 'ramify-agent.gate-attempt/3');
     const [failed, retry] = attempts.filter(attempt => attempt.checkpoint === 'iteration');
     expect(failed).toMatchObject({ verdict: 'not-verified', cause: 'infrastructure' });
     expect(failed!.commit).toBe('revision-01');
@@ -426,7 +426,7 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
 describe('the message the harness writes', () => {
   test('it is a pure function of the records, and an agent\'s words reach it only as the summary', () => {
     const gate: GateAttempt = {
-      schema: 'ramify-agent.gate-attempt/2',
+      schema: 'ramify-agent.gate-attempt/3',
       id: 'ga-0012', checkpoint: 'iteration',
       subject: { workItem: 'wi-001', iteration: 'wi-001.i02' },
       proposedBy: 'inv-0014', repairRound: 1, infrastructureAttempt: 0,

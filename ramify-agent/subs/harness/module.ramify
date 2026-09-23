@@ -42,5 +42,14 @@ expose-src * from "interfaces/protocol/runs.ts" tagged [browser] to parent
 expose-src CheckExecutionPort, CheckExecutionRequest, CheckExecutionContext, CheckExecutionResult, CheckHarnessGuardedChange, checkOutputPath from "checks/execution.ts" to descendants
 expose-src PlannedCheck from "checks/verify.ts" to descendants
 expose-src Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy, TestSelection, CheckCommand, CheckCommandKind, NotVerified, checkCommandEnvironment from "checks/records.ts" to descendants
+expose-src ScenarioCheckSummary, ScenarioCheckRun, ScenarioCheckResult from "checks/records.ts" to descendants
+
+// The scenario check's runs, which both the in-place runner and the audit's
+// executor perform: the profiles, setup and teardown, and the reduction of
+// the message streams. The named types of the scenarios child that its
+// signature mentions are exposed beside it.
+expose-src runScenarioCheck, ScenarioCheckExecution, ScenarioCheckOutcome, ScenarioCheckPlan, ScenarioCheckModuleRun from "checks/scenario-check.ts" to descendants
+expose-sub ScenarioMode, scenarioModeSchema, ScenarioSelection, scenarioSelectionSchema, ScenarioModule from scenarios to descendants
+expose-sub ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema, TrackedScenario from scenarios to descendants
 expose-sub commitAccepted, createRunBranch, isCleanRepository from evidence to descendants
-expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, CommandRun, CommandOutcome, CommandOutput from evidence to descendants
+expose-sub runCommand, childEnvironment, outputTailBytes, CommandRequest, CommandRun, CommandOutcome, CommandOutput, CommandRunner from evidence to descendants

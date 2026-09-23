@@ -31,7 +31,7 @@ export function acceptedCommit(entries: readonly AcceptedBoundaryLine[], base: s
     if (data.verdict !== 'passed' || typeof data.gate !== 'string') continue;
     const record = entry.transaction.records.find(candidate => {
       const body = candidate.body as Partial<GateAttempt> | null;
-      return body?.schema === 'ramify-agent.gate-attempt/2' && body.id === data.gate;
+      return body?.schema === 'ramify-agent.gate-attempt/3' && body.id === data.gate;
     });
     const attempt = record?.body as Partial<GateAttempt> | null | undefined;
     if (attempt === null || attempt === undefined || attempt.checkpoint === undefined) continue;

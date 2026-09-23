@@ -356,7 +356,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // holds, and the attempts name the revisions Git answered with, in order.
     const attempts = recovered.flatMap(line => line.records.flatMap(record => {
       const body = record.body as { schema?: unknown; commit?: unknown } | null;
-      return body?.schema === 'ramify-agent.gate-attempt/2' && typeof body.commit === 'string' ? [body.commit] : [];
+      return body?.schema === 'ramify-agent.gate-attempt/3' && typeof body.commit === 'string' ? [body.commit] : [];
     }));
     expect(attempts).toEqual(git.accepted());
     expect(new Set(committed).size).toBe(committed.length);

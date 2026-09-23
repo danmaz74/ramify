@@ -785,7 +785,7 @@ export const gateViewSchema = z.object({
     violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
   }).strict()),
   commands: z.array(z.object({
-    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance']),
+    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
     argv: z.array(z.string()),
     cwd: text,
     startedAt: z.string(),

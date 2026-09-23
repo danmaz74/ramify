@@ -8,6 +8,8 @@ import type { GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
 import { planScenarioExtractionSchema } from '../../subs/scenarios/src/extraction.js';
 import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
+import { scenarioModeSchema, scenarioSelectionSchema } from '../../subs/scenarios/src/profiles.js';
+import { scenarioRunResultSchema, untrackedScenarioCountsSchema } from '../../subs/scenarios/src/messages.js';
 
 /*
  * The durable records of one implementation run, and where each of them is
@@ -275,9 +277,14 @@ export type EntryAssignments = z.infer<typeof entryAssignmentsSchema>;
 
 // Readiness and its recoveries.
 
-/** The steps readiness verifies, in the order it verifies them. */
+/**
+ * The steps readiness verifies. The attempt records the five the baseline
+ * gate verifies, the two acceptance steps among them, after `ramify-daemon`,
+ * where they run.
+ */
 export const readinessSteps = [
-  'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner', 'nested-packages',
+  'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
+  'baseline-acceptance', 'acceptance-full', 'nested-packages',
   'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
 ] as const;
 export const readinessStepSchema = z.enum(readinessSteps);
@@ -485,8 +492,42 @@ const testSelectionSchema = z.object({
   resolved: z.array(z.string()),
 }).strict();
 
+/** The kinds of command a gate runs. */
+const checkKindSchema = z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']);
+
+/** What a `scenarios` check runs: one run per module, with the mode's setup and teardown around them. */
+const scenarioCheckPlanSchema = z.object({
+  mode: scenarioModeSchema,
+  selection: scenarioSelectionSchema,
+  strict: z.literal(true),
+  dryRun: z.boolean(),
+  support: z.array(text),
+  runs: z.array(z.object({
+    module: z.object({ module: text, dir: z.string(), testing: z.boolean() }).strict(),
+    selection: scenarioSelectionSchema,
+  }).strict()),
+  setup: checkCommandSchema.nullable(),
+  teardown: checkCommandSchema.nullable(),
+  runTimeoutMs: z.int().positive(),
+  tracked: z.array(z.object({ id: text, file: text }).strict()),
+}).strict();
+
+/** What a `scenarios` command established, read from its runs' message streams. */
+export const scenarioCheckSummarySchema = z.object({
+  mode: scenarioModeSchema,
+  selection: scenarioSelectionSchema,
+  dryRun: z.boolean(),
+  excluded: z.int().nonnegative(),
+  setup: z.object({ exit: z.int().nullable() }).strict().nullable(),
+  teardown: z.object({ exit: z.int().nullable() }).strict().nullable(),
+  runs: z.array(z.object({ module: text, exit: z.int().nullable(), profile: text, messages: text }).strict()),
+  scenarios: z.array(scenarioRunResultSchema.extend({ run: text })),
+  untracked: untrackedScenarioCountsSchema,
+  failures: z.array(z.string()),
+}).strict();
+
 const plannedCheckSchema = z.object({
-  kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance']),
+  kind: checkKindSchema,
   command: checkCommandSchema,
   selection: testSelectionSchema.optional(),
   requiresTests: z.boolean().optional(),
@@ -495,12 +536,13 @@ const plannedCheckSchema = z.object({
     detail: z.string(),
   }).strict().optional(),
   attribution: z.enum(['in-scope', 'project']).optional(),
+  scenarios: scenarioCheckPlanSchema.optional(),
 }).strict();
 
 /** A durable gate operation exists only after every plan verified. */
 const verifiedPlannedCheckSchema = plannedCheckSchema
   .omit({ discovery: true })
-  .extend({ kind: z.enum(['ramify-check', 'type-check', 'tests']) });
+  .extend({ kind: z.enum(['ramify-check', 'type-check', 'tests', 'scenarios']) });
 
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
@@ -510,7 +552,7 @@ export const gateRuleSchema = z.object({
 }).strict();
 
 export const gateAttemptSchema = z.object({
-  schema: z.literal('ramify-agent.gate-attempt/2'),
+  schema: z.literal('ramify-agent.gate-attempt/3'),
   id: text,
   checkpoint: z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']),
   subject: z.object({ workItem: text.optional(), iteration: text.optional() }).strict(),
@@ -530,7 +572,7 @@ export const gateAttemptSchema = z.object({
   /** Rules the harness verified itself; absent for a checkpoint that has none. */
   rules: z.array(gateRuleSchema).optional(),
   commands: z.array(z.object({
-    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance']),
+    kind: checkKindSchema,
     command: checkCommandSchema,
     selection: testSelectionSchema.optional(),
     startedAt: z.string(),
@@ -540,7 +582,11 @@ export const gateAttemptSchema = z.object({
     notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing']).optional(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     output: z.object({ path: z.string(), bytes: z.int().nonnegative(), truncated: z.boolean(), tail: z.string() }).strict(),
+    /** A `scenarios` command's summary of its message streams. */
+    scenarios: scenarioCheckSummarySchema.optional(),
   }).strict()),
+  /** The checkpoint's scenario check had nothing to run; not a failure. */
+  scenarios: z.literal('none-selected').optional(),
   verdict: z.enum(['passed', 'failed', 'not-verified']),
   cause: z.enum(['in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']).nullable(),
   /**
@@ -582,6 +628,8 @@ export const gateOperationSchema = z.object({
     infrastructureAttempt: z.int().nonnegative(),
     writeScope: z.array(z.string()),
     limits: z.object({ repairRounds: z.int().positive(), infrastructureRetries: z.int().positive() }).strict(),
+    /** The checkpoint's scenario check had nothing to run. */
+    scenarios: z.literal('none-selected').optional(),
   }).strict(),
   guardedChanges: z.array(z.object({
     path: text, before: z.string(), after: z.string().nullable(), authorizedBy: recordRefSchema.nullable(),
@@ -648,7 +696,7 @@ export const runSchemas = {
   lineEvents: { schema: 'ramify-agent.line-events/1', body: lineEventSummarySchema },
   invocation: { schema: 'ramify-agent.invocation/1', body: invocationSchema },
   outcome: { schema: 'ramify-agent.invocation-outcome/1', body: invocationOutcomeSchema },
-  gate: { schema: 'ramify-agent.gate-attempt/2', body: gateAttemptSchema },
+  gate: { schema: 'ramify-agent.gate-attempt/3', body: gateAttemptSchema },
   gateOperation: { schema: 'ramify-agent.gate-operation/1', body: gateOperationSchema },
 } as const;
 
