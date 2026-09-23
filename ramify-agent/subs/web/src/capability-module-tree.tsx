@@ -3,6 +3,11 @@ import { ModuleTreeCanvas, type ModuleTreeCanvasEmphasis, type ModuleTreeCanvasN
 import type {
   ComparisonCoverage, InitialAssociation, InitialRole, ModuleCapabilities, ModuleCapabilityComparisonResponse, ModuleCapabilityRow,
 } from '../../harness/src/interfaces/protocol/runs.js';
+import type { RunSessionView } from '../../harness/src/interfaces/protocol/sessions.js';
+import {
+  capabilityOf, ElementSessions, isMarked, marksText as sessionMarksText, moduleOf, RunSessionStrip, SessionMarks, SessionMarksLegend, sessionsBy,
+  type DiagramSessions,
+} from './session-marks.js';
 
 /*
  * Progress → By module: the harness's module-capability comparison drawn in
@@ -23,6 +28,8 @@ export interface CapabilityModuleTreeProps {
   readonly comparison: ModuleCapabilityComparisonResponse;
   readonly selection: ModuleCapabilitySelection | null;
   readonly onSelect: (selection: ModuleCapabilitySelection | null) => void;
+  /** The run's sessions: each module is marked with those that reach it. */
+  readonly sessions?: DiagramSessions | undefined;
 }
 
 // Node geometry. The canvas shell is border-box with 6 px padding and a 1 px
@@ -40,6 +47,8 @@ const horizontalChrome = 16 + 20;
 const nameCharacter = 8;
 const idCharacter = 7.5;
 const markCharacter = 6.5;
+/** The room each session mark and role chip takes beside its text. */
+const sessionMarkChrome = 12;
 
 const roleLabels: Record<InitialRole, string> = {
   'entry-owner': 'entry owner',
@@ -70,9 +79,18 @@ export function nodeHeight(entry: ModuleCapabilities): number {
   return Math.max(minimumHeight, shellChrome + content);
 }
 
-function nodeWidth(entry: ModuleCapabilities): number {
+/** The width of a module's name, with its session marks beside it when it has any. */
+function headingWidth(entry: ModuleCapabilities, sessions: readonly RunSessionView[] | undefined): number {
+  const name = leaf(entry.module).length * nameCharacter;
+  if (!isMarked(sessions)) return name;
+  // Each mark and chip is a word or two; marksText holds them all, with separators to spare.
+  const marks = sessionMarksText(sessions);
+  return name + 8 + marks.length * markCharacter + (marks.split(/, | \(/).length + 1) * sessionMarkChrome;
+}
+
+function nodeWidth(entry: ModuleCapabilities, sessions: readonly RunSessionView[] | undefined): number {
   const widest = Math.max(
-    leaf(entry.module).length * nameCharacter,
+    headingWidth(entry, sessions),
     entry.proposedAtStart ? 'proposed at start'.length * markCharacter : 0,
     ...entry.capabilities.map(row => Math.max(row.capability.length * idCharacter, marksText(row).length * markCharacter + 24)),
   );
@@ -87,9 +105,13 @@ function emphasisOf(entry: ModuleCapabilities): ModuleTreeCanvasEmphasis {
 /**
  * Canvas nodes for the modules the harness placed: a declared module under
  * its parent in the current tree, a proposed one under its recorded parent.
- * `unplaced` modules are not drawn.
+ * `unplaced` modules are not drawn. A module with session marks is widened
+ * to hold them beside its name.
  */
-export function comparisonNodes(comparison: ModuleCapabilityComparisonResponse): ModuleTreeCanvasNode[] {
+export function comparisonNodes(
+  comparison: ModuleCapabilityComparisonResponse,
+  sessions: ReadonlyMap<string, readonly RunSessionView[]> = new Map(),
+): ModuleTreeCanvasNode[] {
   if (comparison.tree.status !== 'available') return [];
   const treeParents = new Map(comparison.tree.modules.map(entry => [entry.module, entry.parent]));
   const placed = comparison.modules.filter(entry => entry.placement !== 'unplaced');
@@ -105,7 +127,7 @@ export function comparisonNodes(comparison: ModuleCapabilityComparisonResponse):
     parent: parents.get(entry.module)!,
     children: placed.filter(child => parents.get(child.module) === entry.module).map(child => child.module),
     color: entry.capabilities.some(row => row.implementedHere) ? '#2f7d4f' : entry.capabilities.length > 0 ? '#2f5fa7' : '#94a3b8',
-    width: nodeWidth(entry),
+    width: nodeWidth(entry, sessions.get(entry.module)),
     height: nodeHeight(entry),
     emphasis: emphasisOf(entry),
   }));
@@ -152,14 +174,18 @@ function RowList({ entry, selection, onSelect }: {
   );
 }
 
-function ModuleBody({ entry, selection, onSelect }: {
+function ModuleBody({ entry, selection, onSelect, sessions }: {
   readonly entry: ModuleCapabilities;
   readonly selection: ModuleCapabilitySelection | null;
   readonly onSelect: (selection: ModuleCapabilitySelection) => void;
+  readonly sessions: readonly RunSessionView[] | undefined;
 }) {
   return (
     <div className="capability-module">
-      <span className="capability-module-name" title={entry.module} style={{ height: headerHeight }}>{leaf(entry.module)}</span>
+      <span className="capability-module-heading" style={{ height: headerHeight }}>
+        <span className="capability-module-name" title={entry.module}>{leaf(entry.module)}</span>
+        <SessionMarks sessions={sessions} />
+      </span>
       {entry.proposedAtStart && <span className="capability-module-proposed" style={{ height: proposedHeight }}>proposed at start</span>}
       {entry.capabilities.length > 0 && <RowList entry={entry} selection={selection} onSelect={onSelect} />}
     </div>
@@ -198,7 +224,13 @@ function Coverage({ coverage }: { readonly coverage: ComparisonCoverage }) {
   );
 }
 
-function RowDetail({ module, row }: { readonly module: string; readonly row: ModuleCapabilityRow }) {
+/** The run's sessions and those of the selected element, where the view was given them. */
+interface DetailSessions {
+  readonly diagram: DiagramSessions;
+  readonly of: readonly RunSessionView[] | undefined;
+}
+
+function RowDetail({ module, row, sessions }: { readonly module: string; readonly row: ModuleCapabilityRow; readonly sessions: DetailSessions | undefined }) {
   return (
     <section className="capability-module-detail" aria-label={`Details for ${row.capability} in ${module}`}>
       <h3><code>{row.capability}</code></h3>
@@ -224,6 +256,7 @@ function RowDetail({ module, row }: { readonly module: string; readonly row: Mod
             {row.implementedHere.evidence.length > 0 && <div>Evidence: <ul className="inline-list" aria-label="Evidence">{row.implementedHere.evidence.map(item => <li key={item}><code>{item}</code></li>)}</ul></div>}
           </>
         )}
+      {sessions && <ElementSessions diagram={sessions.diagram} sessions={sessions.of} element={row.capability} />}
     </section>
   );
 }
@@ -234,7 +267,11 @@ function placementText(entry: ModuleCapabilities): string {
   return 'not placed in the tree';
 }
 
-function ModuleDetail({ entry, onSelect }: { readonly entry: ModuleCapabilities; readonly onSelect: (selection: ModuleCapabilitySelection) => void }) {
+function ModuleDetail({ entry, onSelect, sessions }: {
+  readonly entry: ModuleCapabilities;
+  readonly onSelect: (selection: ModuleCapabilitySelection) => void;
+  readonly sessions: DetailSessions | undefined;
+}) {
   return (
     <section className="capability-module-detail" aria-label={`Details for module ${entry.module}`}>
       <h3><code>{entry.module}</code></h3>
@@ -256,21 +293,36 @@ function ModuleDetail({ entry, onSelect }: { readonly entry: ModuleCapabilities;
             ))}
           </ul>
         )}
+      {sessions && <ElementSessions diagram={sessions.diagram} sessions={sessions.of} element={entry.module} />}
     </section>
   );
 }
 
-function Detail({ comparison, selection, onSelect }: CapabilityModuleTreeProps) {
+function Detail({ comparison, selection, onSelect, sessions, byModule, byCapability }: CapabilityModuleTreeProps & {
+  readonly byModule: ReadonlyMap<string, readonly RunSessionView[]>;
+  readonly byCapability: ReadonlyMap<string, readonly RunSessionView[]>;
+}) {
   const entry = selection ? comparison.modules.find(item => item.module === selection.module) : undefined;
   if (!selection || !entry) return <p className="muted">Select a capability row for its roles and evidence, or a module for its capability list.</p>;
-  if (selection.kind === 'module') return <ModuleDetail entry={entry} onSelect={onSelect} />;
+  if (selection.kind === 'module') {
+    return <ModuleDetail entry={entry} onSelect={onSelect} sessions={sessions && { diagram: sessions, of: byModule.get(entry.module) }} />;
+  }
   const row = entry.capabilities.find(item => item.capability === selection.capability);
-  return row ? <RowDetail module={entry.module} row={row} /> : <p className="muted">That capability is not in this answer.</p>;
+  return row
+    ? <RowDetail module={entry.module} row={row} sessions={sessions && { diagram: sessions, of: byCapability.get(row.capability) }} />
+    : <p className="muted">That capability is not in this answer.</p>;
 }
 
 /** The comparison's header, canvas, `unplaced` list and selected detail. */
-export function CapabilityModuleTree({ comparison, selection, onSelect }: CapabilityModuleTreeProps) {
-  const nodes = useMemo(() => comparisonNodes(comparison), [comparison]);
+export function CapabilityModuleTree({ comparison, selection, onSelect, sessions }: CapabilityModuleTreeProps) {
+  const sessionsOfModule = useMemo(() => sessionsBy(sessions?.sessions ?? [], moduleOf), [sessions]);
+  const sessionsOfCapability = useMemo(() => sessionsBy(sessions?.sessions ?? [], capabilityOf), [sessions]);
+  const nodes = useMemo(() => comparisonNodes(comparison, sessionsOfModule), [comparison, sessionsOfModule]);
+  const drawn = new Set(nodes.map(node => node.id));
+  const runLevel = (sessions?.sessions ?? []).filter(session => {
+    const module = moduleOf(session.reaches);
+    return module === null || !drawn.has(module);
+  });
   const byModule = useMemo(() => new Map(comparison.modules.map(entry => [entry.module, entry])), [comparison]);
   const unplaced = comparison.modules.filter(entry => entry.placement === 'unplaced');
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
@@ -285,13 +337,14 @@ export function CapabilityModuleTree({ comparison, selection, onSelect }: Capabi
   }), []);
   const renderBody = useCallback((node: ModuleTreeCanvasNode): ReactNode => {
     const entry = byModule.get(node.id);
-    return entry ? <ModuleBody entry={entry} selection={selection} onSelect={selectRow} /> : null;
-  }, [byModule, selection, selectRow]);
+    return entry ? <ModuleBody entry={entry} selection={selection} onSelect={selectRow} sessions={sessionsOfModule.get(node.id)} /> : null;
+  }, [byModule, selection, selectRow, sessionsOfModule]);
   const ariaLabelOf = useCallback((node: ModuleTreeCanvasNode) => {
     const entry = byModule.get(node.id);
     const rows = entry?.capabilities.length ?? 0;
-    return `${node.id}${entry?.proposedAtStart ? ', proposed at start' : ''}, ${rows === 0 ? 'no capability rows' : rows === 1 ? '1 capability row' : `${rows} capability rows`}`;
-  }, [byModule]);
+    const marks = sessionMarksText(sessionsOfModule.get(node.id));
+    return `${node.id}${entry?.proposedAtStart ? ', proposed at start' : ''}, ${rows === 0 ? 'no capability rows' : rows === 1 ? '1 capability row' : `${rows} capability rows`}${marks ? `, sessions: ${marks}` : ''}`;
+  }, [byModule, sessionsOfModule]);
 
   if (comparison.coverage.state === 'unavailable') {
     return (
@@ -317,8 +370,10 @@ export function CapabilityModuleTree({ comparison, selection, onSelect }: Capabi
           <span className="capability-mark capability-mark-initial">Initial: role</span> outlined
           <span className="capability-mark capability-mark-implemented">Implemented</span> filled
           <span>A dashed shell is a module proposed at start and absent from the tree; a faded shell has no capability rows.</span>
+          {sessions && <SessionMarksLegend />}
         </p>
       </header>
+      {sessions && <RunSessionStrip diagram={sessions} sessions={runLevel} />}
       <div className="capability-module-layout">
         {nodes.length > 0
           ? (
@@ -338,7 +393,8 @@ export function CapabilityModuleTree({ comparison, selection, onSelect }: Capabi
           : <p className="muted capability-module-canvas-empty">No module is drawn: {comparison.tree.status === 'unavailable' ? comparison.tree.message : 'the tree holds no module.'}</p>}
         <aside className="capability-module-side">
           <section aria-label="Selected">
-            <Detail comparison={comparison} selection={selection} onSelect={onSelect} />
+            <Detail comparison={comparison} selection={selection} onSelect={onSelect} sessions={sessions}
+              byModule={sessionsOfModule} byCapability={sessionsOfCapability} />
           </section>
           {unplaced.length > 0 && (
             <section className="capability-unplaced" aria-label="Modules not placed in the tree">

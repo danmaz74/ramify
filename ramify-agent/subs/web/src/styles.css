@@ -221,6 +221,7 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .capability-unplaced h3 { margin: 0.3rem 0; font-size: 1rem; }
 .capability-unplaced ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
 .capability-module { display: flex; flex-direction: column; min-width: 0; }
+.capability-module-heading { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .capability-module-name { display: block; font-weight: 700; font-size: 12px; line-height: 18px; white-space: nowrap; }
 .capability-module-proposed { display: block; color: var(--warn); font-size: 10px; font-weight: 700; line-height: 16px; }
 .capability-rows { display: flex; flex-direction: column; }
@@ -446,3 +447,27 @@ button.link[aria-pressed='true'] { font-weight: 700; }
   .facts dt, .facts.evaluation dt { min-width: 0; }
   .file-lines { padding-left: 3.2rem; }
 }
+
+/* Session marks on the progress diagrams: where agents are working. Words,
+ * never colour alone: each mark carries its state as text. */
+.session-marks { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 3px; font-size: 10px; line-height: 14px; }
+.session-mark, .role-chip { display: inline-block; padding: 0 0.35rem; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 14px; white-space: nowrap; }
+.session-mark-live { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
+.session-mark-suspended { color: var(--warn); background: #fff; border: 1px dashed var(--warn); }
+.session-mark-interrupted { color: var(--bad); background: #fff; border: 1px solid var(--bad); }
+.role-chip { color: var(--accent); background: #dde8f6; border: 1px solid #dde8f6; font-weight: 600; }
+.capability-node-sessions { display: flex; align-items: center; overflow: hidden; flex: 0 0 auto; }
+.graph-legend .session-marks, .graph-legend .session-mark, .graph-legend .role-chip { margin-right: 0.15rem; }
+.capability-legend .session-mark, .capability-legend .role-chip { margin-right: 0.15rem; }
+.session-strip {
+  display: grid; gap: 0.25rem; padding: 0.5rem 1.35rem; border-bottom: 1px solid var(--line); background: #f7f9fc; font-size: 0.88rem;
+}
+.capability-module-tree > .session-strip { border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 1rem; }
+.session-strip-label { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin: 0; }
+.session-strip-list, .element-session-list { list-style: none; margin: 0.1rem 0; padding: 0; display: grid; gap: 0.2rem; }
+.session-strip-finished summary { cursor: pointer; color: var(--muted); }
+.element-session { overflow-wrap: anywhere; }
+.element-session-live { border-left: 3px solid var(--accent); padding-left: 0.4rem; }
+.element-session-suspended { border-left: 3px dashed var(--warn); padding-left: 0.4rem; }
+.element-session-interrupted { border-left: 3px solid var(--bad); padding-left: 0.4rem; }
+.element-sessions h4 { margin: 0.6rem 0 0.2rem; font-size: 0.85rem; color: var(--muted); }

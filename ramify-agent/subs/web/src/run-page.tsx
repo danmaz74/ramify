@@ -11,6 +11,7 @@ import { Markdown } from './markdown.js';
 import { chapterHref, routeHref, sessionHref } from './routes.js';
 import { figure, metricValue, reachText, RunState, SessionState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
+import type { DiagramSessions } from './session-marks.js';
 
 /*
  * The Run page: one run, read-only, as the harness projects it. Its overview
@@ -522,6 +523,11 @@ type ProgressView = typeof progressViews[number][0];
  * mounted, so the page never loads both large visualizations at once. By
  * module is the default: it answers the run's initial-versus-current
  * placement question.
+ *
+ * Both are marked with the run's sessions. They are read again whenever the
+ * run's version moves, which the run's own poll reads, and every change of a
+ * session's state is an event of the run: a mark changes within one poll of
+ * the change. Without them the diagrams are drawn unmarked, and say so.
  */
 function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }: AreaProps & {
   readonly onOpenWorkItem: (workItem: string) => void;
@@ -529,6 +535,9 @@ function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }:
   readonly onSelectModule: (selection: ModuleCapabilitySelection | null) => void;
 }) {
   const [view, setView] = useState<ProgressView>('module');
+  const { client, planId, runId, version } = props;
+  const state = useRunQuery(`progress-sessions:${runId}`, version, () => client.getRunSessions(planId, runId));
+  const sessions: DiagramSessions | undefined = state.status === 'ready' ? { planId, runId, sessions: state.data.sessions } : undefined;
   return (
     <div className="area area-wide" aria-label="Progress">
       <nav className="tabs progress-views" aria-label="Progress views">
@@ -536,36 +545,41 @@ function Progress({ onOpenWorkItem, moduleSelection, onSelectModule, ...props }:
           <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? 'tab tab-selected' : 'tab'} onClick={() => setView(id)}>{label}</button>
         ))}
       </nav>
-      {view === 'module' && <ByModule {...props} selection={moduleSelection} onSelect={onSelectModule} />}
-      {view === 'dependencies' && <Dependencies {...props} onOpenWorkItem={onOpenWorkItem} />}
+      {state.status === 'failed' && <p className="warn" role="status">The sessions are not marked: {state.error.message}</p>}
+      {view === 'module' && <ByModule {...props} sessions={sessions} selection={moduleSelection} onSelect={onSelectModule} />}
+      {view === 'dependencies' && <Dependencies {...props} sessions={sessions} onOpenWorkItem={onOpenWorkItem} />}
     </div>
   );
 }
 
 /** The module-capability comparison on the shared module tree, or the condition that stands in for it. */
-function ByModule({ client, planId, runId, version, selection, onSelect }: AreaProps & {
+function ByModule({ client, planId, runId, version, selection, onSelect, sessions }: AreaProps & {
   readonly selection: ModuleCapabilitySelection | null;
   readonly onSelect: (selection: ModuleCapabilitySelection | null) => void;
+  readonly sessions: DiagramSessions | undefined;
 }) {
   const state = useRunQuery(`module-capabilities:${runId}`, version, () => client.getModuleCapabilities(planId, runId));
   return (
     <section className="progress-view" aria-label="By module">
       {state.status === 'loading' && <p className="muted" role="status">Loading the module comparison…</p>}
       {state.status === 'failed' && <p className="failure" role="alert">The module comparison is unavailable: {state.error.message}</p>}
-      {state.status === 'ready' && <CapabilityModuleTree comparison={state.data} selection={selection} onSelect={onSelect} />}
+      {state.status === 'ready' && <CapabilityModuleTree comparison={state.data} selection={selection} onSelect={onSelect} sessions={sessions} />}
     </section>
   );
 }
 
 /** The dependency graph, or the condition that stands in for it: never a `todo` in place of an answer. */
-function Dependencies({ client, planId, runId, version, onOpenWorkItem }: AreaProps & { readonly onOpenWorkItem: (workItem: string) => void }) {
+function Dependencies({ client, planId, runId, version, onOpenWorkItem, sessions }: AreaProps & {
+  readonly onOpenWorkItem: (workItem: string) => void;
+  readonly sessions: DiagramSessions | undefined;
+}) {
   const state = useRunQuery(`capabilities:${runId}`, version, () => client.getCapabilities(planId, runId));
   return (
     <section className="progress-view" aria-label="Dependencies">
       {state.status === 'loading' && <p className="muted" role="status">Loading the capability progress…</p>}
       {state.status === 'failed' && <p className="failure" role="alert">The capability progress is unavailable: {state.error.message}</p>}
       {state.status === 'ready' && (
-        <CapabilityDependencyGraph capabilities={state.data.capabilities} total={state.data.total} onOpenWorkItem={onOpenWorkItem} />
+        <CapabilityDependencyGraph capabilities={state.data.capabilities} total={state.data.total} onOpenWorkItem={onOpenWorkItem} sessions={sessions} />
       )}
     </section>
   );
