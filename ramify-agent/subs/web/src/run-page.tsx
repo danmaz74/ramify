@@ -6,9 +6,10 @@ import type {
 import { CapabilityDependencyGraph } from './capability-graph.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
+import { excursionsText, guardingText, hookChecksText, linesText, usageText } from './evaluation.js';
 import { Markdown } from './markdown.js';
-import { routeHref } from './routes.js';
-import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
+import { chapterHref, routeHref, sessionHref } from './routes.js';
+import { figure, metricValue, reachText, RunState, SessionState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
 
 /*
@@ -27,6 +28,7 @@ const areas = [
   ['work', 'Work items'],
   ['checks', 'Checks'],
   ['progress', 'Progress'],
+  ['sessions', 'Sessions'],
   ['measurements', 'Measurements'],
 ] as const;
 type Area = typeof areas[number][0];
@@ -88,6 +90,7 @@ export function RunPage({ client, planId, runId, interval }: {
         <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
           onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
       )}
+      {area === 'sessions' && <RunSessions {...props} />}
       {area === 'measurements' && <Measurements {...props} />}
     </section>
   );
@@ -568,6 +571,49 @@ function Dependencies({ client, planId, runId, version, onOpenWorkItem }: AreaPr
   );
 }
 
+// Sessions
+
+/*
+ * The run's sessions, each opening its transcript and each invocation its
+ * chapter. It is read again whenever the run's version moves.
+ */
+function RunSessions({ client, planId, runId, version }: AreaProps) {
+  const state = useRunQuery(`sessions:${runId}`, version, () => client.getRunSessions(planId, runId));
+  return (
+    <div className="area" aria-label="Sessions">
+      <Loading state={state} what="the sessions">
+        {data => data.sessions.length === 0 ? <p className="muted">No session has been opened yet.</p> : (
+          <ul className="session-list">
+            {data.sessions.map(session => {
+              const ref = { source: 'run', planId, runId, session: session.session } as const;
+              return (
+                <li key={session.session} className={`session-entry session-entry-${session.state}`}>
+                  <p className="session-entry-title">
+                    <a href={sessionHref(ref)}><code>{session.session}</code> {session.role}</a>
+                    <SessionState state={session.state} />
+                    {session.finished && <span className="muted"> {session.finished}</span>}
+                  </p>
+                  <p className="muted">{reachText(session.reaches)}{session.lineage.fork ? ` · forked from ${session.lineage.fork.from.session}` : ''}</p>
+                  <p className="session-chapters">
+                    Chapters:{' '}
+                    {session.invocations.map((invocation, index) => (
+                      <span key={invocation.invocation}>
+                        {index > 0 && ', '}
+                        <a href={chapterHref(ref, invocation.invocation)}>{invocation.invocation}</a>
+                        <span className="muted"> {invocation.outcome ?? (session.state === 'live' && session.awaiting === invocation.invocation ? 'awaited' : 'not ended')}</span>
+                      </span>
+                    ))}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Loading>
+    </div>
+  );
+}
+
 // Measurements
 
 function Measurements({ client, planId, runId, version }: AreaProps) {
@@ -631,19 +677,16 @@ function MetricRow({ metric }: { readonly metric: Metric | LineageMetric }) {
 }
 
 function SessionRow({ invocation }: { readonly invocation: InvocationEvaluation }) {
-  const usage = 'unavailable' in invocation.usage
-    ? `unavailable: ${invocation.usage.unavailable}`
-    : `in ${invocation.usage.input} · cache read ${invocation.usage.cacheRead} · cache write ${invocation.usage.cacheWrite} · out ${invocation.usage.output}`;
   return (
     <tr>
       <td>{invocation.invocation}{invocation.iteration ? <div className="muted">{invocation.iteration}</div> : null}</td>
       <td>{invocation.role}</td>
       <td>{invocation.ended ?? 'running'}</td>
-      <td>{invocation.guarding.complete ? 'complete' : 'partial'}{invocation.outsideScope.length > 0 ? <div className="warn">outside scope: {invocation.outsideScope.join(', ')}</div> : null}</td>
-      <td>{invocation.hookChecks.passed} passed, {invocation.hookChecks.findings} with findings, {invocation.hookChecks.notChecked} not checked</td>
-      <td>{invocation.excursions.join(', ') || '—'}</td>
-      <td>{invocation.lines === null ? '—' : `+${invocation.lines.added} −${invocation.lines.deleted} (${invocation.lines.coverage})`}</td>
-      <td>{usage}</td>
+      <td>{guardingText(invocation)}{invocation.outsideScope.length > 0 ? <div className="warn">outside scope: {invocation.outsideScope.join(', ')}</div> : null}</td>
+      <td>{hookChecksText(invocation)}</td>
+      <td>{excursionsText(invocation)}</td>
+      <td>{linesText(invocation)}</td>
+      <td>{usageText(invocation)}</td>
     </tr>
   );
 }

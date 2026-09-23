@@ -20,13 +20,33 @@ it is editable, and closing or reloading it does not affect a run.
   original receipt.
 - Pages are chosen by the URL fragment (`src/routes.ts`): `#/` lists the
   plans, `#/plans/<id>` shows one plan with its runs and Start, and
-  `#/plans/<id>/runs/<run-id>` is the Run page.
+  `#/plans/<id>/runs/<run-id>` is the Run page. `#/sessions` lists every
+  session of the project, and a session's transcript is
+  `#/plans/<id>/runs/<run-id>/sessions/<session>` or
+  `#/sessions/standalone/<session>`, optionally followed by
+  `/chapters/<invocation>`, `/points/<invocation>` or `/appends/<sequence>`
+  to open that place in it. The header links the plans and the sessions.
+- `src/sessions-page.tsx` is the Sessions page: live and suspended sessions
+  first, as the harness orders them, read again while one is live or
+  suspended. `src/session-page.tsx` is one session's transcript: its
+  invocations as chapters, each with its start relation and reason, its
+  points and the evaluation the Run page shows for it (`src/evaluation.tsx`).
+  `src/transcript.tsx` renders the entries: every block's header is shown,
+  and thinking, file contents, tool input and output, the prompts and
+  appended texts are collapsed; a stored or file body is fetched on its first
+  expansion, and a read is shown as a file with its range and line numbers.
+  `src/session-progress.ts` (`useSessionTranscript`) reads the transcript
+  after a cursor and follows a run's session with the run's update poll until
+  it is finished or interrupted and its entries are complete. The view keeps
+  to the bottom within a small margin, and otherwise offers the new entries.
 - `src/run-page.tsx` is the Run page, list and detail only: the overview
   with notices first (every module created or removed, then every
   dependency cycle, resolved or not), then state, current work, waits,
   counts, failure and the event feed; the plan and entries; hypotheses as
   forecasts with standing and revision beside the decisions; work items;
-  checks with bounded output tails; capability progress; and the metrics
+  checks with bounded output tails; capability progress; the run's
+  sessions, each opening its transcript and each invocation its chapter;
+  and the metrics
   with the evaluation evidence. The connection to the harness is shown apart
   from the run's state. `src/run-progress.ts` reads the event page after a
   cursor, as Plan 1's page did, and reads each area again when the run's
