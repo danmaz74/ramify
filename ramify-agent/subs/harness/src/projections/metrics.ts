@@ -4,6 +4,7 @@ import { baselineScope, rootModuleOfSnapshot, scopeSize } from '../kpi/capture.j
 import { guardingReport } from '../kpi/guarding.js';
 import { kpiMetrics, kpiPolicyVersion, measurementPolicyVersion, type InvocationFacts } from '../kpi/metrics.js';
 import { observationSchema, type Observation } from '../run/observations.js';
+import { invocationSessions } from '../run/sessions.js';
 import {
   lineEventSummarySchema, measurementSnapshotSchema, runLayout,
   type Invocation, type LineEventSummary, type MeasurementSnapshot,
@@ -130,6 +131,10 @@ function scoped(invocation: string, observations: readonly Observation[]): Obser
 export async function metricsOf(view: RunView): Promise<MetricsResponse> {
   const baseline = await baselineOf(view);
   const adaptations = adaptationsOf(view);
+  // Invocations are grouped into sessions by the harness session each one
+  // started in, never by an executor's ref: a ref names a point in the
+  // history, and each invocation of a continued session ends at another.
+  const sessions = invocationSessions(view.events);
   const facts: InvocationFacts[] = [];
   const evaluations: InvocationEvaluation[] = [];
   const merged: Observation[] = [];
@@ -145,7 +150,9 @@ export async function metricsOf(view: RunView): Promise<MetricsResponse> {
       iteration: invocation.work.iteration ?? null,
       request: invocation.work.request ?? null,
       writer: invocation.writer,
-      session: outcome?.session?.ref ?? invocation.session.ref,
+      // Its `invocation-started` commits the invocation record, so every
+      // record has a session; the fallback only keeps the type total.
+      session: sessions.get(invocation.id) ?? invocation.id,
       outcome,
       size: invocation.scope.size,
       lines,

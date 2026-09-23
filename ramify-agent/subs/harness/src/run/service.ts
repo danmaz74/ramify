@@ -94,7 +94,8 @@ import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
   recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
-  type SessionFinishReason, type SessionId,
+  type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
+  type RequestRelation, type SessionFinishReason, type SessionId,
 } from './records.js';
 import { reduceSessions, type RunSessions } from './sessions.js';
 import { runSnapshot, type RunSnapshot } from './snapshot.js';
@@ -259,6 +260,17 @@ interface InvocationRequest<T> {
   readonly degraded?: { readonly requested: 'fresh' | 'continued' | 'fork'; readonly reason: string } | undefined;
   /** The session a continued start joins; a fresh or forked start opens a new one. */
   readonly session?: SessionId | undefined;
+  /**
+   * Why a continued start continues its session; required with one. The
+   * point it continues from is the session's latest, which the log holds.
+   */
+  readonly continuing?: ContinueReason | undefined;
+  /** The harness point a forked start forks, and why; required with one. */
+  readonly fork?: ForkRelation | undefined;
+  /** The session a session this invocation opens takes the place of. */
+  readonly replaces?: ReplaceRelation | undefined;
+  /** The invocation whose result asked for the session this invocation opens. */
+  readonly requestedBy?: RequestRelation | undefined;
   /**
    * Whether the harness keeps the session once this invocation ends: kept,
    * to continue it or append to it, or finished with the reason. It is
@@ -448,6 +460,22 @@ export class RunService {
       return true;
     });
     if (written) await this.afterWrite('session-finished', run.record.jobId);
+  }
+
+  /**
+   * What a continued invocation continues from: its session's latest point,
+   * the end of its previous invocation or an append since, and the briefs
+   * appended since that invocation ended. An executor's ref is never read
+   * for it.
+   */
+  private continuationOf(run: Run, session: SessionId, reason: ContinueReason): ContinueRelation {
+    const point = this.sessionsOf(run)?.get(session)?.point ?? null;
+    if (point === null) throw new Error(`Run ${run.record.jobId}: ${session} has no point to continue from`);
+    const ended = run.log.all('invocation-ended').filter(event => event.data.session === session).at(-1)?.sequence ?? 0;
+    const briefs = run.log.all('brief-appended')
+      .filter(event => event.data.session === session && event.sequence > ended)
+      .map(event => event.data.decision);
+    return { from: point, reason, briefs };
   }
 
   /** The run's sessions as its log derives them, or undefined, with a warning, where the log breaks the lifecycle. */
@@ -926,7 +954,11 @@ export class RunService {
     // session the caller kept. The executor's ref stays the caller's.
     const opens = request.start.mode !== 'continue';
     if (!opens && request.session === undefined) throw new Error(`The ${request.role} invocation ${id} continues a session it does not name`);
+    // Every start that is not fresh names its harness point and its reason.
+    if (!opens && request.continuing === undefined) throw new Error(`The ${request.role} invocation ${id} continues a session without a reason`);
+    if (request.start.mode === 'fork' && request.fork === undefined) throw new Error(`The ${request.role} invocation ${id} forks without naming its point`);
     const session = opens ? sessionId(run.log.count('session-opened') + 1) : request.session!;
+    const continues = opens ? undefined : this.continuationOf(run, session, request.continuing!);
     const invocation = invocationSchema.parse({
       schema: 'ramify-agent.invocation/1',
       id,
@@ -951,13 +983,21 @@ export class RunService {
     if (opens) {
       await this.write(run, {
         type: 'session-opened',
-        data: { session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null },
+        data: {
+          session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null,
+          ...(request.start.mode === 'fork' ? { fork: request.fork! } : {}),
+          ...(request.replaces === undefined ? {} : { replaces: request.replaces }),
+          ...(request.requestedBy === undefined ? {} : { requestedBy: request.requestedBy }),
+        },
       });
       await this.afterWrite('session-opened', run.record.jobId);
     }
     await this.write(run, {
       type: 'invocation-started',
-      data: { invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued' },
+      data: {
+        invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued',
+        ...(continues === undefined ? {} : { continues }),
+      },
     }, [
       { path: runLayout.invocation(id), id, revision: 1, body: invocation },
     ]);
@@ -1070,6 +1110,11 @@ export class RunService {
       return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept };
     }
     run.session = agentSession;
+    // A start the executor could not honor is known only now, after the
+    // invocation's start is committed; its end records it.
+    const degraded: DegradeRelation | undefined = request.start.mode !== 'fresh' && agentSession.start.mode !== request.start.mode
+      ? { requested: request.start.mode, actual: agentSession.start.mode, reason: agentSession.start.degradedReason ?? null }
+      : undefined;
 
     // The policy's two bounds on one invocation. Either asks the session to
     // stop and ends the invocation as failed with the bound as its
@@ -1136,7 +1181,7 @@ export class RunService {
       usage: recorder.outcomeUsage(agent),
       elapsedMs,
       ...(outcome.kind === 'failed' && interruption === undefined ? { error: outcome.error } : {}),
-    });
+    }, degraded);
 
     return {
       id,
@@ -1437,6 +1482,8 @@ export class RunService {
     let sessionRef: string | undefined;
     /** The session this architect's turns share, while the harness keeps it; `sessionRef` is its executor's point. */
     let session: SessionId | undefined;
+    /** Why its next turn continues that session: what happened since its last turn. */
+    let continuing: ContinueReason | undefined;
     let attempt = 0;
     let gateRound = 0;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
@@ -1549,6 +1596,7 @@ export class RunService {
         prompt,
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
         session,
+        continuing,
         // The architect is continued after a placement request, an
         // iteration and a refused or failed completion. A yield and an
         // unresolved request end its use: a resumed work item starts afresh.
@@ -1603,6 +1651,7 @@ export class RunService {
         unresolvedRequest = resolution.kind === 'unresolved'
           ? { id: resolution.request, findings: resolution.findings, gaps: resolution.gaps }
           : undefined;
+        continuing = 'placement-answered';
         continue;
       }
 
@@ -1629,6 +1678,7 @@ export class RunService {
           lastIterationGate = undefined;
           failedGate = undefined;
           if (revised.cycle !== undefined) cycleFinding = revised.cycle;
+          continuing = 'iteration-closed';
           continue;
         }
         const outcome = await this.takeIteration(run, agent, packages, baseline, item, assigned, index);
@@ -1654,6 +1704,7 @@ export class RunService {
           lastResult = { ...reported, findings: [...reported.findings, ...contract.findings] };
           if (contract.cycle !== undefined) cycleFinding = contract.cycle;
         }
+        continuing = 'iteration-closed';
         continue;
       }
 
@@ -1678,6 +1729,7 @@ export class RunService {
             open.map(requirement => contractsLayout.requirement(requirement.id, requirement.revision)));
           return null;
         }
+        continuing = 'completion-refused';
         continue;
       }
 
@@ -1708,6 +1760,7 @@ export class RunService {
 
       failedGate = await diagnosticsOf(gate, 'local-architect');
       firstCause ??= { gate: gate.id, cause: gate.cause };
+      continuing = 'repair';
       if (gateRound > bound) {
         await this.fail(run, 'repair-exhausted',
           `The ${item.id} gate did not pass after ${bound} repair round${bound === 1 ? '' : 's'}; the first cause was ${firstCause.cause ?? 'unknown'} at gate ${firstCause.gate}`,
@@ -1894,6 +1947,14 @@ export class RunService {
           ...(revalidate === undefined ? {} : { revalidate }),
         }),
         start: context.ref === null ? { mode: 'fresh' } : { mode: 'fork', from: context.ref },
+        ...(context.point === null ? {} : {
+          fork: { from: context.point, reason: 'placement-request', generation: context.generation, briefs: [...context.appended] },
+        }),
+        // The first fork after a rebuild becomes the context in place of
+        // the one the rebuild found unreadable.
+        ...(context.session === null && context.previous !== null
+          ? { replaces: { session: context.previous, reason: 'context-rebuilt' } }
+          : {}),
         // A fork is never continued. The first fork after a rebuild is the
         // exception: it becomes the architect context, which is kept for
         // the briefs appended to it and the forks taken from it.
@@ -2421,6 +2482,8 @@ export class RunService {
     let sessionRef: string | undefined;
     /** The engineer's session while the harness keeps it; `sessionRef` is its executor's point. */
     let session: SessionId | undefined;
+    /** A lost session the next one is reconstructed in place of. */
+    let replacing: SessionId | undefined;
     let handoff: { done: string[]; unfinished: string[] } | undefined;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
     let firstCause: { gate: string; cause: string | null } | undefined;
@@ -2455,6 +2518,7 @@ export class RunService {
           // The session reconstructed from records takes the lost one's place.
           await this.finishSession(run, session, 'replaced');
           degraded = { requested: 'continued', reason: 'the implementation can no longer read the session; it was reconstructed from records' };
+          replacing = session;
           sessionRef = undefined;
           session = undefined;
         } else {
@@ -2492,6 +2556,12 @@ export class RunService {
         }),
         start,
         session,
+        // The engineer is kept only after a proposed completion, and
+        // continued only for the repair its failing gate asks for. The
+        // harness point is its previous invocation's end: the note appended
+        // before it is the executor's, and no other session starts from it.
+        continuing: 'repair',
+        ...(replacing === undefined ? {} : { replaces: { session: replacing, reason: 'reconstructed' } }),
         ...(degraded === undefined ? {} : { degraded }),
         // A proposed completion is kept for the repair its gate may ask
         // for; any other result closes the iteration, and a budget return
@@ -2534,6 +2604,7 @@ export class RunService {
       invocations.push(result.id);
       sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
       session = sessionRef === undefined ? undefined : result.session;
+      replacing = undefined;
 
       // The line events of this writer, from the two snapshots around it.
       // Two snapshots see the tree and not the history between them, so a
@@ -2900,6 +2971,7 @@ export class RunService {
       provider: entry.owner,
       capability: entry.capability,
       number,
+      requestedBy: { invocation: request.invocation, reason: 'contract-needed' },
     });
   }
 
@@ -2955,6 +3027,8 @@ export class RunService {
       readonly provider: string;
       readonly capability: string;
       readonly number: number;
+      /** The invocation whose need opened this sub-session; none for a revision its architect assigned. */
+      readonly requestedBy?: RequestRelation | undefined;
     },
   ): Promise<ContractOutcome | null> {
     const systemPrompt = renderContractPrompt(loaded, this.projectRoot);
@@ -3005,6 +3079,8 @@ export class RunService {
         }),
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
         session,
+        continuing: 'repair',
+        ...(subject.requestedBy === undefined ? {} : { requestedBy: subject.requestedBy }),
         // An established agreement is kept for the repair its gate may ask
         // for; a budget return or an incomplete one closes the iteration.
         keep: (ended, value) => {
@@ -3917,10 +3993,14 @@ export class RunService {
     session: SessionId,
     keeping: SessionKeeping,
     body: Omit<InvocationOutcome, 'schema' | 'invocation'>,
+    degraded?: DegradeRelation,
   ): Promise<void> {
     if (run.log.all('invocation-ended').some(event => event.data.invocation === id)) return;
     const outcome = invocationOutcomeSchema.parse({ schema: 'ramify-agent.invocation-outcome/1', invocation: id, ...body });
-    const ended = { invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null, session };
+    const ended = {
+      invocation: id, ended: outcome.ended, submission: outcome.submission?.hash ?? null, session,
+      ...(degraded === undefined ? {} : { degraded }),
+    };
     await this.write(run, {
       type: 'invocation-ended',
       data: keeping.kept ? { ...ended, kept: true } : { ...ended, kept: false, finished: keeping.finished },

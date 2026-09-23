@@ -1,5 +1,6 @@
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import type { RunEvent, RunEventOf } from '../run/log.js';
+import type { SessionId, SessionPoint } from '../run/records.js';
 import type { PlacementDecision } from './records.js';
 
 /*
@@ -23,6 +24,10 @@ export interface GlobalContext {
   readonly session: string | null;
   /** The executor's point the parent's history has reached, or null while the run has none. */
   readonly ref: string | null;
+  /** The same point as the harness names it, which a fork records; null exactly when `ref` is. */
+  readonly point: SessionPoint | null;
+  /** The session that held the generation before a rebuild, which this generation's parent replaces; null in generation 1. */
+  readonly previous: SessionId | null;
   /** The decisions whose briefs this generation holds. */
   readonly appended: readonly string[];
   /** Accepted decisions whose briefs are not appended yet. A rebuild clears them. */
@@ -50,9 +55,15 @@ export function globalContext(source: ContextSource): GlobalContext {
   const since = rebuilds.at(-1)?.sequence ?? 0;
 
   const started = of('invocation-started');
-  const parent = generation === 1
-    ? started.find(event => event.data.role === 'initial-architect')
-    : started.find(event => event.data.role === 'global-fork' && event.sequence > since);
+  // The parent of one generation: the initial architect, or the first fork
+  // started within that generation.
+  const parentOf = (of: number) => {
+    const from = of === 1 ? 0 : rebuilds[of - 2]!.sequence;
+    const to = rebuilds[of - 1]?.sequence ?? Number.POSITIVE_INFINITY;
+    return started.find(event => event.sequence > from && event.sequence < to
+      && event.data.role === (of === 1 ? 'initial-architect' : 'global-fork'));
+  };
+  const parent = parentOf(generation);
   const base = parent === undefined ? undefined : source.sessionRef(parent.data.invocation);
 
   const appends = of('brief-appended').filter(event => event.sequence > since);
@@ -64,6 +75,10 @@ export function globalContext(source: ContextSource): GlobalContext {
     generation,
     session: parent?.data.session ?? null,
     ref: latest?.data.ref ?? base ?? null,
+    point: latest !== undefined
+      ? { session: latest.data.session, append: latest.sequence }
+      : parent !== undefined && base !== undefined ? { session: parent.data.session, invocation: parent.data.invocation } : null,
+    previous: generation === 1 ? null : parentOf(generation - 1)?.data.session ?? null,
     appended,
     pending: accepted.map(event => event.data.decision).filter(decision => !appended.includes(decision)),
   };

@@ -299,6 +299,10 @@ describe('a requirement whose fake is still injected is not verified', () => {
     // removed it, the consumer's work item did not complete.
     const completed = log.findIndex(event => event.type === 'work-item-completed' && event.data.workItem === 'wi-001');
     expect(completed).toBeGreaterThan(closedAt);
+    // The turn after the refused completion continues the same architect,
+    // and says why.
+    const refused = log.filter(event => event.type === 'invocation-started' && event.data.continues?.reason === 'completion-refused');
+    expect(refused.map(event => event.data)).toEqual([expect.objectContaining({ role: 'local-architect', start: 'continued', work: { workItem: 'wi-001' } })]);
 
     const source = await readFile(`${root}/${consumerDirectory}/src/notes.ts`, 'utf8');
     expect(source).not.toContain('Fake');

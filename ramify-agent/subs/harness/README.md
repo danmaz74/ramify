@@ -172,7 +172,12 @@ hiding or measured complexity justifies it.
     reducer: `session-opened`, the invocations each session awaits, the
     briefs appended to it and `session-finished`. A session is live,
     suspended or finished, and an event that is not a transition of the
-    session it names is rejected with its sequence.
+    session it names is rejected with its sequence. Its lineage names
+    harness points, the end of an invocation or an append, never an
+    executor's ref: a continuation continues from its session's latest
+    point, a fork names the point it was taken from, a replacement the
+    session it takes the place of, and a request the invocation that asked
+    for it.
   - `observations.ts`: one invocation's observation log. It is canonical for
     what was observed and for nothing else, so it does not go through the
     ledger; a replayed `(invocation, callId, type)` is dropped.
@@ -200,7 +205,9 @@ hiding or measured complexity justifies it.
     the closing event is the last write of the invocation. A fresh or forked
     invocation opens a session and a continued one joins the session its
     loop kept; each end records whether the session is kept or finished, and
-    run end and recovery finish every session still kept.
+    run end and recovery finish every session still kept. Each start that is
+    not fresh records its point and its reason, and each end a start the
+    executor could not honor.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
     guard saw; comparing it with the write scope fills `outsideScope`, and
@@ -386,8 +393,9 @@ hiding or measured complexity justifies it.
   capability progress, where `completed` needs current verification
   evidence, a provider wait stays working with its reason, a reopening
   returns a completed capability to working and a superseded hypothesis
-  leaves the list; `metrics.ts` the KPIs and the evaluation evidence;
-  `queries.ts` the one entry point the HTTP adapter calls.
+  leaves the list; `metrics.ts` the KPIs and the evaluation evidence, with
+  invocations grouped into sessions by the harness session each one started
+  in; `queries.ts` the one entry point the HTTP adapter calls.
 - `prompts/`: one prompt package per role, versioned and hashed into the
   run's `prompts/manifest.json`. `submissionKinds` names the union members a
   package offers its role; a member a package does not offer is one no run

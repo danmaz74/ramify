@@ -1,5 +1,7 @@
 import { runQueryLimits, type ProjectedRunEvent, type RunEventPage, type RunEventRefKind } from '../interfaces/protocol/runs.js';
 import type { RunEvent, RunEventOf } from '../run/log.js';
+import type { SessionPoint } from '../run/records.js';
+import { pointLabel } from '../run/sessions.js';
 import type { RunView } from './inputs.js';
 import { snapshotOf } from './snapshot.js';
 
@@ -24,18 +26,32 @@ function describe(event: RunEvent): [string, Ref[]] {
   switch (event.type) {
     case 'job-started':
       return ['The run started', []];
-    case 'session-opened':
-      return [`The ${event.data.role} session ${event.data.session} opened on ${event.data.executor}${event.data.model === null ? '' : `, model ${event.data.model}`}`, workRefs(event.data.work)];
-    case 'invocation-started':
+    case 'session-opened': {
+      const { fork, replaces, requestedBy } = event.data;
       return [
-        `The ${event.data.role} invocation ${event.data.invocation} started, ${event.data.start === 'opened' ? 'opening' : 'continuing'} session ${event.data.session}`,
+        `The ${event.data.role} session ${event.data.session} opened on ${event.data.executor}${event.data.model === null ? '' : `, model ${event.data.model}`}`
+          + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}, generation ${fork.generation})`)
+          + (replaces === undefined ? '' : `, in place of ${replaces.session} (${replaces.reason})`)
+          + (requestedBy === undefined ? '' : `, requested by ${requestedBy.invocation} (${requestedBy.reason})`),
+        [...workRefs(event.data.work), ...pointRefs(fork?.from), ...ref('invocation', requestedBy?.invocation)],
+      ];
+    }
+    case 'invocation-started': {
+      const continues = event.data.continues;
+      return [
+        `The ${event.data.role} invocation ${event.data.invocation} started, ${event.data.start === 'opened' ? 'opening' : 'continuing'} session ${event.data.session}`
+          + (continues === undefined ? '' : ` from ${pointLabel(continues.from)} (${continues.reason})`),
+        [...ref('invocation', event.data.invocation), ...pointRefs(continues?.from)],
+      ];
+    }
+    case 'invocation-ended': {
+      const degraded = event.data.degraded;
+      return [
+        `Invocation ${event.data.invocation} ended: ${event.data.ended}; session ${event.data.session} ${event.data.kept ? 'is kept' : `finished (${event.data.finished})`}`
+          + (degraded === undefined ? '' : `; it started ${degraded.actual} where ${degraded.requested} was requested${degraded.reason === null ? '' : `: ${degraded.reason}`}`),
         ref('invocation', event.data.invocation),
       ];
-    case 'invocation-ended':
-      return [
-        `Invocation ${event.data.invocation} ended: ${event.data.ended}; session ${event.data.session} ${event.data.kept ? 'is kept' : `finished (${event.data.finished})`}`,
-        ref('invocation', event.data.invocation),
-      ];
+    }
     case 'session-finished':
       return [`Session ${event.data.session} finished (${event.data.reason})`, []];
     case 'analysis-accepted':
@@ -177,6 +193,9 @@ const counted = (count: number, one: string, many: string): string => `${count} 
 const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => [
   ...ref('work-item', work.workItem), ...ref('iteration', work.iteration), ...ref('request', work.request),
 ];
+
+/** The invocation a point names, where it names one. */
+const pointRefs = (point: SessionPoint | undefined): Ref[] => (point !== undefined && 'invocation' in point ? ref('invocation', point.invocation) : []);
 
 function unreachable(event: never): never {
   throw new Error(`No projection for event ${(event as RunEvent).type}`);

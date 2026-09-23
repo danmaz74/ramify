@@ -4,7 +4,10 @@ import { jobIdSchema } from '../interfaces/protocol/ids.js';
 import { acceptedCommandSchema } from '../interfaces/protocol/jobs.js';
 import { roleSchema, runFailureReasonSchema } from '../interfaces/protocol/runs.js';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
-import { invocationWorkSchema, recordRefSchema, sessionFinishReasonSchema, sessionIdSchema } from './records.js';
+import {
+  continueRelationSchema, degradeRelationSchema, forkRelationSchema, invocationWorkSchema, recordRefSchema,
+  replaceRelationSchema, requestRelationSchema, sessionFinishReasonSchema, sessionIdSchema,
+} from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 
@@ -38,6 +41,12 @@ const invocationEndedFields = {
   submission: z.string().nullable(),
   /** The session the invocation belongs to. */
   session: sessionIdSchema,
+  /**
+   * A start the executor could not honor. It is recorded here, at the end,
+   * because the actual start is known only once the session has started,
+   * after `invocation-started` is committed.
+   */
+  degraded: degradeRelationSchema.optional(),
 };
 
 /** One line of a run's event log. */
@@ -49,7 +58,9 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * invocation's `invocation-started`. It names the role and the work the
    * session is for, the executor that runs it and the model the harness
    * asked for, null where the executor chooses its own. How the session
-   * relates to others is added beside these fields, never in their place.
+   * relates to others is beside these fields: the point a fork was taken
+   * from, the session it replaces, and the invocation whose result asked
+   * for it.
    */
   event('session-opened', z.object({
     session: sessionIdSchema,
@@ -57,13 +68,17 @@ export const runEventSchema = z.discriminatedUnion('type', [
     work: invocationWorkSchema,
     executor: text,
     model: text.nullable(),
+    fork: forkRelationSchema.optional(),
+    replaces: replaceRelationSchema.optional(),
+    requestedBy: requestRelationSchema.optional(),
   }).strict()),
   /**
    * Appended before `startSession`, so a stop arriving between this event and
    * the session's start applies to a known invocation. It commits the
    * `Invocation` and the `MeasurementSnapshot` its scope was measured at.
    * `start` says whether it is the first invocation of the session just
-   * opened or continues a suspended one.
+   * opened or continues a suspended one, and `continues` names the point a
+   * continued one continues from and why.
    */
   event('invocation-started', z.object({
     invocation: text,
@@ -71,6 +86,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
     session: sessionIdSchema,
     work: invocationWorkSchema,
     start: z.enum(['opened', 'continued']),
+    continues: continueRelationSchema.optional(),
   }).strict()),
   /**
    * Commits the `InvocationOutcome` and the hash of the submission, if any,

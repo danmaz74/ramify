@@ -34,7 +34,7 @@ export interface InvocationFacts {
   readonly iteration: string | null;
   readonly request: string | null;
   readonly writer: boolean;
-  /** The session this invocation belongs to: a continued session keeps its ref. */
+  /** The harness session this invocation belongs to, which each invocation of a continued session shares. */
   readonly session: string;
   /** Null while the invocation has not ended. */
   readonly outcome: Pick<InvocationOutcome, 'ended' | 'usage' | 'outsideScope'> | null;

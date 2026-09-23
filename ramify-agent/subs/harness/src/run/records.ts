@@ -349,6 +349,73 @@ export const usageSchema = z.object({
 export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict();
 export type InvocationWork = z.infer<typeof invocationWorkSchema>;
 
+// Lineage: how a session relates to others, by harness points and never by
+// an executor's ref.
+
+/**
+ * A point a session can be continued or forked from: the end of one of its
+ * invocations, or the result of one append to it, named by the sequence of
+ * its `brief-appended` event.
+ */
+export const sessionPointSchema = z.union([
+  z.object({ session: sessionIdSchema, invocation: text }).strict(),
+  z.object({ session: sessionIdSchema, append: z.int().positive() }).strict(),
+]);
+export type SessionPoint = z.infer<typeof sessionPointSchema>;
+
+/**
+ * Why a suspended session is continued: its placement request was answered,
+ * the iteration it assigned closed, its completion was refused while
+ * evidence was owed, or a gate failed after its result and it repairs.
+ */
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
+export type ContinueReason = z.infer<typeof continueReasonSchema>;
+
+/** Why a session is forked from another: a placement request forks the architect context. */
+export const forkReasonSchema = z.enum(['placement-request']);
+
+/** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
+export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
+
+/** Why an invocation's result opened a session: an engineer's need opens a contract sub-session. */
+export const requestReasonSchema = z.enum(['contract-needed']);
+
+/** A continued invocation: the point it continues from, why, and the briefs appended since its session's previous invocation. */
+export const continueRelationSchema = z.object({
+  from: sessionPointSchema,
+  reason: continueReasonSchema,
+  briefs: z.array(text),
+}).strict();
+export type ContinueRelation = z.infer<typeof continueRelationSchema>;
+
+/** A forked session: its source point, why, the architect context's generation and the briefs the source held at the point. */
+export const forkRelationSchema = z.object({
+  from: sessionPointSchema,
+  reason: forkReasonSchema,
+  generation: z.int().positive(),
+  briefs: z.array(text),
+}).strict();
+export type ForkRelation = z.infer<typeof forkRelationSchema>;
+
+/** A session that takes another's place, which is finished before it opens. */
+export const replaceRelationSchema = z.object({ session: sessionIdSchema, reason: replaceReasonSchema }).strict();
+export type ReplaceRelation = z.infer<typeof replaceRelationSchema>;
+
+/** A session opened because an invocation's result asked for it; it shares no history with it. */
+export const requestRelationSchema = z.object({ invocation: text, reason: requestReasonSchema }).strict();
+export type RequestRelation = z.infer<typeof requestRelationSchema>;
+
+/**
+ * A start the executor could not honor: the relation requested, the start
+ * that was actual, and the executor's reason, null where it gave none.
+ */
+export const degradeRelationSchema = z.object({
+  requested: z.enum(['continue', 'fork']),
+  actual: z.enum(['fresh', 'continue', 'fork']),
+  reason: z.string().nullable(),
+}).strict();
+export type DegradeRelation = z.infer<typeof degradeRelationSchema>;
+
 export const invocationSchema = z.object({
   schema: z.literal('ramify-agent.invocation/1'),
   id: text,

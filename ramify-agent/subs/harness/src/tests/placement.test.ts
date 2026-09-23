@@ -389,6 +389,49 @@ describe('the invocation of a fork', () => {
   }, 120_000);
 });
 
+describe('a start the executor could not honor', () => {
+  test('is recorded at the invocation\'s end with what was requested, what was actual and the executor\'s reason', async () => {
+    const project = await target();
+    const agent = createScriptedAgent(byRole({
+      'initial-architect': [submit(analysed())],
+      'local-architect': [submit(requestPlacement({ forCapability: 'compare-revisions' })), submit(requestCompletion()), submit(requestCompletion())],
+      'global-fork': [submit(firstDecision('field-diff belongs to the catalog core.'))],
+    }));
+    // The executor forgets the architect context and the local architect's
+    // session as soon as each first invocation ends, so the fork and the
+    // continuation it asks for both start fresh.
+    let ends = 0;
+    const opened = await openRuns(project, {
+      agent,
+      inputs: treeInputs(),
+      unchangedCheckpoints: unchangedPlacementCheckpoints,
+      afterWrite: async write => {
+        if (write !== 'invocation-ended') return;
+        ends += 1;
+        if (ends <= 2) expect(agent.forget(agent.sessions[ends - 1]!.ref)).toBe(true);
+      },
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('revision-diff'));
+    await opened.service.settled('revision-diff', receipt.jobId);
+
+    const events = await runEventsOnDisk(project, 'revision-diff', receipt.jobId);
+    const degraded = events.flatMap(event => (event.type === 'invocation-ended' && event.data.degraded !== undefined ? [[event.data.invocation, event.data.degraded]] : []));
+    expect(degraded).toEqual([
+      ['inv-0003', { requested: 'fork', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') }],
+      ['inv-0004', { requested: 'continue', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') }],
+    ]);
+    // The relations requested stay as they were asked for: the fork still
+    // names its source point, and the continuation its session's last one.
+    const sessions = reduceSessions(events);
+    expect(sessions.get('ses-0003')!.fork).toMatchObject({ from: { session: 'ses-0001', invocation: 'inv-0001' } });
+    const continued = events.find(event => event.type === 'invocation-started' && event.data.invocation === 'inv-0004')!;
+    expect(continued.data).toMatchObject({ start: 'continued', continues: { from: { session: 'ses-0002', invocation: 'inv-0002' }, reason: 'placement-answered' } });
+    // Only a start that degraded says so.
+    expect(events.filter(event => event.type === 'invocation-ended').length).toBeGreaterThan(degraded.length);
+  }, 120_000);
+});
+
 describe('a parent context that can no longer be read', () => {
   test('the generation rises, the pending brief is cleared, and the next fork is oriented from the records', async () => {
     const project = await target();
@@ -469,6 +512,11 @@ describe('a parent context that can no longer be read', () => {
     expect(sessions.get(rebuiltContext)).toMatchObject({ role: 'global-fork', state: 'finished', finished: 'run-ended' });
     expect(sessions.get(rebuiltContext)!.appends).toHaveLength(1);
     expect(sessions.get(context)).toMatchObject({ state: 'finished', finished: 'not-kept' });
+    // ST03: the first fork forked the architect context of generation 1 at
+    // the initial architect's end; the fork that rebuilt the context names
+    // the session it took the place of, and forks from nothing.
+    expect(sessions.get(context)!.fork).toEqual({ from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'placement-request', generation: 1, briefs: [] });
+    expect(sessions.get(rebuiltContext)).toMatchObject({ fork: null, replaces: { session: 'ses-0001', reason: 'context-rebuilt' } });
   }, 120_000);
 });
 

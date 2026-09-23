@@ -1,14 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import { runEvent, type RunEvent, type RunEventInput } from '../run/log.js';
-import { sessionId, sessionIdSchema } from '../run/records.js';
+import { sessionId, sessionIdSchema, type ContinueRelation, type ForkRelation, type ReplaceRelation, type RequestRelation } from '../run/records.js';
 import {
-  applySessionEvent, InvalidSessionTransitionError, reduceSessions, sessionsIn, type RunSessions, type SessionState,
+  applySessionEvent, InvalidSessionTransitionError, invocationSessions, reduceSessions, sessionsIn, type RunSessions, type SessionState,
 } from '../run/sessions.js';
 
 /*
  * The session reducer: a pure function of the run log with a closed set of
  * transitions. Every valid pair of a state and an event is taken here, and
- * every other pair is rejected with the event's sequence.
+ * every other pair is rejected with the event's sequence. A lineage relation
+ * is held to the points the log has reached.
  */
 
 const runId = '20260923T090000Z-5e5510';
@@ -19,13 +20,16 @@ function log(...inputs: RunEventInput[]): RunEvent[] {
   return inputs.map((input, index) => runEvent(runId, index + 1, input, new Date(at.getTime() + index * 1000)));
 }
 
-const opened = (session = 'ses-0001', role: 'initial-architect' | 'engineer' = 'engineer'): RunEventInput => ({
+/** The relations a session can be opened with. */
+type Opening = { fork?: ForkRelation; replaces?: ReplaceRelation; requestedBy?: RequestRelation };
+
+const opened = (session = 'ses-0001', role: 'initial-architect' | 'engineer' = 'engineer', relations: Opening = {}): RunEventInput => ({
   type: 'session-opened',
-  data: { session, role, work: role === 'engineer' ? { workItem: 'wi-001', iteration: 'wi-001.i01' } : {}, executor: 'scripted', model: null },
+  data: { session, role, work: role === 'engineer' ? { workItem: 'wi-001', iteration: 'wi-001.i01' } : {}, executor: 'scripted', model: null, ...relations },
 });
-const started = (invocation: string, start: 'opened' | 'continued', session = 'ses-0001'): RunEventInput => ({
+const started = (invocation: string, start: 'opened' | 'continued', session = 'ses-0001', continues?: ContinueRelation): RunEventInput => ({
   type: 'invocation-started',
-  data: { invocation, role: 'engineer', session, work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, start },
+  data: { invocation, role: 'engineer', session, work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, start, ...(continues === undefined ? {} : { continues }) },
 });
 const ended = (invocation: string, kept: boolean, session = 'ses-0001'): RunEventInput => ({
   type: 'invocation-ended',
@@ -149,6 +153,10 @@ describe('the session reducer', () => {
       awaiting: null,
       appends: [4, 5],
       finished: 'run-ended',
+      point: { session: 'ses-0001', invocation: 'inv-0002' },
+      fork: null,
+      replaces: null,
+      requestedBy: null,
       opened: { sequence: 1, at: events[0]!.at },
       changed: { sequence: 8, at: events[7]!.at },
     });
@@ -177,5 +185,64 @@ describe('the session reducer', () => {
     for (const invalid of ['ses-1', 'inv-0001', 'scripted-1@3#1', '20260921T101500Z-a1b2c3']) {
       expect(sessionIdSchema.safeParse(invalid).success).toBe(false);
     }
+  });
+});
+
+describe('lineage', () => {
+  const context = [opened('ses-0001', 'initial-architect'), started('inv-0001', 'opened'), ended('inv-0001', true)];
+
+  test('a session\'s point moves to each invocation\'s end and each append', () => {
+    const point = (...inputs: RunEventInput[]) => reduceSessions(log(...inputs)).get('ses-0001')!.point;
+    expect(point(opened(), started('inv-0001', 'opened'))).toBeNull();
+    expect(point(...context)).toEqual({ session: 'ses-0001', invocation: 'inv-0001' });
+    expect(point(...context, appended())).toEqual({ session: 'ses-0001', append: 4 });
+    expect(point(opened(), started('inv-0001', 'opened'), ended('inv-0001', false))).toEqual({ session: 'ses-0001', invocation: 'inv-0001' });
+  });
+
+  test('a continuation continues from its session\'s latest point, and from no other', () => {
+    const continued = (from: ContinueRelation['from']) =>
+      reduceSessions(log(...context, appended(), started('inv-0002', 'continued', 'ses-0001', { from, reason: 'repair', briefs: ['gd-001'] })));
+    expect(continued({ session: 'ses-0001', append: 4 }).get('ses-0001')!.state).toBe('live');
+    // The end of the previous invocation is no longer the latest point once
+    // a brief is appended after it.
+    expect(() => continued({ session: 'ses-0001', invocation: 'inv-0001' })).toThrow(/latest point is ses-0001 at append 4/);
+    expect(() => continued({ session: 'ses-0002', append: 4 })).toThrow(InvalidSessionTransitionError);
+    // A start that opens a session continues from nothing.
+    expect(() => reduceSessions(log(opened(), started('inv-0001', 'opened', 'ses-0001', { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'repair', briefs: [] }))))
+      .toThrow(/only a continued start continues from a point/);
+  });
+
+  test('a fork names a point its source reached, whatever state the source is in now', () => {
+    const fork = (from: ForkRelation['from']): ForkRelation => ({ from, reason: 'placement-request', generation: 1, briefs: [] });
+    const forked = reduceSessions(log(...context, appended(), opened('ses-0002', 'engineer', { fork: fork({ session: 'ses-0001', invocation: 'inv-0001' }) })));
+    expect(forked.get('ses-0002')!.fork).toEqual(fork({ session: 'ses-0001', invocation: 'inv-0001' }));
+    expect(forked.get('ses-0001')!.state).toBe('suspended');
+    // A finished source still holds its points.
+    expect(() => reduceSessions(log(...context, released(), opened('ses-0002', 'engineer', { fork: fork({ session: 'ses-0001', invocation: 'inv-0001' }) })))).not.toThrow();
+    // A point not reached: an invocation still awaited, one that never ran, an append that did not happen.
+    expect(() => reduceSessions(log(opened(), started('inv-0001', 'opened'), opened('ses-0002', 'engineer', { fork: fork({ session: 'ses-0001', invocation: 'inv-0001' }) }))))
+      .toThrow(/forks from ses-0001 at inv-0001, which no session has reached/);
+    expect(() => reduceSessions(log(...context, opened('ses-0002', 'engineer', { fork: fork({ session: 'ses-0001', invocation: 'inv-0009' }) })))).toThrow(InvalidSessionTransitionError);
+    expect(() => reduceSessions(log(...context, opened('ses-0002', 'engineer', { fork: fork({ session: 'ses-0001', append: 3 }) })))).toThrow(InvalidSessionTransitionError);
+  });
+
+  test('a replacement names an opened session, and a request an invocation that started', () => {
+    const replaced = reduceSessions(log(...context, released('replaced'),
+      opened('ses-0002', 'engineer', { replaces: { session: 'ses-0001', reason: 'reconstructed' }, requestedBy: { invocation: 'inv-0001', reason: 'contract-needed' } })));
+    expect(replaced.get('ses-0002')).toMatchObject({
+      replaces: { session: 'ses-0001', reason: 'reconstructed' },
+      requestedBy: { invocation: 'inv-0001', reason: 'contract-needed' },
+      fork: null,
+    });
+    expect(() => reduceSessions(log(...context, opened('ses-0002', 'engineer', { replaces: { session: 'ses-0007', reason: 'context-rebuilt' } }))))
+      .toThrow(/replaces ses-0007, which was never opened/);
+    expect(() => reduceSessions(log(...context, opened('ses-0002', 'engineer', { requestedBy: { invocation: 'inv-0009', reason: 'contract-needed' } }))))
+      .toThrow(/requested by inv-0009, which has not started/);
+  });
+
+  test('each invocation\'s session is read from its start, for a projection that groups by session', () => {
+    const events = log(...context, started('inv-0002', 'continued', 'ses-0001', { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'repair', briefs: [] }),
+      opened('ses-0002'), started('inv-0003', 'opened', 'ses-0002'));
+    expect([...invocationSessions(events)]).toEqual([['inv-0001', 'ses-0001'], ['inv-0002', 'ses-0001'], ['inv-0003', 'ses-0002']]);
   });
 });

@@ -16,6 +16,7 @@ import { constructedRun } from './helpers/constructed.js';
 import {
   infrastructureRecoverySchema, invocationOutcomeSchema, measurementSnapshotSchema, readinessSteps,
   gateRuleSchema, runLayout, runSchemas, sessionModeSchema,
+  continueReasonSchema, degradeRelationSchema, forkReasonSchema, replaceReasonSchema, requestReasonSchema, sessionPointSchema,
 } from '../run/records.js';
 import { defaultContextPolicies } from '../run/policy.js';
 import { analysisLayout, analysisSchemas, hypothesisChangeSchema, hypothesisSchema, registryEntrySchema } from '../analysis/records.js';
@@ -102,6 +103,43 @@ describe('the run log', () => {
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
+  });
+
+  test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
+    expect(forkReasonSchema.options).toEqual(['placement-request']);
+    expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
+    expect(requestReasonSchema.options).toEqual(['contract-needed']);
+    expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
+
+    const base = { jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z' };
+    const end = { session: 'ses-0001', invocation: 'inv-0001' };
+    const append = { session: 'ses-0001', append: 4 };
+    const lines = [
+      { sequence: 1, type: 'session-opened', data: {
+        session: 'ses-0002', role: 'global-fork', work: { workItem: 'wi-001', request: 'pr-001' }, executor: 'scripted', model: null,
+        fork: { from: append, reason: 'placement-request', generation: 2, briefs: ['gd-001'] },
+        replaces: { session: 'ses-0001', reason: 'context-rebuilt' },
+        requestedBy: { invocation: 'inv-0001', reason: 'contract-needed' },
+      } },
+      { sequence: 2, type: 'invocation-started', data: {
+        invocation: 'inv-0002', role: 'engineer', session: 'ses-0001', work: {}, start: 'continued',
+        continues: { from: end, reason: 'repair', briefs: [] },
+      } },
+      { sequence: 3, type: 'invocation-ended', data: {
+        invocation: 'inv-0002', ended: 'submitted', submission: null, session: 'ses-0001', kept: true,
+        degraded: { requested: 'continue', actual: 'fresh', reason: null },
+      } },
+      { sequence: 4, type: 'invocation-ended', data: {
+        invocation: 'inv-0003', ended: 'failed', submission: null, session: 'ses-0002', kept: false, finished: 'not-kept',
+        degraded: { requested: 'fork', actual: 'fresh', reason: 'The session is not known.' },
+      } },
+    ];
+    for (const line of lines) expect(runEventSchema.parse({ ...base, ...line })).toEqual({ ...base, ...line });
+    // A point is a harness session with an invocation or an append, never an executor's ref.
+    expect(sessionPointSchema.safeParse({ session: 'scripted-1@3#1', invocation: 'inv-0001' }).success).toBe(false);
+    expect(sessionPointSchema.safeParse({ session: 'ses-0001', ref: 'scripted-1@3#1' }).success).toBe(false);
+    expect(sessionPointSchema.safeParse({ ...end, append: 4 }).success).toBe(false);
   });
 
   test('an event of an unknown type is refused', () => {

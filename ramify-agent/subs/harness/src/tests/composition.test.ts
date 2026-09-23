@@ -294,6 +294,12 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[invocation-ended].data[false].finished', values: ['interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
   { union: 'run log[invocation-ended].data[false].finished', values: ['lost'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
   { union: 'run log[invocation-ended].data[false].finished', values: ['replaced'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a session the implementation can no longer read is reconstructed, and the counters are kept' },
+  { union: 'run log[session-opened].data.replaces.reason', values: ['reconstructed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a session the implementation can no longer read is reconstructed, and the counters are kept' },
+  { union: 'run log[session-opened].data.replaces.reason', values: ['context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['repair'], file: 'subs/harness/src/tests/session-lifecycle.test.ts', test: 'a continued local architect, a global fork, a contract sub-session and a repaired engineer derive the expected state after every event' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['completion-refused'], file: 'subs/harness/src/tests/requirement-verification.test.ts', test: 'a passing verification that left the fake in place closes nothing, and completion is refused until it is gone' },
+  { union: 'run log[invocation-ended].data[true].degraded.requested', values: ['continue', 'fork'], file: 'subs/harness/src/tests/placement.test.ts', test: 'is recorded at the invocation\'s end with what was requested, what was actual and the executor\'s reason' },
+  { union: 'run log[invocation-ended].data[true].degraded.actual', values: ['fresh'], file: 'subs/harness/src/tests/placement.test.ts', test: 'is recorded at the invocation\'s end with what was requested, what was actual and the executor\'s reason' },
   { union: 'run log[brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'G4: a crash after the append and before its completion answers already-present, and one brief exists' },
   { union: 'run log[iteration-closed].data.notices[].kind', values: ['module-created'], file: 'subs/harness/src/tests/module-creation-integration.test.ts', test: 'a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit' },
   { union: 'run log[job-failed].data.reason', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
@@ -407,6 +413,10 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.infrastructure-recovery/1.action', values: ['reconstruct-session', 'none'],
     reason: 'Readiness plans only reinstall-nested, restart-daemon and rerun-command; an unrecoverable failure records no recovery at all (iteration 4, deviation 9), and session reconstruction is recorded on the invocation, not as a recovery.',
+  },
+  {
+    union: 'run log[invocation-ended].data[true].degraded.actual', values: ['continue', 'fork'],
+    reason: 'The agent port degrades a start it cannot honor to fresh, and both of its implementations do. The field takes the port\'s mode as it is answered, so an executor that answered another is recorded rather than refused.',
   },
   {
     union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['provider-error'],

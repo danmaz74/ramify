@@ -399,6 +399,9 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
     expect(events.find(event => event.type === 'session-finished' && event.data.session === lost.session)!.data).toEqual({ session: lost.session, reason: 'replaced' });
     expect(events.findIndex(event => event.type === 'session-finished' && event.data.session === lost.session))
       .toBeLessThan(events.findIndex(event => event.type === 'session-opened' && event.data.session === reconstructed.session));
+    // ST03: the reconstruction names the session it replaces, and why.
+    expect(events.find(event => event.type === 'session-opened' && event.data.session === reconstructed.session)!.data)
+      .toMatchObject({ replaces: { session: lost.session, reason: 'reconstructed' } });
     const iterationGates = (await gates(root, runId)).filter(gate => gate.checkpoint === 'iteration');
     expect(iterationGates.map(gate => gate.repairRound)).toEqual([0, 1]);
     expect(result.commit).toBe('revision-01');

@@ -8,8 +8,8 @@ import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers
 import { accepted, added, answeredGit, modified, unchanged } from './helpers/contracts-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
-import { runLayout, type Invocation } from '../run/records.js';
-import { applySessionEvent, reduceSessions, sessionEventTypes, type RunSessions } from '../run/sessions.js';
+import { runLayout, type Invocation, type InvocationOutcome } from '../run/records.js';
+import { applySessionEvent, pointLabel, reduceSessions, sessionEventTypes, type RunSessions } from '../run/sessions.js';
 import { standaloneSessionState, type SessionOutcomeRecord } from '../sessions/records.js';
 
 vi.mock('node:child_process', async original =>
@@ -22,7 +22,8 @@ vi.mock('node:child_process', async original =>
  * back to it; an engineer iteration whose need opens a contract sub-session;
  * a provider engineer continued for a repair after its first gate failed;
  * and the resumed consumer's fresh architect. Every invocation belongs to a
- * session, and the final run holds no suspended session.
+ * session, and the final run holds no suspended session. Every start that
+ * is not fresh names the harness point it starts from and its reason.
  *
  * Git is external and answered from this file's own data, as are the gate's
  * commands; nothing here simulates a transition.
@@ -169,18 +170,30 @@ function trace(events: readonly RunEvent[]): string[] {
   return lines;
 }
 
+/** One session event, with the lineage relation it records. */
 function label(event: RunEvent): string {
   switch (event.type) {
-    case 'session-opened': return `${event.data.session} opened: ${event.data.role}${event.data.work.workItem === undefined ? '' : ` ${event.data.work.workItem}`}`;
-    case 'invocation-started': return `${event.data.invocation} ${event.data.start === 'opened' ? 'opens' : 'continues'} ${event.data.session}`;
-    case 'invocation-ended': return `${event.data.invocation} ended, ${event.data.session} ${event.data.kept ? 'kept' : `finished: ${event.data.finished}`}`;
+    case 'session-opened': {
+      const { fork, replaces, requestedBy } = event.data;
+      return `${event.data.session} opened: ${event.data.role}${event.data.work.workItem === undefined ? '' : ` ${event.data.work.workItem}`}`
+        + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}, generation ${fork.generation}, briefs [${fork.briefs.join(', ')}])`)
+        + (replaces === undefined ? '' : `, replacing ${replaces.session} (${replaces.reason})`)
+        + (requestedBy === undefined ? '' : `, requested by ${requestedBy.invocation} (${requestedBy.reason})`);
+    }
+    case 'invocation-started': {
+      const continues = event.data.continues;
+      return `${event.data.invocation} ${event.data.start === 'opened' ? 'opens' : 'continues'} ${event.data.session}`
+        + (continues === undefined ? '' : ` from ${pointLabel(continues.from)} (${continues.reason}${continues.briefs.length === 0 ? '' : `, briefs [${continues.briefs.join(', ')}]`})`);
+    }
+    case 'invocation-ended': return `${event.data.invocation} ended, ${event.data.session} ${event.data.kept ? 'kept' : `finished: ${event.data.finished}`}`
+      + (event.data.degraded === undefined ? '' : `, degraded from ${event.data.degraded.requested} to ${event.data.degraded.actual}`);
     case 'brief-appended': return `${event.data.decision} appended to ${event.data.session}`;
     case 'session-finished': return `${event.data.session} finished: ${event.data.reason}`;
     default: return event.type;
   }
 }
 
-describe('ST01, ST02: the sessions of a scripted run', () => {
+describe('ST01, ST02, ST03: the sessions of a scripted run', () => {
   test('a continued local architect, a global fork, a contract sub-session and a repaired engineer derive the expected state after every event', async () => {
     const root = await target();
     const git = answeredGit(root, {
@@ -256,23 +269,23 @@ describe('ST01, ST02: the sessions of a scripted run', () => {
       'ses-0002 opened: local-architect wi-001 | ses-0001 suspended, ses-0002 live',
       'inv-0002 opens ses-0002 | ses-0001 suspended, ses-0002 live',
       'inv-0002 ended, ses-0002 kept | ses-0001 suspended, ses-0002 suspended',
-      'ses-0003 opened: global-fork wi-001 | ses-0001 suspended, ses-0002 suspended, ses-0003 live',
+      'ses-0003 opened: global-fork wi-001, forked from ses-0001 at inv-0001 (placement-request, generation 1, briefs []) | ses-0001 suspended, ses-0002 suspended, ses-0003 live',
       'inv-0003 opens ses-0003 | ses-0001 suspended, ses-0002 suspended, ses-0003 live',
       'inv-0003 ended, ses-0003 finished: not-kept | ses-0001 suspended, ses-0002 suspended',
       'gd-001 appended to ses-0001 | ses-0001 suspended, ses-0002 suspended',
       // The same architect, continued: it assigns the iteration whose need
       // opens the contract sub-session.
-      'inv-0004 continues ses-0002 | ses-0001 suspended, ses-0002 live',
+      'inv-0004 continues ses-0002 from ses-0002 at inv-0002 (placement-answered) | ses-0001 suspended, ses-0002 live',
       'inv-0004 ended, ses-0002 kept | ses-0001 suspended, ses-0002 suspended',
       'ses-0004 opened: engineer wi-001 | ses-0001 suspended, ses-0002 suspended, ses-0004 live',
       'inv-0005 opens ses-0004 | ses-0001 suspended, ses-0002 suspended, ses-0004 live',
       'inv-0005 ended, ses-0004 finished: work-closed | ses-0001 suspended, ses-0002 suspended',
-      'ses-0005 opened: contract-engineer wi-001 | ses-0001 suspended, ses-0002 suspended, ses-0005 live',
+      'ses-0005 opened: contract-engineer wi-001, requested by inv-0005 (contract-needed) | ses-0001 suspended, ses-0002 suspended, ses-0005 live',
       'inv-0006 opens ses-0005 | ses-0001 suspended, ses-0002 suspended, ses-0005 live',
       'inv-0006 ended, ses-0005 kept | ses-0001 suspended, ses-0002 suspended, ses-0005 suspended',
       'ses-0005 finished: work-closed | ses-0001 suspended, ses-0002 suspended',
       // The yield ends the consumer architect's use.
-      'inv-0007 continues ses-0002 | ses-0001 suspended, ses-0002 live',
+      'inv-0007 continues ses-0002 from ses-0002 at inv-0004 (iteration-closed) | ses-0001 suspended, ses-0002 live',
       'inv-0007 ended, ses-0002 finished: not-kept | ses-0001 suspended',
       // The provider: its engineer is kept after the failing gate and
       // continued for the repair.
@@ -282,10 +295,10 @@ describe('ST01, ST02: the sessions of a scripted run', () => {
       'ses-0007 opened: engineer wi-002 | ses-0001 suspended, ses-0006 suspended, ses-0007 live',
       'inv-0009 opens ses-0007 | ses-0001 suspended, ses-0006 suspended, ses-0007 live',
       'inv-0009 ended, ses-0007 kept | ses-0001 suspended, ses-0006 suspended, ses-0007 suspended',
-      'inv-0010 continues ses-0007 | ses-0001 suspended, ses-0006 suspended, ses-0007 live',
+      'inv-0010 continues ses-0007 from ses-0007 at inv-0009 (repair) | ses-0001 suspended, ses-0006 suspended, ses-0007 live',
       'inv-0010 ended, ses-0007 kept | ses-0001 suspended, ses-0006 suspended, ses-0007 suspended',
       'ses-0007 finished: work-closed | ses-0001 suspended, ses-0006 suspended',
-      'inv-0011 continues ses-0006 | ses-0001 suspended, ses-0006 live',
+      'inv-0011 continues ses-0006 from ses-0006 at inv-0008 (iteration-closed) | ses-0001 suspended, ses-0006 live',
       'inv-0011 ended, ses-0006 kept | ses-0001 suspended, ses-0006 suspended',
       'ses-0006 finished: work-closed | ses-0001 suspended',
       // The consumer, resumed, in a session of its own.
@@ -296,7 +309,7 @@ describe('ST01, ST02: the sessions of a scripted run', () => {
       'inv-0013 opens ses-0009 | ses-0001 suspended, ses-0008 suspended, ses-0009 live',
       'inv-0013 ended, ses-0009 kept | ses-0001 suspended, ses-0008 suspended, ses-0009 suspended',
       'ses-0009 finished: work-closed | ses-0001 suspended, ses-0008 suspended',
-      'inv-0014 continues ses-0008 | ses-0001 suspended, ses-0008 live',
+      'inv-0014 continues ses-0008 from ses-0008 at inv-0012 (iteration-closed) | ses-0001 suspended, ses-0008 live',
       'inv-0014 ended, ses-0008 kept | ses-0001 suspended, ses-0008 suspended',
       'ses-0008 finished: work-closed | ses-0001 suspended',
       // Run end finishes the architect context the run kept.
@@ -323,6 +336,45 @@ describe('ST01, ST02: the sessions of a scripted run', () => {
     // The work each session is for is the work of its invocations.
     expect(sessions.get('ses-0007')!.work).toEqual({ workItem: 'wi-002', iteration: 'wi-002.i01' });
     expect(sessions.get('ses-0003')!.work).toEqual({ workItem: 'wi-001', request: 'pr-001' });
+
+    // ST03: every start that is not fresh names its harness point and its
+    // reason. A continuation names its own session's previous invocation, a
+    // fork the architect context's point, and the contract sub-session the
+    // engineer invocation whose need opened it.
+    for (const event of events) {
+      if (event.type === 'invocation-started' && event.data.start === 'continued') {
+        expect(event.data.continues, event.data.invocation).toMatchObject({ from: { session: event.data.session }, reason: expect.any(String) });
+      }
+    }
+    const requested = new Map<string, string>();
+    for (const event of events) {
+      if (event.type !== 'invocation-started') continue;
+      requested.set(event.data.session, (await invocation(event.data.invocation)).session.requested);
+    }
+    for (const session of sessions.values()) {
+      expect([session.id, session.fork === null], session.id).toEqual([session.id, requested.get(session.id) !== 'fork']);
+    }
+    expect(sessions.get('ses-0003')!.fork).toEqual({ from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'placement-request', generation: 1, briefs: [] });
+    expect(sessions.get('ses-0005')!.requestedBy).toEqual({ invocation: 'inv-0005', reason: 'contract-needed' });
+    expect(events.find(event => event.type === 'contract-requested')!.data).toMatchObject({ invocation: 'inv-0005', iteration: 'wi-001.i02' });
+
+    // No relation names an executor's ref: every ref the executor handed
+    // back is absent from the lineage the log records.
+    const refs = new Set<string>();
+    for (const event of events) {
+      if (event.type === 'brief-appended') refs.add(event.data.ref);
+      if (event.type !== 'invocation-ended') continue;
+      const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.outcome(event.data.invocation)), 'utf8')) as InvocationOutcome;
+      if (outcome.session !== undefined) refs.add(outcome.session.ref);
+    }
+    expect(refs.size).toBeGreaterThan(10);
+    const lineage = JSON.stringify(events.flatMap((event): unknown[] => {
+      if (event.type === 'session-opened') return [event.data.fork, event.data.replaces, event.data.requestedBy];
+      if (event.type === 'invocation-started') return [event.data.continues];
+      if (event.type === 'invocation-ended') return [event.data.degraded];
+      return [];
+    }).filter(relation => relation !== undefined));
+    for (const ref of refs) expect(lineage).not.toContain(ref);
   }, 180_000);
 });
 
