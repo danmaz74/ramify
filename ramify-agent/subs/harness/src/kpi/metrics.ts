@@ -36,6 +36,12 @@ export interface InvocationFacts {
   readonly writer: boolean;
   /** The harness session this invocation belongs to, which each invocation of a continued session shares. */
   readonly session: string;
+  /**
+   * The model context it ran in, where that is not its session's first:
+   * a continued start the executor made fresh begins another within the
+   * same session. Absent means the session's own.
+   */
+  readonly history?: string | undefined;
   /** Null while the invocation has not ended. */
   readonly outcome: Pick<InvocationOutcome, 'ended' | 'usage' | 'outsideScope'> | null;
   /** `S_s` as captured when the invocation started; null when none was taken. */
@@ -188,14 +194,29 @@ function sessionsOf(inputs: MetricInputs): Map<string, InvocationFacts[]> {
 }
 
 /**
+ * The model contexts: each session's invocations, split where a continued
+ * start the executor made fresh began another context.
+ */
+function historiesOf(inputs: MetricInputs): Map<string, InvocationFacts[]> {
+  const histories = new Map<string, InvocationFacts[]>();
+  for (const facts of inputs.invocations) {
+    const key = facts.history ?? facts.session;
+    histories.set(key, [...(histories.get(key) ?? []), facts]);
+  }
+  return histories;
+}
+
+/**
  * `sum(S_s / B)` over every session, a continued session counting each
- * component once at the largest value it was observed at.
+ * component once at the largest value it was observed at. A continued
+ * start the executor made fresh loaded its scope into a new context, so
+ * from there on its session counts again as a term of its own.
  */
 function sessionWeightedTotal(inputs: MetricInputs): Metric {
   const id = 'session-weighted-total';
   const unit = 'baselines';
   const common = { measurementPolicy: measurementPolicyVersion };
-  const sessions = sessionsOf(inputs);
+  const sessions = historiesOf(inputs);
   let total = 0;
   const missing: string[] = [];
   let covered = 0;
@@ -221,15 +242,17 @@ function sessionWeightedTotal(inputs: MetricInputs): Metric {
     total += [...largest.values()].reduce<number>((sum, bytes) => sum + (bytes ?? 0), 0);
   }
   const coverage = { covered, total: sessions.size };
+  // The contexts a degraded continuation began, each a term beside its session's first.
+  const restarted = [...sessions].filter(([key, list]) => key !== list[0]!.session).map(([key]) => `${key}: a continued start the executor made fresh counts as a term of its own`);
   if (sessions.size === 0) return metric({ id, unit, state: 'not-applicable', coverage, note: 'No session ran', ...common });
   if (missing.length > 0) {
-    return metric({ id, unit, state: 'unavailable', subtotal: covered > 0 ? total : null, coverage, evidence: missing, note: 'A session\'s scope size is missing a component, so the total is unknown; the known subtotal in bytes is shown', ...common });
+    return metric({ id, unit, state: 'unavailable', subtotal: covered > 0 ? total : null, coverage, evidence: [...missing, ...restarted], note: 'A session\'s scope size is missing a component, so the total is unknown; the known subtotal in bytes is shown', ...common });
   }
   if ('unavailable' in inputs.baseline) {
-    return metric({ id, unit, state: 'unavailable', subtotal: total, coverage, evidence: [`baseline: ${inputs.baseline.unavailable}`], note: 'The frozen baseline B is unavailable; the sum of S_s in bytes is shown', ...common });
+    return metric({ id, unit, state: 'unavailable', subtotal: total, coverage, evidence: [`baseline: ${inputs.baseline.unavailable}`, ...restarted], note: 'The frozen baseline B is unavailable; the sum of S_s in bytes is shown', ...common });
   }
   if (inputs.baseline.bytes === 0) return metric({ id, unit, state: 'not-applicable', numerator: total, denominator: 0, coverage, note: 'The frozen baseline B is zero bytes', ...common });
-  return metric({ id, unit, state: 'measured', value: total / inputs.baseline.bytes, numerator: total, denominator: inputs.baseline.bytes, coverage, ...common });
+  return metric({ id, unit, state: 'measured', value: total / inputs.baseline.bytes, numerator: total, denominator: inputs.baseline.bytes, coverage, evidence: restarted, ...common });
 }
 
 const categories = [

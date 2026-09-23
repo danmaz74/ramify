@@ -232,4 +232,28 @@ describe('ST04: the projection groups invocations by the session they started in
       state: 'unavailable', value: null, subtotal: 3500, coverage: { covered: 2, total: 2 },
     });
   });
+
+  test('a continued start the executor made fresh stays in its session, and counts again in session-weighted-total', async () => {
+    const [started, ended] = invocationLines('inv-0002', 'ses-0001', 3000, 'scripted-1@9#0', { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'repair', briefs: [] });
+    const run = constructedRun([
+      { type: 'job-started', data: {} },
+      opened('ses-0001'),
+      ...invocationLines('inv-0001', 'ses-0001', 1000, 'scripted-1@4#0'),
+      // The executor could not continue, so inv-0002 began a new context:
+      // its scope was loaded again, and the session's later segments run in
+      // that context.
+      started!,
+      { ...ended!, data: { ...(ended!.data as object), degraded: { requested: 'continue', actual: 'fresh', reason: 'the session file is gone' } } },
+      ...invocationLines('inv-0003', 'ses-0001', 2000, 'scripted-1@12#0', { from: { session: 'ses-0001', invocation: 'inv-0002' }, reason: 'repair', briefs: [] }),
+    ]);
+    const response = await metricsOf(runView(run));
+
+    expect(find(response.metrics, 'session-count')).toMatchObject({ state: 'measured', value: 1 });
+    // ses-0001 at 1000 until the degraded start, then its new context at its
+    // largest, 3000: 4000 rather than 3000.
+    expect(find(response.metrics, 'session-weighted-total')).toMatchObject({
+      state: 'unavailable', subtotal: 4000, coverage: { covered: 2, total: 2 },
+      evidence: ['baseline: constructed', 'ses-0001 from inv-0002: a continued start the executor made fresh counts as a term of its own'],
+    });
+  });
 });

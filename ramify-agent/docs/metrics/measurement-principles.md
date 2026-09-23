@@ -102,6 +102,20 @@ model and accounting differences remain visible in comparisons. Token
 efficiency does not by itself measure monetary cost, latency or overall
 productivity.
 
+## Measure a segment by the start it made
+
+A fork or continuation the executor made fresh inherited nothing. Counting it
+as the start the harness asked for would credit a fork or a continuation with
+a fresh start's cost. Measure it as a fresh start and count it as degraded.
+Where the start is unknown, the segment stays in its requested group and its
+figures are missing, never zero.
+
+Session-weighted arithmetic sums scope once per model context, not per harness
+session: a degraded continuation loaded its scope again.
+
+Lineage comparisons are descriptive. A fork and a fresh start, or a repair and
+a fresh engineer, differ in their prompts and work as well as in their start.
+
 ## Keep collection simple
 
 Exploration measurement is deferred. File-read tracking, search-result

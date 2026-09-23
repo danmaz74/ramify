@@ -1,5 +1,5 @@
 import type { JobState } from '../../harness/src/interfaces/protocol/jobs.js';
-import type { Metric } from '../../harness/src/interfaces/protocol/runs.js';
+import type { LineageMetric, Metric } from '../../harness/src/interfaces/protocol/runs.js';
 
 /*
  * How a run's states read on the page. Words, never colour alone: each badge
@@ -31,6 +31,6 @@ export function figure(value: number | null): string {
 }
 
 /** A metric's value, or its state where it has none. */
-export function metricValue(metric: Metric): string {
+export function metricValue(metric: Metric | LineageMetric): string {
   return metric.state === 'measured' ? figure(metric.value) : metric.state;
 }

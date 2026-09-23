@@ -1,8 +1,9 @@
 # Metrics glossary
 
 This glossary names concepts and measurements currently used or selected for
-ramify-agent. Calculation policies live in [token efficiency](token-efficiency.md)
-and the [earlier KPI contract](../measurements-and-kpis.md); the
+ramify-agent. Calculation policies live in [token efficiency](token-efficiency.md),
+[lineage measurements](lineage.md) and the
+[earlier KPI contract](../measurements-and-kpis.md); the
 [terminology map](terminology.md) identifies existing field names and limits.
 
 ## Concept
@@ -190,6 +191,74 @@ calculation.
 
 The extent to which the evidence required by a measurement policy is available
 and attributable.
+
+## Segment
+
+One invocation of a session: the stretch of the session's history from that
+invocation's start to its end.
+
+## Actual start
+
+The start a segment's executor made: fresh, continued or forked. It is the
+requested start unless the segment's end records it degraded, and unknown for
+a segment whose session never ran or whose harness stopped while it ran.
+
+## Degraded start
+
+A segment whose actual start differs from the continuation or fork the harness
+requested.
+
+## Model context history
+
+The consecutive segments of one session that share a model context: the
+session's first segment begins one, and so does each continued segment whose
+actual start was fresh.
+
+## Context generation
+
+The number of the architect context a global fork forks: 1 for the initial
+architect's context, and one more after each rebuild.
+
+## Starting context size
+
+The model context usage of a segment's first context observation, in tokens.
+
+## Segment cost profile
+
+A segment's starting context size and its input, cache-read, cache-write and
+output tokens.
+
+## Fork cost against a fresh start
+
+The mean segment cost profile of the forks of one context generation, beside
+the mean profile of the global forks whose actual start was fresh, under
+`lineage/1`. Its starting context size is the fork's inherited context.
+
+## Continuation growth
+
+The mean, over continued segments, of a segment's starting context size less
+that of the segment before it in its session, under `lineage/1`.
+
+## Repair segment cost
+
+The mean segment cost profile of the segments continued for a repair, beside
+the mean profile of the engineer segments whose actual start was fresh, under
+`lineage/1`.
+
+## Degraded-start rate
+
+Degraded starts per requested continuation or fork, overall and by the
+relation requested, under `lineage/1`.
+
+## Replacement rate
+
+Sessions opened in place of another for one reason, `reconstructed` or
+`context-rebuilt`, per session of the run, under `lineage/1`.
+
+## Forks served by a context generation
+
+The number of forks of one context generation whose actual start was a fork,
+under `lineage/1`.
 
 ## Scope exclusions
 

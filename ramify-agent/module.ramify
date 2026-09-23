@@ -45,7 +45,7 @@ expose-sub runIdSchema, RunId, roleSchema, Role, runAgentSchema, RunAgent from h
 expose-sub startRunCommandSchema, StartRunCommand, runCommandSchema, RunCommand from harness to descendants
 expose-sub RunCommandType, runFailureReasonSchema, RunFailureReason from harness to descendants
 expose-sub runPhaseSchema, RunPhase, runQueryLimits, measurementPolicySchema from harness to descendants
-expose-sub kpiPolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
+expose-sub kpiPolicySchema, lineagePolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
 expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
 expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants
@@ -69,5 +69,6 @@ expose-sub ComparisonCoverage, moduleCapabilityComparisonResponseSchema from har
 expose-sub ModuleCapabilityComparisonResponse from harness to descendants
 expose-sub GateView, gateResponseSchema, GateResponse, metricStateSchema from harness to descendants
 expose-sub MetricState, metricSchema, Metric, guardingViewSchema, GuardingView from harness to descendants
+expose-sub lineageMetricSchema, LineageMetric from harness to descendants
 expose-sub invocationEvaluationSchema, InvocationEvaluation from harness to descendants
 expose-sub metricsResponseSchema, MetricsResponse from harness to descendants
