@@ -128,7 +128,7 @@ describe('the pi adapter', () => {
     ]);
     const finished = harness.events.filter(event => event.type === 'tool-finished');
     expect(finished.map(event => [event.callId, event.isError]).sort()).toEqual([['c-echo', false], ['c-grep', false], ['c-read', false]]);
-    const messages = harness.events.filter(event => event.type === 'message');
+    const messages = harness.events.filter(event => event.type === 'message' && event.role === 'assistant');
     expect(messages.map(event => event.text)).toEqual(['(calls read, grep)', '(calls echo)', 'I have what I need.']);
     expect(messages[2]!.usage).toEqual({ input: 1200, output: 30, cacheRead: 0, cacheWrite: 0, total: 1230 });
 

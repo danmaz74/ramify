@@ -18,10 +18,11 @@ implementations beneath this module receive it:
   each entry available, or unavailable with a reason. Usage, context size
   and compaction are port events; one an implementation cannot observe is
   recorded as a coverage gap, and silence is never read as an empty
-  context. The rest are session control: `continue`, `fork`, `forkAtPoint`
-  (a fork from any ref, not only a latest one), `appendContext`,
-  `exactSystemPrompt`, `guard` and `afterMutation`. A start the executor
-  lacks degrades to `fresh` with the declared reason.
+  context. `thinking` and `retries` say whether the executor reports the
+  model's thinking and its own retries. The rest are session control:
+  `continue`, `fork`, `forkAtPoint` (a fork from any ref, not only a latest
+  one), `appendContext`, `exactSystemPrompt`, `guard` and `afterMutation`. A
+  start the executor lacks degrades to `fresh` with the declared reason.
 - `SessionSpec` holds the role, the scope (the working directory), the
   complete system prompt, the first user message, and the built-in tools to
   enable, which may include `edit` and `write` but never a shell. It also
@@ -63,10 +64,23 @@ implementations beneath this module receive it:
   which are for display. Nothing above the port reads a call otherwise.
 - Events are `tool-started`, carrying `action` and `mutating`, and `tool-finished`,
   matched by `callId` and carrying `reachedTool`, which is false when the
-  implementation rejected the input before the tool ran; `message` with token
-  usage where the agent reports it; `context-observed` with the estimated
-  size and the window, where `tokens: null` means unknown and never room; and
-  `compaction` with its reason and its sizes.
+  implementation rejected the input before the tool ran; `message`;
+  `context-observed` with the estimated size and the window, where
+  `tokens: null` means unknown and never room; `compaction` with its reason
+  and its sizes; and `retry`, the executor retrying a failed model call.
+- `message` carries every message of the conversation once it is complete:
+  the first prompt, reported before the model is called, as `user`; each
+  `assistant` message; and each `tool-result`, as the agent saw it, naming
+  its `callId`. Blocks are `text`, `thinking` with its `ThinkingVisibility`
+  (`full`, `summary`, `unmarked` or `redacted`), `tool-call` with its call
+  ID and action, and `other` for content the port does not map, described
+  and never dropped. An assistant message also carries its display `text`
+  (`assistantText`), its usage and its `MessageDetail`: the model that
+  answered, the thinking level, the stop reason and error, reasoning
+  tokens, cost and cache writes by retention. The required core is the text,
+  the tool calls and their results by call ID; optional detail the executor
+  does not report is `null`, which is never zero, as are compaction sizes
+  and retry detail it does not report.
 - The submission tool's `accept` judges every call:
   - accepted ends the session with outcome `submitted`;
   - rejected with errors goes back to the same session as an error tool
@@ -94,7 +108,12 @@ before each one:
   itself rejected before the tool ran. `action` is the call's action; without
   it a harness tool's declared action is used, and a built-in's is
   classified from the input the port's names take.
-- `message` reports a message, with optional usage.
+- `message` reports an assistant message: its `blocks`, such as thinking,
+  then its text, with optional usage and `detail`; detail it leaves out is
+  reported null. Each `tool` and `submit` step is also an assistant message
+  holding the call, and its result a `tool-result` message; the spec's
+  prompt is reported as the user message before the first step.
+- `retry` reports a failed assistant message and the executor's retry of it.
 - `context` observes the context after a boundary, and reaches the budget
   when the policy says so.
 - `compaction` compacts, unless the session's policy forbids it, in which
@@ -107,7 +126,8 @@ before each one:
 - `fail` crashes the session; `end` stops without a submission.
 
 `toolNames` gives the port's built-ins other names, so a script can play an
-executor whose read tool is `Read`; `support` declares what the fake lacks.
+executor whose read tool is `Read`; `support` declares what the fake lacks,
+and without `thinking` or `retries` it reports neither.
 A script may be a function of the session's spec. `sessions` records each
 spec, verdict and outcome for tests, along with the mode that was actual,
 the appended context the session started with, every tool result the agent

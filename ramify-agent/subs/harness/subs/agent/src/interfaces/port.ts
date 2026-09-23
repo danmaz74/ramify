@@ -154,11 +154,19 @@ export type Availability =
  *   executor's own added.
  * - `guard` asks the spec's guard before a mutating call executes, and
  *   `afterMutation` tells the spec after one settles.
+ * - `thinking` reports the model's thinking as `thinking` blocks, each with
+ *   its visibility. An executor that lacks it reports none, and its
+ *   messages hold no thinking because it cannot say, not because there was
+ *   none.
+ * - `retries` reports the executor's own retries of a failed model call as
+ *   `retry` events.
  */
 export interface ExecutorSupport {
   readonly usage: Availability;
   readonly context: Availability;
   readonly compaction: Availability;
+  readonly thinking: Availability;
+  readonly retries: Availability;
   readonly continue: Availability;
   readonly fork: Availability;
   readonly forkAtPoint: Availability;
@@ -268,9 +276,125 @@ export interface TokenUsage {
 }
 
 /**
+ * How much of a model's thinking a `thinking` block holds.
+ *
+ * - `full`: the thinking as the model produced it.
+ * - `summary`: a summary of it, which some providers return instead.
+ * - `unmarked`: text the executor supplies without saying which of the two
+ *   it is.
+ * - `redacted`: withheld by the provider; the block's text is empty.
+ */
+export type ThinkingVisibility = 'full' | 'summary' | 'unmarked' | 'redacted';
+
+/** Text of a message. */
+export interface TextBlock {
+  readonly type: 'text';
+  readonly text: string;
+}
+
+/** The model's thinking, in an assistant message. Opaque provider data, such as a signature, is never carried. */
+export interface ThinkingBlock {
+  readonly type: 'thinking';
+  readonly visibility: ThinkingVisibility;
+  readonly text: string;
+}
+
+/**
+ * A tool call, in the assistant message that makes it. Its result arrives as
+ * a `tool-result` message with the same `callId`. `tool` and `input` are the
+ * executor's own; `action` is the one `tool-started` carries.
+ */
+export interface ToolCallBlock {
+  readonly type: 'tool-call';
+  readonly callId: string;
+  readonly tool: string;
+  readonly input: unknown;
+  readonly action: ToolAction;
+}
+
+/**
+ * Content the port does not map, such as an image. It is recorded by its
+ * kind and a short description, and its content is not carried; nothing an
+ * executor reports is dropped silently.
+ */
+export interface OtherBlock {
+  readonly type: 'other';
+  /** The executor's own name for the content, such as `image`. */
+  readonly kind: string;
+  readonly description: string;
+}
+
+/** What a user message or a tool result holds. */
+export type ContentBlock = TextBlock | OtherBlock;
+
+/** What an assistant message holds. */
+export type AssistantBlock = TextBlock | ThinkingBlock | ToolCallBlock | OtherBlock;
+
+/** Why a model's message ended, in the port's terms. `other` is a reason the port does not name. */
+export type StopReason = 'end' | 'tool-use' | 'length' | 'error' | 'aborted' | 'other';
+
+/** A message's price as the executor estimates it, in US dollars. */
+export interface MessageCost {
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead: number;
+  readonly cacheWrite: number;
+  readonly total: number;
+}
+
+/** A message's cache writes by retention, in tokens: `short` is the provider's default, `long` its extended retention. */
+export interface CacheWrites {
+  readonly short: number;
+  readonly long: number;
+}
+
+/**
+ * The optional detail of one assistant message. Every field is present in
+ * the event, and a field the executor did not report for this message is
+ * `null`: absent, which is never zero and never an empty value.
+ */
+export interface MessageDetail {
+  /** The model that answered, as the executor names it. */
+  readonly model: string | null;
+  /** The thinking level the answer was produced at, in the provider's own terms. */
+  readonly thinkingLevel: string | null;
+  readonly stopReason: StopReason | null;
+  /** The error the message ended with; null also when it reports none. */
+  readonly error: string | null;
+  /** Tokens of `usage.output` spent on thinking. */
+  readonly reasoningTokens: number | null;
+  readonly cost: MessageCost | null;
+  /** `usage.cacheWrite` split by retention. */
+  readonly cacheWrites: CacheWrites | null;
+}
+
+/** A message detail with nothing reported. */
+export const noMessageDetail: MessageDetail = {
+  model: null, thinkingLevel: null, stopReason: null, error: null, reasoningTokens: null, cost: null, cacheWrites: null,
+};
+
+/**
+ * An assistant message's display text: its text blocks, or the tools it
+ * calls when it has none, such as `(calls read, grep)`. Every implementation
+ * applies this one rule.
+ */
+export function assistantText(blocks: readonly AssistantBlock[]): string {
+  const text = blocks.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n').trim();
+  if (text !== '') return text;
+  const calls = blocks.flatMap(block => (block.type === 'tool-call' ? [block.tool] : []));
+  return calls.length > 0 ? `(calls ${calls.join(', ')})` : '';
+}
+
+/**
  * Observed activity. Tool calls are matched by `callId`, since parallel
  * calls may finish in any order. `tool` and `input` are the executor's own,
  * for display; what the call does is its `action`.
+ *
+ * `message` carries every message of the conversation once it is complete,
+ * in order: the first prompt before the model is called, each assistant
+ * message, and each tool result as the agent saw it. The required core is
+ * the text, the tool calls and their results, paired by call ID. Detail an
+ * executor may not report is `null` when absent; see {@link MessageDetail}.
  */
 export type AgentEvent =
   /** `mutating` and `action` are declared by the implementation or by the tool's author, never inferred from the name. */
@@ -290,7 +414,21 @@ export type AgentEvent =
        */
       readonly reachedTool: boolean;
     }
-  | { readonly type: 'message'; readonly text: string; readonly usage?: TokenUsage | undefined }
+  /** A user message: the first prompt, or other input the executor gave the model as the user's. */
+  | { readonly type: 'message'; readonly role: 'user'; readonly blocks: readonly ContentBlock[] }
+  /**
+   * An assistant message. `text` is for display: its text blocks, or the
+   * tools it calls when it has none. `usage` is null when not reported.
+   */
+  | {
+      readonly type: 'message'; readonly role: 'assistant'; readonly blocks: readonly AssistantBlock[];
+      readonly text: string; readonly usage: TokenUsage | null; readonly detail: MessageDetail;
+    }
+  /** A tool's result as the agent saw it, including any text the harness appended; `callId` names its call. */
+  | {
+      readonly type: 'message'; readonly role: 'tool-result'; readonly callId: string; readonly tool: string;
+      readonly isError: boolean; readonly blocks: readonly ContentBlock[];
+    }
   /**
    * The context size after a model or tool boundary. It is always an
    * estimate. `tokens: null` means the implementation cannot size the context
@@ -298,12 +436,28 @@ export type AgentEvent =
    * a coverage gap, not an empty context.
    */
   | { readonly type: 'context-observed'; readonly tokens: number | null; readonly window: number | null }
+  | { readonly type: 'compaction'; readonly phase: 'started'; readonly reason: CompactionReason }
+  /** Sizes and an error the executor did not report are null. */
   | {
-      readonly type: 'compaction'; readonly phase: 'started' | 'ended';
-      readonly reason: 'manual' | 'threshold' | 'overflow';
-      readonly tokensBefore?: number | undefined; readonly tokensAfter?: number | undefined;
-      readonly aborted?: boolean | undefined; readonly errorText?: string | undefined;
-    };
+      readonly type: 'compaction'; readonly phase: 'ended'; readonly reason: CompactionReason;
+      readonly tokensBefore: number | null; readonly tokensAfter: number | null;
+      readonly aborted: boolean; readonly errorText: string | null;
+    }
+  /**
+   * The executor retrying a failed model call on its own: the failed
+   * assistant message precedes `started`. Detail it did not report is null.
+   */
+  | {
+      readonly type: 'retry'; readonly phase: 'started'; readonly attempt: number;
+      readonly maxAttempts: number | null; readonly delayMs: number | null; readonly errorText: string | null;
+    }
+  | { readonly type: 'retry'; readonly phase: 'ended'; readonly attempt: number; readonly succeeded: boolean; readonly errorText: string | null };
+
+/** Why a compaction ran. */
+export type CompactionReason = 'manual' | 'threshold' | 'overflow';
+
+/** One message of the conversation, as `AgentEvent` carries it. */
+export type MessageEvent = Extract<AgentEvent, { readonly type: 'message' }>;
 
 /** How a session ended. */
 export type SessionOutcome =

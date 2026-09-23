@@ -70,6 +70,10 @@ export interface PiOptions {
   /** pi's own compaction thresholds. */
   readonly compaction?: { readonly reserveTokens?: number | undefined; readonly keepRecentTokens?: number | undefined } | undefined;
   readonly settleMs?: number | undefined;
+  /** pi's first delay before it retries a failed model call. */
+  readonly retryDelayMs?: number | undefined;
+  /** The scripted model's rates per million tokens. */
+  readonly cost?: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number } | undefined;
   /** Tool names the guard denies, with the text the denial returns. */
   readonly deny?: Record<string, string> | undefined;
   readonly guard?: boolean | undefined;
@@ -104,6 +108,7 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
   const scripted = scriptedProvider(steps, {
     ...(options.contextWindow === undefined ? {} : { contextWindow: options.contextWindow }),
     ...(options.reasoning === undefined ? {} : { reasoning: options.reasoning }),
+    ...(options.cost === undefined ? {} : { cost: options.cost }),
   });
   const isolated = await scriptedRuntime(scripted);
   cleanups.push(isolated.remove);
@@ -112,6 +117,7 @@ export async function startPi(cleanups: Array<() => Promise<void>>, steps: reado
     model: options.model ?? 'scripted/scripted-1',
     settleMs: options.settleMs ?? 5_000,
     compaction: options.compaction,
+    retryDelayMs: options.retryDelayMs,
     runtime: async () => isolated.runtime,
   });
 

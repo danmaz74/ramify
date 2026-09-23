@@ -25,8 +25,9 @@ describe('observations are port events', () => {
     const probe = probeSpec();
     expect(await agent.startSession(probe.spec).outcome).toEqual({ kind: 'submitted', input: { done: true } });
 
-    const usage = probe.events.filter(event => event.type === 'message').map(event => event.usage);
-    expect(usage).toEqual([{ input: 1_000, output: 20, cacheRead: 200, cacheWrite: 300, total: 1_520 }]);
+    const usage = probe.events.flatMap(event => (event.type === 'message' && event.role === 'assistant' ? [event.usage] : []));
+    // The submission's assistant message reports no usage, which is absent, not zero.
+    expect(usage).toEqual([{ input: 1_000, output: 20, cacheRead: 200, cacheWrite: 300, total: 1_520 }, null]);
     expect(probe.events.filter(event => event.type === 'context-observed')).toEqual([
       { type: 'context-observed', tokens: 1_520, window },
       { type: 'context-observed', tokens: null, window },
@@ -35,7 +36,7 @@ describe('observations are port events', () => {
       { type: 'compaction', phase: 'started', reason: 'threshold' },
       {
         type: 'compaction', phase: 'ended', reason: 'threshold',
-        tokensBefore: 1_520, tokensAfter: 400, aborted: undefined, errorText: undefined,
+        tokensBefore: 1_520, tokensAfter: 400, aborted: false, errorText: null,
       },
     ]);
   });
@@ -45,7 +46,7 @@ describe('observations are port events', () => {
     // The three observations the port began with are kept among the rest.
     expect(Object.keys(agent.support).sort()).toEqual([
       'afterMutation', 'appendContext', 'compaction', 'context', 'continue', 'exactSystemPrompt',
-      'fork', 'forkAtPoint', 'guard', 'usage',
+      'fork', 'forkAtPoint', 'guard', 'retries', 'thinking', 'usage',
     ]);
     expect(Object.values(agent.support).every(entry => entry.available)).toBe(true);
   });

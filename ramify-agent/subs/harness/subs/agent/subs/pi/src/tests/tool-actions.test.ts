@@ -81,7 +81,7 @@ describe('pi\'s tools as actions', () => {
     expect(Object.entries(agent.support).filter(([, entry]) => !entry.available)).toEqual([]);
     expect(Object.keys(agent.support).sort()).toEqual([
       'afterMutation', 'appendContext', 'compaction', 'context', 'continue', 'exactSystemPrompt',
-      'fork', 'forkAtPoint', 'guard', 'usage',
+      'fork', 'forkAtPoint', 'guard', 'retries', 'thinking', 'usage',
     ]);
   });
 });

@@ -1,24 +1,30 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { contextBudgetReached } from './interfaces/port.js';
+import { assistantText, contextBudgetReached, noMessageDetail } from './interfaces/port.js';
 import type {
   ActualStart,
   AgentPort,
+  AssistantBlock,
   AgentSession,
   AppendOutcome,
   BuiltinTool,
   ExecutorSupport,
+  MessageDetail,
   SessionOutcome,
   SessionRef,
   SessionSpec,
   TokenUsage,
   ToolAction,
+  ToolCallBlock,
   WriteTool,
 } from './interfaces/port.js';
 
 /**
  * One step of a scripted session. The fake runs the steps in order and
- * checks for Stop before each one.
+ * checks for Stop before each one. Before the first step it reports the
+ * spec's prompt as the user message, as an executor does before its first
+ * model call. Each tool call and submission is reported as an assistant
+ * message holding the call, and its result as a tool-result message.
  */
 export type ScriptStep =
   /**
@@ -36,7 +42,24 @@ export type ScriptStep =
       readonly action?: ToolAction | undefined;
       readonly mutating?: boolean | undefined; readonly reachedTool?: boolean | undefined;
     }
-  | { readonly kind: 'message'; readonly text: string; readonly usage?: TokenUsage | undefined }
+  /**
+   * An assistant message: `blocks`, such as thinking, and then `text` as a
+   * text block unless it is empty. Detail the step leaves out is reported
+   * absent, so a script chooses what its executor reports.
+   */
+  | {
+      readonly kind: 'message'; readonly text: string; readonly usage?: TokenUsage | undefined;
+      readonly blocks?: readonly AssistantBlock[] | undefined; readonly detail?: Partial<MessageDetail> | undefined;
+    }
+  /**
+   * The executor retries a failed model call on its own: the failed
+   * assistant message, then the retry's start and end. `succeeded: false`
+   * is a retry that gave up; the script goes on either way.
+   */
+  | {
+      readonly kind: 'retry'; readonly errorText: string; readonly attempt?: number | undefined;
+      readonly maxAttempts?: number | undefined; readonly delayMs?: number | undefined; readonly succeeded?: boolean | undefined;
+    }
   /** Observes the context after a boundary. `tokens: null` is unknown, never room. */
   | { readonly kind: 'context'; readonly tokens: number | null; readonly window: number | null }
   /** Compacts, unless the session's policy forbids it, in which case the step is suppressed and counted. */
@@ -115,7 +138,9 @@ export interface ScriptedAgentOptions {
   readonly toolNames?: { readonly [tool in BuiltinTool | WriteTool]?: string } | undefined;
   /**
    * What the fake declares it lacks. A `continue` or `fork` it lacks degrades
-   * to `fresh` with the declared reason. Default: it supports everything.
+   * to `fresh` with the declared reason; without `thinking` its messages hold
+   * no thinking blocks, and without `retries` it reports no retry events.
+   * Default: it supports everything.
    */
   readonly support?: Partial<ExecutorSupport> | undefined;
 }
@@ -129,6 +154,8 @@ const scriptedSupport: ExecutorSupport = {
   usage: { available: true },
   context: { available: true },
   compaction: { available: true },
+  thinking: { available: true },
+  retries: { available: true },
   continue: { available: true },
   fork: { available: true },
   forkAtPoint: { available: true },
@@ -146,8 +173,8 @@ const scriptedSupport: ExecutorSupport = {
  *
  * It implements every port behavior the real implementation does: session
  * modes, appended context, the guard and the after-mutation hook, usage,
- * context observations, compaction under its policy, settlement and the
- * context budget.
+ * context observations, compaction under its policy, retries, every message
+ * of the conversation, settlement and the context budget.
  */
 export function createScriptedAgent(script: Script, options: ScriptedAgentOptions = {}): ScriptedAgent {
   const sessions: ScriptedSessionRecord[] = [];
@@ -198,6 +225,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
       const run = async (): Promise<SessionOutcome> => {
         const steps = typeof script === 'function' ? script(spec) : script;
         let report: string | undefined;
+        spec.onEvent({ type: 'message', role: 'user', blocks: [{ type: 'text', text: spec.prompt }] });
         for (const step of steps) {
           if (controller.signal.aborted && !deaf) return { kind: 'stopped' };
           stepsRun += 1;
@@ -208,13 +236,36 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             continue;
           }
           switch (step.kind) {
-            case 'message':
-              spec.onEvent({ type: 'message', text: step.text, usage: step.usage });
+            case 'message': {
+              // An executor that declares no thinking reports none.
+              const given = (step.blocks ?? []).filter(block => block.type !== 'thinking' || support.thinking.available);
+              const blocks: AssistantBlock[] = [...given, ...(step.text === '' ? [] : [{ type: 'text' as const, text: step.text }])];
+              spec.onEvent({
+                type: 'message', role: 'assistant', blocks, text: assistantText(blocks),
+                usage: step.usage ?? null, detail: { ...noMessageDetail, ...step.detail },
+              });
               if (budgetTokens !== undefined) {
                 report = step.text;
                 return { kind: 'context-budget-reached', tokens: budgetTokens, report };
               }
               break;
+            }
+            case 'retry': {
+              const attempt = step.attempt ?? 1;
+              spec.onEvent({
+                type: 'message', role: 'assistant', blocks: [], text: '', usage: null,
+                detail: { ...noMessageDetail, stopReason: 'error', error: step.errorText },
+              });
+              // An executor that declares no retries retries silently.
+              if (!support.retries.available) break;
+              spec.onEvent({
+                type: 'retry', phase: 'started', attempt,
+                maxAttempts: step.maxAttempts ?? null, delayMs: step.delayMs ?? null, errorText: step.errorText,
+              });
+              const succeeded = step.succeeded ?? true;
+              spec.onEvent({ type: 'retry', phase: 'ended', attempt, succeeded, errorText: succeeded ? null : step.errorText });
+              break;
+            }
             case 'context': {
               spec.onEvent({ type: 'context-observed', tokens: step.tokens, window: step.window });
               if (contextBudgetReached(spec.context, step.tokens, step.window)) budgetTokens = step.tokens;
@@ -228,8 +279,8 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
               spec.onEvent({ type: 'compaction', phase: 'started', reason: step.reason });
               spec.onEvent({
                 type: 'compaction', phase: 'ended', reason: step.reason,
-                tokensBefore: step.tokensBefore, tokensAfter: step.tokensAfter,
-                aborted: step.aborted, errorText: step.errorText,
+                tokensBefore: step.tokensBefore ?? null, tokensAfter: step.tokensAfter ?? null,
+                aborted: step.aborted === true, errorText: step.errorText ?? null,
               });
               break;
             case 'wait':
@@ -254,6 +305,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
               const action: ToolAction = step.action
                 ?? (tool !== undefined ? tool.action?.(step.input) ?? { kind: 'harness' } : builtinAction(builtin, step.input));
               const mutating = step.mutating ?? tool?.mutating ?? writer !== undefined;
+              announceCall(spec, { type: 'tool-call', callId, tool: step.tool, input: step.input, action });
               spec.onEvent({ type: 'tool-started', callId, tool: step.tool, input: step.input, action, mutating });
               if (step.reachedTool === false) {
                 // The implementation rejected the input against the tool's schema; the tool never ran.
@@ -295,6 +347,7 @@ export function createScriptedAgent(script: Script, options: ScriptedAgentOption
             }
             case 'submit': {
               const callId = nextCallId();
+              announceCall(spec, { type: 'tool-call', callId, tool: spec.submission.name, input: step.input, action: { kind: 'harness' } });
               spec.onEvent({ type: 'tool-started', callId, tool: spec.submission.name, input: step.input, action: { kind: 'harness' }, mutating: false });
               const verdict = await spec.submission.accept(step.input, controller.signal);
               record.verdicts.push(verdict);
@@ -413,12 +466,21 @@ async function performWrite(
   }
 }
 
-/** Reports one tool result, both as the port event and as what the agent saw. */
+/** Reports the assistant message that makes one call, before the call starts. Its detail is absent. */
+function announceCall(spec: SessionSpec, call: ToolCallBlock): void {
+  spec.onEvent({ type: 'message', role: 'assistant', blocks: [call], text: assistantText([call]), usage: null, detail: noMessageDetail });
+}
+
+/** Reports one tool result: the port event, then the tool-result message, and what the agent saw. */
 function finish(spec: SessionSpec, record: ScriptedSessionRecord, result: ScriptedToolResult, reachedTool: boolean): void {
   record.results.push(result);
   spec.onEvent({
     type: 'tool-finished', callId: result.callId, tool: result.tool,
     isError: result.isError, errorText: result.isError ? result.text : undefined, reachedTool,
+  });
+  spec.onEvent({
+    type: 'message', role: 'tool-result', callId: result.callId, tool: result.tool, isError: result.isError,
+    blocks: result.text === '' ? [] : [{ type: 'text', text: result.text }],
   });
 }
 

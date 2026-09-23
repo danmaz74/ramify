@@ -157,7 +157,9 @@ async function engineerRecord(naming: Naming) {
   const result = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
   const observations = (await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.observations(result.invocations[0]!)), 'utf8'))
     .split('\n').filter(Boolean).map(line => JSON.parse(line) as Observation);
-  const neutral = observations.flatMap((line): Array<Record<string, unknown>> => {
+  // The port events' recorder and the guard write to the log independently,
+  // so each keeps its own order and the two are compared apart.
+  const recorded = observations.flatMap((line): Array<Record<string, unknown>> => {
     switch (line.type) {
       case 'activity': {
         const { activity } = line.data;
@@ -166,6 +168,13 @@ async function engineerRecord(naming: Naming) {
         return [];
       }
       case 'excursion':
+        return [{ [line.type]: line.data }];
+      default:
+        return [];
+    }
+  });
+  const guarded = observations.flatMap((line): Array<Record<string, unknown>> => {
+    switch (line.type) {
       case 'mutation':
         return [{ [line.type]: line.data }];
       case 'guard': {
@@ -177,7 +186,7 @@ async function engineerRecord(naming: Naming) {
     }
   });
   return {
-    neutral,
+    neutral: { recorded, guarded },
     guardedTools: observations.flatMap(line => (line.type === 'guard' ? [line.data.tool] : [])),
     badgeUnchanged: await readFile(join(root, outside), 'utf8') === badge,
     stored: await readFile(join(root, store), 'utf8'),
@@ -199,7 +208,7 @@ describe('ST05: an executor whose tools are named otherwise is recorded and guar
     expect(other.guardedTools).toEqual(['CreateFile', 'CreateFile', 'ReplaceText']);
 
     // And what they are is what the calls did.
-    const recorded = relativeTo(pi) as ReadonlyArray<Record<string, unknown>>;
+    const { recorded, guarded } = relativeTo(pi) as Record<'recorded' | 'guarded', ReadonlyArray<Record<string, unknown>>>;
     expect(recorded.filter(line => 'read' in line).map(line => line['read'])).toEqual([
       'subs/workspace/subs/reviews/src/router.ts',
       'subs/workspace/subs/reviews/src/session.ts',
@@ -209,7 +218,7 @@ describe('ST05: an executor whose tools are named otherwise is recorded and guar
     expect(recorded.filter(line => 'excursion' in line).map(line => line['excursion'])).toEqual([
       { callId: 'call-1', module: 'collection-review/workspace/reviews', firstEntry: true },
     ]);
-    expect(recorded.filter(line => 'guard' in line).map(line => (line['guard'] as { verdict: string; requested: string })))
+    expect(guarded.filter(line => 'guard' in line).map(line => (line['guard'] as { verdict: string; requested: string })))
       .toEqual([
         expect.objectContaining({ verdict: 'blocked-scope', requested: outside }),
         expect.objectContaining({ verdict: 'allowed', requested: store }),

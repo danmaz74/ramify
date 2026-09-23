@@ -67,10 +67,21 @@ none can run yet.
   declaration, and anything else is `other`. The guard and `afterMutation`
   receive the same action; `tool-finished` carries
   `reachedTool`, which is false for a call pi's own validation rejected, so
-  every such rejection is counted without reading pi's message text. Each
-  assistant message becomes `message`, with its text (or the tools it called)
-  and its token usage. `compaction_start` and `compaction_end` become
-  `compaction`, with the reason and the sizes the event carries.
+  every such rejection is counted without reading pi's message text.
+  `message_end` becomes `message` for every role: the first prompt, which pi
+  reports before the model call; each assistant message; each tool result,
+  as the agent saw it; and pi's `custom` messages, such as a brief, as the
+  user's. An assistant message carries its blocks: text, thinking (`redacted`
+  when pi marks it so, otherwise `unmarked`, since pi does not say whether
+  the provider summarized it) and tool calls with their actions. Its usage
+  and detail follow: the model that answered, pi's provider thinking level,
+  the stop reason and error, reasoning tokens, cache writes by retention, and
+  the cost, which is null for a model pi has no rates for. Detail pi does not
+  report is null. Signatures and other opaque provider data stay in pi's
+  file, and an image is an `other` block that is described, not carried.
+  `compaction_start` and `compaction_end` become `compaction`, with the
+  reason and the sizes the event carries, and `auto_retry_start` and
+  `auto_retry_end` become `retry`. Nothing is read from pi's session file.
 - **Outcome.** A provider error that survives pi's two retries, or a failure
   to start, is `failed`; a closing message without a submission is `ended`.
 - **Stop and settlement.** `stop()` aborts the session and resolves when pi
@@ -86,8 +97,8 @@ none can run yet.
 - **Support.** The adapter declares every entry of the port's
   `ExecutorSupport` available: pi observes usage, context and compaction,
   continues and forks a session at the entry a ref names, appends without a
-  model call, sends the exact system prompt, and runs the guard and the
-  after-mutation hook.
+  model call, sends the exact system prompt, runs the guard and the
+  after-mutation hook, and reports thinking and its own retries.
 - **Model and login.** Credentials are pi's own, in `auth.json` of pi's agent
   directory (`~/.pi/agent`, or `PI_CODING_AGENT_DIR`). The model is the one
   given as `provider/model`, or else the first model pi has credentials for.

@@ -50,9 +50,16 @@ describe('the scripted agent', () => {
     const { spec: s, events } = spec();
     const session = agent.startSession(s);
     expect(await session.outcome).toEqual({ kind: 'submitted', input: { map: 1 } });
-    expect(events.map(event => `${event.type}:${'tool' in event ? event.tool : ''}${'isError' in event && event.isError ? '!' : ''}`)).toEqual([
-      'tool-started:read', 'tool-finished:read', 'tool-started:echo', 'tool-finished:echo',
-      'tool-started:bash', 'tool-finished:bash!', 'message:', 'tool-started:submit', 'tool-finished:submit',
+    const shape = (event: AgentEvent) => (event.type === 'message' ? `${event.role}:${event.role === 'tool-result' ? event.tool : ''}` : event.type)
+      + `${'tool' in event && event.type !== 'message' ? `:${event.tool}` : ''}${'isError' in event && event.isError ? '!' : ''}`;
+    // Each call is an assistant message before it starts and a tool result after it finishes.
+    expect(events.map(shape)).toEqual([
+      'user:',
+      'assistant:', 'tool-started:read', 'tool-finished:read', 'tool-result:read',
+      'assistant:', 'tool-started:echo', 'tool-finished:echo', 'tool-result:echo',
+      'assistant:', 'tool-started:bash', 'tool-finished:bash!', 'tool-result:bash!',
+      'assistant:',
+      'assistant:', 'tool-started:submit', 'tool-finished:submit', 'tool-result:submit',
     ]);
     expect(agent.sessions[0]!.spec).toBe(s);
   });

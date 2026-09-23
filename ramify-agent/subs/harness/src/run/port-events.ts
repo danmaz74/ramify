@@ -54,7 +54,7 @@ export class PortEventRecorder {
 
   /** Records one event. What is counted is counted before its ordered durable write. */
   record(event: AgentEvent): Promise<void> {
-    if (event.type === 'message' && event.usage) {
+    if (event.type === 'message' && event.role === 'assistant' && event.usage) {
       this.usageObserved = true;
       for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part];
     }

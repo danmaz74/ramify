@@ -37,7 +37,10 @@ export function activityOf(event: AgentEvent, workingDirectory: string, projectR
         ? { kind: 'tool-error', callId: event.callId, tool: event.tool, error: shorten(event.errorText ?? 'The tool reported an error', 2000) }
         : undefined;
     case 'message':
-      return { kind: 'message', text: shorten(event.text, 500), usage: event.usage ?? null };
+      // The assistant's words; the prompt and tool results are not activity.
+      return event.role === 'assistant' ? { kind: 'message', text: shorten(event.text, 500), usage: event.usage } : undefined;
+    default:
+      return undefined;
   }
 }
 

@@ -40,10 +40,10 @@ describe('context observation', () => {
     ], { context: unbudgeted, contextWindow: window, tools: [tester] });
     await expect(harness.session.outcome).resolves.toMatchObject({ kind: 'submitted' });
 
-    const shape = harness.events.map(event => event.type);
-    // Every message and every finished tool call is followed by an observation.
+    const shape = harness.events.map(event => (event.type === 'message' ? `message:${event.role}` : event.type));
+    // Every assistant message and every finished tool call is followed by an observation.
     for (const [index, type] of shape.entries()) {
-      if (type === 'message' || type === 'tool-finished') expect(shape[index + 1]).toBe('context-observed');
+      if (type === 'message:assistant' || type === 'tool-finished') expect(shape[index + 1]).toBe('context-observed');
     }
     const observed = harness.events.filter(event => event.type === 'context-observed');
     expect(observed.length).toBeGreaterThanOrEqual(4);
