@@ -64,7 +64,7 @@ const rootFeature = `src/tests/features/${plan}/note-in-panel.feature`;
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 
 describe('materializing the feature files', () => {
-  test('a scripted run commits every tracked file once readiness has passed, and the work-item gates pass with every scenario pending', async () => {
+  test('a scripted run commits every tracked file once readiness has passed, and each work-item gate implements the scenario its request declared', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
@@ -134,7 +134,8 @@ describe('materializing the feature files', () => {
     expect(git.commits().map(made => made.id)).toEqual(['scenarios-revision']);
 
     // The content is the rendering of the records: each scenario tagged by
-    // its identity and pending, its source verbatim.
+    // its identity, its source verbatim. Each work item's completion request
+    // declared its scenario, so the pending tag is gone from both.
     const reviewsText = await readFile(join(project, reviewsFeature), 'utf8');
     expect(reviewsText.split('\n').slice(0, 9)).toEqual([
       `# Written by ramify-agent for plan ${plan}, run ${receipt.jobId}.`,
@@ -145,28 +146,30 @@ describe('materializing the feature files', () => {
       'Feature: reviewer-note',
       '  A reviewer can attach one note to a completed review run.',
       '',
-      '  @ramify-sc-001 @ramify-pending',
+      '  @ramify-sc-001',
     ]);
     expect(reviewsText).toContain('  Scenario: A person uses reviewer-note\n    Given the project as the plan finds it\n');
-    expect(await readFile(join(project, rootFeature), 'utf8')).toContain('Feature: note-in-panel\n  The review panel shows the note under the findings.\n\n  @ramify-sc-002 @ramify-pending\n');
+    expect(await readFile(join(project, rootFeature), 'utf8')).toContain('Feature: note-in-panel\n  The review panel shows the note under the findings.\n\n  @ramify-sc-002\n');
 
     // The commit is the accepted boundary the first local architect starts from.
     const firstArchitect = JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.invocation('inv-0002')), 'utf8')) as { role: string; base: string };
     expect(firstArchitect).toMatchObject({ role: 'local-architect', base: 'scenarios-revision' });
 
     // Each work-item gate plans the scenario check over both owners with the
-    // pending tag excluded, and passes: every tracked scenario is pending.
+    // pending tag excluded, and passes: the first runs its own declared
+    // scenario and excludes the other, still pending; the second runs both.
     const gateIds = events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate);
     const attempts = await Promise.all(gateIds.map(async id =>
       JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const workItemGates = attempts.filter(attempt => attempt.checkpoint === 'work-item');
     expect(workItemGates).toHaveLength(2);
-    for (const attempt of workItemGates) {
+    for (const [index, attempt] of workItemGates.entries()) {
       expect(attempt.verdict).toBe('passed');
       const scenarios = attempt.commands.find(command => command.kind === 'scenarios')!;
-      expect(scenarios.scenarios).toMatchObject({ mode: 'quick', selection: { kind: 'all-untagged' }, excluded: 0, failures: [] });
+      expect(scenarios.scenarios).toMatchObject({ mode: 'quick', selection: { kind: 'all-untagged' }, excluded: 1 - index, failures: [] });
       expect(scenarios.scenarios!.runs.map(run => run.module)).toEqual(expect.arrayContaining([root, reviews]));
-      expect(scenarios.scenarios!.scenarios).toEqual([]);
+      expect(scenarios.scenarios!.scenarios.map(result => `${result.id} ${result.status}`).sort())
+        .toEqual(index === 0 ? ['sc-001 passed'] : ['sc-001 passed', 'sc-002 passed']);
     }
   }, 300_000);
 
@@ -429,9 +432,13 @@ describe('an engineer and the feature files', () => {
     scripted.assertComplete();
     commands.assertComplete();
 
-    const rendered = await readFile(join(project, notesFeature), 'utf8');
-    expect(rendered).toContain('@ramify-sc-001 @ramify-pending');
-    expect(rendered).not.toContain('tampered');
+    // The work item's completion request declared the scenario, and its
+    // gate's commit rendered it without the pending tag; the assignments
+    // guarded the rendering with the tag, which is what the tree held then.
+    const final = await readFile(join(project, notesFeature), 'utf8');
+    expect(final).toContain('  @ramify-sc-001\n');
+    expect(final).not.toContain('tampered');
+    const rendered = final.replace('  @ramify-sc-001\n', '  @ramify-sc-001 @ramify-pending\n');
 
     // The assignment guards the feature file at its rendering's hash, the
     // configuration and the support files the configuration names.

@@ -4,6 +4,7 @@ import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
+import { declaringScenarios } from './declarations.js';
 import type { RunEvent } from '../../run/log.js';
 import type { RunService, RunWrite } from '../../run/service.js';
 import type { CommandRunner } from '../../../subs/evidence/src/run-command.js';
@@ -905,7 +906,7 @@ export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
  */
 export async function runToEnd(scenario: Scenario, watch?: (service: RunService, runId: string) => Promise<void>) {
   const target = await scenario.target();
-  const agent = createScriptedAgent(scenario.script());
+  const agent = createScriptedAgent(declaringScenarios(scenario.script()));
   const git = scenarioGit(target.root, scenario.git);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let runId = '';
@@ -965,7 +966,7 @@ export interface CrashPoint {
 /** A scenario run up to one boundary and abandoned there, as a crash leaves it. */
 export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const target = await scenario.target();
-  const agent = createScriptedAgent(scenario.script());
+  const agent = createScriptedAgent(declaringScenarios(scenario.script()));
   const git = scenarioGit(target.root, scenario.git);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let resolveFrozen: (runId: string) => void = () => undefined;

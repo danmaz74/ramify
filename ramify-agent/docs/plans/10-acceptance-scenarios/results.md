@@ -803,3 +803,220 @@ did before. The full suite was not run, per the plan's rules.
   rejects this, and no test found a consequence.
 - `iterations-integration` failed once under the concurrent load of a
   65-file batch and passed alone three times.
+
+## Iteration 7: Declarations and state transitions
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **Declarations** (`work/declarations.ts`, new; `work/engineer.ts`,
+  `work/submission.ts`). `completion-proposed` and `request-completion` gain
+  `scenarios: string[]`, default `[]`. `declarationErrors(ids, { entry,
+  records })` accepts IDs of entry scenarios of the work item's own entry,
+  whatever their state, and rejects, each at `scenarios.<index>` with the
+  reason and the IDs expected: an unknown ID, another entry's scenario, an
+  integration scenario, and any ID for a work item without an entry
+  (provider and follow-up items). `validateEngineer` and
+  `validateLocalArchitect` take the context as `scenarios`, so a rejection
+  goes through the existing judge and its per-turn bound.
+  `scenariosToDeclare(ids, states)` is the pending ones, once each; bound,
+  declared and implemented ones are accepted and ignored.
+- **Events** (`run/log.ts`). Six events after `scenarios-materialized`:
+  the four of the architecture's table with iteration 1's data schemas
+  (`scenario-declared`, `scenario-due`, `scenario-implemented`,
+  `scenario-withdrawn`), `scenario-bound-passed { scenario, gate }` and the
+  withdrawal intent `scenarios-withdrawing { withdrawal, workItem,
+  scenarios, reason }`. Each has a projection in `projections/events.ts`.
+  `runFailureReasonSchema` gains `acceptance-incomplete` after
+  `repair-exhausted`.
+- **Acceptance of a declaration** (`run/service.ts`). The engineer's
+  declarations apply when its proposal is accepted, before each iteration
+  gate; the local architect's when its request is accepted, before the
+  refusal checks. Each pending scenario becomes `bound` while the work item
+  holds fakes (an open requirement, or an owed conformance not yet shown)
+  and `declared` otherwise, recorded as `scenario-declared { scenario, by,
+  state }` with the declaring invocation. The gate's commit re-renders the
+  files, as iteration 6 wrote it, so a declared scenario loses its tag there.
+- **Gates.** The identity selection of iteration 5 now receives real
+  states. After every passing committing gate (iteration, contract,
+  breaking-iteration, work-item) `recordScenarioPasses` reads the attempt's
+  scenario summary: a passed `declared` scenario becomes `implemented`
+  (`scenario-implemented { scenario, gate }`), a passed `bound` one records
+  `scenario-bound-passed { scenario, gate }` and stays bound. The events
+  follow the gate's `gate-committed` boundary.
+- **Due.** When `dischargeEvidence` writes a `requirement-verified` and the
+  work item then holds no open requirement and owes no conformance, each of
+  its bound scenarios gets `scenario-due { scenario, cause:
+  'requirements-verified' }`.
+- **Withdrawal.** The work item leaves its repair path without a pass when an
+  iteration (ordinary, contract sub-session or direct revision) closes
+  `exhausted`, and when its local architect requests placement or yields.
+  Every `declared` or `bound` scenario of its entry with no
+  `scenario-bound-passed` or `scenario-implemented` since its latest
+  `scenario-declared` returns to `pending` with the reason
+  `repair-exhausted`, `placement-requested` or `yielded`. Where the
+  rendering changes (a declared one among them) the harness renders with
+  them pending, commits "Withdraw sc-001" (several IDs joined by `, `) with
+  `Ramify-Run` and `Ramify-Scenarios: withdrawn-<n>`, `n` the withdrawal's
+  ordinal in the run, as the ledger effect `scenarios-withdraw:<n>`: intent
+  `scenarios-withdrawing`, completion the first `scenario-withdrawn`, then
+  one `scenario-withdrawn` per further scenario with the same commit.
+  `feature-files.ts` gains `commitForScenarios`, `withdrawnTrailerValue`,
+  `withdrawalMessage` and `withStates`.
+- **Recovery.** `completeEffects` performs a pending `scenarios-withdrawing`
+  again (re-render, look the commit up by its two trailers, commit only if
+  none is found), and `completeWithdrawals` writes the `scenario-withdrawn`
+  of every scenario of a completed withdrawal that has none after its
+  intent, with the recorded commit. `acceptedCommit` does not accept a
+  withdrawal commit (see Deviations), which its comment now states.
+- **Completion** (§9). A request's own declarations apply first; it is then
+  refused, through the existing `blocked` path and refusal bound, while a
+  scenario of its entry is `pending` or `bound`, with one line per scenario.
+  A passing work-item gate that leaves a scenario of the entry unimplemented
+  is refused the same way instead of writing `work-item-completed`. Beyond
+  the bound the run fails `unresolvable-requirement` when a requirement or
+  conformance also blocked it, and `acceptance-incomplete` with the scenario
+  records as evidence otherwise.
+- **Final** (§11). `incompleteScenarios(tracked)` (`run/feature-files.ts`)
+  is the rule `acceptance-incomplete`: before the final gate every entry
+  scenario must be `implemented`, or the run fails with each scenario, its
+  entry and state in the message and its record as evidence.
+  `job-completed` also requires the final attempt's scenario check to be a
+  full-mode, non-dry run that passed and passed every entry scenario;
+  otherwise the run fails `acceptance-incomplete` with the gate as evidence.
+- **The guarded comparison of feature files.** `writtenScenarios(lines)` is
+  the states as the harness last rendered them into the tree (at
+  `scenarios-materializing`, each `gate-committing`, each
+  `scenarios-withdrawing` with its scenarios pending). Assignments capture
+  that rendering's hashes, and iteration and contract gates replace the
+  captured feature-file hashes with it (`guardedAtGate`), so a repair
+  round's gate no longer sees the previous round's commit as an agent's
+  change. See Deviations.
+- **Test helpers.** `helpers/declarations.ts`: `declaringScenarios(script)`
+  makes each scripted local architect's `request-completion` without a
+  `scenarios` field declare every scenario of its work item's entry, with
+  IDs read from the initial architect's submission in the same script
+  (scenarios numbered in order, `wi-00N` the Nth entry). `openRuns`, the
+  composition's agents, `protocolScript` and the agents `placement` and
+  `local-authority` build themselves apply it; a request that states
+  `scenarios`, even `[]`, is left alone, and engineers declare only where a
+  test says so. `passingScenarioSummary` reports, for a module's run without
+  an identity selection, the tracked scenarios of that module's feature
+  files as they stand on disk (all for `all`, the untagged ones for
+  `all-untagged`, counting the rest as excluded). The scripted `cucumber-js`
+  is now a small Node program behind the shell wrapper: it reads the
+  profile, selects the tracked scenarios of its `paths` by its `tags` (none,
+  `not @ramify-pending`, or identity tags joined by `or`) and writes a
+  stream with each executed and no step, so in-place runs report them
+  passed; it clears `NODE_OPTIONS`, which the fixture's scripts set to
+  `--import tsx`. `answeredGit` and `gateGit` accept a `Ramify-Scenarios`
+  lookup and a commit without `Ramify-Gate`; `withdrawn(ids, commit, files)`
+  states a withdrawal commit.
+- **Tests.** A new `scenario-states.test.ts` (14 tests). Updated:
+  `materialization` (the gates now implement what the requests declared),
+  `work-items` (the event sequence), `analysis-scenarios` (the counts after
+  the run), `union-values` (events, samples, the reason),
+  `unguarded-write` and `iteration-gate-integration` (the work-item gate now
+  commits the rendered feature file after the iteration's commit),
+  `placement`, `local-authority`, `composition` (producers of the new union
+  values). The harness README describes the states and the tests.
+
+### Integration scenarios
+
+They are left out of this iteration's rules: `incompleteScenarios` and the
+requirement after the final gate read entry scenarios only, each with a
+`TODO(Plan 10 iteration 8)`. An integration scenario stays `pending`, and a
+declaration of one is rejected. One existing test has one
+(`analysis-scenarios`' acceptance run); it completes with the integration
+scenario pending, and its assertion says so. No test of this iteration has
+one. Note for iteration 8: the final gate's `all` selection runs a pending
+integration scenario too, which the scripted runners report passed; with the
+real runner its undefined steps would fail the final gate until its work
+item binds it.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/scenario-states.test.ts` | 14 passed: §7's row "no" (a declared scenario, selected by identity at its iteration gate with the tag already removed by that gate's commit, implemented there; a repeated declaration ignored; another entry's scenario declared by a request and implemented by its work-item gate; the final gate in full mode with both passed; counts `implemented: 2`); §7's row "yes" and §8 in the provider order (bound with the tag kept at its iteration gate, its fake-backed pass, the yield withdrawing nothing, the provider's conformance, the verification's second bound pass, `requirement-verified`, `scenario-due`, then implemented by the work-item gate untagged); rejected declarations through the judge (unknown ID, another entry's scenario, the bound ending the invocation as `invalid-submission`), a rejected and corrected local architect request, and the integration and no-entry rejections; withdrawal by exhaustion (commit message, trailers, the file at commit time, the effect's lines, the next engineer's base), by placement request (before `placement-requested`) and by yield (a bound scenario, no commit, the accepted boundary named); a refused completion request with its reason in the next briefing; the refusal bound failing `acceptance-incomplete` with `scenarios/sc-001.json`; an implemented scenario failing a later work-item gate as a regression and staying implemented; the final rule over records and states; a passing final gate whose check did not pass the scenario failing `acceptance-incomplete` with the gate as evidence; a crash between the withdrawal commit and its record, recovered by trailer with no second commit |
+| `npx vitest run` over the 72 harness test files other than the composition, fixture and integration files | 72 passed, 622 tests. Before their update `placement` (7), `materialization` (2), `union-values` (3), `analysis-scenarios`, `breaking-work`, `local-authority`, `run-protocol`, `unguarded-write` and `work-items` failed |
+| `npx vitest run` over the 11 integration and fixture files, the composition and its three recovery files, `subs/harness/subs` and `subs/web` | 53 passed, 2 skipped (`fixture-trials`, `fixture-acceptance`, conditional), 419 tests. Before their update `iteration-gate-integration` and `composition` (four new union values without a producer) failed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits, as in iteration 6 |
+
+The exit criterion is the first test of `scenario-states.test.ts`: a
+scripted run on a copy of the collection-review fixture completes with every
+entry scenario `implemented`. No test makes a model call. The full suite was
+not run as `npm test`; the two batches above are the affected files, which
+this iteration's change reaches in nearly every lifecycle test.
+
+### Deviations
+
+- **The fake-backed pass is an event of its own,**
+  `scenario-bound-passed { scenario, gate }`, not part of the events table.
+  It changes no state, so the reducer does not read it; the withdrawal rule
+  reads it ("no pass since the declaration"), and iteration 10's scenario
+  query can list it among the gates a scenario ran in. The attempt's own
+  summary also holds the result.
+- **A withdrawal commit is not an accepted boundary.** Iteration 6's open
+  item suggested `acceptedCommit` count it; it follows a gate that did not
+  pass, whose commit is not accepted either, and it restores tags the
+  accepted boundary already had, so the next engineer's changes are still
+  taken against the last passing gate. `acceptedCommit` is unchanged and
+  says why.
+- **A withdrawal of bound scenarios alone makes no commit.** A bound
+  scenario never lost its tag, so the rendering does not change and Git
+  would refuse an empty commit. Its `scenario-withdrawn.commit` names the
+  accepted boundary, which carries the tag. In practice this is the yield's
+  case: a scenario declared before the requirement opened is run by the
+  contract gate, whose scope is the consumer, so at a yield an unpassed
+  scenario is a bound one.
+- **The withdrawal intent is a sixth event,** `scenarios-withdrawing`, and
+  its completion is the first `scenario-withdrawn`, because one commit
+  withdraws several scenarios and the event data is per scenario.
+- **The trailer value is `withdrawn-<n>`,** not `withdrawn`: a run may
+  withdraw more than once, and a recovery lookup must find its own commit.
+- **Exhaustion means an iteration closing `exhausted`.** The work-item
+  gate's own exhaustion fails the run at once (`repair-exhausted`) and
+  withdraws nothing, as a stop leaves the tags as the states were (§12). An
+  iteration that closes `partial` or `unsuitable` after a failed gate keeps
+  its declared scenarios: the work item is still on its repair path until
+  its architect yields or requests placement.
+- **The guarded comparison of feature files uses the rendering last
+  written,** not the current states. Declarations change states between a
+  gate's comparison and its commit, and `scenario-due` after a gate, so the
+  current rendering is not what the tree holds; a repair round's gate saw
+  the previous round's commit as a guarded change.
+- **`acceptance-incomplete` is a run failure checked before the final
+  gate**, not a `GateRuleRecord` on the final attempt: a failed rule would
+  still commit and run the full-mode check, and the architecture fails the
+  run rather than returning anywhere. The same reason ends a work item's
+  completion refusals when only scenarios blocked it.
+- **`job-completed` requires each entry scenario passed in the final
+  summary**, beside the check's own pass, because the `all` selection's pass
+  rule does not require every tracked scenario executed.
+- **The scripted runners changed.** The direct executor and the scripted
+  `cucumber-js` now report the scenarios a selection reaches as passed, so
+  a lifecycle test's work-item and final gates implement what was declared.
+- **The scenario states are still replayed from the ledger** at each use
+  (declaration, gate, withdrawal, refusal). Keeping them beside the
+  snapshot would need a cache invalidated by every scenario event; the
+  replay is linear in the log and was not measurable in these tests.
+
+### Open items
+
+- Iteration 8: integration scenarios in the final rule and the requirement
+  after the final gate (the two TODOs), their declaration by an integration
+  work item, and the final gate's `all` selection over a pending one.
+- Iteration 9: the briefings say nothing yet about scenarios; the
+  `blocked` section's closing text still speaks only of requirements and
+  obligations, and a scripted architect knows its IDs only from the test.
+- Iteration 10: `scenario-bound-passed` and the withdrawal events are
+  projected as sentences with gate, invocation and commit references; the
+  protocol has no `scenario` reference kind yet.
+- A work item whose declared scenario its work-item gate did not execute
+  (no module with feature files found for its owner) is refused until the
+  bound; the reason names the gate.

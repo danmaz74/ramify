@@ -10,6 +10,7 @@ import {
   type PlacementEvidence,
 } from '../architecture/submission.js';
 import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from './assignment.js';
+import { declarationErrors, type DeclarationContext } from './declarations.js';
 import { decompositionSchema } from './records.js';
 
 /*
@@ -92,6 +93,12 @@ export const localArchitectSubmissionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('request-completion'),
     summary: text,
     outline: outlineBodySchema,
+    /**
+     * Scenarios of this work item's entry that existing step definitions
+     * already bind, declared with the request. They apply before the request
+     * is judged, and the work-item gate verifies them.
+     */
+    scenarios: z.array(text).default([]),
   }).strict(),
   z.object({
     kind: z.literal('yield-for-providers'),
@@ -135,6 +142,8 @@ export interface WorkEvidence {
   readonly contracts?: ReadonlySet<string> | undefined;
   /** The guarded paths of this project, which are the only ones an authorization can name. */
   readonly guardedPaths?: ReadonlySet<string> | undefined;
+  /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
+  readonly scenarios?: DeclarationContext | undefined;
 }
 
 /** The same evidence, as the placement rules read it. */
@@ -162,7 +171,10 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
     return errors.length === 0 ? shape : { ok: false, errors };
   }
   if (shape.value.kind === 'request-completion') {
-    const errors = outlineErrors(shape.value.outline, evidence);
+    const errors = [
+      ...outlineErrors(shape.value.outline, evidence),
+      ...declarationErrors(shape.value.scenarios, evidence.scenarios ?? { entry: null, records: [] }),
+    ];
     return errors.length === 0 ? shape : { ok: false, errors };
   }
   if (shape.value.kind === 'yield-for-providers') {

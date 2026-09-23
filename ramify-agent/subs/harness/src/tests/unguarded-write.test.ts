@@ -141,9 +141,11 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
     expect(lines.coverage).toBe('partial');
     expect(lines.gaps.some(gap => gap.startsWith('unguarded-shell'))).toBe(true);
 
-    // The harness never resets or reverts: the accepted commit carries what
-    // the shell wrote, and the record is what says it was outside the scope.
-    const committed = await git(root, 'show', '--name-only', '--format=', `ramify-agent/run-${runId}`);
+    // The harness never resets or reverts: the iteration's accepted commit
+    // carries what the shell wrote, and the record is what says it was
+    // outside the scope. The work-item gate's commit after it holds the
+    // feature file its completion request declared.
+    const committed = await git(root, 'show', '--name-only', '--format=', result.commit!);
     expect(committed).toContain(outsidePath);
   }, 300_000);
 });

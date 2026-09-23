@@ -34,8 +34,9 @@ export interface GitAnswers {
   readonly head: string;
   readonly commits: readonly CommitResponse[];
   /**
-   * Revisions Git reports for a gate's identity trailers: what a recovery
-   * lookup finds. Gates absent from this map are reported as not committed.
+   * Revisions Git reports for a gate's identity trailers, or a scenario
+   * commit's `Ramify-Scenarios` value: what a recovery lookup finds. Those
+   * absent from this map are reported as not committed.
    */
   readonly recovered?: Readonly<Record<string, string>> | undefined;
   /** What Git reports about the working tree at readiness. */
@@ -128,7 +129,10 @@ export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
     async findCommitByTrailers(project, trailers) {
       check('findCommitByTrailers', () => {
         expect(project).toBe(root);
-        expect(trailers.map(trailer => trailer.key)).toEqual(['Ramify-Run', 'Ramify-Gate']);
+        // A gate's commit, or one of the harness's own scenario commits.
+        expect(trailers.map(trailer => trailer.key)).toHaveLength(2);
+        expect(trailers[0]!.key).toBe('Ramify-Run');
+        expect(['Ramify-Gate', 'Ramify-Scenarios']).toContain(trailers[1]!.key);
         expect(trailers[0]!.value).toBe(branch?.slice(runBranchPrefix.length));
       });
       const gate = trailers[1]!.value;
@@ -194,6 +198,14 @@ export function accepted(subject: string, commit: string, changes: readonly GitC
  */
 export function scenariosCommitted(planId: string, commit = `scenarios-of-${planId}`, files: readonly string[] = []): CommitResponse {
   return accepted(`Scenarios of ${planId}`, commit, added(...files));
+}
+
+/**
+ * The harness's own commit of a withdrawal, "Withdraw sc-001" or "Withdraw
+ * sc-001, sc-002", which restores the pending tag in each file it names.
+ */
+export function withdrawn(scenarios: readonly string[], commit: string, files: readonly string[]): CommitResponse {
+  return accepted(`Withdraw ${scenarios.join(', ')}`, commit, modified(...files));
 }
 
 /** A commit attempt Git reports as an unchanged tree. */

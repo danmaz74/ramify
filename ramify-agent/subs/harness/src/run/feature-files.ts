@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { GitService } from '../../subs/evidence/src/git.js';
 import { scenarioRecordSchema, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { renderFeatureFiles, type RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
 import {
-  applyScenarioEvent, initialScenarioStates, scenarioEventTypes, type ScenarioEvent, type ScenarioStates,
+  applyScenarioEvent, initialScenarioStates, scenarioEventTypes, type ScenarioEvent, type ScenarioState, type ScenarioStates,
 } from '../../subs/scenarios/src/states.js';
 import { resolveContainedPath } from '../guard/resolve-contained-path.js';
 import { runTrailer } from './gates.js';
@@ -50,9 +50,28 @@ export interface TrackedScenarios {
  * rejected one leaves the states as they were, as in the snapshot.
  */
 export function trackedScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios {
+  const { written: _written, ...tracked } = replayScenarios(lines);
+  return tracked;
+}
+
+/**
+ * The tracked scenarios with the states the tree holds them in: the states
+ * as of the harness's latest rendering, which is the materialization, a
+ * gate's commit or a withdrawal commit. A declaration or a scenario falling
+ * due changes a state at once and the tree only at the next of those, so a
+ * gate compares the tree against this rendering, not the current one.
+ */
+export function writtenScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios {
+  const { written, ...tracked } = replayScenarios(lines);
+  return { ...tracked, states: written };
+}
+
+/** One pass over the ledger: the records, the current states, the entries, and the states as last rendered. */
+function replayScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios & { readonly written: ScenarioStates } {
   const records: ScenarioRecord[] = [];
   let entries: TrackedScenarios['entries'] = [];
   let states: ScenarioStates = initialScenarioStates([]);
+  let written: ScenarioStates = states;
   for (const line of lines) {
     for (const record of line.transaction.records) {
       const schema = (record.body as { schema?: unknown } | null)?.schema;
@@ -61,14 +80,45 @@ export function trackedScenarios(lines: readonly ScenarioLedgerLine[]): TrackedS
         entries = entryAssignmentsSchema.parse(record.body).entries.map(entry => ({ capability: entry.capability, description: entry.description }));
       }
     }
-    const event = line.transaction.event;
+    const event = line.transaction.event as { readonly type: string; readonly data?: { readonly scenarios?: readonly string[] } };
     if (event.type === 'analysis-accepted') states = initialScenarioStates(records.map(record => record.id));
     if ((scenarioEventTypes as readonly string[]).includes(event.type)) {
       const applied = applyScenarioEvent(states, event as unknown as ScenarioEvent);
       if (applied.ok) states = applied.states;
     }
+    // The points where the harness renders the files into the tree.
+    if (event.type === 'scenarios-materializing' || event.type === 'gate-committing') written = states;
+    if (event.type === 'scenarios-withdrawing') {
+      const withdrawn = new Map(states);
+      for (const id of event.data?.scenarios ?? []) withdrawn.set(id, 'pending');
+      written = withdrawn;
+    }
   }
-  return { records, states, entries };
+  return { records, states, entries, written };
+}
+
+/** One tracked scenario the final gate cannot run over: its entry, its state and its record's path as evidence. */
+export interface IncompleteScenario {
+  readonly id: string;
+  readonly entry: string | null;
+  readonly state: ScenarioState;
+  readonly evidence: string;
+}
+
+/**
+ * The harness rule `acceptance-incomplete`, architecture §11: before the
+ * final run no tracked scenario may be `pending`, `bound` or `declared`.
+ * Every one that is, with its record as evidence.
+ *
+ * TODO(Plan 10 iteration 8): integration scenarios join the rule once their
+ * work items exist. Until then nothing binds them, they stay `pending`, and
+ * the rule reads entry scenarios only.
+ */
+export function incompleteScenarios(tracked: TrackedScenarios): IncompleteScenario[] {
+  return tracked.records
+    .filter(record => record.kind === 'entry')
+    .map(record => ({ id: record.id, entry: record.entry, state: tracked.states.get(record.id) ?? 'pending', evidence: join('scenarios', `${record.id}.json`) }))
+    .filter(scenario => scenario.state !== 'implemented');
 }
 
 /** Every tracked file's expected content under the current states, ordered by path. */
@@ -163,12 +213,67 @@ export async function commitForMaterialization(
   recovering: boolean,
   git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'>,
 ): Promise<string | null> {
+  return commitForScenarios(projectRoot, runId, materializedTrailerValue, message, recovering, git);
+}
+
+/** The trailer value of a run's nth withdrawal commit; the ordinal keeps each one's identity its own. */
+export function withdrawnTrailerValue(withdrawal: number): string {
+  return `withdrawn-${withdrawal}`;
+}
+
+/**
+ * The commit of one of the harness's own scenario commits, identified by its
+ * `Ramify-Scenarios` value beside `Ramify-Run`: the live attempt commits at
+ * once, a recovery finds the commit an interrupted attempt made first.
+ */
+export async function commitForScenarios(
+  projectRoot: string,
+  runId: string,
+  trailerValue: string,
+  message: string,
+  recovering: boolean,
+  git: Pick<GitService, 'findCommitByTrailers' | 'commitAccepted'>,
+): Promise<string | null> {
   if (recovering) {
     const existing = await git.findCommitByTrailers(projectRoot, [
       { key: runTrailer, value: runId },
-      { key: scenariosTrailer, value: materializedTrailerValue },
+      { key: scenariosTrailer, value: trailerValue },
     ]);
     if (existing !== null) return existing;
   }
   return git.commitAccepted(projectRoot, message);
+}
+
+/**
+ * The message of a withdrawal commit, "Withdraw sc-003" or "Withdraw sc-003,
+ * sc-004", written mechanically from the intent: which work item left its
+ * repair path, why, and the files whose pending tags return.
+ */
+export function withdrawalMessage(parts: {
+  readonly runId: string;
+  readonly withdrawal: number;
+  readonly workItem: string;
+  readonly scenarios: readonly string[];
+  readonly reason: string;
+  readonly files: readonly string[];
+}): string {
+  return [
+    `Withdraw ${parts.scenarios.join(', ')}`,
+    '',
+    `${parts.workItem} left its repair path without a passing gate (${parts.reason}), so the`,
+    `scenario${parts.scenarios.length === 1 ? ' returns' : 's return'} to pending and carr${parts.scenarios.length === 1 ? 'ies' : 'y'} the pending tag again.`,
+    '',
+    ...parts.files.map(file => `  ${file}`),
+    '',
+    `${runTrailer}: ${parts.runId}`,
+    `${scenariosTrailer}: ${withdrawnTrailerValue(parts.withdrawal)}`,
+    '',
+  ].join('\n');
+}
+
+/** The tracked scenarios with some states replaced: what a withdrawal renders before its events are in the log. */
+export function withStates(tracked: TrackedScenarios, states: ReadonlyMap<string, ScenarioState>): TrackedScenarios {
+  const next = new Map(tracked.states);
+  for (const [id, state] of states) next.set(id, state);
+  return { ...tracked, states: next };
 }

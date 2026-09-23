@@ -89,6 +89,8 @@ describe('the run log', () => {
       'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
       'scenarios-materializing', 'scenarios-materialized',
+      'scenario-declared', 'scenario-due', 'scenario-implemented', 'scenario-bound-passed',
+      'scenarios-withdrawing', 'scenario-withdrawn',
       'work-item-started', 'hypotheses-delivered',
       'placement-requested', 'view-refreshed', 'fork-returned-partial', 'decision-accepted',
       'brief-appended', 'global-context-rebuilt', 'decision-delivered',
@@ -751,7 +753,7 @@ describe('the protocol vocabulary', () => {
     expect(runFailureReasonSchema.options).toEqual([
       'analysis-invalid', 'readiness-failed', 'project-config-invalid', 'acceptance-harness-missing',
       'agent-failed', 'invalid-submission', 'inputs-changed', 'dependency-cycle', 'unresolvable-requirement',
-      'repair-exhausted', 'recovery-exhausted', 'writer-unsettled', 'limit-exceeded', 'internal',
+      'repair-exhausted', 'acceptance-incomplete', 'recovery-exhausted', 'writer-unsettled', 'limit-exceeded', 'internal',
     ]);
     expect(runPhaseSchema.options).toEqual(['analysis', 'awaiting-review', 'readiness', 'working', 'final-verification', 'ended']);
     expect(sessionModeSchema.options).toEqual(['fresh', 'continued', 'fork']);
@@ -890,6 +892,12 @@ function sampleData(type: RunEvent['type']): unknown {
     'readiness-failed': { attempt: 1, step: 'git-clean', detail: '', recovery: null, final: true },
     'scenarios-materializing': { files: ['src/tests/features/p/e.feature'] },
     'scenarios-materialized': { commit: 'c', files: ['src/tests/features/p/e.feature'] },
+    'scenario-declared': { scenario: 'sc-001', by: 'inv-0003', state: 'bound' },
+    'scenario-due': { scenario: 'sc-001', cause: 'requirements-verified' },
+    'scenario-implemented': { scenario: 'sc-001', gate: 'ga-0004' },
+    'scenario-bound-passed': { scenario: 'sc-001', gate: 'ga-0003' },
+    'scenarios-withdrawing': { withdrawal: 1, workItem: 'wi-001', scenarios: ['sc-001'], reason: 'yielded' },
+    'scenario-withdrawn': { scenario: 'sc-001', reason: 'yielded', commit: 'c' },
     'work-item-started': { workItem: 'wi-001', module: 'm' },
     'hypotheses-delivered': { workItem: 'wi-001', refs: [r] },
     'placement-requested': { request: 'pr-001', workItem: 'wi-001', requester: 'm', capability: 'c' },

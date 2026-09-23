@@ -674,8 +674,11 @@ Neither child receives this module's vocabulary.
   whose content differs from the rendering of the current states and
   reports whether a commit is needed; every gate's commit re-renders before
   it commits, after the guarded comparison. The files join every
-  assignment's guarded list with the hash of their expected rendering, so a
-  file that differs at a gate is `guarded-change`, and the write guard
+  assignment's guarded list with the hash of the rendering the harness last
+  wrote (`writtenScenarios`), and a gate compares them against that
+  rendering, not against the current states, which a declaration changes
+  before the next commit writes it. A file that differs at a gate is
+  `guarded-change`, and the write guard
   refuses an agent's edit or write of a feature file or of
   `ramify-agent.json` outright, whatever the scope contains; no
   authorization names either.
@@ -697,10 +700,43 @@ Neither child receives this module's vocabulary.
   `ScenarioCheckSummary` is on the command record of the
   `ramify-agent.gate-attempt/3`, whose output ends with the failures, and a
   failure is repaired like failing tests.
+- **Scenario states** (architecture §7 to §9). An engineer's
+  `completion-proposed` and a local architect's `request-completion` carry
+  `scenarios: string[]`, default empty. The judge accepts IDs of entry
+  scenarios of the work item's own entry (`work/declarations.ts`) and
+  rejects an unknown ID, another entry's scenario or an integration scenario
+  with the reason, under the per-turn bound. At acceptance each `pending`
+  one becomes `bound` while the work item has an open requirement or owes a
+  conformance, and `declared` otherwise (`scenario-declared { scenario, by,
+  state }`); a `bound`, `declared` or `implemented` one is left as it is.
+  After a passing committing gate every `declared` scenario its check passed
+  is `implemented` (`scenario-implemented { scenario, gate }`), and every
+  `bound` one stays bound with the attempt recorded as its fake-backed pass
+  (`scenario-bound-passed { scenario, gate }`). When `requirement-verified`
+  closes the last open requirement of a work item that owes no conformance,
+  its bound scenarios are `declared` (`scenario-due`). A work item that
+  leaves its repair path without a pass, because an iteration exhausted its
+  repair rounds, or it requests placement or yields, withdraws every
+  `declared` or `bound` scenario no gate passed since its declaration
+  (`scenario-withdrawn { scenario, reason, commit }`). Where that restores
+  a pending tag the harness re-renders and commits "Withdraw sc-001, …"
+  with `Ramify-Run` and `Ramify-Scenarios: withdrawn-<n>`, as a ledger
+  effect whose intent is `scenarios-withdrawing` and whose completion is the
+  first `scenario-withdrawn`; the commit is not an accepted boundary, and a
+  recovery finds it by its trailers and records the rest. A withdrawal of
+  bound scenarios alone changes no file, and names the accepted boundary.
+  An `implemented` scenario never returns: a later failure fails its gate.
 - **The work-item and final gates.** All project tests, the type check, a
-  complete Ramify check and the scenario check, on the current tree. `work-item-completed` requires
-  a passing `work-item` attempt and is the only thing that closes a work
-  item; `job-completed` requires a passing `final` attempt, and an empty work
+  complete Ramify check and the scenario check, on the current tree. A
+  completion request applies its own declarations first and is refused,
+  under the refusal bound, while a scenario of its entry is `pending` or
+  `bound`. `work-item-completed` requires
+  a passing `work-item` attempt and every scenario of the item's entry
+  `implemented`, and is the only thing that closes a work
+  item. Before the final run the rule `acceptance-incomplete` requires every
+  tracked entry scenario `implemented` (integration scenarios wait for
+  their work items); `job-completed` requires a passing `final` attempt
+  whose scenario check passed every one in full mode, and an empty work
   queue alone never satisfies it. A change to the working
   directory blocks nothing: the gate runs the checks where they are and, on a
   pass, the harness commits. The commit is the ledger's external effect,
@@ -800,14 +836,26 @@ The run's own tests are beside them.
   `invalid-submission`.
 - `materialization.test.ts` drives a run that commits its feature files once
   readiness has passed, with the commit's content, subject, trailers and
-  call arguments through the scripted Git, and whose work-item gates pass
-  with every scenario pending; re-rendering and its idempotence; the
+  call arguments through the scripted Git, and whose work-item gates
+  implement the scenario each completion request declared; re-rendering and its idempotence; the
   commit's lookup on recovery; the guarded list; a feature file that differs
   at a gate as a guarded change; and an engineer whose edits of a feature
   file and of `ramify-agent.json` are refused, whose shell change is a
   guarded change, and whose file the gate's commit restores. The crash
   between the commit and its record is the recovery table's
   `scenarios-committed` row.
+- `scenario-states.test.ts` covers declarations and every transition: a
+  declared scenario implemented by its iteration gate and one a request
+  declares implemented by the work-item gate, with the final gate in full
+  mode; a bound scenario through its fake-backed pass, the yield,
+  `requirement-verified` and `scenario-due` to its implementation; rejected
+  declarations under the bound; withdrawal by exhaustion, by a placement
+  request and by a yield; a refused completion request and the bound; an
+  implemented scenario failing a later gate; the final rule; and the crash
+  between a withdrawal commit and its record. Scripted local architects in
+  every lifecycle test declare their entry's scenarios with their
+  completion requests (`helpers/declarations.ts`), and the scripted runners
+  report the scenarios a selection reaches as passed.
 - `analysis-scenarios.test.ts` captures plans with and without `gherkin`
   blocks and with one that does not parse, rejects a submission per form
   rule through the real validation path and under the per-turn bound, and

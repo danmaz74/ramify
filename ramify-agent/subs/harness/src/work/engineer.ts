@@ -12,6 +12,7 @@ import { resolveTestSelection } from '../checks/selection.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
+import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IterationAssignment } from './iterations.js';
 import { scopePaths } from './scope.js';
 
@@ -62,6 +63,12 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     summary: text,
     findings: z.array(text),
     recommendation: text.optional(),
+    /**
+     * The scenarios of this work item's entry whose steps this iteration's
+     * step definitions bind and which pass in quick mode. A declaration is
+     * a claim: the next gate runs every one strictly.
+     */
+    scenarios: z.array(text).default([]),
   }).strict(),
   z.object({
     kind: z.literal('partial'),
@@ -143,6 +150,8 @@ export interface EngineerEvidence {
    * where the session can still act on it.
    */
   readonly openFindings?: readonly HookFinding[] | undefined;
+  /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
+  readonly scenarios?: DeclarationContext | undefined;
 }
 
 /**
@@ -217,6 +226,10 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
       message: openFindingsMessage(evidence.openFindings),
       expected: '"completion-proposed" only once no Ramify module violation stands',
     });
+  }
+
+  if (value.kind === 'completion-proposed' && value.scenarios.length > 0) {
+    errors.push(...declarationErrors(value.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
   }
 
   if (value.kind === 'partial' && value.done.length === 0 && value.unfinished.length === 0) {

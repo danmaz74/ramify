@@ -7,9 +7,13 @@ import type { RamifyCli } from '../../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex, ModuleEntry } from '../../../subs/evidence/src/views.js';
 import { architectRunInputs, type RunInputs } from '../../run/inputs.js';
 import type { AssignmentBody } from '../../work/assignment.js';
-import type { EngineerSubmission } from '../../work/engineer.js';
+import type { z } from 'zod';
+import type { engineerSubmissionSchema } from '../../work/engineer.js';
 import type { LocalArchitectSubmission } from '../../work/submission.js';
 import { installScriptedCucumber } from './project-config.js';
+
+/** An engineer submission as an agent sends it: a declaration's `scenarios` may be left out. */
+type EngineerSubmission = z.input<typeof engineerSubmissionSchema>;
 
 /*
  * What a test needs to drive an iteration: the submissions a local architect

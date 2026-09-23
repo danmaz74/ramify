@@ -5,6 +5,7 @@ import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
 import type { RunEvent } from '../run/log.js';
 import { copyFixture } from './helpers/fixture.js';
+import { declaringScenarios } from './helpers/declarations.js';
 import { analysis, entry, hypothesis, requestCompletion } from './helpers/analysis.js';
 import { assign, byRole, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
 import { localDecision, registryChange, requestPlacement } from './helpers/placement.js';
@@ -58,7 +59,7 @@ function index(events: readonly RunEvent[], predicate: (event: RunEvent) => bool
 describe('G5, G6, G7: local authority, escalation and what a revision reaches', () => {
   test('one architect refines locally, one escalates with counterevidence, and the revision reaches the rest before their work', async () => {
     const project = await target();
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysis(
         [entry('revision-compare', catalogCore, 'Compares two revisions of one record.'),
           entry('compare-card', catalogUi, 'Shows the comparison on the record card.'),
@@ -135,7 +136,7 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
         brief: 'field-order stays in the catalog core; the shared-formatting forecast is superseded.',
       })],
       engineer: [submit(completionProposed('Nothing needed changing for this iteration.'))],
-    }));
+    })));
 
     // Git is answered, not run. No iteration of this scenario writes source,
     // so every commit Git is asked for is one it reports as an unchanged tree.

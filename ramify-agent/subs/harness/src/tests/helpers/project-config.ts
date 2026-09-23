@@ -1,5 +1,5 @@
 import { chmod, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { projectConfigSchema, type ProjectConfig } from '../../run/records.js';
 
 /*
@@ -30,30 +30,74 @@ export async function writeProjectConfig(root: string, config: unknown = minimal
 }
 
 /**
- * A scripted `cucumber-js` for lifecycle tests: it runs no scenario. Given
- * `--config <profile>`, it writes the message stream the profile asks for,
- * holding only a finished, successful run, and exits 0, so a scenario check
- * over it passes with nothing executed. Without a profile it only exits 0.
+ * A scripted `cucumber-js` for lifecycle tests: it runs no step. Given
+ * `--config <profile>`, it reads the profile the harness wrote, finds every
+ * tracked scenario in the feature files of its `paths` whose tags its `tags`
+ * expression selects, and writes the message stream the profile asks for:
+ * each of those scenarios executed with no step, which the reducer reads as
+ * passed, and a finished, successful run. It exits 0. The expressions it
+ * reads are the three the harness builds: none, `not @ramify-pending` and
+ * identity tags joined by `or`. Without a profile it only exits 0.
  */
 export const scriptedCucumber = [
   '#!/bin/sh',
-  'config=""',
-  'while [ $# -gt 0 ]; do',
-  '  if [ "$1" = "--config" ]; then config="$2"; shift; fi',
-  '  shift',
-  'done',
-  'if [ -n "$config" ] && [ -f "$config" ]; then',
-  '  stream=$(sed -n \'s/.*"message:\\([^"]*\\)".*/\\1/p\' "$config")',
-  '  if [ -n "$stream" ]; then',
-  '    printf \'%s\\n\' \'{"testRunStarted":{"timestamp":{"seconds":0,"nanos":0}}}\' \'{"testRunFinished":{"success":true,"timestamp":{"seconds":0,"nanos":0}}}\' > "$stream"',
-  '  fi',
-  'fi',
-  'exit 0',
+  // A project's script may start the runner with loaders it installs, such
+  // as the fixture's `--import tsx`; the scripted one needs none of them.
+  'NODE_OPTIONS= exec node "$(dirname "$0")/scripted-cucumber.mjs" "$@"',
   '',
 ].join('\n');
 
-/** Writes the scripted `cucumber-js` at `path`, executable. */
+/** The program the scripted `cucumber-js` runs. */
+export const scriptedCucumberProgram = String.raw`import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const args = process.argv.slice(2);
+const at = args.indexOf('--config');
+if (at < 0 || args[at + 1] === undefined) process.exit(0);
+const profile = (await import(pathToFileURL(resolve(args[at + 1])).href)).default ?? {};
+const format = (profile.format ?? []).find(entry => entry.startsWith('message:'));
+if (format === undefined) process.exit(0);
+
+const expression = profile.tags ?? null;
+const selects = tags => {
+  if (expression === null) return true;
+  if (expression.startsWith('not ')) return !tags.includes(expression.slice(4).trim());
+  return expression.split(' or ').some(tag => tags.includes(tag.trim()));
+};
+const features = [];
+const walk = path => {
+  let stat;
+  try { stat = statSync(path); } catch { return; }
+  if (stat.isDirectory()) for (const name of readdirSync(path).sort()) walk(join(path, name));
+  else if (path.endsWith('.feature')) features.push(path);
+};
+for (const path of profile.paths ?? []) walk(resolve(path));
+
+const time = { seconds: 0, nanos: 0 };
+const messages = [{ testRunStarted: { timestamp: time } }];
+for (const file of features) {
+  const uri = relative(process.cwd(), file).split(sep).join('/');
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    const tags = line.trim().split(/\s+/);
+    const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
+    if (identity === undefined || !selects(tags)) continue;
+    const id = identity.slice('@ramify-'.length);
+    messages.push(
+      { pickle: { id: 'pickle-' + id, uri, name: id, language: 'en', astNodeIds: ['node-' + id], tags: tags.map(name => ({ name, astNodeId: 'tag-' + name })), steps: [] } },
+      { testCase: { id: 'case-' + id, pickleId: 'pickle-' + id, testSteps: [] } },
+      { testCaseStarted: { id: 'started-' + id, testCaseId: 'case-' + id, attempt: 0, timestamp: time } },
+      { testCaseFinished: { testCaseStartedId: 'started-' + id, willBeRetried: false, timestamp: time } },
+    );
+  }
+}
+messages.push({ testRunFinished: { success: true, timestamp: time } });
+writeFileSync(format.slice('message:'.length), messages.map(message => JSON.stringify(message)).join('\n') + '\n');
+`;
+
+/** Writes the scripted `cucumber-js` at `path`, executable, with the program it runs beside it. */
 export async function installScriptedCucumber(path: string): Promise<void> {
   await writeFile(path, scriptedCucumber);
   await chmod(path, 0o755);
+  await writeFile(join(dirname(path), 'scripted-cucumber.mjs'), scriptedCucumberProgram);
 }

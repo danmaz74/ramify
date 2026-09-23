@@ -212,8 +212,11 @@ describe('acceptance', () => {
     expect(accepted.records.filter(entry => entry.path.startsWith('scenarios/')).map(entry => entry.id)).toEqual(['sc-001', 'sc-002', 'sc-003', 'sc-004']);
     expect(accepted.records.map(entry => entry.path)).toEqual(expect.arrayContaining([runLayout.entries, 'work-items/wi-001/item.json']));
 
-    // Every state is pending; nothing moves one in this iteration.
-    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 4, bound: 0, declared: 0, implemented: 0 });
+    // Every record was committed pending. Each work item's completion request
+    // then declared its entry's scenarios and its gate implemented them; the
+    // integration scenario has no work item until Plan 10 iteration 8, so it
+    // stays pending.
+    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 1, bound: 0, declared: 0, implemented: 3 });
     // The submission is recorded under the analysis's version.
     const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('submitted');

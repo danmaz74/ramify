@@ -22,6 +22,11 @@ export interface AcceptedBoundaryLine {
  * The audited hash of the latest passed committing checkpoint, or of the
  * commit that materialized the feature files, in committed event order. The
  * run's base is returned only until neither exists.
+ *
+ * A withdrawal commit ("Withdraw sc-NNN") is not an accepted boundary. It
+ * follows a gate that did not pass, whose own commit is not accepted either,
+ * and it restores the pending tags the accepted boundary already carried, so
+ * the next iteration's changes are still taken against that boundary.
  */
 export function acceptedCommit(entries: readonly AcceptedBoundaryLine[], base: string): string {
   let accepted = base;

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
+import { declaringScenarios } from './declarations.js';
 import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
 import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
@@ -244,7 +245,7 @@ export type TestAgent = ScriptedAgent | undefined;
  */
 export async function openRuns(root: string, options: OpenRunsOptions) {
   const lock = await acquireProjectLock(root);
-  const scripted = options.script === undefined ? undefined : createScriptedAgent(options.script);
+  const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script));
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
   const { script: _script, checkScript, ...rest } = options;

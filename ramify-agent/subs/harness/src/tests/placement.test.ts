@@ -11,6 +11,7 @@ import type { RunInputs } from '../run/inputs.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import type { RunEvent } from '../run/log.js';
 import { copyFixture } from './helpers/fixture.js';
+import { declaringScenarios } from './helpers/declarations.js';
 import { analysis, entry, hypothesis, requestCompletion } from './helpers/analysis.js';
 import { byRole, readDeclaredTree, submit, treeInputs } from './helpers/iterations.js';
 import { forkDecision, forkPartial, registryChange, requestPlacement } from './helpers/placement.js';
@@ -127,7 +128,7 @@ describe('G2, G3: two sequential placement forks, and the brief between them', (
   test('the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry', async () => {
     const project = await target();
     const brief = 'field-diff belongs to the catalog core: it owns the revision chain the comparison reads. The panel is its anticipated consumer.';
-    const agent: ScriptedAgent = createScriptedAgent(byRole({
+    const agent: ScriptedAgent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [
         submit(requestPlacement({
@@ -146,7 +147,7 @@ describe('G2, G3: two sequential placement forks, and the brief between them', (
         submit(requestCompletion()),
       ],
       'global-fork': [submit(firstDecision(brief)), submit(secondDecision())],
-    }));
+    })));
 
     /** How many sessions the fake had started at each boundary of the chain. */
     const sessions: Array<{ write: string; started: number }> = [];
@@ -250,7 +251,7 @@ describe('G2, G3: two sequential placement forks, and the brief between them', (
 describe('X1c: a fork that returns partial findings and no decision', () => {
   test('it consumes its retries, nothing is appended, and the local architect is told', async () => {
     const project = await target();
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [
         submit(requestPlacement({ forCapability: 'compare-revisions' })),
@@ -258,7 +259,7 @@ describe('X1c: a fork that returns partial findings and no decision', () => {
         submit(requestCompletion()),
       ],
       'global-fork': [submit(forkPartial(['two modules could own it'], ['the view publishes no dependency facts']))],
-    }));
+    })));
     const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
 
@@ -303,11 +304,11 @@ describe('a view identity that changes under an investigation', () => {
         return { ...tree, revision: `rev/1:declared:${identity}`, input: `input/1:declared-${identity}` };
       },
     };
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [submit(requestPlacement({ forCapability: 'compare-revisions' })), submit(requestCompletion()), submit(requestCompletion())],
       'global-fork': [submit(firstDecision('field-diff belongs to the catalog core.'))],
-    }));
+    })));
     const opened = await openRuns(project, {
       agent,
       inputs,
@@ -355,11 +356,11 @@ describe('a view identity that changes under an investigation', () => {
 describe('the invocation of a fork', () => {
   test('records the mode that was actual, and the point its history reached', async () => {
     const project = await target();
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [submit(requestPlacement({ forCapability: 'compare-revisions' })), submit(requestCompletion()), submit(requestCompletion())],
       'global-fork': [submit(firstDecision('field-diff belongs to the catalog core.'))],
-    }));
+    })));
     const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
@@ -393,7 +394,7 @@ describe('a parent context that can no longer be read', () => {
   test('the generation rises, the pending brief is cleared, and the next fork is oriented from the records', async () => {
     const project = await target();
     const brief = 'field-diff belongs to the catalog core, which owns the revision chain.';
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [
         submit(requestPlacement({ forCapability: 'compare-revisions' })),
@@ -402,7 +403,7 @@ describe('a parent context that can no longer be read', () => {
         submit(requestCompletion()),
       ],
       'global-fork': [submit(firstDecision(brief)), submit(secondDecision())],
-    }));
+    })));
 
     let lost = false;
     const opened = await openRuns(project, {
@@ -463,7 +464,7 @@ describe('a parent context that can no longer be read', () => {
 describe('a fork whose submissions are invalid', () => {
   test('the errors reach the same fork, a corrected submission is accepted, and nothing changed meanwhile', async () => {
     const project = await target();
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [submit(requestPlacement({ forCapability: 'compare-revisions' })), submit(requestCompletion()), submit(requestCompletion())],
       'global-fork': [[
@@ -479,7 +480,7 @@ describe('a fork whose submissions are invalid', () => {
         }) },
         { kind: 'submit', input: firstDecision('field-diff belongs to the catalog core.') },
       ]],
-    }));
+    })));
     const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
@@ -512,7 +513,7 @@ describe('a fork whose submissions are invalid', () => {
   test('the bound ends the fork as an invalid submission, and the run fails with it', async () => {
     const project = await target();
     const broken = { kind: 'decision', decision: { question: 'where?' } };
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [submit(requestPlacement({ forCapability: 'compare-revisions' })), submit(requestCompletion())],
       'global-fork': [[
@@ -521,7 +522,7 @@ describe('a fork whose submissions are invalid', () => {
         { kind: 'submit', input: broken },
         { kind: 'submit', input: broken },
       ]],
-    }));
+    })));
     const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit('revision-diff')] });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));
@@ -551,7 +552,7 @@ describe('a decision that replaces an earlier one', () => {
   test('it names what it affects, and the consequence reaches that work item before its own turn', async () => {
     const project = await target();
     const consequence = 'The panel owns the comparison it was going to consume, so it implements it rather than importing it.';
-    const agent = createScriptedAgent(byRole({
+    const agent = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysed())],
       'local-architect': [
         submit(requestPlacement({ forCapability: 'compare-revisions' })),
@@ -581,7 +582,7 @@ describe('a decision that replaces an earlier one', () => {
           brief: 'field-diff moves from the catalog core to the panel; gd-001 is replaced.',
         })),
       ],
-    }));
+    })));
     const opened = await openRuns(project, { agent, inputs: treeInputs(), unchangedCheckpoints: unchangedPlacementCheckpoints });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));

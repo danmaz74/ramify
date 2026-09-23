@@ -153,6 +153,21 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are being written onto the run branch`, []];
     case 'scenarios-materialized':
       return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are on the run branch`, ref('commit', event.data.commit)];
+    case 'scenario-declared':
+      return [
+        `Scenario ${event.data.scenario} was declared and is ${event.data.state}${event.data.state === 'bound' ? ', keeping its pending tag while its work item holds fakes' : ''}`,
+        ref('invocation', event.data.by),
+      ];
+    case 'scenario-due':
+      return [`Scenario ${event.data.scenario} is due: its work item's requirements are verified, so it runs without fakes`, []];
+    case 'scenario-implemented':
+      return [`Scenario ${event.data.scenario} is implemented`, ref('gate', event.data.gate)];
+    case 'scenario-bound-passed':
+      return [`Scenario ${event.data.scenario} passed against its work item's fakes and stays bound`, ref('gate', event.data.gate)];
+    case 'scenarios-withdrawing':
+      return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, ref('work-item', event.data.workItem)];
+    case 'scenario-withdrawn':
+      return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, ref('commit', event.data.commit)];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-attempted':

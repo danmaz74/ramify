@@ -112,6 +112,13 @@ export const runFailureReasonSchema = z.enum([
   'unresolvable-requirement',
   /** Repair rounds were spent without a passing gate. */
   'repair-exhausted',
+  /**
+   * A tracked scenario was not `implemented` before the final gate, or the
+   * final gate's scenario check did not pass every one in full mode, or a
+   * work item asked for completion with a scenario of its entry unfinished
+   * more often than the bound allows.
+   */
+  'acceptance-incomplete',
   /** Infrastructure recoveries were spent without a running check. */
   'recovery-exhausted',
   /** A writer could not be confirmed settled, so no writer and no gate may follow. */

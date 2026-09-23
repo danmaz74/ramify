@@ -7,6 +7,10 @@ import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evi
 import { recordRefSchema } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
 import { scenarioWarningSchema } from '../analysis/records.js';
+import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
+import {
+  scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
+} from '../../subs/scenarios/src/states.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
 
 /*
@@ -107,6 +111,47 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * precedes the first work item, and the commit is an accepted boundary.
    */
   event('scenarios-materialized', z.object({ commit: z.string().nullable(), files: z.array(text) }).strict()),
+  /**
+   * An engineer's completion proposal or a local architect's completion
+   * request declared a `pending` scenario of its work item's entry. It is
+   * `bound` while the work item has an open requirement or owes a
+   * conformance, and keeps its pending tag; otherwise `declared`, and the
+   * next commit removes the tag.
+   */
+  event('scenario-declared', scenarioDeclaredDataSchema),
+  /**
+   * The last open requirement of the scenario's work item was verified and
+   * no conformance is owed: a `bound` scenario would now run without fakes,
+   * so it is `declared`.
+   */
+  event('scenario-due', scenarioDueDataSchema),
+  /** A passing gate ran a `declared` scenario, which is now `implemented` for good. */
+  event('scenario-implemented', scenarioImplementedDataSchema),
+  /**
+   * A passing gate ran a `bound` scenario: its pass is against the fakes its
+   * work item still holds, so the state stays `bound`, and the attempt is
+   * recorded as its fake-backed pass. A scenario with one since its
+   * declaration is not withdrawn.
+   */
+  event('scenario-bound-passed', z.object({ scenario: scenarioIdSchema, gate: text }).strict()),
+  /**
+   * The durable intent of a withdrawal commit: the scenarios about to return
+   * to `pending`, why, and the withdrawal's ordinal in the run, which is its
+   * commit's `Ramify-Scenarios: withdrawn-<n>` trailer. The first
+   * `scenario-withdrawn` is its completion.
+   */
+  event('scenarios-withdrawing', z.object({
+    withdrawal: z.int().positive(),
+    workItem: text,
+    scenarios: z.array(scenarioIdSchema).min(1),
+    reason: text,
+  }).strict()),
+  /**
+   * A `declared` or `bound` scenario with no pass since its declaration
+   * returned to `pending` when its work item left the repair path without
+   * one, with the commit that restored its pending tag.
+   */
+  event('scenario-withdrawn', scenarioWithdrawnDataSchema),
   /** The work item's turn begins; it licenses its local architect. */
   event('work-item-started', z.object({ workItem: text, module: text }).strict()),
   /**

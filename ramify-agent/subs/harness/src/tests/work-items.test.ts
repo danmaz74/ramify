@@ -84,10 +84,12 @@ describe('a run whose work items need no change', () => {
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
+      // Each completion request declares its entry's scenario, and the
+      // work item's gate implements it.
       'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
+      'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed',
       'work-item-started', 'hypotheses-delivered', 'invocation-started', 'invocation-ended',
-      'outline-revised', 'gate-committing', 'gate-attempted', 'work-item-completed',
+      'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed',
       'gate-committing', 'gate-attempted', 'job-completed',
     ]);
 

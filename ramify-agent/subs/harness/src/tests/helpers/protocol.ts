@@ -8,6 +8,7 @@ import { analysis, entry, hypothesis, requestCompletion } from './analysis.js';
 import {
   addModule, assign, byWork, completionProposed, edit, installMiniRunner, outline, read, shell, submit, write,
 } from './iterations.js';
+import { declaringScenarios } from './declarations.js';
 import { initRepository, testPolicy } from './runs.js';
 
 /*
@@ -65,9 +66,9 @@ export function protocolPolicy(projectRoot: string): RunPolicy {
   };
 }
 
-/** The script: two work items, one of which creates a module. */
+/** The script: two work items, one of which creates a module, each declaring its scenario with its completion request. */
 export function protocolScript() {
-  return byWork({
+  return declaringScenarios(byWork({
     'initial-architect': [submit(analysis(
       [
         entry('review-note', notes, 'The notes module holds a reviewer\'s note and its limit.'),
@@ -98,7 +99,7 @@ export function protocolScript() {
         '',
       ].join('\n')),
     )],
-  });
+  }));
 }
 
 /** Every file beneath a directory with the SHA-256 of its bytes, by relative path. */
