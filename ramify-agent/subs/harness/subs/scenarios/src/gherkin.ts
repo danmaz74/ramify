@@ -62,6 +62,14 @@ export function stepKey(step: ComparableStep): string {
   return JSON.stringify([step.kind, step.text.trim().replace(/\s+/g, ' '), argument]);
 }
 
+/** The steps of recorded scenario lines, which always parse: they are a parsed scenario's own. */
+export function stepsOfSource(source: readonly string[]): ComparableStep[] {
+  const parsed = parseGherkin(['Feature: recorded', ...source].join('\n'));
+  if (!parsed.ok) throw new Error(`Recorded scenario lines do not parse: ${parsed.errors[0]!.message}`);
+  const scenario = parsed.document.feature!.children[0]!.scenario!;
+  return comparableSteps(scenario.steps);
+}
+
 function argumentOf(step: Step): string | null {
   if (step.docString) return `"""${step.docString.mediaType ?? ''}\n${step.docString.content}`;
   if (step.dataTable) return step.dataTable.rows.map((row) => row.cells.map((cell) => cell.value).join('|')).join('\n');

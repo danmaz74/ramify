@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { PlanScenario } from './extraction.js';
 import { anchorOf } from './extraction.js';
-import { comparableSteps, dedent, normalizedText, parseGherkin, scenariosOf, sourceLines, stepKey, type ComparableStep } from './gherkin.js';
+import { comparableSteps, dedent, normalizedText, parseGherkin, scenariosOf, sourceLines, stepKey, stepsOfSource, type ComparableStep } from './gherkin.js';
 
 /*
  * The form rules of the initial architect's scenarios, architecture §2: six
@@ -304,14 +304,6 @@ function parseOneScenario(gherkin: string): { ok: true; scenario: ParsedScenario
   const { scenarios } = scenariosOf(parsed.document);
   const source = sourceLines(lines, scenario.location.line, scenarios[0]!.nextStart, parsed.document).lines;
   return { ok: true, scenario: { name: scenario.name, source: dedent(source), steps: comparableSteps(scenario.steps) } };
-}
-
-/** The steps of recorded scenario lines, which always parse: they are a parsed scenario's own. */
-function stepsOfSource(source: readonly string[]): ComparableStep[] {
-  const parsed = parseGherkin(['Feature: recorded', ...source].join('\n'));
-  if (!parsed.ok) throw new Error(`Recorded scenario lines do not parse: ${parsed.errors[0]!.message}`);
-  const scenario = parsed.document.feature!.children[0]!.scenario!;
-  return comparableSteps(scenario.steps);
 }
 
 /** A place a scenario cites: plan lines with the anchors they sit under, or an explicit reference. */

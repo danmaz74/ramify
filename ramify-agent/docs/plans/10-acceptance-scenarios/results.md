@@ -1020,3 +1020,176 @@ this iteration's change reaches in nearly every lifecycle test.
 - A work item whose declared scenario its work-item gate did not execute
   (no module with feature files found for its owner) is refused until the
   bound; the reason names the gate.
+
+## Iteration 8: Integration scenarios
+
+**Date:** 2026-09-23. **Branch:** `feat/plan10-acceptance-scenarios`.
+
+### What changed
+
+- **The work item's origin** (`work/records.ts`). `WorkItem.origin` gains
+  `{ integration: sc-NNN }`, the scenario's ID in place of an entry
+  capability. `originKindOf(item)` answers `entry`, `obligation`,
+  `verification` or `integration`, and `integrationScenarioOf(item)` the
+  scenario or null. The capability of an integration item is null in the
+  service and in `projections/work.ts`, and the work-items query's `origin`
+  enum (`interfaces/protocol/runs.ts`) gains `integration`.
+- **`work-item-started`** (`run/log.ts`) now carries `origin` (one of the
+  four) for every item, and `scenario` for an integration item. Its event
+  sentence names the scenario.
+- **Creation** (`work/integration.ts`, new; `run/service.ts`).
+  `recordScenarioPasses` attaches to each `scenario-implemented` the records
+  of `integrationItemsDue`: for every integration scenario that lists the
+  implemented scenario among its sub-scenarios, whose sub-scenarios are then
+  all `implemented` and which has no work item yet (`dueIntegrations`), one
+  work item from `integrationWorkItem(record, count)`: the next `wi-NNN`, at
+  the scenario's owner (the recorded lowest common ancestor), goal "Bind the
+  integration scenario …", `acceptanceRefs` the plan scenario's lines, no
+  requirement references, `startedFor: null`. The record is committed in the
+  same transaction as the event, so no crash separates them. Committed after
+  every earlier item at depth 0, the scheduler takes it once the current item
+  and the items before it are done.
+- **The local architect's briefing** (`work/session.ts`,
+  `integrationBriefing`). An integration item's first message has a section
+  after the plan's references, headed `## The integration scenario sc-NNN:
+  <name>`: the scenario's text and feature file; each sub-scenario with its
+  owner, file and bridging Givens; each owner's step directory
+  (`src/tests/steps/`, or `src/steps/` for a testing module, from
+  `stepDirectoryOf(feature file)`) and the step files it holds now
+  (`stepFilesIn`); and how it is bound: the scope, the ancestor's step
+  directory, named imports, `expose-test` along each path, no step of its
+  own, the declaration, the gates, and what a composition failure is.
+- **The engineer's scope** (`work/assignment.ts`, `work/submission.ts`).
+  `integrationScopeOf(record, records)` is the ancestor with
+  `childrenOnPaths(ancestor, owners)`, the direct child on each path to a
+  sub-scenario's owner. An integration item's architect receives it as
+  `WorkEvidence.integration`, and `assignmentErrors` rejects an assignment
+  whose base is not that module (`assignment.scope.base`) or leaves out one
+  of those children (`assignment.scope.base.includedChildren`), each with
+  the expected base. More children are allowed.
+- **Declarations** (`work/declarations.ts`). `DeclarationContext` gains
+  `integration`: an integration item may declare its own scenario, in its
+  engineer's proposal or its architect's request, and nothing else; an
+  entry's item still cannot declare an integration scenario. The service's
+  `unfinishedScenarios` reads an integration item's one scenario, so the
+  completion refusal, `work-item-completed`'s requirement and withdrawal
+  apply to it unchanged.
+- **Composition failures** (`scenarios` child, `composition.ts`, new and
+  exposed with its two types). `compositionFailures(records, results)`
+  returns each integration scenario whose result is `failed` while every
+  sub-scenario has a `passed` result in the same check, with its suspects:
+  the sub-scenarios that have a bridging Given, which `bridgingGivens`
+  finds as the context steps (a `Given`, or an `And`/`But` continuing one)
+  that appear in no step of the integration scenario, compared by kind and
+  text as form rule 5 compares. `stepsOfSource` moved from `form.ts` to
+  `gherkin.ts` for it. The service's `diagnosticsOf(run, gate, audience)`
+  appends one line per failure and one per suspect to every failing gate's
+  diagnostics, so the engineer's repair briefing and the local architect's
+  failed-gate and returned-gate sections carry it; it is repaired like any
+  failure.
+- **The final rule.** Both `TODO(Plan 10 iteration 8)` exclusions are gone:
+  `incompleteScenarios` reads every tracked scenario, integration ones
+  included (named `sc-NNN (integration)` in the failure message), and
+  `job-completed` requires every tracked scenario passed in the final
+  full-mode summary. A run cannot reach the final gate around an open
+  integration item, since the scheduler returns only when every item has
+  completed; the rule stays as the consistency check.
+- **Test helpers.** `declaringScenarios` declares an integration item's
+  scenario, read from its briefing's heading, in a completion request that
+  states none. `helpers/integration-scenario.ts` (new) is the scenario both
+  new test files drive: the fixture with `notes` and `tags` under
+  `reviews`, a plan with one integration scenario, the analysis with one
+  sub-scenario each (the tags' with a bridging Given), each entry's step
+  file with a named export, the ancestor's step file importing both, the
+  `module.ramify` of each child with its `expose-test`, the turns and the
+  Git answers.
+- **Tests.** `integration-scenarios.test.ts` (new, 5 tests, no process):
+  creation by the last sub-scenario's `scenario-implemented` and at the
+  ancestor, the item's record, queueing behind the item that implemented it,
+  `work-item-started` with the origins, the briefing's contents, a refused
+  scope that leaves out a path, the assignment's scope, the iteration gate's
+  identity selection of the integration scenario with its implemented
+  sub-scenarios, the declaration and implementation, completion at the
+  work-item gate, the final gate with every scenario passed, the work-items
+  query; a composition failure's finding in the repair briefing, naming the
+  tags' bridging Given and not the note's, and the repair round that passes;
+  and the rules over literal records (due, the item, the scope, the step
+  directory, the assignment's rejection, the declarations).
+  `integration-scenarios-integration.test.ts` (new) runs the same scenario
+  to completion with the integration scenario `implemented`, then gives the
+  tree to the installed Ramify with a daemon of its own: the complete check
+  passes with no finding, and with the tags' `expose-test` removed it fails
+  with one finding, in the ancestor's step file. The scenarios child has
+  `composition.test.ts` (new, 3 tests). Updated: `analysis-scenarios` (its
+  integration scenario now gets `wi-003` at `collection-review/workspace`
+  and is implemented: the Git answers gain `wi-003`, the counts are four
+  implemented, and the starts are asserted with their origins),
+  `scenario-states` (the final rule now names a pending integration
+  scenario), `union-values` (the `work-item-started` sample), `composition`
+  (producers of `work-item-started.origin` `verification` and `integration`,
+  and of the query's `integration` origin). The harness and scenarios
+  READMEs describe the work item, the rule and the tests.
+
+### Evidence
+
+From `ramify-agent/`:
+
+| Command | Result |
+| --- | --- |
+| `npx vitest run subs/harness/src/tests/integration-scenarios.test.ts subs/harness/src/tests/integration-scenarios-integration.test.ts` | 6 passed. The integration test's real check: `checked`, exit 0, no finding; without the tags' exposure, a non-zero exit and one finding, in `subs/workspace/subs/reviews/src/tests/steps/integration.steps.ts` |
+| `npx vitest run subs/harness/subs/scenarios` | 8 files passed, the new `composition.test.ts` (3 tests) among them |
+| `npx vitest run` over 29 lifecycle and projection files (`scenario-states`, `materialization`, `work-items`, `run-recovery`, `no-rewind`, the contract files, `run-protocol`, `run-projections`, `progress`, `placement`, `local-authority`, `iteration-gate`, `gate-diagnostics`, `engineer-briefing`, `local-architect-submission`, `review-stop`, `analysis-scenarios`, `http`, `union-values`, `requirement-verification`, `breaking-work`, `unguarded-write`, `iterations`, `module-creation`, `projections-pure`, `progress-fixture`) and the scenarios child | 37 files, 365 tests passed. Before its update `analysis-scenarios` failed (the Git answers lacked `wi-003`) and `scenario-states`' final-rule test asserted the old exclusion |
+| `npx vitest run` over the other 57 harness test files | 55 passed, 2 skipped (`fixture-trials`, `fixture-acceptance`, conditional), 427 tests |
+| `npx vitest run subs/harness/src/tests/composition.test.ts` | 5 passed; before the three producers were cited, the union test named them unproduced |
+| `npx vitest run subs/web` | 7 files, 63 tests passed |
+| `npm run type-check` | passed |
+| `npm run check:self` | check passed; 9 owners, 0 errors, 0 warnings, 110 analysis limits |
+
+The exit criterion is `integration-scenarios-integration.test.ts`: the
+scripted run completes with the integration scenario `implemented`, and the
+real checker accepts the ancestor's step file importing the sub-scenarios'
+step files through `expose-test`. No test makes a model call.
+
+### Deviations
+
+- **The work item is committed with the `scenario-implemented` event**, not
+  by `work-item-started` as the architecture's events table puts it. The
+  item exists (and counts, and is scheduled) from the moment it is due;
+  `work-item-started` marks its turn, carrying the origin and scenario, as
+  for every other item.
+- **"Queued behind the current work item" is commit order.** The item is at
+  depth 0 and committed last, so it runs after the current item and after
+  every entry item still open, not necessarily next. Nothing it needs is
+  missing then: its sub-scenarios are implemented already.
+- **The scope is judged, not derived.** The architect states the scope as
+  for every assignment, and the judge rejects one whose base is not the
+  ancestor or that leaves out a child on a path, naming the expected base.
+  Extra children are allowed. The briefing names the scope.
+- **A composition failure is a diagnostic, not an event.** It is a pure
+  function of the gate attempt's scenario summary and the records, so the
+  lines are derived whenever a failing gate is briefed, and a projection can
+  derive them again; no state changes with it.
+- **The local architect of an integration item may declare its scenario** in
+  its completion request, as decision 2 allows for an entry's. The scripted
+  helper relies on it for the tests whose subject is not the binding.
+- **The real checker runs in a file of its own.** Lifecycle files replace
+  `node:child_process` with the guard, which refuses the daemon; the
+  integration test runs the same scripted run unguarded and then the
+  installed Ramify, beside a guarded file that asserts the run in detail.
+- **The work-items query's origin enum gains `integration`** here rather
+  than in iteration 10, since the projection would otherwise misname the
+  item. It is additive.
+
+### Open items
+
+- Iteration 9: the engineer's briefing says nothing yet about the
+  integration scenario; it knows what the architect's assignment states.
+  The `blocked` section's closing text still speaks only of requirements.
+- Iteration 10: the scenario query and the run page should show an
+  integration item's scenario and a gate's composition failure, which
+  `compositionFailures` derives from the attempt; `progress.test.ts` still
+  builds `work-item-started` events without `origin` (they are not parsed).
+- A composition failure is recognized only where every sub-scenario ran in
+  the same check. The work-item gate runs them all; an iteration gate does
+  when the scope includes the children, which the judge requires.
+- Integration items count against `maxWorkItems`.

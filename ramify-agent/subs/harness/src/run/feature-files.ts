@@ -97,7 +97,7 @@ function replayScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios
   return { records, states, entries, written };
 }
 
-/** One tracked scenario the final gate cannot run over: its entry, its state and its record's path as evidence. */
+/** One tracked scenario the final gate cannot run over: its entry (null for an integration scenario), its state and its record's path as evidence. */
 export interface IncompleteScenario {
   readonly id: string;
   readonly entry: string | null;
@@ -107,16 +107,12 @@ export interface IncompleteScenario {
 
 /**
  * The harness rule `acceptance-incomplete`, architecture §11: before the
- * final run no tracked scenario may be `pending`, `bound` or `declared`.
- * Every one that is, with its record as evidence.
- *
- * TODO(Plan 10 iteration 8): integration scenarios join the rule once their
- * work items exist. Until then nothing binds them, they stay `pending`, and
- * the rule reads entry scenarios only.
+ * final run no tracked scenario, integration scenarios included, may be
+ * `pending`, `bound` or `declared`. Every one that is, with its record as
+ * evidence.
  */
 export function incompleteScenarios(tracked: TrackedScenarios): IncompleteScenario[] {
   return tracked.records
-    .filter(record => record.kind === 'entry')
     .map(record => ({ id: record.id, entry: record.entry, state: tracked.states.get(record.id) ?? 'pending', evidence: join('scenarios', `${record.id}.json`) }))
     .filter(scenario => scenario.state !== 'implemented');
 }

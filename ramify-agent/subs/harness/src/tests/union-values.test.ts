@@ -898,7 +898,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'scenario-bound-passed': { scenario: 'sc-001', gate: 'ga-0003' },
     'scenarios-withdrawing': { withdrawal: 1, workItem: 'wi-001', scenarios: ['sc-001'], reason: 'yielded' },
     'scenario-withdrawn': { scenario: 'sc-001', reason: 'yielded', commit: 'c' },
-    'work-item-started': { workItem: 'wi-001', module: 'm' },
+    'work-item-started': { workItem: 'wi-001', module: 'm', origin: 'integration', scenario: 'sc-003' },
     'hypotheses-delivered': { workItem: 'wi-001', refs: [r] },
     'placement-requested': { request: 'pr-001', workItem: 'wi-001', requester: 'm', capability: 'c' },
     'view-refreshed': { request: 'pr-001', attempt: 1, view: { status: 'placeholder' }, unavailable: null },

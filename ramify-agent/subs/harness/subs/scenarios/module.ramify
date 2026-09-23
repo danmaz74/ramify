@@ -37,3 +37,5 @@ expose-src scenarioTagExpression, scenarioRunName from "profiles.ts" to parent
 expose-src summarizeScenarioRun, TrackedScenario, ScenarioRunSummary, scenarioRunSummarySchema from "messages.ts" to parent
 expose-src ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema from "messages.ts" to parent
 expose-src untrackedScenarioCountsSchema from "messages.ts" to parent
+
+expose-src compositionFailures, bridgingGivens, CompositionFailure, CompositionSuspect from "composition.ts" to parent

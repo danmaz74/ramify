@@ -81,7 +81,7 @@ import {
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
-import { workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
+import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, type GateAudience } from '../checks/diagnostics.js';
@@ -101,7 +101,10 @@ import {
   type FeatureRerendering,
 } from './feature-files.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
+import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { scenariosToDeclare, type DeclarationContext } from '../work/declarations.js';
+import { dueIntegrations, integrationBriefing, integrationWorkItem, type IntegrationBriefing } from '../work/integration.js';
+import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
@@ -1407,6 +1410,7 @@ export class RunService {
   private capabilityOfItem(item: WorkItem, records: ReturnType<typeof committedRecords>): string | null {
     if ('entry' in item.origin) return item.origin.entry;
     if ('obligation' in item.origin) return records.obligations.get(item.origin.obligation.id)?.capability ?? null;
+    if ('integration' in item.origin) return null;
     const requirement = records.requirements.get(item.origin.verification.id);
     return requirement?.forCapability ?? null;
   }
@@ -1430,7 +1434,11 @@ export class RunService {
   ): Promise<'completed' | 'yielded' | 'reported' | null> {
     const loaded = packages.get('local-architect')!;
     if (!run.log.all('work-item-started').some(event => event.data.workItem === item.id)) {
-      await this.write(run, { type: 'work-item-started', data: { workItem: item.id, module: item.module } });
+      const integration = integrationScenarioOf(item);
+      await this.write(run, {
+        type: 'work-item-started',
+        data: { workItem: item.id, module: item.module, origin: originKindOf(item), ...(integration === null ? {} : { scenario: integration }) },
+      });
       await this.afterWrite('work-item-started', run.record.jobId);
       if (this.ignoring(run)) return null;
     }
@@ -1449,6 +1457,7 @@ export class RunService {
     const views = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, item.module);
     const systemPrompt = renderLocalArchitectPrompt(loaded, this.projectRoot);
     const scope = baselineScope(item.module, baseline.supplementary.map(entry => entry.path));
+    const integration = await this.integrationOfItem(run, item);
 
     let sessionRef: string | undefined;
     let attempt = 0;
@@ -1539,6 +1548,7 @@ export class RunService {
           ...(revisionReports === undefined || revisionReports.length === 0 ? {} : { revisionsNeeded: revisionReports }),
         },
         ...(unresolvedRequest === undefined ? {} : { unresolvedRequest }),
+        ...(integration === undefined ? {} : { integration }),
         ...(failedGate === undefined ? {} : { failedGate }),
         ...(lastResult === undefined ? {} : {
           lastIteration: {
@@ -1582,6 +1592,7 @@ export class RunService {
           contracts: this.contractsConsumedBy(run, current, item.id),
           guardedPaths: guarded,
           scenarios: this.declarationContext(run, item),
+          ...(integration === undefined ? {} : { integration: integration.scope }),
         }),
         scope: {
           write: null,
@@ -1742,7 +1753,7 @@ export class RunService {
         return 'completed';
       }
 
-      failedGate = await diagnosticsOf(gate, 'local-architect');
+      failedGate = await this.diagnosticsOf(run, gate, 'local-architect');
       firstCause ??= { gate: gate.id, cause: gate.cause };
       if (gateRound > bound) {
         await this.fail(run, 'repair-exhausted',
@@ -2660,12 +2671,12 @@ export class RunService {
           // What failed and what it reported travel with the outcome: a
           // cause alone was read as a write outside the assignment, the
           // architect narrowed the file list, and the same failure returned.
-          const returnedGate = await diagnosticsOf(gate, 'local-architect');
+          const returnedGate = await this.diagnosticsOf(run, gate, 'local-architect');
           return { ...await close('unsuitable'), returnedGate };
         }
         // One repair round: the rerun runs the gate's complete required set.
         repairRound += 1;
-        failedGate = await diagnosticsOf(gate);
+        failedGate = await this.diagnosticsOf(run, gate);
         break;
       }
     }
@@ -3087,7 +3098,7 @@ export class RunService {
 
       if (gate.next === 'repair' && repairRound + 1 < run.record.policy.limits.repairRoundsPerIteration) {
         repairRound += 1;
-        failedGate = await diagnosticsOf(gate);
+        failedGate = await this.diagnosticsOf(run, gate);
         continue;
       }
       findings.push(`the contract gate did not pass: ${gate.cause ?? 'unknown'} at gate ${gate.id}; nothing was registered`);
@@ -4046,12 +4057,12 @@ export class RunService {
     const incomplete = incompleteScenarios(tracked);
     if (incomplete.length > 0) {
       await this.fail(run, 'acceptance-incomplete',
-        `The final gate cannot run: ${incomplete.map(scenario => `${scenario.id} of ${scenario.entry ?? 'no entry'} is ${scenario.state}`).join('; ')}`,
+        `The final gate cannot run: ${incomplete.map(scenario => `${scenario.id} ${scenario.entry === null ? '(integration)' : `of ${scenario.entry}`} is ${scenario.state}`).join('; ')}`,
         incomplete.map(scenario => scenario.evidence));
       return;
     }
-    // TODO(Plan 10 iteration 8): integration scenarios are required here too.
-    const required = tracked.records.filter(record => record.kind === 'entry');
+    // Every tracked scenario, integration scenarios included.
+    const required = tracked.records;
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const head = await this.git.currentHead(this.projectRoot);
     const attempt = await this.committingCheckpoint(run, {
@@ -4298,9 +4309,13 @@ export class RunService {
 
   // Scenario states, architecture §7 to §9
 
-  /** The work item's entry and the run's tracked scenarios, which a declaration is judged against. */
+  /** The work item's entry or integration scenario and the run's tracked scenarios, which a declaration is judged against. */
   private declarationContext(run: Run, item: WorkItem): DeclarationContext {
-    return { entry: 'entry' in item.origin ? item.origin.entry : null, records: trackedScenarios(run.log.ledger.replay()).records };
+    return {
+      entry: 'entry' in item.origin ? item.origin.entry : null,
+      integration: integrationScenarioOf(item),
+      records: trackedScenarios(run.log.ledger.replay()).records,
+    };
   }
 
   /**
@@ -4316,15 +4331,34 @@ export class RunService {
     return !conformed.has(conformanceKey(owing.id, owing.revision));
   }
 
-  /** The scenarios of the work item's entry in the given states; a provider or follow-up work item has none. */
+  /**
+   * The work item's scenarios in the given states: its entry's, or an
+   * integration work item's one scenario. A provider or follow-up work item
+   * has none.
+   */
   private unfinishedScenarios(run: Run, item: WorkItem, states: readonly ScenarioState[]): Array<{ id: string; state: ScenarioState }> {
-    if (!('entry' in item.origin)) return [];
-    const entry = item.origin.entry;
+    const entry = 'entry' in item.origin ? item.origin.entry : null;
+    const integration = integrationScenarioOf(item);
+    if (entry === null && integration === null) return [];
     const tracked = trackedScenarios(run.log.ledger.replay());
     return tracked.records
-      .filter(record => record.kind === 'entry' && record.entry === entry)
+      .filter(record => (integration === null ? record.kind === 'entry' && record.entry === entry : record.id === integration))
       .map(record => ({ id: record.id, state: tracked.states.get(record.id) ?? 'pending' }))
       .filter(scenario => states.includes(scenario.state));
+  }
+
+  /**
+   * An integration work item's briefing: its scenario, the sub-scenarios,
+   * their owners' step files as the tree holds them now, and the scope its
+   * engineer must be given. Undefined for every other work item.
+   */
+  private async integrationOfItem(run: Run, item: WorkItem): Promise<IntegrationBriefing | undefined> {
+    const id = integrationScenarioOf(item);
+    if (id === null) return undefined;
+    const { records } = trackedScenarios(run.log.ledger.replay());
+    const record = records.find(candidate => candidate.id === id);
+    if (record === undefined) return undefined;
+    return integrationBriefing(this.projectRoot, record, records, sub => bridgingGivens(record, sub));
   }
 
   /**
@@ -4360,12 +4394,35 @@ export class RunService {
     const { states } = trackedScenarios(run.log.ledger.replay());
     for (const scenario of passed) {
       const state = states.get(scenario);
-      if (state === 'declared') await this.write(run, { type: 'scenario-implemented', data: { scenario, gate: attempt.id } });
+      if (state === 'declared') await this.write(run, { type: 'scenario-implemented', data: { scenario, gate: attempt.id } }, this.integrationItemsDue(run, scenario));
       else if (state === 'bound') await this.write(run, { type: 'scenario-bound-passed', data: { scenario, gate: attempt.id } });
       else continue;
       if (this.ignoring(run)) return false;
     }
     return true;
+  }
+
+  /**
+   * The integration work items the implementation of one scenario makes due,
+   * as the records its `scenario-implemented` commits: one per integration
+   * scenario whose last sub-scenario this is (architecture §10). Committed
+   * after every earlier work item, it queues behind the current one, since
+   * work items run one at a time.
+   */
+  private integrationItemsDue(run: Run, scenario: string): CommitRecord[] {
+    const lines = run.log.ledger.replay();
+    const tracked = trackedScenarios(lines);
+    const after = new Map(tracked.states);
+    after.set(scenario, 'implemented');
+    const items = [...committedRecords(lines).workItems];
+    const records: CommitRecord[] = [];
+    for (const integration of dueIntegrations(tracked.records, after, items)) {
+      if (!integration.subScenarios.includes(scenario)) continue;
+      const item = integrationWorkItem(integration, items.length);
+      items.push(item);
+      records.push({ path: workLayout.item(item.id), id: item.id, revision: 1, body: item });
+    }
+    return records;
   }
 
   /** Whether a gate passed the scenario since its latest declaration: a fake-backed pass or its implementation. */
@@ -4483,8 +4540,19 @@ export class RunService {
       return;
     }
     await this.fail(run, 'acceptance-incomplete',
-      `${item.id} asked for completion ${refusals} times with scenarios of its entry not implemented: ${blocked.join('; ')}`,
+      `${item.id} asked for completion ${refusals} times with ${integrationScenarioOf(item) === null ? 'scenarios of its entry' : 'its integration scenario'} not implemented: ${blocked.join('; ')}`,
       owing.scenarios.map(scenario => runLayout.scenario(scenario.id)));
+  }
+
+  /**
+   * What a failing gate tells its reader: every command that did not pass
+   * with what it reported, and a composition failure where the gate's
+   * scenario check shows one.
+   */
+  private async diagnosticsOf(run: Run, gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
+    const diagnostics = await gateDiagnostics(gate, audience);
+    const composition = compositionLines(gate, trackedScenarios(run.log.ledger.replay()).records);
+    return { ...diagnostics, summary: [...diagnostics.summary, ...composition] };
   }
 
   private async readGate(run: Run, id: string): Promise<GateAttempt | null> {
@@ -4762,8 +4830,19 @@ function preparedGate(operation: GateOperation): PreparedGate {
  * check's findings are relayed as findings; anything else is quoted from the
  * end of its own output.
  */
-function diagnosticsOf(gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
-  return gateDiagnostics(gate, audience).then(diagnostics => ({ ...diagnostics, summary: [...diagnostics.summary] }));
+/**
+ * The lines a composition failure adds to a failing gate's diagnostics: the
+ * integration scenario that failed while its sub-scenarios passed, and the
+ * sub-scenarios whose bridging Given is suspect (architecture §10).
+ */
+function compositionLines(gate: GateAttempt, records: readonly ScenarioRecord[]): string[] {
+  const results = gate.commands.flatMap(command => (command.kind === 'scenarios' ? command.scenarios?.scenarios ?? [] : []));
+  return compositionFailures(records, results).flatMap(failure => [
+    `- composition failure: \`${failure.scenario}\` failed while its sub-scenarios ${failure.passed.map(id => `\`${id}\``).join(', ')} passed, so their step definitions work one by one and not together.`,
+    ...(failure.suspects.length === 0
+      ? ['  - No sub-scenario has a bridging Given; look at what the step definitions share between the steps.']
+      : failure.suspects.map(suspect => `  - The bridging Given of \`${suspect.scenario}\` is suspect: ${suspect.givens.map(given => `"${given}"`).join(', ')} assumes what the real behavior may not do.`)),
+  ]);
 }
 
 /** The write scope of one assignment, project-relative, as a gate attributes findings against it. */

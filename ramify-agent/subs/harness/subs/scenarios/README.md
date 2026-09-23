@@ -116,6 +116,18 @@ is not JSON is reported and the rest is read, and a step the stream never
 finished did not pass. Whether the check passes is the caller's, since it
 also weighs the exit code, the selection and the mode.
 
+## Composition failures
+
+`compositionFailures(records, results)` reads one scenario check's results
+and returns every integration scenario that `failed` while each of its
+sub-scenarios `passed` in the same check. For each it names the suspects:
+the sub-scenarios with a bridging Given, which `bridgingGivens(integration,
+sub)` finds as the context steps of the sub-scenario that appear in no step
+of the integration scenario, compared by kind and text as rule 5 compares
+them. A sub-scenario the check did not run or did not pass, and an
+integration scenario that is undefined rather than failed, are ordinary
+failures and no composition failure.
+
 ## Recordings
 
 The reducer's tests replay message streams recorded with the real

@@ -123,7 +123,7 @@ describe('plan capture', () => {
     const plan = await planWithScenarios(project);
     const { service, agent } = await openRuns(project, {
       script: script(scenarioAnalysis(plan)),
-      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'wi-003', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -175,7 +175,7 @@ describe('acceptance', () => {
     const plan = await planWithScenarios(project);
     const { service } = await openRuns(project, {
       script: script(scenarioAnalysis(plan)),
-      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'wi-003', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -214,9 +214,16 @@ describe('acceptance', () => {
 
     // Every record was committed pending. Each work item's completion request
     // then declared its entry's scenarios and its gate implemented them; the
-    // integration scenario has no work item until Plan 10 iteration 8, so it
-    // stays pending.
-    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 1, bound: 0, declared: 0, implemented: 3 });
+    // implementation of the last sub-scenario created the integration work
+    // item at the common ancestor, whose request declared the integration
+    // scenario, and its gate implemented it.
+    expect(onlyRun(service, 'review-notes').counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 4 });
+    const started = (await runEventsOnDisk(project, 'review-notes', runId)).filter(event => event.type === 'work-item-started').map(event => event.data);
+    expect(started).toEqual([
+      { workItem: 'wi-001', module: reviews, origin: 'entry' },
+      { workItem: 'wi-002', module: sharedUi, origin: 'entry' },
+      { workItem: 'wi-003', module: 'collection-review/workspace', origin: 'integration', scenario: 'sc-004' },
+    ]);
     // The submission is recorded under the analysis's version.
     const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('submitted');
@@ -262,7 +269,7 @@ describe('acceptance', () => {
     const { service } = await openRuns(project, {
       inputs: { ...shapeOnlyInputs, index: async () => index },
       script: script(submitted),
-      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'final verification of plan "review-notes"'],
+      unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-002', 'wi-003', 'final verification of plan "review-notes"'],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));

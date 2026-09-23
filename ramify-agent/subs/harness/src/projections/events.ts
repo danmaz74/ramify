@@ -48,7 +48,10 @@ function describe(event: RunEvent): [string, Ref[]] {
         [],
       ];
     case 'work-item-started':
-      return [`Work item ${event.data.workItem} started in ${event.data.module}`, ref('work-item', event.data.workItem)];
+      return [
+        `Work item ${event.data.workItem} started in ${event.data.module}${event.data.scenario === undefined ? '' : ` to bind the integration scenario ${event.data.scenario}`}`,
+        ref('work-item', event.data.workItem),
+      ];
     case 'hypotheses-delivered':
       return [
         `${event.data.refs.length} hypothesis revision${event.data.refs.length === 1 ? '' : 's'} delivered to ${event.data.workItem}`,

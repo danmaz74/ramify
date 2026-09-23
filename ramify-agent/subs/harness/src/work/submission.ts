@@ -11,6 +11,7 @@ import {
 } from '../architecture/submission.js';
 import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from './assignment.js';
 import { declarationErrors, type DeclarationContext } from './declarations.js';
+import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
 
 /*
@@ -144,6 +145,8 @@ export interface WorkEvidence {
   readonly guardedPaths?: ReadonlySet<string> | undefined;
   /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
   readonly scenarios?: DeclarationContext | undefined;
+  /** For an integration work item: the scope its engineer must be given. */
+  readonly integration?: IntegrationScope | undefined;
 }
 
 /** The same evidence, as the placement rules read it. */
@@ -203,6 +206,7 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
       revising: outline !== undefined,
       ...(evidence.contracts === undefined ? {} : { contracts: evidence.contracts }),
       ...(evidence.guardedPaths === undefined ? {} : { guardedPaths: evidence.guardedPaths }),
+      ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
     }),
   ];
   return errors.length === 0 ? shape : { ok: false, errors };

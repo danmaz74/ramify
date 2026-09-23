@@ -5,8 +5,9 @@ import type { SubmissionError } from '../run/submissions.js';
 /*
  * Scenario declarations, architecture §7. An engineer's completion proposal
  * and a local architect's completion request each name the scenarios they
- * declare. A declaration names entry scenarios of its own work item's entry:
- * a `pending` or `bound` one is accepted, and an `implemented` or `declared`
+ * declare. A declaration names entry scenarios of its own work item's entry,
+ * or, for an integration work item, its one integration scenario (§10): a
+ * `pending` or `bound` one is accepted, and an `implemented` or `declared`
  * one is accepted and ignored, so a repeated submission is harmless. Any
  * other ID is a rejected submission with the reason, under the per-turn
  * bound the judge already applies.
@@ -15,17 +16,25 @@ import type { SubmissionError } from '../run/submissions.js';
  * acceptance, from the work item's open requirements and owed conformance.
  */
 
-/** What a declaration is judged against: the work item's entry and every tracked scenario. */
+/** What a declaration is judged against: the work item's entry or integration scenario, and every tracked scenario. */
 export interface DeclarationContext {
-  /** The entry capability the work item implements; null for a provider or follow-up work item, which has no scenarios. */
+  /** The entry capability the work item implements; null for any other work item. */
   readonly entry: string | null;
+  /**
+   * The integration scenario an integration work item binds, which is the
+   * one scenario it may declare; null or absent for every other work item.
+   */
+  readonly integration?: string | null | undefined;
   readonly records: readonly ScenarioRecord[];
 }
 
 /** Every reason the declared IDs cannot be accepted, each at its path. */
 export function declarationErrors(ids: readonly string[], context: DeclarationContext, path = 'scenarios'): SubmissionError[] {
   const records = new Map(context.records.map(record => [record.id, record]));
-  const own = context.records.filter(record => record.kind === 'entry' && record.entry !== null && record.entry === context.entry).map(record => record.id);
+  const integration = context.integration ?? null;
+  const own = integration !== null
+    ? [integration]
+    : context.records.filter(record => record.kind === 'entry' && record.entry !== null && record.entry === context.entry).map(record => record.id);
   const expected = own.length === 0 ? 'an empty list: this work item has no scenarios' : `IDs among ${own.join(', ')}`;
   const errors: SubmissionError[] = [];
   ids.forEach((id, index) => {
@@ -33,6 +42,18 @@ export function declarationErrors(ids: readonly string[], context: DeclarationCo
     const at = `${path}.${index}`;
     if (record === undefined) {
       errors.push({ path: at, message: `"${id}" is no tracked scenario of this run`, expected });
+      return;
+    }
+    // An integration work item declares its own scenario, and nothing else.
+    if (integration !== null) {
+      if (id === integration) return;
+      errors.push({
+        path: at,
+        message: record.kind === 'integration'
+          ? `${id} is another integration scenario; this work item binds ${integration} alone`
+          : `${id} is an entry scenario of ${record.entry ?? 'no entry'}; this integration work item binds ${integration} alone`,
+        expected,
+      });
       return;
     }
     if (record.kind === 'integration') {

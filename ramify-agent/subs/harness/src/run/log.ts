@@ -152,8 +152,16 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * one, with the commit that restored its pending tag.
    */
   event('scenario-withdrawn', scenarioWithdrawnDataSchema),
-  /** The work item's turn begins; it licenses its local architect. */
-  event('work-item-started', z.object({ workItem: text, module: text }).strict()),
+  /**
+   * The work item's turn begins; it licenses its local architect. It names
+   * the item's origin, and an integration work item's scenario.
+   */
+  event('work-item-started', z.object({
+    workItem: text,
+    module: text,
+    origin: z.enum(['entry', 'obligation', 'verification', 'integration']),
+    scenario: scenarioIdSchema.optional(),
+  }).strict()),
   /**
    * Which hypothesis revisions the work item received, at a coordination
    * point. Delivery never rewrites an active assignment, and no work is

@@ -2,7 +2,7 @@ import {
   runQueryLimits,
   type GateView, type WorkItemResponse, type WorkItemSummary,
 } from '../interfaces/protocol/runs.js';
-import type { WorkItem } from '../work/records.js';
+import { originKindOf, type WorkItem } from '../work/records.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { ProjectionError, type RunView } from './inputs.js';
 
@@ -16,10 +16,11 @@ import { ProjectionError, type RunView } from './inputs.js';
  * output stays a file of the run.
  */
 
-/** The one capability a work item exists for, where its origin names one. */
+/** The one capability a work item exists for, where its origin names one; an integration work item's names none. */
 export function capabilityOfItem(view: RunView, item: WorkItem): string | null {
   if ('entry' in item.origin) return item.origin.entry;
   if ('obligation' in item.origin) return view.records.obligations.get(item.origin.obligation.id)?.capability ?? null;
+  if ('integration' in item.origin) return null;
   return view.records.requirements.get(item.origin.verification.id)?.forCapability ?? null;
 }
 
@@ -59,7 +60,7 @@ function summaryOf(view: RunView, item: WorkItem, states: ItemState): WorkItemSu
     id: item.id,
     module: item.module,
     capability: capabilityOfItem(view, item),
-    origin: 'entry' in item.origin ? 'entry' : 'obligation' in item.origin ? 'obligation' : 'verification',
+    origin: originKindOf(item),
     goal: item.goal,
     state,
     follows: item.follows ?? null,

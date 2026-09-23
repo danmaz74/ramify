@@ -735,11 +735,16 @@ describe('§9: work-item completion', () => {
 });
 
 describe('§11: the final gate', () => {
-  test('acceptance-incomplete: a tracked entry scenario that is not implemented is named with its record as evidence; integration scenarios wait for their work items', () => {
+  test('acceptance-incomplete: a tracked scenario that is not implemented, integration scenarios included, is named with its record as evidence', () => {
     const records = [record('sc-001', 'entry', 'review-note'), record('sc-002', 'entry', 'review-tags'), record('sc-003', 'integration', null)];
     const tracked = { records, entries: [], states: new Map([['sc-001', 'implemented'], ['sc-002', 'declared'], ['sc-003', 'pending']] as const) };
-    expect(incompleteScenarios(tracked)).toEqual([{ id: 'sc-002', entry: 'review-tags', state: 'declared', evidence: 'scenarios/sc-002.json' }]);
-    expect(incompleteScenarios({ ...tracked, states: new Map([['sc-001', 'implemented'], ['sc-002', 'implemented'], ['sc-003', 'pending']] as const) })).toEqual([]);
+    expect(incompleteScenarios(tracked)).toEqual([
+      { id: 'sc-002', entry: 'review-tags', state: 'declared', evidence: 'scenarios/sc-002.json' },
+      { id: 'sc-003', entry: null, state: 'pending', evidence: 'scenarios/sc-003.json' },
+    ]);
+    expect(incompleteScenarios({ ...tracked, states: new Map([['sc-001', 'implemented'], ['sc-002', 'implemented'], ['sc-003', 'pending']] as const) }))
+      .toEqual([{ id: 'sc-003', entry: null, state: 'pending', evidence: 'scenarios/sc-003.json' }]);
+    expect(incompleteScenarios({ ...tracked, states: new Map([['sc-001', 'implemented'], ['sc-002', 'implemented'], ['sc-003', 'implemented']] as const) })).toEqual([]);
   });
 
   test('a passing final gate whose scenario check did not pass a tracked scenario does not complete the run', async () => {
