@@ -89,8 +89,8 @@ Design documents for the separate agent harness:
   [results](plans/09-session-model-and-transcripts/results.md)
 - [Plan 10: acceptance scenarios](plans/10-acceptance-scenarios/main-plan.md),
   the v1 acceptance scenarios architecture in eleven iterations; implemented,
-  with its [results](plans/10-acceptance-scenarios/results.md); both audits
-  pass
+  with its [results](plans/10-acceptance-scenarios/results.md), and merged
+  with Plan 9's session model; both audits pass on the merge
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

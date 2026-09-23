@@ -1738,3 +1738,124 @@ this plan.
 
 Remaining open: the real pi run on `status-badge-tone`, which waits for Dan's
 go-ahead.
+
+## Merge with Plan 9
+
+`ramify-agent` at `9e89596`, which holds
+[Plan 9: session model and transcripts](../09-session-model-and-transcripts/main-plan.md),
+was merged into this branch as `67a812c`. Git reported conflicts in 18 files.
+All of them were additive: both sides added events, snapshot counts, layout
+entries, exposures, web areas, styles and tests, and each resolution keeps
+both sides. The plans' prompt packages did not overlap, since Plan 9 changes
+no prompt, so no version needed reconciling.
+
+### Reconciliations
+
+Conflicts resolved by keeping both sides:
+
+- `RunSnapshot.counts` carries both `scenarios` and `degradedStarts`.
+- `runLayout` has `scopeScenarios` beside `transcript` and `blobs`.
+- `RunService` holds the review stop's `wake` beside the content store and
+  the transcript writers.
+- The projected-event ref kinds include both `scenario` and `session`.
+- The root `module.ramify` re-exposes both plans' protocol symbols.
+- The web Run page has both the Scenarios area and the Sessions timeline,
+  and its comment names Approve and degraded starts.
+- The stub client has both the scenario query and the session queries.
+
+Semantic reconciliations, where the merge applied cleanly or conflicted
+textually but had to be changed to keep both plans' behavior:
+
+- **The initial analysis.** It is submitted as `initial-architect/2`,
+  validated against the plan's scenarios, and its session is kept as the
+  architect context.
+- **`job.json` stays `ramify-agent.job/3`.** Plan 9 raised it from `/2`.
+  Plan 10 added its project configuration, plan scenarios and review stop to
+  the record without a version change. `/3` now holds both sides' fields, and
+  the composition inventory names the union
+  `record ramify-agent.job/3.projectConfig…`.
+- **Session events in Plan 10's sequences.**
+  - `review-stop`, `scenario-states` (withdrawal by exhaustion) and
+    `work-items` now expect `session-opened` and `session-finished`.
+  - At the review stop, the initial architect's session is suspended. A run
+    stopped or interrupted there finishes that session before its terminal
+    event: `run-ended` when it stops, `interrupted` on recovery. The
+    `review-stop` tests now assert this.
+  - An exhausted iteration's engineer session is finished with `work-closed`
+    before the withdrawal.
+- **Scenario data in Plan 9's scripted runs.** Each of these runs now has
+  the "Scenarios of <plan>" commit and completion requests that declare
+  their entry's scenarios (`declaringScenarios`):
+  - the session scenario that `session-lifecycle`, `transcript-run`,
+    `session-queries` and the session fixture share;
+  - `neutral-actions`;
+  - `placement`'s degraded start.
+
+  The session fixture's live `status-badge-tone` run now gives its entry the
+  plan's two scenarios verbatim, which form rule 3 requires since Plan 10's
+  iteration 11.
+- **Plan 9's port and data in Plan 10's tests.**
+  - The review stop's timed port declares `support` in place of
+    `observations`.
+  - The write guard's denial test passes neutral write actions.
+  - The session reducer's test gives `work-item-started` its `origin`.
+- **Web fixtures.** The session-marks and timeline snapshots carry the
+  scenario counts and `review`. Capability progress carries `scenarios`: a
+  count for an entry, null otherwise.
+- **Composition.** The inventory has 38 distinct crash boundaries: 33 at the
+  base, 3 from Plan 10 and 2 from Plan 9. Recovery may append both
+  `scenarios-materialized` and `session-finished`.
+- **Documents.** The harness README describes both the scenario projections
+  and the metrics' session grouping. The web README lists the scenarios and
+  the run's sessions. `docs/README.md` lists both plans.
+
+### Verification
+
+Run from `ramify-agent/` before the merge commit:
+
+- `npm run type-check` passed.
+- `npm run check:self` passed with 0 errors, 0 warnings and 167 analysis
+  limits.
+- The 94 test files either plan touched, which include every conflicted
+  file, were run in four batches. 92 files passed and 2 were skipped. 837
+  tests passed and 7 were skipped.
+- The three `composition-recovery*` files, `run-closing-order` and
+  `progress-fixture` also passed.
+
+The skipped tests are the opt-in real-toolchain variants:
+`RAMIFY_AGENT_FIXTURE_ACCEPTANCE` for `acceptance-trial` and
+`fixture-acceptance`, and the fixture trial selection for `fixture-trials`.
+They were not run for the merge.
+
+### Audits of `67a812c`
+
+Both audits ran on the merge commit as HEAD, with a clean tree.
+
+**The ramify-agent suite request:** overall `pass`, 176.6 s, audited
+2026-09-23T15:49:33Z. Run ref `refs/audited/runs/2026-09-23T15-49-33Z-67a812c25`,
+report commit `49b565d`.
+
+| Check | Outcome |
+| --- | --- |
+| `patch-integrity` (`git diff --check HEAD^ HEAD`, against the first parent) | pass, no output |
+| `agent-typecheck` | pass, 3.2 s |
+| `agent-tests` | pass, 143.1 s. 150 files passed and 2 were skipped (`fixture-trials`, `fixture-acceptance`). 1,225 tests passed and 7 were skipped. |
+| `agent-structure` (`check:self`) | pass, 12.5 s: 0 errors, 0 warnings, 167 analysis limits |
+| `parent-daemon-test` | pass, 17.7 s, 1 test |
+
+**The root cucumber-viz audit:** overall `PASS`, 3:15, full npm test mode.
+Run ref `refs/audited/runs/2026-09-23T15-53-07Z-67a812c`, report commit
+`9c27ffe`.
+
+| Check | Outcome |
+| --- | --- |
+| static | pass: `worktree-dependencies` and `type-check` |
+| regression | pass: 169 files, 2,260 tests |
+| sealedFiles | pass, skipped because no check phase was given |
+
+Both audits passed on the first run. Neither flaked, and no fix commit
+followed.
+
+The analysis-limit count rose from 122 before the merge to 167. Plan 9's
+exposed session and transcript schemas added these limits: each is a
+`signature-inferred` limit, like every other exposed schema.
