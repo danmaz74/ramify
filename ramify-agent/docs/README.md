@@ -75,7 +75,8 @@ Design documents for the separate agent harness:
 - [Plan 9: session model and transcripts](plans/09-session-model-and-transcripts/main-plan.md),
   harness-owned sessions with lifecycle and lineage, a transcript per session,
   the session list, live transcripts, diagram markers, a lineage timeline and
-  lineage measurements; proposed
+  lineage measurements; implemented 2026-09-23, with its
+  [results](plans/09-session-model-and-transcripts/results.md)
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

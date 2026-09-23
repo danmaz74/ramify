@@ -1,6 +1,6 @@
 # Plan 9: Session model and transcripts
 
-**Date:** 2026-09-23. **Status:** proposed.
+**Date:** 2026-09-23. **Status:** implemented 2026-09-23; see its [results](results.md).
 
 The harness runs agent sessions but does not model them. An invocation is
 recorded, and the conversation that invocations share exists only as pi's

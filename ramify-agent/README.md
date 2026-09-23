@@ -147,7 +147,9 @@ to observe what the harness answers: import formatFinding from \
 harness tells you."
 ```
 
-The session's pi transcript is in its records directory, under `session/`.
+The session's transcript is `transcript.jsonl` in its records directory, and
+pi's own record is under `session/`. The Sessions page of `npm run serve` on
+the copy lists it.
 Reset the copy between tests with `git checkout -- . && git clean -fd`, or
 prepare another.
 

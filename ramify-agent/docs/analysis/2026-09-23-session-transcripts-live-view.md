@@ -1,10 +1,12 @@
 # Session transcripts and live session views
 
-**Date:** 2026-09-23. **Status:** draft analysis. It records what the harness
-already collects for a web view of agent sessions, what is missing, and a
+**Date:** 2026-09-23. **Status:** implemented by
+[Plan 9](../plans/09-session-model-and-transcripts/main-plan.md). Its
+[results](../plans/09-session-model-and-transcripts/results.md) record the
+final names and every change from the shape proposed here. It records what the harness
+already collected for a web view of agent sessions, what was missing, and a
 proposed shape, with lessons from how cucumber-viz tracks live sessions. It is
-not a plan; [Plan 9](../plans/09-session-model-and-transcripts/main-plan.md)
-implements it.
+not a plan.
 
 ## The feature
 
@@ -749,7 +751,11 @@ Taken on 2026-09-23, before planning:
    copies in other directories are other projects.
 6. **Suspended sessions are listed with the live ones,** marked suspended.
 7. **Transcripts exist for runs recorded after the feature.** An earlier run
-   lists its invocations without transcripts.
+   is unsupported: the plan's run list reports it as not served
+   (`unsupported-version`), and nothing derives its sessions. Plan 9 revised
+   this decision, which first
+   listed an earlier run's invocations without transcripts; no test or
+   fixture reads a recorded run.
 8. **Transcripts and stored prompts are raw output, not records.** The rule
    that records hold no file contents stands. A transcript is stored whole, as
    pi's files, shell logs and hook outputs already are: never quoted in a
@@ -758,11 +764,14 @@ Taken on 2026-09-23, before planning:
 
 ## Open decisions
 
-1. **Recovery:** add the session's lifecycle to the recovery that already
-   closes interrupted invocations.
-2. **Session events:** confirm the names, data and reasons of the
-   [proposed model](#proposed-session-model).
-3. **Body size threshold:** the size above which a body is stored out of line.
+Plan 9 settled the first three; its
+[results](../plans/09-session-model-and-transcripts/results.md#review-decisions)
+record the outcomes.
+
+1. **Recovery:** settled. Recovery finishes an interrupted invocation's
+   session as `interrupted`, and every session the run still kept.
+2. **Session events:** settled, with the changes the results list.
+3. **Body size threshold:** settled at 8 KiB, a recorded policy value.
 4. **Redaction:** whether transcripts mask secret-looking values.
 5. **Retention**, deferred to the [to-do list](../todo.md): by run or by plan,
    the age, and compression before deletion.

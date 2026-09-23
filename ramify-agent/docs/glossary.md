@@ -109,6 +109,18 @@ A [session](#session) is **live** while the harness awaits one of its
 invocations, **suspended** while none is awaited and the harness keeps it for
 further use, and **finished** once the harness will not use it again.
 
+## Transcript
+
+A **transcript** is the harness's ordered record of one [session](#session):
+each invocation's start, the messages exchanged, the harness's own decisions
+and each invocation's end. It is raw output, never quoted in a record.
+
+## Point
+
+A **point** is a place in a [session](#session) from which a later invocation
+may continue it or fork from it: the end of one of its invocations, or the
+result of one append to it.
+
 ## Vertical work
 
 **Vertical work** is work within one subtree: a module and its descendants.
