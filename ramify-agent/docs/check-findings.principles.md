@@ -5,7 +5,12 @@
 ## Purpose and authority
 
 These principles govern how ramify-agent records, settles and presents
-CheckFindings from implementation checks and agent reviews. The
+CheckFindings from implementation checks and agent reviews. They follow the
+harness principle that
+[an executable specification is a translation](harness.principles.md#an-executable-specification-is-a-translation):
+a verdict is about an executable specification, a judgment applied to a
+semantic specification gives a signal, and this document is about the
+signals. The
 [harness principles](harness.principles.md) and the rules that govern
 acceptance scenarios still apply to their own subjects. Required gates and
 acceptance scenarios are outside the CheckFinding system: a CheckFinding

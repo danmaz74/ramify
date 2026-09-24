@@ -15,6 +15,40 @@ Ramify's own vocabulary is defined in the toolkit's
 For search space, delivered-change complexity, token efficiency and their
 selected measurements, use the [metrics glossary](metrics/glossary.md).
 
+## Semantic specification
+
+A **semantic specification** is what an author means: a principle, a plan,
+a requirement or a scenario's text. It constrains the solution space and
+cannot execute.
+
+## Executable specification
+
+An **executable specification** is code that checks a solution against a
+[semantic specification](#semantic-specification): the
+[step definitions](#step-definition) of a scenario, a test for a
+requirement, a `module.ramify` declaration that `ramify check` verifies. It
+may cover part of the semantic specification, carries its author's
+[interpretation](#interpretation), and never replaces the semantic
+specification, which stays authoritative over it.
+
+## Translate
+
+To **translate** a [semantic specification](#semantic-specification) is to
+write an [executable specification](#executable-specification) of it. The
+one who translates is whoever writes that code, usually an engineer; it is
+not a role.
+
+## Interpretation
+
+An **interpretation** is the reading of a
+[semantic specification](#semantic-specification) that an
+[executable specification](#executable-specification) carries. A verdict is
+about the executable specification; the interpretation is the gap between
+the verdict and the semantic specification.
+
+A semantic specification that has no translation is interpreted at the moment
+of judgment, by the agent applying it or reviewing against it.
+
 ## Plan
 
 A **plan** is a person's request for a feature, written as
@@ -186,12 +220,15 @@ states the result of another entry's action in place of the action.
 ## Step definition
 
 A **step definition** is the TypeScript that Cucumber matches a step's text
-to.
+to. A scenario's step definitions are its
+[executable specification](#executable-specification).
 
 ## Binding
 
 A scenario's **binding** is the set of [step definitions](#step-definition)
-a run matched to its steps, read from Cucumber's message stream.
+a run matched to its steps, read from Cucumber's message stream. Binding is
+verified mechanically and says nothing about the fidelity of the
+[interpretation](#interpretation) those step definitions carry.
 
 ## Scenario harness
 

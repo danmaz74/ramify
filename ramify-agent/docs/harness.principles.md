@@ -15,7 +15,42 @@ define what a module may import, and its
 define the evidence Ramify supplies to an agent with a global view. This
 document redefines neither.
 
+## Premise
+
+A coding agent is a semantic statistical machine. It reads what is requested
+and what the code and documents already say, and applies the patterns it has
+learned to move the solution in the requested direction. Test cycles verify
+the solution against executable specifications; they do not make it the
+intended solution.
+
+Principles documents, specifications and acceptance scenarios are all
+semantic specifications: they conceptually constrain the solution space so
+that only solutions conforming to them are accepted. The mapping between a
+semantic specification and the solutions that satisfy it is not unique, it
+is full of grey areas, and is subject to interpretation.
+
+ramify-agent's purpose is to help make that mapping practical and efficient
+from an ROI point of view, evaluating costs in terms of human attention first,
+and agent time and tokens second.
+
 ## Principles
+
+### An Executable Specification Is a Translation
+
+"A specification in natural language is a semantic specification: applying it
+takes interpretation. To verify a solution against it, an agent
+translates it into an executable specification: step definitions bind a
+scenario, a test checks a requirement, a declaration lets `ramify check`
+verify an ownership decision. The translation may cover part of the
+specification, carries its author's interpretation, and the semantic
+specification stays authoritative over it. A verdict is about the executable
+specification, never about the semantic one; the gap between them is the
+interpretation. A judgment applied to the semantic specification itself gives
+a signal.
+
+[Trust Follows Provenance](#trust-follows-provenance) applies to both
+authors. A scenario a person approved, translated by an agent, is a person's
+requirement verified through an agent's reading of it.
 
 ### Bounded Context Is What Makes Agents Efficient
 
@@ -52,7 +87,15 @@ The division of work should also facilitate integration and maintain a clean
 architecture. Every other principle serves this divide-and-conquer
 strategy.
 
-In some cases, special views can facilitate this approach. Architecture planning requires reasoning on the whole application, and the architect view creates a smaller search space for that.
+In some cases, special views can facilitate this approach. Architecture planning
+requires reasoning on the whole application, and the architect view creates a smaller
+search space for that.
+
+Semantic specifications such as principles and engineering best practices need the same
+context management. Every requirement in a context is applied more weakly as the context
+grows, until it is ignored, so including all of them in every prompt dilutes each of them.
+Various strategies can be used.
+
 
 ### Plans Are Incomplete; the System Adapts
 
