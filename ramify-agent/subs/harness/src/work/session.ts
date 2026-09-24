@@ -142,6 +142,26 @@ export interface WorkItemBriefing {
     /** The scenarios its passing gate ran, each with the step definitions that bound it. */
     readonly scenarios?: readonly string[] | undefined;
   } | undefined;
+  /**
+   * The reconciliation of this work item's completion request that returns
+   * it to this architect: the correction it chose, with the CheckFindings
+   * planned for repair, and its brief where the brief could not be appended
+   * to this session, from the run log.
+   */
+  readonly reconciliation?: ReconciliationBriefing | undefined;
+}
+
+/** A reconciliation, as the local architect it returns to receives it. */
+export interface ReconciliationBriefing {
+  readonly id: string;
+  readonly next: 'complete' | 'correct' | 'await-user';
+  /** The goal of the correction, where it chose one. */
+  readonly goal?: string | undefined;
+  readonly repairs: ReadonlyArray<{ readonly checkFinding: string; readonly title: string }>;
+  /** The brief, where it is not in this session: its append failed, or the session is a new one. */
+  readonly brief?: string | undefined;
+  /** Why the append failed, where it did. */
+  readonly appendFailure?: string | undefined;
 }
 
 /** What a work item owes and is owed across a delegation, at its coordination point. */
@@ -344,6 +364,8 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');
   }
 
+  if (briefing.reconciliation !== undefined) lines.push(...reconciliationSection(briefing.reconciliation));
+
   if (briefing.failedGate !== undefined) {
     lines.push('## The gate did not pass', '');
     lines.push(`Attempt \`${briefing.failedGate.id}\`${briefing.failedGate.cause === null ? '' : ` (${briefing.failedGate.cause})`}:`, '');
@@ -355,6 +377,26 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
 
   lines.push('Read your module, decide, and submit.');
   return lines.join('\n');
+}
+
+/** What a reconciliation returns to the local architect: its correction, and its brief where the session lacks it. */
+function reconciliationSection(reconciliation: ReconciliationBriefing): string[] {
+  const lines: string[] = [`## Reconciliation ${reconciliation.id}`, ''];
+  if (reconciliation.brief !== undefined) {
+    lines.push(reconciliation.appendFailure === undefined
+      ? 'Its brief, from the run log:'
+      : `Its brief could not be appended to your session (${reconciliation.appendFailure}); here it is, from the run log:`);
+    lines.push('', ...reconciliation.brief.split('\n').map(line => `> ${line}`), '');
+  } else {
+    lines.push('Its brief was appended to your session.', '');
+  }
+  if (reconciliation.next === 'correct') {
+    lines.push('It chose a correction. The CheckFindings planned for repair:', '');
+    for (const repair of reconciliation.repairs) lines.push(`- \`${repair.checkFinding}\`: ${repair.title}`);
+    lines.push('', `The correction's goal: ${reconciliation.goal ?? 'as the brief states it'}`, '');
+    lines.push('Assign one iteration that makes this correction. It goes through the ordinary gate and reviews; request completion again when it is done.', '');
+  }
+  return lines;
 }
 
 /** The section of an integration work item's briefing: what it binds, from what, and how. */

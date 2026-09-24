@@ -22,6 +22,10 @@ import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findi
 import {
   reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewOrientationRecordedDataSchema, reviewRequestRecordedDataSchema,
 } from '../reviews/records.js';
+import {
+  reconciliationAssessedFields, reconciliationBriefAppendedDataSchema, reconciliationExhaustedDataSchema, reconciliationIdSchema,
+  reconciliationRefusedDataSchema, reconciliationStartedDataSchema,
+} from '../reviews/reconciliation.js';
 
 /*
  * The run log, `events.jsonl`: state transitions only, and the canonical
@@ -341,11 +345,19 @@ export const runEventSchema = z.discriminatedUnion('type', [
      * null where the session was not kept, absent in an earlier run.
      */
     architectRef: architectRefSchema.nullable().optional(),
+    /**
+     * The reconciliation whose repair intent this assignment resolves: the
+     * first assignment of the work item after an assessment that chose a
+     * correction. Absent for any other assignment.
+     */
+    corrects: reconciliationIdSchema.optional(),
   }).strict()),
   /**
    * Commits the `IterationResult`. For `accepted` it names the passing gate
    * and its audited commit, and carries a notice for every module added or
-   * removed since the preceding accepted boundary.
+   * removed since the preceding accepted boundary. An accepted correction
+   * carries the repair claim of each CheckFinding planned under the intent
+   * it resolves.
    */
   event('iteration-closed', z.object({
     workItem: text,
@@ -354,6 +366,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
     gate: z.string().nullable(),
     commit: z.string().nullable(),
     notices: z.array(moduleNoticeSchema),
+    checkFindings: checkFindingEventsField.optional(),
   }).strict()),
   /**
    * Commits the `contract` `IterationAssignment` of one sub-session, and
@@ -515,6 +528,25 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * and never appended.
    */
   event('review-attempt-finished', z.object({ ...reviewAttemptFinishedFields, checkFindings: checkFindingEventsField }).strict()),
+  /**
+   * Commits one `ReconciliationBasis`: a work item that requested completion
+   * has CheckFindings needing attention, and one round assesses them. It
+   * licenses one fork of the local architect.
+   */
+  event('reconciliation-started', reconciliationStartedDataSchema),
+  /**
+   * Commits one `ReconciliationAssessment` with the relations and decisions
+   * it makes, validated against its basis under the run mutex. It is the
+   * intent of the brief's append to the local architect's session, keyed
+   * by the reconciliation.
+   */
+  event('reconciliation-assessed', z.object({ ...reconciliationAssessedFields, checkFindings: checkFindingEventsField }).strict()),
+  /** The completion of that append: where the brief went, or why it did not, which the next architect input then carries. */
+  event('reconciliation-brief-appended', reconciliationBriefAppendedDataSchema),
+  /** A basis that no longer held, at the assessment or before the work item's completion; a new round follows. */
+  event('reconciliation-refused', reconciliationRefusedDataSchema),
+  /** The work item's reconciliation rounds are spent: what is unresolved stays so, and its gate alone decides. */
+  event('reconciliation-exhausted', reconciliationExhaustedDataSchema),
   event('stop-requested', z.object({ command: acceptedCommandSchema }).strict()),
   /** Requires a passing `final` gate on the current tree; an empty queue alone never satisfies it. */
   event('job-completed', z.object({ gate: text, commit: z.string().nullable(), workItems: z.int().nonnegative() }).strict()),

@@ -105,13 +105,13 @@ export type TranscriptPoint = z.infer<typeof transcriptPointSchema>;
 /** A continued start: the point it continues from, why, and the briefs appended since the previous invocation. */
 export const transcriptContinuesSchema = z.object({
   from: transcriptPointSchema,
-  reason: z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']),
+  reason: z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']),
   briefs: z.array(text),
 }).strict();
 /** A forked start: the source point, why, the context generation where it forked the architect context, and the briefs held at the point. */
 export const transcriptForkSchema = z.object({
   from: transcriptPointSchema,
-  reason: z.enum(['placement-request', 'scope-review', 'design-orientation']),
+  reason: z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']),
   generation: z.int().positive().optional(),
   briefs: z.array(text),
 }).strict();
