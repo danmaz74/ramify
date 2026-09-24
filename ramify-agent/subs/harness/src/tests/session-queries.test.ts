@@ -9,7 +9,7 @@ import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { metricsResponseSchema } from '../interfaces/protocol/runs.js';
 import {
-  runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionTranscriptResponseSchema,
+  runSessionResponseSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionTranscriptResponseSchema,
   sessionUpdatesResponseSchema, standaloneSessionResponseSchema,
   type RunSessionView, type SessionCursor, type SessionRef,
 } from '../interfaces/protocol/sessions.js';
@@ -150,6 +150,9 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
     const answer = await ok(origin, protocolPaths.runSessions(plan, runId), runSessionsResponseSchema);
     expect([answer.version, answer.total]).toEqual([events.at(-1)!.sequence, sessions.size]);
     const views = new Map(answer.sessions.map(view => [view.session, view]));
+    const targeted = await ok(origin, protocolPaths.runSession(plan, runId, 'ses-0001'), runSessionResponseSchema);
+    expect(targeted).toEqual({ version: answer.version, session: views.get('ses-0001') });
+    expect(await refused(origin, protocolPaths.runSession(plan, runId, 'ses-9999'))).toEqual([404, 'not-found']);
     expect([...views.keys()]).toEqual([...sessions.keys()]);
     for (const session of sessions.values()) {
       expect(views.get(session.id), session.id).toMatchObject({

@@ -180,3 +180,29 @@ Use `ProtocolClient.getExecutionMap(planId, runId)` for the complete, coherent e
 ### Handoff to iteration 8 and acceptance
 
 `ExecutionMapArea` now owns a single execution-or-module selection, and `ExecutionModules` consumes the reassembled `moduleMap` directly. Its separate React Flow provider and narrow panel must remain when transcript windows are added. Session activation still goes to the full-page route; iteration 8 replaces that activation with the live floating workspace. The mocked viewport tests establish state separation, while real pointer pan/zoom, responsive layout and keyboard focus in Chromium remain iteration 9 browser acceptance work, along with the full scripted run and final-commit audit.
+
+## Iteration 8 — movable transcript workspace
+
+**Starting commit:** `4fb6ed211d3f7b47095b4127772b3a701d54c454` (iteration 7 handoff).
+
+### Delivered
+
+- `react-rnd@10.5.3` is a pinned direct dependency after a real React 19 and Chromium spike. The spike moved a controlled window by its header, resized it after dragging, selected transcript text and clicked a header control without moving it. Its viewport shrink left the raw component outside the smaller viewport; the workspace adds controlled clamping and a resize listener.
+- The execution map opens one nonmodal window per run-session ID from a card, detail or shelf. Reopening raises the window. Windows have independent stacking, geometry, minimization, maximization, close and keyboard move/resize/reset controls. Their headers show the shared role glyph and tint, state, session ID, reach and full module path or run-wide scope. The full-page link remains explicit. Focus on map reveals and outlines the session marker; reduced motion leaves a static outline. Narrow or touch layouts use full-screen panels with a switcher. Windows are mounted outside both zoomed canvases.
+- Full-page and floating transcripts now use the same `SessionReading` chapters, entries, body and evaluation renderer. In-run chapter and point links inside a window open or raise the target window at the anchor. A targeted session query opens any run session even beyond the bounded run-session list; the full-page route uses it when necessary.
+- One run coordinator loads each open transcript by cursor and polls all open sessions in batches of at most 50. It rotates cursor order to share the server's byte budget, follows `more` immediately, retains per-window entries and errors across failures, retries initial connection failures, and waits for trailing entries plus two quiet polls before stopping after a final state. Opening another window does not reload existing cursors. Each renderer follows near the bottom, counts new entries when scrolled back and offers Jump to live. Closing and reopening one window leaves the other intact.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| React 19/Chromium `react-rnd` spike | Pass | Headless `/usr/bin/chromium`, real pointer drag and resize, header control click and mouse text selection. Raw `react-rnd` needed explicit viewport clamping after shrink. The temporary spike files were removed. |
+| Focused production Chromium workspace probe | Pass | At a 1300 × 900 desktop viewport, two actual windows rendered; raised-window corner resize enlarged 640 × 560 to 725 × 610 after a clipped-handle issue was corrected; header control left geometry fixed; mouse selected transcript text. At 480 × 700, one full-screen panel and the switcher appeared. This is a focused workspace probe, not iteration 9's full-map browser acceptance. Temporary probe files were removed; no screenshot artifact was retained. |
+| Focused Vitest files for transcript workspace/coordinator, full-page session, execution map, client and harness session query | Pass: 5 files, 36 tests | Includes 52 windows split into 50 + 2 update batches, a 53rd opening without reloading existing details, a target beyond the bounded list, local architect marker opening with full module path, two windows with independent chapters and controls, a cross-session point link, one live follower beside a scrolled-back reader with a new-entry count/Jump to live, trailing final entry and quiet-poll stop, keyboard geometry and viewport clamping. |
+| `npm run type-check`, `npm run build:web` | Pass | Build retains the existing large-chunk advisory. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings; 190 analysis limits | The new targeted protocol was forwarded through the root module declaration; limits are inference coverage. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Handoff to iteration 9
+
+Run the complete scripted fixture through actual browser maps and transcript windows, including pan/zoom, session focus/reveal, narrow/touch switcher, reduced motion, disconnect/reconnect, live append and version restart. The focused Chromium probe exercised window geometry and text selection but not the complete map or synthetic provider run. Finish full suite, project-local browser runner and final-commit audit on a clean tree. The current desktop transcript workspace mounts when the Execution map area is active; changing run identity remounts it cleanly.

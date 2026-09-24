@@ -5,11 +5,23 @@ import {
 } from '../../../harness/src/interfaces/protocol/sessions.js';
 import { SessionPage } from '../session-page.js';
 import {
-  architect, at, engineerEntries, entries, evaluation, globalFork, inline, liveEngineer, page, planId, reply, runId, update,
+  architect, at, engineerEntries, entries, evaluation, globalFork, inline, liveEngineer, page, planId, reply, runId, sessionView, update,
 } from './helpers/sessions.js';
 import { StubClient } from './helpers/stub-client.js';
 
 afterEach(cleanup);
+
+test('the full-page transcript opens a run session beyond the bounded session list', async () => {
+  const client = new StubClient();
+  const id = 'ses-0501';
+  client.runSessions.set(runId, { version: 30, sessions: [], total: 501 });
+  client.runSessionDetails.set(`${runId}:${id}`, { version: 30, session: sessionView(id) });
+  client.transcripts.set(`${id}@0`, { session: { source: 'run', planId, runId, session: id }, page: page([], { file: 'missing' }) });
+  render(<SessionPage client={client} session={{ source: 'run', planId, runId, session: id }} anchor={null} />);
+  expect(await screen.findByRole('heading', { name: `Session ${id}` })).toBeTruthy();
+  expect(await screen.findByText(/The transcript file of this session is missing/)).toBeTruthy();
+  expect(client.calls).toContain(`getRunSession:${runId}:${id}`);
+});
 
 /** A stub whose poll, once its given answers are spent, answers nothing new, as a harness does between entries. */
 class QuietClient extends StubClient {

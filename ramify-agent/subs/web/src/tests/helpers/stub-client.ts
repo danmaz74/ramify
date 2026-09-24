@@ -7,7 +7,7 @@ import type {
   RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, ScenarioListResponse, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import type {
-  RunSessionsResponse, SessionBodyResponse, SessionCursor, SessionListResponse, SessionRef, SessionTranscriptResponse,
+  RunSessionResponse, RunSessionsResponse, SessionBodyResponse, SessionCursor, SessionListResponse, SessionRef, SessionTranscriptResponse,
   SessionUpdatesResponse, StandaloneSessionResponse,
 } from '../../../../harness/src/interfaces/protocol/sessions.js';
 import type { TranscriptBody } from '../../../../harness/src/interfaces/protocol/transcripts.js';
@@ -49,6 +49,7 @@ export class StubClient implements ProtocolClient {
   sessionList: SessionListResponse = { sessions: [], total: 0, offset: 0, next: null, unserved: [] };
   /** A run's sessions, by run ID. */
   runSessions = new Map<string, RunSessionsResponse>();
+  runSessionDetails = new Map<string, RunSessionResponse>();
   /** Standalone sessions, by ID. */
   standalone = new Map<string, StandaloneSessionResponse>();
   /** Transcript pages by session key and cursor, `<session>@<after>`; a missing page is not found. */
@@ -147,6 +148,14 @@ export class StubClient implements ProtocolClient {
   async getRunSessions(_planId: string, runId: string): Promise<RunSessionsResponse> {
     this.calls.push(`getRunSessions:${runId}`);
     return found(this.failure, this.runSessions.get(runId), `sessions of run ${runId}`);
+  }
+
+  async getRunSession(_planId: string, runId: string, session: string): Promise<RunSessionResponse> {
+    this.calls.push(`getRunSession:${runId}:${session}`);
+    const list = this.runSessions.get(runId);
+    const fallback = list?.sessions.find(candidate => candidate.session === session);
+    return found(this.failure, this.runSessionDetails.get(`${runId}:${session}`) ?? (fallback && list
+      ? { version: list.version, session: fallback } : undefined), `session ${session} of run ${runId}`);
   }
 
   async getTranscript(session: SessionRef, after: number): Promise<SessionTranscriptResponse> {

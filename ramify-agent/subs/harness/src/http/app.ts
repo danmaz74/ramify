@@ -19,7 +19,7 @@ import {
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
 import {
-  runSessionIdSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionQueryLimits,
+  runSessionIdSchema, runSessionResponseSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionQueryLimits,
   sessionTranscriptResponseSchema, sessionUpdatesResponseSchema, standaloneSessionResponseSchema, type SessionCursor,
 } from '../interfaces/protocol/sessions.js';
 import { CommandRejection } from '../jobs/commands.js';
@@ -226,6 +226,12 @@ export function createApp(options: AppOptions): express.Express {
     const version = counter(request.query['version'], 'version');
     const cursors = sessionCursors(request.query['cursors']);
     send(response, sessionUpdatesResponseSchema, await projected(() => sessions.updates(request.params.planId, request.params.runId, version, cursors)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/sessions/:session`, async (request: RunSessionRequest, response) => {
+    const { planId, runId, session } = request.params;
+    if (!runSessionIdSchema.safeParse(session).success) throw new ProtocolFailure('not-found', `Run ${runId} has no session ${session}`);
+    send(response, runSessionResponseSchema, await projected(() => sessions.runSession(planId, runId, session)));
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/sessions/:session/transcript`, async (request: RunSessionRequest, response) => {

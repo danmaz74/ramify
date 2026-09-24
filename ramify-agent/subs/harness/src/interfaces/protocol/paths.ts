@@ -45,6 +45,7 @@ export const protocolPaths = {
   sessions: (offset = 0): string => `${apiPrefix}/sessions?offset=${offset}`,
   /** A run's sessions, with their invocations, lineage and the diagram elements each reaches. */
   runSessions: (planId: string, runId: string): string => `${run(planId, runId)}/sessions`,
+  runSession: (planId: string, runId: string, session: string): string => runSession(planId, runId, session),
   /** The entries of one of a run's sessions after entry `after`. */
   runSessionTranscript: (planId: string, runId: string, session: string, after: number): string =>
     `${runSession(planId, runId, session)}/transcript?after=${after}`,

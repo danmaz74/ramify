@@ -244,6 +244,13 @@ export const runSessionsResponseSchema = z.object({
 }).strict();
 export type RunSessionsResponse = z.infer<typeof runSessionsResponseSchema>;
 
+/** One run session, including its invocation evaluations, without the list's census limit. */
+export const runSessionResponseSchema = z.object({
+  version: jobVersionSchema,
+  session: runSessionViewSchema,
+}).strict();
+export type RunSessionResponse = z.infer<typeof runSessionResponseSchema>;
+
 /**
  * The entries of one transcript after a cursor. An entry's number is its
  * cursor: the next page asks for the entries after the last one it

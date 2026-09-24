@@ -4,7 +4,7 @@ import type { z } from 'zod';
 import type { InvocationEvaluation } from '../interfaces/protocol/runs.js';
 import {
   sessionBodyHashSchema, sessionQueryLimits, standaloneSessionIdSchema,
-  type RunSessionView, type RunSessionsResponse, type SessionBodyResponse, type SessionCursor, type SessionListResponse,
+  type RunSessionView, type RunSessionResponse, type RunSessionsResponse, type SessionBodyResponse, type SessionCursor, type SessionListResponse,
   type SessionRef, type SessionListEntry, type SessionTranscriptResponse, type SessionUpdatesResponse, type StandaloneSessionResponse,
   type TranscriptPage, type UnservedSessionSource,
 } from '../interfaces/protocol/sessions.js';
@@ -90,6 +90,14 @@ export class SessionQueries {
     const at = await this.at(planId, runId);
     const sessions = at.sessions.slice(0, sessionQueryLimits.runSessions);
     return { version: at.version, sessions: await this.evaluated(planId, runId, at, sessions), total: at.sessions.length };
+  }
+
+  /** A targeted session can be read even when it lies beyond the bounded run list. */
+  async runSession(planId: string, runId: string, session: string): Promise<RunSessionResponse> {
+    const at = await this.at(planId, runId);
+    const found = at.sessions.find(candidate => candidate.session === session);
+    if (found === undefined) throw new ProjectionError('not-found', `Run ${runId} has no session ${session}`);
+    return { version: at.version, session: (await this.evaluated(planId, runId, at, [found]))[0]! };
   }
 
   /** The entries of one session after `after`. */

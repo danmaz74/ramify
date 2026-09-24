@@ -627,3 +627,41 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .element-session-suspended { border-left: 3px dashed var(--warn); padding-left: 0.4rem; }
 .element-session-interrupted { border-left: 3px solid var(--bad); padding-left: 0.4rem; }
 .element-sessions h4 { margin: 0.6rem 0 0.2rem; font-size: 0.85rem; color: var(--muted); }
+
+/* Transcript windows live in the viewport, outside both zoomed canvases. */
+.transcript-workspace { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+.transcript-window {
+  box-sizing: border-box; display: flex; flex-direction: column; overflow: visible; pointer-events: auto;
+  border: 1px solid #8390a0; border-radius: 9px; background: var(--panel);
+  box-shadow: 0 8px 28px rgb(20 30 45 / 26%);
+}
+.transcript-window-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; border-radius: inherit; }
+.transcript-window-drag {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.25rem 0.4rem;
+  padding: 0.35rem 0.5rem; background: #eef2f7; border-bottom: 1px solid var(--line); cursor: move;
+}
+.transcript-window-drag:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.transcript-window-title { display: flex; align-items: center; gap: 0.35rem; min-width: 0; max-width: 100%; padding-left: 0.4rem; border-left: 4px solid; font-size: 0.78rem; }
+.transcript-window-title strong, .transcript-window-title small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.transcript-window-title small { color: var(--muted); }
+.transcript-window-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem; font-size: 0.75rem; }
+.transcript-window-controls button, .transcript-window-controls a { padding: 0.15rem 0.35rem; cursor: pointer; }
+.transcript-window-body { flex: 1; min-height: 0; overflow: auto; padding: 0.3rem 0.7rem; }
+.transcript-window-body[hidden] { display: none; }
+.session-reading-compact .transcript { height: min(48vh, 25rem); min-height: 10rem; }
+.session-reading-compact .facts { font-size: 0.8rem; }
+.transcript-window-switcher { display: none; }
+.execution-flash { outline: 4px solid #2563eb; outline-offset: 5px; animation: execution-marker-flash 1.1s ease-out; }
+@keyframes execution-marker-flash { 0%, 55% { outline-color: #2563eb; } 100% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .execution-flash { animation: none; outline-color: #2563eb; } }
+@media (max-width: 680px), (pointer: coarse) {
+  .transcript-window-switcher {
+    display: flex; position: fixed; top: 0; left: 0; right: 0; z-index: 2; gap: 0.25rem;
+    overflow-x: auto; padding: 0.3rem; background: #eef2f7; pointer-events: auto;
+  }
+  .transcript-window-switcher button[aria-current='page'] { border-color: var(--accent); font-weight: 700; }
+  .transcript-window-panel { position: fixed; inset: 2.6rem 0 0; border-radius: 0; box-shadow: none; }
+  .transcript-window-panel .transcript-window-drag { cursor: default; }
+  .transcript-window-panel .transcript-window-body { overflow: auto; }
+  .session-reading-compact .transcript { height: 55vh; }
+}

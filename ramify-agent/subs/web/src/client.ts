@@ -22,9 +22,9 @@ import {
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import {
-  runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionTranscriptResponseSchema,
+  runSessionResponseSchema, runSessionsResponseSchema, sessionBodyResponseSchema, sessionListResponseSchema, sessionTranscriptResponseSchema,
   sessionUpdatesResponseSchema, standaloneSessionResponseSchema,
-  type RunSessionsResponse, type SessionBodyResponse, type SessionCursor, type SessionListResponse, type SessionRef,
+  type RunSessionResponse, type RunSessionsResponse, type SessionBodyResponse, type SessionCursor, type SessionListResponse, type SessionRef,
   type SessionTranscriptResponse, type SessionUpdatesResponse, type StandaloneSessionResponse,
 } from '../../harness/src/interfaces/protocol/sessions.js';
 import type { TranscriptBody } from '../../harness/src/interfaces/protocol/transcripts.js';
@@ -87,6 +87,8 @@ export interface ProtocolClient {
   getStandaloneSession(session: string): Promise<StandaloneSessionResponse>;
   /** A run's sessions, with their invocations, lineage and the diagram elements each reaches. */
   getRunSessions(planId: string, runId: string): Promise<RunSessionsResponse>;
+  /** One run session independent of the bounded run-session list. */
+  getRunSession(planId: string, runId: string, session: string): Promise<RunSessionResponse>;
   /** A session's transcript entries after entry `after`. */
   getTranscript(session: SessionRef, after: number): Promise<SessionTranscriptResponse>;
   /** One poll of a run: the sessions changed after `version`, and each followed session's entries after its cursor. */
@@ -196,6 +198,7 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     listSessions: (offset = 0) => get(protocolPaths.sessions(offset), sessionListResponseSchema),
     getStandaloneSession: session => get(protocolPaths.standaloneSession(session), standaloneSessionResponseSchema),
     getRunSessions: (planId, runId) => get(protocolPaths.runSessions(planId, runId), runSessionsResponseSchema),
+    getRunSession: (planId, runId, session) => get(protocolPaths.runSession(planId, runId, session), runSessionResponseSchema),
     getTranscript: (session, after) => get(session.source === 'run'
       ? protocolPaths.runSessionTranscript(session.planId, session.runId, session.session, after)
       : protocolPaths.standaloneTranscript(session.session, after), sessionTranscriptResponseSchema),

@@ -1,32 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow,
   type Edge, type Node, type NodeProps, type Viewport } from '@xyflow/react';
 import type { ExecutionNode } from '../../harness/src/interfaces/protocol/execution-map.js';
 import type { ProjectedRunEvent } from '../../harness/src/interfaces/protocol/runs.js';
-import type { Role } from '../../harness/src/interfaces/protocol/runs.js';
 import type { ProtocolClient } from './client.js';
 import type { ExecutionMapSnapshot } from './execution-map-client.js';
 import { executionLayout, runBandKey } from './execution-map-layout.js';
 import { ExecutionModules } from './execution-modules.js';
 import { executionMapVisualTokens as tokens } from './execution-map-tokens.js';
-import { sessionHref } from './routes.js';
+import { RoleIcon } from './session-role.js';
+import { TranscriptWorkspace, clampWindowRect, defaultWindowRect, type TranscriptWindowState } from './transcript-workspace.js';
+import type { SessionAnchor } from './routes.js';
 import { useQuery } from './use-query.js';
 
 type CardData = { node: ExecutionNode | null; collapsed: boolean; hiddenCount: number; hiddenMatches: number; active: boolean;
-  selected: boolean; related: boolean; hasChildren: boolean; repairFrom: string | null; onSelect: (key: string) => void; onToggle: (key: string) => void };
+  selected: boolean; related: boolean; flash: boolean; hasChildren: boolean; repairFrom: string | null; onSelect: (key: string) => void; onToggle: (key: string) => void };
 type CardNode = Node<CardData, 'execution'>;
 const statusColor = tokens.light.status;
-
-/** Small line icons use the same role identity on cards, shelf and event rail. */
-function RoleIcon({ role }: { role: Role }) {
-  const common = { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-    strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const };
-  if (role === 'initial-architect') return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5z" /></svg>;
-  if (role === 'global-fork') return <svg {...common}><circle cx="6" cy="5" r="2" /><circle cx="18" cy="5" r="2" /><circle cx="12" cy="19" r="2" /><path d="M6 7v3c0 3 6 2 6 7M18 7v3c0 3-6 2-6 7" /></svg>;
-  if (role === 'local-architect') return <svg {...common}><rect x="4" y="3" width="16" height="18" rx="1" /><path d="M8 7h8M8 11h8M8 15h5" /></svg>;
-  if (role === 'engineer') return <svg {...common}><path d="M14 4a6 6 0 0 0-6 7L3 16l5 5 5-5a6 6 0 0 0 7-7l-4 4-4-4z" /></svg>;
-  return <svg {...common}><path d="M10 14a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-2 2M14 10a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l2-2" /></svg>;
-}
 
 function nodeStatus(node: ExecutionNode): keyof typeof statusColor {
   switch (node.kind) {
@@ -72,13 +62,13 @@ function ScenarioSummary({ node, collapsed }: { node: Extract<ExecutionNode, { k
 }
 
 function ExecutionCard({ data }: NodeProps<CardNode>) {
-  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, hasChildren, repairFrom, onSelect, onToggle } = data;
+  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, onSelect, onToggle } = data;
   if (node === null) return <div className="execution-card execution-run-band"><strong>Run band</strong><small>Initial architecture, integration and run-wide evidence</small><Handle type="source" position={Position.Right} isConnectable={false} /></div>;
   const role = node.kind === 'session' ? tokens.roleIdentity[node.role] : null;
   const roleAccent = node.kind === 'session' ? tokens.light.role[node.role] : null;
   const label = `${node.label}, ${node.kind}${node.kind === 'session' ? `, ${role!.label}, ${node.state}` : ''}${related ? ', directly related to selected module' : ''}`;
   const status = nodeStatus(node);
-  return <div className={`execution-card execution-${node.kind} execution-state-${status}${active ? ' execution-live' : ''}${selected ? ' execution-selected' : ''}${related ? ' execution-related' : ''}`}
+  return <div className={`execution-card execution-${node.kind} execution-state-${status}${active ? ' execution-live' : ''}${selected ? ' execution-selected' : ''}${related ? ' execution-related' : ''}${flash ? ' execution-flash' : ''}`}
     style={{ borderColor: statusColor[status], borderLeftColor: roleAccent ?? statusColor[status], color: statusColor[status] }}>
     <Handle type="target" position={Position.Left} isConnectable={false} />
     <button type="button" className="execution-card-main nodrag nopan" onClick={() => onSelect(node.key)} aria-label={label}
@@ -105,8 +95,8 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
 }
 const nodeTypes = { execution: ExecutionCard };
 
-function Detail({ node, map, client, planId, runId, onOpenGate }: { node: ExecutionNode | undefined; map: ExecutionMapSnapshot;
-  client: ProtocolClient; planId: string; runId: string; onOpenGate: (gate: string) => void }) {
+function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }: { node: ExecutionNode | undefined; map: ExecutionMapSnapshot;
+  client: ProtocolClient; planId: string; runId: string; onOpenGate: (gate: string) => void; onOpenSession: (id: string) => void }) {
   const key = node?.key ?? '';
   const capability = useQuery(`capability-detail:${runId}:${map.runVersion}:${key}`, () =>
     node?.kind === 'capability' ? client.getExecutionCapability(planId, runId, key.slice('capability:'.length), map.runVersion) : Promise.resolve(null));
@@ -138,7 +128,7 @@ function Detail({ node, map, client, planId, runId, onOpenGate }: { node: Execut
         {gate.state.data.commands.map((command, i) => <div key={i} className="command"><p>{command.kind}: {command.outcome}; exit {command.exitCode ?? 'none'}; {command.elapsedMs} ms.</p>
           <pre aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre></div>)}</>}
       {gate.state.status === 'failed' && <p role="alert">Could not read gate: {gate.state.error.message}</p>}</>}
-    {node.kind === 'session' && <a href={sessionHref({ source: 'run', planId, runId, session: key.slice('session:'.length) })}>Read transcript of {node.label}</a>}
+    {node.kind === 'session' && <button type="button" onClick={() => onOpenSession(key.slice('session:'.length))}>Open transcript of {node.label}</button>}
     {node.kind === 'work-item' && <><p>{node.goal}</p><p>Module: {node.module ?? 'unavailable'}</p></>}
     {node.kind === 'requirement' && <p>Current revision {node.currentRevision}; verification {node.state}; provider {node.providerStage}; previous verified revision {node.verifiedRevision ?? 'none'}.</p>}
     {node.kind === 'iteration' && <p>Iteration {node.ordinal} of {node.workItem}, outline {node.outlineRevision}; {node.state}, {node.outcome ?? 'no outcome'}.</p>}
@@ -147,14 +137,17 @@ function Detail({ node, map, client, planId, runId, onOpenGate }: { node: Execut
 }
 
 function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSelect,
-  selectedModule, onSelectModule, collapsed, onCollapsed, positions, onPositions, viewport, onViewport }: { map: ExecutionMapSnapshot; events: readonly ProjectedRunEvent[];
+  selectedModule, onSelectModule, collapsed, onCollapsed, positions, onPositions, viewport, onViewport,
+  onOpenSession, focusRequest }: { map: ExecutionMapSnapshot; events: readonly ProjectedRunEvent[];
   client: ProtocolClient; planId: string; runId: string; onOpenGate: (gate: string) => void;
+  onOpenSession: (id: string) => void; focusRequest: { id: string; nonce: number } | null;
   selected: string | null; onSelect: (key: string | null) => void;
   selectedModule: string | null; onSelectModule: (module: string | null) => void;
   collapsed: ReadonlySet<string>; onCollapsed: (keys: ReadonlySet<string>) => void;
   positions: ReadonlyMap<string, { x: number; y: number }>; onPositions: (positions: ReadonlyMap<string, { x: number; y: number }>) => void;
   viewport: Viewport; onViewport: (viewport: Viewport) => void }) {
   const flow = useReactFlow<CardNode, Edge>();
+  const [flash, setFlash] = useState<string | null>(null);
   const layout = useMemo(() => executionLayout(map.nodes, map.links, collapsed), [map.nodes, map.links, collapsed]);
   const allLayout = useMemo(() => executionLayout(map.nodes, map.links, new Set()), [map.nodes, map.links]);
   const allPlace = useMemo(() => new Map(allLayout.placements.map(p => [p.key, p])), [allLayout]);
@@ -196,7 +189,18 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       while (parent && parent !== runBandKey) { next.delete(parent); parent = allPlace.get(parent)?.parent; } onCollapsed(next); }
     onSelect(key);
   };
-  const jump = (key: string) => { onSelectModule(null); focus(key); };
+  const jump = (key: string) => { onSelectModule(null); focus(key); if (key.startsWith('session:')) onOpenSession(key.slice('session:'.length)); };
+  useEffect(() => {
+    if (!focusRequest) return;
+    const key = `session:${focusRequest.id}`;
+    if (byKey.has(key)) {
+      onSelectModule(null);
+      focus(key);
+      setFlash(key);
+      const timer = setTimeout(() => setFlash(null), 1100);
+      return () => clearTimeout(timer);
+    }
+  }, [focusRequest?.nonce]);
   useEffect(() => {
     if (!selected) return;
     const p = place.get(selected);
@@ -208,6 +212,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   const nodes: CardNode[] = layout.placements.map(p => ({ id: p.key, type: 'execution', position: effectivePositions.get(p.key) ?? { x: p.x, y: p.y },
     data: { node: byKey.get(p.key) ?? null, collapsed: collapsed.has(p.key), hiddenCount: layout.hiddenCount.get(p.key) ?? 0,
       hiddenMatches: matchCounts.get(p.key) ?? 0, active: active.has(p.key), selected: selected === p.key,
+      flash: flash === p.key,
       related: directMatches.has(p.key),
       hasChildren: hasChildren.has(p.key),
       repairFrom: (() => { const prior = byKey.get(repairs.get(p.key) ?? ''); return prior?.kind === 'gate' ? prior.verdict === 'failed' ? '✗' : prior.verdict === 'passed' ? '✓' : '?' : null; })(),
@@ -242,10 +247,10 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
         onSelectModule={module => { onSelectModule(module); onSelect(null); }} directMatches={directMatches}
         hiddenMatches={hiddenMatches} onJump={jump} />
       </div>
-      <aside className="execution-side"><Detail node={selectedNode} map={map} client={client} planId={planId} runId={runId} onOpenGate={onOpenGate} />
+      <aside className="execution-side"><Detail node={selectedNode} map={map} client={client} planId={planId} runId={runId} onOpenGate={onOpenGate} onOpenSession={onOpenSession} />
         <section aria-label="All sessions"><h3>All sessions ({map.nodes.filter(n => n.kind === 'session').length})</h3><ul>{map.nodes.filter(n => n.kind === 'session').map(n => n.kind === 'session' &&
           <li key={n.key}><button type="button" onClick={() => jump(n.key)}><span className="execution-role-label" style={{ color: tokens.light.role[n.role] }}><RoleIcon role={n.role} /> {tokens.roleIdentity[n.role].label}</span> · {n.label} · {n.state} · {n.workItem ?? n.reach.kind} · {moduleText(n)}</button>
-            {' '}<a href={sessionHref({ source: 'run', planId, runId, session: n.key.slice('session:'.length) })}>Transcript</a></li>)}</ul></section>
+            {' '}<button type="button" onClick={() => onOpenSession(n.key.slice('session:'.length))}>Transcript</button></li>)}</ul></section>
         <section aria-label="All gates"><h3>All gates ({map.nodes.filter(n => n.kind === 'gate').length})</h3><ul>{map.nodes.filter(n => n.kind === 'gate').map(n => n.kind === 'gate' &&
           <li key={n.key}><button type="button" onClick={() => jump(n.key)}>{n.label} · {n.checkpoint} · {n.subject.workItem ?? 'run-wide'}{n.subject.iteration ? ` / ${n.subject.iteration}` : ''} · {n.verdict ?? 'running'} · audit {n.audit} · round {n.repairRound}</button></li>)}</ul></section>
         <section aria-label="References"><h3>References</h3><ul>{layout.references.filter(l => l.kind === 'provider-for' || l.kind === 'depends-on' || l.from.coverage === 'unresolved' || l.to.coverage === 'unresolved').map(l =>
@@ -262,14 +267,48 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   </div>;
 }
 
-export function ExecutionMapArea({ client, planId, runId, version, events, onOpenGate }: { client: ProtocolClient; planId: string; runId: string;
+function ExecutionMapAreaRun({ client, planId, runId, version, events, onOpenGate }: { client: ProtocolClient; planId: string; runId: string;
   version: number | undefined; events: readonly ProjectedRunEvent[]; onOpenGate: (gate: string) => void }) {
   const [selected, onSelect] = useState<string | null>(null);
   const [selectedModule, onSelectModule] = useState<string | null>(null);
   const [collapsed, onCollapsed] = useState<ReadonlySet<string> | null>(null);
   const [positions, onPositions] = useState<ReadonlyMap<string, { x: number; y: number }>>(new Map());
   const [viewport, onViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
+  const [windows, setWindows] = useState<readonly TranscriptWindowState[]>([]);
+  const [focusRequest, setFocusRequest] = useState<{ id: string; nonce: number } | null>(null);
+  const lastMap = useRef<ExecutionMapSnapshot | null>(null);
   const query = useQuery(`execution-map:${planId}:${runId}:${version ?? 'pending'}`, () => client.getExecutionMap(planId, runId));
+  if (query.state.status === 'ready') lastMap.current = query.state.data;
+  const openSession = (id: string, anchor: SessionAnchor | null = null, opener: HTMLElement | null = document.activeElement instanceof HTMLElement ? document.activeElement : null) => {
+    setWindows(previous => {
+      const top = Math.max(0, ...previous.map(item => item.z)) + 1;
+      const existing = previous.find(item => item.id === id);
+      if (existing) return previous.map(item => item.id === id ? { ...item, z: top, minimized: false,
+        anchor: anchor ?? item.anchor, anchorNonce: item.anchorNonce + 1 } : item);
+      const rect = clampWindowRect(defaultWindowRect(previous.length), window.innerWidth, window.innerHeight);
+      return [...previous, { id, rect, restore: rect, z: top, minimized: false, maximized: false,
+        anchor, anchorNonce: 0, opener }];
+    });
+    const focusHeader = () => document.querySelector<HTMLElement>(`[data-transcript-window="${id}"] .transcript-window-drag`)?.focus();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusHeader);
+    else queueMicrotask(focusHeader);
+  };
+  const changeWindow = (id: string, change: Partial<TranscriptWindowState>) =>
+    setWindows(previous => previous.map(item => item.id === id ? { ...item, ...change } : item));
+  const closeWindow = (id: string) => setWindows(previous => {
+    const opener = previous.find(item => item.id === id)?.opener;
+    queueMicrotask(() => opener?.focus());
+    return previous.filter(item => item.id !== id);
+  });
+  useEffect(() => {
+    const clamp = () => setWindows(previous => previous.map(item => ({ ...item,
+      rect: item.maximized
+        ? clampWindowRect({ x: 8, y: 8, width: window.innerWidth - 16, height: window.innerHeight - 16 }, window.innerWidth, window.innerHeight)
+        : clampWindowRect(item.rect, window.innerWidth, window.innerHeight),
+      restore: clampWindowRect(item.restore, window.innerWidth, window.innerHeight) })));
+    window.addEventListener('resize', clamp);
+    return () => window.removeEventListener('resize', clamp);
+  }, []);
   const initialCollapse = useMemo(() => {
     if (query.state.status !== 'ready') return new Set<string>();
     const snapshot = query.state.data;
@@ -283,11 +322,24 @@ export function ExecutionMapArea({ client, planId, runId, version, events, onOpe
     }
     return roots;
   }, [query.state]);
-  if (version === undefined) return <p>Loading the run…</p>;
-  if (query.state.status === 'loading') return <p>Loading execution map…</p>;
-  if (query.state.status === 'failed') return <p role="alert">Could not load execution map: {query.state.error.message}</p>;
-  return <ReactFlowProvider><Canvas map={query.state.data} events={events} client={client} planId={planId} runId={runId} onOpenGate={onOpenGate}
-    selected={selected} onSelect={onSelect} collapsed={collapsed ?? initialCollapse} onCollapsed={onCollapsed}
-    selectedModule={selectedModule} onSelectModule={onSelectModule}
-    positions={positions} onPositions={onPositions} viewport={viewport} onViewport={onViewport} /></ReactFlowProvider>;
+  const map = query.state.status === 'ready' ? query.state.data : lastMap.current;
+  return <>
+    {version === undefined ? <p>Loading the run…</p> : query.state.status === 'failed' && !map
+      ? <p role="alert">Could not load execution map: {query.state.error.message}</p>
+      : map ? <ReactFlowProvider><Canvas map={map} events={events} client={client} planId={planId} runId={runId} onOpenGate={onOpenGate}
+        selected={selected} onSelect={onSelect} collapsed={collapsed ?? initialCollapse} onCollapsed={onCollapsed}
+        selectedModule={selectedModule} onSelectModule={onSelectModule} focusRequest={focusRequest} onOpenSession={openSession}
+        positions={positions} onPositions={onPositions} viewport={viewport} onViewport={onViewport} /></ReactFlowProvider>
+        : <p>Loading execution map…</p>}
+    {query.state.status === 'failed' && map && <p role="alert">Could not refresh execution map: {query.state.error.message}</p>}
+    <TranscriptWorkspace client={client} planId={planId} runId={runId} nodes={map?.nodes ?? []} windows={windows}
+      onOpen={openSession} onChange={changeWindow} onClose={closeWindow}
+      onFocusMap={id => setFocusRequest({ id, nonce: Date.now() + Math.random() })} />
+  </>;
+}
+
+/** A route change gives the map and its floating workspace a fresh run identity. */
+export function ExecutionMapArea(props: { client: ProtocolClient; planId: string; runId: string; version: number | undefined;
+  events: readonly ProjectedRunEvent[]; onOpenGate: (gate: string) => void }) {
+  return <ExecutionMapAreaRun key={`${props.planId}/${props.runId}`} {...props} />;
 }

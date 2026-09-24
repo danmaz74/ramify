@@ -104,6 +104,11 @@ export function useSessionTranscript(client: ProtocolClient, ref: SessionRef, in
         if (cancelled) return;
         const sessions = new Map(detail.sessions);
         for (const session of answer.sessions) sessions.set(session.session, session);
+        if (answer.version > detail.version && !answer.sessions.some(session => session.session === ref.session)) {
+          const targeted = await client.getRunSession(ref.planId, ref.runId, ref.session);
+          if (cancelled) return;
+          sessions.set(ref.session, targeted.session);
+        }
         detail = { source: 'run', version: answer.version, session: sessions.get(ref.session) ?? detail.session, sessions };
         const page = answer.transcripts.find(transcript => transcript.session === ref.session)?.page;
         const added = page === undefined ? 0 : absorb(page);
@@ -125,8 +130,17 @@ export function useSessionTranscript(client: ProtocolClient, ref: SessionRef, in
         if (ref.source === 'run') {
           const answer = await client.getRunSessions(ref.planId, ref.runId);
           const sessions = new Map(answer.sessions.map(session => [session.session, session] as const));
-          const session = sessions.get(ref.session);
+          let session = sessions.get(ref.session);
+          if (session === undefined) {
+            try { session = (await client.getRunSession(ref.planId, ref.runId, ref.session)).session; }
+            catch (error) {
+              if (error instanceof ClientError && error.code === 'not-found')
+                throw new ClientError('protocol', `The run has no session ${ref.session}`, 'not-found');
+              throw error;
+            }
+          }
           if (session === undefined) throw new ClientError('protocol', `The run has no session ${ref.session}`, 'not-found');
+          sessions.set(ref.session, session);
           detail = { source: 'run', version: answer.version, session, sessions };
         } else {
           detail = { source: 'standalone', standalone: await client.getStandaloneSession(ref.session) };

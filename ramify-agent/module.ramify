@@ -118,6 +118,7 @@ expose-sub sessionInvocationSchema, SessionInvocation, sessionAppendSchema from 
 expose-sub SessionAppend, sessionSuspensionSchema, SessionSuspension from harness to descendants
 expose-sub sessionLineageSchema, SessionLineage, runSessionViewSchema, RunSessionView from harness to descendants
 expose-sub runSessionsResponseSchema, RunSessionsResponse, transcriptPageSchema from harness to descendants
+expose-sub runSessionResponseSchema, RunSessionResponse from harness to descendants
 expose-sub TranscriptPage, sessionTranscriptResponseSchema, SessionTranscriptResponse from harness to descendants
 expose-sub sessionCursorSchema, SessionCursor, sessionUpdatesResponseSchema from harness to descendants
 expose-sub SessionUpdatesResponse, sessionBodyResponseSchema, SessionBodyResponse from harness to descendants

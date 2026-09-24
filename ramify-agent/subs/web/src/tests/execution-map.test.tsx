@@ -49,6 +49,17 @@ test('typed layout keeps one shared provider and finite cycle references, with o
   expect(collapsed.placements.some(p => p.key === 'session:ses-initial')).toBe(true);
 });
 
+test('a local architect marker opens a floating transcript with its full module path', async () => {
+  view();
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  fireEvent.click(within(canvas).getByRole('button', { name: /Status local architect, session/ }));
+  const floating = await screen.findByLabelText('Transcript window ses-local-status');
+  expect(within(floating).getByText(/project\/ui/)).toBeTruthy();
+  expect(within(floating).getByRole('link', { name: 'Open full page' }).getAttribute('href')).toContain('/sessions/ses-local-status');
+  fireEvent.click(within(floating).getByRole('button', { name: 'Close ses-local-status' }));
+  expect(screen.queryByLabelText('Transcript window ses-local-status')).toBeNull();
+});
+
 test('roots, coverage, complete shelf, Now, keyboard buttons, details and independent audit are available', async () => {
   const opened = view();
   const canvas = await screen.findByLabelText('Zoomable execution canvas');

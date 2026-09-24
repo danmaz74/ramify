@@ -8,7 +8,7 @@ import { ClientError, type ProtocolClient } from './client.js';
 import { EvaluationFacts } from './evaluation.js';
 import { chapterHref, routeHref, sessionHref, type SessionAnchor } from './routes.js';
 import { reachText, SessionState } from './run-labels.js';
-import { isFinal, useSessionTranscript, type SessionDetail } from './session-progress.js';
+import { isFinal, useSessionTranscript, type SessionDetail, type SessionTranscript } from './session-progress.js';
 import {
   PointLink, pointElementId, TranscriptBodies, TranscriptEntryView, transcriptCalls, type TranscriptContext,
 } from './transcript.js';
@@ -252,7 +252,20 @@ export function SessionPage({ client, session: ref, anchor, interval }: {
   readonly anchor: SessionAnchor | null;
   readonly interval?: number;
 }) {
-  const { detail, entries, file, unreadable, following, error } = useSessionTranscript(client, ref, interval);
+  const reading = useSessionTranscript(client, ref, interval);
+  return <SessionReading client={client} session={ref} anchor={anchor} reading={reading} />;
+}
+
+/** The same chapters, bodies and evaluations used by full-page and workspace transcripts. */
+export function SessionReading({ client, session: ref, anchor, anchorNonce = 0, reading, compact = false }: {
+  readonly client: ProtocolClient;
+  readonly session: SessionRef;
+  readonly anchor: SessionAnchor | null;
+  readonly anchorNonce?: number;
+  readonly reading: SessionTranscript;
+  readonly compact?: boolean;
+}) {
+  const { detail, entries, file, unreadable, following, error } = reading;
   const state = detail === undefined ? undefined : detail.source === 'run' ? detail.session.state : detail.standalone.session.state;
   const firstState = useRef<ShownSessionState | undefined>(undefined);
   if (firstState.current === undefined && state !== undefined) firstState.current = state;
@@ -299,14 +312,14 @@ export function SessionPage({ client, session: ref, anchor, interval }: {
   }, [entries, anchor, state, toBottom]);
 
   // A link to a chapter or a point opens it once the transcript is read, and again when the link changes.
-  const anchorKey = anchor === null ? '' : JSON.stringify(anchor);
+  const anchorKey = `${anchor === null ? '' : JSON.stringify(anchor)}:${anchorNonce}`;
   useEffect(() => { anchored.current = false; }, [anchorKey]);
   useEffect(() => {
     if (anchor === null || anchored.current || detail === undefined) return;
     const id = anchor.kind === 'chapter' ? `chapter-${anchor.invocation}` : pointElementId(anchor.kind === 'point'
       ? { session: ref.session, invocation: anchor.invocation }
       : { session: ref.session, append: anchor.append });
-    const target = document.getElementById(id);
+    const target = [...(scroller.current?.querySelectorAll<HTMLElement>('[id]') ?? [])].find(element => element.id === id) ?? null;
     if (target === null) return;
     anchored.current = true;
     atBottom.current = false;
@@ -321,13 +334,10 @@ export function SessionPage({ client, session: ref, anchor, interval }: {
   const changed = state !== undefined && firstState.current !== undefined && firstState.current !== state;
 
   return (
-    <section className="page session-page">
-      <p className="page-links">{back} · <a href={routeHref({ page: 'sessions' })}>All sessions</a></p>
-      <header className="page-header">
-        <h1>Session <code>{ref.session}</code></h1>
-        {state && <SessionState state={state} />}
-      </header>
-      {ref.source === 'run' && <p className="muted">Of run <code>{ref.runId}</code> of plan <code>{ref.planId}</code>.</p>}
+    <section className={compact ? 'session-reading session-reading-compact' : 'page session-page'}>
+      {!compact && <><p className="page-links">{back} · <a href={routeHref({ page: 'sessions' })}>All sessions</a></p>
+        <header className="page-header"><h1>Session <code>{ref.session}</code></h1>{state && <SessionState state={state} />}</header>
+        {ref.source === 'run' && <p className="muted">Of run <code>{ref.runId}</code> of plan <code>{ref.planId}</code>.</p>}</>}
       <p className={`connection-line${error ? ' connection-line-lost' : ''}`} role="status" aria-label="Following">
         {error
           ? detail
@@ -361,7 +371,7 @@ export function SessionPage({ client, session: ref, anchor, interval }: {
             </div>
             {unseen > 0 && (
               <button type="button" className="new-entries" onClick={toBottom}>
-                {unseen === 1 ? '1 new entry' : `${unseen} new entries`} below
+                {unseen === 1 ? '1 new entry' : `${unseen} new entries`} below{compact ? ' · Jump to live' : ''}
               </button>
             )}
           </div>
