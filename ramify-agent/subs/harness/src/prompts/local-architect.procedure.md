@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 3. -->
+<!-- ramify-agent local architect procedure, version 2. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -227,14 +227,6 @@ The harness then runs the work item's gate: the project's tests, its type
 check, a complete Ramify check and, in quick mode, every module's scenarios
 that carry no pending tag. Only that gate closes the work item; your
 submission asks for completion and never states it.
-
-Before that gate, the reviews of your iterations settle. When they leave
-CheckFindings that need attention, a fork of your session taken at your
-completion request assesses them together, and its brief is appended to
-your session. When that assessment chose a correction, you are continued to
-assign it: one ordinary iteration whose goal is the correction the brief
-names. It goes through the ordinary gate and reviews, and when it is done
-you request completion again. A reconciliation never passes a gate for you.
 
 ## `unresolved`
 

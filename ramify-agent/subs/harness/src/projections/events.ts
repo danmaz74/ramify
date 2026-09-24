@@ -228,21 +228,6 @@ function describe(event: RunEvent): [string, Ref[]] {
       const concerns = event.data.checkFindings.length === 0 ? '' : `, with ${counted(event.data.checkFindings.length, 'CheckFinding event', 'CheckFinding events')}`;
       return [`Review attempt ${event.data.attempt} finished: ${result}${event.data.settles ? '' : ', to be retried'}${concerns}`, []];
     }
-    case 'reconciliation-started':
-      return [`Reconciliation ${event.data.reconciliation} (round ${event.data.round}) of ${event.data.workItem} started`, ref('work-item', event.data.workItem)];
-    case 'reconciliation-assessed': {
-      const next = event.data.next === 'correct' ? 'a correction' : event.data.next === 'await-user' ? 'a user decision' : 'the work item\'s gate';
-      return [
-        `Reconciliation ${event.data.reconciliation} was assessed, with ${counted(event.data.checkFindings.length, 'CheckFinding event', 'CheckFinding events')}; next, ${next}`,
-        [...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
-      ];
-    }
-    case 'reconciliation-brief-appended':
-      return [`The brief of ${event.data.reconciliation} reached the local architect's session (${event.data.outcome}${event.data.reason === null ? '' : `: ${event.data.reason}`})`, ref('session', event.data.session)];
-    case 'reconciliation-refused':
-      return [`${event.data.reconciliation === null ? `${event.data.workItem}'s completion` : `Reconciliation ${event.data.reconciliation}`} was refused at its ${event.data.stage}: ${event.data.reason}`, ref('work-item', event.data.workItem)];
-    case 'reconciliation-exhausted':
-      return [`${event.data.workItem} spent ${counted(event.data.rounds, 'reconciliation round', 'reconciliation rounds')}; ${counted(event.data.unresolved.length, 'CheckFinding stays', 'CheckFindings stay')} unresolved`, ref('work-item', event.data.workItem)];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':

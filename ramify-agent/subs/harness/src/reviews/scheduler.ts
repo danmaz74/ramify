@@ -47,8 +47,6 @@ export class ReviewQueue {
   private readonly running = new Map<string, Promise<void>>();
   private readonly finishing = new Map<string, Promise<void>>();
   private readonly parked = new Set<string>();
-  /** Each waiter of `changed`, woken once when an attempt or a finish ends. */
-  private readonly waiters = new Set<() => void>();
   private open = true;
   /** Wakes the queue when the earliest waiting request's last moment to start has passed. */
   private timer: NodeJS.Timeout | undefined;
@@ -102,7 +100,6 @@ export class ReviewQueue {
         .finally(() => {
           this.running.delete(request);
           this.wake();
-          this.notify();
         });
       this.running.set(request, task);
     }
@@ -121,10 +118,7 @@ export class ReviewQueue {
   private finish(request: string, how: (request: string) => Promise<void>, what: string): void {
     const task = how(request)
       .catch(error => this.options.warn(`Review ${request} could not be ${what}: ${String(error)}`))
-      .finally(() => {
-        this.finishing.delete(request);
-        this.notify();
-      });
+      .finally(() => this.finishing.delete(request));
     this.finishing.set(request, task);
   }
 
@@ -133,22 +127,6 @@ export class ReviewQueue {
     this.open = false;
     clearTimeout(this.timer);
     this.timer = undefined;
-  }
-
-  /**
-   * Settles when the next attempt or finish ends, whichever request it
-   * was for: a work item waiting for its own requests reads the log again
-   * then. It is registered before the caller reads the log, so an end in
-   * between still wakes it.
-   */
-  changed(): Promise<void> {
-    return new Promise(resolve => { this.waiters.add(resolve); });
-  }
-
-  private notify(): void {
-    const waiters = [...this.waiters];
-    this.waiters.clear();
-    for (const waiter of waiters) waiter();
   }
 
   /** Settles once no attempt is running or being finished, including any started meanwhile. */
