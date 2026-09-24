@@ -114,6 +114,8 @@ describe('execution-map/1 contract', () => {
   it('keeps partial records and an unavailable tree explicit', () => {
     const partial = clone();
     partial.tree = { status: 'unavailable', message: 'Architect view is not materialized.' };
+    partial.moduleMap.tree = partial.tree;
+    partial.moduleMap.modules = [];
     partial.coverage.gaps = ['line-events/1 for inv-repair is partial'];
     const capability = partial.nodes.find(node => node.key === 'capability:status-badge')!;
     if (capability.kind !== 'capability') throw new Error('Fixture capability missing');
@@ -121,6 +123,9 @@ describe('execution-map/1 contract', () => {
     expect(executionMapPageSchema.safeParse(partial).success).toBe(true);
     capability.directRequirements.coverage = { state: 'complete', known: 0, total: 0 };
     expect(executionMapPageSchema.safeParse(partial).success).toBe(false);
+    const mismatchedTree = clone();
+    mismatchedTree.moduleMap.tree = { status: 'unavailable', message: 'Different view.' };
+    expect(executionMapPageSchema.safeParse(mismatchedTree).success).toBe(false);
   });
 
   it('requires current-revision verification and known scenario/requirement counts', () => {

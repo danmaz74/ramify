@@ -8,7 +8,7 @@ import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { analysisOf, decisionsOf } from './analysis.js';
 import { eventPage } from './events.js';
-import { executionCapabilityDetailOf, executionCoreOf, executionScenarioDetailOf } from './execution-map.js';
+import { executionCapabilityDetailOf, executionCoreOf, executionMapOf, executionScenarioDetailOf } from './execution-map.js';
 import { ProjectionError, readRunFile, runView, unservedRun, unservedRuns, type CommittedRun, type RunView } from './inputs.js';
 import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
@@ -108,6 +108,12 @@ export class RunQueries {
   /** The complete unpaged execution census; the versioned HTTP page is added in iteration 5. */
   async executionCore(planId: string, runId: string) {
     return executionCoreOf(await this.view(planId, runId));
+  }
+
+  /** Full module relations and captured writer volume beside the unpaged execution census. */
+  async executionMap(planId: string, runId: string) {
+    const view = await this.view(planId, runId);
+    return executionMapOf(view, await currentModuleTree(this.source.projectRoot));
   }
 
   /** A capability's full accepted entry description or registered behavior. */

@@ -49,11 +49,47 @@ export type ExecutionSourceRef = z.infer<typeof executionSourceRefSchema>;
 
 export const executionModuleRelationSchema = z.object({
   module: modulePathSchema,
-  role: z.enum(['owner', 'consumer', 'provider', 'candidate', 'authorized-scope', 'observed-write']),
+  role: z.enum(['owner', 'consumer', 'provider', 'candidate', 'authorized-scope', 'observed-write',
+    'local-architect', 'engineer', 'contract-engineer']),
   /** Candidate and authorized scope do not imply recorded participation. */
   source: executionSourceRefSchema,
 }).strict();
 export type ExecutionModuleRelation = z.infer<typeof executionModuleRelationSchema>;
+
+const lineTotals = z.object({ added: count, deleted: count, textPaths: count,
+  invocationIds: z.array(text) }).strict();
+/** Binary changes have no line counts; coverage describes every started writer. */
+export const executionLineSummarySchema = z.object({
+  totals: lineTotals,
+  coverage: z.enum(['complete', 'partial', 'pending', 'unavailable']),
+  gaps: z.array(text),
+  binary: z.object({ paths: count, invocationIds: z.array(text) }).strict(),
+  methodLimit: z.literal('Two worktree snapshots can miss edits reverted before the second snapshot.'),
+}).strict();
+export type ExecutionLineSummary = z.infer<typeof executionLineSummarySchema>;
+
+export const executionModuleMapSchema = z.object({
+  tree: moduleTreeResponseSchema.shape.tree,
+  modules: z.array(z.object({
+    module: modulePathSchema, parent: modulePathSchema.nullable(), dir: z.string(),
+    direct: z.array(z.object({ element: executionElementKeySchema,
+      role: executionModuleRelationSchema.shape.role, source: executionSourceRefSchema }).strict()),
+    workedIn: z.boolean(), involvedDescendants: count,
+    lines: executionLineSummarySchema,
+  }).strict()),
+  /** Recorded modules absent from the current tree retain their relations and captured totals. */
+  outsideTree: z.array(z.object({ module: modulePathSchema,
+    direct: z.array(z.object({ element: executionElementKeySchema,
+      role: executionModuleRelationSchema.shape.role, source: executionSourceRefSchema }).strict()),
+    workedIn: z.boolean(), lines: executionLineSummarySchema,
+  }).strict()),
+  proposed: z.array(z.object({ module: modulePathSchema, parent: modulePathSchema,
+    directory: text, element: executionElementKeySchema }).strict()),
+  unplaced: z.array(z.object({ element: executionElementKeySchema, reason: text }).strict()),
+  unmapped: executionLineSummarySchema,
+  lines: executionLineSummarySchema,
+}).strict();
+export type ExecutionModuleMap = z.infer<typeof executionModuleMapSchema>;
 
 /** A known subtotal never silently becomes a complete or zero-valued total. */
 export const executionCountCoverageSchema = z.discriminatedUnion('state', [
@@ -204,6 +240,7 @@ export const executionMapPageSchema = z.object({
   cursor: text.nullable(),
   nextCursor: text.nullable(),
   tree: moduleTreeResponseSchema.shape.tree,
+  moduleMap: executionModuleMapSchema,
   current: executionCurrentActivitySchema,
   nodes: z.array(executionNodeSchema).max(executionMapLimits.nodes),
   links: z.array(executionLinkSchema).max(executionMapLimits.links),
@@ -213,6 +250,7 @@ export const executionMapPageSchema = z.object({
   }).strict(),
 }).strict().superRefine((page, context) => {
   const issue = (message: string, path: PropertyKey[]) => context.addIssue({ code: 'custom', message, path });
+  if (JSON.stringify(page.tree) !== JSON.stringify(page.moduleMap.tree)) issue('Module map and page must name the same current tree', ['moduleMap', 'tree']);
   const keys = new Set<string>();
   const linkIds = new Set<string>();
   for (const [i, node] of page.nodes.entries()) {

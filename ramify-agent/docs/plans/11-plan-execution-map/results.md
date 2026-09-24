@@ -83,3 +83,26 @@ Iteration 3 should add the remaining typed provider, repair, request, verificati
 ### Handoff to iteration 4
 
 Use `executionCoreOf` and its `current`, node and link streams as the unpaged input. The new `providerStage`, `provider` and contract `mode` fields are browser-safe and version-bound with the rest of `execution-map/1`. The `modules` arrays currently contain only baseline owner/consumer/provider associations; iteration 4 must derive direct participation from recorded work, session reach and observed writes, and keep authorized scope distinct from participation. Captured line totals and tree coverage remain iteration 4 work. Gate audit color must use the new exact outcome record when present and preserve `unavailable` on historical records. Full browser and final audit acceptance remain iteration 9 work.
+
+## Iteration 4 — module relations and captured change volume
+
+**Starting commit:** `ec90d83db2ffb4b7f73edaed6f3af728517f0dae` (iteration 3 handoff).
+
+### Delivered
+
+- `executionModuleMapOf` indexes the current architect tree by full declared-name path, parent and directory with its revision/input identity. It retains proposed capability placements, work items without a module, and recorded modules outside the current tree separately. Direct relations keep owner, scenario, consumer, provider, local architect, engineer, contract engineer, authorized scope and observed write roles. A started work item, started iteration, attached local/engineer session or captured write marks only its direct module `workedIn`; a request or authorized path alone does not. Parent modules report an involved-descendant count without becoming violet.
+- `capturedLinesOf` reads every writer invocation's retained `lines.json`, including failed and repair invocations, and sums text additions/deletions by the **recorded owner**. It keeps invocation IDs, unmapped text, binary path counts and owner modules absent from the current tree. A missing, malformed or partial settled snapshot yields a known subtotal with partial coverage; a live writer yields pending coverage. It never fabricates binary line counts or treats unavailable snapshots as complete zeroes. Every line summary names the two-snapshot method limit.
+- `executionMapOf` and `RunQueries.executionMap` combine the unpaged execution index with the current tree and captured writer records. `execution-map/1` adds a browser-safe `moduleMap` contract. The page contract rejects a module map whose tree differs from the page tree. The HTTP endpoint and versioned pagination are iteration 5 work.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| Five focused Vitest files for module projection, map contract, core, causal and durable replay | Pass, 27 tests | Direct fixture roles, scope-only neutral module, parent descendant count, proposed and outside-tree owner, two-module text subtotals, failed/repair writers, unmapped and binary paths, missing/partial records, pending writer and deterministic disk replay. The constructed line records exercise the reader; final scripted-run/browser acceptance is iteration 9. |
+| `npm run type-check` | Pass | Harness, web and scripts TypeScript scopes. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings; 189 analysis limits | Ownership/exposure analysis over 9 owners. Limits are inference coverage, not runtime acceptance. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Handoff to iteration 5
+
+Use `RunQueries.executionMap` as the unpaged query. Its `moduleMap` carries current tree identity, direct relation roles and captured line coverage. The current architect tree can refresh **without a run event**: bind every cursor/page to both the run sequence and the tree revision/input, and restart or report a named stale/partial state if either changes during pagination. Do not combine module rows from one tree revision with nodes from another. `lines.json` is retained beside each invocation **outside the committed event log**; the query reads it after settlement. A missing or partial file is a coverage gap, and a live writer is pending. Do not infer complete `+0 / -0` for either. Page the module map or return a bounded module census rather than copying an unbounded tree into every page. Final scripted-run and browser checks remain iteration 9 work.

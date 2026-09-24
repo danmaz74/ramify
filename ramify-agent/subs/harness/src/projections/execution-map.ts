@@ -10,14 +10,23 @@ import { scenariosOf } from './scenarios.js';
 import { runSessionViews } from './sessions.js';
 import { allWorkItemsOf, capabilityOfItem } from './work.js';
 import type { RunView } from './inputs.js';
+import type { ModuleTree } from '../interfaces/protocol/evidence.js';
+import { capturedLinesOf, executionModuleMapOf } from './execution-modules.js';
 
-/** The complete, unpaged census. HTTP pagination and the remaining causal links are later iterations. */
+/** The complete, unpaged census. HTTP pagination is added in iteration 5. */
 export interface ExecutionCoreIndex {
   readonly runVersion: number;
   readonly nodes: readonly ExecutionNode[];
   readonly links: readonly ExecutionLink[];
   readonly gaps: readonly string[];
   readonly current: ExecutionMapPage['current'];
+}
+
+/** The complete census enriched from the current tree and retained writer snapshots. */
+export async function executionMapOf(view: RunView, tree: ModuleTree): Promise<ExecutionCoreIndex & { moduleMap: ExecutionMapPage['moduleMap'] }> {
+  const core = executionCoreOf(view);
+  const captured = await capturedLinesOf(view);
+  return { ...core, moduleMap: executionModuleMapOf(view, tree, core.nodes, captured) };
 }
 
 const key = (kind: ExecutionNode['kind'], id: string): string => `${kind}:${id}`;
@@ -197,7 +206,8 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     add({ ...base(key('session', session.session), `${label(session.role)} ${session.session}`, source), kind: 'session',
       role: session.role, state: session.state, executor: session.executor, workItem: workItem === null ? null : key('work-item', workItem),
       reach: session.reaches, invocations: session.invocations.map(invocation => invocation.invocation),
-      modules: module === null ? [] : [{ module, role: 'owner', source }],
+      modules: module === null ? [] : [{ module, role: session.role === 'local-architect' ? 'local-architect' as const :
+        session.role === 'engineer' ? 'engineer' as const : session.role === 'contract-engineer' ? 'contract-engineer' as const : 'owner' as const, source }],
     });
     if (workItem !== null && view.records.workItems.some(item => item.id === workItem)) {
       relate('session-for', key('session', session.session), key('work-item', workItem), source);
