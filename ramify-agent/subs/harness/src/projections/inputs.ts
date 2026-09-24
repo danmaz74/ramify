@@ -6,7 +6,7 @@ import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { jobSchemaVersion, jobsDirectory } from '../jobs/records.js';
 import type { RunEvent } from '../run/log.js';
 import {
-  entryAssignmentsSchema, gateAttemptSchema, runLayout, runRecordSchema,
+  entryAssignmentsSchema, gateAttemptSchema, gateAuditOutcomeSchema, runLayout, runRecordSchema,
   type EntryAssignments, type RunRecord,
 } from '../run/records.js';
 import { committedRecords, CommittedRecordError, type CommittedRecords } from '../work/committed.js';
@@ -82,6 +82,7 @@ export interface RunView {
   readonly contracts: readonly CommittedBody<ContractRecord>[];
   /** Each gate attempt at the last body the log committed for it, in the order of their first commit. */
   readonly gates: ReadonlyMap<string, CommittedBody<z.infer<typeof gateAttemptSchema>>>;
+  readonly gateAuditOutcomes: ReadonlyMap<string, CommittedBody<z.infer<typeof gateAuditOutcomeSchema>>>;
 }
 
 /**
@@ -94,7 +95,7 @@ const supported: Readonly<Record<string, string>> = Object.fromEntries([
   'ramify-agent.work-item-outline/1', 'ramify-agent.iteration-assignment/1', 'ramify-agent.iteration-result/1',
   'ramify-agent.invocation/1', 'ramify-agent.invocation-outcome/1', 'ramify-agent.placement-request/1',
   'ramify-agent.placement-decision/1', 'ramify-agent.contract/1', 'ramify-agent.provider-obligation/1',
-  'ramify-agent.consumer-requirement/1', 'ramify-agent.gate-attempt/3', 'ramify-agent.entry-assignments/1',
+  'ramify-agent.consumer-requirement/1', 'ramify-agent.gate-attempt/3', 'ramify-agent.gate-audit-outcome/1', 'ramify-agent.entry-assignments/1',
   'ramify-agent.readiness-attempt/1', 'ramify-agent.infrastructure-recovery/1', 'ramify-agent.measurement-snapshot/1',
   'ramify-agent.line-events/1', 'ramify-agent.scenario/1',
 ].map(schema => [familyOf(schema), schema]));
@@ -113,6 +114,7 @@ export function unsupportedVersion(declared: unknown): string | null {
 /** The view every projection of one run is computed from. */
 export function runView(run: CommittedRun): RunView {
   const gates = new Map<string, CommittedBody<z.infer<typeof gateAttemptSchema>>>();
+  const gateAuditOutcomes = new Map<string, CommittedBody<z.infer<typeof gateAuditOutcomeSchema>>>();
   const hypothesisRevisions: CommittedBody<Hypothesis>[] = [];
   const outlines: CommittedBody<WorkItemOutline>[] = [];
   const assignments: CommittedBody<IterationAssignment>[] = [];
@@ -136,6 +138,11 @@ export function runView(run: CommittedRun): RunView {
           const body = parse(gateAttemptSchema, record.body, run, record.path);
           gates.delete(body.id);
           gates.set(body.id, { body, ...at });
+          break;
+        }
+        case 'ramify-agent.gate-audit-outcome/1': {
+          const body = parse(gateAuditOutcomeSchema, record.body, run, record.path);
+          gateAuditOutcomes.set(body.gate, { body, ...at });
           break;
         }
         case 'ramify-agent.hypothesis/1':
@@ -185,6 +192,7 @@ export function runView(run: CommittedRun): RunView {
     assignments,
     contracts,
     gates: ordered,
+    gateAuditOutcomes,
   };
 }
 

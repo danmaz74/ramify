@@ -60,6 +60,7 @@ describe('an implementation run with no entry capabilities', () => {
       'invocation-started',
       'invocation-ended',
       'analysis-accepted',
+      'gate-started',
       'readiness-passed',
       'gate-committing',
       'gate-attempted',
@@ -141,7 +142,7 @@ describe('an implementation run with no entry capabilities', () => {
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-failed',
+      'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-failed',
     ]);
     // The unchanged tree needs no new commit, but its current revision was
     // audited and the failing attempt records that identity and evidence.

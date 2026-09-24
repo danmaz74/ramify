@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scenarioRecordSchema, scenarioSourceHash } from '../../subs/scenarios/src/records.js';
-import { entryAssignmentsSchema, gateAttemptSchema } from '../run/records.js';
+import { entryAssignmentsSchema, gateAttemptSchema, gateAuditOutcomeSchema } from '../run/records.js';
 import { iterationAssignmentSchema, iterationResultSchema } from '../work/iterations.js';
 import { executionCapabilityDetailSchema, executionNodeSchema, executionScenarioDetailSchema } from '../interfaces/protocol/execution-map.js';
 import { executionCapabilityDetailOf, executionCoreOf, executionScenarioDetailOf } from '../projections/execution-map.js';
@@ -66,6 +66,24 @@ function assignment(id: string, workItem: string, revision: number) {
 }
 
 describe('execution core from committed run records', () => {
+  it('reads old gates without an audit fact and a failed published audit independently of verdict', () => {
+    const old = gate('ga-old', 'failed', false);
+    const failedAudit = gate('ga-audit-failed', 'failed', false);
+    const run = recordedRun([
+      { type: 'gate-attempted', data: { gate: 'ga-old', checkpoint: 'iteration', verdict: 'failed', next: 'repair' },
+        records: [{ path: 'gates/ga-old/attempt.json', body: old }] },
+      { type: 'gate-attempted', data: { gate: 'ga-audit-failed', checkpoint: 'iteration', verdict: 'failed', next: 'repair' },
+        records: [
+          { path: 'gates/ga-audit-failed/attempt.json', body: failedAudit },
+          { path: 'gates/ga-audit-failed/audit-outcome.json', body: gateAuditOutcomeSchema.parse({
+            schema: 'ramify-agent.gate-audit-outcome/1', gate: 'ga-audit-failed', overall: 'fail', audited: 'audited-commit',
+          }) },
+        ] },
+    ]);
+    const index = executionCoreOf(runView(run));
+    expect(index.nodes.find(node => node.key === 'gate:ga-old')).toMatchObject({ verdict: 'failed', audit: 'unavailable' });
+    expect(index.nodes.find(node => node.key === 'gate:ga-audit-failed')).toMatchObject({ verdict: 'failed', audit: 'failed', evidencePresent: true });
+  });
   it('keeps full descriptions, latest real scenario status, every gate and every session', () => {
     const run = recordedRun([
       { type: 'session-opened', data: { session: 'ses-initial', role: 'initial-architect', work: {}, executor: 'scripted', model: null } },

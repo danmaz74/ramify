@@ -4343,6 +4343,7 @@ export class RunService {
       // Readiness runs on the branch the project is on. The run branch is
       // created only once a clean repository has been established.
       const head = await this.git.currentHead(this.projectRoot);
+      await this.write(run, { type: 'gate-started', data: { gate: gateId, checkpoint: 'readiness' } });
       const result = await runReadiness(this.options.readinessExecution ?? inPlaceCheckExecution, {
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
@@ -4395,7 +4396,7 @@ export class RunService {
       const final = recovery === null || recovery.outcome === 'failed';
       await this.write(run, {
         type: 'readiness-failed',
-        data: { attempt: attemptNumber, step: step?.step ?? 'unknown', detail: step?.detail ?? '', recovery: recovery?.id ?? null, final },
+        data: { attempt: attemptNumber, gate: gateId, step: step?.step ?? 'unknown', detail: step?.detail ?? '', recovery: recovery?.id ?? null, final },
       }, records);
       await this.afterWrite('readiness-attempted', run.record.jobId);
 
@@ -4552,10 +4553,20 @@ export class RunService {
         }
         return attempt;
       },
-      complete: attempt => ({
-        event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
-        records: [{ path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: attempt }],
-      }),
+      complete: attempt => {
+        const { auditOverall, ...durableAttempt } = attempt;
+        if (auditOverall != null && (attempt.audited === null || attempt.evidence === null)) {
+          throw new Error(`Gate ${attempt.id} has an audit outcome without its published commit`);
+        }
+        return {
+          event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
+          records: [
+            { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
+            ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
+              body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
+          ],
+        };
+      },
     }));
   }
 

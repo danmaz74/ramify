@@ -689,6 +689,14 @@ export const gateAttemptSchema = z.object({
   next: z.enum(['accept', 'repair', 'retry-infrastructure', 'return-to-local-architect', 'exhausted']),
 }).strict();
 
+/** Exact overall result supplied by the external auditor, independent of the gate verdict. */
+export const gateAuditOutcomeSchema = z.object({
+  schema: z.literal('ramify-agent.gate-audit-outcome/1'),
+  gate: text,
+  overall: z.enum(['pass', 'fail']),
+  audited: text,
+}).strict();
+
 /** The reader and the engine's own type describe one record; this keeps them so. */
 const _gateAttemptsAgree: GateAttempt = undefined as unknown as z.infer<typeof gateAttemptSchema>;
 void _gateAttemptsAgree;
@@ -758,6 +766,7 @@ export const runLayout = {
   recovery: (id: RecoveryId): string => join('recoveries', `${id}.json`),
   measurement: (id: SnapshotId): string => join('measurements', `${id}.json`),
   gate: (id: string): string => join('gates', id, 'attempt.json'),
+  gateAuditOutcome: (id: string): string => join('gates', id, 'audit-outcome.json'),
   gateOperation: (id: string): string => join('gates', id, 'operation.json'),
   gateOutput: (id: string): string => join('gates', id),
   invocation: (id: InvocationId): string => join('invocations', id, 'invocation.json'),
@@ -792,6 +801,7 @@ export const runSchemas = {
   invocation: { schema: 'ramify-agent.invocation/1', body: invocationSchema },
   outcome: { schema: 'ramify-agent.invocation-outcome/1', body: invocationOutcomeSchema },
   gate: { schema: 'ramify-agent.gate-attempt/3', body: gateAttemptSchema },
+  gateAuditOutcome: { schema: 'ramify-agent.gate-audit-outcome/1', body: gateAuditOutcomeSchema },
   gateOperation: { schema: 'ramify-agent.gate-operation/1', body: gateOperationSchema },
 } as const;
 

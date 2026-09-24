@@ -200,6 +200,8 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`${counted(event.data.scenarios.length, 'scenario is', 'scenarios are')} being withdrawn to pending: ${event.data.scenarios.join(', ')} (${event.data.reason})`, [...ref('work-item', event.data.workItem), ...event.data.scenarios.flatMap(scenario => ref('scenario', scenario))]];
     case 'scenario-withdrawn':
       return [`Scenario ${event.data.scenario} was withdrawn to pending (${event.data.reason})`, [...ref('scenario', event.data.scenario), ...ref('commit', event.data.commit)]];
+    case 'gate-started':
+      return [`Gate ${event.data.gate} (${event.data.checkpoint}) started`, ref('gate', event.data.gate)];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-attempted':

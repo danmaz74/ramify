@@ -73,6 +73,9 @@ export type ExecutionScenarioResult = z.infer<typeof executionScenarioResultSche
 export const executionRequirementStateSchema = z.enum([
   'not-started', 'working', 'provider-conformed', 'verified', 'reopened', 'unavailable',
 ]);
+export const executionProviderStageSchema = z.enum([
+  'not-started', 'working', 'conformed', 'access-established', 'unavailable',
+]);
 export const executionAuditLifecycleSchema = z.enum([
   'not-applicable', 'not-started', 'passed', 'failed', 'incomplete', 'unavailable',
 ]);
@@ -113,11 +116,12 @@ export const executionNodeSchema = z.discriminatedUnion('kind', [
     requestedBy: executionElementKeySchema,
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('contract'), state: z.enum(['proposed', 'working', 'conformed', 'reopened', 'unavailable']),
-    revision: z.int().positive(),
+    revision: z.int().positive(), mode: z.enum(['fake-backed', 'access-only']),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('requirement'), state: executionRequirementStateSchema,
     consumer: executionElementKeySchema, contract: executionElementKeySchema, currentRevision: z.int().positive(),
-    verifiedRevision: z.int().positive().nullable(),
+    verifiedRevision: z.int().positive().nullable(), providerStage: executionProviderStageSchema,
+    provider: executionElementKeySchema.nullable(),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('session'), role: roleSchema, state: sessionStateSchema,
     executor: text, workItem: executionElementKeySchema.nullable(),

@@ -4,6 +4,8 @@ import { runView } from '../projections/inputs.js';
 import { RunQueries } from '../projections/queries.js';
 import type { RunService } from '../run/service.js';
 import { analysis, entry } from './helpers/analysis.js';
+import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { emptyAnalysis } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, startRun, stopRun, until } from './helpers/runs.js';
@@ -29,6 +31,29 @@ function indexOf(service: RunService, runId: string) {
 }
 
 describe('execution projection over a persisted run', () => {
+  it('replays the independent published audit result after restart', async () => {
+    const fixture = await copyFixture();
+    cleanup.push(fixture.remove);
+    await installTestRunner(fixture.root);
+    const direct = createPassingCheckExecution();
+    const first = await openUnchangedRuns(fixture.root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
+      checkExecution: { run: async (checks, request) => ({ ...(await direct.run(checks, request)), auditOverall: 'pass' as const }) },
+    });
+    cleanup.push(() => first.service.close());
+    const receipt = await first.service.execute(startRun('review-notes'));
+    await first.service.settled('review-notes', receipt.jobId);
+    const before = indexOf(first.service, receipt.jobId);
+    const final = before.index.nodes.find(node => node.kind === 'gate' && node.checkpoint === 'final');
+    expect(final).toMatchObject({ verdict: 'passed', audit: 'passed', evidencePresent: true });
+    expect(before.view.gateAuditOutcomes.get(final!.key.slice('gate:'.length))?.body.overall).toBe('pass');
+    await first.service.close();
+    const reopened = await openUnchangedRuns(fixture.root, { script: [] });
+    cleanup.push(() => reopened.service.close());
+    expect(indexOf(reopened.service, receipt.jobId).index).toEqual(before.index);
+  }, 120_000);
+
   it('replays the same complete roots, scenario blocks and sessions after service restart', async () => {
     const fixture = await copyFixture();
     cleanup.push(fixture.remove);

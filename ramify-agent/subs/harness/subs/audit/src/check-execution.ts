@@ -226,6 +226,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         commands,
         audited: result.summary.sourceCommit,
         evidence: { runRef: result.refs.runRef, reportCommit: result.refs.reportCommit, treeRef: result.refs.treeRef },
+        auditOverall: result.summary.overall,
       };
     },
   };

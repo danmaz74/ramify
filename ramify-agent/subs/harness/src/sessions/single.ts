@@ -525,7 +525,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         authorizations: [],
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
-      await writeFile(at(sessionLayout.gate), `${JSON.stringify(gateAttemptSchema.parse(attempt), null, 2)}\n`);
+      const { auditOverall: _auditOverall, ...durableAttempt } = attempt;
+      await writeFile(at(sessionLayout.gate), `${JSON.stringify(gateAttemptSchema.parse(durableAttempt), null, 2)}\n`);
       gate = {
         ran: true,
         verdict: attempt.verdict,

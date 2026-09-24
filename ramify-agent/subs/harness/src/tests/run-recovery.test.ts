@@ -515,7 +515,7 @@ describe('the recovery table', () => {
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-interrupted',
+      'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-interrupted',
     ]);
     // The architect context the run kept is finished as a run end finishes
     // it, so the recovered run holds no suspended session.

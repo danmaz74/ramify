@@ -103,7 +103,7 @@ describe('the run log', () => {
       'evidence-reopened', 'revision-needed', 'dependency-cycle-detected',
       'work-item-completed',
       'writer-acquired', 'writer-released',
-      'gate-committing', 'gate-attempted', 'stop-requested',
+      'gate-started', 'gate-committing', 'gate-attempted', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
@@ -963,6 +963,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'work-item-completed': { workItem: 'wi-001', gate: 'ga-0004' },
     'writer-acquired': { invocation: 'inv-0003', scopeRevision: 1 },
     'writer-released': { invocation: 'inv-0003', confirmed: false, groupsKilled: 0 },
+    'gate-started': { gate: 'ga-0001', checkpoint: 'readiness' },
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },
     'gate-attempted': { gate: 'ga-0001', checkpoint: 'final', verdict: 'passed', next: 'accept' },
     'job-completed': { gate: 'ga-0001', commit: null, workItems: 0 },

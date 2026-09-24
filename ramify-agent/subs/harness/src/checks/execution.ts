@@ -77,6 +77,8 @@ export interface CheckExecutionResult {
   readonly audited: string | null;
   /** Null unless an external audit published evidence. */
   readonly evidence: GateEvidence | null;
+  /** The external audit's exact overall result, when it published a report. */
+  readonly auditOverall?: 'pass' | 'fail' | null;
 }
 
 /** Today's runner: execute the verified commands in the project's working directory. */

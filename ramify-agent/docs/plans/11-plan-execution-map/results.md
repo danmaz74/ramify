@@ -59,3 +59,27 @@ The gate verdict and audit outcome are distinct. The current `GateAttempt` retai
 **Required successor work before the gate marker is accepted:** the harness/audit owner must carry the exact `result.summary.overall` through `CheckExecutionResult` into a versioned durable outcome associated with the gate attempt (a new gate record version with backward reading for v3, or a separate committed audit-outcome record). The projection can then map exact `pass`/`fail` to `passed`/`failed`; it must not derive either from the gate verdict. Iteration 3 is the earliest dependency-safe place to add this provider fact while it adds causal gate links; if deferred, iteration 9's audit acceptance remains open. The final browser witness needs one failed gate with a passing audit and one audit failure independently of the gate verdict.
 
 Iteration 3 should add the remaining typed provider, repair, request, verification and cycle links and requirement states to this index. It should preserve source order and reuse these canonical keys; it should also add exact awaited-session/running-gate activity from the log without inferring a readiness gate from an open phase. The existing scripted two-root fixture is a contract witness, not a replayed durable run. The separate `status-badge-tone` pi witness still has not been replayed; full harness, browser and audit acceptance remain iteration 9 work.
+
+## Iteration 3 — causal decomposition and requirement progress
+
+**Starting commit:** `1dcfb95dac87ada47000f81eabbae87e3b9527a6` (iteration 2 handoff).
+
+### Delivered
+
+- The core index now projects canonical placement request, contract and current consumer requirement cards. Typed links join requests to their originating work items, decisions and contracts to requests and establishing iterations, providers to each consumer requirement, current requirement verification to its contract, confirmed capability dependencies, successive iterations and follow-up work items, global forks and engineer sessions to their recorded work, and repair attempts to the prior gate. Dependency cycles remain finite references between canonical cards.
+- Requirement state is computed for the current revision only. A registered fake-backed requirement can be working while provider implementation remains `not-started`; provider start and conformance advance that substage separately. Verification is per consumer. Reopening clears the current green state and retains the earlier verified revision. A missing provider binding is unavailable and reported as a coverage gap. Access-only contracts show `mode: access-only` and close at registration without an invented provider work item or requirement.
+- `executionCoreOf.current` now names only an unended invocation and an explicitly started gate, with source sequence. Readiness writes `gate-started` before it runs and pairs `readiness-failed` with that gate ID; old logs without this event do not invent active readiness. Terminal runs with an unmatched start show a gap rather than a live marker.
+- The audit adapter carries the exact `result.summary.overall` through gate execution. A `ramify-agent.gate-audit-outcome/1` record is committed atomically beside the existing `/3` gate attempt. Old `/3` runs remain readable and their published evidence without an outcome remains `unavailable`; a new `pass` or `fail` is projected independently of the gate verdict. The outcome is bound to the attempt's audited commit and exposed as an audit source reference. Standalone gate serialization strips the in-memory outcome from its unchanged `/3` record.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| Ten focused Vitest files for execution map contracts/projection/causality/durable replay, audit adapter, run/readiness/recovery, event unions and standalone sessions | Pass, 124 tests | Includes two consumers with distinct current colors, provider conformance before consumer verification, reopened revision, access-only agreement, finite dependency cycle, repair chain, explicit readiness Now and backward audit reading. A service-run test reopens the committed audit outcome after restart. The service witness uses scripted checks; the adapter test reads a real published audit report. |
+| `npm run type-check` | Pass | Harness, web and scripts TypeScript scopes. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings; 187 analysis limits | Ownership/exposure check over 9 owners. Limits are inference coverage, not runtime acceptance. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Handoff to iteration 4
+
+Use `executionCoreOf` and its `current`, node and link streams as the unpaged input. The new `providerStage`, `provider` and contract `mode` fields are browser-safe and version-bound with the rest of `execution-map/1`. The `modules` arrays currently contain only baseline owner/consumer/provider associations; iteration 4 must derive direct participation from recorded work, session reach and observed writes, and keep authorized scope distinct from participation. Captured line totals and tree coverage remain iteration 4 work. Gate audit color must use the new exact outcome record when present and preserve `unavailable` on historical records. Full browser and final audit acceptance remain iteration 9 work.

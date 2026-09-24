@@ -152,6 +152,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
    */
   event('readiness-failed', z.object({
     attempt: z.int().positive(),
+    /** Present on new runs; older logs pair by the most recent start. */
+    gate: text.optional(),
     step: text,
     detail: z.string(),
     recovery: z.string().nullable(),
@@ -442,6 +444,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** `confirmed: false` blocks every writer and every gate that follows. */
   event('writer-released', z.object({ invocation: text, confirmed: z.boolean(), groupsKilled: z.int().nonnegative() }).strict()),
   /** The durable intent of a verified committing gate's commit-and-audit effect. */
+  event('gate-started', z.object({ gate: text, checkpoint: text }).strict()),
   event('gate-committing', z.object({ gate: text, checkpoint: text }).strict()),
   /** A gate finished and commits its one complete `GateAttempt`. */
   event('gate-attempted', z.object({

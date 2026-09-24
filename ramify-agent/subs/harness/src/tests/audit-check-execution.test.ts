@@ -173,6 +173,10 @@ describe('audit-backed gate execution', () => {
     const failingInPlace = await inPlaceGate(fixture, failing, 'ga-fail-place');
     const failingAudit = (await auditGate(fixture, failing, 'ga-fail-audit')).attempt;
 
+    expect(passingAudit.auditOverall).toBe('pass');
+    expect(failingAudit.auditOverall).toBe('fail');
+    expect(failingAudit.evidence).not.toBeNull();
+
     expect(commandSemantics(passingAudit)).toEqual(commandSemantics(passingInPlace));
     expect([passingAudit.verdict, passingAudit.cause, passingAudit.next])
       .toEqual([passingInPlace.verdict, passingInPlace.cause, passingInPlace.next]);

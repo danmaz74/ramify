@@ -170,6 +170,7 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
     commit,
     audited: executionResult.audited,
     evidence: executionResult.evidence,
+    ...(executionResult.auditOverall == null ? {} : { auditOverall: executionResult.auditOverall }),
     guardedChanges,
     ...(rules.length === 0 ? {} : { rules }),
     commands,

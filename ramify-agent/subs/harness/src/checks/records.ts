@@ -240,6 +240,8 @@ export interface GateAttempt {
   readonly audited: AcceptedCommit | null;
   /** The audit publication bound to `audited`; null when no evidence was published. */
   readonly evidence: GateEvidence | null;
+  /** Exact external report result. Kept on the in-memory attempt for atomic durable publication. */
+  readonly auditOverall?: 'pass' | 'fail' | null;
   /** `after: null` is a deletion, which is a change like any other. */
   readonly guardedChanges: Array<{ readonly path: string; readonly before: string; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
   /** Rules the harness verified itself. A checkpoint with none records none. */
