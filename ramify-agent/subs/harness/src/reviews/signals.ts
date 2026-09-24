@@ -13,10 +13,13 @@ import type { CandidateSnapshot } from './snapshot.js';
  * move a concern into another module's authority.
  *
  * Credibility follows the provenance of the ground, never its kind or its
- * wording. A ground is human-reviewed when it is a principles document, a
- * document of the run's plan directory or a feature file the harness wrote
- * from the accepted analysis; any other file an agent may have written, and
- * is agent-generated; no ground is ungrounded. An approved requirement
+ * wording. A ground is human-reviewed when it is a principles document, the
+ * run's plan document or a feature file the harness wrote from the accepted
+ * analysis; any other file an agent may have written, and is
+ * agent-generated. That includes any other file of the plan's directory: an
+ * agent may write there, and under-crediting a person's note costs only
+ * attention order, while crediting an agent's would raise its own words to
+ * human-reviewed. No ground is ungrounded. An approved requirement
  * record would count as human-reviewed too, but the run's records live in
  * its state directory, which is never part of an audited candidate, so no
  * ground a reviewer read can name one.
@@ -33,8 +36,7 @@ export interface GroundProvenance {
 export function groundCredibility(path: string | null, provenance: GroundProvenance): Exclude<CheckFindingReportCredibility, 'objective'> {
   if (path === null) return 'ungrounded';
   if (posix.basename(path).endsWith('.principles.md')) return 'human-reviewed';
-  const plan = `plans/${provenance.planId}/`;
-  if (path.startsWith(plan) && !path.slice(plan.length).split('/').includes('.harness')) return 'human-reviewed';
+  if (path === `plans/${provenance.planId}/plan.md`) return 'human-reviewed';
   if (provenance.featureFiles.has(path)) return 'human-reviewed';
   return 'agent-generated';
 }

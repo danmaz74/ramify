@@ -84,17 +84,21 @@ test('review coverage reads clean, complete with concerns, partial, not verified
   expect(await screen.findByLabelText('Review coverage')).toHaveProperty('textContent', expect.stringMatching(/^Review coverage complete: 2 complete/));
   const rows = within(screen.getByRole('table', { name: 'Review requests' })).getAllByRole('row').slice(1);
   expect(rows.map(row => within(row).getAllByRole('cell')[4]!.textContent)).toEqual(['clean', 'complete, 2 concerns']);
+  // A Git object ID is shortened to 12 characters; any other candidate identifier is shown whole.
+  expect(within(rows[0]!).getAllByRole('cell')[3]!.textContent).toBe(`${'b'.repeat(12)} → ${'c'.repeat(12)}`);
   cleanup();
 
   const partial = client({
     reviews: { 'wi-001': reviews({ state: 'available', requested: 3, complete: 1, partial: 1, notVerified: 1, pending: 0 }, [
-      request('rq-0001', 'code', 'complete'), request('rq-0002', 'scope', 'partial', { missing: 1 }), request('rq-0003', 'design', 'not-verified', { reason: 'timed-out' }),
+      request('rq-0001', 'code', 'complete'), request('rq-0002', 'scope', 'partial', { missing: 1 }),
+      { ...request('rq-0003', 'design', 'not-verified', { reason: 'timed-out' }), base: 'revision-01', candidate: 'revision-02' },
     ]) },
   });
   renderWorkItem(partial);
   expect(await screen.findByLabelText('Review coverage')).toHaveProperty('textContent', expect.stringMatching(/^Review coverage partial: 1 complete, 1 partial, 1 not verified/));
   const partialRows = within(screen.getByRole('table', { name: 'Review requests' })).getAllByRole('row').slice(1);
   expect(partialRows.map(row => within(row).getAllByRole('cell')[4]!.textContent)).toEqual(['clean', 'partial: 1 path not inspected, 0 concerns', 'not verified (timed-out)']);
+  expect(within(partialRows[2]!).getAllByRole('cell')[3]!.textContent).toBe('revision-01 → revision-02');
   cleanup();
 
   // A run whose policy requested no reviews: no CheckFinding, and still not clean.
@@ -120,7 +124,7 @@ test('fixed, superseded, waived, deferred, unresolved and open CheckFindings rea
     summary('cf-0001', { standing: 'closed', reason: 'fixed-by-assessment', awaiting: null, userCommands: [],
       settlement: { kind: 'fixed-by-assessment', decision: 'cfd-0001', by: architect, rationale: 'The rounding now uses cents' } }),
     summary('cf-0008', { standing: 'deferred', reason: 'deferred', awaiting: null, risk: 'low',
-      settlement: { kind: 'deferred', decision: 'cfd-0005', by: architect, reason: 'Logging is configured later', revisit: 'when logging is configured' } }),
+      settlement: { kind: 'deferred', decision: 'cfd-0005', by: architect, reason: 'Logging is configured later.', revisit: 'when logging is configured' } }),
     summary('cf-0005', { risk: 'low', unresolved: 'below-floor' }),
     summary('cf-0002', { standing: 'closed', reason: 'superseded', awaiting: null, risk: 'low', userCommands: [],
       settlement: { kind: 'superseded', decision: 'cfd-0002', by: architect, replacement: 'The name follows the glossary' } }),
@@ -154,6 +158,9 @@ test('fixed, superseded, waived, deferred, unresolved and open CheckFindings rea
   // The waiver names its actor and the risk accepted; its material choice is shown apart.
   expect(within(card('cf-0003')).getByRole('group', { name: 'Waiver' }).textContent).toMatch(/Waived by local-architect \(inv-0020\): The cache is rebuilt on start.*Accepted risk: high/);
   expect(within(card('cf-0003')).getByRole('group', { name: 'Material choice' }).textContent).toMatch(/kept the cache/);
+  // Recorded prose that already ends with a period gets no second one.
+  expect(within(card('cf-0008')).getByRole('group', { name: 'Deferral' }).textContent)
+    .toBe('Deferred by local-architect (inv-0020): Logging is configured later. Revisit: when logging is configured.');
   // Unresolved, and the distinct marker for a non-low signal from the latest review.
   expect(within(card('cf-0004')).getByLabelText('Unresolved').textContent).toMatch(/^Unresolved from the latest review: a high-risk signal/);
   expect(within(card('cf-0004')).getByLabelText('Unresolved').className).toContain('unresolved-latest');
@@ -187,16 +194,18 @@ test('a decision request is a question with its exact text and options, apart fr
   expect(within(question).getByRole('list', { name: 'Conflicting text' }).textContent).toMatch(/The API returns a list\.plans\/review-notes\/plan\.md at sha256:plan/);
   expect(within(asking).getByText('medium risk').closest('[role="group"]')).toBeNull();
 
-  // The first send is at the list's version; a stale refusal is answered once more at the version it names.
+  // The first send is at the list's version; each stale refusal is answered again at the version it
+  // names, since a live run can append several lines between the read and the send.
   stub.commandRefusals.push(new ClientError('protocol', 'The job is at version 41, not 40', 'stale-version', 41));
+  stub.commandRefusals.push(new ClientError('protocol', 'The job is at version 42, not 41', 'stale-version', 42));
   fireEvent.click(within(question).getByRole('radio', { name: /Return a list/ }));
   fireEvent.change(within(question).getByRole('textbox', { name: 'Your name' }), { target: { value: 'dan' } });
   fireEvent.change(within(question).getByRole('textbox', { name: 'Note (optional)' }), { target: { value: 'Callers can change' } });
   fireEvent.click(within(question).getByRole('button', { name: 'Answer' }));
   await within(question).findByRole('status');
-  expect(stub.commands.map(command => [command.type, command.expectedVersion])).toEqual([['respond-to-check-finding', 40], ['respond-to-check-finding', 41]]);
-  expect(stub.commands[1]).toMatchObject({ payload: { planId, jobId: runId, checkFinding: 'cf-0006', expectedRevision: 2, request: 'cfd-0004', option: 'list', responder: 'dan', note: 'Callers can change' } });
-  expect(stub.commands[0]!.commandId).not.toBe(stub.commands[1]!.commandId);
+  expect(stub.commands.map(command => [command.type, command.expectedVersion])).toEqual([['respond-to-check-finding', 40], ['respond-to-check-finding', 41], ['respond-to-check-finding', 42]]);
+  expect(stub.commands[2]).toMatchObject({ payload: { planId, jobId: runId, checkFinding: 'cf-0006', expectedRevision: 2, request: 'cfd-0004', option: 'list', responder: 'dan', note: 'Callers can change' } });
+  expect(new Set(stub.commands.map(command => command.commandId)).size).toBe(3);
 });
 
 test('waive and revoke send their typed commands against the revision shown, and a refusal says why', async () => {

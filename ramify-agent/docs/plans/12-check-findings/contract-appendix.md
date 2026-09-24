@@ -669,9 +669,11 @@ names the plan document when the candidate holds it); the run service's
   the content `snapshot_read` answered for it in the attempt. `quote` stays
   in the submission record only.
 - **Credibility.** `groundCredibility(path, { planId, featureFiles })`:
-  `human-reviewed` for a basename ending `.principles.md`, a path under
-  `plans/<planId>/` outside its `.harness/`, or a path among the tracked
-  scenario records' `file`s; `agent-generated` otherwise; `ungrounded` for
+  `human-reviewed` for a basename ending `.principles.md`, the run's plan
+  document `plans/<planId>/plan.md`, or a path among the tracked scenario
+  records' `file`s; `agent-generated` otherwise, any other file of
+  `plans/<planId>/` included, since an agent may write there (decided
+  2026-09-24; iteration 4b credited the whole directory); `ungrounded` for
   null. The approved-requirement rule has nothing to match: the run's
   records live in its gitignored state directory, which no audited
   candidate holds, so no ground a reviewer read can name one.
@@ -792,7 +794,9 @@ the child decides, the harness refuses the submission as a whole for a
 CheckFinding and its risk) and for a `waive` on a CheckFinding whose
 `modules` are not all the work item's module or its included children
 (`insufficient-authority`, naming the modules); a refused submission is
-returned to the fork once, then the attempt fails as invalid output. The next
+returned to the fork as a validation error under the invocation's ordinary
+rejection bound (`rejectedSubmissionsPerTurn`), after which the round is
+refused (§6.1; an earlier text here said once, then the attempt fails). The next
 `iteration-assigned` for that work item resolves the intent; recovery creates
 it from the recorded assessment when absent. When the correction iteration
 closes accepted, `iteration-closed` carries `claim-repair` for each
@@ -888,7 +892,7 @@ Refinements of §6:
 | `attempt` | the gate attempt, `ga-0005` |
 | `reportKey`, `issueKey` | `scenario:<sc-id>` |
 | obligation | `{ subject: 'scenario:<sc-id>', revision: 1 }`; an authorized obligation revision raises it |
-| `selection` | `<mode>/<selection kind>@<profile hash>`, as the gate's scenario check recorded it |
+| `selection` | `<mode>/<run module>@<command hash>`, the conditions the scenario ran under (§7.1); the selection kind is the observation's breadth, so a work-item gate can verify an iteration gate's failure and a narrower run is refused as `insufficient-coverage`. The plan's `<mode>/<selection kind>@<profile hash>` was not implemented. |
 | `required` | `true` for a required scenario gate |
 | `source` / witness `source` | `{ kind: 'tree', id: <audited tree> }` |
 | witness `coverage` | `complete` when the retained message stream reports the scenario executed with every step finished; `partial` when some pickle or step did not finish; `not-run` when it is excluded, absent or the stream is missing |

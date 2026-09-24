@@ -453,7 +453,7 @@ function WorkItems({ client, planId, runId, version, selected, onSelect: setSele
 }) {
   const list = useRunQuery(`work-items:${runId}`, version, () => client.getWorkItems(planId, runId));
   return (
-    <div className="area" aria-label="Work items">
+    <div className="area area-broad" aria-label="Work items">
       <Loading state={list} what="the work items">
         {data => data.workItems.length === 0 ? <p className="muted">No work item yet.</p> : (
           <ul className="run-list">

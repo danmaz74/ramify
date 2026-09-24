@@ -35,6 +35,17 @@ interface Scope {
 
 // Words for what the harness states.
 
+/** Recorded prose as one sentence: ends with the period it has, or gets one. */
+function sentence(text: string): string {
+  const trimmed = text.trim();
+  return trimmed === '' || /[.!?…]$/u.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/** A Git object ID shortened to 12 characters; any other identifier whole, such as a fixture's `revision-01`. */
+function shortId(id: string): string {
+  return /^[0-9a-f]{40}$|^[0-9a-f]{64}$/iu.test(id) ? id.slice(0, 12) : id;
+}
+
 const credibilityLabels: Record<CheckFindingSummaryView['credibility'], string> = {
   'objective-reproduced': 'objective, reproduced',
   objective: 'objective, observed once',
@@ -147,7 +158,7 @@ export function WorkItemCheckFindings({ onOpenGate, ...scope }: Scope & { readon
                     <td><code>{request.id}</code></td>
                     <td>{request.kind}</td>
                     <td>{request.iteration}</td>
-                    <td><code>{(request.base ?? '?').slice(0, 10)}</code> → <code>{request.candidate.slice(0, 10)}</code></td>
+                    <td><code>{shortId(request.base ?? '?')}</code> → <code>{shortId(request.candidate)}</code></td>
                     <td>{reviewResultText(request)}</td>
                     <td>{request.attempts.map(attempt => (
                       <span key={attempt.id} className="review-attempt">
@@ -250,7 +261,7 @@ function CheckFindingCard({ client, planId, runId, version, summary, onOpenGate 
       {summary.materialChoice !== null && (
         <div className="material-choice" role="group" aria-label="Material choice">
           <p><strong>Material choice</strong> ({summary.materialChoice.action}): {summary.materialChoice.choice}</p>
-          <p className="muted">Uncertainty: {summary.materialChoice.uncertainty}. Reported because {summary.materialChoice.reason}.</p>
+          <p className="muted">Uncertainty: {sentence(summary.materialChoice.uncertainty)} Reported because {sentence(summary.materialChoice.reason)}</p>
         </div>
       )}
       {summary.settlement !== null && <Settlement settlement={summary.settlement} />}
@@ -270,7 +281,7 @@ function Settlement({ settlement }: { readonly settlement: CheckFindingSettlemen
       const { witness } = settlement;
       return (
         <p className="settlement factual" role="group" aria-label="Factual verification">
-          Verified by check: <code>{witness.obligation}</code> ran {witness.coverage === 'complete' ? 'completely' : witness.coverage} and {witness.outcome} in <code>{witness.attempt}</code> on {witness.source.kind} <code>{witness.source.id.slice(0, 12)}</code>, recorded by {actorText(settlement.by)}.
+          Verified by check: <code>{witness.obligation}</code> ran {witness.coverage === 'complete' ? 'completely' : witness.coverage} and {witness.outcome} in <code>{witness.attempt}</code> on {witness.source.kind} <code>{shortId(witness.source.id)}</code>, recorded by {actorText(settlement.by)}.
         </p>
       );
     }
@@ -282,11 +293,11 @@ function Settlement({ settlement }: { readonly settlement: CheckFindingSettlemen
       return (
         <div className="settlement waiver" role="group" aria-label="Waiver">
           <p>Waived by {actorText(settlement.by)}: {settlement.reason}</p>
-          <p className="muted">Accepted risk: {settlement.acceptedRisk}. Uncertainty: {settlement.uncertainty}.</p>
+          <p className="muted">Accepted risk: {settlement.acceptedRisk}. Uncertainty: {sentence(settlement.uncertainty)}</p>
         </div>
       );
     case 'deferred':
-      return <p className="settlement" role="group" aria-label="Deferral">Deferred by {actorText(settlement.by)}: {settlement.reason}. Revisit: {settlement.revisit}.</p>;
+      return <p className="settlement" role="group" aria-label="Deferral">Deferred by {actorText(settlement.by)}: {sentence(settlement.reason)} Revisit: {sentence(settlement.revisit)}</p>;
   }
 }
 
@@ -302,22 +313,30 @@ interface CommandScope {
 
 type Status = { readonly kind: 'idle' | 'sending' | 'sent' } | { readonly kind: 'failed'; readonly message: string };
 
+/** How many times a command is sent again at the version a stale refusal names before it is given up. */
+const staleResends = 5;
+
 /**
  * Sends one typed command at the version the list was read at. A run that
- * moved on is refused at that version, and the command is sent once more at
- * the version the refusal names: the CheckFinding's revision still guards
- * what the person decided about.
+ * moved on is refused at that version, and the command is sent again at the
+ * version the refusal names, a bounded number of times, since a live run can
+ * append several lines between the read and the send: the CheckFinding's
+ * revision still guards what the person decided about.
  */
 function useCommand(client: ProtocolClient, version: number, build: (expectedVersion: number) => RunCommandInput) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const send = async () => {
     setStatus({ kind: 'sending' });
     try {
-      try {
-        await client.sendCommand(build(version));
-      } catch (error) {
-        if (!(error instanceof ClientError) || error.code !== 'stale-version' || error.currentVersion === undefined) throw error;
-        await client.sendCommand(build(error.currentVersion));
+      let expectedVersion = version;
+      for (let resends = 0; ; resends += 1) {
+        try {
+          await client.sendCommand(build(expectedVersion));
+          break;
+        } catch (error) {
+          if (!(error instanceof ClientError) || error.code !== 'stale-version' || error.currentVersion === undefined || resends >= staleResends) throw error;
+          expectedVersion = error.currentVersion;
+        }
       }
       setStatus({ kind: 'sent' });
     } catch (error) {
@@ -451,8 +470,8 @@ function HistoryBody({ planId, runId, detail, onOpenGate }: {
               <p><code>{report.id}</code> from {report.producer}, attempt <code>{report.attempt}</code>: {report.observation.summary}</p>
               {report.judgment && (
                 <p className="muted">
-                  {actorText(report.judgment.by)} judged it {report.judgment.risk} risk: {report.judgment.consequence}. Uncertainty: {report.judgment.uncertainty}.
-                  {report.judgment.remedy ? ` Remedy: ${report.judgment.remedy}.` : ''} Ground: {report.judgment.ground === null ? 'none' : <code>{report.judgment.ground}</code>} ({credibilityLabels[report.credibility]}).
+                  {actorText(report.judgment.by)} judged it {report.judgment.risk} risk: {sentence(report.judgment.consequence)} Uncertainty: {sentence(report.judgment.uncertainty)}
+                  {report.judgment.remedy ? ` Remedy: ${sentence(report.judgment.remedy)}` : ''} Ground: {report.judgment.ground === null ? 'none' : <code>{report.judgment.ground}</code>} ({credibilityLabels[report.credibility]}).
                 </p>
               )}
               {report.observation.locations.length > 0 && <p className="muted">At {report.observation.locations.map(location => `${location.path}${location.startLine ? `:${location.startLine}` : ''}`).join(', ')}</p>}
@@ -463,8 +482,8 @@ function HistoryBody({ planId, runId, detail, onOpenGate }: {
                   {attempt.iteration && <> on iteration {attempt.iteration}</>}
                   {attempt.gate && <>, gate {gateLink(attempt.gate, onOpenGate)}</>}
                   {attempt.session && attempt.invocation && <>, session {session(attempt.session, attempt.invocation, attempt.session)}</>}
-                  . Candidate diff: <code>{(attempt.candidate.base ?? '?').slice(0, 12)}</code> → <code>{(attempt.candidate.commit ?? '?').slice(0, 12)}</code>
-                  {attempt.candidate.tree && <> (tree <code>{attempt.candidate.tree.slice(0, 12)}</code>)</>}.
+                  . Candidate diff: <code>{shortId(attempt.candidate.base ?? '?')}</code> → <code>{shortId(attempt.candidate.commit ?? '?')}</code>
+                  {attempt.candidate.tree && <> (tree <code>{shortId(attempt.candidate.tree)}</code>)</>}.
                 </p>
               )}
             </li>
@@ -493,7 +512,7 @@ function HistoryBody({ planId, runId, detail, onOpenGate }: {
         <>
           <h4>Relations</h4>
           <ul>{detail.relations.map(relation => (
-            <li key={relation.id}>{relation.from.checkFinding} and {relation.to.checkFinding}: {relation.relation}, by {actorText(relation.by)}. <span className="muted">{relation.shared}. {relation.rationale}</span></li>
+            <li key={relation.id}>{relation.from.checkFinding} and {relation.to.checkFinding}: {relation.relation}, by {actorText(relation.by)}. <span className="muted">{sentence(relation.shared)} {relation.rationale}</span></li>
           ))}</ul>
         </>
       )}
@@ -506,7 +525,7 @@ function decisionText(decision: CheckFindingDecisionView): string {
   const risk = decision.risk === null ? '' : `, correcting the risk to ${decision.risk}`;
   switch (action.action) {
     case 'plan-repair': return `planned a repair (${action.repair.kind} ${action.repair.ref})${risk}`;
-    case 'claim-repair': return `claimed a repair by ${action.change} on ${action.candidate.kind} ${action.candidate.id.slice(0, 12)}${risk}`;
+    case 'claim-repair': return `claimed a repair by ${action.change} on ${action.candidate.kind} ${shortId(action.candidate.id)}${risk}`;
     case 'fix-by-check': return `fixed by check: ${action.witness.obligation} ${action.witness.outcome} in ${action.witness.attempt}${risk}`;
     case 'fix-by-assessment': return `fixed by assessment of ${action.reassessed.join(', ')}${risk}`;
     case 'supersede': return `superseded: ${action.replacement}${risk}`;

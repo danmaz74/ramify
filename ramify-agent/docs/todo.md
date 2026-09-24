@@ -162,3 +162,25 @@ learns of it without looking at the web.
 - [ ] Later, notify other events that need a person: a review stop, a failed
       or stopped run, an unresolved high-risk signal.
 - [ ] Keep no timeout: a waiting run waits until answered or stopped.
+
+## 8. CheckFindings after Plan 12
+
+**Why.** Plan 12's open items were decided on 2026-09-24 (see its
+[results](plans/12-check-findings/results.md#decisions-on-open-items-2026-09-24));
+these are the ones decided in outline and left to the follow-up plan, beside
+the deferrals that plan already lists (cross-run waivers, revisit conditions,
+the execution map's badge).
+
+- [ ] Offer the reconciliation fork the revocation of a waiver it or a lower
+      authority made, as the principles allow; the harness's rank rule
+      (`mayRevoke`) exists and is tested pure. The user's path stays as it is.
+- [ ] Evaluate revisit conditions, so a deferred signal can come due. A
+      condition is prose today; decide what a condition may name (a gate, a
+      work item, a file) before any heuristic, since a guess manufactures
+      attention.
+- [ ] Give the approved-requirement credibility rule something to match: a
+      ground that names a requirement record a person approved. The records
+      live in the run's state directory, which no audited candidate holds.
+- [ ] Replace the design review's fixed guidance selection (principles files
+      and the READMEs on the way to a changed path) with a relevance
+      judgment, once the live-model trial says what the fixed selection costs.

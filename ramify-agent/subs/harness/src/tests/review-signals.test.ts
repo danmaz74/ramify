@@ -36,11 +36,10 @@ const featureFile = `${notesDirectory}/src/tests/features/${plan}/${plan}.featur
 describe('the credibility of a ground', () => {
   const provenance = { planId: plan, featureFiles: new Set([featureFile]) };
 
-  test('is human-reviewed for a principles document, the run\'s plan directory and a feature file the harness wrote', () => {
+  test('is human-reviewed for a principles document, the run\'s plan document and a feature file the harness wrote', () => {
     expect(groundCredibility('docs/check-findings.principles.md', provenance)).toBe('human-reviewed');
     expect(groundCredibility('check.principles.md', provenance)).toBe('human-reviewed');
     expect(groundCredibility(`plans/${plan}/plan.md`, provenance)).toBe('human-reviewed');
-    expect(groundCredibility(`plans/${plan}/notes/decision.md`, provenance)).toBe('human-reviewed');
     expect(groundCredibility(featureFile, provenance)).toBe('human-reviewed');
   });
 
@@ -51,6 +50,9 @@ describe('the credibility of a ground', () => {
     // Another plan, the run's own state and a feature file the harness did not write are not the run's reviewed material.
     expect(groundCredibility('plans/other-plan/plan.md', provenance)).toBe('agent-generated');
     expect(groundCredibility(`plans/${plan}/.harness/jobs/run/analysis/entries.json`, provenance)).toBe('agent-generated');
+    // Any other file of the plan's directory may have been written by an agent; only the plan document is credited.
+    expect(groundCredibility(`plans/${plan}/notes/decision.md`, provenance)).toBe('agent-generated');
+    expect(groundCredibility(`plans/${plan}/plan.md.bak`, provenance)).toBe('agent-generated');
     expect(groundCredibility(`${notesDirectory}/src/tests/features/${plan}/extra.feature`, provenance)).toBe('agent-generated');
     expect(groundCredibility(null, provenance)).toBe('ungrounded');
   });

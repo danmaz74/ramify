@@ -97,8 +97,10 @@ belongs to its gate.
 Fixing signals leads to a review of the fix, which raises new signals. Left
 alone, this loop never ends. Correction rounds per work item are bounded. The
 first round may correct any signal the architect chooses; a later round may be
-started only for a signal of non-low risk, and its review covers the
-correction's own change.
+started only for a signal of non-low risk, or to assess a claimed repair or a
+person's answer that an earlier round is owed, and its review covers the
+correction's own change. Such a round may plan a correction only within its
+own floor.
 
 When the bound is reached, the remaining signals stay **unresolved**. Neither
 the harness nor a final agent turn settles them. Unresolved is a normal end

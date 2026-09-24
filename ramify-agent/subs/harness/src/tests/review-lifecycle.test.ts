@@ -169,14 +169,22 @@ describe('CF04: an unscheduled review', () => {
   test('a request beyond the queue\'s bound is finished as overflowed and never run', async () => {
     const root = await reviewTarget(cleanups);
     // One reader, one waiting request: the third request has no room while
-    // the first reader waits for it to be refused.
+    // the first reader waits for it to be refused. The reader also waits for
+    // the work item's completion request, so the second request is always
+    // still waiting when its deadline is set; `settleMs` above `attemptMs`
+    // leaves it time to start then, as the trial policy does. With the two
+    // equal, it was finished as having no time whenever the completion
+    // request landed first, which under load it sometimes did.
     const run = await reviewRun(root, cleanups, {
-      policy: { concurrency: 1, queue: 1 },
+      policy: { concurrency: 1, queue: 1, settleMs: 120_000 },
       afterWrite: async (_write, id) => { currentRun = id; },
       engineer: engineers(),
       reviewers: {
-        'rq-0001': [{ kind: 'await', until: () => until(async () => (await runEventsOnDisk(root, plan, runIdOf())).some(event =>
-          event.type === 'review-attempt-finished' && event.data.reason === 'queue-overflow')) }, ...clean(store)],
+        'rq-0001': [{ kind: 'await', until: () => until(async () => {
+          const events = await runEventsOnDisk(root, plan, runIdOf());
+          return events.some(event => event.type === 'review-attempt-finished' && event.data.reason === 'queue-overflow')
+            && events.some(event => event.type === 'outline-revised' && event.data.workItem === 'wi-001' && event.data.architectRef !== undefined);
+        }) }, ...clean(store)],
         'rq-0002': clean(limit),
       },
     });
