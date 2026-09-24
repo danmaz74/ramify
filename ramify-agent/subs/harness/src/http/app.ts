@@ -4,6 +4,7 @@ import { basename, join } from 'node:path';
 import type { z } from 'zod';
 import { errorHttpStatus, errorResponseSchema, type ErrorCode } from '../interfaces/protocol/errors.js';
 import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
+import { executionCapabilityDetailSchema, executionMapPageSchema, executionScenarioDetailSchema } from '../interfaces/protocol/execution-map.js';
 import { commandResponseSchema } from '../interfaces/protocol/jobs.js';
 import { apiPrefix, protocolPaths } from '../interfaces/protocol/paths.js';
 import {
@@ -24,6 +25,7 @@ import {
 import { CommandRejection } from '../jobs/commands.js';
 import { discoverPlans, readPlan } from '../plans/discover.js';
 import { ProjectionError } from '../projections/inputs.js';
+import { ExecutionPageError } from '../projections/execution-pages.js';
 import { currentModuleTree } from '../projections/tree.js';
 import { RunQueries } from '../projections/queries.js';
 import { SessionQueries } from '../projections/session-queries.js';
@@ -54,6 +56,8 @@ type PlanRequest = Request<{ planId: string }>;
 type RunRequest = Request<{ planId: string; runId: string }>;
 type WorkItemRequest = Request<{ planId: string; runId: string; workItem: string }>;
 type GateRequest = Request<{ planId: string; runId: string; gate: string }>;
+type ExecutionCapabilityRequest = Request<{ planId: string; runId: string; capability: string }>;
+type ExecutionScenarioRequest = Request<{ planId: string; runId: string; scenario: string }>;
 type RunSessionRequest = Request<{ planId: string; runId: string; session: string }>;
 type BodyRequest = Request<{ planId: string; runId: string; hash: string }>;
 type StandaloneRequest = Request<{ session: string }>;
@@ -151,6 +155,35 @@ export function createApp(options: AppOptions): express.Express {
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/scenarios`, async (request: RunRequest, response) => {
     send(response, scenarioListResponseSchema, await projected(() => queries.scenarios(request.params.planId, request.params.runId)));
   });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/execution-map`, async (request: RunRequest, response) => {
+    const version = requiredCounter(request.query['version'], 'version');
+    const cursor = request.query['cursor'];
+    if (cursor !== undefined && (typeof cursor !== 'string' || cursor.length === 0)) {
+      throw new ProtocolFailure('invalid-request', '"cursor" must be an opaque cursor');
+    }
+    const limit = request.query['limit'] === undefined ? undefined : requiredCounter(request.query['limit'], 'limit');
+    send(response, executionMapPageSchema, await projected(() => queries.executionMapPage(
+      request.params.planId, request.params.runId, { version, ...(cursor === undefined ? {} : { cursor }),
+        ...(limit === undefined ? {} : { limit }) },
+    )));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/execution-map/capabilities/:capability`,
+    async (request: ExecutionCapabilityRequest, response) => {
+      const version = requiredCounter(request.query['version'], 'version');
+      const detail = await projected(() => queries.executionCapabilityDetail(
+        request.params.planId, request.params.runId, request.params.capability, version));
+      send(response, executionCapabilityDetailSchema, detail);
+    });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/execution-map/scenarios/:scenario`,
+    async (request: ExecutionScenarioRequest, response) => {
+      const version = requiredCounter(request.query['version'], 'version');
+      const detail = await projected(() => queries.executionScenarioDetail(
+        request.params.planId, request.params.runId, request.params.scenario, version));
+      send(response, executionScenarioDetailSchema, detail);
+    });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/gates/:gate`, async (request: GateRequest, response) => {
     send(response, gateResponseSchema, await projected(() => queries.gate(request.params.planId, request.params.runId, request.params.gate)));
@@ -270,6 +303,11 @@ function counter(value: unknown, name: string): number {
   return Number(given);
 }
 
+function requiredCounter(value: unknown, name: string): number {
+  if (value === undefined) throw new ProtocolFailure('invalid-request', `"${name}" is required`);
+  return counter(value, name);
+}
+
 /** A poll's cursors: `<session>:<after>`, comma-separated, each session once, at most 50. */
 function sessionCursors(value: unknown): SessionCursor[] {
   if (value === undefined || value === '') return [];
@@ -299,6 +337,7 @@ async function projected<T>(query: () => Promise<T>): Promise<T> {
     return await query();
   } catch (error) {
     if (error instanceof ProjectionError) throw new ProtocolFailure(error.code, error.message, undefined, error.evidence);
+    if (error instanceof ExecutionPageError) throw new ProtocolFailure(error.code, error.message, error.currentVersion);
     throw error;
   }
 }

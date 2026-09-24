@@ -1,5 +1,7 @@
 import type { z } from 'zod';
 import { errorResponseSchema, type ErrorCode } from '../../harness/src/interfaces/protocol/errors.js';
+import { executionCapabilityDetailSchema, executionMapPageSchema, executionScenarioDetailSchema,
+  type ExecutionCapabilityDetail, type ExecutionScenarioDetail } from '../../harness/src/interfaces/protocol/execution-map.js';
 import { moduleTreeResponseSchema, type ModuleTree } from '../../harness/src/interfaces/protocol/evidence.js';
 import { commandResponseSchema, type Receipt } from '../../harness/src/interfaces/protocol/jobs.js';
 import { protocolPaths } from '../../harness/src/interfaces/protocol/paths.js';
@@ -26,6 +28,7 @@ import {
   type SessionTranscriptResponse, type SessionUpdatesResponse, type StandaloneSessionResponse,
 } from '../../harness/src/interfaces/protocol/sessions.js';
 import type { TranscriptBody } from '../../harness/src/interfaces/protocol/transcripts.js';
+import { loadExecutionMapPages, type ExecutionMapSnapshot } from './execution-map-client.js';
 
 export type ProjectInfo = ProjectResponse['project'];
 
@@ -72,6 +75,10 @@ export interface ProtocolClient {
   getModuleCapabilities(planId: string, runId: string): Promise<ModuleCapabilityComparisonResponse>;
   /** Every tracked acceptance scenario with its state and the gates that ran it. */
   getScenarios(planId: string, runId: string): Promise<ScenarioListResponse>;
+  /** All three execution censuses from one coherent version; a disconnected read retains the last complete map as stale. */
+  getExecutionMap(planId: string, runId: string): Promise<ExecutionMapSnapshot>;
+  getExecutionCapability(planId: string, runId: string, capability: string, version: number): Promise<ExecutionCapabilityDetail>;
+  getExecutionScenario(planId: string, runId: string, scenario: string, version: number): Promise<ExecutionScenarioDetail>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
   /** Every session of the project, live and suspended first; a page of at most 200 from `offset`. */
@@ -110,6 +117,7 @@ const commandAttempts = 3;
 /** A client of the harness at `origin`, the page's own origin by default. */
 export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...args) => fetch(...args), retryDelay = 500): ProtocolClient {
   let state: ConnectionState = 'connecting';
+  const lastExecutionMaps = new Map<string, ExecutionMapSnapshot>();
   const listeners = new Set<(state: ConnectionState) => void>();
   const setState = (next: ConnectionState) => {
     if (next === state) return;
@@ -159,6 +167,30 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getCapabilities: (planId, runId) => get(protocolPaths.runCapabilities(planId, runId), capabilityListResponseSchema),
     getModuleCapabilities: (planId, runId) => get(protocolPaths.runModuleCapabilities(planId, runId), moduleCapabilityComparisonResponseSchema),
     getScenarios: (planId, runId) => get(protocolPaths.runScenarios(planId, runId), scenarioListResponseSchema),
+    getExecutionMap: async (planId, runId) => {
+      const identity = JSON.stringify([planId, runId]);
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const version = (await get(protocolPaths.run(planId, runId), runResponseSchema)).run.version;
+          const map = await loadExecutionMapPages(version, cursor => get(
+            protocolPaths.runExecutionMap(planId, runId, version, cursor), executionMapPageSchema));
+          lastExecutionMaps.set(identity, map);
+          return map;
+        } catch (error) {
+          if (error instanceof ClientError && error.code === 'stale-version' && attempt < 3) continue;
+          if (error instanceof ClientError && error.kind === 'connection') {
+            const previous = lastExecutionMaps.get(identity);
+            if (previous !== undefined) return { ...previous, freshness: 'stale' };
+          }
+          throw error;
+        }
+      }
+      throw new ClientError('protocol', 'The execution map kept changing during the read', 'stale-version');
+    },
+    getExecutionCapability: (planId, runId, capability, version) => get(
+      protocolPaths.runExecutionCapability(planId, runId, capability, version), executionCapabilityDetailSchema),
+    getExecutionScenario: (planId, runId, scenario, version) => get(
+      protocolPaths.runExecutionScenario(planId, runId, scenario, version), executionScenarioDetailSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
     listSessions: (offset = 0) => get(protocolPaths.sessions(offset), sessionListResponseSchema),

@@ -12,6 +12,7 @@ export const executionMapPolicySchema = z.literal('execution-map/1');
 export const executionMapLimits = {
   nodes: 100,
   links: 200,
+  modules: 100,
   sourceRefsPerElement: 32,
   moduleRelationsPerElement: 16,
 } as const;
@@ -244,9 +245,19 @@ export const executionMapPageSchema = z.object({
   current: executionCurrentActivitySchema,
   nodes: z.array(executionNodeSchema).max(executionMapLimits.nodes),
   links: z.array(executionLinkSchema).max(executionMapLimits.links),
+  /** Direct module relations are a separate census so one busy module cannot overflow a row. */
+  moduleRelations: z.array(z.object({ module: modulePathSchema, element: executionElementKeySchema,
+    role: executionModuleRelationSchema.shape.role, source: executionSourceRefSchema }).strict()).max(executionMapLimits.modules),
+  /** Line provenance is paged independently of numeric summaries. */
+  lineRefs: z.array(z.object({ scope: z.enum(['module', 'outside', 'unmapped', 'all', 'core']),
+    module: modulePathSchema.nullable(), field: z.enum(['text-invocation', 'binary-invocation', 'gap']), value: text }).strict())
+    .max(executionMapLimits.modules),
   coverage: z.object({ nodes: z.object({ shown: count, total: count }).strict(),
     links: z.object({ shown: count, total: count }).strict(),
-    gaps: z.array(text),
+    modules: z.object({ shown: count, total: count }).strict(),
+    moduleRelations: z.object({ shown: count, total: count }).strict(),
+    lineRefs: z.object({ shown: count, total: count }).strict(),
+    gaps: z.array(text).max(32),
   }).strict(),
 }).strict().superRefine((page, context) => {
   const issue = (message: string, path: PropertyKey[]) => context.addIssue({ code: 'custom', message, path });
@@ -274,10 +285,27 @@ export const executionMapPageSchema = z.object({
       page.coverage.nodes.total < page.nodes.length || page.coverage.links.total < page.links.length) {
     issue('Page coverage must count returned elements', ['coverage']);
   }
-  if (page.nextCursor === null && page.coverage.gaps.length === 0 &&
-      page.coverage.nodes.total === page.nodes.length && page.coverage.links.total !== page.links.length) {
-    issue('Final complete page cannot omit links', ['coverage', 'links']);
+  const moduleRows = page.moduleMap.modules.length + page.moduleMap.outsideTree.length +
+    page.moduleMap.proposed.length + page.moduleMap.unplaced.length;
+  if (moduleRows > executionMapLimits.modules || page.coverage.modules.shown !== moduleRows ||
+      page.coverage.modules.total < moduleRows ||
+      (page.tree.status === 'available' && (page.tree.modules.length !== page.moduleMap.modules.length ||
+        page.tree.modules.some((module, i) => module.module !== page.moduleMap.modules[i]?.module)))) {
+    issue('Module page must count its bounded rows and match the tree', ['coverage', 'modules']);
   }
+  if (page.coverage.moduleRelations.shown !== page.moduleRelations.length ||
+      page.coverage.moduleRelations.total < page.moduleRelations.length ||
+      page.coverage.lineRefs.shown !== page.lineRefs.length ||
+      page.coverage.lineRefs.total < page.lineRefs.length ||
+      [...page.moduleMap.modules, ...page.moduleMap.outsideTree].some(row => row.direct.length > 0) ||
+      [...page.moduleMap.modules, ...page.moduleMap.outsideTree].some(row =>
+        row.lines.totals.invocationIds.length > 0 || row.lines.binary.invocationIds.length > 0 || row.lines.gaps.length > 0) ||
+      [page.moduleMap.lines, page.moduleMap.unmapped].some(lines =>
+        lines.totals.invocationIds.length > 0 || lines.binary.invocationIds.length > 0 || lines.gaps.length > 0)) {
+    issue('Relation and line provenance arrays must be paged separately', ['moduleMap']);
+  }
+  // End-of-census totals are checked by the cursor producer and by the client
+  // across every page; a final page may contain no nodes and only late links.
 });
 export type ExecutionMapPage = z.infer<typeof executionMapPageSchema>;
 

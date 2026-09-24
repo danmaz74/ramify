@@ -89,12 +89,22 @@ describe('execution projection over a persisted run', () => {
     await first.service.execute(stopRun('review-notes', receipt.jobId, version));
     await first.service.settled('review-notes', receipt.jobId);
     const settled = indexOf(first.service, receipt.jobId);
+    const settledVersion = settled.index.runVersion;
+    const firstPage = await new RunQueries(first.service).executionMapPage('review-notes', receipt.jobId,
+      { version: settledVersion, limit: 1 });
+    expect(firstPage.nextCursor).not.toBeNull();
+    const followingPage = await new RunQueries(first.service).executionMapPage('review-notes', receipt.jobId,
+      { version: settledVersion, cursor: firstPage.nextCursor!, limit: 1 });
     await first.service.close();
 
     const reopened = await openUnchangedRuns(fixture.root, { script: [] });
     cleanup.push(() => reopened.service.close());
     const replayed = indexOf(reopened.service, receipt.jobId);
     expect(replayed.index).toEqual(settled.index);
+    expect(await new RunQueries(reopened.service).executionMapPage('review-notes', receipt.jobId,
+      { version: settledVersion, limit: 1 })).toEqual(firstPage);
+    expect(await new RunQueries(reopened.service).executionMapPage('review-notes', receipt.jobId,
+      { version: settledVersion, cursor: firstPage.nextCursor!, limit: 1 })).toEqual(followingPage);
     expect(executionCapabilityDetailOf(replayed.view, 'first-root')).toEqual(executionCapabilityDetailOf(settled.view, 'first-root'));
     expect(executionScenarioDetailOf(replayed.view, scenarioId)).toEqual(executionScenarioDetailOf(settled.view, scenarioId));
   }, 120_000);

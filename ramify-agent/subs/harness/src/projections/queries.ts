@@ -9,6 +9,7 @@ import { runLayout } from '../run/records.js';
 import { analysisOf, decisionsOf } from './analysis.js';
 import { eventPage } from './events.js';
 import { executionCapabilityDetailOf, executionCoreOf, executionMapOf, executionScenarioDetailOf } from './execution-map.js';
+import { ExecutionPageError, executionPageOf } from './execution-pages.js';
 import { ProjectionError, readRunFile, runView, unservedRun, unservedRuns, type CommittedRun, type RunView } from './inputs.js';
 import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
@@ -116,14 +117,44 @@ export class RunQueries {
     return executionMapOf(view, await currentModuleTree(this.source.projectRoot));
   }
 
+  /** A bounded page bound to the committed run, current tree and captured line evidence. */
+  async executionMapPage(planId: string, runId: string, input: unknown) {
+    const map = await this.executionMap(planId, runId);
+    const page = executionPageOf(map, input, `${planId}\u0000${runId}`);
+    const latest = this.source.committed(planId, runId);
+    const version = latest?.entries.at(-1)?.sequence ?? 0;
+    if (version !== map.runVersion) throw new ExecutionPageError('stale-version',
+      'The run advanced while its execution map was read', version);
+    if (JSON.stringify(await currentModuleTree(this.source.projectRoot)) !== JSON.stringify(map.moduleMap.tree)) {
+      throw new ExecutionPageError('stale-version', 'The current module tree changed while its execution map was read', version);
+    }
+    return page;
+  }
+
   /** A capability's full accepted entry description or registered behavior. */
-  async executionCapabilityDetail(planId: string, runId: string, capability: string) {
-    return executionCapabilityDetailOf(await this.view(planId, runId), capability);
+  async executionCapabilityDetail(planId: string, runId: string, capability: string, expectedVersion?: number) {
+    const view = await this.view(planId, runId);
+    if (expectedVersion !== undefined && expectedVersion !== (view.entries.at(-1)?.sequence ?? 0)) {
+      throw new ExecutionPageError('stale-version', 'The capability detail belongs to another run version',
+        view.entries.at(-1)?.sequence ?? 0);
+    }
+    if (!executionCoreOf(view).nodes.some(node => node.key === `capability:${capability}`)) {
+      throw new ProjectionError('not-found', `No capability ${capability} in run ${runId}`);
+    }
+    return executionCapabilityDetailOf(view, capability);
   }
 
   /** A scenario's complete frozen Gherkin block. */
-  async executionScenarioDetail(planId: string, runId: string, scenario: string) {
-    return executionScenarioDetailOf(await this.view(planId, runId), scenario);
+  async executionScenarioDetail(planId: string, runId: string, scenario: string, expectedVersion?: number) {
+    const view = await this.view(planId, runId);
+    if (expectedVersion !== undefined && expectedVersion !== (view.entries.at(-1)?.sequence ?? 0)) {
+      throw new ExecutionPageError('stale-version', 'The scenario detail belongs to another run version',
+        view.entries.at(-1)?.sequence ?? 0);
+    }
+    if (!executionCoreOf(view).nodes.some(node => node.key === `scenario:${scenario}`)) {
+      throw new ProjectionError('not-found', `No scenario ${scenario} in run ${runId}`);
+    }
+    return executionScenarioDetailOf(view, scenario);
   }
 
   async gate(planId: string, runId: string, gate: string): Promise<GateResponse> {

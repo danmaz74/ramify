@@ -106,3 +106,28 @@ Use `executionCoreOf` and its `current`, node and link streams as the unpaged in
 ### Handoff to iteration 5
 
 Use `RunQueries.executionMap` as the unpaged query. Its `moduleMap` carries current tree identity, direct relation roles and captured line coverage. The current architect tree can refresh **without a run event**: bind every cursor/page to both the run sequence and the tree revision/input, and restart or report a named stale/partial state if either changes during pagination. Do not combine module rows from one tree revision with nodes from another. `lines.json` is retained beside each invocation **outside the committed event log**; the query reads it after settlement. A missing or partial file is a coverage gap, and a live writer is pending. Do not infer complete `+0 / -0` for either. Page the module map or return a bounded module census rather than copying an unbounded tree into every page. Final scripted-run and browser checks remain iteration 9 work.
+
+## Iteration 5 — HTTP query, bounded pages and coherent client read
+
+**Starting commit:** `db813fbda28aa5162d0f5f58bea5f4ca2ea18b40` (iteration 4 handoff).
+
+### Delivered
+
+- `GET /api/v1/plans/:planId/runs/:runId/execution-map` and targeted capability/scenario detail routes. The run and detail requests require a version; a changed version returns `stale-version` with the current sequence, a missing element returns `not-found`, and an inconsistent retained census returns `unreadable`. Existing query routes are unchanged.
+- The harness pages nodes, links, current-tree module rows, direct module relations and line provenance as five separate bounded streams. Each page carries `shown / total` for every stream. Module rows contain numeric line summaries, with the invocation IDs and gap text paged separately; the current tree is sliced with its module rows. A link endpoint absent from the complete census is explicitly `unresolved` with a reason. Duplicate identities and missing module relation targets are rejected before paging.
+- The opaque cursor binds the plan/run scope, requested limit, run sequence and a digest of the full projected snapshot. The digest includes current architect-tree revision/input and projected totals, provenance IDs and gaps from retained `lines.json`, so a tree refresh or a change to those projected line facts between pages is reported as stale even when the run sequence has not advanced. A file change that leaves the projected facts identical does not change the map. The query checks the run and tree again after projection to catch changes during a request. There is no durable cursor cache.
+- `ProtocolClient.getExecutionMap` collects all streams before returning one map, checks page identity, totals and uniqueness, resolves page-local link endpoints against the completed node census, and restarts on stale-version (up to four reads). On connection loss after a coherent read, it returns that last map with `freshness: 'stale'`; a first read with no prior map still reports the connection failure. Targeted detail methods use the encoded protocol paths.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| `npx vitest run` with execution-map contract, pages, HTTP, durable replay, browser client and existing client files | Pass: 6 files, 31 tests | Includes 610 nodes, 551 links, 610 direct module relations, >300 line references, page boundaries including links continuing after nodes, unresolved targets, changed tree and line evidence, same-version tree restart, bounded repeated staleness, partial coverage, missing detail, URL encoding, connection loss, old route and cursor equality after a disk-backed service restart. The large census is constructed; iteration 9 still owns scripted-run/browser acceptance. |
+| `npm run type-check` | Pass | Harness, web and scripts TypeScript scopes. |
+| `npm run build:web` | Pass | Vite built the client; its existing large-chunk advisory remains. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings; 189 analysis limits | Ownership/exposure analysis over 9 owners; analysis limits are inference coverage, not runtime acceptance. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Handoff to iteration 6
+
+Use `ProtocolClient.getExecutionMap(planId, runId)` for the complete, coherent execution and module census; `freshness` is independent of run progress. The map's `coverage` counts include every session and gate node, and `moduleMap.modules[].direct` is fully reassembled from relation pages. Fetch full descriptions through `getExecutionCapability` and frozen Gherkin through `getExecutionScenario` at the displayed `runVersion`. A stale-version retry is bounded, so UI state must show its error if changes keep occurring. A partial line summary retains its known subtotal and gap text; an unavailable tree stays explicit. No execution canvas or browser interaction was added here; those are iterations 6–9.

@@ -211,10 +211,40 @@ export const executionMapFixturePage: ExecutionMapPage = {
       gaps: ['Writer inv-repair has partial coverage.'], binary: { paths: 1, invocationIds: ['inv-provider'] }, methodLimit },
   },
   current: { awaitedSession: 'session:ses-engineer', runningGate: null, source: source(41) },
-  nodes: executionMapFixtureNodes, links: executionMapFixtureLinks,
+  nodes: executionMapFixtureNodes, links: executionMapFixtureLinks, moduleRelations: [], lineRefs: [],
   coverage: { nodes: { shown: executionMapFixtureNodes.length, total: executionMapFixtureNodes.length },
-    links: { shown: executionMapFixtureLinks.length, total: executionMapFixtureLinks.length }, gaps: [] },
+    links: { shown: executionMapFixtureLinks.length, total: executionMapFixtureLinks.length },
+    modules: { shown: 5, total: 5 }, moduleRelations: { shown: 0, total: 0 },
+    lineRefs: { shown: 0, total: 0 }, gaps: [] },
 };
+
+for (const row of executionMapFixturePage.moduleMap.modules) {
+  executionMapFixturePage.moduleRelations.push(...row.direct.map(relation => ({ module: row.module, ...relation })));
+  row.direct.length = 0;
+}
+for (const row of executionMapFixturePage.moduleMap.outsideTree) {
+  executionMapFixturePage.moduleRelations.push(...row.direct.map(relation => ({ module: row.module, ...relation })));
+  row.direct.length = 0;
+}
+const fixtureLineRefs = (scope: ExecutionMapPage['lineRefs'][number]['scope'], module: string | null,
+  lines: ExecutionMapPage['moduleMap']['lines']) => {
+  executionMapFixturePage.lineRefs.push(...lines.totals.invocationIds.map(value =>
+    ({ scope, module, field: 'text-invocation' as const, value })));
+  executionMapFixturePage.lineRefs.push(...lines.binary.invocationIds.map(value =>
+    ({ scope, module, field: 'binary-invocation' as const, value })));
+  executionMapFixturePage.lineRefs.push(...lines.gaps.map(value => ({ scope, module, field: 'gap' as const, value })));
+  lines.totals.invocationIds.length = 0;
+  lines.binary.invocationIds.length = 0;
+  lines.gaps.length = 0;
+};
+for (const row of executionMapFixturePage.moduleMap.modules) fixtureLineRefs('module', row.module, row.lines);
+for (const row of executionMapFixturePage.moduleMap.outsideTree) fixtureLineRefs('outside', row.module, row.lines);
+fixtureLineRefs('unmapped', null, executionMapFixturePage.moduleMap.unmapped);
+fixtureLineRefs('all', null, executionMapFixturePage.moduleMap.lines);
+executionMapFixturePage.coverage.moduleRelations.shown = executionMapFixturePage.moduleRelations.length;
+executionMapFixturePage.coverage.moduleRelations.total = executionMapFixturePage.moduleRelations.length;
+executionMapFixturePage.coverage.lineRefs.shown = executionMapFixturePage.lineRefs.length;
+executionMapFixturePage.coverage.lineRefs.total = executionMapFixturePage.lineRefs.length;
 
 /** A separate page state before a running gate has produced any verdict. */
 export const executionMapRunningGateFixturePage: ExecutionMapPage = {
@@ -227,5 +257,7 @@ export const executionMapRunningGateFixturePage: ExecutionMapPage = {
     commit: null, auditedCommit: null, active: true, subject: { workItem: 'wi-status', iteration: 'it-status-2' }, cause: null, evidencePresent: false }],
   links: [],
   coverage: { nodes: { shown: 1, total: executionMapFixtureNodes.length + 1 },
-    links: { shown: 0, total: executionMapFixtureLinks.length }, gaps: [] },
+    links: { shown: 0, total: executionMapFixtureLinks.length }, modules: { shown: 5, total: 5 },
+    moduleRelations: { shown: executionMapFixturePage.moduleRelations.length, total: executionMapFixturePage.moduleRelations.length },
+    lineRefs: { shown: executionMapFixturePage.lineRefs.length, total: executionMapFixturePage.lineRefs.length }, gaps: [] },
 };

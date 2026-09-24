@@ -116,6 +116,7 @@ describe('execution-map/1 contract', () => {
     partial.tree = { status: 'unavailable', message: 'Architect view is not materialized.' };
     partial.moduleMap.tree = partial.tree;
     partial.moduleMap.modules = [];
+    partial.coverage.modules.shown = 1;
     partial.coverage.gaps = ['line-events/1 for inv-repair is partial'];
     const capability = partial.nodes.find(node => node.key === 'capability:status-badge')!;
     if (capability.kind !== 'capability') throw new Error('Fixture capability missing');

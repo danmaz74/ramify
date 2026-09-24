@@ -1,4 +1,5 @@
 import type { ModuleTree } from '../../../../harness/src/interfaces/protocol/evidence.js';
+import type { ExecutionCapabilityDetail, ExecutionScenarioDetail } from '../../../../harness/src/interfaces/protocol/execution-map.js';
 import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
@@ -11,6 +12,7 @@ import type {
 } from '../../../../harness/src/interfaces/protocol/sessions.js';
 import type { TranscriptBody } from '../../../../harness/src/interfaces/protocol/transcripts.js';
 import { ClientError, type ConnectionState, type ProjectInfo, type ProtocolClient } from '../../client.js';
+import type { ExecutionMapSnapshot } from '../../execution-map-client.js';
 
 export const project: ProjectInfo = { name: 'collection-review', root: '/work/collection-review', planPattern: 'plans/<plan-id>/plan.md' };
 
@@ -26,6 +28,9 @@ export interface StubRun {
   moduleCapabilities?: ModuleCapabilityComparisonResponse;
   gates?: Record<string, GateView>;
   scenarios?: ScenarioListResponse;
+  executionMap?: ExecutionMapSnapshot;
+  executionCapabilities?: Record<string, ExecutionCapabilityDetail>;
+  executionScenarios?: Record<string, ExecutionScenarioDetail>;
   metrics?: MetricsResponse;
 }
 
@@ -116,6 +121,15 @@ export class StubClient implements ProtocolClient {
   async getCapabilities(_planId: string, runId: string) { this.calls.push(`getCapabilities:${runId}`); return this.answer(runId, run => run.capabilities, 'capabilities'); }
   async getModuleCapabilities(_planId: string, runId: string) { this.calls.push(`getModuleCapabilities:${runId}`); return this.answer(runId, run => run.moduleCapabilities, 'module capabilities'); }
   async getScenarios(_planId: string, runId: string) { this.calls.push(`getScenarios:${runId}`); return this.answer(runId, run => run.scenarios, 'scenarios'); }
+  async getExecutionMap(_planId: string, runId: string) { this.calls.push(`getExecutionMap:${runId}`); return this.answer(runId, run => run.executionMap, 'execution map'); }
+  async getExecutionCapability(_planId: string, runId: string, capability: string, _version: number) {
+    this.calls.push(`getExecutionCapability:${runId}:${capability}`);
+    return this.answer(runId, run => run.executionCapabilities?.[capability], `execution capability ${capability}`);
+  }
+  async getExecutionScenario(_planId: string, runId: string, scenario: string, _version: number) {
+    this.calls.push(`getExecutionScenario:${runId}:${scenario}`);
+    return this.answer(runId, run => run.executionScenarios?.[scenario], `execution scenario ${scenario}`);
+  }
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 
