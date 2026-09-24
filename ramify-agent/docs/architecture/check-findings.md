@@ -22,6 +22,13 @@ existing ledger. Reviewers report concerns; a fork of the responsible local
 architect assesses them when the work item has CheckFindings; ordinary engineer
 iterations perform repairs. A CheckFinding never changes a gate verdict.
 
+Under the principles, a CheckFinding is a **risk signal**: objective when a
+check observed it, subjective when an agent judged it, with a risk level and
+a credibility derived from the provenance of what grounds it. The system
+spends on a signal in proportion to both. No signal is skipped: the local
+architect gives every signal of its work item at least a little attention,
+and every subjective signal is waivable.
+
 The **ledger remains the only persistence mechanism**, and **web remains a
 client of the harness's protocol**. Ramify supplies its existing project
 checks and generated views. It knows nothing of this CheckFinding lifecycle,
@@ -172,6 +179,9 @@ These are semantic fields, not a final TypeScript schema.
 | `verification` | Whether a claimed resolution needs producer check evidence or an agent assessment. Chosen by the trusted producer integration, not by the reporting agent. |
 | `decisions` | Actor, considered CheckFinding revision, source/evidence, action, rationale and links to repair work or a superseding assessment. |
 | `relations` | Explicit, justified links such as duplicate-of or follows-from. File overlap is not issue identity. |
+| `risk` | High, medium or low: the harm if the concern is real. The reporter proposes it; the assessing architect may correct it, and the correction is a recorded decision. |
+| `ground`, `credibility` | What grounds the signal, named by the reporter as a reference the harness can classify: a principles document, the original plan, a frozen scenario, an approved requirement, an agent's test or documentation, or nothing. Credibility is derived by the harness from that provenance and from whether an objective signal was reproduced; a reporter cannot declare it. |
+| `modules` | The modules the evidence concerns, derived by the harness from the report's locations on the report's own source tree, or the owner work item's module when no location falls inside a module. Used for presentation and for waive authority, never for identity. |
 
 The child receives immutable source references and compares them for identity;
 the harness retains the concrete commit/tree, document revision or file/hash
@@ -213,7 +223,9 @@ Recognition has three steps, each answering a different question:
    It sees the collected CheckFindings together, confirms a same-issue relation
    or keeps the concerns separate, and records the reason. Linked CheckFindings
    can be presented as one assessment group while retaining both original
-   IDs, reports and verification obligations.
+   IDs, reports and verification obligations. A reasonable match is enough:
+   matching subjective signals is a judgment, and it must not cost more than
+   the signals are worth.
 
 Agent prose, line numbers, similar wording and file overlap alone never
 merge CheckFindings. Two reviewers can report the same defect concurrently, before
@@ -228,8 +240,7 @@ It is a projection, not another mutable authority. Matching always uses the
 current accepted records under the run's serialized transition, so two
 concurrent review callbacks cannot both allocate the same issue identity.
 The [disposition rules](#disposition-rules) decide whether a fresh report
-reopens a closed issue; a repeated report does not automatically cancel a
-reasoned accepted choice.
+reopens a closed issue; a repeated report never reopens a waiver.
 
 ### The architect's semantic match
 
@@ -306,17 +317,21 @@ lifecycle machines.
 | Action | Result and required evidence |
 | --- | --- |
 | Plan a repair | Remains open; link the responsible correction assignment or durable pending assignment intent. |
-| Report a repair | Remains open until verified; link what the engineer changed and the candidate it claims repaired. |
-| Verify a resolution | Closed with a check rerun or a fresh assessment appropriate to the producer's verification rule. |
+| Report a repair | Remains open until fixed; link what the engineer changed and the candidate it claims repaired. |
+| Fix | Closed as fixed, with a check rerun or a fresh assessment appropriate to the producer's verification rule. |
 | Supersede a judgment | Closed or narrowed with an explicit replacement assessment and rationale. Cannot cancel a required factual verification obligation. |
-| Accept the current choice or risk | Closed as accepted, with authority, source and uncertainty. Does not claim a repair or change a gate result. |
+| Waive | Closed as waived, with the actor, the accepted risk and the reason. Does not claim a repair or change a gate result. Refused for a required check. |
+| Revoke a waiver | Open again at a new revision. The user can revoke any waiver; an agent only its own or a lower authority's. |
 | Defer | Deferred with a responsible owner, reason and revisit condition or follow-up reference. Does not claim fixed. |
-| Request a user decision | Remains open; cite the exact conflict and current alternatives. No automatic escalation from a reviewer's severity label. |
-| Reopen | Open at a new revision when matching evidence contradicts a disposition or invalidates its assumptions. Preserve earlier decisions. |
+| Correct the risk level | The assessing architect may raise or lower the reporter's level; the correction is recorded with its reason. |
+| Request a user decision | Remains open; cite the exact conflict and current alternatives. Only the architect's judgment of an authority conflict requests one; the risk level orders attention and never escalates by itself. |
+| Reopen | Open at a new revision when matching evidence contradicts a fix, a supersession or a deferral. Never applies to a waiver. Preserve earlier decisions. |
 
-A fresh report of the same unchanged issue can add evidence without
-automatically reopening a justified accepted choice. A new source or
-obligation that invalidates the choice requires reassessment. Conversely,
+Waiving is a settlement. The user can waive any subjective signal; an agent
+can waive one when it has authority over every module the signal concerns:
+the local architect for its own module, the global architect for the
+project. A fresh report of the same issue joins a waived CheckFinding as
+evidence and does not reopen it; only an explicit revocation does. Conversely,
 mere absence from a later report cannot close an existing CheckFinding.
 
 The harness validates that the actor can make the decision. The CheckFinding child
@@ -340,8 +355,8 @@ Strong contradictions with explicit requirements, principles or protected
 obligations follow the existing authority boundary. Weak tensions can be
 resolved automatically and reported as material choices when appropriate.
 Required checks remain governed by their own policy even if a related CheckFinding
-is deferred or its risk is accepted. The simplest initial rule permits
-deferral only when it does not evade a required obligation or reserved approval.
+is deferred or waived. The simplest initial rule permits deferral and waiving
+only when they do not evade a required obligation or reserved approval.
 
 ## Application flow
 
@@ -357,13 +372,15 @@ flowchart TD
     S --> O{CheckFindings need assessment?}
     O -- No --> W[Ordinary work-item gate]
     O -- Yes --> L[Local architect fork matches and assesses current tree]
-    L --> D[Accept, supersede or defer with reasons]
+    L --> D[Waive, supersede or defer with reasons]
     D --> W
     L --> E[Assign normal correction iteration]
     E --> G
     L --> U[User decision for a strong authority conflict]
     U --> D
     U --> E
+    L --> X[Rounds exhausted: remaining signals stay unresolved]
+    X --> W
     W --> F[Complete work item when its obligations pass]
 ```
 
@@ -483,8 +500,10 @@ schedule future work.
 Otherwise, fork the local architect from its captured completion-request
 point to assess all current concerns together. The fork can find that later
 iterations already repaired an issue, supersede a weak earlier judgment,
-accept a justified tradeoff, defer a nonblocking improvement, or choose
-correction work. Give it concise summaries
+waive a justified tradeoff, defer a nonblocking improvement, or choose
+correction work. Its packet orders the signals by risk and credibility, so
+that a low-risk, low-credibility signal costs it a one-line waiver and a
+high-risk, credible one gets its attention. Give it concise summaries
 and retrievable evidence, not every transcript. Its submission may contain
 the batch dispositions and its next ordinary action in one response.
 
@@ -511,10 +530,14 @@ candidate. Deterministic harness scenario rendering may change commit identity;
 carry its explicit lineage and verify its expected bytes. A changed
 implementation cannot inherit reconciliation through that exception.
 
-Bound assessment and correction rounds. At exhaustion, nonblocking judgments
-may receive reasoned acceptance or deferral; required failures remain failures
-and unresolved authority conflicts retain their decision path. A round limit
-must not manufacture a clean outcome.
+Bound assessment and correction rounds, with a mechanical floor: the first
+round may correct any signal the architect chooses; a later round may be
+started only for a signal of non-low risk, and its review covers the
+correction's own change. At exhaustion the remaining signals stay
+**unresolved**: neither the harness nor a final agent turn settles them, and
+the work item completes with them visible. Unresolved is a normal end state.
+Required failures remain failures and unresolved authority conflicts retain
+their decision path. A round limit must not manufacture a clean outcome.
 
 A correction iteration ends in a new completion request, which captures a new
 fork point. The next reconciliation forks from that latest point and receives
@@ -526,7 +549,7 @@ decisions that the earlier basis still supports.
 
 An ordinary concern waits for the batch. A concern about a contract that later
 work will rely on can be included in the architect's next safe briefing. A
-reviewer's urgency is advice for that decision, not an automatic permission
+reviewer's risk level is advice for that decision, not an automatic permission
 to interrupt the writer or change the assignment.
 
 The origin and remediation owner are separate. Keep the CheckFinding with its
@@ -718,21 +741,27 @@ Ramify check. These snippets propose an exposure path, not proof that unwritten
 symbols are currently importable.
 
 Web should place CheckFindings beside their work item, attempt, candidate diff and
-repair session. Default summaries show material choices with their fix and
-remaining uncertainty, and explicit user decisions when needed. Routine
-automatic resolutions remain available through optional inspection. CheckFinding
-standing, required-check verdict and review coverage are separate fields.
+repair session, ordered by risk, then credibility, then recency, and grouped
+by the modules their evidence concerns. The global view shows for each
+module how many signals are unsettled, and opens that module's list. A
+non-low risk signal left unresolved because it surfaced in the latest review
+is marked distinctly. Default summaries show material choices with their fix
+and remaining uncertainty, and explicit user decisions when needed. Settled
+signals remain available through optional inspection. CheckFinding standing,
+required-check verdict and review coverage are separate fields.
 
 The deciding architect records a communication judgment with its disposition:
 quiet by default, report the material choice, or request a decision. Record
 why it chose to report or ask. The architect judges the strength of a
 conflict; the harness validates the actor, current authority references and
-required request fields. The UI renders that result rather than inferring
-user urgency from a severity label or the number of CheckFindings.
+required request fields. The UI renders that result; the risk level orders
+the list and never turns into a decision request by itself.
 
-There is no generic “mark resolved” command that bypasses the disposition
-contract. Any user response carries the pending request and expected CheckFinding
-revision so it cannot silently apply to a later change.
+The user's commands are answering a pending decision, waiving a signal and
+revoking a waiver. There is no generic “mark resolved” command that bypasses
+the disposition contract. Every user command carries the expected CheckFinding
+revision, and a decision answer its pending request, so it cannot silently
+apply to a later change.
 
 ## Studio lessons applied
 

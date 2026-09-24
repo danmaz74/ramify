@@ -234,6 +234,21 @@ A scenario that passes against a fake is bound, not done, as a delegation is.
 A plan is finished when every scenario passes in full mode at the final
 gate.
 
+### Trust Follows Provenance
+
+Most tests, documentation and requirements in a run are written by agents and
+never read by a person, and agents invent requirements together with the
+tests that verify them. The harness is built for that reality: it cannot have
+everything reviewed, so it weighs an artifact by its provenance, never by its
+kind or its wording.
+
+Principles documents and the original plan count as human-reviewed. What a
+person approved, such as the accepted analysis and its frozen scenarios, and
+what is derived directly from human-reviewed material weigh more than what an
+agent derived on its own. Scarce human and agent attention goes where the
+weight and the risk are highest. Weight orders attention; it never turns a
+required gate into an option.
+
 ### Work Starts at the Consumer; Integration Happens on the Return
 
 Work begins at the highest consumer of the feature. It writes its behavioral
