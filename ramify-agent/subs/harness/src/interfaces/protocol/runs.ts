@@ -225,6 +225,26 @@ export type RunNotice = z.infer<typeof runNoticeSchema>;
 export type RunNoticeKind = RunNotice['kind'];
 
 /**
+ * The requests for a person's decision that the run's CheckFindings hold
+ * open. A work item with one is held before its gate until a person
+ * answers, with no time limit, and the run advances no further meanwhile.
+ * `waiting` says the run is held now: it is running, no stop was requested,
+ * and a work item has an open request. A run with no CheckFinding, such as
+ * one begun before CheckFindings existed, has none.
+ */
+export const runDecisionRequestsSchema = z.object({
+  /** Every open request, a run-level CheckFinding's included. */
+  open: count,
+  waiting: z.boolean(),
+  /** The work items with an open request, in the order of their CheckFindings' IDs. */
+  workItems: z.array(z.object({
+    workItem: text,
+    requests: z.array(z.object({ checkFinding: text, request: text }).strict()).min(1),
+  }).strict()),
+}).strict();
+export type RunDecisionRequests = z.infer<typeof runDecisionRequestsSchema>;
+
+/**
  * A run as its log states it. Status lives in the log: every field here is
  * derived from the events the run committed, and nothing is stored.
  */
@@ -270,6 +290,7 @@ export const runSnapshotSchema = z.object({
   review: runReviewSchema,
   /** Module notices first, then cycles, each in the order the log established them. */
   notices: z.array(runNoticeSchema),
+  decisionRequests: runDecisionRequestsSchema,
 }).strict();
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 

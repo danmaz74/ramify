@@ -5,9 +5,9 @@ import { jobIdSchema, planIdSchema } from '../interfaces/protocol/ids.js';
 import { acceptedCommandSchema, activitySchema, apiViewEvidenceSchema, receiptSchema, stopJobCommandSchema } from '../interfaces/protocol/jobs.js';
 import { citationSchema, inputManifestSchema, modulePathSchema, moduleTreeResponseSchema, sha256Schema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
-import { planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
+import { planDecisionWaitSchema, planListResponseSchema, planResponseSchema, projectResponseSchema } from '../interfaces/protocol/queries.js';
 import {
-  analysisResponseSchema, capabilityProgressSchema, gateViewSchema, moduleCapabilityComparisonResponseSchema, projectedRunEventSchema,
+  analysisResponseSchema, capabilityProgressSchema, gateViewSchema, moduleCapabilityComparisonResponseSchema, projectedRunEventSchema, runDecisionRequestsSchema,
   runEventRefKindSchema, runQueryLimits, scenarioListResponseSchema, scenarioStatusSchema, trackedScenarioStateSchema,
 } from '../interfaces/protocol/runs.js';
 import {
@@ -19,18 +19,34 @@ describe('queries', () => {
   test('a plan list carries readable and unreadable entries', () => {
     const list = {
       plans: [
-        { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md' },
-        { status: 'unreadable', id: 'b', path: 'plans/b/plan.md', message: 'EISDIR' },
+        { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md', waitingForDecision: [] },
+        { status: 'unreadable', id: 'b', path: 'plans/b/plan.md', message: 'EISDIR', waitingForDecision: [] },
       ],
     };
     expect(planListResponseSchema.parse(list)).toEqual(list);
   });
 
   test('a readable entry rejects unknown fields', () => {
-    const entry = { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md' };
+    const entry = { status: 'readable', id: 'a', title: 'A', path: 'plans/a/plan.md', waitingForDecision: [] };
     expect(planListResponseSchema.safeParse({ plans: [entry] }).success).toBe(true);
     expect(planListResponseSchema.safeParse({ plans: [{ ...entry, extra: 1 }] }).success).toBe(false);
     expect(planListResponseSchema.safeParse({ plans: [{ status: 'readable', id: 'a', path: 'plans/a/plan.md' }] }).success).toBe(false);
+  });
+
+  test('a plan names its runs that wait for a decision, each holding at least one work item and request', () => {
+    const wait = { runId: '20260921T080000Z-c0ffee', requests: 1, workItems: ['wi-002'] };
+    expect(planDecisionWaitSchema.parse(wait)).toEqual(wait);
+    expect(planDecisionWaitSchema.safeParse({ ...wait, requests: 0 }).success).toBe(false);
+    expect(planDecisionWaitSchema.safeParse({ ...wait, workItems: [] }).success).toBe(false);
+    expect(planDecisionWaitSchema.safeParse({ ...wait, since: '2026-09-24T12:00:00.000Z' }).success).toBe(false);
+  });
+
+  test('a run\'s decision requests: none, or the work items they hold, each with a request', () => {
+    expect(runDecisionRequestsSchema.safeParse({ open: 0, waiting: false, workItems: [] }).success).toBe(true);
+    const held = { open: 2, waiting: true, workItems: [{ workItem: 'wi-002', requests: [{ checkFinding: 'cf-0006', request: 'cfd-0004' }] }] };
+    expect(runDecisionRequestsSchema.parse(held)).toEqual(held);
+    expect(runDecisionRequestsSchema.safeParse({ ...held, workItems: [{ workItem: 'wi-002', requests: [] }] }).success).toBe(false);
+    expect(runDecisionRequestsSchema.safeParse({ ...held, deadline: '2026-09-25T12:00:00.000Z' }).success).toBe(false);
   });
 
   test('plan IDs are one non-hidden path segment', () => {

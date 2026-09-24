@@ -56,6 +56,8 @@
 .execution-gate-mark.audit-not-started { border-color: #475569; border-style: dotted; }
 .execution-gate-mark.audit-incomplete, .execution-gate-mark.audit-unavailable { border-style: dashed; border-color: #92400e; }
 .execution-live { outline: 3px solid #1d4ed8; animation: execution-pulse 1600ms ease-in-out infinite; }
+.execution-awaiting-decision { box-shadow: 0 0 0 3px var(--ask), 0 1px 5px #0002; }
+.execution-decision-mark { display: block; margin: 0.1rem 0; padding: 0 0.35rem; border-radius: 4px; background: var(--ask); color: #fff; font-weight: 600; }
 @keyframes execution-pulse { 50% { outline-color: transparent; } }
 .execution-rail { margin-top: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .execution-rail ol { display: flex; gap: 0.5rem; overflow-x: auto; list-style: none; padding: 0.4rem 0; }
@@ -86,6 +88,8 @@
   --bad: #a3312b;
   --good: #2f7d4f;
   --warn: #9a6a12;
+  /* A run waiting for the person's decision: apart from running, failure and risk. */
+  --ask: #6b2fb3;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -696,7 +700,20 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .standing-closed { color: var(--good); }
 .unresolved { color: var(--warn); }
 .unresolved-latest { border-left: 3px solid var(--bad); padding-left: 0.5rem; color: var(--bad); }
-.decision-request { border: 2px solid var(--accent); border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0.4rem 0; background: #f2f6fc; }
+.decision-request { border: 2px solid var(--ask); border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0.4rem 0; background: #f6f1fc; }
+.decision-request:focus { outline: 3px solid var(--ask); outline-offset: 2px; }
+/* A run that waits for the person's decision, wherever runs are shown. */
+.badge.awaiting-decision { background: var(--ask); color: #fff; }
+.decision-banner { border: 2px solid var(--ask); border-left-width: 6px; border-radius: 8px; padding: 0.5rem 0.9rem; margin: 0.5rem 0; background: #f6f1fc; color: var(--ink); }
+.decision-banner p { margin: 0.2rem 0; }
+.decision-banner strong:first-child { color: var(--ask); }
+.decision-banner ul { margin: 0.3rem 0; padding-left: 1.2rem; }
+.decision-banner button.link { color: var(--ask); font-weight: 600; }
+.header-decision-waits { margin: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; flex-basis: 100%; }
+.header-decision-wait { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 6px; background: var(--ask); color: #fff; font-weight: 600; font-size: 0.9rem; text-decoration: none; overflow-wrap: anywhere; }
+.header-decision-wait:hover, .header-decision-wait:focus { text-decoration: underline; }
+.plan-waits { grid-column: 1 / -1; list-style: none; padding: 0; margin: 0.2rem 0 0; font-size: 0.9rem; }
+.plan-waits .badge { margin-left: 0; }
 .decision-request blockquote { margin: 0.2rem 0 0; padding-left: 0.6rem; border-left: 3px solid var(--line); }
 .decision-request .option { display: block; margin: 0.2rem 0; }
 .decision-request fieldset, .reason-command fieldset { border: none; padding: 0; margin: 0.3rem 0; display: grid; gap: 0.3rem; }

@@ -1,5 +1,6 @@
 import type { PlanEntry } from '../../harness/src/interfaces/protocol/queries.js';
 import type { ProjectInfo, ProtocolClient } from './client.js';
+import { DecisionWaitBadge, workItemsText } from './decision-waits.js';
 import { routeHref } from './routes.js';
 import { useQuery } from './use-query.js';
 
@@ -43,6 +44,7 @@ function PlanList({ plans }: { readonly plans: readonly PlanEntry[] }) {
           <li key={plan.id} className="plan-entry">
             <a className="plan-title" href={routeHref({ page: 'plan', planId: plan.id })}>{plan.title}</a>
             <code className="plan-path">{plan.path}</code>
+            <PlanWaits plan={plan} />
           </li>
         )
         : (
@@ -50,8 +52,25 @@ function PlanList({ plans }: { readonly plans: readonly PlanEntry[] }) {
             <span className="plan-title">{plan.id}</span>
             <code className="plan-path">{plan.path}</code>
             <span className="failure">Unreadable: {plan.message}</span>
+            <PlanWaits plan={plan} />
           </li>
         ))}
+    </ul>
+  );
+}
+
+/** The plan's runs that wait for the person's decision, each linked to its Run page. */
+function PlanWaits({ plan }: { readonly plan: PlanEntry }) {
+  if (plan.waitingForDecision.length === 0) return null;
+  return (
+    <ul className="plan-waits" aria-label={`Runs of ${plan.id} waiting for your decision`}>
+      {plan.waitingForDecision.map(wait => (
+        <li key={wait.runId}>
+          <DecisionWaitBadge />{' '}
+          <a href={routeHref({ page: 'run', planId: plan.id, runId: wait.runId })}>run <code>{wait.runId}</code></a>
+          <span className="muted">, {workItemsText(wait.workItems)}</span>
+        </li>
+      ))}
     </ul>
   );
 }

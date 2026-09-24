@@ -1,6 +1,7 @@
-import type { RunNotice, RunSnapshot } from '../interfaces/protocol/runs.js';
+import { replayCheckFindingState } from '../check-findings/state.js';
+import type { RunDecisionRequests, RunNotice, RunSnapshot } from '../interfaces/protocol/runs.js';
 import { runSnapshot } from '../run/snapshot.js';
-import type { RunView } from './inputs.js';
+import type { CommittedLine, RunView } from './inputs.js';
 
 /*
  * The run's snapshot as a client reads it: the harness's own snapshot of the
@@ -10,6 +11,11 @@ import type { RunView } from './inputs.js';
  * A created or removed module is what the person must learn at the end of a
  * run, so module notices come first; every detected dependency cycle
  * follows, kept after the run ends, resolved or not.
+ *
+ * A request for a person's decision holds its work item, and so the run,
+ * until a person answers, with no time limit. The snapshot says so, read
+ * from the CheckFinding state the log replays, so every page that shows a
+ * run can show that it waits for a person rather than looking slow.
  */
 
 /** A run's public snapshot, from its view. */
@@ -49,6 +55,33 @@ export function snapshotOf(view: RunView): RunSnapshot {
     writer: { ...internal.writer },
     review: internal.review === 'not-reviewed' ? 'not-reviewed' : { ...internal.review },
     notices: orderedNotices(internal.notices.map(notice => withDecisionStatement(notice))),
+    decisionRequests: decisionRequestsOf(view.entries, internal.state === 'running' && !internal.stopRequested),
+  };
+}
+
+/**
+ * The open requests for a person's decision, from the CheckFinding state
+ * the log replays, and the work items they hold. `live` says the run's
+ * driver would wait on them: it is running and no stop was requested, the
+ * same conditions under which the harness holds a work item for an answer.
+ */
+export function decisionRequestsOf(entries: readonly CommittedLine[], live: boolean): RunDecisionRequests {
+  const state = replayCheckFindingState(entries);
+  let open = 0;
+  const workItems = new Map<string, Array<{ checkFinding: string; request: string }>>();
+  // The state holds CheckFindings in the order they were created, which is their IDs' order.
+  for (const [id, entry] of state.findings) {
+    if (entry.pendingUserDecision === null) continue;
+    open += 1;
+    if (entry.owner.kind !== 'work-item') continue;
+    const requests = workItems.get(entry.owner.workItem) ?? [];
+    requests.push({ checkFinding: id, request: entry.pendingUserDecision });
+    workItems.set(entry.owner.workItem, requests);
+  }
+  return {
+    open,
+    waiting: live && workItems.size > 0,
+    workItems: [...workItems].map(([workItem, requests]) => ({ workItem, requests })),
   };
 }
 

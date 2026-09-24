@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 import { App } from '../app.js';
 import { ClientError } from '../client.js';
@@ -45,4 +45,21 @@ test('the fragment selects the page', async () => {
   expect(await screen.findByText('collection-review')).toBeTruthy();
   act(() => { window.location.hash = '#/'; window.dispatchEvent(new HashChangeEvent('hashchange')); });
   expect(await screen.findByText('This project has no plans yet.')).toBeTruthy();
+});
+
+test('the header and the tab title say a run waits for the person\'s decision, on every page, until it is answered', async () => {
+  const client = new StubClient();
+  const wait = { runId: '20260924T120000Z-a00001', requests: 1, workItems: ['wi-002'] };
+  client.plans = [{ status: 'readable', id: 'review-notes', title: 'Reviewer notes', path: 'plans/review-notes/plan.md', waitingForDecision: [wait] }];
+  window.location.hash = '#/sessions';
+  render(<App client={client} attentionInterval={20} />);
+  const mark = await screen.findByRole('status', { name: 'Waiting for your decision' });
+  const link = within(mark).getByRole('link');
+  expect(link.textContent).toBe('Waiting for your decision: run 20260924T120000Z-a00001 of review-notes, work item wi-002');
+  expect(link.getAttribute('href')).toBe('#/plans/review-notes/runs/20260924T120000Z-a00001');
+  await waitFor(() => expect(document.title).toBe('Waiting for your decision · collection-review · ramify-agent'));
+
+  client.plans = [{ status: 'readable', id: 'review-notes', title: 'Reviewer notes', path: 'plans/review-notes/plan.md', waitingForDecision: [] }];
+  await waitFor(() => expect(screen.queryByRole('status', { name: 'Waiting for your decision' })).toBeNull());
+  expect(document.title).toBe('collection-review · ramify-agent');
 });

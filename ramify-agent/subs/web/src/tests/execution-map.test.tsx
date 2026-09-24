@@ -157,3 +157,13 @@ test('a long coverage list keeps its count and first facts visible, with every g
   expect(details.querySelectorAll('li')).toHaveLength(14);
   expect(details.lastElementChild?.textContent).toContain(gaps[13]);
 });
+
+test('a work item the run holds for the person\'s decision is marked on its card, in words', async () => {
+  render(<ExecutionMapArea client={client()} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]}
+    onOpenGate={vi.fn()} waitingWorkItems={new Set(['wi-status'])} />);
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  const card = within(canvas).getByRole('button', { name: /^Implement status badge, work-item, waiting for your decision/ });
+  expect(card.textContent).toContain('Waiting for your decision');
+  expect(canvas.querySelectorAll('.execution-awaiting-decision')).toHaveLength(1);
+  expect(card.closest('.execution-card')!.classList.contains('execution-awaiting-decision')).toBe(true);
+});

@@ -684,4 +684,46 @@ Both runs use `audit/plan12-check-findings.request.json` from the repository roo
 | `de84358` | `fail`, 202 s | Patch integrity, type-check, `check:self` and the parent daemon case pass; the agent suite fails | 186 files passed, 1 failed, 2 skipped; 1483 tests passed, 1 failed, 7 skipped | `refs/audited/runs/2026-09-24T19-13-10Z-de8435816` |
 | `11688f9` | **`pass`**, 202 s | All five checks pass: patch integrity, agent type-check, agent suite, agent `check:self` (0 errors, 0 warnings, 277 analysis limits; 10 owners, 450 source files; 0 denied accesses) and the parent daemon case | 187 files passed, 2 skipped; 1484 tests passed, 7 skipped | `refs/audited/runs/2026-09-24T19-25-48Z-11688f993`; Git note `git notes --ref=audit show 11688f993e503eed6c83b6ab11a0963dd9d1da16` |
 
-`11688f9` is the audited final implementation commit, and its passing run is the plan's full-suite evidence. The commit recording this result changes only this document. The `review-lifecycle.test.ts` overflow flake above passed in this audit and remains an open item. The live-model trial remains pending the user's approval.modules/.bin/ramify-audit audit --request ramify-agent/audit/plan12-check-findings.request.json --cwd . --json` on the final Plan 12 commit (overall verdict, per-check results, suite counts, duration, run ref and Git note). Not run by iteration 8._
+`11688f9` is the audited final implementation commit, and its passing run is the plan's full-suite evidence. The commit recording this result changes only this document. The `review-lifecycle.test.ts` overflow flake above passed in this audit and remains an open item. The live-model trial remains pending the user's approval.
+
+## Follow-up: a pending decision is visible across the web
+
+**Starting commit:** `95ffc1c` on `feat/plan12-check-findings`. **Not yet audited:** the final audit above applies to `11688f9`; this commit has run no ramify-audit.
+
+**The user's decision (Dan, 2026-09-24):** a work item waiting for a person's answer to a CheckFinding decision request has no time limit; it waits. The waiting must be very visible in the web page. A notification system should come soon and is not part of this change.
+
+Before this change the only signs of a pending decision were inside the run page: the overview's CheckFinding notice, the per-module "Decisions requested" column and the work item's decision request form. A run held by `awaitUserDecisions` looked like a slow run everywhere else.
+
+### Delivered
+
+- **Protocol (harness, derived from the ledger).** `runSnapshotSchema` gains `decisionRequests` (`runDecisionRequestsSchema`): `open`, the count of open decision requests, run-level ones included; `workItems`, each work item with an open request and its `{ checkFinding, request }` pairs in ID order; and `waiting`, true when the run is running, no stop was requested and a work item has an open request. These are the conditions under which `awaitUserDecisions` holds the driver. `projections/snapshot.ts` computes it by `decisionRequestsOf`, which replays the CheckFinding state from the log exactly as the check-findings projection does. A run with no CheckFinding event, such as one begun before CheckFindings, reports `{ open: 0, waiting: false, workItems: [] }`. Every plan entry of `GET /api/v1/plans` gains `waitingForDecision` (`planDecisionWaitSchema`: run ID, request count and held work items). `RunQueries.decisionWaits` computes it and replays the CheckFinding state only for a running run with no stop requested. Both fields are required and always computed, the convention for projection fields such as `degradedStarts`. The root re-exposes the two new schemas and types to the web.
+- **Web.** The new `decision-waits.tsx` owns the words and marks. A waiting run has its own badge, "Waiting for your decision", in white on a violet `--ask` colour. It is distinct from the blue running badge, the red failure, the amber or red risk badges and the amber notices, and it always carries words.
+  - **Header, every page:** `App` reads the plan list every 5 s (`attentionInterval`). While any run waits, the header shows a `role="status"` link per waiting run, naming the plan and the held work items. The document title is prefixed `Waiting for your decision · `, so a background tab shows it.
+  - **Plans list:** each plan with a waiting run lists it with the badge and a link.
+  - **A plan's run list:** the badge sits beside the run's own `running` state, with the held work items in its title.
+  - **Run page:** the header has the badge beside the run state. Above every area, a `role="status"` banner names each held work item and its requests, says nothing advances and there is no time limit, and has an "answer cfd-…" button per request. The button opens Work items with the work item selected, and the decision request form scrolls into view and takes the focus. It does this through a small `DecisionFocusContext`, and the form now has `id="decision-<request>"`.
+  - **Work items list:** the waiting work item has the badge.
+  - **Execution map:** the waiting work item's card has a violet ring, a "Waiting for your decision" line and the words in its accessible name. The card data gained an `awaitingDecision` flag, passed from the run snapshot.
+  - The decision request form's border uses the same violet.
+- **To do:** [`docs/todo.md`](../../todo.md) item 7 records the notification system: notify a person when a run waits for their decision, later other attention events, with no timeout for now.
+- **Housekeeping:** stray text left by an earlier edit at the end of "Final audit" (a fragment of the audit command) is removed.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| `npx vitest run` on `check-findings-projection`, `protocol-contract`, `http` | Pass, 3 files | New: the snapshot of the composed run names cf-0006/cfd-0004 on wi-002 and waits; the person's answer clears it; a stop request or `job-stopped` keeps the request open and no longer waits; a run with no CheckFinding has none; `decisionWaits` names only the running, waiting run of three. Schema cases for both new shapes. The plan-list fixtures gained the field. |
+| Focused harness batch (`http`, `protocol-contract`, `run-projections`, `projections-pure`, `check-findings-projection`, `check-findings-run`, `check-findings-commands`, `plans`, `review-stop`, `execution-map-http`, `run-commands`, `reconciliation`, `progress`, `run-protocol-materialization.integration`) | Pass, 14 files, 137 tests | Explicit paths; the full suite was not run. |
+| All web tests (`subs/web/src/tests/*`) | Pass, 16 files, 148 tests | New Testing Library cases: the run page's banner, header badge, work-item marker, focus on the request and their removal after the answer; the plan page's run-list badge only for the waiting run; the plans list's waits; the header link and title prefix appearing and going; the execution map card mark. Snapshot fixtures gained `decisionRequests`. The existing work-item CheckFinding test now waits for the review coverage to load. It had read the coverage synchronously and failed once the page's render order changed; it asserts one `getReviews` call, so it does not hide a reload. |
+| `npm run test:browser:check-findings` | Pass, 31 checks (22 before), 6 screenshots | Headless Chromium against the real harness server and the rebuilt `dist/web`. New checks cover the pending decision: the plans list, the header and the tab title, the plan's run list badge beside `running`, and the run page banner naming wi-001. The banner opens Work items with wi-001 marked, and the request takes the focus. After the answer and completion: no banner or mark on the run page, and no header, title, plans-list or run-list mark. New screenshots: `plan-waiting-1440x900.png`, `run-waiting-1440x900.png`. Scripted agents, no model. |
+| `npm run type-check` | Pass | Harness, web, scripts and browser-acceptance scopes. |
+| `npm run build:web` | Pass | Vite chunk-size advisory only. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings, 279 analysis limits | 10 owners, 451 source files, 0 denied. The two new limits are `signature-inferred` on `planDecisionWaitSchema` and `runDecisionRequestsSchema`, like every protocol schema. Before the root re-exposed them, the web's imports were 3 `not-visible` errors. |
+| `git diff --check` | Clean | |
+| ramify-audit | **Not run** | This commit is not yet audited. |
+
+### Deviations and open items
+
+- The plan list is now read by the header every 5 s on every page, and each read replays the CheckFinding state of every running run. The run page still reads its own snapshot every second, so the header can lag the run page by up to 5 s after an answer.
+- A run that ended or was stopped with an open request is not marked as waiting. The request stays open in `decisionRequests.open` and in the CheckFinding panel. The session pages show a waiting run only through the header.
+- No notification is sent, as decided; `docs/todo.md` item 7 holds it.

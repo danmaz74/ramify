@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
+import { runSnapshotSchema, type RunDecisionRequests, type RunSnapshot } from '../../../harness/src/interfaces/protocol/runs.js';
 import { PlanPage } from '../plan-page.js';
 import { StubClient } from './helpers/stub-client.js';
 
@@ -91,4 +92,37 @@ test('without an agent no run can start, and a run directory the harness does no
   expect(await screen.findByText(/No agent is configured/)).toBeTruthy();
   expect((screen.getByRole('button', { name: 'Start a run' }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText(/unsupported-version: Run declares ramify-agent.job\/3/)).toBeTruthy();
+});
+
+function run(jobId: string, state: RunSnapshot['state'], decisionRequests: RunDecisionRequests): RunSnapshot {
+  const at = '2026-09-24T12:00:00.000Z';
+  return runSnapshotSchema.parse({
+    jobId, planId: 'p', agent: 'scripted', version: 30, state, phase: state === 'running' ? 'working' : 'ended', stopRequested: false,
+    startedAt: at, updatedAt: at, endedAt: state === 'running' ? null : at, failure: null, current: null, waits: [],
+    counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 5, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 0, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests,
+  });
+}
+
+test('a run that waits for the person\'s decision carries its own badge in the run list, apart from running and from an ended run\'s open request', async () => {
+  const client = clientWith('# Plan');
+  const held = { workItem: 'wi-002', requests: [{ checkFinding: 'cf-0006', request: 'cfd-0004' }] };
+  client.runList = {
+    runs: [
+      run('20260924T120000Z-a00001', 'running', { open: 1, waiting: true, workItems: [held] }),
+      run('20260924T110000Z-a00002', 'stopped', { open: 1, waiting: false, workItems: [held] }),
+      run('20260924T100000Z-a00003', 'completed', { open: 0, waiting: false, workItems: [] }),
+    ],
+    total: 3, agent: 'scripted', unserved: [],
+  };
+  render(<PlanPage client={client} planId="p" />);
+  const waiting = (await screen.findByRole('link', { name: '20260924T120000Z-a00001' })).closest('li')!;
+  const badge = within(waiting).getByText('Waiting for your decision');
+  expect(badge.className).toBe('badge awaiting-decision');
+  expect(badge.getAttribute('title')).toBe('Held until you answer: work item wi-002');
+  // Its run state stays what the log says: running, not failed.
+  expect(within(waiting).getByText('running').className).toBe('badge run-state run-state-running');
+  for (const other of ['20260924T110000Z-a00002', '20260924T100000Z-a00003']) {
+    expect(within(screen.getByRole('link', { name: other }).closest('li')!).queryByText('Waiting for your decision')).toBeNull();
+  }
 });

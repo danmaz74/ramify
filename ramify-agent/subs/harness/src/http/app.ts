@@ -99,9 +99,10 @@ export function createApp(options: AppOptions): express.Express {
   app.get(protocolPaths.plans, async (_request, response) => {
     const plans: PlanEntry[] = [];
     for (const plan of await discoverPlans(projectRoot)) {
+      const waitingForDecision = queries.decisionWaits(plan.id);
       plans.push(plan.status === 'readable'
-        ? { status: 'readable', id: plan.id, title: plan.title, path: plan.path }
-        : plan);
+        ? { status: 'readable', id: plan.id, title: plan.title, path: plan.path, waitingForDecision }
+        : { ...plan, waitingForDecision });
     }
     send(response, planListResponseSchema, { plans });
   });

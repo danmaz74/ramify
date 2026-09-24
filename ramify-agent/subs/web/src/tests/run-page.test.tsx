@@ -29,6 +29,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 2, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
     writer: { held: 'inv-0006', unsettled: null },
     review: 'not-reviewed',
+    decisionRequests: { open: 0, waiting: false, workItems: [] },
     notices: [
       {
         kind: 'module-created', at, sequence: 9, summary: 'Module created: shop/notes/drafts (subs/drafts/module.ramify) in wi-002.i01, commit abc. No placement decision proposed it.',
@@ -763,8 +764,68 @@ test('a work item\'s CheckFindings sit in its history, and the overview shows th
   fireEvent.click(await screen.findByRole('button', { name: 'wi-001' }));
   const history = await screen.findByLabelText('Work item wi-001');
   const findings = await within(history).findByLabelText('CheckFindings of wi-001');
-  expect(within(findings).getByLabelText('Review coverage').textContent).toMatch(/^Review coverage/);
+  expect((await within(findings).findByLabelText('Review coverage')).textContent).toMatch(/^Review coverage/);
   const card = await within(findings).findByRole('listitem', { name: 'CheckFinding cf-0001' });
   expect(within(card).getByRole('group', { name: 'Decision requested' })).toBeTruthy();
-  expect(client.calls).toContain(`getReviews:${runId}:wi-001`);
+  expect(client.calls.filter(call => call === `getReviews:${runId}:wi-001`)).toHaveLength(1);
+});
+
+test('a run that waits for the person\'s decision says so above every area and marks its work item; the banner opens the request; the answer clears it', async () => {
+  const signal = {
+    id: 'cf-0001', revision: 2, workItem: 'wi-001', standing: 'open', reason: 'awaiting-user-decision', awaiting: 'user-decision', verification: 'assessment',
+    obligation: null, required: false, risk: 'high', credibility: 'human-reviewed', modules: ['collection-review/workspace/reviews'], unresolved: null,
+    latestReview: false, settlement: null, materialChoice: null, repair: null, producers: ['review:scope'], title: 'The API conflicts with the plan',
+    reports: 1, decisions: 1, group: null, userCommands: ['respond'],
+    pendingUserDecision: { request: 'cfd-0001', by: { kind: 'agent', role: 'local-architect', invocation: 'inv-0020' }, rationale: 'A strong conflict',
+      conflicts: [{ text: 'The API returns a list.', document: 'plans/review-notes/plan.md', revision: 'sha256:plan' }],
+      options: [{ id: 'keep', summary: 'Keep', consequence: 'Unmet' }, { id: 'list', summary: 'List', consequence: 'Callers change' }] },
+  };
+  const coverage = { state: 'available', requested: 3, complete: 3, partial: 0, notVerified: 0, pending: 0 } as const;
+  const other: WorkItemSummary = { ...workItemSummary, id: 'wi-002', capability: 'send-email' };
+  const waiting = { open: 1, waiting: true, workItems: [{ workItem: 'wi-001', requests: [{ checkFinding: 'cf-0001', request: 'cfd-0001' }] }] };
+  const run: StubRun = {
+    ...stubRun({ current: null, writer: { held: null, unsettled: null }, decisionRequests: waiting }),
+    workItems: workItemListResponseSchema.parse({ workItems: [workItemSummary, other], total: 2 }),
+    workItem: { 'wi-001': workItemResponseSchema.parse({ workItem: workItemSummary, outlines: [], iterations: [], gates: [], requirements: [], requests: [] }) },
+    checkFindings: { [checkFindingKey({ workItem: 'wi-001', select: 'reported' })]: checkFindingListResponseSchema.parse({
+      protocol: 'check-findings/1', runId, version: 12, coverage, query: { workItem: 'wi-001', module: null, select: 'reported', order: 'attention' },
+      total: 1, shown: 1, next: null, counts: { total: 1, open: 1, deferred: 0, closed: 0, fixed: 0, waived: 0, superseded: 0, unresolved: 0, awaitingUser: 1 }, items: [signal],
+    }) },
+    checkFindingModules: checkFindingModuleCountsSchema.parse({ protocol: 'check-findings/1', runId, version: 12, coverage,
+      modules: [{ module: 'collection-review/workspace/reviews', open: 1, deferred: 0, unresolved: 0, highestOpenRisk: 'high', pendingUserDecisions: 1 }] }),
+  };
+  const client = clientWith(run);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={20} />);
+
+  // Above every area: a banner, and a header badge beside the run's state, which stays running.
+  const banner = await screen.findByRole('status', { name: 'Waiting for your decision' });
+  expect(banner.closest('[aria-label="Overview"]')).toBeNull();
+  expect(banner.textContent).toMatch(/^Waiting for your decision\. This run is held until you answer/);
+  expect(banner.textContent).toContain('There is no time limit.');
+  expect(banner.textContent).toContain('Work item wi-001: answer cfd-0001 (CheckFinding cf-0001)');
+  const header = document.querySelector('.run-page > .page-header')!;
+  expect(within(header as HTMLElement).getByText('Waiting for your decision').className).toBe('badge awaiting-decision');
+  expect(header.querySelector('.run-state')!.textContent).toBe('running');
+  // Apart from a failure and from a risk level: no alert, and the high risk is only the card's label.
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(banner.textContent).not.toMatch(/risk|fail/);
+
+  // The banner opens the work item and brings its request into view with the focus.
+  fireEvent.click(within(banner).getByRole('button', { name: 'answer cfd-0001' }));
+  expect(screen.getByRole('tab', { name: 'Work items' }).getAttribute('aria-selected')).toBe('true');
+  const list = await within(screen.getByLabelText('Work items')).findAllByRole('listitem');
+  expect(within(list[0]!).getByText('Waiting for your decision')).toBeTruthy();
+  expect(within(list[1]!).queryByText('Waiting for your decision')).toBeNull();
+  const history = await screen.findByLabelText('Work item wi-001');
+  const request = await within(history).findByRole('group', { name: 'Decision requested' });
+  await waitFor(() => expect(document.activeElement).toBe(request));
+  expect(request.id).toBe('decision-cfd-0001');
+  // The banner stays while the work item is open.
+  expect(screen.getByRole('status', { name: 'Waiting for your decision' })).toBe(banner);
+
+  // Answered: the next read of the run no longer waits, and every mark goes.
+  run.snapshot = snapshot({ version: 13, current: null, writer: { held: null, unsettled: null } });
+  await waitFor(() => expect(screen.queryByRole('status', { name: 'Waiting for your decision' })).toBeNull());
+  expect(header.querySelector('.awaiting-decision')).toBeNull();
+  expect(within(screen.getByLabelText('Work items')).queryByText('Waiting for your decision')).toBeNull();
 });

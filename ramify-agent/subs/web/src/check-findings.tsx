@@ -1,10 +1,11 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   CheckFindingActorView, CheckFindingDecisionView, CheckFindingDetail, CheckFindingListResponse, CheckFindingSettlement,
   CheckFindingSummaryView, PendingUserDecision, ReviewCoverageView, ReviewRequestView, UnresolvedReasonView,
 } from '../../harness/src/interfaces/protocol/check-findings.js';
 import type { RunCommandInput } from '../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, newCommandId, type ProtocolClient } from './client.js';
+import { useDecisionFocus } from './decision-waits.js';
 import { chapterHref } from './routes.js';
 import { useRunQuery } from './run-progress.js';
 
@@ -335,9 +336,18 @@ function CommandStatus({ status, what }: { readonly status: Status; readonly wha
 /**
  * A request for the person's decision: the exact conflicting text with its
  * document and revision, the options with their consequences, and the
- * answer form.
+ * answer form. The Run page's banner can ask for it, and it scrolls into
+ * view and takes the focus once it is shown.
  */
 function DecisionRequest({ client, planId, runId, version, summary, request }: CommandScope & { readonly request: PendingUserDecision }) {
+  const focus = useDecisionFocus();
+  const element = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus.request !== request.request || element.current === null) return;
+    element.current.scrollIntoView?.({ block: 'center' });
+    element.current.focus();
+    focus.done();
+  }, [focus, request.request]);
   const [option, setOption] = useState('');
   const [responder, setResponder] = useState('');
   const [note, setNote] = useState('');
@@ -355,7 +365,7 @@ function DecisionRequest({ client, planId, runId, version, summary, request }: C
     void send();
   };
   return (
-    <div className="decision-request" role="group" aria-label="Decision requested">
+    <div className="decision-request" role="group" aria-label="Decision requested" id={`decision-${request.request}`} ref={element} tabIndex={-1}>
       <p><strong>Your decision is requested.</strong> {actorText(request.by)} could not choose responsibly under its authority: {request.rationale}</p>
       <ul className="conflicts" aria-label="Conflicting text">
         {request.conflicts.map((conflict, index) => (

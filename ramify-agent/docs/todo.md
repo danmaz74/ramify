@@ -147,3 +147,18 @@ of the session-transcripts analysis has the measurement and a proposal.
       pruned and when instead of a missing file. Allow a run to be kept.
 - [ ] Decide whether transcripts outlive the raw check output, and whether to
       compress before deleting.
+
+## 7. Notify a person when a run waits for them
+
+**Why.** A work item whose CheckFinding requests a person's decision waits
+before its gate until a person answers, and the run advances no further
+meanwhile. Dan decided on 2026-09-24 that the wait has no time limit. Since
+Plan 12's follow-up, the web marks a waiting run in the header, the tab title,
+the plans list, the run list, the run page and the execution map. Nobody
+learns of it without looking at the web.
+
+- [ ] Notify the person when a run starts waiting for their decision, with a
+      link to the request. Choose the channel and whom it reaches.
+- [ ] Later, notify other events that need a person: a review stop, a failed
+      or stopped run, an unresolved high-risk signal.
+- [ ] Keep no timeout: a waiting run waits until answered or stopped.

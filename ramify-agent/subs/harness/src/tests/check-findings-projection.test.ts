@@ -7,14 +7,18 @@ import {
   checkFindingDetailSchema, checkFindingListResponseSchema, checkFindingModuleCountsSchema, reviewListResponseSchema,
   type CheckFindingSummaryView,
 } from '../interfaces/protocol/check-findings.js';
+import { planDecisionWaitSchema } from '../interfaces/protocol/queries.js';
+import { runSnapshotSchema } from '../interfaces/protocol/runs.js';
 import {
   checkFindingDetailOf, checkFindingListOf, checkFindingModulesOf, reviewListOf, type CheckFindingListQuery,
 } from '../projections/check-findings.js';
-import { ProjectionError, runView } from '../projections/inputs.js';
+import { ProjectionError, runView, type CommittedRun } from '../projections/inputs.js';
+import { RunQueries } from '../projections/queries.js';
+import { snapshotOf } from '../projections/snapshot.js';
 import { defaultReviewPolicy } from '../run/policy.js';
 import { reviewPolicyVersion, type RunPolicy } from '../run/records.js';
 import { concern, decision, dispose, failure, producerCause, report } from './helpers/check-findings.js';
-import { constructedRecord, constructedRun, type Line } from './helpers/constructed.js';
+import { constructedRecord, constructedRun, runId, type Line } from './helpers/constructed.js';
 
 /*
  * The CheckFinding protocol's projections over constructed runs: each
@@ -337,5 +341,52 @@ describe('CheckFinding detail and reviews', () => {
     expect(reviewListOf(view, { workItem: 'wi-002', after: null, limit: 50 }).requests).toEqual([
       expect.objectContaining({ id: 'rq-0005', result: null, attempts: [] }),
     ]);
+  });
+});
+
+describe('A run waiting for a person\'s decision', () => {
+  const snapshot = (lines: readonly Line[]) => runSnapshotSchema.parse(snapshotOf(runView(constructedRun(lines, reviewed))));
+  const held = { open: 1, waiting: true, workItems: [{ workItem: 'wi-002', requests: [{ checkFinding: 'cf-0006', request: 'cfd-0004' }] }] };
+
+  test('the snapshot names the open request and the work item it holds, and says the run waits; the answer clears it', () => {
+    const stream = fullRun();
+    expect(snapshot(stream.lines).decisionRequests).toEqual(held);
+
+    stream.record([dispose('cf-0006', stream.revision('cf-0006'), decision({ action: 'answer-user-decision', request: 'cfd-0004', option: 'keep' },
+      { actor: { kind: 'user', name: 'dana' } }))], { kind: 'user-response', command: 'answer-0001' });
+    expect(snapshot(stream.lines).decisionRequests).toEqual({ open: 0, waiting: false, workItems: [] });
+  });
+
+  test('a stop or the run\'s end leaves the request open and the run no longer waits; a run with no CheckFinding has none', () => {
+    const stopped = fullRun().line({ type: 'stop-requested', data: { command: {
+      commandId: 'stop-0001', contentHash: 'h', receipt: { commandId: 'stop-0001', jobId: runId, sequence: 30, acceptedAt: iso },
+    } } });
+    expect(snapshot(stopped.lines).decisionRequests).toEqual({ ...held, waiting: false });
+    const ended = fullRun().line({ type: 'job-stopped', data: { settled: true } });
+    expect(snapshot(ended.lines)).toMatchObject({ state: 'stopped', decisionRequests: { ...held, waiting: false } });
+    // A run begun before CheckFindings: no CheckFinding event, so no request.
+    const before = snapshot([request('rq-0001', 'wi-001', 'wi-001.i01', 'code', 'c-01')]);
+    expect(before.decisionRequests).toEqual({ open: 0, waiting: false, workItems: [] });
+  });
+
+  test('the plan list names a plan\'s waiting runs only', () => {
+    const run = (lines: readonly Line[], jobId: string): CommittedRun => {
+      const built = constructedRun(lines, constructedRecord({ jobId, policy: { reviews: defaultReviewPolicy } as unknown as RunPolicy }));
+      return { ...built, entries: built.entries.map(entry => ({ ...entry, transaction: { ...entry.transaction, event: { ...entry.transaction.event, jobId } } })) };
+    };
+    const runs = [
+      run(fullRun().lines, runId),
+      run(fullRun().line({ type: 'job-stopped', data: { settled: true } }).lines, '20260921T070000Z-0ff1ce'),
+      run([], '20260921T060000Z-5eed00'),
+    ];
+    const queries = new RunQueries({
+      projectRoot: '/nonexistent', agentName: 'scripted',
+      committed: (_plan, id) => runs.find(entry => entry.record.jobId === id),
+      committedRuns: () => runs,
+      runVersions: () => [],
+    });
+    const waits = queries.decisionWaits('review-notes');
+    expect(waits).toEqual([{ runId, requests: 1, workItems: ['wi-002'] }]);
+    expect(waits.map(wait => planDecisionWaitSchema.parse(wait))).toEqual(waits);
   });
 });

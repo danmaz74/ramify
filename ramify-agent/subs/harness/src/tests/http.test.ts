@@ -43,11 +43,11 @@ describe('the protocol over HTTP, with the web assets absent', () => {
     const { status, body } = await query(server, protocolPaths.plans);
     expect(status).toBe(200);
     expect(planListResponseSchema.parse(body).plans).toEqual([
-      { status: 'unreadable', id: 'broken', path: 'plans/broken/plan.md', message: 'plan.md is a directory, not a file' },
-      { status: 'readable', id: 'review-notes', title: 'Reviewer notes on a review run', path: 'plans/review-notes/plan.md' },
-      { status: 'readable', id: 'reviewer-identity', title: 'Who reviewed a record', path: 'plans/reviewer-identity/plan.md' },
-      { status: 'readable', id: 'revision-diff', title: 'Compare two revisions of a record', path: 'plans/revision-diff/plan.md' },
-      { status: 'readable', id: 'status-badge-tone', title: 'A tone for the status badge', path: 'plans/status-badge-tone/plan.md' },
+      { status: 'unreadable', id: 'broken', path: 'plans/broken/plan.md', message: 'plan.md is a directory, not a file', waitingForDecision: [] },
+      { status: 'readable', id: 'review-notes', title: 'Reviewer notes on a review run', path: 'plans/review-notes/plan.md', waitingForDecision: [] },
+      { status: 'readable', id: 'reviewer-identity', title: 'Who reviewed a record', path: 'plans/reviewer-identity/plan.md', waitingForDecision: [] },
+      { status: 'readable', id: 'revision-diff', title: 'Compare two revisions of a record', path: 'plans/revision-diff/plan.md', waitingForDecision: [] },
+      { status: 'readable', id: 'status-badge-tone', title: 'A tone for the status badge', path: 'plans/status-badge-tone/plan.md', waitingForDecision: [] },
     ]);
   });
 

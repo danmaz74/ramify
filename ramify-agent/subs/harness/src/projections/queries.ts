@@ -4,8 +4,10 @@ import {
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunEventPage, type RunListResponse, type RunResponse,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../interfaces/protocol/runs.js';
+import type { PlanDecisionWait } from '../interfaces/protocol/queries.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
+import { runSnapshot } from '../run/snapshot.js';
 import type { CheckFindingDetail, CheckFindingListResponse, CheckFindingModuleCounts, ReviewListResponse } from '../interfaces/protocol/check-findings.js';
 import { analysisOf, decisionsOf } from './analysis.js';
 import {
@@ -19,7 +21,7 @@ import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
 import { capabilityProgressOf } from './progress.js';
 import { scenarioListOf } from './scenarios.js';
-import { snapshotOf } from './snapshot.js';
+import { decisionRequestsOf, snapshotOf } from './snapshot.js';
 import { currentModuleTree } from './tree.js';
 import { gateOf, workItemOf, workItemsOf } from './work.js';
 
@@ -61,6 +63,22 @@ export class RunQueries {
         message: entry.error.message,
       })),
     };
+  }
+
+  /**
+   * The plan's runs that wait for a person's decision now, in the order the
+   * run list shows them. Only a running run with no stop requested can
+   * wait, so only such a run's CheckFinding state is replayed.
+   */
+  decisionWaits(planId: string): PlanDecisionWait[] {
+    return this.source.committedRuns(planId).flatMap(run => {
+      const internal = runSnapshot(run.record, run.entries.map(entry => entry.transaction.event));
+      if (internal.state !== 'running' || internal.stopRequested) return [];
+      const requests = decisionRequestsOf(run.entries, true);
+      if (!requests.waiting) return [];
+      const held = requests.workItems.reduce((sum, item) => sum + item.requests.length, 0);
+      return [{ runId: run.record.jobId, requests: held, workItems: requests.workItems.map(item => item.workItem) }];
+    });
   }
 
   async run(planId: string, runId: string): Promise<RunResponse> {

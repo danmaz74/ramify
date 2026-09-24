@@ -17,7 +17,10 @@ import { chromium, type Locator, type Page } from 'playwright-core';
  * revocation of an agent's waiver and the answer to a pending decision, each
  * through the page's own forms and the real command endpoint; then the run
  * completes and the page shows the settled and unresolved signals and their
- * history. No model is called. Screenshots and the checks go to the plan's
+ * history. While the decision is pending, the run page's banner, the header,
+ * the tab title, the plans list and the plan's run list say the run waits
+ * for the person; after the answer every one of those marks is gone. No
+ * model is called. Screenshots and the checks go to the plan's
  * evidence directory.
  *
  *   npm run build:web
@@ -60,7 +63,32 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
+  const plans = `${served.url}/#/`;
+  const plan = `${served.url}/#/plans/${encodeURIComponent(served.planId)}`;
+  const waitingLabel = 'Waiting for your decision';
+
+  // Before the run page: the plans list and the plan's run list say the run waits for the person.
+  await page.goto(plans, { waitUntil: 'networkidle' });
+  const planWaits = page.getByRole('list', { name: `Runs of ${served.planId} waiting for your decision` });
+  await planWaits.waitFor();
+  check('the plans list marks the plan whose run waits for the person\'s decision, linking the run',
+    await planWaits.getByRole('link', { name: `run ${served.runId}` }).count() === 1 && await planWaits.getByText(waitingLabel).count() === 1);
+  const headerWait = page.getByRole('status', { name: waitingLabel });
+  await headerWait.waitFor();
+  check('the header names the waiting run on every page, and the tab title says so',
+    (await headerWait.innerText()).includes(served.runId) && (await page.title()).startsWith(`${waitingLabel} · `));
+  await page.goto(plan, { waitUntil: 'networkidle' });
+  const runRow = page.locator('.run-list li').filter({ hasText: served.runId });
+  await runRow.waitFor();
+  check('the plan\'s run list gives the waiting run its own badge beside its running state',
+    await runRow.locator('.badge.awaiting-decision').innerText() === waitingLabel && await runRow.locator('.run-state').innerText() === 'running');
+  await shoot(page, 'plan-waiting-1440x900.png');
+
   await page.goto(served.page, { waitUntil: 'networkidle' });
+  const banner = page.locator('.run-page').getByRole('status', { name: waitingLabel });
+  await banner.waitFor();
+  check('the run page\'s banner, above every area, names the held work item and its request',
+    (await banner.innerText()).includes('Work item wi-001') && (await banner.innerText()).includes('There is no time limit.'));
 
   // The overview: per-module counts and the notice that a decision is requested.
   const modules = page.getByRole('table', { name: 'CheckFindings by module' });
@@ -71,9 +99,12 @@ try {
     await page.getByText('A decision is requested of you.').count() === 1);
   await shoot(page, 'overview-1440x900.png');
 
-  // The work item: review coverage and requests.
-  await page.getByRole('tab', { name: 'Work items' }).click();
-  await page.getByRole('button', { name: 'wi-001', exact: true }).click();
+  // The banner opens the work item and brings the request into view: its review coverage and requests.
+  await banner.getByRole('button', { name: /^answer cfd-/u }).click();
+  const itemMark = page.locator('.run-list li').filter({ hasText: 'wi-001' }).locator('.badge.awaiting-decision');
+  await itemMark.waitFor();
+  check('the banner opens the Work items area with the waiting work item marked',
+    await page.getByRole('tab', { name: 'Work items' }).getAttribute('aria-selected') === 'true' && await itemMark.innerText() === waitingLabel);
   const item = page.getByRole('region', { name: 'CheckFindings of wi-001' });
   const coverage = item.getByLabel('Review coverage');
   await coverage.waitFor();
@@ -95,6 +126,9 @@ try {
   check('by default: the open signal and the reported material choice, not the deferral',
     await card('cf-0001').count() === 1 && await card('cf-0003').count() === 1 && await card('cf-0002').count() === 0);
   const decision = card('cf-0001').getByRole('group', { name: 'Decision requested' });
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Decision requested', null, { timeout: 5_000 });
+  check('the banner\'s request takes the focus', await decision.evaluate(element => element === document.activeElement));
+  await shoot(page, 'run-waiting-1440x900.png');
   check('the decision request quotes the conflicting plan text with its revision',
     (await decision.getByRole('list', { name: 'Conflicting text' }).innerText()).match(/A note belongs to exactly one review run\.\s*plan at sha256:/u) !== null);
   check('a risk level is a badge, not a decision request',
@@ -134,6 +168,9 @@ try {
   await decision.getByLabel('Note (optional)').fill('The plan stands.');
   await decision.getByRole('button', { name: 'Answer' }).click();
   await page.getByText('completed', { exact: true }).first().waitFor({ timeout: 30_000 });
+  await banner.waitFor({ state: 'detached', timeout: 15_000 });
+  check('after the answer the run page shows no banner and no waiting mark',
+    await page.locator('.awaiting-decision').count() === 0);
   await card('cf-0001').getByRole('group', { name: 'Waiver' }).waitFor({ timeout: 15_000 });
   check('the answered decision is settled by the next round under the person\'s choice',
     (await card('cf-0001').getByLabel('Standing').innerText()).startsWith('Waived') &&
@@ -154,6 +191,21 @@ try {
     attempt.includes('Review rq-0001.a01 of request rq-0001 on iteration wi-001.i01') && attempt.includes('Candidate diff:') &&
     await history.locator('.attempt-link').first().getByRole('link', { name: /^ses-/u }).count() === 1);
   await shoot(page, 'work-item-completed-1440x900.png');
+
+  // Every other mark goes as well: the header, the tab title, the plans list and the run list.
+  await page.goto(plans, { waitUntil: 'networkidle' });
+  await page.locator('.plan-list').waitFor();
+  await page.waitForFunction(label => !document.title.startsWith(label), waitingLabel, { timeout: 15_000 });
+  check('after the answer the plans list, the header and the tab title no longer say the run waits',
+    await page.getByRole('status', { name: waitingLabel }).count() === 0 && await page.locator('.plan-waits').count() === 0);
+  await page.goto(plan, { waitUntil: 'networkidle' });
+  await page.locator('.run-list li').filter({ hasText: served.runId }).waitFor();
+  check('after the answer the plan\'s run list shows the completed run without the badge',
+    await page.locator('.run-list li').filter({ hasText: served.runId }).locator('.badge.awaiting-decision').count() === 0);
+  await page.goto(served.page, { waitUntil: 'networkidle' });
+  await page.getByRole('tab', { name: 'Work items' }).click();
+  await page.getByRole('button', { name: 'wi-001', exact: true }).click();
+  await card('cf-0003').waitFor();
 
   await page.setViewportSize({ width: 480, height: 800 });
   await card('cf-0003').scrollIntoViewIfNeeded();
