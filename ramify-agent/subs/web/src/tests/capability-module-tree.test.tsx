@@ -382,9 +382,13 @@ test('CM01: the capability module tree imports its canvas and styles only from t
   expect(imports.filter(([, target]) => /ramify\.ts\/(dist|subs|src)|presentation|project-view/.test(target!))).toEqual([]);
   expect(imports.filter(([, target]) => target!.startsWith('ramify.ts'))).toEqual([
     ['capability-module-tree.tsx', 'ramify.ts/module-tree'],
+    ['execution-modules.tsx', 'ramify.ts/module-tree'],
     ['styles.css', 'ramify.ts/module-tree.css'],
   ]);
-  expect(imports.filter(([, target]) => target!.startsWith('@xyflow'))).toEqual([['execution-map.tsx', '@xyflow/react']]);
+  expect(imports.filter(([, target]) => target!.startsWith('@xyflow'))).toEqual([
+    ['execution-map.tsx', '@xyflow/react'],
+    ['execution-modules.tsx', '@xyflow/react'],
+  ]);
   // The capability view still has no copied shell CSS or React Flow internals.
   for (const file of files.filter(file => file.path !== 'execution-map.tsx')) {
     expect(file.text, file.path).not.toMatch(/\.module-tree__|react-flow__|\bnodrag\b|\bnopan\b|ProjectExplorerModel|module-activity|ModuleActivity/);

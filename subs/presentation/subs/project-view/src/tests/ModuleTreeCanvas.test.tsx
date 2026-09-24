@@ -264,6 +264,21 @@ describe('ModuleTreeCanvas interaction', () => {
     expect(screen.getByRole('treeitem', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('supports several accessible highlights without changing the primary selection', () => {
+    const { rerender } = render(<ModuleTreeCanvas {...props({ nodes: mixedNodes(), selectedNodeId: 'a',
+      highlightedNodeIds: new Set(['b', 'b1']) })} />);
+    for (const id of ['b', 'b1']) {
+      const shell = document.querySelector(`[data-module-id="${id}"]`)!;
+      expect(shell).toHaveClass('module-tree__node--highlighted');
+      expect(shell).toHaveAttribute('aria-label', expect.stringContaining('highlighted'));
+      expect(shell).toHaveAttribute('aria-selected', 'false');
+    }
+    expect(document.querySelector('[data-module-id="a"]')).toHaveAttribute('aria-selected', 'true');
+    rerender(<ModuleTreeCanvas {...props({ nodes: mixedNodes() })} />);
+    expect(document.querySelectorAll('.module-tree__node--highlighted')).toHaveLength(0);
+    expect(screen.getByRole('treeitem', { name: 'B1' })).toHaveAttribute('aria-selected', 'false');
+  });
+
   it('leaves Enter and the other shell keys on a focused collapse control to the control', () => {
     const onSelectNode = vi.fn();
     const onToggleCollapsed = vi.fn();

@@ -75,6 +75,11 @@
   box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.2), 0 6px 16px rgba(15, 23, 42, 0.16);
 }
 
+.module-tree__node--highlighted {
+  outline: 3px solid #6d28d9;
+  outline-offset: 2px;
+}
+
 .module-tree__node--project {
   align-items: center;
   border-left-width: 1px;

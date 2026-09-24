@@ -42,6 +42,8 @@ export interface ModuleTreeCanvasProps {
   /** The single parentless node to lay out as the root; several parentless nodes share a project node. */
   readonly rootNodeId?: string;
   readonly selectedNodeId: string | null;
+  /** Directly related nodes highlighted alongside the primary selection. */
+  readonly highlightedNodeIds?: ReadonlySet<string>;
   readonly collapsedNodeIds: ReadonlySet<string>;
   readonly ariaLabel: string;
   /** Contents of a node shell. Controls in it neither select, open, drag nor pan. */
@@ -59,6 +61,7 @@ interface CanvasNodeData extends Record<string, unknown> {
   /** The supplied node, or null for the synthetic project node. */
   readonly module: ModuleTreeCanvasNode | null;
   readonly isSelected: boolean;
+  readonly isHighlighted: boolean;
   readonly isCollapsed: boolean;
   readonly childCount: number;
   readonly hiddenCount: number;
@@ -158,6 +161,7 @@ function ModuleTreeCanvasNodeView({ data }: NodeProps<CanvasFlowNode>): React.Re
   };
   const classes = ['module-tree__node'];
   if (data.isSelected) classes.push('module-tree__node--selected');
+  if (data.isHighlighted) classes.push('module-tree__node--highlighted');
   if (emphasis !== 'normal') classes.push(`module-tree__node--${emphasis}`);
   return (
     <div
@@ -167,6 +171,7 @@ function ModuleTreeCanvasNodeView({ data }: NodeProps<CanvasFlowNode>): React.Re
       data-emphasis={emphasis}
       role="treeitem"
       aria-selected={data.isSelected}
+      data-highlighted={data.isHighlighted}
       aria-expanded={data.childCount > 0 ? !data.isCollapsed : undefined}
       aria-label={data.ariaLabel}
       tabIndex={0}
@@ -253,6 +258,7 @@ export function ModuleTreeCanvas({
   nodes: items,
   rootNodeId,
   selectedNodeId,
+  highlightedNodeIds,
   collapsedNodeIds,
   ariaLabel,
   renderNodeBody,
@@ -285,10 +291,11 @@ export function ModuleTreeCanvas({
       data: {
         module: item,
         isSelected: placed.id === selectedNodeId,
+        isHighlighted: highlightedNodeIds?.has(placed.id) ?? false,
         isCollapsed: collapsedNodeIds.has(placed.id),
         childCount: index.children.get(placed.id)?.length ?? 0,
         hiddenCount: index.descendants.get(placed.id) ?? 0,
-        ariaLabel: item === null ? 'Project' : ariaLabelOf?.(item) ?? item.name,
+        ariaLabel: item === null ? 'Project' : `${ariaLabelOf?.(item) ?? item.name}${highlightedNodeIds?.has(placed.id) ? ', highlighted' : ''}`,
         renderBody: renderNodeBody,
         onSelect: onSelectNode,
         onToggle: onToggleCollapsed,
@@ -296,7 +303,7 @@ export function ModuleTreeCanvas({
       },
     };
   }), [ariaLabelOf, collapsedNodeIds, index, layout, onOpenNode, onSelectNode, onToggleCollapsed, renderNodeBody,
-    selectedNodeId]);
+    highlightedNodeIds, selectedNodeId]);
   const edges = useMemo<CanvasFlowEdge[]>(() => layout.edges.map(edge => ({
     id: edge.id, source: edge.parent, target: edge.child, type: 'treeElbow', data: { points: edge.points },
   })), [layout]);

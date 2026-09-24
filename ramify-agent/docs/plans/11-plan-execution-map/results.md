@@ -155,3 +155,28 @@ Use `ProtocolClient.getExecutionMap(planId, runId)` for the complete, coherent e
 ### Handoff to iterations 7–9
 
 `ExecutionMapArea` owns selected execution key, collapsed branches, card positions and viewport; the companion map can connect its selection at that boundary in iteration 7. The module tree and direct/descendant highlight counts are not yet rendered. Sessions currently open the existing full-page transcript; iteration 8 replaces that activation with multiple floating windows and a shared live update coordinator. Browser viewport, drag/zoom/focus, contrast and reduced-motion behavior need real-browser acceptance in iteration 9. The full suite, scripted-run witness and final-commit audit remain iteration 9 gates.
+
+## Iteration 7 — compact modules canvas and cross-selection
+
+**Starting commit:** `f7ed9845663aa04dd9878dd8f5c091a53db9bea9` (iteration 6 handoff).
+
+### Delivered
+
+- The Execution map now includes a smaller companion modules hierarchy from the complete `moduleMap` snapshot. It uses the packaged `ramify.ts/module-tree` canvas and a separate React Flow provider, so each canvas owns its pan, zoom and fit state. Its current-tree rows retain full paths in selected detail; proposed and outside-tree shells, unplaced work, and an explicit unavailable-tree fallback remain visible. The narrow layout has an expandable modules panel.
+- Violet marks only `workedIn` modules; uninvolved parents remain gray and show a separate involved-descendant count. Captured writer additions and deletions appear numerically and as symmetric diverging bars scaled to the largest known module side in the run. Partial and pending subtotals have text and hatching; unavailable data has no numeric zero or bar. Selected detail preserves coverage gaps and binary counts.
+- One selection state links the maps. Selecting an execution node highlights every directly related module with its role available in detail. Selecting a module highlights distinct canonical direct execution nodes from the fully reassembled relation rows. Hidden matches remain in a jump list and add a counted, accessible badge to each collapsed branch containing them. A jump reveals and focuses the target. Main cards, Now, session/gate shelves and event rail all clear a previous module selection when they select execution work. Hover has no selection effect.
+- The toolkit `ModuleTreeCanvas` received one optional, backward-compatible `highlightedNodeIds` prop. Its shells expose an outline, `data-highlighted`, and a spoken highlighted label; existing consumers pass no new prop.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| Focused web execution-map, companion-map and existing capability-module-tree Vitest files | Pass: 3 files, 25 tests | Covers direct and multi-module selection, deduplicated canonical matches, keyboard module activation, hidden badge and reveal, direct vs descendant color, run-wide bar scale, partial and unavailable lines, proposed/outside/unplaced, drawer control and independent mocked viewport state. |
+| Focused toolkit `ModuleTreeCanvas` Vitest file | Pass: 1 file, 23 tests | Optional multi-highlight accessibility and existing selection/collapse consumers. |
+| Agent `npm run type-check`, `npm run build:web`, `npm run check:self` | Pass | Self-check: 0 errors, 0 warnings, 189 existing analysis limits. The Vite large-chunk advisory remains. |
+| Toolkit `npm run build`, `npm run type-check`, `npm run check:self` | Pass | Toolkit self-check: 0 errors, 0 warnings, 0 analysis limits. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Handoff to iteration 8 and acceptance
+
+`ExecutionMapArea` now owns a single execution-or-module selection, and `ExecutionModules` consumes the reassembled `moduleMap` directly. Its separate React Flow provider and narrow panel must remain when transcript windows are added. Session activation still goes to the full-page route; iteration 8 replaces that activation with the live floating workspace. The mocked viewport tests establish state separation, while real pointer pan/zoom, responsive layout and keyboard focus in Chromium remain iteration 9 browser acceptance work, along with the full scripted run and final-commit audit.
