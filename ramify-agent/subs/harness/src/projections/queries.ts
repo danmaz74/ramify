@@ -4,9 +4,15 @@ import {
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunEventPage, type RunListResponse, type RunResponse,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../interfaces/protocol/runs.js';
+import type { PlanDecisionWait } from '../interfaces/protocol/queries.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
+import { runSnapshot } from '../run/snapshot.js';
+import type { CheckFindingDetail, CheckFindingListResponse, CheckFindingModuleCounts, ReviewListResponse } from '../interfaces/protocol/check-findings.js';
 import { analysisOf, decisionsOf } from './analysis.js';
+import {
+  checkFindingDetailOf, checkFindingListOf, checkFindingModulesOf, reviewListOf, runVersionOf, type CheckFindingListQuery,
+} from './check-findings.js';
 import { eventPage } from './events.js';
 import { executionCapabilityDetailOf, executionCoreOf, executionMapOf, executionScenarioDetailOf } from './execution-map.js';
 import { ExecutionPageError, executionPageOf } from './execution-pages.js';
@@ -15,7 +21,7 @@ import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
 import { capabilityProgressOf } from './progress.js';
 import { scenarioListOf } from './scenarios.js';
-import { snapshotOf } from './snapshot.js';
+import { decisionRequestsOf, snapshotOf } from './snapshot.js';
 import { currentModuleTree } from './tree.js';
 import { gateOf, workItemOf, workItemsOf } from './work.js';
 
@@ -57,6 +63,22 @@ export class RunQueries {
         message: entry.error.message,
       })),
     };
+  }
+
+  /**
+   * The plan's runs that wait for a person's decision now, in the order the
+   * run list shows them. Only a running run with no stop requested can
+   * wait, so only such a run's CheckFinding state is replayed.
+   */
+  decisionWaits(planId: string): PlanDecisionWait[] {
+    return this.source.committedRuns(planId).flatMap(run => {
+      const internal = runSnapshot(run.record, run.entries.map(entry => entry.transaction.event));
+      if (internal.state !== 'running' || internal.stopRequested) return [];
+      const requests = decisionRequestsOf(run.entries, true);
+      if (!requests.waiting) return [];
+      const held = requests.workItems.reduce((sum, item) => sum + item.requests.length, 0);
+      return [{ runId: run.record.jobId, requests: held, workItems: requests.workItems.map(item => item.workItem) }];
+    });
   }
 
   async run(planId: string, runId: string): Promise<RunResponse> {
@@ -157,12 +179,46 @@ export class RunQueries {
     return executionScenarioDetailOf(view, scenario);
   }
 
+  /**
+   * A page of the run's CheckFindings with its review coverage. A version
+   * the query names that is not the run's is refused as stale, with the
+   * current one, so a client never mixes pages of two versions.
+   */
+  async checkFindings(planId: string, runId: string, query: CheckFindingListQuery, expectedVersion?: number): Promise<CheckFindingListResponse> {
+    return checkFindingListOf(await this.versioned(planId, runId, expectedVersion), query);
+  }
+
+  /** Every module the run's CheckFindings concern, with the unsettled ones of each. */
+  async checkFindingModules(planId: string, runId: string, expectedVersion?: number): Promise<CheckFindingModuleCounts> {
+    return checkFindingModulesOf(await this.versioned(planId, runId, expectedVersion));
+  }
+
+  /** One CheckFinding with its history, relations, attempts, candidate diffs and repairs. */
+  async checkFinding(planId: string, runId: string, checkFinding: string, expectedVersion?: number): Promise<CheckFindingDetail> {
+    return checkFindingDetailOf(await this.versioned(planId, runId, expectedVersion), checkFinding);
+  }
+
+  /** The run's review requests, of one work item when named, with their attempts and coverage. */
+  async reviews(planId: string, runId: string, query: { readonly workItem: string | null; readonly after: string | null; readonly limit: number }, expectedVersion?: number): Promise<ReviewListResponse> {
+    return reviewListOf(await this.versioned(planId, runId, expectedVersion), query);
+  }
+
   async gate(planId: string, runId: string, gate: string): Promise<GateResponse> {
     return { gate: gateOf(await this.view(planId, runId), gate) };
   }
 
   async metrics(planId: string, runId: string): Promise<MetricsResponse> {
     return metricsOf(await this.view(planId, runId));
+  }
+
+  /** The view of one served run, refused as stale when the caller named another version. */
+  private async versioned(planId: string, runId: string, expectedVersion: number | undefined): Promise<RunView> {
+    const view = await this.view(planId, runId);
+    const current = runVersionOf(view);
+    if (expectedVersion !== undefined && expectedVersion !== current) {
+      throw new ProjectionError('stale-version', `Run ${runId} is at version ${current}, not ${expectedVersion}`, [], current);
+    }
+    return view;
   }
 
   /** The view of one served run; a run that exists and is not served is reported with why, never as absent. */

@@ -1,10 +1,14 @@
 import type { z } from 'zod';
+import {
+  checkFindingDetailSchema, checkFindingListResponseSchema, checkFindingModuleCountsSchema, reviewListResponseSchema,
+  type CheckFindingDetail, type CheckFindingListResponse, type CheckFindingModuleCounts, type ReviewListResponse,
+} from '../../harness/src/interfaces/protocol/check-findings.js';
 import { errorResponseSchema, type ErrorCode } from '../../harness/src/interfaces/protocol/errors.js';
 import { executionCapabilityDetailSchema, executionMapPageSchema, executionScenarioDetailSchema,
   type ExecutionCapabilityDetail, type ExecutionScenarioDetail } from '../../harness/src/interfaces/protocol/execution-map.js';
 import { moduleTreeResponseSchema, type ModuleTree } from '../../harness/src/interfaces/protocol/evidence.js';
 import { commandResponseSchema, type Receipt } from '../../harness/src/interfaces/protocol/jobs.js';
-import { protocolPaths } from '../../harness/src/interfaces/protocol/paths.js';
+import { protocolPaths, type CheckFindingPathQuery } from '../../harness/src/interfaces/protocol/paths.js';
 import {
   planListResponseSchema,
   planResponseSchema,
@@ -80,6 +84,14 @@ export interface ProtocolClient {
   getExecutionCapability(planId: string, runId: string, capability: string, version: number): Promise<ExecutionCapabilityDetail>;
   getExecutionScenario(planId: string, runId: string, scenario: string, version: number): Promise<ExecutionScenarioDetail>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
+  /** A page of the run's CheckFindings, of one work item or module, with its review coverage. */
+  getCheckFindings(planId: string, runId: string, query: CheckFindingPathQuery): Promise<CheckFindingListResponse>;
+  /** One CheckFinding with its history and what it links to. */
+  getCheckFinding(planId: string, runId: string, checkFinding: string): Promise<CheckFindingDetail>;
+  /** The unsettled CheckFindings of every module they concern. */
+  getCheckFindingModules(planId: string, runId: string): Promise<CheckFindingModuleCounts>;
+  /** The run's review requests, of one work item when named, with their coverage. */
+  getReviews(planId: string, runId: string, workItem?: string): Promise<ReviewListResponse>;
   getMetrics(planId: string, runId: string): Promise<MetricsResponse>;
   /** Every session of the project, live and suspended first; a page of at most 200 from `offset`. */
   listSessions(offset?: number): Promise<SessionListResponse>;
@@ -194,6 +206,10 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getExecutionScenario: (planId, runId, scenario, version) => get(
       protocolPaths.runExecutionScenario(planId, runId, scenario, version), executionScenarioDetailSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
+    getCheckFindings: (planId, runId, query) => get(protocolPaths.runCheckFindings(planId, runId, query), checkFindingListResponseSchema),
+    getCheckFinding: (planId, runId, checkFinding) => get(protocolPaths.runCheckFinding(planId, runId, checkFinding), checkFindingDetailSchema),
+    getCheckFindingModules: (planId, runId) => get(protocolPaths.runCheckFindingModules(planId, runId), checkFindingModuleCountsSchema),
+    getReviews: (planId, runId, workItem) => get(protocolPaths.runReviews(planId, runId, { workItem }), reviewListResponseSchema),
     getMetrics: (planId, runId) => get(protocolPaths.runMetrics(planId, runId), metricsResponseSchema),
     listSessions: (offset = 0) => get(protocolPaths.sessions(offset), sessionListResponseSchema),
     getStandaloneSession: session => get(protocolPaths.standaloneSession(session), standaloneSessionResponseSchema),

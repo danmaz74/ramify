@@ -30,7 +30,7 @@ function describe(event: RunEvent): [string, Ref[]] {
       const { fork, replaces, requestedBy } = event.data;
       return [
         `The ${event.data.role} session ${event.data.session} opened on ${event.data.executor}${event.data.model === null ? '' : `, model ${event.data.model}`}`
-          + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}, generation ${fork.generation})`)
+          + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}${fork.generation === undefined ? '' : `, generation ${fork.generation}`})`)
           + (replaces === undefined ? '' : `, in place of ${replaces.session} (${replaces.reason})`)
           + (requestedBy === undefined ? '' : `, requested by ${requestedBy.invocation} (${requestedBy.reason})`),
         [
@@ -173,7 +173,10 @@ function describe(event: RunEvent): [string, Ref[]] {
         [...event.data.members.map(id => ({ kind: 'capability' as const, id })), ...ref('work-item', event.data.closedBy)],
       ];
     case 'work-item-completed':
-      return [`Work item ${event.data.workItem} completed`, [...ref('work-item', event.data.workItem), ...ref('gate', event.data.gate)]];
+      return [
+        `Work item ${event.data.workItem} completed${event.data.unresolved === undefined || event.data.unresolved.length === 0 ? '' : `, with ${counted(event.data.unresolved.length, 'CheckFinding', 'CheckFindings')} unresolved`}`,
+        [...ref('work-item', event.data.workItem), ...ref('gate', event.data.gate)],
+      ];
     case 'writer-acquired':
       return [`Session ${event.data.invocation} holds the writer`, ref('invocation', event.data.invocation)];
     case 'writer-released':
@@ -182,9 +185,9 @@ function describe(event: RunEvent): [string, Ref[]] {
         ref('invocation', event.data.invocation),
       ];
     case 'scenarios-materializing':
-      return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are being written onto the run branch`, []];
+      return [`${featureFiles(event.data.files.length)} being written onto the run branch`, []];
     case 'scenarios-materialized':
-      return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are on the run branch`, ref('commit', event.data.commit)];
+      return [`${featureFiles(event.data.files.length)} on the run branch`, ref('commit', event.data.commit)];
     case 'scenario-declared':
       return [
         `Scenario ${event.data.scenario} was declared and is ${event.data.state}${event.data.state === 'bound' ? ', keeping its pending tag while its work item holds fakes' : ''}`,
@@ -204,8 +207,49 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) started`, ref('gate', event.data.gate)];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
-    case 'gate-attempted':
-      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}`, ref('gate', event.data.gate)];
+    case 'gate-attempted': {
+      const carried = event.data.checkFindings?.length ?? 0;
+      const refused = event.data.scenarioFindings?.refused;
+      const findings = carried > 0 ? `, with ${counted(carried, 'CheckFinding event', 'CheckFinding events')}`
+        : refused ? `; its CheckFinding part was refused (${refused.reason})` : '';
+      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}${findings}`, ref('gate', event.data.gate)];
+    }
+    case 'check-findings-recorded': {
+      // CheckFindings have no reference kind on the wire yet; the page names the count and the cause.
+      const cause = event.data.cause;
+      const why = cause.kind === 'recovery' ? `recovery: ${cause.detail}`
+        : cause.kind === 'user-response' ? `a response, command ${cause.command}`
+          : cause.kind === 'user-command' ? `a person's command ${cause.command.commandId}`
+            : `${cause.producer} attempt ${cause.attempt}`;
+      return [`${counted(event.data.checkFindings.length, 'CheckFinding event was', 'CheckFinding events were')} recorded (${why})`, []];
+    }
+    case 'review-request-recorded':
+      return [`A ${event.data.kind} review ${event.data.request} was requested of iteration ${event.data.iteration}'s audited candidate`, [...ref('work-item', event.data.workItem), ...ref('gate', event.data.gate), ...ref('commit', event.data.candidate)]];
+    case 'review-attempt-started':
+      return [`Review attempt ${event.data.attempt} started`, [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)]];
+    case 'review-orientation-recorded':
+      return [event.data.outcome === 'oriented'
+        ? `The design guidance of ${event.data.request} was read once, as orientation ${event.data.key.slice(0, 12)}, for design reviews to fork`
+        : `The design orientation ${event.data.key.slice(0, 12)} of ${event.data.request} failed; its design reviews start fresh`,
+      [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)]];
+    case 'review-attempt-finished': {
+      const result = event.data.result === 'not-verified' ? `not verified (${event.data.reason ?? 'no reason'})` : event.data.result;
+      const concerns = event.data.checkFindings.length === 0 ? '' : `, with ${counted(event.data.checkFindings.length, 'CheckFinding event', 'CheckFinding events')}`;
+      return [`Review attempt ${event.data.attempt} finished: ${result}${event.data.settles ? '' : ', to be retried'}${concerns}`, []];
+    }
+    case 'reconciliation-started':
+      return [`Reconciliation ${event.data.reconciliation} (round ${event.data.round}) of ${event.data.workItem} started`, ref('work-item', event.data.workItem)];
+    case 'reconciliation-assessed': {
+      const next = event.data.next === 'correct' ? 'a correction' : event.data.next === 'await-user' ? 'a user decision' : 'the work item\'s gate';
+      return [
+        `Reconciliation ${event.data.reconciliation} was assessed, with ${counted(event.data.checkFindings.length, 'CheckFinding event', 'CheckFinding events')}; next, ${next}`,
+        [...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
+      ];
+    }
+    case 'reconciliation-brief-appended':
+      return [`The brief of ${event.data.reconciliation} reached the local architect's session (${event.data.outcome}${event.data.reason === null ? '' : `: ${event.data.reason}`})`, ref('session', event.data.session)];
+    case 'reconciliation-refused':
+      return [`${event.data.reconciliation === null ? `${event.data.workItem}'s completion` : `Reconciliation ${event.data.reconciliation}`} was refused at its ${event.data.stage}: ${event.data.reason}`, ref('work-item', event.data.workItem)];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':
@@ -230,6 +274,11 @@ const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => 
 
 /** The invocation a point names, where it names one. */
 const pointRefs = (point: SessionPoint | undefined): Ref[] => (point !== undefined && 'invocation' in point ? ref('invocation', point.invocation) : []);
+
+/** The plan's feature files as a sentence's subject and verb, which agree in number. */
+function featureFiles(count: number): string {
+  return count === 1 ? 'The feature file of the plan\'s scenarios is' : `The ${count} feature files of the plan's scenarios are`;
+}
 
 function unreachable(event: never): never {
   throw new Error(`No projection for event ${(event as RunEvent).type}`);

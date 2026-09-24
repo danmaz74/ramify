@@ -12,6 +12,8 @@ import { workSchemas } from '../work/records.js';
 import { iterationSchemas } from '../work/iterations.js';
 import { contractSchemas } from '../contracts/records.js';
 import { architectureSchemas } from '../architecture/records.js';
+import { reviewSchemas } from '../reviews/records.js';
+import { reconciliationSchemas } from '../reviews/reconciliation.js';
 import { initialAnalysisSubmissionSchema } from '../analysis/submission.js';
 import { localArchitectSubmissionSchema } from '../work/submission.js';
 import { engineerSubmissionSchema, scopeTestsInputSchema } from '../work/engineer.js';
@@ -180,6 +182,9 @@ describe('no query appends an event', () => {
         await queries.capabilities(plan, run.runId);
         await queries.scenarios(plan, run.runId);
         await queries.metrics(plan, run.runId);
+        await queries.checkFindings(plan, run.runId, { workItem: null, module: null, select: 'all', order: 'attention', after: null, limit: 100 });
+        await queries.checkFindingModules(plan, run.runId);
+        await queries.reviews(plan, run.runId, { workItem: null, after: null, limit: 100 });
         const page = await queries.events(plan, run.runId, 0);
         for (const gate of new Set(page.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
           await queries.gate(plan, run.runId, gate);
@@ -194,7 +199,7 @@ describe('no query appends an event', () => {
 
 /** Every schema a durable record, a log line, a submission, a harness tool or a projection is written against. */
 function unionRoots(): Record<string, unknown> {
-  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas };
+  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas, ...reviewSchemas, ...reconciliationSchemas };
   return {
     'run log': runEventSchema,
     'observation log': observationSchema,
@@ -233,7 +238,7 @@ const submissionSchemas: Readonly<Record<string, unknown>> = {
 /** What the composed runs wrote, walked value by value against the schemas that describe it. */
 async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
   const observed = new Map<unknown, Set<string>>();
-  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas };
+  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas, ...reviewSchemas, ...reconciliationSchemas };
   const bySchema = new Map<string, unknown>(Object.values(registries).map(entry => [entry.schema, entry.body]));
   for (const run of finished.values()) {
     const directory = runDirectory(run.root, run.runId);
@@ -292,6 +297,110 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  // Plan 12: CheckFindings committed through a driven run's own transition, and iteration reviews.
+  { union: 'run log.type', values: ['check-findings-recorded'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  // Plan 12 iteration 7: a person's CheckFinding commands.
+  { union: 'command.type', values: ['respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-command'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['waive', 'revoke-waiver', 'answer-user-decision'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['user-decision'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-response'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
+  { union: 'run log[check-findings-recorded].data.cause.kind', values: ['recovery'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
+  { union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-opened'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.credibility', values: ['objective'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  // Plan 12 iteration 4b: a driven review's concerns, with the reviewer's risk and the harness's credibility.
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.judgment.risk', values: ['high', 'medium', 'low'], file: 'subs/harness/src/tests/review-signals.test.ts', test: 'the harness classifies what each concern names, on the candidate\'s own module tree, and refuses a ground the reviewer did not read' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.credibility', values: ['human-reviewed', 'agent-generated', 'ungrounded'], file: 'subs/harness/src/tests/review-signals.test.ts', test: 'the harness classifies what each concern names, on the candidate\'s own module tree, and refuses a ground the reviewer did not read' },
+  { union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-decided'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.owner.kind', values: ['work-item'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.source.kind', values: ['tree'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.verification.kind', values: ['assessment', 'check'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.observation.kind', values: ['check-failed', 'review-concern'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.judgment.actor.kind', values: ['agent'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.communication.mode', values: ['quiet'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['plan-repair'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[plan-repair].repair.kind', values: ['intent'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
+  { union: 'run log.type', values: ['review-request-recorded', 'review-attempt-started', 'review-attempt-finished'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'run log[session-opened].data.role', values: ['reviewer'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'run log[review-request-recorded].data.kind', values: ['code'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'run log[review-attempt-started].data.requestedStart', values: ['fresh'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'run log[review-attempt-finished].data.result', values: ['complete', 'partial'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'run log[review-attempt-finished].data.result', values: ['not-verified'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
+  // Plan 12 iteration 6: the scenario producer's promotions, witnesses and what a gate's line leaves out.
+  { union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-reported'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['fix-by-check'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['complete'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['passed'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['source-unavailable'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'an audited tree that cannot be read refuses the part with its reason on the gate\'s line; the verdict and the run go on' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['witness'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['promotion'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a line holds at most 100 CheckFinding events; a scenario that does not fit is named and left for its next failure' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['failure-source'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['incomparable-inputs', 'insufficient-coverage', 'obligation-changed'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a narrower run, another mode, a pass on the failure\'s own tree and a changed obligation do not fix it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['not-executed', 'not-passed'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a witness that did not run, ran in part or did not pass is refused by the child' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['awaiting-user-decision'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'an open CheckFinding awaiting a user\'s answer is not fixed by a gate' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|1', values: ['event-bound'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a line holds at most 100 CheckFinding events; a scenario that does not fit is named and left for its next failure' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|1', values: ['source-unavailable'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a failure whose audited tree was not read is named and left out, and the other scenarios go on' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].classification', values: ['inconclusive'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].classification', values: ['intermittent'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'two passes on the failure\'s own tree are provisionally intermittent, and still fix nothing' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['invalid-output', 'timed-out', 'unavailable'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['stopped'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'two live readers are stopped with the writer, each attempt is settled before job-stopped, and a reader that ignores its stop ingests nothing' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['deadline'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'the settlement bound stops a reader that never answers, and the run completes with no reader left' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['execution-failed'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'a crash while a reader runs finishes its attempt as not verified, and its session as interrupted' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['queue-overflow'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: "a request beyond the queue's bound is finished as overflowed and never run" },
+  { union: 'record ramify-agent.review-request/1.forkPoint.kind', values: ['none'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'record ramify-agent.review-attempt/1.requestedStart', values: ['fresh'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'record ramify-agent.review-attempt/1.actualStart', values: ['fresh'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'record ramify-agent.review-attempt/1.result.result', values: ['complete', 'partial'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
+  { union: 'record ramify-agent.review-attempt/1.result.result', values: ['not-verified'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
+  // Plan 12 iteration 4: the scope and design questions, their fork points and the bounded scheduler.
+  { union: 'run log[review-request-recorded].data.kind', values: ['scope', 'design'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[review-attempt-started].data.requestedStart', values: ['fork'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-request/1.forkPoint.kind', values: ['session', 'orientation'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-request/1.forkPoint.kind', values: ['unavailable'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a candidate without guidance leaves its design review unavailable, never clean' },
+  { union: 'record ramify-agent.review-attempt/1.requestedStart', values: ['fork'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-attempt/1.actualStart', values: ['fork'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log.type', values: ['review-orientation-recorded'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  // Plan 12 iteration 5: work-item reconciliation.
+  { union: 'run log.type', values: ['reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'run log[session-opened].data.fork.reason', values: ['reconciliation'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'run log[reconciliation-assessed].data.next', values: ['complete'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['appended'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-basis/1.requests[].result', values: ['complete'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-basis/1.floor', values: ['any'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.requestedStart', values: ['fork'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.actualStart', values: ['fork'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['fixed', 'supersede', 'waive'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.next.kind', values: ['complete'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.next', values: ['complete'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'parallel reports of one behavior are linked, same-file concerns stay distinct, a judgment is superseded, a later repair is fixed and a weak tension is waived as a material choice' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['reconciliation'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'run log[work-item-completed].data.unresolved[].reason', values: ['below-floor'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'run log[reconciliation-assessed].data.next', values: ['correct', 'unresolved'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'record ramify-agent.reconciliation-basis/1.floor', values: ['non-low'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['repair', 'leave'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.next.kind', values: ['correct', 'unresolved'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.next', values: ['correct', 'unresolved'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
+  { union: 'run log[work-item-completed].data.unresolved[].reason', values: ['rounds-exhausted', 'raised-after-last-round'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'at the last round no correction is planned, what is open stays unresolved, and a signal raised after it does not block completion' },
+  { union: 'record ramify-agent.reconciliation-basis/1.floor', values: ['none'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'at the last round no correction is planned, what is open stays unresolved, and a signal raised after it does not block completion' },
+  { union: 'run log[reconciliation-assessed].data.next', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['request-user-decision'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.next.kind', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.next', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'run log.type', values: ['reconciliation-refused'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
+  { union: 'run log[reconciliation-refused].data.stage', values: ['assessment', 'completion'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['defer'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['session-lost'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a fork point that no longer exists starts fresh with the whole packet, and a brief that cannot be appended reaches the next architect input from the log' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['failed'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'an append the executor fails is recorded as failed, the session is kept, and the next architect input carries the brief from the log' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['no-session'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a round after the architect\'s session was lost has no session to append to, and records no-session' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.actualStart', values: ['fresh'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a fork point that no longer exists starts fresh with the whole packet, and a brief that cannot be appended reaches the next architect input from the log' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a crash after the parent append is recovered once from the committed assessment, and the repair keeps its intent' },
+  { union: 'record ramify-agent.reconciliation-basis/1.requests[].result', values: ['not-verified'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a reader still running at the deadline is fenced and stopped, the queue stays open, and the correction\'s review still runs' },
+  { union: 'run log[session-opened].data.fork.reason', values: ['scope-review', 'design-orientation'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[review-orientation-recorded].data.outcome', values: ['oriented'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[review-orientation-recorded].data.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once, and the design reviews of its guidance start fresh with the reason' },
+  { union: 'record ramify-agent.review-orientation/1.outcome', values: ['oriented'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-orientation/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once, and the design reviews of its guidance start fresh with the reason' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['no-time-before-deadline'], file: 'subs/harness/src/tests/review-scheduling.test.ts', test: "after the completion request, a waiting request that could not finish before the work item's deadline is finished at once" },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['pass'], file: 'subs/harness/src/tests/execution-map-durable.test.ts', test: 'replays the independent published audit result after restart' },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['fail'], file: 'subs/harness/src/tests/execution-map-projection.test.ts', test: 'reads old gates without an audit fact and a failed published audit independently of verdict' },
   { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
@@ -431,6 +540,67 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
   {
+    union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-related'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.owner.kind', values: ['run'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.source.kind', values: ['file', 'document', 'artifact'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.judgment.actor.kind', values: ['user', 'harness'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.communication.mode', values: ['report'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'fix-by-assessment', 'supersede', 'defer', 'request-user-decision', 'reopen', 'revise-obligation'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[plan-repair].repair.kind', values: ['assignment'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['partial', 'not-run'],
+    reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers partial and unrun witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['failed', 'inconclusive'],
+    reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers failed and inconclusive witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['work-item-assessment', 'governing-record'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[defer].revisit.kind', values: ['condition', 'follow-up'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[reopen].cause.kind', values: ['decision', 'report'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-related].data.relation.relation', values: ['same-issue', 'related-but-distinct', 'distinct', 'uncertain'],
+    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['transition-refused'],
+    reason: 'The scenario adapter decides every command of a gate\'s CheckFinding part in order before the transition decides them again, and leaves out each one the child refuses, so the transition has nothing left to refuse. The value keeps an unexpected refusal from failing the gate; it has never been reached.',
+  },
+  {
+    union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0',
+    values: ['invalid-command', 'invalid-report', 'report-key-conflict', 'ambiguous-issue-key', 'unknown-check-finding', 'unknown-report', 'stale-revision', 'invalid-transition', 'waived', 'not-waived', 'no-pending-user-decision', 'unknown-option', 'insufficient-authority', 'verification-kind-mismatch', 'factual-obligation', 'required-obligation', 'producer-mismatch', 'wrong-subject', 'source-mismatch', 'relation-self', 'cross-owner', 'relation-cycle', 'replay-conflict', 'invalid-query'],
+    reason: 'A note carries the child\'s own rejection code. The scenario adapter reports only a failure of a tracked scenario it bound itself, attaching to the one CheckFinding its key names, and offers a witness only of the same scenario for an open scenario CheckFinding of its own work item, so none of these refusals can follow; the child\'s own tests produce each one.',
+  },
+  {
     union: 'run log[iteration-closed].data.outcome', values: ['superseded'],
     reason: 'No iteration-closed event carries it: a superseded result is committed by the evidence-reopened transaction, never by iteration-closed. The event\'s schema admits a value its only writer never writes.',
   },
@@ -493,6 +663,18 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.iteration-assignment/1.gate.checkpoint', values: ['readiness', 'work-item', 'final'],
     reason: 'An assignment\'s checkpoint is derived from its kind and is iteration, contract or breaking-iteration; the field shares the checkpoint vocabulary of GateAttempt, where these three are produced.',
+  },
+  {
+    union: 'record ramify-agent.reconciliation-basis/1.requests[].result', values: ['partial'],
+    reason: 'A partial review settles its request like a complete one; the reconciliation tests\' reviewers submit complete reviews, and partial coverage is exercised by the review tests of iterations 3 and 4.',
+  },
+  {
+    union: 'record ramify-agent.reconciliation-assessment/1.requestedStart', values: ['fresh'],
+    reason: 'Every reconciliation requests the fork of its completion request; a missing point is a degraded fork request, recorded as requested fork and actually fresh (appendix §5), so no assessment requests a fresh start.',
+  },
+  {
+    union: 'record ramify-agent.job/3.policy.limits.laterRoundMinimumRisk', values: ['high'],
+    reason: 'The trial captures medium (appendix §4); high is a policy value no run captures yet, and the floor rule for it is exercised by reconciliation-submission.test.ts.',
   },
   {
     union: 'error.error.code', values: ['inputs-changed'],

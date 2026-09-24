@@ -1,8 +1,8 @@
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { mkdir, readFile, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
-import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
+import { gitCandidateSource, gitService, GitError, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -11,21 +11,64 @@ import { acceptedCommit } from '../checks/accepted.js';
 import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection } from '../checks/selection.js';
+import {
+  planScenarioFindings, scenarioGatesToRead, scenarioObservations,
+  type GateCheckFindingOutcome, type ScenarioFindingNote, type ScenarioGateInputs, type ScenarioObservation,
+} from '../checks/scenario-findings.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
+import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
+import { decideCheckFindingChange } from '../../subs/check-findings/src/decide.js';
+import type {
+  CheckFindingAt, CheckFindingCommand, CheckFindingGround, CheckFindingId, CheckFindingQueryInput, CheckFindingReportCredibility, CheckFindingRisk,
+  CheckFindingSelection, CheckFindingState, CheckFindingSummary,
+} from '../../subs/check-findings/src/interfaces/check-findings.js';
+import type { CheckFindingCause } from '../check-findings/records.js';
+import { checkFindingStateOf } from '../check-findings/state.js';
+import {
+  commitCheckFindingChange, decideCheckFindingTransaction, type CheckFindingBuild, type CheckFindingCommit,
+} from '../check-findings/transition.js';
+import {
+  attentionAt, basisChange, briefText as reconciliationBrief, needsLaterRound, reconciliationAssessmentSchema, reconciliationBasisSchema,
+  reconciliationId, reconciliationJsonSchema, reconciliationLayout, reconciliationSubmissionDescription, reconciliationToolName, roundFloor,
+  validateReconciliation,
+  type AttentionEntry, type BasisRequest, type BoundReconciliation, type BriefAppendOutcome, type ReconciliationAssessment,
+  type ReconciliationBasis, type ReconciliationSubmission, type UnresolvedReason,
+} from '../reviews/reconciliation.js';
+import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { recordSettledSnapshot } from './mutations.js';
-import type { Receipt } from '../interfaces/protocol/jobs.js';
+import { reportCommand, type BoundReport } from '../check-findings/report.js';
+import { userCheckFindingChange, userRejectionCode } from '../check-findings/user-commands.js';
+import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
+import { canonicalJson } from '../jobs/commands.js';
+import {
+  concernKey, reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas,
+  type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
+  type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
+} from '../reviews/records.js';
+import { orientationKey, planExcerpts, readGuidance, type CapturedInput } from '../reviews/inputs.js';
+import { orientationMessage, reviewMessage } from '../reviews/message.js';
+import { ReviewQueue } from '../reviews/scheduler.js';
+import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
+import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotTools } from '../reviews/snapshot.js';
+import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
+import {
+  orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
+  reviewToolName, validateOrientation, validateReview,
+} from '../reviews/submission.js';
+import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
-import { Mutex } from '../jobs/mutex.js';
+import { Mutex, PriorityMutex } from '../jobs/mutex.js';
 import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planStateDirectory } from '../jobs/records.js';
 import { ensureStateDirectory } from '../store/state-directory.js';
-import { readPlan } from '../plans/discover.js';
+import { planPath, readPlan } from '../plans/discover.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderGlobalForkPrompt,
-  renderInitialArchitectPrompt, renderLocalArchitectPrompt, sha256, type LoadedPackage,
+  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
+  type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
 import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
@@ -70,7 +113,7 @@ import {
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
-  iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, moduleNoticeSchema,
+  iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, iterationSchemas, moduleNoticeSchema,
   workItemOfIteration,
   type IterationAssignment, type IterationResult, type ModuleNotice,
 } from '../work/iterations.js';
@@ -82,7 +125,7 @@ import {
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
-import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
+import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type ReconciliationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
@@ -91,12 +134,13 @@ import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/sc
 import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
 import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
+import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
-import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
+import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from './policy.js';
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
-  commitForMaterialization, commitForScenarios, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
+  commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
   incompleteScenarios, trackedScenarios, withdrawalMessage, withdrawnTrailerValue, withStates, writtenScenarios,
   type FeatureRerendering,
 } from './feature-files.js';
@@ -111,7 +155,7 @@ import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
   recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
-  type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
+  type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
 } from './records.js';
 import { reduceSessions, type RunSessions } from './sessions.js';
@@ -196,6 +240,8 @@ export interface RunServiceOptions {
   readonly ramify: RamifyCli;
   /** External Git operations. Lifecycle tests supply scripted answers, like their agent port. */
   readonly git?: GitService | undefined;
+  /** Where a review reads its frozen candidate from: Git's objects by default; tests script it like Git. */
+  readonly candidates?: CandidateSource | undefined;
   /** How committing checkpoint commands run. */
   readonly checkExecution: CheckExecutionPort;
   /**
@@ -233,6 +279,8 @@ export interface RunRecoveryReport {
   readonly invocations: string[];
   /** Run directories that could not be loaded and are not served. */
   readonly skipped: string[];
+  /** Review requests an accepted iteration was owed and recovery recorded, and attempts it finished as not verified. */
+  readonly reviews: string[];
 }
 
 const key = (planId: string, runId: string) => `${planId}/${runId}`;
@@ -279,6 +327,25 @@ interface InvocationRequest<T> {
   readonly equip?: ((session: EquipContext) => Equipment) | undefined;
   /** A session that ended for a reason only the caller can name, such as a tool's exhausted bound. */
   readonly endedAs?: (() => InvocationOutcome['ended'] | undefined) | undefined;
+  /**
+   * Whether this invocation is a reader beside the writer: it holds no
+   * writer, a run-wide bound it meets refuses it without failing the run,
+   * and a session of it that does not become idle blocks no writer, since it
+   * was given nothing that writes or starts a process.
+   */
+  readonly reader?: boolean | undefined;
+  /** The session's working directory; the project root when absent. A reader's is an empty directory of its own. */
+  readonly workingDirectory?: string | undefined;
+  /** A tighter absolute bound than the run policy's, such as a review attempt's. */
+  readonly absoluteMs?: number | undefined;
+  /** Called once `invocation-started` is committed and before the session starts, such as to commit what the invocation is for. */
+  readonly onStarted?: ((invocation: string, session: SessionId) => Promise<void>) | undefined;
+  /**
+   * Whether the invocation, once started, ends at once as stopped with no
+   * session: a reader whose request its work item's deadline settled while
+   * it was being started. Asked after `onStarted`.
+   */
+  readonly fenced?: (() => boolean) | undefined;
   /** A session mode the caller could not honor, recorded on the invocation. */
   readonly degraded?: { readonly requested: 'fresh' | 'continued' | 'fork'; readonly reason: string } | undefined;
   /** The session a continued start joins; a fresh or forked start opens a new one. */
@@ -309,6 +376,49 @@ type SessionKeeping = { readonly kept: true } | { readonly kept: false; readonly
 
 const kept: SessionKeeping = { kept: true };
 const finished = (reason: SessionFinishReason): SessionKeeping => ({ kept: false, finished: reason });
+
+/** The reconciliation rounds of a run whose policy predates them. */
+const defaultReconciliationRounds = 3;
+
+/**
+ * The local architect's own session while its work item reconciles: the
+ * harness's session and the executor's latest point, which a brief append
+ * moves, and the rounds whose brief did not land, which its next input carries.
+ */
+interface ParentSession {
+  session: SessionId | undefined;
+  ref: string | undefined;
+  readonly undelivered: string[];
+}
+
+/**
+ * What a work item's completion is validated against before
+ * `work-item-completed`: the source, the settled requests and the attention
+ * set its last reconciliation left, and whether decisions were made against
+ * that source, which its scenario-rendering lineage must then preserve.
+ */
+interface CompletionBasis {
+  readonly commit: string;
+  readonly requests: readonly BasisRequest[];
+  readonly checkFindings: readonly CheckFindingAt[];
+  readonly decided: boolean;
+}
+
+/** What a reconciliation leads to: the work item's gate, or a correction its architect assigns. */
+type Reconciled =
+  | { readonly kind: 'gate'; readonly basis: CompletionBasis }
+  | { readonly kind: 'correct'; readonly reconciliation: string };
+
+/** What a reconciliation brief's append did; the completion of its effect. */
+interface BriefAppend {
+  readonly session: SessionId | null;
+  readonly ref: string | null;
+  readonly outcome: BriefAppendOutcome;
+  readonly reason: string | null;
+}
+
+/** An assessment whose basis no longer held when it was to be committed; nothing was appended. */
+class AssessmentRefusedError extends Error {}
 
 /**
  * What one iteration ended with: the result that closed it, and the need it
@@ -353,16 +463,44 @@ interface InvocationResult<T> {
   readonly session: SessionId;
   /** Whether the harness kept the session to use it again. */
   readonly kept: boolean;
+  /** The bound or fault that interrupted it, where one did. */
+  readonly interruption?: InvocationOutcome['interruption'];
+  /** The mode the executor actually started the session in; absent where none started. */
+  readonly actual?: 'fresh' | 'continue' | 'fork' | undefined;
+}
+
+/** One invocation the run has open: the writer or a reader, and its session once it started. */
+interface LiveInvocation {
+  readonly role: Role;
+  readonly reader: boolean;
+  session: AgentSession | undefined;
+  readonly done: Promise<void>;
 }
 
 class Run {
   readonly mutex = new Mutex();
-  session: AgentSession | undefined;
+  /**
+   * Serializes the start of invocations: each one's identifier and its
+   * session's are counted from the log, so two starts must not count the
+   * same prefix. Nothing slow runs under it. A writer's start waiting here
+   * goes before every reader's: the writer has scheduling priority.
+   */
+  readonly starting = new PriorityMutex();
+  /** Every invocation the run has open, by ID: at most one writer, and the readers beside it. */
+  readonly live = new Map<string, LiveInvocation>();
   stopRequested: boolean;
   /** Settles when the run's driver has nothing left to do. */
   done: Promise<void> = Promise.resolve();
-  /** Settles when the invocation the run has open is closed. */
-  invocationDone: Promise<void> = Promise.resolve();
+  /** The run's review readers, once it reviews; undefined for a run whose policy requests none. */
+  reviews: ReviewQueue | undefined;
+  /** Why the run stopped its readers, which a reader stopped for it records as its attempt's reason. */
+  readerStop: NotVerifiedReason | undefined;
+  /** When the run's reviews must be settled by, once its final settlement began; epoch milliseconds. */
+  settleDeadline: number | undefined;
+  /** The design orientations being made, by key, so that two attempts of one key make it once. */
+  readonly orienting = new Map<string, Promise<ReviewOrientation>>();
+  /** The commit-and-audit effect in flight, which the run's terminal event waits for. */
+  gating: Promise<unknown> | undefined;
   /** The writer of the run; one at a time, and the log says which. */
   readonly writer: WriterOwnership;
   index: ArchitectIndex | null = null;
@@ -387,6 +525,18 @@ class Run {
 
   get key(): string {
     return key(this.record.planId, this.record.jobId);
+  }
+
+  /** The sessions of every open invocation, the writer's and the readers'. */
+  sessions(filter: (live: LiveInvocation) => boolean = () => true): AgentSession[] {
+    return [...this.live.values()].filter(filter).flatMap(live => (live.session === undefined ? [] : [live.session]));
+  }
+
+  /** Settles once the driver, every open invocation and every review attempt have finished. */
+  async idle(): Promise<void> {
+    await this.done;
+    await this.reviews?.settled();
+    while (this.live.size > 0) await Promise.all([...this.live.values()].map(live => live.done));
   }
 
   /** Settles at the next `notify`: an approval, a stop or the service closing. */
@@ -414,9 +564,11 @@ export class RunService {
   private closing: Promise<void> | undefined;
 
   private readonly git: GitService;
+  private readonly candidates: CandidateSource;
 
   private constructor(private readonly options: RunServiceOptions) {
     this.git = options.git ?? gitService;
+    this.candidates = options.candidates ?? gitCandidateSource;
   }
 
   /**
@@ -475,7 +627,10 @@ export class RunService {
    * session. A session whose invocation is still awaited is left live: its
    * end is that invocation's own.
    */
-  private endRun(run: Run, terminal: RunEventInput, opening: SessionFinishReason = 'run-ended'): Promise<'committed' | 'ended'> {
+  private async endRun(run: Run, terminal: RunEventInput, opening: SessionFinishReason = 'run-ended'): Promise<'committed' | 'ended'> {
+    // A gate's commit and audit run outside the mutex; its attempt is
+    // committed before anything ends the run, as when the mutex held it.
+    await run.gating?.catch(() => undefined);
     return run.mutex.run(async () => {
       if (run.log.terminal) return 'ended';
       const sessions = this.sessionsOf(run);
@@ -516,7 +671,12 @@ export class RunService {
     const briefs = run.log.all('brief-appended')
       .filter(event => event.data.session === session && event.sequence > ended)
       .map(event => event.data.decision);
-    return { from: point, reason, briefs };
+    // A reconciliation's brief is appended to the local architect's own
+    // session; the append is the executor's and names no harness point.
+    const reconciled = run.log.all('reconciliation-brief-appended')
+      .filter(event => event.data.session === session && event.sequence > ended && (event.data.outcome === 'appended' || event.data.outcome === 'already-present'))
+      .map(event => event.data.reconciliation);
+    return { from: point, reason, briefs: [...briefs, ...reconciled] };
   }
 
   /** The transcript of one of the run's sessions. */
@@ -558,10 +718,1312 @@ export class RunService {
     }
   }
 
+  // Reviews
+
+  /**
+   * The run's review readers, created when its driver starts for a run whose
+   * policy requests reviews. Each wake starts what the policy has room for.
+   */
+  private startReviews(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>): void {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined || run.reviews !== undefined) return;
+    run.reviews = new ReviewQueue({
+      concurrency: policy.concurrency,
+      queue: policy.queue,
+      unsettled: () => unsettledRequests(run.log.events).map(request => request.id),
+      attempt: request => this.runReviewAttempt(run, agent, packages, request),
+      overflow: async request => {
+        await this.finishUnsettledReviews(run, () => ({ reason: 'queue-overflow', detail: `More than ${policy.queue} review requests were waiting; this one was not run` }), [request]);
+      },
+      deadline: request => this.reviewDeadline(run, request),
+      attemptMs: policy.attemptMs,
+      expire: async request => {
+        await this.finishUnsettledReviews(run, () => ({
+          reason: 'no-time-before-deadline',
+          detail: `An attempt may run ${policy.attemptMs} ms, and its reviews must be settled by ${new Date(this.reviewDeadline(run, request) ?? 0).toISOString()}; none was started`,
+        }), [request]);
+      },
+      now: () => this.now().getTime(),
+      warn: text => this.warn(`Run ${run.record.jobId}: ${text}`),
+    });
+    run.reviews.wake();
+  }
+
+  /**
+   * When a request must be settled by: its work item's first completion
+   * request after it was recorded, plus the policy's settlement bound, or
+   * the run's own settlement deadline once that began, whichever is
+   * earlier. Null while neither applies. Read from the log each time.
+   */
+  private reviewDeadline(run: Run, id: string): number | null {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined) return null;
+    const recorded = run.log.all('review-request-recorded').find(event => event.data.request === id);
+    if (recorded === undefined) return null;
+    // Only the revision that commits a completion request carries the
+    // architect's point after it, null or not.
+    const completion = run.log.all('outline-revised')
+      .find(event => event.data.workItem === recorded.data.workItem && event.sequence > recorded.sequence && event.data.architectRef !== undefined);
+    const deadlines = [
+      ...(completion === undefined ? [] : [Date.parse(completion.at) + policy.settleMs]),
+      ...(run.settleDeadline === undefined ? [] : [run.settleDeadline]),
+    ];
+    return deadlines.length === 0 ? null : Math.min(...deadlines);
+  }
+
+  /**
+   * The iterations that closed accepted after an engineer's passing gate,
+   * which are the ones a review request is owed for: their audited commit,
+   * gate and assignment. Contract iterations establish agreements and are
+   * not reviewed in this version.
+   */
+  private reviewableClosings(run: Run): Array<{ readonly workItem: string; readonly iteration: string; readonly gate: string; readonly commit: string }> {
+    const assigned = new Set(run.log.all('iteration-assigned').map(event => event.data.iteration));
+    return run.log.all('iteration-closed').flatMap(event => (
+      event.data.outcome === 'accepted' && event.data.gate !== null && event.data.commit !== null && assigned.has(event.data.iteration)
+        ? [{ workItem: event.data.workItem, iteration: event.data.iteration, gate: event.data.gate, commit: event.data.commit }]
+        : []));
+  }
+
+  /**
+   * Records every review request owed for one accepted iteration, once per
+   * key, before the driver passes it. The candidate's tree is read first,
+   * outside the mutex; the key is checked and the identifier counted under
+   * it. Answers the requests it recorded: none for a key already recorded,
+   * a run that has ended, or a candidate whose tree cannot be read, which
+   * is warned about.
+   */
+  private async requestReviews(run: Run, closed: { readonly workItem: string; readonly iteration: string; readonly gate: string; readonly commit: string }): Promise<string[]> {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined) return [];
+    let tree: string;
+    try {
+      tree = await this.candidates.commitTree(this.projectRoot, closed.commit);
+    } catch (error) {
+      // A request binds its tree; without one there is nothing to review
+      // against, and the gap is the missing request, stated here.
+      this.warn(`Run ${run.record.jobId}: no review of ${closed.iteration} was requested; the tree of ${closed.commit} could not be read: ${message(error)}`);
+      return [];
+    }
+    const number = Number.parseInt(closed.iteration.slice(closed.iteration.lastIndexOf('.i') + 2), 10);
+    const base = this.acceptedBefore(run, closed.gate);
+    const assignment = iterationLayout.assignment(closed.workItem, number);
+    // Each question's captured inputs are read before the mutex, as the tree is.
+    const inputs = new Map<ReviewKind, ReviewInputs>();
+    for (const kind of policy.kinds) inputs.set(kind, await this.reviewInputs(run, kind, { ...closed, assignment, base }));
+    const recorded: string[] = [];
+    for (const kind of policy.kinds) {
+      const outcome = await run.mutex.run(async () => {
+        if (run.log.terminal) return null;
+        const existing = [...reviewStateOf(run.log.events).values()]
+          .find(request => request.iteration === closed.iteration && request.candidate === closed.commit && request.kind === kind);
+        if (existing !== undefined) return null;
+        const id = reviewRequestId(run.log.count('review-request-recorded') + 1);
+        const request = reviewRequestSchema.parse({
+          schema: 'ramify-agent.review-request/1',
+          id,
+          key: { iteration: closed.iteration, candidate: closed.commit, kind, policy: policy.version },
+          workItem: closed.workItem,
+          assignment,
+          base,
+          gate: closed.gate,
+          tree,
+          ...inputs.get(kind)!,
+        } satisfies ReviewRequest);
+        await commitRecord(run.log.ledger, {
+          event: run.log.next({
+            type: 'review-request-recorded',
+            data: { request: id, workItem: closed.workItem, iteration: closed.iteration, kind, gate: closed.gate, candidate: closed.commit },
+          }),
+          records: [{ path: reviewLayout.request(id), id, revision: 1, body: request }],
+        });
+        return id;
+      });
+      if (outcome !== null) recorded.push(outcome);
+    }
+    run.reviews?.wake();
+    return recorded;
+  }
+
+  /**
+   * What one question of one candidate is given besides the candidate, and
+   * the point its reviewer starts from. Code review needs nothing more and
+   * never forks. Scope review binds the plan excerpts the assignment cites
+   * and the local architect's pinned point at the assignment. Design review
+   * binds the guidance it selects from the candidate and the orientation
+   * key of that selection. An input that cannot be read is recorded as
+   * such: the attempt then says what it lacked.
+   */
+  private async reviewInputs(
+    run: Run,
+    kind: ReviewKind,
+    closed: { readonly workItem: string; readonly iteration: string; readonly commit: string; readonly assignment: string; readonly base: string },
+  ): Promise<ReviewInputs> {
+    const none: ReviewInputs = { requirements: [], guidance: [], forkPoint: { kind: 'none' } };
+    if (kind === 'code') return none;
+    if (kind === 'scope') {
+      const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === closed.iteration);
+      const pinned = assigned?.data.architectRef;
+      const forkPoint: ForkPoint = pinned === undefined || pinned === null
+        ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after the assignment' : 'The assignment recorded no pinned point of the local architect' }
+        : { kind: 'session', session: pinned.session, ref: pinned.ref };
+      const requirements = await this.scopeRequirements(run, closed.assignment).catch(error => {
+        this.warn(`Run ${run.record.jobId}: the plan excerpts of ${closed.iteration} could not be read: ${message(error)}`);
+        return [] as CapturedInput[];
+      });
+      return { requirements: requirements.map(({ ref, hash }) => ({ ref, hash })), guidance: [], forkPoint };
+    }
+    try {
+      const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: closed.commit, base: closed.base });
+      const guidance = (await readGuidance(this.candidates, this.projectRoot, snapshot)).map(({ ref, hash }) => ({ ref, hash }));
+      if (guidance.length === 0) return { ...none, forkPoint: { kind: 'unavailable', reason: 'The candidate holds no guidance to judge a design against' } };
+      const key = orientationKey({
+        guidance,
+        packageHash: run.record.prompts.reviewer?.hash ?? null,
+        agent: run.record.agent,
+        model: this.options.model ?? null,
+        context: run.record.policy.context.reviewer,
+      });
+      return { requirements: [], guidance, forkPoint: { kind: 'orientation', key } };
+    } catch (error) {
+      return { ...none, forkPoint: { kind: 'unavailable', reason: `The candidate's guidance could not be read: ${message(error)}` } };
+    }
+  }
+
+  /** The plan excerpts an iteration's assignment cites, from the captured plan. */
+  private async scopeRequirements(run: Run, assignmentPath: string): Promise<CapturedInput[]> {
+    const assignment = iterationAssignmentSchema.parse(this.committedBody(run, assignmentPath));
+    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    return planExcerpts(plan, assignment.requirementRefs);
+  }
+
+  /** A record body as the log committed it, never the materialized file. */
+  private committedBody(run: Run, path: string): unknown {
+    for (const entry of run.log.ledger.replay()) {
+      for (const record of entry.transaction.records) if (record.path === path) return record.body;
+    }
+    return undefined;
+  }
+
+  /**
+   * One attempt of one request, from its snapshot to its terminal record.
+   * Answers whether a terminal record was committed: an attempt fenced by a
+   * settled request, a run that ended or a service that is closing commits
+   * nothing, and its reader's session was stopped and closed like any other.
+   */
+  private async runReviewAttempt(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, id: string): Promise<boolean> {
+    const policy = run.record.policy.reviews;
+    const state = reviewStateOf(run.log.events).get(id);
+    if (policy === undefined || state === undefined || state.settledBy !== null) return false;
+    if (this.ignoring(run) || run.reviews?.accepting !== true) return false;
+    const request = reviewRequestSchema.parse(this.committedBody(run, reviewLayout.request(id)));
+    const kind = request.key.kind;
+    const attempt = reviewAttemptId(id, state.attempts.length + 1);
+    const queuedAt = state.attempts.at(-1)?.finished?.at ?? state.recordedAt;
+    const retryLeft = state.attempts.filter(entry => entry.finished !== null && !entry.finished.settles).length < policy.retries;
+    const requestedStart = requestedStartOf(request);
+    const base = { id: attempt, request: id, queuedAt, requestedStart };
+    const unavailable = (detail: string) => this.finishReview(run, request, {
+      ...base, startedAt: null, invocation: null, session: null, actualStart: null,
+    }, { result: 'not-verified', reason: 'unavailable', detail }, true);
+
+    const loaded = packages.get('reviewer');
+    if (loaded?.reviewer === undefined) return await unavailable('No prompt package is loaded for the reviewer') === 'committed';
+    if (kind === 'design' && request.guidance.length === 0) {
+      return await unavailable(request.forkPoint.kind === 'unavailable' ? request.forkPoint.reason : 'No design guidance was selected') === 'committed';
+    }
+    let snapshot: CandidateSnapshot;
+    let requirements: CapturedInput[] = [];
+    let guidance: CapturedInput[] = [];
+    try {
+      snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: request.key.candidate, base: request.base });
+    } catch (error) {
+      return await unavailable(`The audited candidate could not be read: ${message(error)}`) === 'committed';
+    }
+    try {
+      // The question's inputs are read again and must be the bytes the
+      // request bound; anything else is not the question it asked.
+      if (kind === 'scope') requirements = boundInputs(await this.scopeRequirements(run, request.assignment), request.requirements);
+      if (kind === 'design') {
+        const texts = await Promise.all(request.guidance.map(entry => this.candidates.readBlob(this.projectRoot, request.key.candidate, entry.ref)));
+        guidance = boundInputs(request.guidance.map((entry, index) => ({ ref: entry.ref, hash: sha256(texts[index]!), text: texts[index]! })), request.guidance);
+      }
+    } catch (error) {
+      return await unavailable(`The ${kind} review's captured inputs could not be read as recorded: ${message(error)}`) === 'committed';
+    }
+    const start = await this.reviewStart(run, agent, loaded, request, guidance);
+    // An orientation made first may have met a stop or the deadline, and
+    // its work item's deadline may have settled the request meanwhile.
+    if (this.closed || this.ignoring(run) || run.reviews?.accepting !== true) return false;
+    if (reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+
+    const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
+    const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
+    const tools = snapshotTools(snapshot, this.candidates, this.projectRoot);
+    const workspace = run.path(join(dirname(reviewLayout.attempt(attempt)), 'workspace'));
+    await mkdir(workspace, { recursive: true });
+
+    let started: { invocation: string; session: SessionId; at: string } | undefined;
+    /** Set when the request was settled before this attempt's start could be recorded. */
+    let fenced = false;
+    const result = await this.runInvocation<ReviewSubmission>(run, agent, {
+      role: 'reviewer',
+      work: { workItem: request.workItem, iteration: request.key.iteration },
+      attempt: state.attempts.length + 1,
+      loaded,
+      systemPrompt: renderReviewerPrompt(loaded, '(no working directory: the audited candidate only)', kind),
+      prompt: reviewMessage({
+        request,
+        snapshot,
+        assignment: assignment.success ? assignment.data : null,
+        checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
+        requirements,
+        planDocument: snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null,
+      }),
+      start: start.start,
+      ...(start.fork === undefined ? {} : { fork: start.fork }),
+      ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
+      toolName: reviewToolName,
+      description: reviewSubmissionDescription,
+      inputSchema: reviewJsonSchema,
+      submissionSchema: 'ramify-agent.review-submission/1',
+      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), read: tools.read(), maxConcerns: policy.maxConcerns }),
+      keep: () => finished('work-closed'),
+      scope: { write: null, measurement: null, size: null },
+      reader: true,
+      workingDirectory: workspace,
+      absoluteMs: policy.attemptMs,
+      equip: () => ({ builtinTools: [], tools: [...tools.definitions] }),
+      // The start is recorded only for a request still unsettled, under the
+      // mutex its deadline settles it under; a settled one's reader never starts.
+      onStarted: async (invocation, session) => {
+        const at = this.now();
+        const recorded = await run.mutex.run(async () => {
+          if (run.log.terminal !== undefined || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+          await run.log.append({ type: 'review-attempt-started', data: { request: id, attempt, invocation, session, requestedStart } }, at);
+          return true;
+        });
+        if (recorded) started = { invocation, session, at: at.toISOString() };
+        else fenced = true;
+      },
+      fenced: () => fenced,
+    });
+    // A closing service records nothing more; recovery finishes the attempt.
+    if (this.closed || fenced) return false;
+
+    const outcome = reviewOutcome(result, run.readerStop);
+    const settles = !(outcome.retryable && retryLeft && !this.ignoring(run) && run.reviews?.accepting === true);
+    const attemptBody = {
+      ...base,
+      startedAt: started?.at ?? null,
+      invocation: started?.invocation ?? null,
+      session: started?.session ?? null,
+      // What the executor answered, never what was asked: a fork it could
+      // not take is a fresh start, and is never measured as a fork.
+      actualStart: result.actual === undefined ? null : result.actual === 'fork' ? 'fork' as const : 'fresh' as const,
+    };
+    const submission = result.ended === 'submitted' ? result.value : undefined;
+    // What the harness binds to each concern is read here, before the
+    // transition takes the run mutex.
+    const bindings = submission === undefined || submission.concerns.length === 0
+      ? []
+      : await this.concernBindings(run, request, snapshot, tools, submission);
+    const committed = await this.finishReview(run, request, attemptBody, outcome.result, settles, submission, bindings);
+    return committed === 'committed';
+  }
+
+  /**
+   * The ground, credibility and modules of each concern of a valid
+   * submission, in concern order. The ground is the file the reviewer named,
+   * with the hash of what `snapshot_read` answered; its credibility is the
+   * provenance class of that file; the modules own the concern's locations
+   * on the candidate's own module tree, else the work item's module. A
+   * candidate whose module declarations cannot be read leaves only that
+   * fallback, with a warning.
+   */
+  private async concernBindings(run: Run, request: ReviewRequest, snapshot: CandidateSnapshot, tools: SnapshotTools, submission: ReviewSubmission): Promise<ConcernBinding[]> {
+    const index = await candidateModuleIndex(this.candidates, this.projectRoot, snapshot).catch(error => {
+      this.warn(`Run ${run.record.jobId}: the module declarations of ${request.key.candidate} could not be read, so ${request.id}'s concerns name only their work item's module: ${message(error)}`);
+      return null;
+    });
+    const ledger = run.log.ledger.replay();
+    const workItemModule = committedRecords(ledger).workItems.find(item => item.id === request.workItem)?.module ?? null;
+    const provenance = { planId: run.record.planId, featureFiles: new Set(trackedScenarios(ledger).records.map(record => record.file)) };
+    const read = tools.read();
+    return submission.concerns.map(concern => {
+      const resolved = concern.ground === null ? null : resolveSnapshotPath(snapshot, concern.ground.path);
+      const path = resolved?.ok === true ? resolved.path : null;
+      const hash = path === null ? undefined : read.get(path);
+      const ground = path === null || hash === undefined ? null : { ref: path, hash };
+      return {
+        ground,
+        credibility: groundCredibility(ground?.ref ?? null, provenance),
+        modules: concernModules(index, concern.locations, workItemModule),
+      };
+    });
+  }
+
+  /**
+   * Where one attempt's reviewer starts. Code review starts fresh. Scope
+   * review forks the local architect at the point that produced its
+   * assignment, and design review forks the orientation of its guidance,
+   * made first where none exists yet. A fork point that is missing or
+   * unusable starts fresh, recorded as a start the caller could not honor;
+   * the message is the complete input either way.
+   */
+  private async reviewStart(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, guidance: readonly CapturedInput[]): Promise<{
+    readonly start: SessionStart;
+    readonly fork?: ForkRelation | undefined;
+    readonly degraded?: { readonly requested: 'fork'; readonly reason: string } | undefined;
+  }> {
+    const fresh = (reason: string) => ({ start: { mode: 'fresh' } as const, degraded: { requested: 'fork' as const, reason } });
+    const point = request.forkPoint;
+    if (point.kind === 'none') return { start: { mode: 'fresh' } };
+    if (point.kind === 'unavailable') return fresh(point.reason);
+    let from: { readonly session: SessionId; readonly invocation: string; readonly ref: string; readonly reason: 'scope-review' | 'design-orientation' };
+    if (point.kind === 'session') {
+      const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === request.key.iteration);
+      if (assigned === undefined) return fresh(`No assignment of ${request.key.iteration} is recorded`);
+      from = { session: point.session as SessionId, invocation: assigned.data.invocation, ref: point.ref, reason: 'scope-review' };
+    } else {
+      const orientation = await this.orientation(run, agent, loaded, request, guidance);
+      if (orientation.outcome !== 'oriented' || orientation.session === null || orientation.invocation === null || orientation.ref === null) {
+        return fresh(`The design orientation ${point.key.slice(0, 12)} did not orient: ${orientation.reason ?? 'no reason was recorded'}`);
+      }
+      from = { session: orientation.session as SessionId, invocation: orientation.invocation, ref: orientation.ref, reason: 'design-orientation' };
+    }
+    const source = this.sessionsOf(run)?.get(from.session);
+    if (source === undefined || !source.invocations.includes(from.invocation) || source.awaiting === from.invocation) {
+      return fresh(`${from.session} has not reached the end of ${from.invocation}`);
+    }
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === from.invocation)?.sequence ?? 0;
+    const briefs = run.log.all('brief-appended')
+      .filter(event => event.data.session === from.session && event.sequence < ended)
+      .map(event => event.data.decision);
+    return {
+      start: { mode: 'fork', from: from.ref },
+      fork: { from: { session: from.session, invocation: from.invocation }, reason: from.reason, briefs },
+    };
+  }
+
+  /**
+   * The design orientation of a request's guidance selection: the one the
+   * log records for its key, or one made now, once, by a reviewer session
+   * that reads the guidance and is kept. A failed orientation is recorded
+   * too, so the run does not pay for it twice; its design reviews start
+   * fresh with the reason.
+   */
+  private async orientation(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, guidance: readonly CapturedInput[]): Promise<ReviewOrientation> {
+    const key = request.forkPoint.kind === 'orientation' ? request.forkPoint.key : '';
+    const recorded = this.recordedOrientation(run, key);
+    if (recorded !== undefined) return recorded;
+    let making = run.orienting.get(key);
+    if (making === undefined) {
+      making = this.orient(run, agent, loaded, request, key, guidance);
+      run.orienting.set(key, making);
+    }
+    return await making;
+  }
+
+  private recordedOrientation(run: Run, key: string): ReviewOrientation | undefined {
+    if (run.log.all('review-orientation-recorded').every(event => event.data.key !== key)) return undefined;
+    const parsed = reviewOrientationSchema.safeParse(this.committedBody(run, reviewLayout.orientation(key)));
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  private async orient(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, key: string, guidance: readonly CapturedInput[]): Promise<ReviewOrientation> {
+    const policy = run.record.policy.reviews!;
+    const workspace = run.path(join(dirname(reviewLayout.orientation(key)), key.slice(0, 16)));
+    await mkdir(workspace, { recursive: true });
+    const result = await this.runInvocation<OrientationSubmission>(run, agent, {
+      role: 'reviewer',
+      work: { workItem: request.workItem, iteration: request.key.iteration },
+      attempt: 1,
+      loaded,
+      systemPrompt: renderOrientationPrompt(loaded),
+      prompt: orientationMessage(guidance),
+      start: { mode: 'fresh' },
+      toolName: orientationToolName,
+      description: orientationSubmissionDescription,
+      inputSchema: orientationJsonSchema,
+      submissionSchema: 'ramify-agent.orientation-submission/1',
+      validate: input => validateOrientation(input, guidance.map(entry => entry.ref)),
+      // The orientation is retained: every design review of its key forks it.
+      keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
+      scope: { write: null, measurement: null, size: null },
+      reader: true,
+      workingDirectory: workspace,
+      absoluteMs: policy.attemptMs,
+      equip: () => ({ builtinTools: [], tools: [] }),
+    });
+    const oriented = result.ended === 'submitted' && result.value !== undefined && result.ref !== '';
+    const orientation = reviewOrientationSchema.parse({
+      schema: 'ramify-agent.review-orientation/1',
+      key,
+      guidance: guidance.map(({ ref, hash }) => ({ ref, hash })),
+      request: request.id,
+      invocation: result.id === '' ? null : result.id,
+      session: result.session === '' ? null : result.session,
+      ref: oriented ? result.ref : null,
+      outcome: oriented ? 'oriented' : 'failed',
+      summary: oriented ? result.value!.summary : null,
+      reason: oriented ? null : `The orientation ended ${result.ended}${result.interruption === undefined ? '' : ` (${result.interruption})`}`,
+    } satisfies ReviewOrientation);
+    if (!this.closed) {
+      await this.write(run, {
+        type: 'review-orientation-recorded',
+        data: { key, request: request.id, invocation: orientation.invocation, session: orientation.session, outcome: orientation.outcome },
+      }, [{ path: reviewLayout.orientation(key), id: key, revision: 1, body: orientation }]);
+    }
+    return orientation;
+  }
+
+  /**
+   * Commits one terminal attempt: its record, its valid submission and one
+   * report per concern, as one line through the CheckFinding transition. A
+   * request already settled or an attempt already finished is fenced, and a
+   * terminal run refuses it; neither appends anything. A concern set the
+   * transition refuses leaves the attempt not verified, never clean.
+   */
+  private async finishReview(
+    run: Run,
+    request: ReviewRequest,
+    attempt: Omit<ReviewAttempt, 'schema' | 'result' | 'settles' | 'checkFindings' | 'finishedAt'>,
+    result: ReviewResult,
+    settles: boolean,
+    submission?: ReviewSubmission,
+    bindings: readonly ConcernBinding[] = [],
+  ): Promise<'committed' | 'fenced'> {
+    if ((submission?.concerns.length ?? 0) !== bindings.length) {
+      throw new Error(`${attempt.id} submitted ${submission?.concerns.length ?? 0} concerns, and ${bindings.length} were bound`);
+    }
+    const finishedAt = this.now().toISOString();
+    const record: ReviewSubmissionRecord | undefined = submission === undefined
+      ? undefined
+      : { schema: 'ramify-agent.review-submission/1', attempt: attempt.id, ...submission };
+    const evidenceHash = record === undefined ? null : `sha256:${sha256(canonicalJson(record))}`;
+    const commit = await this.commitCheckFindings(run, ({ log, state }) => {
+      const current = reviewStateOf(log.events).get(request.id);
+      if (current === undefined) return { stale: `No review request ${request.id} is recorded` };
+      if (current.settledBy !== null) return { stale: `${request.id} was settled by ${current.settledBy}; the result of ${attempt.id} is fenced` };
+      if (current.attempts.some(entry => entry.id === attempt.id && entry.finished !== null)) return { stale: `${attempt.id} has already finished; its later result is fenced` };
+      const concerns = record?.concerns ?? [];
+      const commands = concerns.map((concern, index) => reportCommand({
+        producer: `review:${request.key.kind}`,
+        attempt: attempt.id,
+        reportKey: concernKey(index),
+        owner: { kind: 'work-item', workItem: request.workItem },
+        source: { kind: 'tree', id: request.tree },
+        issueKey: null,
+        verification: { kind: 'assessment' },
+        observation: {
+          kind: 'review-concern',
+          summary: concern.summary,
+          evidence: [{ kind: 'review-submission', ref: reviewLayout.submission(attempt.id), hash: evidenceHash }],
+          locations: concern.locations,
+        },
+        judgment: {
+          actor: { kind: 'agent', role: 'reviewer', invocation: attempt.invocation ?? 'none' },
+          consequence: concern.consequence,
+          rationale: concern.rationale,
+          uncertainty: concern.uncertainty,
+          remedy: concern.remedy,
+          risk: concern.risk,
+          ground: bindings[index]!.ground,
+        },
+        // A hint only, and only toward a CheckFinding of the same work item.
+        suggests: concern.suggests !== null && sameWorkItem(state.findings.get(concern.suggests)?.owner, request.workItem) ? concern.suggests : null,
+        credibility: bindings[index]!.credibility,
+        modules: [...bindings[index]!.modules],
+      } satisfies BoundReport));
+      return {
+        commands,
+        compose: decided => {
+          const touched = [...new Set(decided.outcomes.flatMap(outcome => outcome.touched))];
+          const body: ReviewAttempt = { schema: 'ramify-agent.review-attempt/1', ...attempt, finishedAt, result, settles, checkFindings: touched };
+          return {
+            event: {
+              type: 'review-attempt-finished',
+              data: {
+                request: request.id, attempt: attempt.id, result: result.result,
+                reason: result.result === 'not-verified' ? result.reason : null, settles, checkFindings: [...decided.events],
+              },
+            },
+            records: [
+              { path: reviewLayout.attempt(attempt.id), id: attempt.id, revision: 1, body },
+              ...(record === undefined ? [] : [{ path: reviewLayout.submission(attempt.id), id: attempt.id, revision: 1, body: record }]),
+            ],
+          };
+        },
+      };
+    });
+    if (commit.kind === 'committed' || commit.kind === 'replayed') return 'committed';
+    if (commit.refusal.reason === 'run-ended' || commit.refusal.reason === 'stale-basis') return 'fenced';
+    // The concerns could not be promoted as submitted; the attempt covers
+    // nothing then, and says why.
+    return await this.finishReview(run, request, attempt, {
+      result: 'not-verified', reason: 'invalid-output', detail: `Its concerns were refused: ${commit.refusal.message}`,
+    }, settles);
+  }
+
+  /**
+   * Finishes every unsettled request, or those named, as not verified: an
+   * attempt a reader started and never finished, whose later result is then
+   * fenced, or a new one that never started. Each settles its request.
+   */
+  private async finishUnsettledReviews(
+    run: Run,
+    why: (request: ReturnType<typeof unsettledRequests>[number], running: boolean) => { readonly reason: NotVerifiedReason; readonly detail: string },
+    only?: readonly string[],
+  ): Promise<string[]> {
+    const finishedIds: string[] = [];
+    for (const state of unsettledRequests(run.log.events)) {
+      if (only !== undefined && !only.includes(state.id)) continue;
+      const body = this.committedBody(run, reviewLayout.request(state.id));
+      const parsed = reviewRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        this.warn(`Run ${run.record.jobId}: review request ${state.id} cannot be read, so it was left unsettled`);
+        continue;
+      }
+      const open = state.attempts.find(entry => entry.started !== null && entry.finished === null);
+      const { reason, detail } = why(state, open !== undefined);
+      const attempt = open?.id ?? reviewAttemptId(state.id, state.attempts.length + 1);
+      const outcome = await this.finishReview(run, parsed.data, {
+        id: attempt,
+        request: state.id,
+        queuedAt: state.attempts.filter(entry => entry.id !== attempt).at(-1)?.finished?.at ?? state.recordedAt,
+        startedAt: open?.started?.at ?? null,
+        invocation: open?.started?.invocation ?? null,
+        session: (open?.started?.session ?? null) as SessionId | null,
+        requestedStart: requestedStartOf(parsed.data),
+        actualStart: null,
+      }, { result: 'not-verified', reason, detail }, true);
+      if (outcome === 'committed') finishedIds.push(attempt);
+    }
+    return finishedIds;
+  }
+
+  /**
+   * Waits for the run's reviews before its final gate, at most the policy's
+   * settlement bound, then stops what is still running and finishes it as
+   * not verified at the deadline, so the run completes with every request
+   * settled and no reader left.
+   */
+  private async settleReviews(run: Run): Promise<void> {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined || run.reviews === undefined) return;
+    // From here every waiting request has a deadline, and one that could not
+    // finish by it is finished at once rather than started.
+    run.settleDeadline = this.now().getTime() + policy.settleMs;
+    run.reviews.wake();
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      run.reviews.settled(),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, policy.settleMs); }),
+    ]);
+    clearTimeout(timer);
+    await this.stopReaders(run, 'deadline', run.record.policy.limits.stopSettleMs);
+  }
+
+  /**
+   * Settles one work item's review requests at its completion request: it
+   * waits for them until their deadline, the completion request plus the
+   * policy's settlement bound, and then finishes what is left as not
+   * verified at the deadline and stops its readers. The run's queue stays
+   * open for the rest of the run. Answers false once the run has ended.
+   */
+  private async settleWorkItemReviews(run: Run, workItem: string): Promise<boolean> {
+    const policy = run.record.policy.reviews;
+    const queue = run.reviews;
+    if (policy === undefined || queue === undefined) return !this.ignoring(run);
+    for (;;) {
+      if (this.ignoring(run)) return false;
+      // Both waits are registered before the log is read, so an attempt that
+      // ends, or a stop that lands, in between still wakes this one.
+      const ended = queue.changed();
+      const stopped = run.changed();
+      const unsettled = unsettledRequests(run.log.events).filter(request => request.workItem === workItem);
+      if (unsettled.length === 0) return true;
+      const deadlines = unsettled.map(request => this.reviewDeadline(run, request.id)).filter((deadline): deadline is number => deadline !== null);
+      const deadline = deadlines.length === 0 ? this.now().getTime() + policy.settleMs : Math.max(...deadlines);
+      const remaining = deadline - this.now().getTime();
+      if (remaining <= 0) {
+        await this.stopWorkItemReaders(run, workItem, run.record.policy.limits.stopSettleMs);
+        return !this.ignoring(run);
+      }
+      queue.wake();
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([ended, stopped, new Promise<void>(resolve => { timer = setTimeout(resolve, remaining); })]);
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * The deadline of one work item's reviews. Every request of it still
+   * unsettled is finished as not verified at the deadline, which fences any
+   * later result of its attempt, and each reader still running for one is
+   * asked to stop and awaited at most `grace`; the harness owns its cleanup
+   * until it settles. The queue, and every other work item's requests, are
+   * left as they are.
+   */
+  private async stopWorkItemReaders(run: Run, workItem: string, grace: number): Promise<void> {
+    const unsettled = unsettledRequests(run.log.events).filter(request => request.workItem === workItem);
+    if (unsettled.length === 0) return;
+    const running = unsettled.flatMap(request => request.attempts
+      .filter(attempt => attempt.started !== null && attempt.finished === null)
+      .map(attempt => attempt.started!.invocation));
+    await this.finishUnsettledReviews(run, (_request, open) => ({
+      reason: 'deadline',
+      detail: open
+        ? `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this attempt was still running, and its reader was stopped`
+        : `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this review had not run`,
+    }), unsettled.map(request => request.id));
+    const readers = running.flatMap(invocation => {
+      const live = run.live.get(invocation);
+      return live === undefined ? [] : [live];
+    });
+    if (readers.length === 0) return;
+    for (const reader of readers) void reader.session?.stop().catch(() => undefined);
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      Promise.all(readers.map(reader => reader.done)),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, grace); }),
+    ]);
+    clearTimeout(timer);
+  }
+
+  /**
+   * Recovery of a run's reviews: every request an accepted iteration is owed
+   * and has not is recorded once, and every request left unsettled is
+   * finished as not verified, since a recovered run is interrupted and runs
+   * nothing more. An attempt whose reader was running is one whose session
+   * was lost with the harness.
+   */
+  private async recoverReviews(run: Run): Promise<string[]> {
+    if (run.record.policy.reviews === undefined) return [];
+    const recovered: string[] = [];
+    for (const closed of this.reviewableClosings(run)) {
+      for (const request of await this.requestReviews(run, closed)) recovered.push(`review request ${request} of ${closed.iteration}`);
+    }
+    const finishedIds = await this.finishUnsettledReviews(run, (_request, running) => (running
+      ? { reason: 'execution-failed', detail: 'The harness stopped while this attempt ran; its reader\'s session was lost with it' }
+      : { reason: 'stopped', detail: 'The harness stopped before this review ran; a recovered run is interrupted and runs nothing more' }));
+    for (const attempt of finishedIds) recovered.push(`review attempt ${attempt}, finished as not verified`);
+    return recovered;
+  }
+
+  /** The run's review requests and coverage, from its log; undefined for an unknown run. */
+  reviews(planId: string, runId: string, workItem?: string): { readonly coverage: ReviewCoverage; readonly requests: ReturnType<typeof unsettledRequests> } | undefined {
+    const run = this.runs.get(key(planId, runId));
+    if (run === undefined) return undefined;
+    const requests = [...reviewStateOf(run.log.events).values()].filter(request => workItem === undefined || request.workItem === workItem);
+    return { coverage: reviewCoverage(run.record.policy, run.log.events, workItem), requests };
+  }
+
+  // Reconciliation
+
+  /**
+   * The work item's review requests and attention set as the log stands:
+   * each settled request with the attempt that settled it, the requests
+   * still unsettled, every open CheckFinding of the work item in attention
+   * order, and the revision of every one of its CheckFindings. This version
+   * evaluates no revisit condition, so no deferral is due.
+   */
+  private basisState(run: Run, workItem: string): {
+    readonly requests: BasisRequest[];
+    readonly unsettled: string[];
+    readonly attention: Map<CheckFindingId, AttentionEntry>;
+    readonly revisions: Map<CheckFindingId, number>;
+    readonly due: CheckFindingId[];
+    readonly state: CheckFindingState;
+  } {
+    const requests: BasisRequest[] = [];
+    const unsettled: string[] = [];
+    for (const request of reviewStateOf(run.log.events).values()) {
+      if (request.workItem !== workItem) continue;
+      const settling = request.attempts.find(attempt => attempt.id === request.settledBy)?.finished;
+      if (request.settledBy === null || settling == null) unsettled.push(request.id);
+      else requests.push({ request: request.id, attempt: request.settledBy, result: settling.result });
+    }
+    const state = checkFindingStateOf(run.log.ledger);
+    const due: CheckFindingId[] = [];
+    const attention = new Map<CheckFindingId, AttentionEntry>();
+    for (const summary of this.ownerCheckFindings(state, workItem, 'attention', due)) {
+      attention.set(summary.id, { revision: summary.revision, reason: summary.reason, awaiting: summary.awaiting, risk: summary.risk, modules: summary.modules });
+    }
+    const revisions = new Map(this.ownerCheckFindings(state, workItem, 'all').map(summary => [summary.id, summary.revision]));
+    return { requests, unsettled, attention, revisions, due, state };
+  }
+
+  /** Every CheckFinding of one work item the query selects, all pages, in attention order. */
+  private ownerCheckFindings(state: CheckFindingState, workItem: string, select: 'attention' | 'all', due: readonly CheckFindingId[] = []): CheckFindingSummary[] {
+    const items: CheckFindingSummary[] = [];
+    let after: CheckFindingId | null = null;
+    for (;;) {
+      const page = selectCheckFindings(state, {
+        kind: 'list', owner: { kind: 'work-item', workItem }, select, due: [...due], after, limit: 100, order: 'attention',
+      });
+      if (!page.ok || page.view.kind !== 'list') return items;
+      items.push(...page.view.items);
+      if (page.view.next === null) return items;
+      after = page.view.next;
+    }
+  }
+
+  /** The `outline-revised` that commits the work item's latest completion request. */
+  private latestCompletion(run: Run, workItem: string): RunEventOf<'outline-revised'> | undefined {
+    return run.log.all('outline-revised').filter(event => event.data.workItem === workItem && event.data.architectRef !== undefined).at(-1);
+  }
+
+  /** The reconciliation of the work item's latest round, whose basis a completion's unresolved reasons are read against. */
+  private latestBasis(run: Run, workItem: string): ReconciliationBasis | undefined {
+    const started = run.log.all('reconciliation-started').filter(event => event.data.workItem === workItem).at(-1);
+    if (started === undefined) return undefined;
+    const parsed = reconciliationBasisSchema.safeParse(this.committedBody(run, reconciliationLayout.basis(started.data.reconciliation)));
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  /**
+   * The reconciliation whose repair intent the work item's next assignment
+   * resolves: its latest assessment, where that chose a correction and no
+   * assignment has resolved it yet.
+   */
+  private pendingCorrection(run: Run, workItem: string): string | undefined {
+    const assessed = run.log.all('reconciliation-assessed').filter(event => event.data.workItem === workItem).at(-1);
+    if (assessed === undefined || assessed.data.next !== 'correct') return undefined;
+    const resolved = run.log.all('iteration-assigned').some(event => event.data.corrects === assessed.data.reconciliation);
+    return resolved ? undefined : assessed.data.reconciliation;
+  }
+
+  /**
+   * Reconciles one work item that requested completion (appendix §6): its
+   * reviews settle, any user decision it waits for is answered, and its
+   * attention set is captured. An empty set goes to the work item's gate
+   * with no agent call. Otherwise one round forks the local architect at
+   * its completion request, within the round's floor, and the assessment it
+   * commits leads to the gate, to a correction, or to a user decision and
+   * another round. A refused basis or a fork that returns nothing is another
+   * round. A round after the first starts only for a signal that warrants
+   * one, and none starts once the rounds are spent: what is open then stays
+   * unresolved, and the gate alone decides. Null once the run has ended.
+   */
+  private async reconcileWorkItem(run: Run, agent: AgentPort, loaded: LoadedPackage, item: WorkItem, parent: ParentSession): Promise<Reconciled | null> {
+    const limit = run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds;
+    const minimum = run.record.policy.limits.laterRoundMinimumRisk ?? 'medium';
+    for (;;) {
+      if (!await this.settleWorkItemReviews(run, item.id)) return null;
+      if (!await this.awaitUserDecisions(run, item.id)) return null;
+      const commit = this.accepted(run);
+      const captured = this.basisState(run, item.id);
+      const rounds = run.log.all('reconciliation-started').filter(event => event.data.workItem === item.id).length;
+      const gate = (decided: boolean): Reconciled => ({
+        kind: 'gate',
+        basis: { commit, requests: captured.requests, checkFindings: attentionAt(captured.attention), decided },
+      });
+      // Nothing needs attention, the rounds are spent, or what is left does
+      // not warrant a later round: the gate follows, and what is open stays
+      // unresolved.
+      if (captured.attention.size === 0) return gate(false);
+      if (rounds >= limit || (rounds > 0 && !needsLaterRound(captured.attention.values(), minimum))) return gate(rounds > 0);
+
+      let tree: string;
+      try {
+        tree = await this.candidates.commitTree(this.projectRoot, commit);
+      } catch (error) {
+        await this.fail(run, 'internal', `The audited source ${commit} of ${item.id}'s reconciliation could not be read: ${message(error)}`);
+        return null;
+      }
+      const basis = await this.startReconciliation(run, item.id, rounds + 1, limit, { commit, tree }, captured);
+      if (basis === 'ended') return null;
+      if (basis === 'stale') continue;
+      const assessed = await this.assessReconciliation(run, agent, loaded, item, basis, captured.attention, parent, { limit, minimum });
+      if (assessed === null) return null;
+      if (assessed.kind === 'refused') {
+        await this.write(run, { type: 'reconciliation-refused', data: { workItem: item.id, reconciliation: basis.id, stage: 'assessment', reason: assessed.reason } });
+        if (this.ignoring(run)) return null;
+        continue;
+      }
+      if (assessed.next === 'correct') return { kind: 'correct', reconciliation: basis.id };
+      if (assessed.next === 'await-user') continue;
+      const after = this.basisState(run, item.id);
+      return { kind: 'gate', basis: { commit, requests: after.requests, checkFindings: attentionAt(after.attention), decided: true } };
+    }
+  }
+
+  /**
+   * Commits one round's `reconciliation-started` with its basis, after
+   * checking under the mutex that what was captured still holds. Stale when
+   * it does not, and nothing is appended.
+   */
+  private async startReconciliation(
+    run: Run,
+    workItem: string,
+    round: number,
+    limit: number,
+    source: { readonly commit: string; readonly tree: string },
+    captured: ReturnType<RunService['basisState']>,
+  ): Promise<ReconciliationBasis | 'stale' | 'ended'> {
+    const id = reconciliationId(workItem, round);
+    const pinned = this.latestCompletion(run, workItem)?.data.architectRef;
+    const forkPoint: ForkPoint = pinned === undefined || pinned === null
+      ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after its completion request' : 'No completion request of this work item recorded the local architect\'s point' }
+      : { kind: 'session', session: pinned.session, ref: pinned.ref };
+    const basis = reconciliationBasisSchema.parse({
+      schema: 'ramify-agent.reconciliation-basis/1',
+      id,
+      workItem,
+      round,
+      source,
+      requests: captured.requests,
+      checkFindings: attentionAt(captured.attention),
+      due: captured.due,
+      applied: captured.state.applied,
+      forkPoint,
+      floor: roundFloor(round, limit),
+    } satisfies ReconciliationBasis);
+    return await run.mutex.run(async () => {
+      if (run.log.terminal !== undefined) return 'ended' as const;
+      const now = this.basisState(run, workItem);
+      const changed = this.accepted(run) !== source.commit
+        || basisChange(basis, { source, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions }) !== null
+        || attentionAt(now.attention).some(entry => !basis.checkFindings.some(held => held.checkFinding === entry.checkFinding))
+        || run.log.all('reconciliation-started').some(event => event.data.reconciliation === id);
+      if (changed) return 'stale' as const;
+      await commitRecord(run.log.ledger, {
+        event: run.log.next({ type: 'reconciliation-started', data: { workItem, reconciliation: id, round } }),
+        records: [{ path: reconciliationLayout.basis(id), id, revision: 1, body: basis }],
+      });
+      return basis;
+    });
+  }
+
+  /**
+   * Waits while a CheckFinding of the work item awaits a user's answer: the
+   * answer is what the next round assesses. A stop or the service closing
+   * ends the wait. Answers false once the run has ended.
+   */
+  private async awaitUserDecisions(run: Run, workItem: string): Promise<boolean> {
+    for (;;) {
+      if (this.ignoring(run)) return false;
+      // Registered before the state is read, so an answer in between still wakes it.
+      const changed = run.changed();
+      const pending = [...checkFindingStateOf(run.log.ledger).findings.values()]
+        .some(entry => sameWorkItem(entry.owner, workItem) && entry.pendingUserDecision !== null);
+      if (!pending) return true;
+      await changed;
+    }
+  }
+
+  /**
+   * Where a reconciliation's fork starts: the local architect's point after
+   * its completion request, or fresh with the complete packet and the reason
+   * where that point is missing or unusable.
+   */
+  private reconciliationStart(run: Run, basis: ReconciliationBasis, completion: RunEventOf<'outline-revised'> | undefined): {
+    readonly start: SessionStart;
+    readonly fork?: ForkRelation | undefined;
+    readonly degraded?: { readonly requested: 'fork'; readonly reason: string } | undefined;
+  } {
+    const fresh = (reason: string) => ({ start: { mode: 'fresh' } as const, degraded: { requested: 'fork' as const, reason } });
+    const point = basis.forkPoint;
+    if (point.kind !== 'session') return fresh(point.kind === 'unavailable' ? point.reason : 'No point of the local architect was captured');
+    if (completion === undefined) return fresh('No completion request of this work item is recorded');
+    const from = { session: point.session as SessionId, invocation: completion.data.invocation };
+    const source = this.sessionsOf(run)?.get(from.session);
+    if (source === undefined || !source.invocations.includes(from.invocation) || source.awaiting === from.invocation) {
+      return fresh(`${from.session} has not reached the end of ${from.invocation}`);
+    }
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === from.invocation)?.sequence ?? 0;
+    const briefs = run.log.all('brief-appended')
+      .filter(event => event.data.session === from.session && event.sequence < ended)
+      .map(event => event.data.decision);
+    return { start: { mode: 'fork', from: point.ref }, fork: { from, reason: 'reconciliation', briefs } };
+  }
+
+  /** The one bounded packet of a round, from the log and the CheckFinding state. */
+  private reconciliationPacket(run: Run, item: WorkItem, basis: ReconciliationBasis, state: CheckFindingState, bounds: { readonly limit: number; readonly minimum: string }): ReconciliationPacket {
+    const reviews = reviewStateOf(run.log.events);
+    const requests: PacketRequest[] = basis.requests.map(entry => {
+      const request = reviews.get(entry.request);
+      const attempt = entry.attempt === null ? undefined : reviewAttemptSchema.safeParse(this.committedBody(run, reviewLayout.attempt(entry.attempt)));
+      return {
+        request: entry.request,
+        kind: request?.kind ?? 'unknown',
+        iteration: request?.iteration ?? 'unknown',
+        candidate: request?.candidate ?? 'unknown',
+        attempt: entry.attempt,
+        result: attempt?.success === true ? resultText(attempt.data.result) : entry.result,
+      };
+    });
+    const attention = basis.checkFindings.flatMap(entry => {
+      const detail = selectCheckFindings(state, { kind: 'detail', checkFinding: entry.checkFinding });
+      return detail.ok && detail.view.kind === 'detail' ? [detail.view] : [];
+    });
+    const inBasis = new Set(basis.checkFindings.map(entry => entry.checkFinding));
+    const iterations = run.log.all('iteration-assigned').filter(event => event.data.workItem === item.id).map(event => {
+      const number = Number.parseInt(event.data.iteration.slice(event.data.iteration.lastIndexOf('.i') + 2), 10);
+      const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, iterationLayout.assignment(item.id, number)));
+      const closed = run.log.all('iteration-closed').find(entry => entry.data.iteration === event.data.iteration);
+      return { id: event.data.iteration, goal: assignment.success ? assignment.data.goal : '(its assignment could not be read)', outcome: closed?.data.outcome ?? null };
+    });
+    const earlier = run.log.all('reconciliation-assessed').filter(event => event.data.workItem === item.id).flatMap(event => {
+      const record = reconciliationAssessmentSchema.safeParse(this.committedBody(run, reconciliationLayout.assessment(event.data.reconciliation)));
+      return record.success ? [{ id: record.data.id, next: record.data.next, brief: record.data.submission.brief }] : [];
+    });
+    return {
+      basis,
+      limit: bounds.limit,
+      laterRoundMinimumRisk: bounds.minimum,
+      module: item.module,
+      requests,
+      attention,
+      others: this.ownerCheckFindings(state, item.id, 'all').filter(summary => !inBasis.has(summary.id)),
+      iterations,
+      earlier,
+      refused: run.log.all('reconciliation-refused').filter(event => event.data.workItem === item.id)
+        .map(event => ({ reconciliation: event.data.reconciliation, reason: event.data.reason })),
+    };
+  }
+
+  /**
+   * One round's fork: the packet, a submission validated against the basis
+   * and the CheckFinding rules, and its commit. Refused when the fork ends
+   * without an assessment or its basis no longer holds when it commits; null
+   * once the run has ended.
+   */
+  private async assessReconciliation(
+    run: Run,
+    agent: AgentPort,
+    loaded: LoadedPackage,
+    item: WorkItem,
+    basis: ReconciliationBasis,
+    attention: ReadonlyMap<CheckFindingId, AttentionEntry>,
+    parent: ParentSession,
+    bounds: { readonly limit: number; readonly minimum: CheckFindingRisk },
+  ): Promise<{ readonly kind: 'refused'; readonly reason: string } | { readonly kind: 'assessed'; readonly next: ReconciliationAssessment['next'] } | null> {
+    const completion = this.latestCompletion(run, item.id);
+    const start = this.reconciliationStart(run, basis, completion);
+    const state = checkFindingStateOf(run.log.ledger);
+    const held = new Map(this.ownerCheckFindings(state, item.id, 'all').map(summary => [summary.id, summary.revision]));
+    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    let invocation: string | undefined;
+    let bound: BoundReconciliation | undefined;
+    const result = await this.runInvocation<ReconciliationSubmission>(run, agent, {
+      role: 'local-architect',
+      work: { workItem: item.id },
+      attempt: basis.round,
+      loaded,
+      systemPrompt: renderReconciliationPrompt(loaded, this.projectRoot),
+      prompt: reconciliationMessage(this.reconciliationPacket(run, item, basis, state, bounds)),
+      start: start.start,
+      ...(start.fork === undefined ? {} : { fork: start.fork }),
+      ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
+      toolName: reconciliationToolName,
+      description: reconciliationSubmissionDescription,
+      inputSchema: reconciliationJsonSchema,
+      submissionSchema: 'ramify-agent.reconciliation-submission/1',
+      validate: async input => {
+        const checked = await validateReconciliation(input, {
+          id: basis.id,
+          workItem: item.id,
+          module: item.module,
+          floor: basis.floor,
+          laterRoundMinimumRisk: bounds.minimum,
+          attention,
+          held,
+          actor: { kind: 'agent', role: 'local-architect', invocation: invocation ?? 'none' },
+          source: { kind: 'tree', id: basis.source.tree },
+          evidence: submission => [{
+            kind: 'reconciliation-submission',
+            ref: runLayout.submission(invocation ?? 'none'),
+            hash: `sha256:${sha256(canonicalJson(submission))}`,
+          }],
+          document: async path => {
+            if (path === 'plan') return { text: plan, revision: `sha256:${sha256(plan)}` };
+            try {
+              return { text: await this.candidates.readBlob(this.projectRoot, basis.source.commit, path), revision: basis.source.commit };
+            } catch {
+              return null;
+            }
+          },
+          decide: command => {
+            const now = this.basisState(run, item.id);
+            if (basisChange(basis, { source: basis.source, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions }) !== null) return null;
+            const change = decideCheckFindingChange(now.state, command);
+            return change.ok ? null : change.rejection;
+          },
+        });
+        if (!checked.ok) return checked;
+        bound = checked.value;
+        return { ok: true, value: checked.value.submission };
+      },
+      // A fork is never continued: its brief is what reaches the architect's own session.
+      keep: () => finished('not-kept'),
+      scope: { write: null, measurement: null, size: null },
+      onStarted: async id => { invocation = id; },
+    });
+    if (this.ignoring(run)) return null;
+    if (result.ended !== 'submitted' || result.value === undefined || bound === undefined || invocation === undefined) {
+      return { kind: 'refused', reason: `The reconciliation fork${result.id === '' ? '' : ` ${result.id}`} ended without an assessment (${result.ended})` };
+    }
+    return await this.commitAssessment(run, agent, basis, {
+      invocation,
+      session: result.session,
+      requestedStart: start.start.mode === 'fork' || start.degraded !== undefined ? 'fork' : 'fresh',
+      actualStart: result.actual === undefined ? null : result.actual === 'fork' ? 'fork' : 'fresh',
+      bound,
+    }, parent);
+  }
+
+  /**
+   * Commits one assessment and appends its brief to the local architect's
+   * session, as the ledger's external effect keyed `brief:<reconciliation>`:
+   * the intent is `reconciliation-assessed` with its record and every
+   * CheckFinding event, decided under the mutex against the basis as it
+   * stands; the effect is the append; the completion says what the append
+   * did. The decisions are durable before any append, and a repeat after a
+   * crash appends the same key once.
+   */
+  private async commitAssessment(
+    run: Run,
+    agent: AgentPort,
+    basis: ReconciliationBasis,
+    fork: {
+      readonly invocation: string;
+      readonly session: SessionId;
+      readonly requestedStart: 'fresh' | 'fork';
+      readonly actualStart: 'fresh' | 'fork' | null;
+      readonly bound: BoundReconciliation;
+    },
+    parent: ParentSession,
+  ): Promise<{ readonly kind: 'refused'; readonly reason: string } | { readonly kind: 'assessed'; readonly next: ReconciliationAssessment['next'] }> {
+    const { submission, commands, conflicts } = fork.bound;
+    const parentRef = parent.session !== undefined && parent.ref !== undefined ? { session: parent.session, ref: parent.ref } : null;
+    let record: ReconciliationAssessment | undefined;
+    let appended: BriefAppend;
+    try {
+      appended = await run.log.ledger.effect<BriefAppend>({
+        key: `brief:${basis.id}`,
+        serialize: work => run.mutex.run(work),
+        intent: () => {
+          const decided = decideCheckFindingTransaction(run.log, ({ log }) => {
+            if (log.all('reconciliation-assessed').some(event => event.data.reconciliation === basis.id)) return { stale: `${basis.id} is already assessed` };
+            const latest = log.all('reconciliation-started').filter(event => event.data.workItem === basis.workItem).at(-1);
+            if (latest?.data.reconciliation !== basis.id) return { stale: `${basis.id} is not the work item's latest round` };
+            const now = this.basisState(run, basis.workItem);
+            const stale = this.accepted(run) !== basis.source.commit
+              ? `the accepted source is ${this.accepted(run)}, not ${basis.source.commit}`
+              : basisChange(basis, { source: basis.source, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions });
+            if (stale !== null) return { stale };
+            return {
+              commands: commands.length === 0 ? [] : [{ type: 'assess', commands: [...commands] }],
+              compose: decided => {
+                const events = decided.events;
+                record = reconciliationAssessmentSchema.parse({
+                  schema: 'ramify-agent.reconciliation-assessment/1',
+                  id: basis.id,
+                  workItem: basis.workItem,
+                  round: basis.round,
+                  invocation: fork.invocation,
+                  session: fork.session,
+                  requestedStart: fork.requestedStart,
+                  actualStart: fork.actualStart,
+                  submission,
+                  conflicts,
+                  next: submission.next.kind,
+                  checkFindings: [...new Set(decided.outcomes.flatMap(outcome => outcome.touched))],
+                  decisions: events.flatMap(event => (event.type === 'check-finding-decided' ? [event.data.decision.id] : [])),
+                  relations: events.flatMap(event => (event.type === 'check-finding-related' ? [event.data.relation.id] : [])),
+                  parent: parentRef,
+                  brief: reconciliationBrief({ id: basis.id, round: basis.round, source: basis.source, submission, events }),
+                } satisfies ReconciliationAssessment);
+                return {
+                  event: {
+                    type: 'reconciliation-assessed',
+                    data: { workItem: basis.workItem, reconciliation: basis.id, invocation: fork.invocation, next: submission.next.kind, checkFindings: [...events] },
+                  },
+                  records: [{ path: reconciliationLayout.assessment(basis.id), id: basis.id, revision: 1, body: record }],
+                };
+              },
+            };
+          }, this.now());
+          if (decided.kind === 'transaction') return decided.transaction;
+          throw new AssessmentRefusedError(decided.kind === 'refused' ? decided.refusal.message : `${basis.id} decided nothing new`);
+        },
+        perform: key => this.appendReconciliationBrief(agent, key, parentRef, record!.brief),
+        complete: result => ({
+          event: run.log.next({ type: 'reconciliation-brief-appended', data: { reconciliation: basis.id, ...result } }),
+          records: [],
+        }),
+      });
+    } catch (error) {
+      if (error instanceof AssessmentRefusedError) return { kind: 'refused', reason: error.message };
+      // The ledger measures a line before writing any of it.
+      if (error instanceof RangeError) return { kind: 'refused', reason: `The assessment does not fit one ledger line: ${error.message}` };
+      throw error;
+    }
+    await this.afterBriefAppend(run, basis.id, appended, record!.brief, parent);
+    return { kind: 'assessed', next: record!.next };
+  }
+
+  /** The brief's append to the local architect's session. A lost session, a failure and no session are outcomes, never thrown. */
+  private async appendReconciliationBrief(agent: AgentPort, key: string, parent: ArchitectRef | null, brief: string): Promise<BriefAppend> {
+    if (parent === null) return { session: null, ref: null, outcome: 'no-session', reason: 'The local architect\'s session was not kept after its completion request' };
+    try {
+      const answer = await agent.appendContext(parent.ref, key, brief);
+      if (answer.outcome === 'session-lost') return { session: parent.session, ref: null, outcome: 'session-lost', reason: 'The local architect\'s session can no longer be read' };
+      return { session: parent.session, ref: answer.ref, outcome: answer.outcome, reason: null };
+    } catch (error) {
+      return { session: parent.session, ref: null, outcome: 'failed', reason: message(error) };
+    }
+  }
+
+  /**
+   * What the architect's own session holds after the append: the point its
+   * next turn continues from, the note in its transcript, or, where the
+   * append did not land, the brief its next input carries from the log. A
+   * session that can no longer be read is finished as lost.
+   */
+  private async afterBriefAppend(run: Run, reconciliation: string, appended: BriefAppend, brief: string, parent: ParentSession): Promise<void> {
+    if (appended.outcome === 'appended' || appended.outcome === 'already-present') {
+      parent.ref = appended.ref ?? parent.ref;
+      const session = appended.session;
+      if (appended.outcome === 'appended' && session !== null) {
+        await recordAppend(this.transcriptOf(run, session), { kind: 'note-appended', text: brief }, null)
+          .catch(error => this.warn(`Run ${run.record.jobId}: the brief of ${reconciliation} is missing from ${session}'s transcript: ${message(error)}`));
+      }
+      return;
+    }
+    parent.undelivered.push(reconciliation);
+    if (appended.outcome === 'session-lost') {
+      await this.finishSession(run, parent.session, 'lost');
+      parent.session = undefined;
+      parent.ref = undefined;
+    }
+  }
+
+  /**
+   * What the local architect's next turn is told of a reconciliation: the
+   * correction it chose with the CheckFindings planned for repair, and the
+   * brief of every round whose append did not land, read from the log.
+   */
+  private reconciliationBriefing(run: Run, reconciliation: string, undelivered: readonly string[]): ReconciliationBriefing | undefined {
+    const read = (id: string) => {
+      const parsed = reconciliationAssessmentSchema.safeParse(this.committedBody(run, reconciliationLayout.assessment(id)));
+      return parsed.success ? parsed.data : undefined;
+    };
+    const record = read(reconciliation);
+    if (record === undefined) return undefined;
+    const state = checkFindingStateOf(run.log.ledger);
+    const repairs = [...state.findings.values()]
+      .filter(entry => entry.standing === 'open' && entry.repair?.kind === 'intent' && entry.repair.ref === reconciliation)
+      .map(entry => ({ checkFinding: entry.id, title: entry.reports[0]?.observation.summary ?? '' }));
+    const briefs = undelivered.flatMap(id => {
+      const undeliveredRecord = read(id);
+      return undeliveredRecord === undefined ? [] : [undeliveredRecord.brief];
+    });
+    const failure = run.log.all('reconciliation-brief-appended').filter(event => undelivered.includes(event.data.reconciliation)).at(-1);
+    return {
+      id: reconciliation,
+      next: record.next,
+      ...(record.submission.next.kind === 'correct' ? { goal: record.submission.next.goal } : {}),
+      repairs,
+      ...(briefs.length === 0 ? {} : { brief: briefs.join('\n\n') }),
+      ...(failure === undefined ? {} : { appendFailure: `${failure.data.outcome}${failure.data.reason === null ? '' : `: ${failure.data.reason}`}` }),
+    };
+  }
+
+  /**
+   * Commits `work-item-completed` where the completion basis still holds
+   * (appendix §6): the gate audited the reconciled source or its scenario
+   * rendering, every request of the work item is settled as the basis names
+   * it, every basis CheckFinding is at its captured revision, and nothing
+   * that warrants another round has become open. Where one of those fails
+   * and a round remains, the completion is refused and recorded, and the
+   * caller reconciles again; otherwise the work item completes, naming each
+   * CheckFinding left open and why.
+   */
+  private async completeWorkItem(run: Run, item: WorkItem, gate: GateAttempt, basis: CompletionBasis): Promise<'completed' | 'ended' | { readonly refused: string }> {
+    const limit = run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds;
+    const minimum = run.record.policy.limits.laterRoundMinimumRisk ?? 'medium';
+    // The lineage is read outside the mutex: both commits are immutable.
+    const lineage = basis.decided ? await this.sourceLineage(run, basis.commit, gate.audited) : null;
+    const outcome = await run.mutex.run(async () => {
+      if (run.log.terminal !== undefined) return 'ended' as const;
+      const now = this.basisState(run, item.id);
+      const rounds = run.log.all('reconciliation-started').filter(event => event.data.workItem === item.id).length;
+      const inBasis = new Set(basis.checkFindings.map(entry => entry.checkFinding));
+      const raised = [...now.attention].filter(([id]) => !inBasis.has(id)).map(([, entry]) => entry);
+      // A changed source or request set always refuses: the next capture
+      // binds the source and requests as they now stand. A changed or new
+      // CheckFinding refuses only where it warrants a round that remains.
+      const hard = lineage ?? basisChange({ source: { commit: basis.commit, tree: '' }, requests: basis.requests, checkFindings: [] },
+        { source: { commit: basis.commit, tree: '' }, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions });
+      if (hard !== null) return { refused: hard };
+      const moved = basis.checkFindings.find(entry => now.revisions.get(entry.checkFinding) !== entry.revision);
+      const soft = moved !== undefined
+        ? `${moved.checkFinding} is at revision ${now.revisions.get(moved.checkFinding) ?? 'none'}, not ${moved.revision}`
+        : raised.length > 0 ? `${raised.length === 1 ? 'a CheckFinding' : `${raised.length} CheckFindings`} became open after the basis` : null;
+      // A first round is warranted by any signal; a later one by a signal that clears its start.
+      const warranted = (entries: readonly AttentionEntry[]) => (rounds === 0 ? entries.length > 0 : needsLaterRound(entries, minimum));
+      if (soft !== null && rounds < limit && warranted([...now.attention.values()])) return { refused: soft };
+      const unresolved = this.unresolvedOf(run, item.id, now.state, limit);
+      await run.log.append({
+        type: 'work-item-completed',
+        data: { workItem: item.id, gate: gate.id, ...(unresolved.length === 0 ? {} : { unresolved }) },
+      });
+      return 'completed' as const;
+    });
+    if (typeof outcome === 'object') {
+      await this.write(run, { type: 'reconciliation-refused', data: { workItem: item.id, reconciliation: this.latestBasis(run, item.id)?.id ?? null, stage: 'completion', reason: outcome.refused } });
+    }
+    return outcome;
+  }
+
+  /**
+   * Each open CheckFinding of a completing work item, and why it is left
+   * open: open at the last round's assessment, open below its round's floor,
+   * or opened after the last basis. Read under the mutex.
+   */
+  private unresolvedOf(run: Run, workItem: string, state: CheckFindingState, limit: number): Array<{ readonly checkFinding: CheckFindingId; readonly reason: UnresolvedReason }> {
+    const last = this.latestBasis(run, workItem);
+    const inLast = new Set(last?.checkFindings.map(entry => entry.checkFinding) ?? []);
+    return this.ownerCheckFindings(state, workItem, 'all').filter(summary => summary.standing === 'open').map(summary => ({
+      checkFinding: summary.id,
+      reason: !inLast.has(summary.id) ? 'raised-after-last-round' as const : last!.round >= limit ? 'rounds-exhausted' as const : 'below-floor' as const,
+    }));
+  }
+
+  /**
+   * Why the gate's audited commit is not the reconciled source, or null when
+   * it is, or when it differs from it only by the expected rendering of the
+   * tracked feature files, byte for byte.
+   */
+  private async sourceLineage(run: Run, from: string, to: string | null): Promise<string | null> {
+    if (to === null) return `the gate audited no commit, and the reconciled source is ${from}`;
+    if (to === from) return null;
+    try {
+      const changes = await this.candidates.diffNameStatus(this.projectRoot, from, to);
+      const tracked = trackedScenarios(run.log.ledger.replay());
+      const expected = new Map(expectedFeatureHashes(expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }))
+        .map(file => [file.path, file.hash]));
+      for (const change of changes) {
+        const hash = expected.get(change.path);
+        if (hash === undefined) return `${change.path} changed between the reconciled source ${from} and the gate's ${to}, and only a rendered feature file may`;
+        if (change.status === 'D' || featureContentHash(await this.candidates.readBlob(this.projectRoot, to, change.path)) !== hash) {
+          return `${change.path} at ${to} is not its expected rendering`;
+        }
+      }
+      return null;
+    } catch (error) {
+      return `the lineage from ${from} to ${to} could not be read: ${message(error)}`;
+    }
+  }
+
   // Loading and recovery
 
   private async load(): Promise<RunRecoveryReport> {
-    const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [] };
+    const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [], reviews: [] };
     for (const { planId, jobId } of await listJobDirectories(this.projectRoot)) {
       const directory = runDirectory(this.projectRoot, planId, jobId);
       const recordPath = join(directory, runLayout.record);
@@ -593,6 +2055,9 @@ export class RunService {
         for (const scenario of await this.completeWithdrawals(run)) report.effects.push(`${run.key}: the withdrawal of ${scenario}`);
         for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
         for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
+        // A request an accepted iteration is owed is recorded once, and
+        // every unsettled one is finished: the run runs nothing more.
+        for (const review of await this.recoverReviews(run)) report.reviews.push(`${run.key}: ${review}`);
         // Every session the run still keeps is finished as a run end
         // finishes it, and one opened whose first invocation never started
         // was interrupted with it, so a recovered run holds no suspended
@@ -608,6 +2073,7 @@ export class RunService {
         if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved') {
           this.commands.remember(event.data.command);
         }
+        if (event.type === 'check-findings-recorded' && event.data.cause.kind === 'user-command') this.commands.remember(event.data.cause.command);
       }
     }
     return report;
@@ -640,6 +2106,28 @@ export class RunService {
         }
         await this.appendBrief(run, agent, decision, null);
         performed.push(`the parent append of decision ${decision.id}`);
+        continue;
+      }
+      if (event.type === 'reconciliation-assessed') {
+        // The assessment is committed and its brief is not in the local
+        // architect's session yet. The append is keyed by the
+        // reconciliation, so performing it again appends it once.
+        const id = event.data.reconciliation;
+        const record = reconciliationAssessmentSchema.safeParse(this.committedBody(run, reconciliationLayout.assessment(id)));
+        const agent = this.options.agent;
+        if (!record.success || agent === undefined) {
+          this.warn(`Run ${run.record.jobId}: the brief of ${id} was left unappended: ${record.success ? 'no agent is configured' : 'its assessment cannot be read'}`);
+          continue;
+        }
+        await run.log.ledger.effect<BriefAppend>({
+          key: pending.key,
+          serialize: work => run.mutex.run(work),
+          // The intent is in the log already; the ledger never builds it again.
+          intent: () => { throw new Error(`The intent of ${pending.key} is already committed`); },
+          perform: key => this.appendReconciliationBrief(agent, key, record.data.parent, record.data.brief),
+          complete: result => ({ event: run.log.next({ type: 'reconciliation-brief-appended', data: { reconciliation: id, ...result } }), records: [] }),
+        });
+        performed.push(`the parent append of reconciliation ${id}`);
         continue;
       }
       if (event.type === 'scenarios-withdrawing') {
@@ -776,6 +2264,47 @@ export class RunService {
     return run && { record: run.record, directory: run.directory, entries: run.log.ledger.replay() };
   }
 
+  /**
+   * Commits CheckFinding commands on a path with no run event of its own,
+   * such as recovery or a user's answer, as one `check-findings-recorded`
+   * line under the run mutex. An exact redelivery appends nothing; a
+   * refusal appends nothing and says why. Undefined for an unknown run.
+   */
+  async recordCheckFindings(
+    planId: string,
+    runId: string,
+    change: { readonly cause: CheckFindingCause; readonly commands: readonly CheckFindingCommand[] },
+  ): Promise<CheckFindingCommit | undefined> {
+    const run = this.runs.get(key(planId, runId));
+    if (run === undefined) return undefined;
+    const committed = await this.commitCheckFindings(run, () => ({
+      commands: change.commands,
+      compose: decided => ({ event: { type: 'check-findings-recorded', data: { cause: change.cause, checkFindings: [...decided.events] } } }),
+    }));
+    // A work item waiting for a user's answer reads the state again.
+    if (committed.kind === 'committed') run.notify();
+    return committed;
+  }
+
+  /**
+   * The run's CheckFindings, as the child selects them from the state
+   * replayed from its log: a bounded list or one detail. Undefined for an
+   * unknown run.
+   */
+  checkFindings(planId: string, runId: string, query: CheckFindingQueryInput): CheckFindingSelection | undefined {
+    const run = this.runs.get(key(planId, runId));
+    return run && selectCheckFindings(checkFindingStateOf(run.log.ledger), query);
+  }
+
+  /**
+   * The one CheckFinding transition of a run, for every producer and
+   * decision path: see `check-findings/transition.ts`. Slow work is done
+   * before it; `build` validates what that work captured under the mutex.
+   */
+  private async commitCheckFindings(run: Run, build: CheckFindingBuild): Promise<CheckFindingCommit> {
+    return await commitCheckFindingChange(run, build, this.now());
+  }
+
   /** The runs of one plan, newest first, as `committed` answers each. */
   committedRuns(planId: string) {
     return this.runsOf(planId).map(run => ({ record: run.record, directory: run.directory, entries: run.log.ledger.replay() }));
@@ -802,7 +2331,7 @@ export class RunService {
   /** Settles when the run's driver has nothing left to do. For tests and shutdown. */
   async settled(planId: string, runId: string): Promise<void> {
     const run = this.runs.get(key(planId, runId));
-    if (run) await run.done;
+    if (run) await run.idle();
   }
 
   private runsOf(planId: string): Run[] {
@@ -831,6 +2360,10 @@ export class RunService {
         case 'start-run': return this.start(command, admitted.contentHash);
         case 'stop-job': return this.stop(command, admitted.contentHash);
         case 'approve-analysis': return this.approve(command, admitted.contentHash);
+        case 'respond-to-check-finding':
+        case 'waive-check-finding':
+        case 'revoke-check-finding-waiver':
+          return this.checkFindingCommand(command, admitted.contentHash);
       }
     });
   }
@@ -991,28 +2524,53 @@ export class RunService {
   }
 
   /**
-   * Ends a stopped run: asks the session to stop, waits for it at most the
-   * bound, and marks the run stopped whether or not it became idle. Whatever
-   * the session produces afterwards is rejected.
+   * Ends a stopped run: asks every open session to stop, the writer's and
+   * each reader's, waits for them at most the bound, finishes every review
+   * request still unsettled as stopped, and marks the run stopped whether or
+   * not they became idle. Whatever a session produces afterwards is rejected.
    */
   private async endStopped(run: Run): Promise<void> {
     const grace = this.options.stopGraceMs ?? run.record.policy.limits.stopSettleMs;
-    let settled = true;
-    if (run.session) {
-      let timer: NodeJS.Timeout | undefined;
-      settled = await Promise.race([
-        run.session.stop().then(() => true, () => true),
-        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), grace); }),
-      ]);
-      clearTimeout(timer);
-    }
-    // The run's terminal event is its last write, so an invocation the
-    // driver has open is closed before it.
-    let timer: NodeJS.Timeout | undefined;
-    await Promise.race([run.invocationDone, new Promise<void>(resolve => { timer = setTimeout(resolve, grace); })]);
-    clearTimeout(timer);
+    const settled = await this.stopReaders(run, 'stopped', grace, true);
     if (this.closed) return;
     await this.endRun(run, { type: 'job-stopped', data: { settled } });
+  }
+
+  /**
+   * Stops the run's readers, and with `writer` its writer too: no attempt
+   * starts from here on, every open session is asked to stop, and each open
+   * invocation and review attempt is awaited at most `grace`. A request still
+   * unsettled then is finished as not verified with `reason`, so the run's
+   * terminal event follows a complete review history. Answers whether every
+   * session stopped within the bound.
+   */
+  private async stopReaders(run: Run, reason: NotVerifiedReason, grace: number, writer = false): Promise<boolean> {
+    run.readerStop ??= reason;
+    run.reviews?.close();
+    const sessions = run.sessions(live => writer || live.reader);
+    let timer: NodeJS.Timeout | undefined;
+    const settled = sessions.length === 0 || await Promise.race([
+      Promise.all(sessions.map(session => session.stop().then(() => true, () => true))).then(() => true),
+      new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), grace); }),
+    ]);
+    clearTimeout(timer);
+    // The run's terminal event is its last write, so the invocations it has
+    // open, and the attempts that record their readers' results, close first.
+    const open = [...run.live.values()].filter(live => writer || live.reader).map(live => live.done);
+    await Promise.race([
+      Promise.all([...open, run.reviews?.settled()]),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, grace); }),
+    ]);
+    clearTimeout(timer);
+    if (!this.closed && run.record.policy.reviews !== undefined) {
+      await this.finishUnsettledReviews(run, (_request, running) => ({
+        reason,
+        detail: reason === 'deadline'
+          ? (running ? 'The reviews\' settlement bound passed while this attempt ran; its reader was stopped' : 'The reviews\' settlement bound passed before this review ran')
+          : (running ? 'The run stopped while this attempt ran; its reader was stopped' : 'The run stopped before this review ran'),
+      }));
+    }
+    return settled;
   }
 
   /**
@@ -1048,6 +2606,47 @@ export class RunService {
     return receipt;
   }
 
+  /**
+   * A person's answer, waiver or revocation of one CheckFinding. Under the
+   * run's lock it expects the run's version and the CheckFinding's revision
+   * the person saw, validates the person's authority, and commits the one
+   * decision the child accepts on a `check-findings-recorded` line that holds
+   * the accepted command. A refusal appends nothing. A work item waiting for
+   * the answer reads the state again.
+   */
+  private async checkFindingCommand(command: CheckFindingUserCommand, contentHash: string): Promise<Receipt> {
+    const { planId, jobId } = command.payload;
+    const run = this.runs.get(key(planId, jobId));
+    if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
+    const at = this.now();
+    let accepted: AcceptedCommand | undefined;
+    const committed = await commitCheckFindingChange(run, ({ log, state }) => {
+      this.commands.requireVersion(command, log.version);
+      const change = userCheckFindingChange(command, state.findings.get(command.payload.checkFinding));
+      if (!change.ok) throw new CommandRejection(change.code, change.message, undefined, change.evidence);
+      const receipt = this.commands.accept(command, contentHash, jobId, log.nextSequence, at);
+      accepted = receipt;
+      return {
+        commands: [change.command],
+        compose: decided => ({ event: { type: 'check-findings-recorded', data: { cause: { kind: 'user-command', command: receipt }, checkFindings: [...decided.events] } } }),
+      };
+    }, at);
+    if (committed.kind === 'refused') {
+      const { refusal } = committed;
+      if (refusal.reason === 'run-ended') throw new CommandRejection('conflict', `The run has ended; its CheckFindings accept no command. ${refusal.message}`);
+      if (refusal.reason === 'check-finding') {
+        const entry = checkFindingStateOf(run.log.ledger).findings.get(command.payload.checkFinding);
+        throw new CommandRejection(userRejectionCode(refusal.rejection), refusal.message, undefined,
+          entry === undefined ? [] : [`${entry.id} is at revision ${entry.revision}`]);
+      }
+      throw new CommandRejection('conflict', refusal.message);
+    }
+    if (committed.kind !== 'committed' || accepted === undefined) throw new CommandRejection('internal', 'The CheckFinding command committed nothing');
+    this.commands.remember(accepted);
+    run.notify();
+    return accepted.receipt;
+  }
+
   // The run itself
 
   private ignoring(run: Run): boolean {
@@ -1059,6 +2658,7 @@ export class RunService {
     // of the run itself has happened yet.
     await this.afterWrite('job-created', run.record.jobId);
     if (this.ignoring(run)) return;
+    this.startReviews(run, agent, packages);
     const accepted = await this.analyse(run, agent, packages, baseline);
     if (!accepted || this.ignoring(run)) return;
 
@@ -1074,6 +2674,11 @@ export class RunService {
     const worked = await this.takeWorkItems(run, agent, packages, baseline);
     if (!worked || this.ignoring(run)) return;
 
+    // Every review settles, or is finished at its bound, before the final
+    // gate: the run completes with no reader left and no request pending.
+    await this.settleReviews(run);
+    if (this.ignoring(run)) return;
+
     await this.finalGate(run);
   }
 
@@ -1087,20 +2692,48 @@ export class RunService {
    * closing event is the last write of the invocation.
    */
   private async runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+    // The start is serialized with every other start, since the identifiers
+    // are counted from the log; the session itself runs outside it, so a
+    // reader and the writer run at once.
+    const started = await run.starting.run(() => this.startInvocation(run, agent, request), request.reader === true ? 'after' : 'first');
+    if ('refused' in started) {
+      // A run that has spent its bounds starts nothing more. The writer's
+      // path fails the run with the counter as evidence; a reader is only
+      // refused, and the next writer invocation meets the same bound.
+      if (request.reader !== true) await this.fail(run, 'limit-exceeded', started.refused);
+      return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
+    }
+    try {
+      return await this.runSession(run, agent, started.id, started.session, started.observations, started.transcript, request);
+    } finally {
+      started.closed();
+    }
+  }
+
+  /**
+   * Everything before an invocation's session starts, under `run.starting`:
+   * the run-wide bounds, the identifiers, the events that license it, its
+   * transcript's start and, for the writer, the writer's acquisition.
+   */
+  private async startInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<
+    | { readonly refused: string }
+    | { readonly id: string; readonly session: SessionId; readonly observations: ObservationLog; readonly transcript: InvocationTranscript; readonly closed: () => void }
+  > {
     // The run-wide bounds are read before an invocation is started, so a run
-    // that has spent them starts nothing more: it fails with the counter as
-    // evidence. The absolute bound is checked at each invocation boundary;
-    // an invocation already running is bounded by its own limits below.
+    // that has spent them starts nothing more. The absolute bound is checked
+    // at each invocation boundary; an invocation already running is bounded
+    // by its own limits below.
     const limits = run.record.policy.limits;
     const invocations = run.log.count('invocation-started');
     // The time the run waited for a person at its review stop is not its own.
     const now = this.now().getTime();
     const age = now - Date.parse(run.record.createdAt) - reviewPauseMs(run.log.events, now);
     if (invocations + 1 > limits.maxInvocationsPerRun || age > limits.runAbsoluteMs) {
-      await this.fail(run, 'limit-exceeded', invocations + 1 > limits.maxInvocationsPerRun
-        ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
-        : `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`);
-      return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
+      return {
+        refused: invocations + 1 > limits.maxInvocationsPerRun
+          ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
+          : `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`,
+      };
     }
     const id = invocationId(invocations + 1);
     // A fresh or forked start opens a session; a continued one joins the
@@ -1129,59 +2762,65 @@ export class RunService {
     await mkdir(run.path(runLayout.session(id)), { recursive: true });
     const observations = await ObservationLog.open(run.path(runLayout.observations(id)));
 
-    // Appended before `startSession`, so a stop that arrives between this
-    // event and the session's start applies to a known invocation.
+    // Registered before any event, so a stop that arrives between the
+    // invocation's start and its session's applies to a known invocation.
     let closed = () => undefined as void;
-    run.invocationDone = new Promise<void>(resolve => { closed = () => resolve(); });
-    if (opens) {
-      await this.write(run, {
-        type: 'session-opened',
-        data: {
-          session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null,
-          ...(request.start.mode === 'fork' ? { fork: request.fork! } : {}),
-          ...(request.replaces === undefined ? {} : { replaces: request.replaces }),
-          ...(request.requestedBy === undefined ? {} : { requestedBy: request.requestedBy }),
-        },
-      });
-      await this.afterWrite('session-opened', run.record.jobId);
-    }
-    await this.write(run, {
-      type: 'invocation-started',
-      data: {
-        invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued',
-        ...(continues === undefined ? {} : { continues }),
-      },
-    }, [
-      { path: runLayout.invocation(id), id, revision: 1, body: invocation },
-    ]);
-    // The transcript's start holds the prompts, and is written before the
-    // session starts, so a crash before the first reply still leaves them.
-    const transcript = this.invocationTranscript(run, session, id, observations);
-    await transcript.started({
-      role: request.role,
-      work: request.work,
-      start: opens ? 'opened' : 'continued',
-      requested: request.start.mode,
-      continues,
-      fork: request.start.mode === 'fork' ? request.fork : undefined,
-      replaces: opens ? request.replaces : undefined,
-      requestedBy: opens ? request.requestedBy : undefined,
-      executor: agent.name,
-      model: this.options.model ?? null,
-      systemPrompt: request.systemPrompt,
-      prompt: request.prompt,
-    });
-    if (request.writer === true) {
-      // The writer is acquired before the session starts, so a stop that
-      // arrives between them applies to a writer the log already names.
-      run.writer.acquire(id);
-      await this.write(run, { type: 'writer-acquired', data: { invocation: id, scopeRevision: request.scope.write } });
-      await this.afterWrite('writer-acquired', run.record.jobId);
-    }
-    try {
-      return await this.runSession(run, agent, id, session, observations, transcript, request);
-    } finally {
+    run.live.set(id, { role: request.role, reader: request.reader === true, session: undefined, done: new Promise<void>(resolve => { closed = () => resolve(); }) });
+    const release = () => {
+      run.live.delete(id);
       closed();
+    };
+    try {
+      if (opens) {
+        await this.write(run, {
+          type: 'session-opened',
+          data: {
+            session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null,
+            ...(request.start.mode === 'fork' ? { fork: request.fork! } : {}),
+            ...(request.replaces === undefined ? {} : { replaces: request.replaces }),
+            ...(request.requestedBy === undefined ? {} : { requestedBy: request.requestedBy }),
+          },
+        });
+        await this.afterWrite('session-opened', run.record.jobId);
+      }
+      await this.write(run, {
+        type: 'invocation-started',
+        data: {
+          invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued',
+          ...(continues === undefined ? {} : { continues }),
+        },
+      }, [
+        { path: runLayout.invocation(id), id, revision: 1, body: invocation },
+      ]);
+      // The transcript's start holds the prompts, and is written before the
+      // session starts, so a crash before the first reply still leaves them.
+      const transcript = this.invocationTranscript(run, session, id, observations);
+      await transcript.started({
+        role: request.role,
+        work: request.work,
+        start: opens ? 'opened' : 'continued',
+        requested: request.start.mode,
+        continues,
+        fork: request.start.mode === 'fork' ? request.fork : undefined,
+        replaces: opens ? request.replaces : undefined,
+        requestedBy: opens ? request.requestedBy : undefined,
+        executor: agent.name,
+        model: this.options.model ?? null,
+        systemPrompt: request.systemPrompt,
+        prompt: request.prompt,
+      });
+      if (request.writer === true) {
+        // The writer is acquired before the session starts, so a stop that
+        // arrives between them applies to a writer the log already names.
+        run.writer.acquire(id);
+        await this.write(run, { type: 'writer-acquired', data: { invocation: id, scopeRevision: request.scope.write } });
+        await this.afterWrite('writer-acquired', run.record.jobId);
+      }
+      await request.onStarted?.(id, session);
+      return { id, session, observations, transcript, closed: release };
+    } catch (error) {
+      release();
+      throw error;
     }
   }
 
@@ -1199,7 +2838,7 @@ export class RunService {
     const keeping = (ended: InvocationOutcome['ended'], value: T | undefined): SessionKeeping =>
       (this.ignoring(run) ? finished('run-ended') : request.keep(ended, value));
     await this.afterWrite('invocation-started', run.record.jobId);
-    if (this.ignoring(run)) {
+    if (this.ignoring(run) || request.fenced?.() === true) {
       await this.endInvocation(run, id, session, keeping('stopped', undefined), stoppedOutcome(), undefined, transcript);
       return { id, ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session, kept: false };
     }
@@ -1229,7 +2868,7 @@ export class RunService {
       index: run.index,
       scope: request.guarded,
     });
-    const context = run.record.policy.context[request.role];
+    const context = contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context, transcript });
     const equipment: Equipment = request.equip?.({
       invocation: id,
@@ -1240,12 +2879,14 @@ export class RunService {
     }) ?? {};
 
     // Every port event is activity; `touch` is what the idle bound resets.
-    const bounds = new InvocationBounds(run.record.policy.limits);
+    const bounds = new InvocationBounds(request.absoluteMs === undefined
+      ? run.record.policy.limits
+      : { ...run.record.policy.limits, invocationAbsoluteMs: Math.min(run.record.policy.limits.invocationAbsoluteMs, request.absoluteMs) });
     let budget: InvocationOutcome['budget'] | undefined;
 
     const spec: SessionSpec = {
       role: request.role,
-      scope: { workingDirectory: this.projectRoot },
+      scope: { workingDirectory: request.workingDirectory ?? this.projectRoot },
       systemPrompt: request.systemPrompt,
       prompt: request.prompt,
       session: request.start,
@@ -1283,9 +2924,10 @@ export class RunService {
         interruption: 'adapter-fault',
         error: `The agent session could not start: ${message(error)}`,
       }, undefined, transcript);
-      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept };
+      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept, interruption: 'adapter-fault' };
     }
-    run.session = agentSession;
+    const live = run.live.get(id);
+    if (live !== undefined) live.session = agentSession;
     // A start the executor could not honor is known only now, after the
     // invocation's start is committed; its end records it.
     const degraded: DegradeRelation | undefined = request.start.mode !== 'fresh' && agentSession.start.mode !== request.start.mode
@@ -1311,7 +2953,7 @@ export class RunService {
 
     // An architect writes nothing, so it holds no writer; its settlement is
     // still the harness's own observation of the session.
-    const settled = await this.settleSession(run, id, agentSession);
+    const settled = await this.settleSession(run, id, agentSession, request.reader === true);
     // `onEvent` cannot be async at the port boundary. Its ordered writes must
     // still finish before gaps are derived and before this driver can settle.
     await recorder.drain();
@@ -1368,6 +3010,8 @@ export class RunService {
       outcomeKind: interruption === undefined ? outcome.kind : 'failed',
       session,
       kept: keptAs.kept,
+      ...(interruption === undefined ? {} : { interruption }),
+      actual: agentSession.start.mode,
     };
   }
 
@@ -1716,8 +3360,12 @@ export class RunService {
     let refusals = 0;
     let released = resumes;
     const bound = run.record.policy.limits.repairRoundsPerWorkItemGate;
+    /** The reconciliation that returns this work item to its architect: a correction, or a brief that did not land. */
+    let returned: string | undefined;
+    /** The rounds whose brief the architect's own session lacks, which its next input carries from the log. */
+    const undelivered: string[] = [];
 
-    for (;;) {
+    turns: for (;;) {
       if (this.ignoring(run)) return null;
       attempt += 1;
       const current = committedRecords(run.log.ledger.replay());
@@ -1786,6 +3434,7 @@ export class RunService {
           ...(revisionReports === undefined || revisionReports.length === 0 ? {} : { revisionsNeeded: revisionReports }),
         },
         ...(unresolvedRequest === undefined ? {} : { unresolvedRequest }),
+        ...(returned === undefined ? {} : { reconciliation: this.reconciliationBriefing(run, returned, undelivered) }),
         ...(integration === undefined ? {} : { integration }),
         ...(scenarios.length === 0 ? {} : { scenarios }),
         ...(failedGate === undefined ? {} : { failedGate }),
@@ -1808,6 +3457,8 @@ export class RunService {
       blocked = undefined;
       released = null;
       revisionReports = [];
+      returned = undefined;
+      undelivered.length = 0;
 
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
         role: 'local-architect',
@@ -1895,7 +3546,7 @@ export class RunService {
       }
 
       if (result.value.kind === 'assign') {
-        const assigned = await this.assignIteration(run, item, result.id, result.value, index, registry);
+        const assigned = await this.assignIteration(run, item, result.id, result.value, index, registry, architectRefOf(result));
         if (assigned === null) return null;
         lastAssignment = assigned;
         // A direct revision is a contract iteration of this work item: the
@@ -1983,33 +3634,67 @@ export class RunService {
         ...result.value.outline,
         hypothesesSeen: hypotheses.map(hypothesis => refOf(hypothesis.id, hypothesis.revision, hypothesis)),
       } satisfies WorkItemOutline);
-      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id } }, [
+      // The revision that commits a completion request records the point
+      // after it, which this work item's reconciliation forks; and it starts
+      // the work item's wait for its reviews.
+      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id, architectRef: architectRefOf(result) } }, [
         { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
       ]);
       await this.afterWrite('outline-revised', run.record.jobId);
+      run.reviews?.wake();
       if (this.ignoring(run)) return null;
 
-      const gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
-      gateRound += 1;
-      if (gate === null) return null;
-      if (gate.verdict === 'passed') {
+      // Before the gate, the work item's reviews settle and what they
+      // raised is reconciled; a completion whose basis no longer holds is
+      // reconciled again, as often as rounds remain.
+      const parent: ParentSession = { session, ref: sessionRef, undelivered };
+      let gate: GateAttempt | null = null;
+      let refusedCompletions = 0;
+      for (;;) {
+        const reconciled = await this.reconcileWorkItem(run, agent, loaded, item, parent);
+        session = parent.session;
+        sessionRef = parent.ref;
+        if (reconciled === null) return null;
+        if (reconciled.kind === 'correct') {
+          // The architect's own session assigns the correction, through the
+          // ordinary gate and reviews.
+          returned = reconciled.reconciliation;
+          continuing = 'reconciliation';
+          continue turns;
+        }
+        if (undelivered.length > 0) returned = this.latestBasis(run, item.id)?.id;
+        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
+        gateRound += 1;
+        if (gate === null) return null;
+        if (gate.verdict !== 'passed') break;
         // A declared scenario the gate did not pass stays declared, and the
         // work item cannot complete around it.
         const unverified = this.unfinishedScenarios(run, item, ['pending', 'bound', 'declared']);
         if (unverified.length > 0) {
           refusals += 1;
-          blocked = unverified.map(entry => scenarioRefusal(entry, gate.id));
+          const refusingGate = gate.id;
+          blocked = unverified.map(entry => scenarioRefusal(entry, refusingGate));
           if (refusals > bound) {
             await this.refuseCompletion(run, item, refusals, blocked, { open: [], owed: false, scenarios: unverified });
             return null;
           }
-          continue;
+          continue turns;
         }
-        await this.write(run, { type: 'work-item-completed', data: { workItem: item.id, gate: gate.id } });
-        await this.afterWrite('work-item-completed', run.record.jobId);
-        await this.finishSession(run, session, 'work-closed');
-        return 'completed';
+        const completed = await this.completeWorkItem(run, item, gate, reconciled.basis);
+        if (completed === 'ended' || this.ignoring(run)) return null;
+        if (completed === 'completed') {
+          await this.afterWrite('work-item-completed', run.record.jobId);
+          await this.finishSession(run, session, 'work-closed');
+          return 'completed';
+        }
+        // Each refusal found another round warranted; the rounds bound them.
+        refusedCompletions += 1;
+        if (refusedCompletions > (run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds)) {
+          await this.fail(run, 'repair-exhausted', `${item.id}'s completion was refused ${refusedCompletions} times: ${completed.refused}`);
+          return null;
+        }
       }
+      if (gate === null) return null;
 
       failedGate = await this.diagnosticsOf(run, gate, 'local-architect');
       firstCause ??= { gate: gate.id, cause: gate.cause };
@@ -2450,6 +4135,7 @@ export class RunService {
     submission: Extract<LocalArchitectSubmission, { kind: 'assign' }>,
     index: ArchitectIndex | null,
     registry: ReadonlyMap<string, RegistryEntry>,
+    architectRef: ArchitectRef | null,
   ): Promise<IterationAssignment | null> {
     const committed = committedRecords(run.log.ledger.replay());
     let outlines = committed.outlines.get(item.id) ?? [];
@@ -2623,7 +4309,14 @@ export class RunService {
     await this.write(run, revised === undefined
       ? {
         type: 'iteration-assigned',
-        data: { workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions },
+        // The architect's pinned point that produced this assignment is
+        // committed with it: the iteration's scope review forks it. The
+        // first assignment after a reconciliation chose a correction
+        // resolves that reconciliation's repair intent.
+        data: {
+          workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions, architectRef,
+          ...(this.pendingCorrection(run, item.id) === undefined ? {} : { corrects: this.pendingCorrection(run, item.id)! }),
+        },
       }
       : {
         type: 'contract-requested',
@@ -2971,6 +4664,9 @@ export class RunService {
             commit: gate.audited,
             ...(proposal.recommendation === undefined ? {} : { recommendation: proposal.recommendation }),
           });
+          // The candidate's reviews are requested before the driver passes
+          // it; they run beside the next iteration's writer.
+          if (closed.commit !== null) await this.requestReviews(run, { workItem: item.id, iteration: assignment.id, gate: gate.id, commit: closed.commit });
           await this.finishSession(run, session, 'work-closed');
           // The evidence this acceptance discharges: a provider that ran the
           // agreed suite against the real implementation has conformed, and a
@@ -4160,19 +5856,71 @@ export class RunService {
       artifacts: [],
     } satisfies IterationResult);
 
-    await this.write(run, {
-      type: 'iteration-closed',
-      data: {
-        workItem: item.id,
-        iteration: assignment.id,
-        outcome: result.outcome,
-        gate: result.gate,
-        commit: result.commit,
-        notices,
-      },
-    }, [{ path: iterationLayout.result(item.id, number), id: assignment.id, revision: 1, body: result }]);
+    const data = { workItem: item.id, iteration: assignment.id, outcome: result.outcome, gate: result.gate, commit: result.commit, notices };
+    const record = { path: iterationLayout.result(item.id, number), id: assignment.id, revision: 1, body: result };
+    const corrects = run.log.all('iteration-assigned').find(event => event.data.iteration === assignment.id)?.data.corrects;
+    if (result.outcome === 'accepted' && result.gate !== null && result.commit !== null && corrects !== undefined) {
+      await this.closeCorrection(run, item.id, { data, record, corrects, gate: result.gate, commit: result.commit, invocation: body.invocations.at(-1) ?? null });
+    } else {
+      await this.write(run, { type: 'iteration-closed', data }, [record]);
+    }
     await this.afterWrite('iteration-closed', run.record.jobId);
     return result;
+  }
+
+  /**
+   * Closes an accepted correction iteration with the repair claim of each
+   * CheckFinding still planned under the reconciliation intent it resolves,
+   * on the same line: the claim names the audited tree and the iteration,
+   * and each CheckFinding stays open until its verification rule is met.
+   * A claim the transition refuses leaves the iteration closed without it.
+   */
+  private async closeCorrection(
+    run: Run,
+    workItem: string,
+    closing: {
+      readonly data: Omit<RunEventOf<'iteration-closed'>['data'], 'checkFindings'>;
+      readonly record: CommitRecord;
+      readonly corrects: string;
+      readonly gate: string;
+      readonly commit: string;
+      readonly invocation: string | null;
+    },
+  ): Promise<void> {
+    let tree: string | undefined;
+    try {
+      tree = await this.candidates.commitTree(this.projectRoot, closing.commit);
+    } catch (error) {
+      this.warn(`Run ${run.record.jobId}: the tree of ${closing.commit} could not be read, so ${closing.data.iteration} claims no repair: ${message(error)}`);
+    }
+    if (tree !== undefined) {
+      const candidate = { kind: 'tree' as const, id: tree };
+      const committed = await this.commitCheckFindings(run, ({ state }) => ({
+        commands: [...state.findings.values()]
+          .filter(entry => entry.standing === 'open' && entry.reason === 'repair-planned' && entry.pendingUserDecision === null
+            && entry.repair?.kind === 'intent' && entry.repair.ref === closing.corrects && sameWorkItem(entry.owner, workItem))
+          .map(entry => ({
+            type: 'dispose' as const,
+            checkFinding: entry.id,
+            expectedRevision: entry.revision,
+            decision: {
+              actor: { kind: 'agent' as const, role: 'engineer', invocation: closing.invocation ?? 'none' },
+              source: candidate,
+              rationale: `The correction ${closing.data.iteration} of ${closing.corrects} closed accepted at gate ${closing.gate}, on the audited commit ${closing.commit}`,
+              evidence: [{ kind: 'gate-attempt', ref: runLayout.gate(closing.gate), hash: null }],
+              communication: { mode: 'quiet' as const },
+              decision: { action: 'claim-repair' as const, candidate, change: closing.data.iteration },
+            },
+          })),
+        compose: decided => ({
+          event: { type: 'iteration-closed', data: { ...closing.data, ...(decided.events.length === 0 ? {} : { checkFindings: [...decided.events] }) } },
+          records: [closing.record],
+        }),
+      }));
+      if (committed.kind !== 'refused' || committed.refusal.reason === 'run-ended') return;
+      this.warn(`Run ${run.record.jobId}: the repair claims of ${closing.data.iteration} were refused, so it closes without them: ${committed.refusal.message}`);
+    }
+    await this.write(run, { type: 'iteration-closed', data: closing.data }, [closing.record]);
   }
 
   /** Captures one writer invocation's line events from the two snapshots around it. */
@@ -4264,7 +6012,7 @@ export class RunService {
    * session idle, and every process group it registered killed and gone.
    * Neither `stop()` resolving nor the agent's word is evidence.
    */
-  private async settleSession(run: Run, id: string, session: AgentSession) {
+  private async settleSession(run: Run, id: string, session: AgentSession, reader = false) {
     if (run.writer.held === id) {
       const released = await run.writer.release(id, session);
       // The release is in the log before anything else may write or check:
@@ -4278,7 +6026,11 @@ export class RunService {
     }
     const idle = await session.settled().catch(() => 'timed-out' as const);
     const settled = { confirmed: idle === 'settled', at: this.now().toISOString(), groupsKilled: 0, lateWrites: [] as string[] };
-    if (!settled.confirmed) {
+    // A reader was given no tool that writes or starts a process, so its
+    // session not becoming idle leaves the tree as the writer's settlement
+    // found it; it is recorded on its outcome and blocks no writer. Its
+    // session stays the run's to stop at a stop or a shutdown.
+    if (!settled.confirmed && !reader) {
       run.writer.markUnsettled(id, 'its session did not become idle within the implementation\'s bound');
     }
     return settled;
@@ -4502,6 +6254,15 @@ export class RunService {
    * operation, not a partial attempt. Recovery finds the commit by its run
    * and gate trailers and re-audits it; completion writes the immutable
    * attempt exactly once.
+   *
+   * The run mutex is held while the intent is appended and again while the
+   * completion is, and not while the commit and audit run: a reader's
+   * result arriving during a slow audit is committed at once instead of
+   * waiting for it. Nothing a reader commits is part of what the gate
+   * verified or decides, the driver is the only writer of gates and
+   * iterations, and a terminal event waits for the effect (`endRun`), so the
+   * attempt and its verdict are exactly what holding the mutex throughout
+   * produced.
    */
   private async commitGate(
     run: Run,
@@ -4512,7 +6273,8 @@ export class RunService {
     recordedMessage?: string,
   ): Promise<GateAttempt> {
     const identity = prepared.request;
-    const invocations = run.log.all('invocation-started').map(event => event.data.invocation);
+    // A reader contributed nothing to the source this commit holds.
+    const invocations = run.log.all('invocation-started').filter(event => event.data.role !== 'reviewer').map(event => event.data.invocation);
     const message = recordedMessage ?? commitMessage({
       runId: run.record.jobId, planId: run.record.planId,
       gate: {
@@ -4526,12 +6288,13 @@ export class RunService {
       ...(earlierAttempts(run, identity.id, identity.subject ?? {}).length === 0 ? {} : { earlier: earlierAttempts(run, identity.id, identity.subject ?? {}) }),
     });
     const operation = gateOperation(prepared, message);
-    return run.mutex.run(() => run.log.ledger.effect<GateAttempt>({
+    const effect = run.log.ledger.effect<{ readonly attempt: GateAttempt; readonly findings: ScenarioGateFindings }>({
       key: `gate-commit:${identity.id}`,
-      intent: {
+      serialize: work => run.mutex.run(work),
+      intent: () => ({
         event: run.log.next({ type: 'gate-committing', data: { gate: identity.id, checkpoint: prepared.checkpoint } }),
         records: [{ path: runLayout.gateOperation(identity.id), id: identity.id, revision: 1, body: operation }],
-      },
+      }),
       perform: async () => {
         await this.afterWrite('gate-attempted', run.record.jobId);
         // The feature files go into the gate's commit as the states now
@@ -4551,23 +6314,124 @@ export class RunService {
         if (attempt.verdict === 'passed' && (attempt.audited !== sourceCommit || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} passed without published evidence for ${sourceCommit}`);
         }
-        return attempt;
+        // What the scenario check means for the work item's CheckFindings
+        // is read here, outside the mutex; the completion decides it.
+        return { attempt, findings: await this.scenarioGateFindings(run, attempt) };
       },
-      complete: attempt => {
+      complete: ({ attempt, findings }) => {
         const { auditOverall, ...durableAttempt } = attempt;
         if (auditOverall != null && (attempt.audited === null || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} has an audit outcome without its published commit`);
         }
-        return {
-          event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
-          records: [
-            { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
-            ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
-              body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
-          ],
-        };
+        return this.gateAttempted(run, attempt, findings, [
+          { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
+          ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
+            body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
+        ]);
       },
-    }));
+    });
+    run.gating = effect;
+    try {
+      return (await effect).attempt;
+    } finally {
+      if (run.gating === effect) run.gating = undefined;
+    }
+  }
+
+  /**
+   * What a committing gate's scenario check means for its work item's
+   * CheckFindings, read before its completion takes the mutex (Plan 12
+   * iteration 6): the tracked scenarios it observed, every earlier attempt
+   * of the work item, and the audited tree of each attempt a promotion or a
+   * witness needs. Null when there is nothing to promote or witness, which
+   * reads no tree; unavailable when a tree cannot be read, which the
+   * completion records and the attempt survives.
+   */
+  private async scenarioGateFindings(run: Run, attempt: GateAttempt): Promise<ScenarioGateFindings> {
+    const workItem = attempt.subject.workItem;
+    if (workItem === undefined || attempt.audited === null) return null;
+    try {
+      const tracked = trackedScenarios(run.log.ledger.replay()).records.map(record => ({ id: record.id, owner: record.owner, file: record.file }));
+      const observations = scenarioObservations(attempt, tracked);
+      if (observations.length === 0) return null;
+      const earlier = run.log.all('gate-attempted').flatMap(event => {
+        const body = event.data.gate === attempt.id ? undefined : gateBodyOf(run, event.data.gate);
+        return body === undefined || body.subject.workItem !== workItem ? [] : [{ body, observations: scenarioObservations(body, tracked) }];
+      });
+      const needed = scenarioGatesToRead(checkFindingStateOf(run.log.ledger), workItem, attempt.verdict, observations,
+        earlier.map(entry => ({ gate: entry.body.id, observations: entry.observations })));
+      if (needed === null) return null;
+      const trees = new Map<string, string>();
+      const treeOf = async (commit: string): Promise<string> => {
+        const known = trees.get(commit);
+        if (known !== undefined) return known;
+        const tree = await this.candidates.commitTree(this.projectRoot, commit);
+        trees.set(commit, tree);
+        return tree;
+      };
+      const observed = async (body: GateAttempt, entries: readonly ScenarioObservation[], read: boolean) => ({
+        gate: body.id,
+        tree: read && body.audited !== null ? await treeOf(body.audited) : null,
+        observations: entries,
+        record: runLayout.gate(body.id),
+        output: runLayout.gateOutput(body.id),
+      });
+      const current = await observed(attempt, observations, true);
+      return {
+        workItem,
+        verdict: attempt.verdict,
+        changedFiles: attempt.guardedChanges.map(change => change.path),
+        current: { ...current, tree: current.tree! },
+        earlier: await Promise.all(earlier.map(entry => observed(entry.body, entry.observations, needed.includes(entry.body.id)))),
+        tracked,
+      };
+    } catch (error) {
+      return { unavailable: `The audited tree a scenario CheckFinding of gate ${attempt.id} needs could not be read: ${message(error)}` };
+    }
+  }
+
+  /**
+   * The `gate-attempted` line of a committing gate: its attempt and records,
+   * and the CheckFinding part its scenario check decides under the mutex.
+   * The attempt and its verdict are committed whatever that part does; a
+   * part refused as a whole is recorded on the event with its reason, and a
+   * scenario left out as a note.
+   */
+  private gateAttempted(run: Run, attempt: GateAttempt, findings: ScenarioGateFindings, records: CommitRecord[]): Transaction<RunEvent> {
+    const data = { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next };
+    const plain = (outcome?: GateCheckFindingOutcome): Transaction<RunEvent> => ({
+      event: run.log.next({ type: 'gate-attempted', data: { ...data, ...(outcome === undefined ? {} : { scenarioFindings: outcome }) } }),
+      records,
+    });
+    if (findings === null) return plain();
+    if ('unavailable' in findings) {
+      this.warn(`Run ${run.record.jobId}: ${findings.unavailable}; the gate is committed without its CheckFinding part`);
+      return plain({ refused: { reason: 'source-unavailable', message: findings.unavailable }, notes: [] });
+    }
+    let notes: ScenarioFindingNote[] = [];
+    const decided = decideCheckFindingTransaction(run.log, ({ state }) => {
+      const plan = planScenarioFindings(state, findings);
+      notes = [...plan.notes];
+      return {
+        commands: plan.commands,
+        compose: outcome => ({
+          event: {
+            type: 'gate-attempted',
+            data: {
+              ...data,
+              ...(outcome.events.length === 0 ? {} : { checkFindings: [...outcome.events] }),
+              ...(notes.length === 0 ? {} : { scenarioFindings: { refused: null, notes } }),
+            },
+          },
+          records,
+        }),
+      };
+    });
+    if (decided.kind === 'transaction') return decided.transaction;
+    if (decided.kind === 'replayed') return plain(notes.length === 0 ? undefined : { refused: null, notes });
+    const refusal = `${decided.refusal.reason}: ${decided.refusal.message}`;
+    this.warn(`Run ${run.record.jobId}: the CheckFinding part of gate ${attempt.id} was refused (${refusal}); the gate is committed without it`);
+    return plain({ refused: { reason: 'transition-refused', message: refusal }, notes });
   }
 
   /**
@@ -5008,6 +6872,9 @@ export class RunService {
   }
 
   private async fail(run: Run, reason: RunFailureReason, text: string, evidence: readonly string[] = []): Promise<void> {
+    // A failure is the run's final decision; its readers are stopped and
+    // their requests finished first, so no review is left running past it.
+    if (run.reviews !== undefined && !run.log.terminal) await this.stopReaders(run, 'stopped', run.record.policy.limits.stopSettleMs);
     await this.endRun(run, { type: 'job-failed', data: { reason, message: text, evidence: [...evidence] } });
   }
 
@@ -5037,7 +6904,8 @@ export class RunService {
       const drivers = [...this.runs.values()];
       const active = drivers.filter(run => !run.log.terminal);
       for (const run of active) {
-        void run.session?.stop().catch(() => undefined);
+        run.reviews?.close();
+        for (const session of run.sessions()) void session.stop().catch(() => undefined);
         run.notify();
       }
 
@@ -5045,7 +6913,7 @@ export class RunService {
         const bound = Math.max(...drivers.map(run => run.record.policy.limits.stopSettleMs));
         let timer: NodeJS.Timeout | undefined;
         const quiescent = await Promise.race([
-          Promise.all(drivers.map(run => run.done)).then(() => true),
+          Promise.all(drivers.map(run => run.idle())).then(() => true),
           new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), bound); }),
         ]);
         clearTimeout(timer);
@@ -5197,6 +7065,9 @@ function earlierAttempts(run: Run, attemptId: string, attemptSubject: GateAttemp
     });
 }
 
+/** What a committing gate's completion decides its CheckFinding part from; see `scenarioGateFindings`. */
+type ScenarioGateFindings = ScenarioGateInputs | { readonly unavailable: string } | null;
+
 /** One gate attempt as the log committed it, without reading the file again. */
 function gateBodyOf(run: Run, id: string): GateAttempt | undefined {
   for (const entry of run.log.ledger.replay()) {
@@ -5310,6 +7181,43 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  * before the invocation starts. What the implementation answered is in the
  * outcome, which is written once the session has started.
  */
+/** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
+type ReviewInputs = Pick<ReviewRequest, 'requirements' | 'guidance' | 'forkPoint'>;
+
+/** What the harness binds to one concern of a valid submission. */
+interface ConcernBinding {
+  readonly ground: CheckFindingGround | null;
+  readonly credibility: CheckFindingReportCredibility;
+  readonly modules: readonly string[];
+}
+
+/** The start a request intends: a fork for every question with a fork point, fresh for code review. */
+function requestedStartOf(request: ReviewRequest): 'fresh' | 'fork' {
+  return request.forkPoint.kind === 'none' ? 'fresh' : 'fork';
+}
+
+/**
+ * The inputs a request bound, as read again now: each must be there with
+ * the hash the request recorded, or the question is not the one it asked.
+ */
+function boundInputs(read: readonly CapturedInput[], bound: ReadonlyArray<{ readonly ref: string; readonly hash: string }>): CapturedInput[] {
+  return bound.map(entry => {
+    const found = read.find(input => input.ref === entry.ref);
+    if (found === undefined) throw new Error(`${entry.ref} is no longer there`);
+    if (found.hash !== entry.hash) throw new Error(`${entry.ref} has hash ${found.hash}, and the request bound ${entry.hash}`);
+    return found;
+  });
+}
+
+/**
+ * The local architect's pinned point after one invocation, where the harness
+ * kept its session: the session and the executor's ref at the invocation's
+ * end. Null where the session was not kept or no ref was reported.
+ */
+function architectRefOf(result: InvocationResult<unknown>): ArchitectRef | null {
+  return result.kept && result.ref !== '' && result.session !== '' ? { session: result.session, ref: result.ref } : null;
+}
+
 function requestedSession<T>(request: InvocationRequest<T>): Invocation['session'] {
   if (request.degraded !== undefined) {
     return {
@@ -5486,4 +7394,56 @@ function message(error: unknown): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms).unref());
+}
+
+/** Whether a CheckFinding's owner is this work item. */
+/** A terminal review result as a reconciliation packet states it: covered scope, gaps and concerns. */
+function resultText(result: ReviewResult): string {
+  const concerns = (count: number) => `${count} concern${count === 1 ? '' : 's'}`;
+  if (result.result === 'complete') return `complete, ${concerns(result.concerns)}`;
+  if (result.result === 'partial') return `partial, ${concerns(result.concerns)}; not inspected: ${result.missing.map(entry => `${entry.path} (${entry.reason})`).join(', ')}`;
+  return `not verified (${result.reason}): ${result.detail}`;
+}
+
+function sameWorkItem(owner: { readonly kind: string; readonly workItem?: string } | undefined, workItem: string): boolean {
+  return owner?.kind === 'work-item' && owner.workItem === workItem;
+}
+
+/**
+ * What one reviewer invocation's end means for its attempt: covered scope,
+ * or why none, and whether another attempt could do better. Invalid output,
+ * a failed execution and a timeout may be retried; an unavailable input or
+ * a stop may not.
+ */
+function reviewOutcome(
+  result: InvocationResult<ReviewSubmission>,
+  stop: NotVerifiedReason | undefined,
+): { readonly result: ReviewResult; readonly retryable: boolean } {
+  const notVerified = (reason: NotVerifiedReason, detail: string, retryable: boolean) => ({ result: { result: 'not-verified' as const, reason, detail }, retryable });
+  if (result.id === '') return notVerified('unavailable', 'The run\'s invocation bounds refused the reviewer', false);
+  switch (result.ended) {
+    case 'submitted': {
+      const submission = result.value;
+      if (submission === undefined) return notVerified('invalid-output', 'The reviewer ended without an accepted submission', true);
+      const inspected = submission.inspected.map(path => ({ path }));
+      return {
+        result: submission.missing.length === 0
+          ? { result: 'complete', inspected, concerns: submission.concerns.length }
+          : { result: 'partial', inspected, missing: submission.missing.map(entry => ({ path: entry.path, reason: entry.reason })), concerns: submission.concerns.length },
+        retryable: false,
+      };
+    }
+    case 'invalid-submission':
+      return notVerified('invalid-output', 'Every submission the reviewer made was invalid, up to the bound', true);
+    case 'ended':
+      return notVerified('invalid-output', 'The reviewer ended without a submission', true);
+    case 'context-budget-reached':
+      return notVerified('execution-failed', 'The reviewer reached its context budget before it submitted', true);
+    case 'failed':
+      return result.interruption === 'idle-timeout' || result.interruption === 'absolute-timeout'
+        ? notVerified('timed-out', `The reviewer met its ${result.interruption === 'idle-timeout' ? 'idle' : 'attempt'} bound`, true)
+        : notVerified('execution-failed', `The reviewer's session failed${result.interruption === undefined ? '' : ` (${result.interruption})`}`, true);
+    case 'stopped':
+      return notVerified(stop ?? 'stopped', stop === 'deadline' ? 'The reviews\' settlement bound passed while this attempt ran' : 'The run stopped its readers while this attempt ran', false);
+  }
 }

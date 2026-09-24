@@ -35,6 +35,16 @@ signatures name, and the `session` command's entry with the types it names:
     evaluation evidence beside them, with the limit of each list. Each answer
     is a projection; the durable records and the internal event union stay
     private, so the log can change without changing the wire.
+  - `check-findings.ts` holds the CheckFinding protocol (Plan 12): review
+    coverage, which is unavailable, never clean, for a run whose policy
+    requested no reviews; bounded, versioned lists of a run's CheckFindings
+    by work item or module, ordered by risk, then credibility, then recency;
+    one CheckFinding's history with the attempts, candidate diffs and repair
+    sessions it links to; the unsettled counts of every module; the review
+    requests; and a person's three commands, answering a pending decision,
+    waiving and revoking a waiver, each against the CheckFinding's revision.
+    It redefines the projection it serves and names no internal type;
+    `runs.ts` includes its commands in the run's command union.
   - `transcripts.ts` holds the entry schema of a session's transcript: its
     numbered entries, each block's header and body, and where a body is
     stored. It is not exposed yet; the session queries will expose it.
@@ -594,6 +604,128 @@ client draws on. It also runs one of the project's own commands, hashes
 the guarded files and holds the small git service the run branch needs.
 Neither child receives this module's vocabulary.
 
+The child `check-findings` decides CheckFinding identity, dispositions,
+replay and queries as pure functions over the references this module binds.
+It receives nothing from this module. Its events travel in the run log in a
+`checkFindings` array on the run event that commits them, and `src/check-findings/`
+is the one transition that decides and appends them: under the run mutex it
+refuses a terminal run, replays the current state, revalidates the basis the
+producer's slow work captured, asks the child to decide, and appends the
+carrier with a record copy of every event as one ledger line. An exact
+redelivery of a report appends nothing. The state and its key indexes are
+replayed from the log after a restart; the record copies are materialized
+like any other record.
+
+`src/reviews/` holds iteration reviews (Plan 12). Every iteration that
+closes accepted after an engineer's passing gate has one request per review
+question, code, scope and design, recorded before the driver passes it,
+keyed by the iteration, its audited commit, the question and the review
+policy; recovery records a request the log is owed. Each request binds the
+question's own inputs by hash and the point its reviewer starts from. Code
+review starts fresh. Scope review binds the plan excerpts its assignment
+cites and forks the local architect at the point that produced the
+assignment, which `iteration-assigned` records; the `outline-revised` that
+commits a completion request records the point after it. Design review
+binds a small selection of guidance from the candidate (its principles
+documents and the READMEs on the way to what changed) and forks the one
+orientation session of that selection, made once by a reviewer that read
+it; a changed selection is another orientation. A fork point that is
+missing, or a fork the executor cannot take, starts fresh with the same
+complete message, and the attempt records the start that was made. The
+queue drains waiting requests in the order they were recorded, overflows
+beyond its bound, retries once, and finishes at once a request no attempt
+of which could finish before its work item's deadline; a writer's start
+goes before a waiting reader's. A request is run by a reader beside the run's one writer:
+the run keeps a registry of open invocations, at most one writer and the
+policy's bounded readers, and a stop, a failure, a shutdown and the
+reviews' settlement bound before the final gate stop each of them. A reader
+has no built-in tool and no working directory of the project's: its four
+snapshot tools answer the audited commit from Git's objects alone, through
+the evidence child's candidate source, and refuse an absolute path, a path
+out of the candidate, a symbolic link and a generated view. Each concern
+carries the reviewer's risk level and names its ground, a file the reviewer
+read with `snapshot_read` in that attempt, or none. The harness binds the
+rest: the ground's hash, its credibility from the file's provenance (a
+principles document, the run's plan directory or a feature file the harness
+wrote is human-reviewed; any other file is agent-generated; no ground is
+ungrounded), and the modules that own the concern's locations on the
+candidate's own module declarations, else the work item's module
+(`src/reviews/signals.ts`). Its terminal
+attempt, its submission and the CheckFindings its concerns open are one
+line through the CheckFinding transition; a result that arrives after its
+request settled or its run ended is fenced and appends nothing. The gate's
+commit and audit run outside the run mutex, which is held for the effect's
+intent and completion, so a reader's result is not held back by a slow
+audit.
+
+At a work item's completion request, `src/reviews/reconciliation.ts` and
+the run service's reconciliation section settle its review requests, waiting
+at most the policy's settlement bound from the request and then finishing
+what is left as not verified at the deadline and stopping those readers
+only; the queue stays open. An empty attention set goes to the work item's
+gate with no agent call. Otherwise one round records its basis (the audited
+source, the settled requests, the attention set in risk and credibility
+order, and the round's correction floor) and forks the local architect at
+the point after its completion request, fresh with the same packet where
+that point is gone. Its one submission relates, disposes of each signal and
+names the next action; the harness refuses a correction below the floor and
+a waiver outside the work item's module before the child decides, binds
+actor, source, authority, revisions and the repair intent, and commits the
+assessment under the mutex as the intent of a ledger effect whose effect
+appends the brief to the architect's own session, keyed by the round. A
+correction is assigned by that session as an ordinary iteration, which
+resolves the intent and, when it closes accepted, claims the repair on its
+`iteration-closed`. A user decision waits for its answer before the next
+round. Before `work-item-completed` the basis is validated once more; a
+changed source or request set, or a new or changed signal that warrants a
+round that remains, refuses the completion and reconciles again, and
+otherwise the work item completes naming each signal it leaves unresolved.
+
+`src/checks/scenario-findings.ts` is the one factual producer: the scenario
+check of a committing gate that has a work item. A failed tracked scenario
+stays on its gate attempt, where the immediate repair answers it, unless it
+needs continuity: it failed an earlier gate of the same work item too, or a
+CheckFinding for it exists. Then the gate's own `gate-attempted` line
+carries a report of each of those failures, oldest first, under the issue
+key `scenario:<id>`: an objective, required, high-risk signal whose
+repeated failures make it reproduced. A passing gate is the witness: for
+each open scenario CheckFinding of its work item that its scenario check
+observed, it offers the same scenario at its frozen obligation, on the
+audited tree being accepted, with the coverage and outcome the message
+stream established, and the child decides whether that fixes it. A run
+narrower than the one that observed the failure covers it only in part,
+and a pass on the tree of the latest failure is intermittent evidence,
+classified and never a fix. What was left out is a note on the line, and a
+part that cannot be decided, such as an audited tree Git cannot read, is
+refused on the line while the attempt and its verdict are committed as
+they were. The trees and earlier attempts are read before the completion
+takes the mutex. The verdict is decided first and never reads any of this.
+The project's own scenarios are counted, never identified; a dry run, the
+readiness and final gates and every other command stay on their attempts.
+
+`src/projections/check-findings.ts` answers the CheckFinding protocol from
+the committed run alone: the state replayed from the log's carriers, the
+child's attention order, the review coverage from the review events, and
+each work item's `work-item-completed` for the reason an open signal was
+left unresolved. A signal opened or reopened after its work item completed
+is `raised-after-last-round`, and an unresolved signal of non-low risk that
+surfaced in its work item's latest review, or after its last round, is
+marked. Each summary names the commands a person may send now; the command
+path checks them again. A person's answer, waiver or revocation
+(`src/check-findings/user-commands.ts`) becomes one child decision with the
+person as its actor, validated under the run mutex against the run's
+version and the CheckFinding's revision, with the harness's authority
+rules: the user may waive any signal but a required check, which the child
+refuses, and a revocation needs a rank at least the waiver's actor's. It
+is committed on a `check-findings-recorded` line that holds the accepted
+command, so a retry after a restart receives its original receipt; a run
+that has ended accepts none.
+
+`src/probes/pi-fork.probe.ts` is a development probe, run by hand with a
+real model and never by the test suite: it forks a pinned pi session point
+as a reviewer confined to an audited Git candidate and reports the start
+pi actually made and what the snapshot tools answered.
+
 ## The run
 
 - **Commands.** `start-run` carries the plan, the agent and `reviewStop`,
@@ -604,7 +736,10 @@ Neither child receives this module's vocabulary.
   the run was working when it was given (`duringRun`); it is refused before
   the analysis is accepted, during the final verification and for a run that
   failed, stopped or was interrupted, and accepted after completion, the one
-  event that may follow `job-completed`.
+  event that may follow `job-completed`. `respond-to-check-finding`,
+  `waive-check-finding` and `revoke-check-finding-waiver` expect the run's
+  version and the CheckFinding's revision; there is no command that marks a
+  CheckFinding resolved.
 - **The review stop.** With `reviewStop`, `analysis-accepted` is followed by
   `review-requested` and the phase `awaiting-review`. The run stays
   `running` and keeps the project, starts no session and writes nothing to

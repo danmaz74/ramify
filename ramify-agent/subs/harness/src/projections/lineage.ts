@@ -40,7 +40,7 @@ export function lineageInputsOf(view: RunView, logs: ObservationLogs): LineageIn
     if (event.type === 'global-context-rebuilt') generations.add(event.data.generation);
     if (event.type === 'session-opened') {
       opened.set(event.data.session, { fork: event.data.fork ?? null, replaces: event.data.replaces ?? null });
-      if (event.data.fork !== undefined) generations.add(event.data.fork.generation);
+      if (event.data.fork?.generation !== undefined) generations.add(event.data.fork.generation);
       // The initial architect's context is generation 1, forked or not.
       if (event.data.role === 'initial-architect') generations.add(1);
     }
@@ -75,7 +75,7 @@ export function lineageInputsOf(view: RunView, logs: ObservationLogs): LineageIn
       unknown,
       degraded,
       continues: continues?.reason ?? null,
-      generation: requested === 'fork' ? relation!.fork!.generation : null,
+      generation: requested === 'fork' ? relation!.fork!.generation ?? null : null,
       previous,
       startContext: startContextOf(logs.get(invocation)),
       usage: outcome === undefined

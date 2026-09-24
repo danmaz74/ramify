@@ -245,10 +245,13 @@ function openSessionManager(spec: SessionSpec): { readonly manager: SessionManag
     const { file, entryId } = splitRef(start.from);
     if (file === '' || entryId === '' || !existsSync(file)) return fresh(`The point named by "${start.from}" no longer exists.`);
     try {
-      // The fork is a new file holding root to that entry; the parent is untouched.
-      const branched = SessionManager.open(file, spec.sessionDirectory).createBranchedSession(entryId);
+      // The fork is a new file holding root to that entry; the parent is
+      // untouched. pi writes the working directory it opened the parent
+      // with into the fork's header, so the parent is opened with the
+      // fork's own: a fork in another directory never claims its parent's.
+      const branched = SessionManager.open(file, spec.sessionDirectory, spec.scope.workingDirectory).createBranchedSession(entryId);
       if (branched === undefined) return fresh(`pi could not branch "${start.from}".`);
-      return { manager: SessionManager.open(branched, spec.sessionDirectory), start: { mode: 'fork' } };
+      return { manager: SessionManager.open(branched, spec.sessionDirectory, spec.scope.workingDirectory), start: { mode: 'fork' } };
     } catch (error) {
       return fresh(`pi could not branch "${start.from}": ${message(error)}`);
     }

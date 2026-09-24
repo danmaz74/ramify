@@ -59,6 +59,12 @@ try {
   check('all five session roles and both gates are reachable in the shelf',
     await page.getByLabel('All sessions').getByRole('listitem').count() === 5 &&
     await page.getByLabel('All gates').getByRole('listitem').count() === 2);
+  // Every card of a column is measured, and its extent meets no other card's: a gate's audit line is not under the next card.
+  const overlappingCards = async () => await page.evaluate(`[...document.querySelectorAll('.execution-viewport .react-flow__node')]
+    .map(node => ({ id: node.getAttribute('data-id'), box: node.getBoundingClientRect() }))
+    .flatMap((a, i, all) => all.slice(i + 1).filter(b => a.box.left < b.box.right && b.box.left < a.box.right && a.box.top < b.box.bottom && b.box.top < a.box.bottom)
+      .map(b => a.id + ' meets ' + b.id))`) as string[];
+  check('no two execution map cards overlap', (await overlappingCards()).length === 0);
   check('cycle is a finite reference', await page.getByLabel('References').getByText(/theme-tokens → capability:status-badge/).count() === 1);
   await page.screenshot({ path: resolve(artifacts, 'desktop-initial-1440x900.png'), fullPage: true });
   const transform = async (scope: typeof canvas) => scope.locator('.react-flow__viewport').getAttribute('style');
@@ -137,6 +143,7 @@ try {
   await page.getByLabel('Direct execution matches').getByRole('button', { name: /Implement status badge.*hidden; reveal/ }).click();
   check('hidden-match jump reveals its execution node',
     await canvas.getByRole('button', { name: /Implement status badge, work-item/ }).count() === 1);
+  check('after a branch is revealed no two execution map cards overlap', (await overlappingCards()).length === 0);
   await page.evaluate(() => window.acceptance.setScenarioCount(20));
   await canvas.getByRole('button', { name: 'Collapse Status badge' }).click();
   check('20 collapsed scenarios display dots', await canvas.locator('.execution-capability').first().locator('.execution-dots i').count() === 20);
@@ -151,6 +158,7 @@ try {
   await canvas.locator('.execution-capability.execution-state-working').first().waitFor({ state: 'attached' });
   check('reopened requirement clears capability green',
     await canvas.locator('.execution-capability.execution-state-working').count() >= 1);
+  check('after live version updates change card content no two execution map cards overlap', (await overlappingCards()).length === 0);
   await page.evaluate(() => window.acceptance.setScenarioCount(1));
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   await moduleCanvas.locator('.react-flow__controls-fitview').click();

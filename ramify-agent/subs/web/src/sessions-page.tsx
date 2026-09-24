@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { sessionQueryLimits, type SessionListEntry, type SessionListResponse } from '../../harness/src/interfaces/protocol/sessions.js';
 import type { ProtocolClient } from './client.js';
 import { routeHref, sessionHref, sessionKey } from './routes.js';
-import { DegradedStarts, reachText, SessionState } from './run-labels.js';
+import { counted, DegradedStarts, reachText, SessionState } from './run-labels.js';
 import { isFinal } from './session-progress.js';
 import { useQuery } from './use-query.js';
 
@@ -71,7 +71,7 @@ function SessionList({ list }: { readonly list: SessionListResponse }) {
         : (
           <>
             <p className="muted">
-              {list.total} sessions{list.sessions.length < list.total ? `; ${list.offset + 1}–${list.offset + list.sessions.length} shown` : ''}.
+              {counted(list.total, 'session')}{list.sessions.length < list.total ? `; ${list.offset + 1}–${list.offset + list.sessions.length} shown` : ''}.
             </p>
             <SessionGroup title="Live and suspended" entries={open} />
             <SessionGroup title="Finished and interrupted" entries={closed} />

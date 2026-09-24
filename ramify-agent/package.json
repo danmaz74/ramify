@@ -14,7 +14,8 @@
     "real-session": "tsx scripts/real-session.ts",
     "session": "tsx src/main.ts session",
     "trial": "tsx scripts/live-trial.ts",
-    "test:browser:execution-map": "tsx scripts/browser-acceptance/run.ts"
+    "test:browser:execution-map": "tsx scripts/browser-acceptance/run.ts",
+    "test:browser:check-findings": "tsx scripts/browser-acceptance/check-findings.ts"
   },
   "dependencies": {
     "@cucumber/gherkin": "42.0.0",

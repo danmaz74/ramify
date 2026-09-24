@@ -1,0 +1,13 @@
+ramify 1
+module check-findings
+
+// CheckFindings as pure functions: the identity of an issue across reports,
+// the decisions that may change it, the state replay derives and the views
+// a query selects. The harness binds every reference it passes in and
+// commits the returned events through its ledger. The contract file names
+// every type a signature below mentions, so the parent can name what it
+// receives.
+expose-src * from "interfaces/check-findings.ts" to parent
+expose-src decideCheckFindingChange from "decide.ts" to parent
+expose-src applyCheckFindingEvent, replayCheckFindingEvents, emptyCheckFindingState from "replay.ts" to parent
+expose-src selectCheckFindings from "queries.ts" to parent

@@ -23,6 +23,7 @@ expose-sub UnreadablePlanEntry, planEntrySchema from harness to descendants
 expose-sub planListResponseSchema, planResponseSchema from harness to descendants
 expose-sub projectResponseSchema, readablePlanEntrySchema from harness to descendants
 expose-sub unreadablePlanEntrySchema from harness to descendants
+expose-sub planDecisionWaitSchema, PlanDecisionWait from harness to descendants
 
 // protocol/errors.ts
 expose-sub ErrorCode, ErrorResponse, errorCodeSchema from harness to descendants
@@ -38,7 +39,31 @@ expose-sub jobVersionSchema, receiptSchema, stopJobCommandSchema from harness to
 expose-sub usageSchema from harness to descendants
 
 // protocol/paths.ts
-expose-sub apiPrefix, protocolPaths from harness to descendants
+expose-sub apiPrefix, protocolPaths, CheckFindingPathQuery from harness to descendants
+
+// protocol/check-findings.ts
+expose-sub checkFindingProtocolVersion, checkFindingWireLimits, checkFindingWireIdSchema from harness to descendants
+expose-sub checkFindingDecisionWireIdSchema, reviewCoverageSchema, ReviewCoverageView from harness to descendants
+expose-sub checkFindingRiskViewSchema, CheckFindingRiskView, checkFindingCredibilityViewSchema from harness to descendants
+expose-sub CheckFindingCredibilityView, checkFindingStandingViewSchema, CheckFindingStandingView from harness to descendants
+expose-sub checkFindingReasonViewSchema, CheckFindingReasonView, checkFindingAwaitingViewSchema from harness to descendants
+expose-sub unresolvedReasonViewSchema, UnresolvedReasonView, checkFindingActorViewSchema from harness to descendants
+expose-sub CheckFindingActorView, checkFindingSourceViewSchema, checkFindingWitnessViewSchema from harness to descendants
+expose-sub checkFindingSettlementSchema, CheckFindingSettlement, checkFindingConflictViewSchema from harness to descendants
+expose-sub checkFindingOptionViewSchema, pendingUserDecisionSchema, PendingUserDecision from harness to descendants
+expose-sub checkFindingMaterialChoiceSchema, CheckFindingMaterialChoice, userCheckFindingCommandKindSchema from harness to descendants
+expose-sub UserCheckFindingCommandKind, checkFindingSummarySchema, CheckFindingSummaryView from harness to descendants
+expose-sub checkFindingCountsSchema, CheckFindingCountsView, checkFindingSelectSchema from harness to descendants
+expose-sub CheckFindingSelect, checkFindingOrderSchema, checkFindingListResponseSchema from harness to descendants
+expose-sub CheckFindingListResponse, checkFindingModuleCountsSchema, CheckFindingModuleCounts from harness to descendants
+expose-sub checkFindingReportViewSchema, CheckFindingReportView, checkFindingDecisionViewSchema from harness to descendants
+expose-sub CheckFindingDecisionView, checkFindingRelationViewSchema, checkFindingAttemptLinkSchema from harness to descendants
+expose-sub CheckFindingAttemptLink, checkFindingRepairLinkSchema, CheckFindingRepairLink from harness to descendants
+expose-sub checkFindingDetailSchema, CheckFindingDetail, reviewAttemptViewSchema, ReviewAttemptView from harness to descendants
+expose-sub reviewRequestViewSchema, ReviewRequestView, reviewListResponseSchema, ReviewListResponse from harness to descendants
+expose-sub respondToCheckFindingCommandSchema, RespondToCheckFindingCommand, waiveCheckFindingCommandSchema from harness to descendants
+expose-sub WaiveCheckFindingCommand, revokeCheckFindingWaiverCommandSchema, RevokeCheckFindingWaiverCommand from harness to descendants
+expose-sub CheckFindingUserCommand from harness to descendants
 
 // protocol/execution-map.ts
 expose-sub executionMapPolicySchema, executionMapLimits from harness to descendants
@@ -60,6 +85,7 @@ expose-sub approveAnalysisCommandSchema, ApproveAnalysisCommand, RunCommandInput
 expose-sub runReviewSchema, RunReview from harness to descendants
 expose-sub runPhaseSchema, RunPhase, runQueryLimits, measurementPolicySchema from harness to descendants
 expose-sub kpiPolicySchema, lineagePolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
+expose-sub runDecisionRequestsSchema, RunDecisionRequests from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
 expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
 expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants

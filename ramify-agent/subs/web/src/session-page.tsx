@@ -100,7 +100,7 @@ function SessionFacts({ at: ref, detail }: { readonly at: SessionRef; readonly d
   const { lineage } = session;
   const relations: ReactNode[] = [];
   if (lineage.fork) {
-    relations.push(<>Forked from <PointLink from={ref} point={lineage.fork.from} /> ({lineage.fork.reason}, context generation {lineage.fork.generation}{lineage.fork.briefs.length > 0 ? `, holding briefs ${lineage.fork.briefs.join(', ')}` : ''})</>);
+    relations.push(<>Forked from <PointLink from={ref} point={lineage.fork.from} /> ({lineage.fork.reason}{lineage.fork.generation === undefined ? '' : `, context generation ${lineage.fork.generation}`}{lineage.fork.briefs.length > 0 ? `, holding briefs ${lineage.fork.briefs.join(', ')}` : ''})</>);
   }
   if (lineage.replaces) relations.push(<>Replaces <SessionLink from={ref} session={lineage.replaces.session} sessions={sessions} /> ({lineage.replaces.reason})</>);
   if (lineage.replacedBy) relations.push(<>Replaced by <SessionLink from={ref} session={lineage.replacedBy} sessions={sessions} /></>);
@@ -172,7 +172,7 @@ function StartRelation({ at: ref, invocation, started, session, sessions }: {
     const fork = session?.lineage.fork ?? started?.fork ?? null;
     const replaces = session?.lineage.replaces ?? started?.replaces ?? null;
     const requestedBy = session?.lineage.requestedBy ?? started?.requestedBy ?? null;
-    if (fork) parts.push(<>Forked from <PointLink from={ref} point={fork.from} />, because {fork.reason} (context generation {fork.generation})</>);
+    if (fork) parts.push(<>Forked from <PointLink from={ref} point={fork.from} />, because {fork.reason}{fork.generation === undefined ? '' : ` (context generation ${fork.generation})`}</>);
     if (replaces) parts.push(<>Opened in place of <SessionLink from={ref} session={replaces.session} sessions={sessions} />, {replaces.reason}</>);
     if (requestedBy) parts.push(<>Requested by {requestedBy.invocation}, because {requestedBy.reason}</>);
     if (parts.length === 0) parts.push(<>Opened fresh</>);

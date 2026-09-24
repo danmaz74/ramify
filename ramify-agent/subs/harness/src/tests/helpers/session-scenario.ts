@@ -188,7 +188,7 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
       unchanged('final verification of plan "review-notes"'),
     ],
   });
-  const turns: Record<Role, Turn[]> = {
+  const turns: Partial<Record<Role, Turn[]>> = {
     'initial-architect': [submit(analysis([entry('review-notes', consumer)]))],
     'local-architect': [
       // The consumer asks where its own capability belongs; the global
@@ -218,7 +218,7 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
       write(seam.conformance, conformanceFile), write(seam.consumer, integrated))],
   };
   for (const [role, steps] of Object.entries(options.before ?? {}) as Array<[Role, readonly ScriptStep[]]>) {
-    const [first, ...rest] = turns[role];
+    const [first, ...rest] = turns[role] ?? [];
     turns[role] = [[...steps, ...(first ?? [])], ...rest];
   }
   // Each completion request declares its entry's scenarios.

@@ -103,15 +103,17 @@ describe('the run log', () => {
       'evidence-reopened', 'revision-needed', 'dependency-cycle-detected',
       'work-item-completed',
       'writer-acquired', 'writer-released',
-      'gate-started', 'gate-committing', 'gate-attempted', 'stop-requested',
+      'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded',
+      'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished',
+      'reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended', 'reconciliation-refused', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
-    expect(forkReasonSchema.options).toEqual(['placement-request']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']);
+    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
@@ -137,6 +139,12 @@ describe('the run log', () => {
       { sequence: 4, type: 'invocation-ended', data: {
         invocation: 'inv-0003', ended: 'failed', submission: null, session: 'ses-0002', kept: false, finished: 'not-kept',
         degraded: { requested: 'fork', actual: 'fresh', reason: 'The session is not known.' },
+      } },
+      // A review's fork is of another role's session, not of the architect
+      // context, and names no generation.
+      { sequence: 5, type: 'session-opened', data: {
+        session: 'ses-0003', role: 'reviewer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null,
+        fork: { from: end, reason: 'scope-review', briefs: [] },
       } },
     ];
     for (const line of lines) expect(runEventSchema.parse({ ...base, ...line })).toEqual({ ...base, ...line });
@@ -784,7 +792,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer']);
   });
 
   test('every failure reason and every phase is named', () => {
@@ -854,6 +862,17 @@ describe('the run protocol a client reads', () => {
     const kinds = new Set(events.flatMap(([type, data], index) =>
       projectEvent(runEventSchema.parse({ sequence: index + 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type, data })).refs.map(ref => ref.kind)));
     expect([...kinds].sort()).toEqual([...runEventRefKindSchema.options].sort());
+  });
+
+  test('the materialization summaries agree in number with their feature files', () => {
+    const summary = (type: 'scenarios-materializing' | 'scenarios-materialized', files: string[]) => projectEvent(runEventSchema.parse({
+      sequence: 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type, data: type === 'scenarios-materialized' ? { commit: 'c', files } : { files } })).summary;
+    const one = ['src/tests/features/p/e.feature'];
+    const two = [...one, 'src/tests/features/p/f.feature'];
+    expect(summary('scenarios-materializing', one)).toBe('The feature file of the plan\'s scenarios is being written onto the run branch');
+    expect(summary('scenarios-materialized', one)).toBe('The feature file of the plan\'s scenarios is on the run branch');
+    expect(summary('scenarios-materializing', two)).toBe('The 2 feature files of the plan\'s scenarios are being written onto the run branch');
+    expect(summary('scenarios-materialized', two)).toBe('The 2 feature files of the plan\'s scenarios are on the run branch');
   });
 
   test('every event type of the run log has a projection that names its transition', () => {
@@ -966,6 +985,15 @@ function sampleData(type: RunEvent['type']): unknown {
     'gate-started': { gate: 'ga-0001', checkpoint: 'readiness' },
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },
     'gate-attempted': { gate: 'ga-0001', checkpoint: 'final', verdict: 'passed', next: 'accept' },
+    'check-findings-recorded': { cause: { kind: 'recovery', detail: 'd' }, checkFindings: [] },
+    'review-request-recorded': { request: 'rq-0001', workItem: 'wi-001', iteration: 'wi-001.i01', kind: 'code', gate: 'ga-0002', candidate: 'c1' },
+    'review-attempt-started': { request: 'rq-0001', attempt: 'rq-0001.a01', invocation: 'inv-0004', session: 'ses-0004', requestedStart: 'fresh' },
+    'review-orientation-recorded': { key: 'b'.repeat(64), request: 'rq-0003', invocation: 'inv-0005', session: 'ses-0005', outcome: 'oriented' },
+    'review-attempt-finished': { request: 'rq-0001', attempt: 'rq-0001.a01', result: 'complete', reason: null, settles: true, checkFindings: [] },
+    'reconciliation-started': { workItem: 'wi-001', reconciliation: 'wi-001.rc01', round: 1 },
+    'reconciliation-assessed': { workItem: 'wi-001', reconciliation: 'wi-001.rc01', invocation: 'inv-0009', next: 'complete', checkFindings: [] },
+    'reconciliation-brief-appended': { reconciliation: 'wi-001.rc01', session: 'ses-0002', ref: 'r', outcome: 'appended', reason: null },
+    'reconciliation-refused': { workItem: 'wi-001', reconciliation: null, stage: 'completion', reason: 'a CheckFinding became open after the basis' },
     'job-completed': { gate: 'ga-0001', commit: null, workItems: 0 },
     'job-failed': { reason: 'internal', message: '', evidence: [] },
     'job-stopped': { settled: false },

@@ -1,11 +1,23 @@
 import type { ExecutionLink, ExecutionNode } from '../../harness/src/interfaces/protocol/execution-map.js';
 
 export const runBandKey = 'run-band';
+/** A card's width in pixels (styles.css `.execution-card`); columns are `columnWidth` apart, so cards of different columns never meet. */
+export const cardWidth = 244;
+export const columnWidth = 310;
+/** The vertical space kept between two cards of the stack. */
+export const cardGap = 24;
+/** A card's height before the canvas has measured it; the measured height replaces it. */
+export const estimatedCardHeight = 104;
 export interface ExecutionPlacement { readonly key: string; readonly parent: string | null; readonly x: number; readonly y: number; readonly depth: number }
 export interface ExecutionLayout { readonly placements: readonly ExecutionPlacement[]; readonly references: readonly ExecutionLink[]; readonly hidden: ReadonlySet<string>; readonly hiddenCount: ReadonlyMap<string, number> }
+export type CardPosition = { readonly x: number; readonly y: number };
 
-/** Choose one presentation parent. Every other causal relation stays a reference edge. */
-export function executionLayout(nodes: readonly ExecutionNode[], links: readonly ExecutionLink[], collapsed: ReadonlySet<string>): ExecutionLayout {
+/**
+ * Choose one presentation parent. Every other causal relation stays a reference edge.
+ * Cards stack one per row, each row as tall as its card (`heightOf`) plus `cardGap`.
+ */
+export function executionLayout(nodes: readonly ExecutionNode[], links: readonly ExecutionLink[], collapsed: ReadonlySet<string>,
+  heightOf: (key: string) => number = () => estimatedCardHeight): ExecutionLayout {
   const byKey = new Map(nodes.map(node => [node.key, node]));
   const parents = new Map<string, string>();
   const primaryLinks = new Set<string>();
@@ -56,29 +68,56 @@ export function executionLayout(nodes: readonly ExecutionNode[], links: readonly
   const hidden = new Set<string>();
   const hiddenCount = new Map<string, number>();
   const placements: ExecutionPlacement[] = [];
-  let row = 0;
-  const visit = (key: string, depth: number, ancestorCollapsed = false): number => {
+  let cursor = 0;
+  const visit = (key: string, depth: number, ancestorCollapsed = false) => {
     const concealed = ancestorCollapsed || collapsed.has(key);
     const descendants = children.get(key) ?? [];
-    const start = row;
+    const y = cursor;
     if (key !== runBandKey && ancestorCollapsed) hidden.add(key);
+    if (key !== runBandKey && !ancestorCollapsed) cursor += heightOf(key) + cardGap;
     if (!concealed) {
-      if (key !== runBandKey) row++;
       for (const child of descendants) visit(child, depth + 1);
     } else {
       const stack = [...descendants];
       let count = 0;
       while (stack.length) { const child = stack.pop()!; hidden.add(child); count++; stack.push(...(children.get(child) ?? [])); }
       hiddenCount.set(key, count);
-      if (key !== runBandKey && !ancestorCollapsed) row++;
     }
     if (key !== runBandKey && !ancestorCollapsed) placements.push({ key, parent: parents.get(key) ?? null,
-      x: depth * 310, y: start * 128, depth });
-    return row;
+      x: depth * columnWidth, y, depth });
   };
   // The run band starts the canvas. Entry roots follow in source order.
   placements.push({ key: runBandKey, parent: null, x: 0, y: 0, depth: 0 });
-  row = 1;
+  cursor = heightOf(runBandKey) + cardGap;
   for (const child of children.get(runBandKey) ?? []) visit(child, 1);
   return { placements, references: links.filter(link => !primaryLinks.has(link.id)), hidden, hiddenCount };
+}
+
+/**
+ * Where each placed card is drawn. A card keeps its `kept` position across version updates; a card without one
+ * takes its layout position, or the first free place below it in its column. A kept card moves only when a card
+ * above it in its column has grown into it, and then just below that card. No two cards of a column meet.
+ */
+export function settlePositions(placements: readonly ExecutionPlacement[], kept: ReadonlyMap<string, CardPosition>,
+  heightOf: (key: string) => number): Map<string, CardPosition> {
+  const settled: { key: string; x: number; y: number; bottom: number }[] = [];
+  const sameColumn = (x: number, other: { x: number }) => Math.abs(other.x - x) < cardWidth;
+  const order = new Map(placements.map((p, index) => [p.key, index]));
+  const keptCards = placements.filter(p => kept.has(p.key)).map(p => ({ key: p.key, ...kept.get(p.key)! }))
+    .sort((a, b) => a.y - b.y || order.get(a.key)! - order.get(b.key)!);
+  for (const card of keptCards) {
+    const y = Math.max(card.y, ...settled.filter(other => sameColumn(card.x, other)).map(other => other.bottom + cardGap));
+    settled.push({ key: card.key, x: card.x, y, bottom: y + heightOf(card.key) });
+  }
+  for (const p of placements) if (!kept.has(p.key)) {
+    const height = heightOf(p.key);
+    let y = p.y;
+    for (let meets = true; meets;) {
+      const blocking = settled.filter(other => sameColumn(p.x, other) && other.y < y + height + cardGap && y < other.bottom + cardGap);
+      meets = blocking.length > 0;
+      if (meets) y = Math.max(...blocking.map(other => other.bottom + cardGap));
+    }
+    settled.push({ key: p.key, x: p.x, y, bottom: y + height });
+  }
+  return new Map(settled.map(card => [card.key, { x: card.x, y: card.y }]));
 }

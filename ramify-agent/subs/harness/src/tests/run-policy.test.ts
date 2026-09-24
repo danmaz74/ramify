@@ -24,7 +24,10 @@ afterEach(async () => {
 describe('the captured commands', () => {
   test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
-    expect(policy.version).toBe('run-policy/2');
+    expect(policy.version).toBe('run-policy/3');
+    // The first trial's review policy and reconciliation bound (Plan 12).
+    expect(policy.reviews).toEqual({ version: 'review-policy/1', kinds: ['code', 'scope', 'design'], concurrency: 2, queue: 12, retries: 1, attemptMs: 600_000, settleMs: 900_000, maxConcerns: 20 });
+    expect(policy.limits.reconciliationRoundsPerWorkItem).toBe(3);
     // The transcript's inline body limit is a recorded policy value.
     expect(policy.transcript).toEqual({ inlineBodyBytes: 8192 });
     expect(policy.commands.typeCheck.argv).toEqual(['npm', 'run', 'type-check']);
@@ -81,6 +84,9 @@ describe('the captured commands', () => {
     expect(policy.context['engineer']).toEqual({ compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 });
     const { engineer: _dropped, ...partial } = policy.context;
     expect(runPolicySchema.safeParse({ ...policy, context: partial }).success).toBe(false);
+    // A run captured before the reviewer existed has no context for it, and reads back.
+    const { reviewer: _reviewer, ...earlier } = policy.context;
+    expect(runPolicySchema.safeParse({ ...policy, version: 'run-policy/2', context: earlier, reviews: undefined }).success).toBe(true);
   });
 });
 

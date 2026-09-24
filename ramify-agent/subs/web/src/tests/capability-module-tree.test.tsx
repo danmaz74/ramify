@@ -405,13 +405,16 @@ test('the tab rows wrap, so Progress stays reachable at a narrow width', () => {
 
 // KI-8: `main { max-width: 52rem }` capped the canvas, because the earlier `.run-page main`
 // named the Run page's parent and matched nothing. The route class on <main> lifts the cap
-// for the Run route alone, and the page keeps the same measure on all but its wide area.
+// for the Run route alone, and the page keeps the same measure on all but its broad and wide
+// areas. The header and the tab bar span the page, so they line up with every area.
 test('the Run route lifts the shell width cap and keeps a reading measure on its prose', () => {
   const styles = webFiles.find(file => file.path === 'styles.css')!.text;
   expect(styles).not.toMatch(/^\.run-page main/m);
   expect(styles).toMatch(/^main\.route-run \{ max-width: none; \}$/m);
   expect(styles).toMatch(/^\.run-page > \* \{ max-width: 52rem; \}$/m);
+  expect(styles).toMatch(/^\.run-page > \.area-broad \{ max-width: 80rem; \}$/m);
   expect(styles).toMatch(/^\.run-page > \.area-wide \{ max-width: none; \}$/m);
+  expect(styles).toMatch(/^\.run-page > \.page-header, \.run-page > \.tabs \{ max-width: none; \}$/m);
   expect(webFiles.find(file => file.path === 'run-page.tsx')!.text)
     .toMatch(/className="area area-wide" aria-label="Progress"/);
 });

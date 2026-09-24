@@ -56,6 +56,8 @@
 .execution-gate-mark.audit-not-started { border-color: #475569; border-style: dotted; }
 .execution-gate-mark.audit-incomplete, .execution-gate-mark.audit-unavailable { border-style: dashed; border-color: #92400e; }
 .execution-live { outline: 3px solid #1d4ed8; animation: execution-pulse 1600ms ease-in-out infinite; }
+.execution-awaiting-decision { box-shadow: 0 0 0 3px var(--ask), 0 1px 5px #0002; }
+.execution-decision-mark { display: block; margin: 0.1rem 0; padding: 0 0.35rem; border-radius: 4px; background: var(--ask); color: #fff; font-weight: 600; }
 @keyframes execution-pulse { 50% { outline-color: transparent; } }
 .execution-rail { margin-top: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .execution-rail ol { display: flex; gap: 0.5rem; overflow-x: auto; list-style: none; padding: 0.4rem 0; }
@@ -86,6 +88,8 @@
   --bad: #a3312b;
   --good: #2f7d4f;
   --warn: #9a6a12;
+  /* A run waiting for the person's decision: apart from running, failure and risk. */
+  --ask: #6b2fb3;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -229,11 +233,18 @@ h1 { font-size: 1.5rem; margin: 0.5rem 0; }
  * that is unreadable at 52rem. `<main>` carries the route class (app.tsx); the
  * earlier `.run-page main` matched nothing, since `<main>` is the Run page's
  * parent. Widening the shell must not widen the prose, so the page keeps the
- * same 52rem measure on every area, and only an area marked wide uses the full
- * width. */
+ * same 52rem measure on every area, an area marked broad takes the wider
+ * measure its tables and nested cards need (Work items, whose review table
+ * and CheckFinding cards were cut to 52rem of a 1440px screen), and only an
+ * area marked wide uses the full width. The header (the run's state) and the
+ * tab bar span the page on every area: sized to the 52rem measure they sat
+ * mid-page above a broad or wide area, and sized to the current area they
+ * would move and rewrap whenever a tab is chosen. */
 main.route-run { max-width: none; }
 .run-page > * { max-width: 52rem; }
+.run-page > .area-broad { max-width: 80rem; }
 .run-page > .area-wide { max-width: none; }
+.run-page > .page-header, .run-page > .tabs { max-width: none; }
 .connection-line { font-size: 0.9rem; color: var(--muted); margin: 0.25rem 0 0.5rem; }
 .connection-line-lost, .connection-line-disconnected { color: var(--bad); }
 .tabs .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 0.4rem 0.8rem; }
@@ -673,3 +684,48 @@ button.link[aria-pressed='true'] { font-weight: 700; }
   .transcript-window-panel .transcript-window-body { overflow: auto; }
   .session-reading-compact .transcript { height: 55vh; }
 }
+
+/* CheckFindings beside their work item. A risk is a label; a decision
+ * request is a framed question; each settlement reads apart from the rest. */
+.work-item-check-findings { margin-top: 0.8rem; border-top: 1px solid var(--line); }
+.review-coverage { margin: 0.2rem 0 0.5rem; }
+.review-coverage-complete { color: var(--good); }
+.review-coverage-partial, .review-coverage-pending { color: var(--warn); }
+.review-coverage-unavailable { color: var(--bad); }
+.review-attempt { display: block; font-size: 0.85rem; }
+.check-finding-counts { font-size: 0.9rem; color: var(--muted); }
+.check-finding-cards { display: grid; gap: 0.6rem; }
+.check-finding p { margin: 0.2rem 0; }
+.check-finding-signal { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.check-finding-signal .badge { margin-left: 0; }
+.check-finding-signal .module-name { font-size: 0.8rem; color: var(--muted); }
+.badge.risk-high { background: #f6dcd9; color: var(--bad); }
+.badge.risk-medium { background: #f7ecd4; color: var(--warn); }
+.badge.risk-low { background: #eceff2; color: var(--muted); }
+.badge.required { background: #dde8f6; color: var(--accent); }
+.standing { font-weight: 600; }
+.standing-closed { color: var(--good); }
+.unresolved { color: var(--warn); }
+.unresolved-latest { border-left: 3px solid var(--bad); padding-left: 0.5rem; color: var(--bad); }
+.decision-request { border: 2px solid var(--ask); border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0.4rem 0; background: #f6f1fc; }
+.decision-request:focus { outline: 3px solid var(--ask); outline-offset: 2px; }
+/* A run that waits for the person's decision, wherever runs are shown. */
+.badge.awaiting-decision { background: var(--ask); color: #fff; }
+.decision-banner { border: 2px solid var(--ask); border-left-width: 6px; border-radius: 8px; padding: 0.5rem 0.9rem; margin: 0.5rem 0; background: #f6f1fc; color: var(--ink); }
+.decision-banner p { margin: 0.2rem 0; }
+.decision-banner strong:first-child { color: var(--ask); }
+.decision-banner ul { margin: 0.3rem 0; padding-left: 1.2rem; }
+.decision-banner button.link { color: var(--ask); font-weight: 600; }
+.header-decision-waits { margin: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; flex-basis: 100%; }
+.header-decision-wait { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 6px; background: var(--ask); color: #fff; font-weight: 600; font-size: 0.9rem; text-decoration: none; overflow-wrap: anywhere; }
+.header-decision-wait:hover, .header-decision-wait:focus { text-decoration: underline; }
+.plan-waits { grid-column: 1 / -1; list-style: none; padding: 0; margin: 0.2rem 0 0; font-size: 0.9rem; }
+.plan-waits .badge { margin-left: 0; }
+.decision-request blockquote { margin: 0.2rem 0 0; padding-left: 0.6rem; border-left: 3px solid var(--line); }
+.decision-request .option { display: block; margin: 0.2rem 0; }
+.decision-request fieldset, .reason-command fieldset { border: none; padding: 0; margin: 0.3rem 0; display: grid; gap: 0.3rem; }
+.material-choice { border-left: 3px solid var(--accent); padding-left: 0.5rem; }
+.settlement { border-left: 3px solid var(--good); padding-left: 0.5rem; }
+.settlement.waiver { border-left-color: var(--warn); }
+.check-finding-history { font-size: 0.9rem; border-top: 1px dashed var(--line); margin-top: 0.4rem; }
+.check-finding-history h4 { margin: 0.5rem 0 0.2rem; color: var(--muted); }

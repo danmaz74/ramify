@@ -142,6 +142,35 @@ describe('an external effect', () => {
     ).rejects.toThrow(TypeError);
   });
 
+  test('a caller serialization is held for the intent and the completion, and released while the effect performs', async () => {
+    const ledger = await testLedger(directory.path);
+    let tail: Promise<unknown> = Promise.resolve();
+    const serialize = <T>(work: () => Promise<T>): Promise<T> => {
+      const result = tail.then(work);
+      tail = result.catch(() => undefined);
+      return result;
+    };
+    let release!: () => void;
+    const performing = new Promise<void>(resolve => { release = resolve; });
+    let performed!: () => void;
+    const reached = new Promise<void>(resolve => { performed = resolve; });
+    const effect = ledger.effect({
+      key: 'slow-audit',
+      intent: () => transaction(ledger.version + 1),
+      perform: async () => { performed(); await performing; return 'audited'; },
+      complete: () => transaction(ledger.version + 1),
+      serialize,
+    });
+    await reached;
+    // Another writer under the same serialization is not held up by the effect.
+    await serialize(() => ledger.append(transaction(ledger.version + 1)));
+    expect(ledger.version).toBe(2);
+    release();
+    expect(await effect).toBe('audited');
+    expect(await marks()).toEqual([{ key: 'slow-audit', phase: 'intent' }, { key: 'slow-audit', phase: 'completion' }]);
+    expect(ledger.version).toBe(3);
+  });
+
   test('an ordinary append carries no effect mark', async () => {
     const ledger = await testLedger(directory.path);
     await ledger.append(transaction(1));

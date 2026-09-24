@@ -4,12 +4,14 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
+import { ModuleCheckFindings, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
+import { DecisionBanner, DecisionFocusContext, DecisionWaitBadge } from './decision-waits.js';
 import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
-import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
+import { counted, figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
 import { ApproveForm, canApprove, reviewText, ReviewPanel, ScenarioCheckSummaryView, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
@@ -19,7 +21,9 @@ import { SessionTimeline } from './session-timeline.js';
  * The Run page: one run, as the harness projects it. Its overview shows
  * notices first: every module created or removed, every detected dependency
  * cycle, resolved or not, during the run and after it, and every degraded
- * start. Stop and Approve are its commands; Start is on the Plan page. The
+ * start. A run that waits for the person's decision says so above every
+ * area, and its banner opens each request's answer form. Stop and Approve
+ * are its commands; Start is on the Plan page. The
  * connection to the harness is shown apart from the run's state: losing it
  * changes nothing in the run.
  */
@@ -66,51 +70,59 @@ export function RunPage({ client, planId, runId, interval }: {
   const [workItem, setWorkItem] = useState<string | undefined>(undefined);
   const [gateSelection, setGateSelection] = useState<string | undefined>(undefined);
   const [moduleSelection, setModuleSelection] = useState<ModuleCapabilitySelection | null>(null);
+  const [decisionFocus, setDecisionFocus] = useState<string | null>(null);
   const version = run?.version;
   const props: AreaProps = { client, planId, runId, version };
+  const openGate = (gate: string) => { setGateSelection(gate); setArea('checks'); };
+  const openDecision = (item: string, request: string) => { setWorkItem(item); setArea('work'); setDecisionFocus(request); };
+  const waiting = new Set(run?.decisionRequests.waiting ? run.decisionRequests.workItems.map(item => item.workItem) : []);
 
   return (
-    <section className="page run-page">
-      <p><a href={routeHref({ page: 'plan', planId })}>← The plan</a></p>
-      <header className="page-header">
-        <h1>Run <code>{runId}</code></h1>
-        {run && <RunState state={run.state} />}
-      </header>
-      <p className={`connection-line connection-line-${error ? 'lost' : connection}`} aria-label="Connection to the harness">
-        {error
-          ? `The harness is not answering (${error.message}). What is shown is the last state read${run ? `, at version ${run.version}` : ''}; the run does not depend on this page.`
-          : run ? `Read at version ${run.version}. Closing or reloading this page does not affect the run.` : 'Reading the run…'}
-      </p>
-      {!run && error && <p className="failure" role="alert">Could not read the run: {error.message}</p>}
-      <nav className="tabs" aria-label="Areas of the run">
-        {areas.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={area === id} className={area === id ? 'tab tab-selected' : 'tab'} onClick={() => setArea(id)}>{label}</button>
-        ))}
-      </nav>
-      {run && area === 'overview' && <Overview client={client} run={run} events={events} onApproved={refresh} />}
-      {area === 'plan' && <PlanAndEntries {...props} run={run} onApproved={refresh} />}
-      {area === 'decisions' && <HypothesesAndDecisions {...props} />}
-      {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} />}
-      {area === 'scenarios' && <Scenarios {...props} />}
-      {area === 'checks' && <Checks {...props} events={events} selected={gateSelection} onSelect={setGateSelection} />}
-      {area === 'progress' && (
-        <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
-          onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
-      )}
-      {area === 'sessions' && <RunSessions {...props} />}
-      {area === 'execution' && <ExecutionMapArea {...props} events={events} onOpenGate={gate => { setGateSelection(gate); setArea('checks'); }} />}
-      {area === 'measurements' && <Measurements {...props} />}
-    </section>
+    <DecisionFocusContext.Provider value={{ request: decisionFocus, done: () => setDecisionFocus(null) }}>
+      <section className="page run-page">
+        <p><a href={routeHref({ page: 'plan', planId })}>← The plan</a></p>
+        <header className="page-header">
+          <h1>Run <code>{runId}</code></h1>
+          {run && <span><RunState state={run.state} />{run.decisionRequests.waiting && <DecisionWaitBadge />}</span>}
+        </header>
+        {run && <DecisionBanner requests={run.decisionRequests} onOpen={openDecision} />}
+        <p className={`connection-line connection-line-${error ? 'lost' : connection}`} aria-label="Connection to the harness">
+          {error
+            ? `The harness is not answering (${error.message}). What is shown is the last state read${run ? `, at version ${run.version}` : ''}; the run does not depend on this page.`
+            : run ? `Read at version ${run.version}. Closing or reloading this page does not affect the run.` : 'Reading the run…'}
+        </p>
+        {!run && error && <p className="failure" role="alert">Could not read the run: {error.message}</p>}
+        <nav className="tabs" aria-label="Areas of the run">
+          {areas.map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={area === id} className={area === id ? 'tab tab-selected' : 'tab'} onClick={() => setArea(id)}>{label}</button>
+          ))}
+        </nav>
+        {run && area === 'overview' && <Overview client={client} run={run} events={events} onApproved={refresh} onOpenGate={openGate} />}
+        {area === 'plan' && <PlanAndEntries {...props} run={run} onApproved={refresh} />}
+        {area === 'decisions' && <HypothesesAndDecisions {...props} />}
+        {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} onOpenGate={openGate} waiting={waiting} />}
+        {area === 'scenarios' && <Scenarios {...props} />}
+        {area === 'checks' && <Checks {...props} events={events} selected={gateSelection} onSelect={setGateSelection} />}
+        {area === 'progress' && (
+          <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
+            onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
+        )}
+        {area === 'sessions' && <RunSessions {...props} />}
+        {area === 'execution' && <ExecutionMapArea {...props} events={events} onOpenGate={openGate} waitingWorkItems={waiting} />}
+        {area === 'measurements' && <Measurements {...props} />}
+      </section>
+    </DecisionFocusContext.Provider>
   );
 }
 
 // Overview
 
-function Overview({ client, run, events, onApproved }: {
+function Overview({ client, run, events, onApproved, onOpenGate }: {
   readonly client: ProtocolClient;
   readonly run: RunSnapshot;
   readonly events: readonly ProjectedRunEvent[];
   readonly onApproved: () => void;
+  readonly onOpenGate: (gate: string) => void;
 }) {
   const [stop, setStop] = useState<{ status: 'idle' | 'sending' | 'sent' } | { status: 'failed'; message: string }>({ status: 'idle' });
   const stopRun = async () => {
@@ -165,6 +177,7 @@ function Overview({ client, run, events, onApproved }: {
         )}
       </section>
       <ReviewPanel client={client} run={run} onApproved={onApproved} />
+      <ModuleCheckFindings client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />
       <section className="panel" aria-labelledby="events-heading">
         <h2 id="events-heading">Events</h2>
         <ol className="feed" aria-label="Run events">
@@ -431,13 +444,16 @@ function Decision({ decision }: { readonly decision: DecisionView }) {
 
 // Work items
 
-function WorkItems({ client, planId, runId, version, selected, onSelect: setSelected }: AreaProps & {
+function WorkItems({ client, planId, runId, version, selected, onSelect: setSelected, onOpenGate, waiting }: AreaProps & {
   readonly selected: string | undefined;
   readonly onSelect: (workItem: string) => void;
+  readonly onOpenGate: (gate: string) => void;
+  /** The work items the run holds for the person's decision, as its snapshot states them. */
+  readonly waiting: ReadonlySet<string>;
 }) {
   const list = useRunQuery(`work-items:${runId}`, version, () => client.getWorkItems(planId, runId));
   return (
-    <div className="area" aria-label="Work items">
+    <div className="area area-broad" aria-label="Work items">
       <Loading state={list} what="the work items">
         {data => data.workItems.length === 0 ? <p className="muted">No work item yet.</p> : (
           <ul className="run-list">
@@ -445,19 +461,20 @@ function WorkItems({ client, planId, runId, version, selected, onSelect: setSele
               <li key={item.id}>
                 <button type="button" className="link" aria-pressed={selected === item.id} onClick={() => setSelected(item.id)}>{item.id}</button>
                 <StateBadge state={item.state} />
+                {waiting.has(item.id) && <DecisionWaitBadge />}
                 <code>{item.module}</code>
-                <span className="muted">{item.capability ?? ''} · {item.counts.iterations} iterations · {item.counts.gateAttempts} gates{item.waitingFor.length > 0 ? ` · waits for ${item.waitingFor.join(', ')}` : ''}{item.follows ? ` · follows ${item.follows}` : ''}</span>
+                <span className="muted">{item.capability ?? ''} · {counted(item.counts.iterations, 'iteration')} · {counted(item.counts.gateAttempts, 'gate')}{item.waitingFor.length > 0 ? ` · waits for ${item.waitingFor.join(', ')}` : ''}{item.follows ? ` · follows ${item.follows}` : ''}</span>
               </li>
             ))}
           </ul>
         )}
       </Loading>
-      {selected && <WorkItemDetail client={client} planId={planId} runId={runId} version={version} workItem={selected} />}
+      {selected && <WorkItemDetail client={client} planId={planId} runId={runId} version={version} workItem={selected} onOpenGate={onOpenGate} />}
     </div>
   );
 }
 
-function WorkItemDetail({ client, planId, runId, version, workItem }: AreaProps & { readonly workItem: string }) {
+function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }: AreaProps & { readonly workItem: string; readonly onOpenGate: (gate: string) => void }) {
   const state = useRunQuery(`work-item:${runId}:${workItem}`, version, () => client.getWorkItem(planId, runId, workItem));
   return (
     <section className="panel" aria-label={`Work item ${workItem}`}>
@@ -506,6 +523,7 @@ function WorkItemDetail({ client, planId, runId, version, workItem }: AreaProps 
                 <ul>{data.requests.map(request => <li key={request.id}>{request.id}: {request.question} → {request.decision ?? 'no decision yet'}</li>)}</ul>
               </>
             )}
+            <WorkItemCheckFindings client={client} planId={planId} runId={runId} version={version} workItem={workItem} onOpenGate={onOpenGate} />
           </>
         )}
       </Loading>
@@ -577,7 +595,7 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
               <div key={index} className="command">
                 <p><strong>{command.kind}</strong>: {command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
-                {command.selection && <p className="muted">Selection ({command.selection.policy}): {command.selection.resolved.length} files{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
+                {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
                 {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>

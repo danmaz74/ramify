@@ -18,7 +18,7 @@ import { runCheckpoint } from '../run/gates.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
-import { defaultRunPolicy, discoverNestedPackages } from '../run/policy.js';
+import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from '../run/policy.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from '../run/port-events.js';
 import { gateAttemptId, gateAttemptSchema, type InvocationOutcome, type RunPolicy } from '../run/records.js';
 import { SubmissionJudge } from '../run/submissions.js';
@@ -373,7 +373,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   });
 
   const excursions = new ExcursionWatcher({ projectRoot, index: initial, scope: guarded });
-  const context = policy.context.engineer;
+  const context = contextPolicyOf(policy, 'engineer');
   const recorder = new PortEventRecorder({ projectRoot, observations, judge, excursions, context, transcript });
   const bounds = new InvocationBounds(limits);
   const equipment = tools.equip({

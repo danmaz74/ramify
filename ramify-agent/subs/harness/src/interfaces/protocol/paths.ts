@@ -7,6 +7,25 @@ const run = (planId: string, runId: string): string => `${runs(planId)}/${encode
 const runSession = (planId: string, runId: string, session: string): string => `${run(planId, runId)}/sessions/${encodeURIComponent(session)}`;
 const standaloneSession = (session: string): string => `${apiPrefix}/sessions/standalone/${encodeURIComponent(session)}`;
 
+/** The query of a CheckFinding list, each field optional. */
+export type CheckFindingPathQuery = {
+  readonly version?: number | undefined;
+  readonly workItem?: string | undefined;
+  readonly module?: string | undefined;
+  readonly select?: 'attention' | 'reported' | 'all' | undefined;
+  readonly order?: 'attention' | 'id' | undefined;
+  readonly after?: string | undefined;
+  readonly limit?: number | undefined;
+};
+
+/** A path with the given query fields, in the order given, leaving out those not set. */
+function withQuery(path: string, query: Readonly<Record<string, string | number | undefined>>): string {
+  const search = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) if (value !== undefined) search.set(name, String(value));
+  const text = search.toString();
+  return text === '' ? path : `${path}?${text}`;
+}
+
 /** The paths of the queries and of the command endpoint, relative to the server's origin. */
 export const protocolPaths = {
   project: `${apiPrefix}/project`,
@@ -41,6 +60,21 @@ export const protocolPaths = {
     `${run(planId, runId)}/execution-map/capabilities/${encodeURIComponent(capability)}?version=${version}`,
   runExecutionScenario: (planId: string, runId: string, scenario: string, version: number): string =>
     `${run(planId, runId)}/execution-map/scenarios/${encodeURIComponent(scenario)}?version=${version}`,
+  /**
+   * A page of a run's CheckFindings, of one work item or one module, with the
+   * run's review coverage. A `version` that is not the run's is refused as stale.
+   */
+  runCheckFindings: (planId: string, runId: string, query: CheckFindingPathQuery = {}): string =>
+    withQuery(`${run(planId, runId)}/check-findings`, query),
+  /** The unsettled CheckFindings of every module they concern. */
+  runCheckFindingModules: (planId: string, runId: string, version?: number): string =>
+    withQuery(`${run(planId, runId)}/check-findings/modules`, { version }),
+  /** One CheckFinding with its history and links. */
+  runCheckFinding: (planId: string, runId: string, checkFinding: string, version?: number): string =>
+    withQuery(`${run(planId, runId)}/check-findings/${encodeURIComponent(checkFinding)}`, { version }),
+  /** A run's review requests, of one work item when named, with their attempts and coverage. */
+  runReviews: (planId: string, runId: string, query: { readonly version?: number | undefined; readonly workItem?: string | undefined; readonly after?: string | undefined; readonly limit?: number | undefined } = {}): string =>
+    withQuery(`${run(planId, runId)}/reviews`, query),
   /** Every session of the project, a page of at most 200 from `offset`. */
   sessions: (offset = 0): string => `${apiPrefix}/sessions?offset=${offset}`,
   /** A run's sessions, with their invocations, lineage and the diagram elements each reaches. */

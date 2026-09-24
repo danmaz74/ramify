@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RunListResponse } from '../../harness/src/interfaces/protocol/runs.js';
 import { newCommandId, type ProtocolClient } from './client.js';
+import { DecisionWaitBadge, workItemsText } from './decision-waits.js';
 import { Markdown } from './markdown.js';
 import { routeHref } from './routes.js';
 import { RunState } from './run-labels.js';
@@ -79,6 +80,9 @@ function Runs({ client, planId, navigate }: { readonly client: ProtocolClient; r
             <li key={run.jobId}>
               <a href={routeHref({ page: 'run', planId, runId: run.jobId })}><code>{run.jobId}</code></a>
               <RunState state={run.state} />
+              {run.decisionRequests.waiting && (
+                <DecisionWaitBadge title={`Held until you answer: ${workItemsText(run.decisionRequests.workItems.map(item => item.workItem))}`} />
+              )}
               <span className="muted">{run.phase} · {run.counts.completedWorkItems}/{run.counts.workItems} work items · started {run.startedAt}</span>
               {run.notices.length > 0 && <span className="notice-count">{run.notices.length} notice{run.notices.length === 1 ? '' : 's'}</span>}
             </li>

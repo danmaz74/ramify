@@ -99,6 +99,32 @@ export const contextPolicySchema = z.object({
   reportReserveTokens: z.int().nonnegative(),
 }).strict();
 
+/** The review questions a run can ask of one audited iteration candidate. */
+export const reviewKindSchema = z.enum(['code', 'scope', 'design']);
+export type ReviewKind = z.infer<typeof reviewKindSchema>;
+
+/** The version of the review policy and prompt contract a request is keyed by. */
+export const reviewPolicyVersion = 'review-policy/1';
+
+/**
+ * How a run reviews its passing iterations: which questions, how many
+ * readers beside the one writer, how many requests may wait, how many
+ * retries follow an execution or validation failure, how long one attempt
+ * may run, how long a work item waits for its reviews from its completion
+ * request, and how many concerns one submission may carry.
+ */
+export const reviewPolicySchema = z.object({
+  version: z.literal(reviewPolicyVersion),
+  kinds: z.array(reviewKindSchema).min(1),
+  concurrency: z.int().positive(),
+  queue: z.int().positive(),
+  retries: z.int().nonnegative(),
+  attemptMs: z.int().positive(),
+  settleMs: z.int().positive(),
+  maxConcerns: z.int().positive(),
+}).strict();
+export type ReviewPolicy = z.infer<typeof reviewPolicySchema>;
+
 /**
  * The bounds and commands a run ran under, captured in `job.json` and not
  * configurable while it runs, so that an exhaustion is reproducible.
@@ -125,10 +151,32 @@ export const runPolicySchema = z.object({
     maxPlacementRequests: z.int().positive(),
     maxInvocationsPerRun: z.int().positive(),
     runAbsoluteMs: z.int().positive(),
+    /** Assessment and correction rounds of one work item's reconciliation; absent before `run-policy/3`. */
+    reconciliationRoundsPerWorkItem: z.int().positive().optional(),
+    /** The least risk a correction after a work item's first reconciliation round may be planned for; absent before iteration 5. */
+    laterRoundMinimumRisk: z.enum(['medium', 'high']).optional(),
   }).strict(),
-  context: z.record(roleSchema, contextPolicySchema),
+  /**
+   * The context policy of each role. The reviewer's is absent from a run
+   * captured before `run-policy/3`, which reviews nothing; every other role
+   * must have one.
+   */
+  context: z.object({
+    'initial-architect': contextPolicySchema,
+    'global-fork': contextPolicySchema,
+    'local-architect': contextPolicySchema,
+    engineer: contextPolicySchema,
+    'contract-engineer': contextPolicySchema,
+    reviewer: contextPolicySchema.optional(),
+  }).strict() satisfies z.ZodType<Partial<Record<Role, z.infer<typeof contextPolicySchema>>>>,
   /** A transcript body larger than `inlineBodyBytes` is stored in the content store, not in its entry. */
   transcript: z.object({ inlineBodyBytes: z.int().positive() }).strict(),
+  /**
+   * The iteration reviews a run requests and how it runs them. A policy
+   * without it records no review request, and every review coverage view of
+   * the run answers unavailable, never clean.
+   */
+  reviews: reviewPolicySchema.optional(),
   commands: z.object({
     typeCheck: checkCommandSchema,
     allTests: checkCommandSchema,
@@ -448,13 +496,20 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
 /**
  * Why a suspended session is continued: its placement request was answered,
  * the iteration it assigned closed, its completion was refused while
- * evidence was owed, or a gate failed after its result and it repairs.
+ * evidence was owed, a gate failed after its result and it repairs, or the
+ * reconciliation of its completion request chose a correction.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
-/** Why a session is forked from another: a placement request forks the architect context. */
-export const forkReasonSchema = z.enum(['placement-request']);
+/**
+ * Why a session is forked from another: a placement request forks the
+ * architect context; a scope review forks the local architect at the point
+ * that produced the assignment; a design review forks the orientation that
+ * read its guidance; a reconciliation forks the local architect at the
+ * point after its completion request.
+ */
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
@@ -470,14 +525,27 @@ export const continueRelationSchema = z.object({
 }).strict();
 export type ContinueRelation = z.infer<typeof continueRelationSchema>;
 
-/** A forked session: its source point, why, the architect context's generation and the briefs the source held at the point. */
+/**
+ * A forked session: its source point, why, and the briefs the source held
+ * at the point. The architect context's generation is named by a fork of
+ * that context, a placement request's; a review's fork is of another
+ * session and names none.
+ */
 export const forkRelationSchema = z.object({
   from: sessionPointSchema,
   reason: forkReasonSchema,
-  generation: z.int().positive(),
+  generation: z.int().positive().optional(),
   briefs: z.array(text),
 }).strict();
 export type ForkRelation = z.infer<typeof forkRelationSchema>;
+
+/**
+ * The local architect's session and the executor's pinned ref at one point
+ * of it, captured with the event that commits what that point produced. A
+ * fork from the ref starts at that point whatever the session did later.
+ */
+export const architectRefSchema = z.object({ session: sessionIdSchema, ref: text }).strict();
+export type ArchitectRef = z.infer<typeof architectRefSchema>;
 
 /** A session that takes another's place, which is finished before it opens. */
 export const replaceRelationSchema = z.object({ session: sessionIdSchema, reason: replaceReasonSchema }).strict();

@@ -1,0 +1,55 @@
+{
+  "chromium": "/usr/bin/chromium",
+  "viewports": [
+    "1440x900",
+    "480x800"
+  ],
+  "checks": [
+    "the plans list marks the plan whose run waits for the person's decision, linking the run",
+    "the header names the waiting run on every page, and the tab title says so",
+    "the plan's run list gives the waiting run its own badge beside its running state",
+    "the run page's banner, above every area, names the held work item and its request",
+    "the overview lists the notes module with its unsettled CheckFindings",
+    "the overview says a decision is requested of the person",
+    "the banner opens the Work items area with the waiting work item marked",
+    "the run's header and tab bar span at least the broad Work items area, so its state badge is not mid-page",
+    "review coverage is partial, never clean, with its counts",
+    "the work item's CheckFinding section is not painted as a failure",
+    "nine review requests, three questions per candidate",
+    "the partial scope review names what it did not inspect",
+    "a concern-raising review is complete with its concern",
+    "by default: the open signal and the reported material choice, not the deferral",
+    "the banner's request takes the focus",
+    "the decision request quotes the conflicting plan text with its revision",
+    "a risk level is a badge, not a decision request",
+    "the material choice and the agent's waiver are separate elements",
+    "the settled toggle shows the deferral with its revisit condition",
+    "the list is in attention order: high, medium, low",
+    "the person's waiver is recorded with the person as its actor",
+    "the revoked waiver opens the signal again, and the history keeps it",
+    "after the answer the run page shows no banner and no waiting mark",
+    "the answered decision is settled by the next round under the person's choice",
+    "the reopened low-risk signal is left unresolved below the floor, without the latest-review marker",
+    "a completed run offers no command",
+    "the history shows the report, the request, the person's answer and the waiver with their actors",
+    "the report names its review attempt, request, iteration and candidate diff, and links the reader's session",
+    "after the answer the plans list, the header and the tab title no longer say the run waits",
+    "after the answer the plan's run list shows the completed run without the badge",
+    "narrow 480x800: the cards fit the viewport",
+    "no browser exceptions"
+  ],
+  "screenshots": [
+    "plan-waiting-1440x900.png",
+    "overview-1440x900.png",
+    "run-waiting-1440x900.png",
+    "work-item-waiting-1440x900.png",
+    "work-item-completed-1440x900.png",
+    "work-item-narrow-480x800.png"
+  ],
+  "failure": null,
+  "fixture": {
+    "planId": "review-notes",
+    "runId": "20260924T203248Z-900b4d",
+    "source": "one live run of scripted agents, scripted Git answers and scripted candidates, served by the real harness server with the built web client; commands sent through the page's own forms"
+  }
+}

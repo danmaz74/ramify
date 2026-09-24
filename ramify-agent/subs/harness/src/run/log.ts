@@ -5,7 +5,7 @@ import { acceptedCommandSchema } from '../interfaces/protocol/jobs.js';
 import { roleSchema, runFailureReasonSchema } from '../interfaces/protocol/runs.js';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import {
-  continueRelationSchema, degradeRelationSchema, forkRelationSchema, invocationWorkSchema, recordRefSchema,
+  architectRefSchema, continueRelationSchema, degradeRelationSchema, forkRelationSchema, invocationWorkSchema, recordRefSchema,
   replaceRelationSchema, requestRelationSchema, sessionFinishReasonSchema, sessionIdSchema,
 } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
@@ -15,6 +15,18 @@ import {
   scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
 } from '../../subs/scenarios/src/states.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
+import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
+import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
+import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
+import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
+import { gateCheckFindingOutcomeSchema } from '../checks/scenario-findings.js';
+import {
+  reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewOrientationRecordedDataSchema, reviewRequestRecordedDataSchema,
+} from '../reviews/records.js';
+import {
+  reconciliationAssessedFields, reconciliationBriefAppendedDataSchema, reconciliationIdSchema, reconciliationRefusedDataSchema,
+  reconciliationStartedDataSchema, unresolvedField,
+} from '../reviews/reconciliation.js';
 
 /*
  * The run log, `events.jsonl`: state transitions only, and the canonical
@@ -25,6 +37,12 @@ import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/s
  *
  * Observations are not here. Each invocation has its own observation log,
  * which no state derives from.
+ *
+ * CheckFindings are here, carried: a run event that commits CheckFinding
+ * events holds them, in order, in its `checkFindings` array, and their state
+ * is replayed from those arrays alone. Only the CheckFinding transition
+ * builds such an event, so every carried event was decided by the
+ * `check-findings` child against the log it follows.
  */
 
 const eventBase = {
@@ -295,8 +313,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }).strict()),
   /** The accepted decision returns to the requesting local architect. */
   event('decision-delivered', z.object({ decision: text, workItem: text }).strict()),
-  /** Commits one revision of a `WorkItemOutline`, revision 1 included. */
-  event('outline-revised', z.object({ workItem: text, revision: z.int().positive(), invocation: text }).strict()),
+  /**
+   * Commits one revision of a `WorkItemOutline`, revision 1 included.
+   * `architectRef` is present exactly on the revision that commits a
+   * `request-completion` submission: the local architect's pinned point
+   * after it, which reconciliation forks, or null where none was kept. A
+   * revision committed with an assignment, and one of an earlier run, has
+   * none.
+   */
+  event('outline-revised', z.object({
+    workItem: text,
+    revision: z.int().positive(),
+    invocation: text,
+    architectRef: architectRefSchema.nullable().optional(),
+  }).strict()),
   /**
    * Commits one `IterationAssignment` with its captured `WriteScope`, its
    * derived gate and its guarded hashes. It licenses the engineer that works
@@ -310,11 +340,25 @@ export const runEventSchema = z.discriminatedUnion('type', [
     invocation: text,
     /** The local architect's own placement decisions, committed with the assignment. */
     decisions: z.array(text),
+    /**
+     * The local architect's pinned point at the end of the invocation that
+     * produced this assignment, which the iteration's scope review forks;
+     * null where the session was not kept, absent in an earlier run.
+     */
+    architectRef: architectRefSchema.nullable().optional(),
+    /**
+     * The reconciliation whose repair intent this assignment resolves: the
+     * first assignment of the work item after an assessment that chose a
+     * correction. Absent for any other assignment.
+     */
+    corrects: reconciliationIdSchema.optional(),
   }).strict()),
   /**
    * Commits the `IterationResult`. For `accepted` it names the passing gate
    * and its audited commit, and carries a notice for every module added or
-   * removed since the preceding accepted boundary.
+   * removed since the preceding accepted boundary. An accepted correction
+   * carries the repair claim of each CheckFinding planned under the intent
+   * it resolves.
    */
   event('iteration-closed', z.object({
     workItem: text,
@@ -323,6 +367,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
     gate: z.string().nullable(),
     commit: z.string().nullable(),
     notices: z.array(moduleNoticeSchema),
+    checkFindings: checkFindingEventsField.optional(),
   }).strict()),
   /**
    * Commits the `contract` `IterationAssignment` of one sub-session, and
@@ -437,8 +482,12 @@ export const runEventSchema = z.discriminatedUnion('type', [
     /** How many times this same cycle has been detected, this detection included. */
     detection: z.int().positive(),
   }).strict()),
-  /** Requires a passing `work-item` gate; the work item is closed by it. */
-  event('work-item-completed', z.object({ workItem: text, gate: text }).strict()),
+  /**
+   * Requires a passing `work-item` gate; the work item is closed by it.
+   * `unresolved` names each CheckFinding it completed with open, and why;
+   * absent in an earlier run, and where none was.
+   */
+  event('work-item-completed', z.object({ workItem: text, gate: text, unresolved: unresolvedField.optional() }).strict()),
   /** Appended before a writer starts; the one writer of the run holds it. */
   event('writer-acquired', z.object({ invocation: text, scopeRevision: z.int().nonnegative().nullable() }).strict()),
   /** `confirmed: false` blocks every writer and every gate that follows. */
@@ -446,14 +495,68 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** The durable intent of a verified committing gate's commit-and-audit effect. */
   event('gate-started', z.object({ gate: text, checkpoint: text }).strict()),
   event('gate-committing', z.object({ gate: text, checkpoint: text }).strict()),
-  /** A gate finished and commits its one complete `GateAttempt`. */
+  /**
+   * A gate finished and commits its one complete `GateAttempt`. A committing
+   * gate of a work item also carries what its scenario check means for the
+   * work item's CheckFindings: a repeated failure promoted, a witness that
+   * fixes one, and what was left out. The verdict never depends on them.
+   */
   event('gate-attempted', z.object({
     gate: text,
     checkpoint: text,
     verdict: z.enum(['passed', 'failed', 'not-verified']),
     next: text,
     committing: z.boolean().optional(),
+    checkFindings: checkFindingEventsField.optional(),
+    scenarioFindings: gateCheckFindingOutcomeSchema.optional(),
   }).strict()),
+  /**
+   * CheckFinding events committed by a path with no run event of its own:
+   * recovery, a user's answer, or a producer outside a gate. The cause names
+   * which.
+   */
+  event('check-findings-recorded', z.object({
+    cause: checkFindingCauseSchema,
+    checkFindings: checkFindingEventsField.min(1),
+  }).strict()),
+  /**
+   * Commits one `ReviewRequest`: a review question over the audited
+   * candidate of an iteration that closed accepted, recorded before the
+   * driver passes it, or by recovery from that `iteration-closed`.
+   */
+  event('review-request-recorded', reviewRequestRecordedDataSchema),
+  /** A review attempt's reader session is about to start; the invocation is already started. */
+  event('review-attempt-started', reviewAttemptStartedDataSchema),
+  /**
+   * Commits one design orientation: the reviewer session that read one
+   * guidance selection, which the design reviews of that selection fork,
+   * or why it could not be made. One per orientation key.
+   */
+  event('review-orientation-recorded', reviewOrientationRecordedDataSchema),
+  /**
+   * Commits one terminal `ReviewAttempt`, its valid submission and the
+   * CheckFindings its concerns open, as one line. A result that arrives
+   * after its request settled, or after its attempt finished, is fenced
+   * and never appended.
+   */
+  event('review-attempt-finished', z.object({ ...reviewAttemptFinishedFields, checkFindings: checkFindingEventsField }).strict()),
+  /**
+   * Commits one `ReconciliationBasis`: a work item that requested completion
+   * has CheckFindings needing attention, and one round assesses them. It
+   * licenses one fork of the local architect.
+   */
+  event('reconciliation-started', reconciliationStartedDataSchema),
+  /**
+   * Commits one `ReconciliationAssessment` with the relations and decisions
+   * it makes, validated against its basis under the run mutex. It is the
+   * intent of the brief's append to the local architect's session, keyed
+   * by the reconciliation.
+   */
+  event('reconciliation-assessed', z.object({ ...reconciliationAssessedFields, checkFindings: checkFindingEventsField }).strict()),
+  /** The completion of that append: where the brief went, or why it did not, which the next architect input then carries. */
+  event('reconciliation-brief-appended', reconciliationBriefAppendedDataSchema),
+  /** A basis that no longer held, at the assessment or before the work item's completion; a new round follows. */
+  event('reconciliation-refused', reconciliationRefusedDataSchema),
   event('stop-requested', z.object({ command: acceptedCommandSchema }).strict()),
   /** Requires a passing `final` gate on the current tree; an empty queue alone never satisfies it. */
   event('job-completed', z.object({ gate: text, commit: z.string().nullable(), workItems: z.int().nonnegative() }).strict()),
@@ -482,6 +585,17 @@ function mayFollow(ended: RunEvent, type: RunEventType): boolean {
 /** An event to append: its type and data. The log assigns the sequence and time. */
 export type RunEventInput = { [T in RunEventType]: { readonly type: T; readonly data: RunEventOf<T>['data'] } }[RunEventType];
 
+/** The run event types that carry CheckFinding events in their `checkFindings` array. */
+export type CheckFindingCarrierType = {
+  [T in RunEventType]: 'checkFindings' extends keyof RunEventOf<T>['data'] ? T : never
+}[RunEventType];
+
+/** The CheckFinding events one run event carries, in order; none for any other event. */
+export function carriedCheckFindings(event: Pick<RunEvent, 'data'> | RunEventInput): readonly CheckFindingEvent[] {
+  const data = event.data as { readonly checkFindings?: readonly CheckFindingEvent[] };
+  return data.checkFindings ?? [];
+}
+
 /** A log line that is not a valid event in sequence. */
 export class CorruptRunLogError extends Error {
   constructor(path: string, line: number, reason: string) {
@@ -507,10 +621,15 @@ export class RunLog {
     readonly ledger: Ledger<RunEvent>,
   ) {}
 
-  static async open(path: string, runId: string): Promise<RunLog> {
+  /**
+   * Opens and validates the log: sequence, run, terminal order, and that the
+   * carried CheckFinding events replay. `fs` is the ledger's file system
+   * seam, for a test that fails one of its operations.
+   */
+  static async open(path: string, runId: string, fs?: LedgerFileSystem): Promise<RunLog> {
     let ledger: Ledger<RunEvent>;
     try {
-      ledger = await openLedger({ logPath: path, recordsRoot: dirname(path), eventSchema: runEventSchema });
+      ledger = await openLedger({ logPath: path, recordsRoot: dirname(path), eventSchema: runEventSchema, ...(fs === undefined ? {} : { fs }) });
     } catch (error) {
       if (error instanceof LedgerCorruptError) throw new CorruptRunLogError(error.path, error.line, error.reason);
       throw error;
@@ -522,6 +641,14 @@ export class RunLog {
       const ended = terminalOf(events.slice(0, index));
       if (ended && !mayFollow(ended, current.type)) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
     });
+    const carriers = events.filter(current => carriedCheckFindings(current).length > 0);
+    const replayed = replayCheckFindingEvents(carriers.flatMap(carriedCheckFindings));
+    if (!replayed.ok) {
+      // Name the line that carries the refused event.
+      let remaining = replayed.event;
+      const line = carriers.find(current => (remaining -= carriedCheckFindings(current).length) < 0);
+      throw new CorruptRunLogError(path, line?.sequence ?? 0, `its CheckFinding events do not replay: ${replayed.rejection.message}`);
+    }
     return new RunLog(path, runId, ledger);
   }
 
@@ -571,8 +698,24 @@ export class RunLog {
     return current;
   }
 
-  /** The event a caller is about to commit with its records, refused after a terminal event. */
+  /**
+   * The event a caller is about to commit with its records, refused after a
+   * terminal event. It carries no CheckFinding event: those are decided by
+   * the CheckFinding transition, which builds its event with `carrier`.
+   */
   next(input: RunEventInput, at: Date = new Date()): RunEvent {
+    if (carriedCheckFindings(input).length > 0) {
+      throw new Error(`Run ${this.runId}: ${input.type} carries CheckFinding events, which only the CheckFinding transition commits`);
+    }
+    return this.carrier(input, at);
+  }
+
+  /**
+   * The event that carries decided CheckFinding events, refused after a
+   * terminal event. Only `check-findings/transition.ts` calls it, under the
+   * run mutex, with the events the child decided against this log.
+   */
+  carrier(input: RunEventInput, at: Date = new Date()): RunEvent {
     const ended = this.terminal;
     if (ended && !mayFollow(ended, input.type)) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
     return runEvent(this.runId, this.nextSequence, input, at);

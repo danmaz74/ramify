@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow,
-  type Edge, type Node, type NodeProps, type Viewport } from '@xyflow/react';
+  type Edge, type Node, type NodeChange, type NodeProps, type Viewport } from '@xyflow/react';
 import type { ExecutionNode } from '../../harness/src/interfaces/protocol/execution-map.js';
 import type { ProjectedRunEvent } from '../../harness/src/interfaces/protocol/runs.js';
 import type { ProtocolClient } from './client.js';
 import type { ExecutionMapSnapshot } from './execution-map-client.js';
-import { executionLayout, runBandKey } from './execution-map-layout.js';
+import { estimatedCardHeight, executionLayout, runBandKey, settlePositions } from './execution-map-layout.js';
 import { ExecutionModules } from './execution-modules.js';
 import { executionMapVisualTokens as tokens } from './execution-map-tokens.js';
+import { waitingLabel } from './decision-waits.js';
 import { RoleIcon } from './session-role.js';
 import { TranscriptWorkspace, clampWindowRect, defaultWindowRect, type TranscriptWindowState } from './transcript-workspace.js';
 import type { SessionAnchor } from './routes.js';
 import { useQuery } from './use-query.js';
 
 type CardData = { node: ExecutionNode | null; collapsed: boolean; hiddenCount: number; hiddenMatches: number; active: boolean;
-  selected: boolean; related: boolean; flash: boolean; hasChildren: boolean; repairFrom: string | null; onSelect: (key: string) => void; onToggle: (key: string) => void };
+  selected: boolean; related: boolean; flash: boolean; hasChildren: boolean; repairFrom: string | null;
+  /** A work item the run holds for the person's decision, as the run's snapshot states it. */
+  awaitingDecision: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void };
 type CardNode = Node<CardData, 'execution'>;
 const statusColor = tokens.light.status;
 
@@ -62,13 +65,13 @@ function ScenarioSummary({ node, collapsed }: { node: Extract<ExecutionNode, { k
 }
 
 function ExecutionCard({ data }: NodeProps<CardNode>) {
-  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, onSelect, onToggle } = data;
+  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, awaitingDecision, onSelect, onToggle } = data;
   if (node === null) return <div className="execution-card execution-run-band"><strong>Run band</strong><small>Initial architecture, integration and run-wide evidence</small><Handle type="source" position={Position.Right} isConnectable={false} /></div>;
   const role = node.kind === 'session' ? tokens.roleIdentity[node.role] : null;
   const roleAccent = node.kind === 'session' ? tokens.light.role[node.role] : null;
-  const label = `${node.label}, ${node.kind}${node.kind === 'session' ? `, ${role!.label}, ${node.state}` : ''}${related ? ', directly related to selected module' : ''}`;
+  const label = `${node.label}, ${node.kind}${node.kind === 'session' ? `, ${role!.label}, ${node.state}` : ''}${awaitingDecision ? `, ${waitingLabel.toLowerCase()}` : ''}${related ? ', directly related to selected module' : ''}`;
   const status = nodeStatus(node);
-  return <div className={`execution-card execution-${node.kind} execution-state-${status}${active ? ' execution-live' : ''}${selected ? ' execution-selected' : ''}${related ? ' execution-related' : ''}${flash ? ' execution-flash' : ''}`}
+  return <div className={`execution-card execution-${node.kind} execution-state-${status}${awaitingDecision ? ' execution-awaiting-decision' : ''}${active ? ' execution-live' : ''}${selected ? ' execution-selected' : ''}${related ? ' execution-related' : ''}${flash ? ' execution-flash' : ''}`}
     style={{ borderColor: statusColor[status], borderLeftColor: roleAccent ?? statusColor[status], color: statusColor[status] }}>
     <Handle type="target" position={Position.Left} isConnectable={false} />
     <button type="button" className="execution-card-main nodrag nopan" onClick={() => onSelect(node.key)} aria-label={label}
@@ -77,6 +80,7 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
       {node.kind === 'gate' ? <span className={`execution-gate-mark audit-${node.audit}`} aria-label={`Verdict ${node.verdict ?? 'running'}; audit ${node.audit}`}>
         {node.verdict === 'passed' ? '✓' : node.verdict === 'failed' ? '✗' : node.verdict === null ? '…' : '?'}</span> : null}
       <strong>{node.label}</strong>
+      {awaitingDecision && <small className="execution-decision-mark">{waitingLabel}</small>}
       <small>{moduleText(node)}</small>
       {node.kind === 'session' && node.role === 'local-architect' && <small>Local architect lane · {node.invocations.length} invocation{node.invocations.length === 1 ? '' : 's'} across the work item</small>}
       {node.kind === 'iteration' && <small>Iteration {node.ordinal} · outline {node.outlineRevision} · {node.outcome ?? node.state}</small>}
@@ -94,6 +98,8 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
   </div>;
 }
 const nodeTypes = { execution: ExecutionCard };
+/** Heights of the cards of each kind in the real run's canvas, used until a card is measured. */
+const estimatedHeights: Partial<Record<ExecutionNode['kind'] | 'run-band', number>> = { 'run-band': 110, capability: 210, gate: 140, session: 100 };
 
 function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }: { node: ExecutionNode | undefined; map: ExecutionMapSnapshot;
   client: ProtocolClient; planId: string; runId: string; onOpenGate: (gate: string) => void; onOpenSession: (id: string) => void }) {
@@ -138,7 +144,8 @@ function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }:
 
 function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSelect,
   selectedModule, onSelectModule, collapsed, onCollapsed, positions, onPositions, viewport, onViewport,
-  onOpenSession, focusRequest }: { map: ExecutionMapSnapshot; events: readonly ProjectedRunEvent[];
+  onOpenSession, focusRequest, waitingWorkItems }: { map: ExecutionMapSnapshot; events: readonly ProjectedRunEvent[];
+  waitingWorkItems: ReadonlySet<string>;
   client: ProtocolClient; planId: string; runId: string; onOpenGate: (gate: string) => void;
   onOpenSession: (id: string) => void; focusRequest: { id: string; nonce: number } | null;
   selected: string | null; onSelect: (key: string | null) => void;
@@ -148,7 +155,22 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   viewport: Viewport; onViewport: (viewport: Viewport) => void }) {
   const flow = useReactFlow<CardNode, Edge>();
   const [flash, setFlash] = useState<string | null>(null);
-  const layout = useMemo(() => executionLayout(map.nodes, map.links, collapsed), [map.nodes, map.links, collapsed]);
+  // Cards differ in height (a capability's scenario summary, a gate's audit line), so the stack uses each card's
+  // measured height, or an estimate by kind until the canvas has measured it.
+  const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
+  const onNodesChange = (changes: NodeChange<CardNode>[]) => setHeights(current => {
+    let next: Map<string, number> | null = null;
+    for (const change of changes) if (change.type === 'dimensions' && change.dimensions && Math.abs((current.get(change.id) ?? -1) - change.dimensions.height) >= 1) {
+      next ??= new Map(current);
+      next.set(change.id, change.dimensions.height);
+    }
+    return next ?? current;
+  });
+  const heightOf = useMemo(() => {
+    const kinds = new Map(map.nodes.map(node => [node.key, node.kind]));
+    return (key: string) => heights.get(key) ?? estimatedHeights[kinds.get(key) ?? 'run-band'] ?? estimatedCardHeight;
+  }, [heights, map.nodes]);
+  const layout = useMemo(() => executionLayout(map.nodes, map.links, collapsed, heightOf), [map.nodes, map.links, collapsed, heightOf]);
   const allLayout = useMemo(() => executionLayout(map.nodes, map.links, new Set()), [map.nodes, map.links]);
   const allPlace = useMemo(() => new Map(allLayout.placements.map(p => [p.key, p])), [allLayout]);
   const hasChildren = useMemo(() => new Set(allLayout.placements.flatMap(p => p.parent ? [p.parent] : [])), [allLayout]);
@@ -171,16 +193,12 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     }
     return counts;
   }, [allPlace, collapsed, hiddenMatches]);
-  const effectivePositions = useMemo(() => {
-    const next = new Map(positions);
-    for (const p of layout.placements) if (!next.has(p.key)) {
-      let y = p.y;
-      while ([...next.values()].some(other => Math.abs(other.x - p.x) < 200 && Math.abs(other.y - y) < 110)) y += 128;
-      next.set(p.key, { x: p.x, y });
-    }
-    return next;
-  }, [layout, positions]);
-  useEffect(() => { if (effectivePositions.size > positions.size) onPositions(effectivePositions); }, [effectivePositions, positions, onPositions]);
+  const effectivePositions = useMemo(() => settlePositions(layout.placements, positions, heightOf), [layout, positions, heightOf]);
+  // A card's position is kept once the canvas has measured it; until then it follows the layout.
+  useEffect(() => {
+    const fresh = layout.placements.filter(p => !positions.has(p.key) && heights.has(p.key));
+    if (fresh.length) onPositions(new Map([...positions, ...fresh.map(p => [p.key, effectivePositions.get(p.key)!] as const)]));
+  }, [effectivePositions, positions, heights, layout, onPositions]);
   const toggle = (key: string) => { const next = new Set(collapsed); if (next.has(key)) next.delete(key); else next.add(key); onCollapsed(next); };
   const focus = (key: string) => {
     let parent = place.get(key)?.parent;
@@ -217,6 +235,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       flash: flash === p.key,
       related: directMatches.has(p.key),
       hasChildren: hasChildren.has(p.key),
+      awaitingDecision: byKey.get(p.key)?.kind === 'work-item' && waitingWorkItems.has(p.key.slice('work-item:'.length)),
       repairFrom: (() => { const prior = byKey.get(repairs.get(p.key) ?? ''); return prior?.kind === 'gate' ? prior.verdict === 'failed' ? '✗' : prior.verdict === 'passed' ? '✓' : '?' : null; })(),
       onSelect: jump, onToggle: toggle }, draggable: false, selectable: true }));
   const visible = new Set(nodes.map(node => node.id));
@@ -246,7 +265,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       <ol>{map.coverage.gaps.map((gap, index) => <li key={`${index}:${gap}`}>{gap}</li>)}</ol>
     </details>}
     <div className="execution-workspace"><div className="execution-maps"><div className="execution-viewport" aria-label="Zoomable execution canvas">
-      <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} viewport={viewport} onMove={(_, next) => onViewport(next)}
+      <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} viewport={viewport} onMove={(_, next) => onViewport(next)} onNodesChange={onNodesChange}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2}>
         <Background /><Controls showInteractive={false} />
       </ReactFlow></div>
@@ -274,8 +293,8 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   </div>;
 }
 
-function ExecutionMapAreaRun({ client, planId, runId, version, events, onOpenGate }: { client: ProtocolClient; planId: string; runId: string;
-  version: number | undefined; events: readonly ProjectedRunEvent[]; onOpenGate: (gate: string) => void }) {
+function ExecutionMapAreaRun({ client, planId, runId, version, events, onOpenGate, waitingWorkItems = noWaits }: { client: ProtocolClient; planId: string; runId: string;
+  version: number | undefined; events: readonly ProjectedRunEvent[]; onOpenGate: (gate: string) => void; waitingWorkItems?: ReadonlySet<string> }) {
   const [selected, onSelect] = useState<string | null>(null);
   const [selectedModule, onSelectModule] = useState<string | null>(null);
   const [collapsed, onCollapsed] = useState<ReadonlySet<string> | null>(null);
@@ -336,7 +355,7 @@ function ExecutionMapAreaRun({ client, planId, runId, version, events, onOpenGat
       : map ? <ReactFlowProvider><Canvas map={map} events={events} client={client} planId={planId} runId={runId} onOpenGate={onOpenGate}
         selected={selected} onSelect={onSelect} collapsed={collapsed ?? initialCollapse} onCollapsed={onCollapsed}
         selectedModule={selectedModule} onSelectModule={onSelectModule} focusRequest={focusRequest} onOpenSession={openSession}
-        positions={positions} onPositions={onPositions} viewport={viewport} onViewport={onViewport} /></ReactFlowProvider>
+        positions={positions} onPositions={onPositions} viewport={viewport} onViewport={onViewport} waitingWorkItems={waitingWorkItems} /></ReactFlowProvider>
         : <p>Loading execution map…</p>}
     {query.state.status === 'failed' && map && <p role="alert">Could not refresh execution map: {query.state.error.message}</p>}
     <TranscriptWorkspace client={client} planId={planId} runId={runId} nodes={map?.nodes ?? []} windows={windows}
@@ -345,8 +364,12 @@ function ExecutionMapAreaRun({ client, planId, runId, version, events, onOpenGat
   </>;
 }
 
+const noWaits: ReadonlySet<string> = new Set();
+
 /** A route change gives the map and its floating workspace a fresh run identity. */
 export function ExecutionMapArea(props: { client: ProtocolClient; planId: string; runId: string; version: number | undefined;
-  events: readonly ProjectedRunEvent[]; onOpenGate: (gate: string) => void }) {
+  events: readonly ProjectedRunEvent[]; onOpenGate: (gate: string) => void;
+  /** The work items the run holds for the person's decision; their cards say so. */
+  waitingWorkItems?: ReadonlySet<string> }) {
   return <ExecutionMapAreaRun key={`${props.planId}/${props.runId}`} {...props} />;
 }
