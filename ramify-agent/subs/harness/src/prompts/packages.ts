@@ -8,8 +8,8 @@ import { localArchitectJsonSchema, localArchitectSubmissionKinds, localArchitect
 import { engineerJsonSchema, engineerSubmissionKinds, engineerToolName } from '../work/engineer.js';
 import { forkJsonSchema, forkSubmissionKinds, forkToolName } from '../architecture/submission.js';
 import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '../contracts/submission.js';
-import { reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
-import { promptPackageManifestSchema, type PromptPackageManifest } from '../run/records.js';
+import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
+import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 
 /*
  * One prompt package per role, versioned and hashed into the run's
@@ -38,6 +38,9 @@ const contractSystemFile = fileURLToPath(new URL('./contract-engineer.system.md'
 const contractProcedureFile = fileURLToPath(new URL('./contract.procedure.md', import.meta.url));
 const reviewerSystemFile = fileURLToPath(new URL('./reviewer.system.md', import.meta.url));
 const codeReviewProcedureFile = fileURLToPath(new URL('./code-review.procedure.md', import.meta.url));
+const scopeReviewProcedureFile = fileURLToPath(new URL('./scope-review.procedure.md', import.meta.url));
+const designReviewProcedureFile = fileURLToPath(new URL('./design-review.procedure.md', import.meta.url));
+const orientationSystemFile = fileURLToPath(new URL('./reviewer-orientation.system.md', import.meta.url));
 
 /** The contract skill the harness supplies with a contract iteration. */
 const contractSkillFile = fileURLToPath(new URL('./contract.skill.md', import.meta.url));
@@ -82,6 +85,15 @@ export interface LoadedPackage {
   /** A further skill this package carries, such as the contract skill; empty where it has none. */
   readonly extraSkill: string;
   readonly submissionSchema: string;
+  /**
+   * The reviewer's texts beyond its system prompt: one procedure per review
+   * question, and the design orientation's own system prompt and
+   * submission. Only the reviewer's package has them.
+   */
+  readonly reviewer?: {
+    readonly procedures: Readonly<Record<ReviewKind, string>>;
+    readonly orientation: { readonly system: string; readonly submissionSchema: string };
+  } | undefined;
 }
 
 export interface PromptPackageOptions {
@@ -94,7 +106,7 @@ export const globalForkPackage = 'global-fork/1';
 export const localArchitectPackage = 'local-architect/2';
 export const engineerPackage = 'engineer/2';
 export const contractEngineerPackage = 'contract-engineer/1';
-export const reviewerPackage = 'reviewer/1';
+export const reviewerPackage = 'reviewer/2';
 
 /**
  * Loads every package a run offers. A role with no package yet has no entry:
@@ -209,19 +221,40 @@ function loadContractEngineer(options: PromptPackageOptions): Promise<LoadedPack
 }
 
 /**
- * The reviewer's package: code review of one frozen candidate. Its one
- * submission is the review; it offers no union.
+ * The reviewer's package: code, scope and design review of one frozen
+ * candidate, and the design orientation that reads the guidance once. Its
+ * review submission is one; the orientation's is the other. Every file is
+ * part of its hash, so a changed procedure is another package.
  */
-function loadReviewer(options: PromptPackageOptions): Promise<LoadedPackage> {
-  return loadPackage({
+async function loadReviewer(options: PromptPackageOptions): Promise<LoadedPackage> {
+  const [scope, design, orientation] = await Promise.all([
+    readFile(scopeReviewProcedureFile, 'utf8'),
+    readFile(designReviewProcedureFile, 'utf8'),
+    readFile(orientationSystemFile, 'utf8'),
+  ]);
+  const orientationSchema = `${JSON.stringify(orientationJsonSchema, null, 2)}\n`;
+  const loaded = await loadPackage({
     role: 'reviewer',
     name: reviewerPackage,
     systemFile: reviewerSystemFile,
     procedureFile: codeReviewProcedureFile,
     schema: reviewJsonSchema,
-    submissionKinds: ['review'],
+    submissionKinds: ['review', 'orientation'],
+    extraFiles: [
+      describe(scopeReviewProcedureFile, scope, 'procedure'),
+      describe(designReviewProcedureFile, design, 'procedure'),
+      describe(orientationSystemFile, orientation, 'system'),
+      { path: 'orientation.schema.json', hash: sha256(orientationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(orientationSchema) },
+    ],
     options,
   });
+  return {
+    ...loaded,
+    reviewer: {
+      procedures: { code: loaded.procedure, scope: withoutVersionComment(scope).trim(), design: withoutVersionComment(design).trim() },
+      orientation: { system: withoutVersionComment(orientation), submissionSchema: orientationSchema },
+    },
+  };
 }
 
 async function loadPackage(request: {
@@ -233,6 +266,8 @@ async function loadPackage(request: {
   readonly submissionKinds: readonly string[];
   /** A further skill file this package carries beside the module architect's. */
   readonly extraSkillFile?: string | undefined;
+  /** Further files of the package, already read, which its hash covers. */
+  readonly extraFiles?: readonly PackageFile[] | undefined;
   readonly options: PromptPackageOptions;
 }): Promise<LoadedPackage> {
   const skillDirectory = request.options.skillDirectory ?? defaultSkillDirectory;
@@ -249,6 +284,7 @@ async function loadPackage(request: {
     ...(await Promise.all(skillFiles.map(async path => describe(path, await readFile(path, 'utf8'), 'skill')))),
     ...(request.extraSkillFile === undefined ? [] : [describe(request.extraSkillFile, extraSkill, 'skill')]),
     { path: schemaName, hash: sha256(submissionSchema), kind: 'submission-schema', bytes: Buffer.byteLength(submissionSchema) },
+    ...(request.extraFiles ?? []),
   ];
 
   return {
@@ -324,9 +360,18 @@ function render(loaded: LoadedPackage, projectRoot: string, submissionTool: stri
   });
 }
 
-/** The rendered system prompt of one reviewer. It is never stored either. */
-export function renderReviewerPrompt(loaded: LoadedPackage, projectRoot: string): string {
-  return render(loaded, projectRoot, reviewToolName);
+/** The rendered system prompt of one reviewer of one question. It is never stored either. */
+export function renderReviewerPrompt(loaded: LoadedPackage, projectRoot: string, kind: ReviewKind = 'code'): string {
+  const procedure = loaded.reviewer?.procedures[kind];
+  if (procedure === undefined) throw new Error(`The ${loaded.package} package has no ${kind} review procedure`);
+  return render({ ...loaded, procedure }, projectRoot, reviewToolName);
+}
+
+/** The rendered system prompt of a design orientation. It is never stored either. */
+export function renderOrientationPrompt(loaded: LoadedPackage): string {
+  const orientation = loaded.reviewer?.orientation;
+  if (orientation === undefined) throw new Error(`The ${loaded.package} package has no design orientation`);
+  return fill(orientation.system, { submissionTool: orientationToolName, submissionSchema: orientation.submissionSchema.trim() });
 }
 
 /** The identity of what one invocation was given, beside the package's own hash. */

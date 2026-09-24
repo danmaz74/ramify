@@ -30,7 +30,7 @@ function describe(event: RunEvent): [string, Ref[]] {
       const { fork, replaces, requestedBy } = event.data;
       return [
         `The ${event.data.role} session ${event.data.session} opened on ${event.data.executor}${event.data.model === null ? '' : `, model ${event.data.model}`}`
-          + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}, generation ${fork.generation})`)
+          + (fork === undefined ? '' : `, forked from ${pointLabel(fork.from)} (${fork.reason}${fork.generation === undefined ? '' : `, generation ${fork.generation}`})`)
           + (replaces === undefined ? '' : `, in place of ${replaces.session} (${replaces.reason})`)
           + (requestedBy === undefined ? '' : `, requested by ${requestedBy.invocation} (${requestedBy.reason})`),
         [
@@ -218,6 +218,11 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`A ${event.data.kind} review ${event.data.request} was requested of iteration ${event.data.iteration}'s audited candidate`, [...ref('work-item', event.data.workItem), ...ref('gate', event.data.gate), ...ref('commit', event.data.candidate)]];
     case 'review-attempt-started':
       return [`Review attempt ${event.data.attempt} started`, [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)]];
+    case 'review-orientation-recorded':
+      return [event.data.outcome === 'oriented'
+        ? `The design guidance of ${event.data.request} was read once, as orientation ${event.data.key.slice(0, 12)}, for design reviews to fork`
+        : `The design orientation ${event.data.key.slice(0, 12)} of ${event.data.request} failed; its design reviews start fresh`,
+      [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)]];
     case 'review-attempt-finished': {
       const result = event.data.result === 'not-verified' ? `not verified (${event.data.reason ?? 'no reason'})` : event.data.result;
       const concerns = event.data.checkFindings.length === 0 ? '' : `, with ${counted(event.data.checkFindings.length, 'CheckFinding event', 'CheckFinding events')}`;

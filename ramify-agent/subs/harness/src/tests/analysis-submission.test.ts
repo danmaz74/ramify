@@ -412,11 +412,15 @@ describe('the prompt package', () => {
     expect(contract.files.some(file => file.kind === 'skill' && file.path.endsWith('contract.skill.md'))).toBe(true);
     expect(contract.hash).toMatch(/^[0-9a-f]{64}$/);
 
-    // A reviewer's one submission is its review.
+    // A reviewer submits its review; a design orientation submits what it
+    // read. One procedure per question, each a file the hash covers.
     const reviewer = manifest.packages['reviewer']!;
-    expect(reviewer.package).toBe('reviewer/1');
-    expect(reviewer.submissionKinds).toEqual(['review']);
-    expect(reviewer.files.some(file => file.kind === 'procedure' && file.path.endsWith('code-review.procedure.md'))).toBe(true);
+    expect(reviewer.package).toBe('reviewer/2');
+    expect(reviewer.submissionKinds).toEqual(['review', 'orientation']);
+    const procedures = reviewer.files.filter(file => file.kind === 'procedure').map(file => file.path.split('/').at(-1)).sort();
+    expect(procedures).toEqual(['code-review.procedure.md', 'design-review.procedure.md', 'scope-review.procedure.md']);
+    expect(reviewer.files.filter(file => file.kind === 'system').map(file => file.path.split('/').at(-1)).sort()).toEqual(['reviewer-orientation.system.md', 'reviewer.system.md']);
+    expect(reviewer.files.filter(file => file.kind === 'submission-schema').map(file => file.path).sort()).toEqual(['orientation.schema.json', 'review.schema.json']);
   });
 
   test('asks for the entry assignments, which become the work items', async () => {

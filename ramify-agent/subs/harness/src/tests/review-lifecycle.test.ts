@@ -103,8 +103,11 @@ describe('CF07: a stop owns every live reader, and a late result is fenced', () 
     cleanups.push(() => run.service.close());
     const { service, runId } = run;
     await Promise.all(waiting.map(entry => entry.opened));
-    // The third iteration's writer is live beside both readers.
-    await until(async () => (await runEventsOnDisk(root, plan, runId)).some(event => event.type === 'invocation-started' && event.data.work.iteration === 'wi-001.i03'));
+    // The third iteration's writer is live beside both readers: its session
+    // has started, not only its invocation. A stop between the two ends the
+    // invocation before any session exists, and there is none to stop.
+    await until(async () => (await runEventsOnDisk(root, plan, runId)).some(event => event.type === 'invocation-started' && event.data.work.iteration === 'wi-001.i03')
+      && run.agent!.sessions.filter(session => session.spec.role === 'engineer').length === 3);
     // Readers may still be writing, so the stop is sent at the version it finds.
     for (;;) {
       try {

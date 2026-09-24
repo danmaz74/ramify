@@ -222,7 +222,7 @@ function startText(session: RunSessionView, invocation: SessionInvocation): stri
   }
   const { fork, replaces, requestedBy } = session.lineage;
   const parts: string[] = [];
-  if (fork) parts.push(`forked from ${pointText(fork.from, session.session)} (${fork.reason}, context generation ${fork.generation})`);
+  if (fork) parts.push(`forked from ${pointText(fork.from, session.session)} (${fork.reason}${fork.generation === undefined ? '' : `, context generation ${fork.generation}`})`);
   if (replaces) parts.push(`opened in place of ${replaces.session} (${replaces.reason})`);
   if (requestedBy) parts.push(`requested by ${requestedBy.invocation}${requestedBy.session ? ` in ${requestedBy.session}` : ''} (${requestedBy.reason})`);
   return parts.length === 0 ? 'opened fresh' : parts.join(', ');
@@ -414,7 +414,7 @@ function SessionItem({ session, refOf }: { readonly session: RunSessionView; rea
   const sessionLink = (id: string) => <a key={id} href={sessionHref(refOf(id))}>{id}</a>;
   const relations: ReactNode[] = [];
   if (lineage.fork) {
-    relations.push(<>forked from <a href={pointHref(ref, lineage.fork.from)}>{pointText(lineage.fork.from, session.session)}</a> ({lineage.fork.reason}, context generation {lineage.fork.generation}{lineage.fork.briefs.length > 0 ? `, holding briefs ${lineage.fork.briefs.join(', ')}` : ''})</>);
+    relations.push(<>forked from <a href={pointHref(ref, lineage.fork.from)}>{pointText(lineage.fork.from, session.session)}</a> ({lineage.fork.reason}{lineage.fork.generation === undefined ? '' : `, context generation ${lineage.fork.generation}`}{lineage.fork.briefs.length > 0 ? `, holding briefs ${lineage.fork.briefs.join(', ')}` : ''})</>);
   }
   if (lineage.replaces) relations.push(<>in place of {sessionLink(lineage.replaces.session)} ({lineage.replaces.reason})</>);
   if (lineage.replacedBy) relations.push(<>replaced by {sessionLink(lineage.replacedBy)}</>);

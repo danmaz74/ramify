@@ -33,11 +33,16 @@ const hashedRefSchema = z.object({ ref: text, hash: sha256Schema }).strict();
 
 /**
  * The session point a review starts from. Code review never forks, so its
- * key cannot change when forks are introduced for the other questions.
+ * key cannot change when forks are introduced for the other questions. A
+ * scope review names the local architect's pinned point at the assignment,
+ * or why none was captured. A design review names the orientation of its
+ * guidance selection by key: the orientation is made by the first attempt
+ * that needs it, and every design review of the same key forks it.
  */
 export const forkPointSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
   z.object({ kind: z.literal('session'), session: sessionIdSchema, ref: text }).strict(),
+  z.object({ kind: z.literal('orientation'), key: sha256Schema }).strict(),
   z.object({ kind: z.literal('unavailable'), reason: text }).strict(),
 ]);
 export type ForkPoint = z.infer<typeof forkPointSchema>;
@@ -171,15 +176,56 @@ export const reviewAttemptFinishedFields = {
   settles: z.boolean(),
 } as const;
 
+/**
+ * One design orientation: a reviewer session that read one guidance
+ * selection, whose end point the design reviews of the same key fork. A
+ * failed orientation is recorded too, so the run does not make it again
+ * and its design reviews start fresh with the reason.
+ */
+export const reviewOrientationSchema = z.object({
+  schema: z.literal('ramify-agent.review-orientation/1'),
+  /** SHA-256 over the guidance selection and hashes, the question, the reviewer's package and the executor. */
+  key: sha256Schema,
+  guidance: z.array(hashedRefSchema).min(1),
+  /** The request whose attempt made it. */
+  request: reviewRequestIdSchema,
+  invocation: text.nullable(),
+  session: sessionIdSchema.nullable(),
+  /** The executor's pinned ref at the orientation's end; null when it did not orient. */
+  ref: text.nullable(),
+  outcome: z.enum(['oriented', 'failed']),
+  /** The reviewer's own account of what the guidance asks, from its submission. */
+  summary: z.string().nullable(),
+  reason: z.string().nullable(),
+}).strict();
+export type ReviewOrientation = z.infer<typeof reviewOrientationSchema>;
+
+export const reviewOrientationRecordedDataSchema = z.object({
+  key: sha256Schema,
+  request: reviewRequestIdSchema,
+  invocation: text.nullable(),
+  session: sessionIdSchema.nullable(),
+  outcome: z.enum(['oriented', 'failed']),
+}).strict();
+
+/** What an orientation session submits: the guidance it read, and what that guidance asks of a design. */
+export const orientationSubmissionSchema = z.object({
+  read: z.array(z.string().min(1)).min(1).max(50),
+  summary: z.string().min(1).max(4000),
+}).strict();
+export type OrientationSubmission = z.infer<typeof orientationSubmissionSchema>;
+
 /** Where each review record is materialized, under the run directory. */
 export const reviewLayout = {
   request: (request: string): string => join('reviews', request, 'request.json'),
   attempt: (attempt: string): string => join('reviews', attempt.slice(0, attempt.lastIndexOf('.a')), 'attempts', attemptDirectory(attempt), 'attempt.json'),
   submission: (attempt: string): string => join('reviews', attempt.slice(0, attempt.lastIndexOf('.a')), 'attempts', attemptDirectory(attempt), 'submission.json'),
+  orientation: (key: string): string => join('reviews', 'orientations', `${key.slice(0, 16)}.json`),
 } as const;
 
 export const reviewSchemas = {
   reviewRequest: { schema: 'ramify-agent.review-request/1', body: reviewRequestSchema },
   reviewAttempt: { schema: 'ramify-agent.review-attempt/1', body: reviewAttemptSchema },
   reviewSubmission: { schema: 'ramify-agent.review-submission/1', body: reviewSubmissionRecordSchema },
+  reviewOrientation: { schema: 'ramify-agent.review-orientation/1', body: reviewOrientationSchema },
 } as const;

@@ -26,7 +26,7 @@ describe('the captured commands', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
     expect(policy.version).toBe('run-policy/3');
     // The first trial's review policy and reconciliation bound (Plan 12).
-    expect(policy.reviews).toEqual({ version: 'review-policy/1', kinds: ['code'], concurrency: 2, queue: 12, retries: 1, attemptMs: 600_000, settleMs: 900_000, maxConcerns: 20 });
+    expect(policy.reviews).toEqual({ version: 'review-policy/1', kinds: ['code', 'scope', 'design'], concurrency: 2, queue: 12, retries: 1, attemptMs: 600_000, settleMs: 900_000, maxConcerns: 20 });
     expect(policy.limits.reconciliationRoundsPerWorkItem).toBe(3);
     // The transcript's inline body limit is a recorded policy value.
     expect(policy.transcript).toEqual({ inlineBodyBytes: 8192 });

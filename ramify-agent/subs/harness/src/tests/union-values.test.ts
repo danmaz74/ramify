@@ -104,7 +104,7 @@ describe('the run log', () => {
       'work-item-completed',
       'writer-acquired', 'writer-released',
       'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded',
-      'review-request-recorded', 'review-attempt-started', 'review-attempt-finished', 'stop-requested',
+      'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
@@ -112,7 +112,7 @@ describe('the run log', () => {
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
     expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
-    expect(forkReasonSchema.options).toEqual(['placement-request']);
+    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
@@ -138,6 +138,12 @@ describe('the run log', () => {
       { sequence: 4, type: 'invocation-ended', data: {
         invocation: 'inv-0003', ended: 'failed', submission: null, session: 'ses-0002', kept: false, finished: 'not-kept',
         degraded: { requested: 'fork', actual: 'fresh', reason: 'The session is not known.' },
+      } },
+      // A review's fork is of another role's session, not of the architect
+      // context, and names no generation.
+      { sequence: 5, type: 'session-opened', data: {
+        session: 'ses-0003', role: 'reviewer', work: { workItem: 'wi-001', iteration: 'wi-001.i01' }, executor: 'scripted', model: null,
+        fork: { from: end, reason: 'scope-review', briefs: [] },
       } },
     ];
     for (const line of lines) expect(runEventSchema.parse({ ...base, ...line })).toEqual({ ...base, ...line });
@@ -970,6 +976,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'check-findings-recorded': { cause: { kind: 'recovery', detail: 'd' }, checkFindings: [] },
     'review-request-recorded': { request: 'rq-0001', workItem: 'wi-001', iteration: 'wi-001.i01', kind: 'code', gate: 'ga-0002', candidate: 'c1' },
     'review-attempt-started': { request: 'rq-0001', attempt: 'rq-0001.a01', invocation: 'inv-0004', session: 'ses-0004', requestedStart: 'fresh' },
+    'review-orientation-recorded': { key: 'b'.repeat(64), request: 'rq-0003', invocation: 'inv-0005', session: 'ses-0005', outcome: 'oriented' },
     'review-attempt-finished': { request: 'rq-0001', attempt: 'rq-0001.a01', result: 'complete', reason: null, settles: true, checkFindings: [] },
     'job-completed': { gate: 'ga-0001', commit: null, workItems: 0 },
     'job-failed': { reason: 'internal', message: '', evidence: [] },

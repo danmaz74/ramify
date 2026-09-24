@@ -5,7 +5,7 @@ import { acceptedCommandSchema } from '../interfaces/protocol/jobs.js';
 import { roleSchema, runFailureReasonSchema } from '../interfaces/protocol/runs.js';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import {
-  continueRelationSchema, degradeRelationSchema, forkRelationSchema, invocationWorkSchema, recordRefSchema,
+  architectRefSchema, continueRelationSchema, degradeRelationSchema, forkRelationSchema, invocationWorkSchema, recordRefSchema,
   replaceRelationSchema, requestRelationSchema, sessionFinishReasonSchema, sessionIdSchema,
 } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
@@ -20,7 +20,7 @@ import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.j
 import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
 import {
-  reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewRequestRecordedDataSchema,
+  reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewOrientationRecordedDataSchema, reviewRequestRecordedDataSchema,
 } from '../reviews/records.js';
 
 /*
@@ -308,8 +308,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }).strict()),
   /** The accepted decision returns to the requesting local architect. */
   event('decision-delivered', z.object({ decision: text, workItem: text }).strict()),
-  /** Commits one revision of a `WorkItemOutline`, revision 1 included. */
-  event('outline-revised', z.object({ workItem: text, revision: z.int().positive(), invocation: text }).strict()),
+  /**
+   * Commits one revision of a `WorkItemOutline`, revision 1 included.
+   * `architectRef` is present exactly on the revision that commits a
+   * `request-completion` submission: the local architect's pinned point
+   * after it, which reconciliation forks, or null where none was kept. A
+   * revision committed with an assignment, and one of an earlier run, has
+   * none.
+   */
+  event('outline-revised', z.object({
+    workItem: text,
+    revision: z.int().positive(),
+    invocation: text,
+    architectRef: architectRefSchema.nullable().optional(),
+  }).strict()),
   /**
    * Commits one `IterationAssignment` with its captured `WriteScope`, its
    * derived gate and its guarded hashes. It licenses the engineer that works
@@ -323,6 +335,12 @@ export const runEventSchema = z.discriminatedUnion('type', [
     invocation: text,
     /** The local architect's own placement decisions, committed with the assignment. */
     decisions: z.array(text),
+    /**
+     * The local architect's pinned point at the end of the invocation that
+     * produced this assignment, which the iteration's scope review forks;
+     * null where the session was not kept, absent in an earlier run.
+     */
+    architectRef: architectRefSchema.nullable().optional(),
   }).strict()),
   /**
    * Commits the `IterationResult`. For `accepted` it names the passing gate
@@ -484,6 +502,12 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('review-request-recorded', reviewRequestRecordedDataSchema),
   /** A review attempt's reader session is about to start; the invocation is already started. */
   event('review-attempt-started', reviewAttemptStartedDataSchema),
+  /**
+   * Commits one design orientation: the reviewer session that read one
+   * guidance selection, which the design reviews of that selection fork,
+   * or why it could not be made. One per orientation key.
+   */
+  event('review-orientation-recorded', reviewOrientationRecordedDataSchema),
   /**
    * Commits one terminal `ReviewAttempt`, its valid submission and the
    * CheckFindings its concerns open, as one line. A result that arrives

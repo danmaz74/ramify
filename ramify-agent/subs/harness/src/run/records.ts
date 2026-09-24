@@ -499,8 +499,13 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
 export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
-/** Why a session is forked from another: a placement request forks the architect context. */
-export const forkReasonSchema = z.enum(['placement-request']);
+/**
+ * Why a session is forked from another: a placement request forks the
+ * architect context; a scope review forks the local architect at the point
+ * that produced the assignment; a design review forks the orientation that
+ * read its guidance.
+ */
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
@@ -516,14 +521,27 @@ export const continueRelationSchema = z.object({
 }).strict();
 export type ContinueRelation = z.infer<typeof continueRelationSchema>;
 
-/** A forked session: its source point, why, the architect context's generation and the briefs the source held at the point. */
+/**
+ * A forked session: its source point, why, and the briefs the source held
+ * at the point. The architect context's generation is named by a fork of
+ * that context, a placement request's; a review's fork is of another
+ * session and names none.
+ */
 export const forkRelationSchema = z.object({
   from: sessionPointSchema,
   reason: forkReasonSchema,
-  generation: z.int().positive(),
+  generation: z.int().positive().optional(),
   briefs: z.array(text),
 }).strict();
 export type ForkRelation = z.infer<typeof forkRelationSchema>;
+
+/**
+ * The local architect's session and the executor's pinned ref at one point
+ * of it, captured with the event that commits what that point produced. A
+ * fork from the ref starts at that point whatever the session did later.
+ */
+export const architectRefSchema = z.object({ session: sessionIdSchema, ref: text }).strict();
+export type ArchitectRef = z.infer<typeof architectRefSchema>;
 
 /** A session that takes another's place, which is finished before it opens. */
 export const replaceRelationSchema = z.object({ session: sessionIdSchema, reason: replaceReasonSchema }).strict();

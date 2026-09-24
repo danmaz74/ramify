@@ -606,11 +606,26 @@ redelivery of a report appends nothing. The state and its key indexes are
 replayed from the log after a restart; the record copies are materialized
 like any other record.
 
-`src/reviews/` holds iteration code review (Plan 12). Every iteration that
+`src/reviews/` holds iteration reviews (Plan 12). Every iteration that
 closes accepted after an engineer's passing gate has one request per review
-kind recorded before the driver passes it, keyed by the iteration, its
-audited commit, the kind and the review policy; recovery records a request
-the log is owed. A request is run by a reader beside the run's one writer:
+question, code, scope and design, recorded before the driver passes it,
+keyed by the iteration, its audited commit, the question and the review
+policy; recovery records a request the log is owed. Each request binds the
+question's own inputs by hash and the point its reviewer starts from. Code
+review starts fresh. Scope review binds the plan excerpts its assignment
+cites and forks the local architect at the point that produced the
+assignment, which `iteration-assigned` records; the `outline-revised` that
+commits a completion request records the point after it. Design review
+binds a small selection of guidance from the candidate (its principles
+documents and the READMEs on the way to what changed) and forks the one
+orientation session of that selection, made once by a reviewer that read
+it; a changed selection is another orientation. A fork point that is
+missing, or a fork the executor cannot take, starts fresh with the same
+complete message, and the attempt records the start that was made. The
+queue drains waiting requests in the order they were recorded, overflows
+beyond its bound, retries once, and finishes at once a request no attempt
+of which could finish before its work item's deadline; a writer's start
+goes before a waiting reader's. A request is run by a reader beside the run's one writer:
 the run keeps a registry of open invocations, at most one writer and the
 policy's bounded readers, and a stop, a failure, a shutdown and the
 reviews' settlement bound before the final gate stop each of them. A reader
@@ -624,6 +639,11 @@ request settled or its run ended is fenced and appends nothing. The gate's
 commit and audit run outside the run mutex, which is held for the effect's
 intent and completion, so a reader's result is not held back by a slow
 audit.
+
+`src/probes/pi-fork.probe.ts` is a development probe, run by hand with a
+real model and never by the test suite: it forks a pinned pi session point
+as a reviewer confined to an audited Git candidate and reports the start
+pi actually made and what the snapshot tools answered.
 
 ## The run
 

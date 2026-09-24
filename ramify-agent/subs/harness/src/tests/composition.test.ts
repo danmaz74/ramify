@@ -323,6 +323,20 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.review-attempt/1.actualStart', values: ['fresh'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
   { union: 'record ramify-agent.review-attempt/1.result.result', values: ['complete', 'partial'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
   { union: 'record ramify-agent.review-attempt/1.result.result', values: ['not-verified'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
+  // Plan 12 iteration 4: the scope and design questions, their fork points and the bounded scheduler.
+  { union: 'run log[review-request-recorded].data.kind', values: ['scope', 'design'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[review-attempt-started].data.requestedStart', values: ['fork'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-request/1.forkPoint.kind', values: ['session', 'orientation'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-request/1.forkPoint.kind', values: ['unavailable'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a candidate without guidance leaves its design review unavailable, never clean' },
+  { union: 'record ramify-agent.review-attempt/1.requestedStart', values: ['fork'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-attempt/1.actualStart', values: ['fork'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log.type', values: ['review-orientation-recorded'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[session-opened].data.fork.reason', values: ['scope-review', 'design-orientation'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[review-orientation-recorded].data.outcome', values: ['oriented'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'run log[review-orientation-recorded].data.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once, and the design reviews of its guidance start fresh with the reason' },
+  { union: 'record ramify-agent.review-orientation/1.outcome', values: ['oriented'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'each accepted iteration binds code, scope and design requests to one candidate, scope forks the assignment point and design forks one orientation per guidance selection' },
+  { union: 'record ramify-agent.review-orientation/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/review-questions.test.ts', test: 'a failed orientation is recorded once, and the design reviews of its guidance start fresh with the reason' },
+  { union: 'run log[review-attempt-finished].data.reason', values: ['no-time-before-deadline'], file: 'subs/harness/src/tests/review-scheduling.test.ts', test: "after the completion request, a waiting request that could not finish before the work item's deadline is finished at once" },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['pass'], file: 'subs/harness/src/tests/execution-map-durable.test.ts', test: 'replays the independent published audit result after restart' },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['fail'], file: 'subs/harness/src/tests/execution-map-projection.test.ts', test: 'reads old gates without an audit fact and a failed published audit independently of verdict' },
   { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
@@ -516,30 +530,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-related].data.relation.relation', values: ['same-issue', 'related-but-distinct', 'distinct', 'uncertain'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
-  },
-  {
-    union: 'run log[review-request-recorded].data.kind', values: ['scope', 'design'],
-    reason: 'Plan 12 iteration 4 adds scope and design reviews and pinned fork points; code review never forks, and no run records these yet.',
-  },
-  {
-    union: 'run log[review-attempt-started].data.requestedStart', values: ['fork'],
-    reason: 'Plan 12 iteration 4 adds scope and design reviews and pinned fork points; code review never forks, and no run records these yet.',
-  },
-  {
-    union: 'record ramify-agent.review-request/1.forkPoint.kind', values: ['session', 'unavailable'],
-    reason: 'Plan 12 iteration 4 adds scope and design reviews and pinned fork points; code review never forks, and no run records these yet.',
-  },
-  {
-    union: 'record ramify-agent.review-attempt/1.requestedStart', values: ['fork'],
-    reason: 'Plan 12 iteration 4 adds scope and design reviews and pinned fork points; code review never forks, and no run records these yet.',
-  },
-  {
-    union: 'record ramify-agent.review-attempt/1.actualStart', values: ['fork'],
-    reason: 'Plan 12 iteration 4 adds scope and design reviews and pinned fork points; code review never forks, and no run records these yet.',
-  },
-  {
-    union: 'run log[review-attempt-finished].data.reason', values: ['no-time-before-deadline'],
-    reason: "An attempt that cannot finish before its work item's review deadline, which Plan 12 iteration 5 introduces with work-item reconciliation; this version waits for reviews only before the final gate.",
   },
   {
     union: 'run log[iteration-closed].data.outcome', values: ['superseded'],

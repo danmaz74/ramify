@@ -318,7 +318,9 @@ Rules the transition adds to §2.3:
 ## 3. Review requests and attempts (iterations 3–4)
 
 **Owner:** harness `src/reviews/`. Code review is implemented by iteration 3;
-§3.5 records its exact interface and where it refines §3.1–3.4.
+§3.5 records its exact interface and where it refines §3.1–3.4. Scope and
+design review, their fork points and the bounded scheduler are implemented
+by iteration 4; §3.6 records them.
 
 ### 3.1 Identifiers and records
 
@@ -343,7 +345,8 @@ export const reviewPolicyVersion = 'review-policy/1';
 const hashedRefSchema = z.object({ ref: text, hash: sha256Schema }).strict();
 export const forkPointSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),                      // code review, always
-  z.object({ kind: z.literal('session'), session: sessionIdSchema, ref: text }).strict(),
+  z.object({ kind: z.literal('session'), session: sessionIdSchema, ref: text }).strict(),   // scope review
+  z.object({ kind: z.literal('orientation'), key: sha256Schema }).strict(),                 // design review (iteration 4)
   z.object({ kind: z.literal('unavailable'), reason: text }).strict(),
 ]);
 
@@ -419,6 +422,7 @@ non-empty it is `partial`.
 | `review-request-recorded` | `{ request, workItem, iteration, kind, gate, candidate }` | request |
 | `review-attempt-started` | `{ request, attempt, invocation, session, requestedStart, actualStart }` | none |
 | `review-attempt-finished` | `{ request, attempt, result, settles, checkFindings }` | attempt, submission (when valid), CheckFinding copies |
+| `review-orientation-recorded` (iteration 4) | `{ key, request, invocation, session, outcome: oriented \| failed }` | orientation |
 
 A queued attempt is the durable request without a finished settling attempt;
 it needs no event. One settling attempt ends the request; a result that
@@ -525,6 +529,73 @@ Refinements of §3.1–3.4:
   under it. The gate's commit-and-audit effect uses the run mutex so, and a
   terminal event waits for the effect in flight.
 
+### 3.6 Scope, design and the bounded scheduler (iteration 4)
+
+**Files:** `src/reviews/inputs.ts` (plan excerpts, guidance selection,
+orientation key), `message.ts` (one message per question and the
+orientation's), `records.ts` (the orientation record and event, the
+`orientation` fork point), `scheduler.ts` (deadlines), `submission.ts`
+(the orientation's submission); the prompt package `reviewer/2`
+(`reviewer.system.md`, `reviewer-orientation.system.md` and the code, scope
+and design procedures); `jobs/mutex.ts` (`PriorityMutex`); the run
+service's review section; the pi adapter's fork.
+
+- **Inputs by question.** Code: `requirements: []`, `guidance: []`,
+  `forkPoint: none`. Scope: `requirements` are the sections of the captured
+  plan the assignment's `requirementRefs` cite, as `{ ref: plan#<anchor> |
+  plan:<from>-<to>, hash }` with the SHA-256 of the excerpt's text;
+  `forkPoint` is `session` from `iteration-assigned.architectRef`, or
+  `unavailable` with the reason when it is null or absent. Design:
+  `guidance` is read from the audited candidate itself: every
+  `*.principles.md`, then the `README.md` of each directory on the way to a
+  changed path, at most 12 files, 64 KiB each and 192 KiB together, each
+  with the SHA-256 of its bytes; `forkPoint` is `orientation` with its key,
+  or `unavailable` when the candidate holds no guidance or it cannot be
+  read, and such a design request finishes `unavailable` without a reader.
+- **Orientation key** = SHA-256 over the canonical JSON of the question
+  (`design`), the guidance refs and hashes, the reviewer package's hash, the
+  run's agent, the model and the reviewer's context policy. Any change is
+  another orientation, never a reuse.
+- **Orientation.** The first design attempt of a key runs one reviewer
+  invocation with the guidance inline, no tool but `submit_orientation`
+  (`{ read: [every guidance path once], summary }`), kept on success.
+  `review-orientation-recorded` commits `reviews/orientations/<key16>.json`
+  (`ramify-agent.review-orientation/1`: key, guidance, request, invocation,
+  session, the executor's `ref` at its end, outcome, summary, reason). A
+  failed orientation is recorded too and never made again in the run; the
+  attempts of its key start fresh with the reason. Two attempts of one key
+  share one orientation in flight.
+- **Starts.** Scope forks `{ mode: fork, from: forkPoint.ref }` with the
+  fork relation `{ from: { session, invocation: <the assignment's
+  invocation> }, reason: scope-review, briefs }`; design forks the
+  orientation's ref with `reason: design-orientation`. The fork relation's
+  `generation` is now optional: only a fork of the architect context (a
+  placement request) names one. A missing or unusable point starts fresh
+  with the caller's degradation on the invocation record (`requested:
+  fork`, `degradedReason`); a fork the executor cannot take is its own
+  degradation on `invocation-ended`. `requestedStart` is `fork` for every
+  request whose fork point is not `none`, and the attempt's `actualStart` is
+  what the executor answered. The message is the question's complete input
+  in either case: the design message names each guidance path and hash and
+  asks a reviewer that has not read one to read it through the snapshot.
+- **Deadline.** A request's deadline is its work item's first
+  `outline-revised` carrying `architectRef` after the request was recorded,
+  plus `settleMs`, or the run's own settlement deadline once the final
+  settlement began, whichever is earlier. A waiting request, first attempt
+  or retry, with `now + attemptMs > deadline` is finished at once as
+  `no-time-before-deadline`, whether or not a slot is free; the queue wakes
+  at the completion request and when a waiting request's last moment to
+  start passes.
+- **Order and priority.** Waiting requests start in the order they were
+  recorded, whatever their work item or question; beyond the queue's bound
+  the newest overflow. Invocation starts use a `PriorityMutex`: a waiting
+  writer's start goes before every waiting reader's.
+- **pi fork.** The adapter opens the parent for a fork with the fork's own
+  working directory, so the fork's session file names the reviewer's
+  directory rather than its parent's. Isolation is the fork's tool set:
+  pi offers exactly the spec's tools, and the fork still holds whatever its
+  parent read before the point.
+
 ## 4. Policy (iterations 3–5)
 
 The run policy becomes `run-policy/3`; `run-policy/2` runs remain readable.
@@ -545,7 +616,7 @@ reviews: z.object({
 
 | Value | Initial trial value |
 | --- | --- |
-| `kinds` | `code`, `scope`, `design`; `code` alone until iteration 4 adds the other two |
+| `kinds` | `code`, `scope`, `design` (iteration 4; iteration 3 captured `code` alone) |
 | `concurrency` (readers beside the one writer) | 2 |
 | `queue` | 12 |
 | `retries` after an execution or validation failure | 1 |
@@ -566,10 +637,16 @@ finishes the attempt as `queue-overflow`; an attempt or retry that cannot
 finish before its work item's deadline finishes at once as
 `no-time-before-deadline`. The writer has scheduling priority.
 
-## 5. Fork points (iteration 4)
+## 5. Fork points (iteration 4, implemented)
 
 `iteration-assigned` and `outline-revised` gain an optional
-`architectRef: z.object({ session: sessionIdSchema, ref: text }).strict().nullable()`.
+`architectRef: z.object({ session: sessionIdSchema, ref: text }).strict().nullable()`
+(`architectRefSchema` in `run/records.ts`). On `outline-revised` it is
+present exactly on the revision that commits a `request-completion`
+submission; a revision committed with an assignment has none, and that
+presence is what starts the work item's review deadline (§3.6). The ref
+is the one the executor reported at the end of the local architect's
+invocation, where the harness kept the session.
 On `iteration-assigned` it is the local architect's pinned ref at the
 assignment (scope review's fork point); on the `outline-revised` that commits
 a `request-completion` submission it is the ref after that submission

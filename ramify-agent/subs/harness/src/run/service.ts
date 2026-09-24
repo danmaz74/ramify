@@ -24,26 +24,31 @@ import { recordSettledSnapshot } from './mutations.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
 import { canonicalJson } from '../jobs/commands.js';
 import {
-  concernKey, reviewAttemptId, reviewLayout, reviewRequestId, reviewRequestSchema, reviewSchemas,
-  type NotVerifiedReason, type ReviewAttempt, type ReviewRequest, type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
+  concernKey, reviewAttemptId, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas,
+  type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
+  type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
 } from '../reviews/records.js';
-import { reviewMessage } from '../reviews/message.js';
+import { orientationKey, planExcerpts, readGuidance, type CapturedInput } from '../reviews/inputs.js';
+import { orientationMessage, reviewMessage } from '../reviews/message.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { openCandidateSnapshot, snapshotTools, type CandidateSnapshot } from '../reviews/snapshot.js';
 import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
-import { reviewJsonSchema, reviewSubmissionDescription, reviewToolName, validateReview } from '../reviews/submission.js';
+import {
+  orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
+  reviewToolName, validateOrientation, validateReview,
+} from '../reviews/submission.js';
 import type { Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
-import { Mutex } from '../jobs/mutex.js';
+import { Mutex, PriorityMutex } from '../jobs/mutex.js';
 import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planStateDirectory } from '../jobs/records.js';
 import { ensureStateDirectory } from '../store/state-directory.js';
 import { readPlan } from '../plans/discover.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderGlobalForkPrompt,
-  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderReviewerPrompt, sha256, type LoadedPackage,
+  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReviewerPrompt, sha256, type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
 import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
@@ -129,7 +134,7 @@ import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
   recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
-  type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
+  type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
 } from './records.js';
 import { reduceSessions, type RunSessions } from './sessions.js';
@@ -407,9 +412,10 @@ class Run {
   /**
    * Serializes the start of invocations: each one's identifier and its
    * session's are counted from the log, so two starts must not count the
-   * same prefix. Nothing slow runs under it.
+   * same prefix. Nothing slow runs under it. A writer's start waiting here
+   * goes before every reader's: the writer has scheduling priority.
    */
-  readonly starting = new Mutex();
+  readonly starting = new PriorityMutex();
   /** Every invocation the run has open, by ID: at most one writer, and the readers beside it. */
   readonly live = new Map<string, LiveInvocation>();
   stopRequested: boolean;
@@ -419,6 +425,10 @@ class Run {
   reviews: ReviewQueue | undefined;
   /** Why the run stopped its readers, which a reader stopped for it records as its attempt's reason. */
   readerStop: NotVerifiedReason | undefined;
+  /** When the run's reviews must be settled by, once its final settlement began; epoch milliseconds. */
+  settleDeadline: number | undefined;
+  /** The design orientations being made, by key, so that two attempts of one key make it once. */
+  readonly orienting = new Map<string, Promise<ReviewOrientation>>();
   /** The commit-and-audit effect in flight, which the run's terminal event waits for. */
   gating: Promise<unknown> | undefined;
   /** The writer of the run; one at a time, and the log says which. */
@@ -650,9 +660,40 @@ export class RunService {
       overflow: async request => {
         await this.finishUnsettledReviews(run, () => ({ reason: 'queue-overflow', detail: `More than ${policy.queue} review requests were waiting; this one was not run` }), [request]);
       },
+      deadline: request => this.reviewDeadline(run, request),
+      attemptMs: policy.attemptMs,
+      expire: async request => {
+        await this.finishUnsettledReviews(run, () => ({
+          reason: 'no-time-before-deadline',
+          detail: `An attempt may run ${policy.attemptMs} ms, and its reviews must be settled by ${new Date(this.reviewDeadline(run, request) ?? 0).toISOString()}; none was started`,
+        }), [request]);
+      },
+      now: () => this.now().getTime(),
       warn: text => this.warn(`Run ${run.record.jobId}: ${text}`),
     });
     run.reviews.wake();
+  }
+
+  /**
+   * When a request must be settled by: its work item's first completion
+   * request after it was recorded, plus the policy's settlement bound, or
+   * the run's own settlement deadline once that began, whichever is
+   * earlier. Null while neither applies. Read from the log each time.
+   */
+  private reviewDeadline(run: Run, id: string): number | null {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined) return null;
+    const recorded = run.log.all('review-request-recorded').find(event => event.data.request === id);
+    if (recorded === undefined) return null;
+    // Only the revision that commits a completion request carries the
+    // architect's point after it, null or not.
+    const completion = run.log.all('outline-revised')
+      .find(event => event.data.workItem === recorded.data.workItem && event.sequence > recorded.sequence && event.data.architectRef !== undefined);
+    const deadlines = [
+      ...(completion === undefined ? [] : [Date.parse(completion.at) + policy.settleMs]),
+      ...(run.settleDeadline === undefined ? [] : [run.settleDeadline]),
+    ];
+    return deadlines.length === 0 ? null : Math.min(...deadlines);
   }
 
   /**
@@ -691,6 +732,10 @@ export class RunService {
     }
     const number = Number.parseInt(closed.iteration.slice(closed.iteration.lastIndexOf('.i') + 2), 10);
     const base = this.acceptedBefore(run, closed.gate);
+    const assignment = iterationLayout.assignment(closed.workItem, number);
+    // Each question's captured inputs are read before the mutex, as the tree is.
+    const inputs = new Map<ReviewKind, ReviewInputs>();
+    for (const kind of policy.kinds) inputs.set(kind, await this.reviewInputs(run, kind, { ...closed, assignment, base }));
     const recorded: string[] = [];
     for (const kind of policy.kinds) {
       const outcome = await run.mutex.run(async () => {
@@ -704,13 +749,11 @@ export class RunService {
           id,
           key: { iteration: closed.iteration, candidate: closed.commit, kind, policy: policy.version },
           workItem: closed.workItem,
-          assignment: iterationLayout.assignment(closed.workItem, number),
+          assignment,
           base,
           gate: closed.gate,
           tree,
-          requirements: [],
-          guidance: [],
-          forkPoint: { kind: 'none' },
+          ...inputs.get(kind)!,
         } satisfies ReviewRequest);
         await commitRecord(run.log.ledger, {
           event: run.log.next({
@@ -725,6 +768,58 @@ export class RunService {
     }
     run.reviews?.wake();
     return recorded;
+  }
+
+  /**
+   * What one question of one candidate is given besides the candidate, and
+   * the point its reviewer starts from. Code review needs nothing more and
+   * never forks. Scope review binds the plan excerpts the assignment cites
+   * and the local architect's pinned point at the assignment. Design review
+   * binds the guidance it selects from the candidate and the orientation
+   * key of that selection. An input that cannot be read is recorded as
+   * such: the attempt then says what it lacked.
+   */
+  private async reviewInputs(
+    run: Run,
+    kind: ReviewKind,
+    closed: { readonly workItem: string; readonly iteration: string; readonly commit: string; readonly assignment: string; readonly base: string },
+  ): Promise<ReviewInputs> {
+    const none: ReviewInputs = { requirements: [], guidance: [], forkPoint: { kind: 'none' } };
+    if (kind === 'code') return none;
+    if (kind === 'scope') {
+      const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === closed.iteration);
+      const pinned = assigned?.data.architectRef;
+      const forkPoint: ForkPoint = pinned === undefined || pinned === null
+        ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after the assignment' : 'The assignment recorded no pinned point of the local architect' }
+        : { kind: 'session', session: pinned.session, ref: pinned.ref };
+      const requirements = await this.scopeRequirements(run, closed.assignment).catch(error => {
+        this.warn(`Run ${run.record.jobId}: the plan excerpts of ${closed.iteration} could not be read: ${message(error)}`);
+        return [] as CapturedInput[];
+      });
+      return { requirements: requirements.map(({ ref, hash }) => ({ ref, hash })), guidance: [], forkPoint };
+    }
+    try {
+      const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: closed.commit, base: closed.base });
+      const guidance = (await readGuidance(this.candidates, this.projectRoot, snapshot)).map(({ ref, hash }) => ({ ref, hash }));
+      if (guidance.length === 0) return { ...none, forkPoint: { kind: 'unavailable', reason: 'The candidate holds no guidance to judge a design against' } };
+      const key = orientationKey({
+        guidance,
+        packageHash: run.record.prompts.reviewer?.hash ?? null,
+        agent: run.record.agent,
+        model: this.options.model ?? null,
+        context: run.record.policy.context.reviewer,
+      });
+      return { requirements: [], guidance, forkPoint: { kind: 'orientation', key } };
+    } catch (error) {
+      return { ...none, forkPoint: { kind: 'unavailable', reason: `The candidate's guidance could not be read: ${message(error)}` } };
+    }
+  }
+
+  /** The plan excerpts an iteration's assignment cites, from the captured plan. */
+  private async scopeRequirements(run: Run, assignmentPath: string): Promise<CapturedInput[]> {
+    const assignment = iterationAssignmentSchema.parse(this.committedBody(run, assignmentPath));
+    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    return planExcerpts(plan, assignment.requirementRefs);
   }
 
   /** A record body as the log committed it, never the materialized file. */
@@ -747,24 +842,44 @@ export class RunService {
     if (policy === undefined || state === undefined || state.settledBy !== null) return false;
     if (this.ignoring(run) || run.reviews?.accepting !== true) return false;
     const request = reviewRequestSchema.parse(this.committedBody(run, reviewLayout.request(id)));
+    const kind = request.key.kind;
     const attempt = reviewAttemptId(id, state.attempts.length + 1);
     const queuedAt = state.attempts.at(-1)?.finished?.at ?? state.recordedAt;
     const retryLeft = state.attempts.filter(entry => entry.finished !== null && !entry.finished.settles).length < policy.retries;
-    const base = { id: attempt, request: id, queuedAt, requestedStart: 'fresh' as const };
+    const requestedStart = requestedStartOf(request);
+    const base = { id: attempt, request: id, queuedAt, requestedStart };
     const unavailable = (detail: string) => this.finishReview(run, request, {
       ...base, startedAt: null, invocation: null, session: null, actualStart: null,
     }, { result: 'not-verified', reason: 'unavailable', detail }, true);
 
     const loaded = packages.get('reviewer');
-    if (loaded === undefined || request.key.kind !== 'code') {
-      return await unavailable(loaded === undefined ? 'No prompt package is loaded for the reviewer' : `This harness has no ${request.key.kind} review yet`) === 'committed';
+    if (loaded?.reviewer === undefined) return await unavailable('No prompt package is loaded for the reviewer') === 'committed';
+    if (kind === 'design' && request.guidance.length === 0) {
+      return await unavailable(request.forkPoint.kind === 'unavailable' ? request.forkPoint.reason : 'No design guidance was selected') === 'committed';
     }
     let snapshot: CandidateSnapshot;
+    let requirements: CapturedInput[] = [];
+    let guidance: CapturedInput[] = [];
     try {
       snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: request.key.candidate, base: request.base });
     } catch (error) {
       return await unavailable(`The audited candidate could not be read: ${message(error)}`) === 'committed';
     }
+    try {
+      // The question's inputs are read again and must be the bytes the
+      // request bound; anything else is not the question it asked.
+      if (kind === 'scope') requirements = boundInputs(await this.scopeRequirements(run, request.assignment), request.requirements);
+      if (kind === 'design') {
+        const texts = await Promise.all(request.guidance.map(entry => this.candidates.readBlob(this.projectRoot, request.key.candidate, entry.ref)));
+        guidance = boundInputs(request.guidance.map((entry, index) => ({ ref: entry.ref, hash: sha256(texts[index]!), text: texts[index]! })), request.guidance);
+      }
+    } catch (error) {
+      return await unavailable(`The ${kind} review's captured inputs could not be read as recorded: ${message(error)}`) === 'committed';
+    }
+    const start = await this.reviewStart(run, agent, loaded, request, guidance);
+    // An orientation made first may have met a stop or the deadline.
+    if (this.closed || this.ignoring(run) || run.reviews?.accepting !== true) return false;
+
     const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
     const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
     const tools = snapshotTools(snapshot, this.candidates, this.projectRoot);
@@ -777,14 +892,17 @@ export class RunService {
       work: { workItem: request.workItem, iteration: request.key.iteration },
       attempt: state.attempts.length + 1,
       loaded,
-      systemPrompt: renderReviewerPrompt(loaded, '(no working directory: the audited candidate only)'),
+      systemPrompt: renderReviewerPrompt(loaded, '(no working directory: the audited candidate only)', kind),
       prompt: reviewMessage({
         request,
         snapshot,
         assignment: assignment.success ? assignment.data : null,
         checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
+        requirements,
       }),
-      start: { mode: 'fresh' },
+      start: start.start,
+      ...(start.fork === undefined ? {} : { fork: start.fork }),
+      ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
       toolName: reviewToolName,
       description: reviewSubmissionDescription,
       inputSchema: reviewJsonSchema,
@@ -798,7 +916,7 @@ export class RunService {
       equip: () => ({ builtinTools: [], tools: [...tools.definitions] }),
       onStarted: async (invocation, session) => {
         const at = this.now();
-        await this.write(run, { type: 'review-attempt-started', data: { request: id, attempt, invocation, session, requestedStart: 'fresh' } }, [], at);
+        await this.write(run, { type: 'review-attempt-started', data: { request: id, attempt, invocation, session, requestedStart } }, [], at);
         started = { invocation, session, at: at.toISOString() };
       },
     });
@@ -812,11 +930,128 @@ export class RunService {
       startedAt: started?.at ?? null,
       invocation: started?.invocation ?? null,
       session: started?.session ?? null,
+      // What the executor answered, never what was asked: a fork it could
+      // not take is a fresh start, and is never measured as a fork.
       actualStart: result.actual === undefined ? null : result.actual === 'fork' ? 'fork' as const : 'fresh' as const,
     };
     const committed = await this.finishReview(run, request, attemptBody, outcome.result, settles,
       result.ended === 'submitted' ? result.value : undefined);
     return committed === 'committed';
+  }
+
+  /**
+   * Where one attempt's reviewer starts. Code review starts fresh. Scope
+   * review forks the local architect at the point that produced its
+   * assignment, and design review forks the orientation of its guidance,
+   * made first where none exists yet. A fork point that is missing or
+   * unusable starts fresh, recorded as a start the caller could not honor;
+   * the message is the complete input either way.
+   */
+  private async reviewStart(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, guidance: readonly CapturedInput[]): Promise<{
+    readonly start: SessionStart;
+    readonly fork?: ForkRelation | undefined;
+    readonly degraded?: { readonly requested: 'fork'; readonly reason: string } | undefined;
+  }> {
+    const fresh = (reason: string) => ({ start: { mode: 'fresh' } as const, degraded: { requested: 'fork' as const, reason } });
+    const point = request.forkPoint;
+    if (point.kind === 'none') return { start: { mode: 'fresh' } };
+    if (point.kind === 'unavailable') return fresh(point.reason);
+    let from: { readonly session: SessionId; readonly invocation: string; readonly ref: string; readonly reason: 'scope-review' | 'design-orientation' };
+    if (point.kind === 'session') {
+      const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === request.key.iteration);
+      if (assigned === undefined) return fresh(`No assignment of ${request.key.iteration} is recorded`);
+      from = { session: point.session as SessionId, invocation: assigned.data.invocation, ref: point.ref, reason: 'scope-review' };
+    } else {
+      const orientation = await this.orientation(run, agent, loaded, request, guidance);
+      if (orientation.outcome !== 'oriented' || orientation.session === null || orientation.invocation === null || orientation.ref === null) {
+        return fresh(`The design orientation ${point.key.slice(0, 12)} did not orient: ${orientation.reason ?? 'no reason was recorded'}`);
+      }
+      from = { session: orientation.session as SessionId, invocation: orientation.invocation, ref: orientation.ref, reason: 'design-orientation' };
+    }
+    const source = this.sessionsOf(run)?.get(from.session);
+    if (source === undefined || !source.invocations.includes(from.invocation) || source.awaiting === from.invocation) {
+      return fresh(`${from.session} has not reached the end of ${from.invocation}`);
+    }
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === from.invocation)?.sequence ?? 0;
+    const briefs = run.log.all('brief-appended')
+      .filter(event => event.data.session === from.session && event.sequence < ended)
+      .map(event => event.data.decision);
+    return {
+      start: { mode: 'fork', from: from.ref },
+      fork: { from: { session: from.session, invocation: from.invocation }, reason: from.reason, briefs },
+    };
+  }
+
+  /**
+   * The design orientation of a request's guidance selection: the one the
+   * log records for its key, or one made now, once, by a reviewer session
+   * that reads the guidance and is kept. A failed orientation is recorded
+   * too, so the run does not pay for it twice; its design reviews start
+   * fresh with the reason.
+   */
+  private async orientation(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, guidance: readonly CapturedInput[]): Promise<ReviewOrientation> {
+    const key = request.forkPoint.kind === 'orientation' ? request.forkPoint.key : '';
+    const recorded = this.recordedOrientation(run, key);
+    if (recorded !== undefined) return recorded;
+    let making = run.orienting.get(key);
+    if (making === undefined) {
+      making = this.orient(run, agent, loaded, request, key, guidance);
+      run.orienting.set(key, making);
+    }
+    return await making;
+  }
+
+  private recordedOrientation(run: Run, key: string): ReviewOrientation | undefined {
+    if (run.log.all('review-orientation-recorded').every(event => event.data.key !== key)) return undefined;
+    const parsed = reviewOrientationSchema.safeParse(this.committedBody(run, reviewLayout.orientation(key)));
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  private async orient(run: Run, agent: AgentPort, loaded: LoadedPackage, request: ReviewRequest, key: string, guidance: readonly CapturedInput[]): Promise<ReviewOrientation> {
+    const policy = run.record.policy.reviews!;
+    const workspace = run.path(join(dirname(reviewLayout.orientation(key)), key.slice(0, 16)));
+    await mkdir(workspace, { recursive: true });
+    const result = await this.runInvocation<OrientationSubmission>(run, agent, {
+      role: 'reviewer',
+      work: { workItem: request.workItem, iteration: request.key.iteration },
+      attempt: 1,
+      loaded,
+      systemPrompt: renderOrientationPrompt(loaded),
+      prompt: orientationMessage(guidance),
+      start: { mode: 'fresh' },
+      toolName: orientationToolName,
+      description: orientationSubmissionDescription,
+      inputSchema: orientationJsonSchema,
+      submissionSchema: 'ramify-agent.orientation-submission/1',
+      validate: input => validateOrientation(input, guidance.map(entry => entry.ref)),
+      // The orientation is retained: every design review of its key forks it.
+      keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
+      scope: { write: null, measurement: null, size: null },
+      reader: true,
+      workingDirectory: workspace,
+      absoluteMs: policy.attemptMs,
+      equip: () => ({ builtinTools: [], tools: [] }),
+    });
+    const oriented = result.ended === 'submitted' && result.value !== undefined && result.ref !== '';
+    const orientation = reviewOrientationSchema.parse({
+      schema: 'ramify-agent.review-orientation/1',
+      key,
+      guidance: guidance.map(({ ref, hash }) => ({ ref, hash })),
+      request: request.id,
+      invocation: result.id === '' ? null : result.id,
+      session: result.session === '' ? null : result.session,
+      ref: oriented ? result.ref : null,
+      outcome: oriented ? 'oriented' : 'failed',
+      summary: oriented ? result.value!.summary : null,
+      reason: oriented ? null : `The orientation ended ${result.ended}${result.interruption === undefined ? '' : ` (${result.interruption})`}`,
+    } satisfies ReviewOrientation);
+    if (!this.closed) {
+      await this.write(run, {
+        type: 'review-orientation-recorded',
+        data: { key, request: request.id, invocation: orientation.invocation, session: orientation.session, outcome: orientation.outcome },
+      }, [{ path: reviewLayout.orientation(key), id: key, revision: 1, body: orientation }]);
+    }
+    return orientation;
   }
 
   /**
@@ -928,7 +1163,7 @@ export class RunService {
         startedAt: open?.started?.at ?? null,
         invocation: open?.started?.invocation ?? null,
         session: (open?.started?.session ?? null) as SessionId | null,
-        requestedStart: 'fresh',
+        requestedStart: requestedStartOf(parsed.data),
         actualStart: null,
       }, { result: 'not-verified', reason, detail }, true);
       if (outcome === 'committed') finishedIds.push(attempt);
@@ -945,6 +1180,10 @@ export class RunService {
   private async settleReviews(run: Run): Promise<void> {
     const policy = run.record.policy.reviews;
     if (policy === undefined || run.reviews === undefined) return;
+    // From here every waiting request has a deadline, and one that could not
+    // finish by it is finished at once rather than started.
+    run.settleDeadline = this.now().getTime() + policy.settleMs;
+    run.reviews.wake();
     let timer: NodeJS.Timeout | undefined;
     await Promise.race([
       run.reviews.settled(),
@@ -1586,7 +1825,7 @@ export class RunService {
     // The start is serialized with every other start, since the identifiers
     // are counted from the log; the session itself runs outside it, so a
     // reader and the writer run at once.
-    const started = await run.starting.run(() => this.startInvocation(run, agent, request));
+    const started = await run.starting.run(() => this.startInvocation(run, agent, request), request.reader === true ? 'after' : 'first');
     if ('refused' in started) {
       // A run that has spent its bounds starts nothing more. The writer's
       // path fails the run with the counter as evidence; a reader is only
@@ -2430,7 +2669,7 @@ export class RunService {
       }
 
       if (result.value.kind === 'assign') {
-        const assigned = await this.assignIteration(run, item, result.id, result.value, index, registry);
+        const assigned = await this.assignIteration(run, item, result.id, result.value, index, registry, architectRefOf(result));
         if (assigned === null) return null;
         lastAssignment = assigned;
         // A direct revision is a contract iteration of this work item: the
@@ -2518,10 +2757,14 @@ export class RunService {
         ...result.value.outline,
         hypothesesSeen: hypotheses.map(hypothesis => refOf(hypothesis.id, hypothesis.revision, hypothesis)),
       } satisfies WorkItemOutline);
-      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id } }, [
+      // The revision that commits a completion request records the point
+      // after it, which this work item's reconciliation forks; and it starts
+      // the work item's wait for its reviews.
+      await this.write(run, { type: 'outline-revised', data: { workItem: item.id, revision, invocation: result.id, architectRef: architectRefOf(result) } }, [
         { path: workLayout.outline(item.id, revision), id: item.id, revision, body: outline },
       ]);
       await this.afterWrite('outline-revised', run.record.jobId);
+      run.reviews?.wake();
       if (this.ignoring(run)) return null;
 
       const gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
@@ -2985,6 +3228,7 @@ export class RunService {
     submission: Extract<LocalArchitectSubmission, { kind: 'assign' }>,
     index: ArchitectIndex | null,
     registry: ReadonlyMap<string, RegistryEntry>,
+    architectRef: ArchitectRef | null,
   ): Promise<IterationAssignment | null> {
     const committed = committedRecords(run.log.ledger.replay());
     let outlines = committed.outlines.get(item.id) ?? [];
@@ -3158,7 +3402,9 @@ export class RunService {
     await this.write(run, revised === undefined
       ? {
         type: 'iteration-assigned',
-        data: { workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions },
+        // The architect's pinned point that produced this assignment is
+        // committed with it: the iteration's scope review forks it.
+        data: { workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions, architectRef },
       }
       : {
         type: 'contract-requested',
@@ -5873,6 +6119,36 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  * before the invocation starts. What the implementation answered is in the
  * outcome, which is written once the session has started.
  */
+/** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
+type ReviewInputs = Pick<ReviewRequest, 'requirements' | 'guidance' | 'forkPoint'>;
+
+/** The start a request intends: a fork for every question with a fork point, fresh for code review. */
+function requestedStartOf(request: ReviewRequest): 'fresh' | 'fork' {
+  return request.forkPoint.kind === 'none' ? 'fresh' : 'fork';
+}
+
+/**
+ * The inputs a request bound, as read again now: each must be there with
+ * the hash the request recorded, or the question is not the one it asked.
+ */
+function boundInputs(read: readonly CapturedInput[], bound: ReadonlyArray<{ readonly ref: string; readonly hash: string }>): CapturedInput[] {
+  return bound.map(entry => {
+    const found = read.find(input => input.ref === entry.ref);
+    if (found === undefined) throw new Error(`${entry.ref} is no longer there`);
+    if (found.hash !== entry.hash) throw new Error(`${entry.ref} has hash ${found.hash}, and the request bound ${entry.hash}`);
+    return found;
+  });
+}
+
+/**
+ * The local architect's pinned point after one invocation, where the harness
+ * kept its session: the session and the executor's ref at the invocation's
+ * end. Null where the session was not kept or no ref was reported.
+ */
+function architectRefOf(result: InvocationResult<unknown>): ArchitectRef | null {
+  return result.kept && result.ref !== '' && result.session !== '' ? { session: result.session, ref: result.ref } : null;
+}
+
 function requestedSession<T>(request: InvocationRequest<T>): Invocation['session'] {
   if (request.degraded !== undefined) {
     return {

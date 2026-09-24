@@ -44,15 +44,15 @@ export const defaultLimits: RunPolicy['limits'] = {
 };
 
 /**
- * The first trial's review policy (Plan 12): two readers beside the writer,
- * twelve waiting requests, one retry, ten minutes an attempt and fifteen a
- * work item's wait. Only code review is implemented so far; the scope and
- * design questions join `kinds` when their prompts exist. These are limits
+ * The first trial's review policy (Plan 12): the code, scope and design
+ * questions of every accepted engineer iteration, two readers beside the
+ * writer, twelve waiting requests, one retry, ten minutes an attempt and
+ * fifteen a work item's wait from its completion request. These are limits
  * to measure, not claims about throughput.
  */
 export const defaultReviewPolicy: ReviewPolicy = {
   version: reviewPolicyVersion,
-  kinds: ['code'],
+  kinds: ['code', 'scope', 'design'],
   concurrency: 2,
   queue: 12,
   retries: 1,

@@ -108,11 +108,11 @@ export const transcriptContinuesSchema = z.object({
   reason: z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']),
   briefs: z.array(text),
 }).strict();
-/** A forked start: the source point, why, the context generation and the briefs held at the point. */
+/** A forked start: the source point, why, the context generation where it forked the architect context, and the briefs held at the point. */
 export const transcriptForkSchema = z.object({
   from: transcriptPointSchema,
-  reason: z.enum(['placement-request']),
-  generation: z.int().positive(),
+  reason: z.enum(['placement-request', 'scope-review', 'design-orientation']),
+  generation: z.int().positive().optional(),
   briefs: z.array(text),
 }).strict();
 /** The session a new one took the place of, and why. */

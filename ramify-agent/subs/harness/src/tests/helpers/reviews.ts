@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { ScriptStep } from '../../../subs/agent/src/scripted.js';
+import type { ScriptedAgent, ScriptedAgentOptions, ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 import type { RunEvent } from '../../run/log.js';
 import type { ReviewPolicy } from '../../run/records.js';
@@ -78,6 +78,16 @@ export interface ReviewRun {
   readonly stopGraceMs?: number;
   /** How the gates' checks run; passing and immediate by default. */
   readonly checkExecution?: CheckExecutionPort;
+  /** The audited candidates Git answers for, in place of {@link candidates}. */
+  readonly commits?: Record<string, ScriptedCommit>;
+  /** What the scripted fake declares, such as a fork it lacks. */
+  readonly agentOptions?: ScriptedAgentOptions;
+  /** Given the scripted fake once the service is open, before the run starts. */
+  readonly agentReady?: (agent: ScriptedAgent) => void;
+  /** The local architect's turns in place of the three assignments and the completion request. */
+  readonly architect?: ReadonlyArray<readonly ScriptStep[]>;
+  /** The run's `now`, for a scenario that moves the clock. */
+  readonly now?: () => Date;
 }
 
 /** Drives one work item of three iterations with the reviewers each request's prompt selects, to the run's end. */
@@ -93,12 +103,12 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
       unchanged,
     ],
   });
-  const scripted = candidates();
+  const scripted = scenario.commits ?? candidates();
   const source = scriptedCandidates(root, scripted);
   scenario.candidates?.(source);
   const roles = byRole({
     'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
-    'local-architect': [
+    'local-architect': scenario.architect?.map(turn => [...turn]) ?? [
       submit(assign(notes, { goal: 'Add the note store.' }, outline())),
       submit(assign(notes, { goal: 'State the note limit.' })),
       submit(assign(notes, { goal: 'Export the store.' })),
@@ -108,7 +118,10 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
   }) as (spec: SessionSpec) => readonly ScriptStep[];
   const script = (spec: SessionSpec): readonly ScriptStep[] => {
     if (spec.role !== 'reviewer') return roles(spec);
-    const request = /Code review (rq-\d{4})/u.exec(spec.prompt)?.[1] ?? 'unknown';
+    // A design orientation is scripted as `orientation`, by the order it started in.
+    const request = spec.prompt.startsWith('Design orientation.')
+      ? 'orientation'
+      : /(?:Code|Scope|Design) review (rq-\d{4})/u.exec(spec.prompt)?.[1] ?? 'unknown';
     const attempts = reviewerStarts.get(request) ?? 0;
     reviewerStarts.set(request, attempts + 1);
     return scenario.reviewers[`${request}#${attempts + 1}`] ?? scenario.reviewers[request] ?? [{ kind: 'end', message: `no review scripted for ${request}` }];
@@ -124,7 +137,10 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     ...(scenario.afterWrite === undefined ? {} : { afterWrite: scenario.afterWrite }),
     ...(scenario.stopGraceMs === undefined ? {} : { stopGraceMs: scenario.stopGraceMs }),
     ...(scenario.checkExecution === undefined ? {} : { checkExecution: scenario.checkExecution }),
+    ...(scenario.agentOptions === undefined ? {} : { agentOptions: scenario.agentOptions }),
+    ...(scenario.now === undefined ? {} : { now: scenario.now }),
   });
+  if (opened.agent !== undefined) scenario.agentReady?.(opened.agent);
   if (scenario.detached !== true) cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
   if (scenario.detached === true) return { ...opened, runId: receipt.jobId, git, source, events: [] as RunEvent[] };

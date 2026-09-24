@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import { schemaErrors, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
-import { reviewSubmissionSchema, type ReviewSubmission } from './records.js';
+import { orientationSubmissionSchema, reviewSubmissionSchema, type OrientationSubmission, type ReviewSubmission } from './records.js';
 import { resolveChangedPath, resolveSnapshotPath, snapshotToolNames, type CandidateSnapshot } from './snapshot.js';
 
 /*
@@ -80,4 +80,28 @@ export function validateReview(input: unknown, evidence: ReviewEvidence): Submis
   });
 
   return errors.length === 0 ? { ok: true, value: submission } : { ok: false, errors };
+}
+
+export const orientationToolName = 'submit_orientation';
+
+export const orientationJsonSchema = z.toJSONSchema(orientationSubmissionSchema) as JsonSchema;
+
+export const orientationSubmissionDescription = 'End this orientation: every guidance path you read, and a short account of what the guidance asks of a design. The harness validates it; an invalid submission is returned with every error.';
+
+/** An orientation names exactly the guidance it was given, each path once. */
+export function validateOrientation(input: unknown, guidance: readonly string[]): SubmissionValidation<OrientationSubmission> {
+  const parsed = orientationSubmissionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, errors: schemaErrors(parsed.error) };
+  const errors: SubmissionError[] = [];
+  const given = new Set(guidance);
+  const named = new Set<string>();
+  parsed.data.read.forEach((path, index) => {
+    if (!given.has(path)) errors.push({ path: `read.${index}`, message: `"${path}" is not guidance this orientation was given`, expected: `one of: ${guidance.join(', ')}` });
+    else if (named.has(path)) errors.push({ path: `read.${index}`, message: `"${path}" is already named`, expected: 'each guidance path once' });
+    named.add(path);
+  });
+  for (const path of guidance) {
+    if (!named.has(path)) errors.push({ path: 'read', message: `The guidance path "${path}" is not named`, expected: 'every guidance path the message gives' });
+  }
+  return errors.length === 0 ? { ok: true, value: parsed.data } : { ok: false, errors };
 }

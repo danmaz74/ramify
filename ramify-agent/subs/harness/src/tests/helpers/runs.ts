@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { createScriptedAgent, type Script, type ScriptedAgent } from '../../../subs/agent/src/scripted.js';
+import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptedAgentOptions } from '../../../subs/agent/src/scripted.js';
 import { declaringScenarios } from './declarations.js';
 import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
 import { checkCommand } from '../../checks/records.js';
@@ -240,6 +240,8 @@ export interface OpenRunsOptions extends Partial<RunServiceOptions> {
   readonly script?: Script | undefined;
   /** Script for the direct test executor. Ignored when `checkExecution` is supplied. */
   readonly checkScript?: readonly DirectCheckStep[] | DirectCheckScript | undefined;
+  /** What the scripted fake declares, such as a fork it lacks. */
+  readonly agentOptions?: ScriptedAgentOptions | undefined;
 }
 
 /** The scripted fake a test drove the run with, where it gave a script. */
@@ -253,10 +255,10 @@ export type TestAgent = ScriptedAgent | undefined;
  */
 export async function openRuns(root: string, options: OpenRunsOptions) {
   const lock = await acquireProjectLock(root);
-  const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script));
+  const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script), options.agentOptions);
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
-  const { script: _script, checkScript, ...rest } = options;
+  const { script: _script, checkScript, agentOptions: _agentOptions, ...rest } = options;
   const checkExecution = checkScript === undefined
     ? createPassingCheckExecution()
     : typeof checkScript === 'function'
