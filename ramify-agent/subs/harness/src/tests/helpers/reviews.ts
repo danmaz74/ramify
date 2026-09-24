@@ -11,7 +11,7 @@ import { scriptedCandidates, testReviewPolicy, type ScriptedCandidates, type Scr
 import { directReadinessExecution } from './external-tools.js';
 import { copyFixture } from './fixture.js';
 import { gateGit, scenariosCommit, type GateCommit } from './gate-git.js';
-import { addModule, assign, byRole, outline, submit, treeInputs } from './iterations.js';
+import { addModule, assign, byRole, byWork, outline, submit, treeInputs } from './iterations.js';
 import { installTestRunner, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './runs.js';
 
 /*
@@ -105,32 +105,36 @@ export interface ReviewRun {
   readonly gates?: readonly GateCommit[];
   /** Run limits beside the test policy's, such as the reconciliation rounds. */
   readonly limits?: Partial<RunPolicy['limits']>;
+  /**
+   * Every role's turns by work item, as `byWork` takes them (`engineer:wi-002`),
+   * in place of the one work item's analysis, architect and engineers: for a
+   * scenario of several work items. `reviewers` and `reconcilers` still apply.
+   */
+  readonly roles?: Parameters<typeof byWork>[0];
 }
 
-/** Drives one work item of three iterations with the reviewers each request's prompt selects, to the run's end. */
-export async function reviewRun(root: string, cleanups: Array<() => Promise<void>>, scenario: ReviewRun) {
-  const git = gateGit(root, {
-    head: base,
-    commits: [
-      scenariosCommit(plan, materialized, base),
-      ...(scenario.gates ?? [...revisionGates, unchanged, unchanged]),
-    ],
-  });
-  const scripted = scenario.commits ?? candidates();
-  const source = scriptedCandidates(root, scripted);
-  scenario.candidates?.(source);
-  const roles = byRole({
-    'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
-    'local-architect': scenario.architect?.map(turn => [...turn]) ?? [
-      submit(assign(notes, { goal: 'Add the note store.' }, outline())),
-      submit(assign(notes, { goal: 'State the note limit.' })),
-      submit(assign(notes, { goal: 'Export the store.' })),
-      submit(requestCompletion()),
-    ],
-    engineer: scenario.engineer.map(turn => [...turn]),
-  }) as (spec: SessionSpec) => readonly ScriptStep[];
+/**
+ * The scripted agent's answer to each session of a reviewed run: a
+ * reconciliation fork by its reconciliation, a reviewer by its request and
+ * start, and every other role from `roles` by work item, or from the one
+ * work item's analysis, architect and engineers.
+ */
+export function reviewScript(scenario: Pick<ReviewRun, 'reviewers' | 'engineer' | 'architect' | 'reconcilers' | 'roles'>): (spec: SessionSpec) => readonly ScriptStep[] {
+  const roles = (scenario.roles === undefined
+    ? byRole({
+      'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
+      'local-architect': scenario.architect?.map(turn => [...turn]) ?? [
+        submit(assign(notes, { goal: 'Add the note store.' }, outline())),
+        submit(assign(notes, { goal: 'State the note limit.' })),
+        submit(assign(notes, { goal: 'Export the store.' })),
+        submit(requestCompletion()),
+      ],
+      engineer: scenario.engineer.map(turn => [...turn]),
+    })
+    : byWork(scenario.roles)) as (spec: SessionSpec) => readonly ScriptStep[];
   const reconcilerStarts = new Map<string, number>();
-  const script = (spec: SessionSpec): readonly ScriptStep[] => {
+  const reviewerStarts = new Map<string, number>();
+  return (spec: SessionSpec): readonly ScriptStep[] => {
     const reconciliation = /^# Reconciliation (\S+)/u.exec(spec.prompt)?.[1];
     if (spec.role === 'local-architect' && reconciliation !== undefined) {
       const starts = (reconcilerStarts.get(reconciliation) ?? 0) + 1;
@@ -146,7 +150,21 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     reviewerStarts.set(request, attempts + 1);
     return scenario.reviewers[`${request}#${attempts + 1}`] ?? scenario.reviewers[request] ?? [{ kind: 'end', message: `no review scripted for ${request}` }];
   };
-  const reviewerStarts = new Map<string, number>();
+}
+
+/** Drives one work item of three iterations with the reviewers each request's prompt selects, to the run's end. */
+export async function reviewRun(root: string, cleanups: Array<() => Promise<void>>, scenario: ReviewRun) {
+  const git = gateGit(root, {
+    head: base,
+    commits: [
+      scenariosCommit(plan, materialized, base),
+      ...(scenario.gates ?? [...revisionGates, unchanged, unchanged]),
+    ],
+  });
+  const scripted = scenario.commits ?? candidates();
+  const source = scriptedCandidates(root, scripted);
+  scenario.candidates?.(source);
+  const script = reviewScript(scenario);
   const opened = await openRuns(root, {
     script,
     inputs: treeInputs(),

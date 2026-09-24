@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import type { ScriptStep } from '../../subs/agent/src/scripted.js';
+import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import type { CheckFindingEvent, CheckFindingSummary } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import type { GateAttempt } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
@@ -66,6 +68,8 @@ interface RunOptions {
   readonly checkScript: DirectCheckScript;
   readonly candidates?: (source: ScriptedCandidates) => void;
   readonly detached?: boolean;
+  /** The local architect's reconciliation forks, by reconciliation ID; a fork with none scripted ends without a submission. */
+  readonly reconcilers?: Readonly<Record<string, readonly ScriptStep[]>>;
 }
 
 /** A run of one work item on the notes module, with Git and the audited trees answered. */
@@ -73,8 +77,13 @@ async function run(root: string, script: Parameters<typeof byRole>[0], commits: 
   const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits] });
   const candidates = treeCandidates(root);
   options.candidates?.(candidates);
+  const roles = byRole(script) as (spec: SessionSpec) => readonly ScriptStep[];
   const opened = await openRuns(root, {
-    script: byRole(script),
+    script: (spec: SessionSpec): readonly ScriptStep[] => {
+      const reconciliation = /^# Reconciliation (\S+)/u.exec(spec.prompt)?.[1];
+      if (spec.role !== 'local-architect' || reconciliation === undefined) return roles(spec);
+      return options.reconcilers?.[reconciliation] ?? [{ kind: 'end', message: `no reconciliation scripted for ${reconciliation}` }];
+    },
     inputs: treeInputs(),
     git,
     candidates,
@@ -264,6 +273,70 @@ describe('CF13: a pass on the tree that failed is intermittent evidence, and the
     // Both failures were on one tree; the failed executions stay in the history.
     expect(detail.view.reports.items.map(report => report.source.id)).toEqual(['tree-of-revision-01', 'tree-of-revision-01']);
     expect(detail.view.decisions.items.map(decision => [decision.decision.action, decision.source.id])).toEqual([['fix-by-check', 'tree-of-revision-02']]);
+    git.assertAnswered();
+  }, 120_000);
+});
+
+describe('CF02 and CF13: an open scenario CheckFinding reaches the work item\'s reconciliation', () => {
+  test('the architect cannot waive it and plans a repair; the correction\'s gate fixes it by check on a changed tree; the next completion needs no round', async () => {
+    const root = await fixture();
+    const disposition = (action: Record<string, unknown>) => ({
+      relations: [],
+      dispositions: [{ checkFinding: 'cf-0001', rationale: 'The note scenario failed twice and passed once on one tree.', communication: { mode: 'quiet' }, action }],
+      next: action['action'] === 'repair' ? { kind: 'correct', goal: 'Make the note scenario pass for a reason.' } : { kind: 'complete' },
+      brief: 'The scenario failure was assessed.',
+    });
+    const { service, runId, agent, git } = await run(root, {
+      'initial-architect': [submit(analysis([entry('review-note', notes)]))],
+      'local-architect': [
+        submit(assign(notes, {}, outline())),
+        submit(requestCompletion()),
+        submit(assign(notes, { goal: 'Make the note scenario pass for a reason.', kind: 'repair' })),
+        submit(requestCompletion()),
+      ],
+      engineer: [
+        submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
+        submit(completionProposed('Nothing to change, it seems.', { scenarios: ['sc-001'] })),
+        submit(completionProposed('Still nothing to change.', { scenarios: ['sc-001'] })),
+        submit(completionProposed('The step waits for the note.'), write(steps, `${stepFile}// waits\n`)),
+      ],
+    }, [
+      accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
+      unchanged('wi-001.i01'),
+      unchanged('wi-001.i01'),
+      accepted('wi-001.i02', 'revision-02', modified(steps)),
+      unchanged('wi-001'),
+      unchanged(finalSubject),
+    ], {
+      checkScript: failingIterationGates(2),
+      reconcilers: {
+        // A waiver of a required scenario is refused and returned to the fork, which then plans a repair.
+        'wi-001.rc01': [{ kind: 'submit', input: disposition({ action: 'waive', uncertainty: 'It passed once.' }) }, { kind: 'submit', input: disposition({ action: 'repair' }) }],
+      },
+    });
+
+    expect(onlyRun(service, plan).failure).toBeNull();
+    expect(onlyRun(service, plan).state).toBe('completed');
+    const log = await runEventsOnDisk(root, plan, runId);
+    // The promoted CheckFinding was open at the completion request, so a round assessed it.
+    expect(log.filter(event => event.type === 'reconciliation-started').map(event => (event.data as { reconciliation: string }).reconciliation)).toEqual(['wi-001.rc01']);
+    const fork = agent!.sessions.find(session => session.spec.prompt.startsWith('# Reconciliation wi-001.rc01'))!;
+    expect(JSON.stringify(fork.verdicts[0])).toContain('required-obligation');
+    expect(fork.verdicts[1]).toMatchObject({ accepted: true });
+    const assessed = log.find(event => event.type === 'reconciliation-assessed')!;
+    expect(assessed.data).toMatchObject({ next: 'correct' });
+    // The correction's gate passed the same scenario on a changed tree: a factual fix, not an assessment.
+    const gates = await iterationGates(root, runId);
+    expect(gates.map(gate => gate.verdict)).toEqual(['failed', 'failed', 'passed', 'passed']);
+    expect(gates[3]!.carried).toEqual(['check-finding-decided']);
+    const [summary] = listOf(service, runId);
+    expect(summary).toMatchObject({ id: 'cf-0001', standing: 'closed', reason: 'fixed-by-check', verification: expect.objectContaining({ kind: 'check', required: true }) });
+    const detail = service.checkFindings(plan, runId, { kind: 'detail', checkFinding: 'cf-0001' });
+    if (detail === undefined || !detail.ok || detail.view.kind !== 'detail') throw new Error('no detail');
+    expect(detail.view.decisions.items.map(decision => decision.decision.action)).toEqual(['plan-repair', 'fix-by-check']);
+    // The second completion request found nothing to assess.
+    expect(log.filter(event => event.type === 'reconciliation-started')).toHaveLength(1);
+    expect(log.find(event => event.type === 'work-item-completed')!.data).toEqual({ workItem: 'wi-001', gate: expect.any(String) });
     git.assertAnswered();
   }, 120_000);
 });

@@ -676,7 +676,7 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 
 /* CheckFindings beside their work item. A risk is a label; a decision
  * request is a framed question; each settlement reads apart from the rest. */
-.check-findings { margin-top: 0.8rem; border-top: 1px solid var(--line); }
+.work-item-check-findings { margin-top: 0.8rem; border-top: 1px solid var(--line); }
 .review-coverage { margin: 0.2rem 0 0.5rem; }
 .review-coverage-complete { color: var(--good); }
 .review-coverage-partial, .review-coverage-pending { color: var(--warn); }

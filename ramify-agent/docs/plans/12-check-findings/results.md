@@ -508,3 +508,159 @@ Iteration 5 resumes from `8183f0a`; its twelve files were written against the na
 - **Trusted inputs bound here:** the user actor (the command's responder), the authority `{ user-decision, commandId }`, the accepted risk (the CheckFinding's current risk), the decision's source (the latest report's), the expected revision and the run version, all under the run mutex.
 - **For the composition:** a browser witness should open a work item, see its coverage and CheckFindings, answer a pending decision and waive a signal through the real server; the page reloads on the run's version, and a sent command shows "accepted" until then.
 - **Open gaps:** a run that has ended accepts no command, so an unresolved signal of a completed run cannot be waived; the web shows no command for it. Agent revocation is not offered. The candidate diff is shown as commits, not patch text. The per-module table is on the overview, not the execution map. No real browser has rendered the new page (build and Testing Library only).
+
+## Iteration 8 — Composition and acceptance
+
+**Starting commit:** `b7e5879` on `feat/plan12-check-findings` (iteration 7). **Contract:** unchanged. No schema, event, record path or protocol field changed; the one product change is a web style class (deviation 1).
+
+### Delivered
+
+- **Composed fixture** (`subs/harness/src/tests/helpers/check-findings-composition.ts`): one run of two work items, reviewed by code, scope and design readers on every accepted iteration (policy `concurrency: 2`, `queue: 12`, one retry). wi-001 (notes module) is clean. wi-002 (a tags module) has two iterations; the three readers of its second candidate overlap and raise four concerns: a high-risk defect (cf-0001), a low-risk simplification in the same file (cf-0002), a medium scope concern grounded in the module README (cf-0003) and a high design concern grounded in a principles document (cf-0004) that names the defect's behavior. Round 1 relates cf-0004 to cf-0001 as the same issue and cf-0002 as related but distinct, supersedes cf-0003, waives cf-0002 as a reported material choice and plans a correction. The correction is a later changed candidate: its acceptance claims the repair on its own tree, its code reader raises one more low-risk signal (cf-0005), and round 2 (floor `non-low`) fixes the pair and leaves cf-0005 unresolved `below-floor`. The candidates carry their own `module.ramify` files, so modules come from the candidate's tree. `reviewRun` gained a `roles` option for several work items, and its script builder is exported as `reviewScript`.
+- **`check-findings-composition.test.ts`**, four driven cases:
+  1. The composed run end to end: 12 requests over 4 candidates, coverage 12 of 12 complete, at most two readers at once, attention order in the basis, grouping, supersession, waiver with material choice, claim on the correction's line, both rounds forked, grounds bound to what the reader read, per-module filtering, and every gate's verdict its checks' own. It computes the measurements below.
+  2. **Crash sweep (CF06):** the composed log is cut before and after every review, reconciliation, CheckFinding-carrying and `work-item-completed` line (76 cuts). Each cut is a prefix of the log with every record copy deleted, which is what a crash leaves: the ledger writes whole lines only (iteration 2's fault sweep). For each cut, recovery calls no agent session, leaves the prefix unchanged, appends only recovery completions (the owed review requests, the unsettled attempts finished as not verified, the open brief append, session ends, `job-interrupted`), carries no CheckFinding event, holds every request, attempt, round and composition identity once, and replays the CheckFinding events. It leaves no request pending and owes three requests per accepted iteration. The CheckFinding list and every detail equal the child's pure selection over the replayed state, and every committed record is rematerialized byte for byte. A second restart changes nothing. Three named boundaries are asserted exactly: the gate-to-request crash of the correction, whose line also claims the repair, records `rq-0010`–`rq-0012`; a running reader's attempt is finished `execution-failed`; a committed assessment's brief is completed `session-lost` by the restart.
+  3. **Shutdown (CF07):** `close()` while two of wi-002's readers are live stops both and records no review result or CheckFinding. A reader that ignores its stop submits afterwards and is refused at the tool. The restart settles every attempt once, and no CheckFinding exists.
+  4. **Tightest policy (CF15):** one reader, a queue of one, one retry, one reconciliation round. Every candidate's third request overflows and never runs (3 of 9 not verified), and an invalid first review is retried once and completes. The only round is the last: its floor refuses the planned correction (`correction-floor`) and the fork leaves all three signals unresolved (`rounds-exhausted`, high, medium and low). The signals stay open and every gate passes on its own checks.
+- **Iteration gaps closed:**
+  - `failed` and `no-session` brief-append outcomes now have driven tests in `reconciliation.test.ts`. A failed append keeps the session, and the next architect input quotes the brief. A round after a lost session, with no architect turn between, records `no-session` and `parent: null`, and its decisions stand.
+  - An open scenario CheckFinding reaching reconciliation (`scenario-findings-run.test.ts`): the fork's waiver is refused `required-obligation`, the fork plans a repair, the correction's gate fixes it by check on a changed tree, and the next completion needs no round. The composition inventory cites the new tests.
+- **Real snapshot/process witness** (`check-findings-composition.integration.test.ts`): one work item over a real Git repository with code, scope and design readers on the real snapshot tools. A code concern and a design concern grounded in the committed principles document relate as one issue. The correction's commit claims both on its real tree, its reader reads the corrected limit from Git's objects, and round 2 fixes both. Request trees, report and decision sources, both bases, the claim and the ground's `sha256` are asserted against `git rev-parse`/`git show`. The agents are scripted; no model is called.
+- **Browser witness** (`npm run test:browser:check-findings`, `scripts/browser-acceptance/check-findings.ts`, served by `subs/harness/src/tests/helpers/serve-check-findings-fixture.ts`): a live scripted run on the real harness server with the built web client, driven in headless Chromium. It follows the Plan 11 pattern: a development and acceptance script, outside the Vitest suite. The run waits at a pending user decision. The browser reads the overview's per-module table and decision notice, then the work item's partial review coverage and nine requests. It reads the default and settled lists in attention order and the decision request with the plan text and its revision. Through the page's own forms it waives the deferred signal, revokes the local architect's waiver and answers the decision. It then sees the run complete, the answered signal settled by round 2, the reopened low signal unresolved `below-floor`, no command on the completed run, and the history with every actor and the attempt link. It also checks a narrow viewport and that the page raised no exception. The result is 22 checks, with 4 screenshots and `browser-results.json` in [`evidence/`](evidence/).
+- **Final-gate preparation:** [`audit/plan12-check-findings.request.json`](../../../audit/plan12-check-findings.request.json), derived from the Plan 11 request: the same five checks, a 600 s suite timeout, and `requestId`, `universeId` and `coverageClaim.change` set to `plan12-check-findings`, with metadata naming Plan 12. [`audit/README.md`](../../../audit/README.md) documents it.
+- **Measurement helper** (`helpers/check-findings-measurements.ts`): computes the measurements from a run's log alone.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| `npx vitest run subs/harness/src/tests/check-findings-composition.test.ts` | Pass, 4 tests (about 10 s, of which the 76-cut sweep is about 8.7 s) | Scripted agent, scripted gate Git and candidates, process guard; no process, no model. |
+| Negative control for the sweep | With `review-request-recorded` removed from the allowed recovery appends, the sweep failed at cut 24 (`recovery appended review-request-recorded`) | Restored. It shows the per-cut assertions run. |
+| `npx vitest run subs/harness/src/tests/check-findings-composition.integration.test.ts` | Pass, 1 test, about 29 s, run twice | Real Git (`gitService`, default `gitCandidateSource`), scripted agents, no model. |
+| `reconciliation.test.ts`, `scenario-findings-run.test.ts`, `composition.test.ts` with the composition file | Pass, 4 files, 27 tests | The two append-outcome cases and the scenario-reconciliation case are new. |
+| Focused batch: every harness test file starting `review-`, `reconciliation`, `check-findings`, `scenario-findings`, `composition`, `union`, `run-recovery`, `iterations`, `scenario-states`, `execution-map`, `run-projections`, `projections-pure`, `http`, `run-commands`, `protocol-contract`, `run-protocol`, `work-items`, `session-lifecycle`, `transcript-run`, `acceptance-trial`, `analysis-submission`, `run-policy`, `commit-recovery`, `late-writes`, `stop-before-start`, `writer-settlement`, `run-closing-order`, `single-session`, `fixture-trials` | Pass, 55 files passed and 1 skipped; 444 tests passed, 4 skipped | Explicit file paths. The skipped file and tests are the existing opt-in ones. |
+| The check-findings child's tests and all web tests | Pass, 22 files, 218 tests | Includes `check-findings.test.tsx` and `run-page.test.tsx` after the class rename. |
+| `npm run test:browser:check-findings` | Pass, 22 checks, 1440×900 and 480×800 | Headless Chromium (`/usr/bin/chromium`) against the real harness server and `dist/web`. The run is scripted, Git's answers and candidates are scripted, and no model is called. Negative control: with the old section class restored and rebuilt, the check "the work item's CheckFinding section is not painted as a failure" failed. |
+| `npm run type-check` in `ramify-agent/` | Pass | Harness (tests included), web, scripts and browser-acceptance scopes; the new browser script is type-checked. |
+| `npm run check:self` in `ramify-agent/` | Pass: 0 errors, 0 warnings, 277 analysis limits | 10 owners, 450 source files, 0 denied accesses; the same `signature-inferred` set as iteration 7. |
+| `npm run build:web` | Pass | Vite chunk-size advisory only. |
+| `git diff --check b7e5879` | Clean | |
+| Full suite (ramify-audit) | Not run by this iteration | The orchestrator runs `audit/plan12-check-findings.request.json` on the final commit; see "Final audit" below. |
+| Live-model trial | Not run: **live-model trial pending user approval** | See open gaps. |
+
+### Final diff inspection (`git diff 6da0086..b7e5879`, plus this iteration)
+
+- **Owners:** the diff touches the root, `harness`, the new `harness/check-findings` child, and `evidence`, `ledger`, `scenarios`, `agent/pi` and `web`, each in its own files. Every cross-owner import names a symbol the owner exposes; `check:self` reports 0 denied accesses. The web imports only the harness's `src/interfaces/protocol/*` through the root's re-exposure. The child imports only `zod` and its own files; only its `purity.test.ts` touches `node:fs`. The ledger's new `nodeFileSystem` exposure is used by harness tests only. This iteration changed only tests, test helpers, one web class, scripts, the audit request and documents.
+- **No parallel CheckFinding store:** no source writes CheckFinding, review or reconciliation state outside the ledger. Requests, orientations, attempts, submissions, bases and assessments go through `commitRecord` or a transaction's `records`, and CheckFinding records through the transition. `check-findings/state.ts` is a cache keyed by ledger sequence and replayed from carriers, and `reviews/state.ts` derives from events. The scheduler's `parked` set and the `orienting` map only coordinate the current process. The crash sweep confirms that list, detail and coverage are rebuilt from the log alone. The web holds only toggles and form input and sends typed commands the summary names.
+- **Gates:** the gate verdict and `next` are computed before any CheckFinding state is read (`executePreparedGate`, `gateAttempted`), and a refused CheckFinding part commits the gate unchanged. `awaitUserDecisions` holds a work item's completion while a decision is pending; that is workflow, not a verdict. Every driven run of this iteration asserts every gate's verdict.
+- **Noted, not a violation:** the hand-run probe `probes/pi-fork.probe.ts` lives in the harness's ordinary `src/` and uses `child_process`; it is excluded from Vitest by name.
+
+### Measurements
+
+Source: the working tree at `b7e5879` plus this iteration's changes; no harness source affecting these runs changed. Times are the log's own timestamps from scripted runs on this machine. They measure the harness's and the fake's overhead, never a model's.
+
+| Measure | Composed run (default trial policy shape) | Tightest policy |
+| --- | --- | --- |
+| Captured policy | `review-policy/1`: kinds code, scope, design; concurrency 2; queue 12; retries 1; `attemptMs` 60 000; `settleMs` 60 000; `maxConcerns` 20. Limits: `reconciliationRoundsPerWorkItem` 3, `laterRoundMinimumRisk` medium, `repairRoundsPerWorkItemGate` 3, `repairRoundsPerIteration` 3 | Same kinds; concurrency 1; queue 1; retries 1; `reconciliationRoundsPerWorkItem` 1 |
+| Review requests / attempts / retries | 12 / 12 / 0 | 9 / 10 / 1 |
+| Coverage (of requests) | 12 complete, 0 partial, 0 not verified | 6 complete, 0 partial, 3 not verified (all `queue-overflow`) |
+| Queue delay, first attempts (ms) | n 12: min 10, median 15, max 72 | n 6: min 9, median 10, max 38 |
+| Review duration (ms) | n 12: min 5, median 11, max 29 | n 7: min 4, median 6, max 13 |
+| Start modes (requested→actual) | fresh→fresh 4 (code), fork→fork 8 (scope, design); 2 orientations, both oriented | fresh→fresh 4, fork→fork 3; no orientation (every design request overflowed) |
+| Work-item completion tail, first completion request to `work-item-completed` (ms) | wi-001 31 (settle 27); wi-002 231 (settle 3), including one correction iteration | wi-001 13; wi-002 31 |
+| Retained CheckFindings (reports, decisions) | 5 (5, 8) | 3 (3, 0) |
+| Signals by risk | high 2, medium 1, low 2 (of 5) | high 1, medium 1, low 1 (of 3) |
+| Signals by credibility | ungrounded 3, agent-generated 1, human-reviewed 1 (of 5) | ungrounded 2, agent-generated 1 (of 3) |
+| Standing at the end | fixed by assessment 2, waived 1, superseded 1, open 1 (of 5) | open 3 (of 3) |
+| Waivers by actor | local architect 1 (of 1) | none |
+| Unresolved at completion, with risk | cf-0005 `below-floor`, low (1 of 5) | cf-0001 high, cf-0003 medium, cf-0002 low, all `rounds-exhausted` (3 of 3) |
+| Correction rounds (rounds / corrections) | wi-001 0 / 0; wi-002 2 / 1 | wi-001 0 / 0; wi-002 1 / 0 |
+| Human decisions | 0 requested, 0 answered, 0 user waivers, 0 revocations | none |
+| Browser witness run (separate fixture) | 1 decision requested and answered by a person, 1 user waiver, 1 user revocation, over 3 signals and 9 requests (8 complete, 1 partial) | |
+| Review tokens and warm-up (orientation) cost | Not measured: the log holds no token usage, and the scripted fake reports none (`usage: null`). Any count from these runs would be a fake. | |
+| Fork against fresh | No savings claim. No matched pair of actual modes with equivalent inputs was recorded, and scripted forks cost nothing. The only real datum remains iteration 4's pi probe: parent 315 tokens, fork 1,964 tokens, 2,279 in all, one short turn each, not a matched comparison. | |
+
+These are harness-overhead figures; they cannot revise the concurrency or deadline policy. That needs the live-model trial.
+
+### Deviations
+
+1. **A web defect found by the browser and fixed.** Iteration 7's work-item section used the class `check-findings`, which the transcript's hook-check badge already styles as a failure (`styles.css`: red background and text). In a real browser the whole Reviews and CheckFindings section was painted as a failure, which Testing Library could not see. The section's class is now `work-item-check-findings`. The browser witness asserts it, with the negative control above.
+2. **Crash points as log prefixes.** The plan asks for crashes injected at each ledger boundary. The run service's `RunWrite` hooks name no review, reconciliation or carrier boundary, and adding them would need new recovery-table rows for the whole service (iteration 2, deviation 4). The sweep instead places a crash before and after every such line as the prefix a crash leaves, with every record copy deleted. Live freezes at existing boundaries remain in iterations 2, 3, 5 and 6, and the shutdown case here is live.
+3. **The live-model trial was not run**, as instructed: a real session needs the user's approval.
+4. **Shared test scaffolding:** `reviewRun` gained `roles`, and its script builder `reviewScript` is exported. `scenario-findings-run.test.ts`'s `run` answers reconciliation forks from their own scripts. No existing assertion changed.
+5. **The browser run is a script, not a Vitest file,** as Plan 11's is. It writes `evidence/` and is not part of the audited suite.
+
+### Acceptance matrix (CF01–CF17)
+
+| Case | Status | Evidence |
+| --- | --- | --- |
+| CF01 | Met | Pure: `identity.test.ts` (iteration 1). Ledger: `check-findings-ledger.test.ts` "CF01" (5 concurrent transitions, 1 committed), conflict and ambiguous cases; `check-findings-run.test.ts` concurrent `recordCheckFindings` (iteration 2). |
+| CF02 | Met | Judgment superseded with no code change: `reconciliation.test.ts` "parallel reports …" and the composed run (cf-0003). Factual failure needs its own witness: `scenario-findings.test.ts`, and here `scenario-findings-run.test.ts` "an open scenario CheckFinding reaches the work item's reconciliation" (waiver refused `required-obligation`, fixed only by the correction's check). |
+| CF03 | Met | `reconciliation.test.ts` "parallel reports …" (iteration 5). Composed run: cf-0001/cf-0004 grouped with rationale, both IDs kept; same-file cf-0002 related but distinct and ungrouped. Real Git witness: two concerns grouped over real trees. |
+| CF04 | Met | `review-attempts.test.ts`, `review-lifecycle.test.ts`, `review-tools.test.ts` (iteration 3); `review-questions.test.ts`, `review-scheduling.test.ts` (iteration 4). Composition: tightest policy (overflowed, invalid-then-retried); crash sweep (execution-failed, stopped); browser shows partial coverage distinct from clean. |
+| CF05 | Met | `review-attempts.test.ts` CF05, `review-tools.test.ts`, `review-snapshot.integration.test.ts` (iteration 3); pi `fork-isolation.test.ts` and the iteration 4 probe. Here: composed run (two readers overlap, never more than two), real Git witness (readers read Git's objects of each audited commit). |
+| CF06 | Met (scripted; crash points modeled as log prefixes, deviation 2) | Iterations 2–3 live crashes and record-loss cases; here the 76-cut sweep over the composed log with exactly-once identities, replay, byte-for-byte rematerialization, projections equal to pure replay, and an idempotent second restart. |
+| CF07 | Met | `review-lifecycle.test.ts` CF07 stop and settlement bound (iteration 3). Here: the composed shutdown case (both live readers stopped, nothing recorded, the late submission refused, the restart settles once). |
+| CF08 | Met | `reconciliation.test.ts` "clean reviews …" (iteration 5); composed wi-001 (three clean reviews, no reconciliation, no assessment call). |
+| CF09 | Met | `reconciliation.test.ts` CF09 case and `reconciliation-submission.test.ts` basis cases (iteration 5). Not re-driven here. |
+| CF10 | Met | Missing fork point: `reconciliation.test.ts` CF10 (iteration 5), `review-questions.test.ts` (iteration 4). Parent append: `session-lost` and crash-around-append (iteration 5); here `failed` and `no-session` driven, and the sweep's open-brief recovery. |
+| CF11 | Met | Iterations 1, 2 and 5. Here: composed run (repair intent, `corrects`, claim on the correction's line, open until round 2 fixes it), the real Git witness (claim on the real tree), and the sweep's cut after the claiming line. |
+| CF12 | Met | `reconciliation.test.ts` CF12 (iteration 5, answered by typed command in 7); `check-findings-commands.test.ts` (waiver passes no gate). Browser: the person answers the conflict with its exact plan text and revision through the page, and routine concerns in the composed run settle with no person (0 human decisions). |
+| CF13 | Met | `decide.test.ts` (iteration 1); `scenario-findings.test.ts`, `scenario-findings-run.test.ts` (iteration 6); here the correction's same-scenario pass fixes after reconciliation. |
+| CF14 | Met | Wire and Testing Library (iteration 7). Here the real browser shows reason and standing, history with actors and attempt links, review coverage (partial never shown as clean), the material choice, total counts, the decision request, waiver and revocation. |
+| CF15 | Met (scripted) | Iterations 4–5 unit and driven cases. Here: the tightest-policy composition (overflow, one retry, last-round floor, `rounds-exhausted` with risk, gates unchanged) and the composed run's `below-floor`. Not measured against a model. |
+| CF16 | Met | Iterations 4b, 5 and 7. Here, in the browser: a person's waiver with the person as actor; the revocation of the local architect's waiver reopens the signal and history keeps it. Scenario waiver refused (`required-obligation`). |
+| CF17 | Met | Iterations 4b and 7. Composed run: risk from readers, credibility and modules bound by the harness from the candidate's tree, the basis in attention order, module filter. Browser: attention order; the low unresolved signal carries no latest-review marker (the marked non-low case is iteration 7's). |
+
+### v1 completion statement
+
+**Supported producer coverage.** Three review questions (code, scope and design) run on every accepted engineer iteration's audited candidate. Each is a bounded, read-only reader on the candidate's snapshot, and its concerns become CheckFindings with a reviewer-proposed risk and a harness-bound credibility and modules. One factual producer, `check:scenario`, covers a tracked scenario of a committing work-item gate attempt that executed it (`iteration`, `contract`, `breaking-iteration`, `work-item`). It promotes a failure on a repeated failure of the same work item and verifies with a same-scenario pass on a changed audited tree at obligation revision 1.
+
+**Left on ordinary gate attempts.** The following stay on their gate attempts with their gate's own verdict and are not CheckFindings:
+- a first scenario failure;
+- inconclusive observations;
+- dry runs;
+- the project's own untracked scenarios, which are counted only;
+- readiness and final gates;
+- a scenario check that selected nothing;
+- every other command: tests, type check, Ramify check, harness rules and guarded changes.
+
+Contract iterations are not reviewed.
+
+**Explicit deferrals (outside v1, unchanged):**
+- a new gate engine;
+- generic test-identity inference;
+- a general focused flaky-test runner (`intermittent` arises only from repeated gates on one tree);
+- sealed-file edit hooks;
+- initial-plan review;
+- independent work-item gap review;
+- cumulative and final reviews;
+- peer-review policy;
+- cross-run backlog scheduling;
+- delivery and merge decisions;
+- evaluation of revisit conditions (`due` is always empty);
+- the execution map's per-module badge;
+- whether waivers reach across runs (a completed run accepts no command).
+
+These go to the follow-up plan.
+
+### Handoff and open gaps
+
+- **Live-model trial pending user approval.** No real pi session has run with `reviewer/3` or `local-architect/3`, so the policy values, queue delay, completion tail, orientation and review token cost, and any fork-against-fresh comparison are unmeasured against a model. The trial would be run from `ramify-agent/`, after the user approves the cost:
+  ```sh
+  npm run real-session -- --model openai-codex/gpt-5.6-luna
+  ```
+  That prepares a copy of the fixture and runs one implementation run with the default `run-policy/3`, which captures code, scope and design reviews. Its log can be measured with `compositionMeasurements` (`subs/harness/src/tests/helpers/check-findings-measurements.ts`). A fork saving needs a matched fresh run of the same inputs.
+- **Browser observations, not fixed:**
+  - The deferral and waiver lines print a doubled period when a rationale ends with one ("source.. Revisit").
+  - The review table's candidate column cuts IDs at 10 characters (`revision-0`).
+  - The run page's column uses about 600 px of a 1440 px viewport.
+- **Unchanged from earlier iterations:**
+  - Waiting for a user decision has no bound beyond a stop.
+  - No harness path revises a scenario obligation.
+  - Agent revocation is not offered.
+  - The candidate diff is shown as commits, not patch text.
+  - The credibility classifier trusts `plans/<planId>/` as human-reviewed.
+
+### Final audit
+
+_Placeholder for the orchestrator: the result of `ramify-agent/node_modules/.bin/ramify-audit audit --request ramify-agent/audit/plan12-check-findings.request.json --cwd . --json` on the final Plan 12 commit (overall verdict, per-check results, suite counts, duration, run ref and Git note). Not run by iteration 8._

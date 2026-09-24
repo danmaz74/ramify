@@ -12,6 +12,18 @@ ramify-agent/node_modules/.bin/ramify-audit audit \
   --cwd . --json
 ```
 
+Plan 12's CheckFindings and iteration reviews use
+[`plan12-check-findings.request.json`](plan12-check-findings.request.json).
+It is derived from the Plan 11 request: the same five checks and the same
+600-second suite timeout, with the claim bound to `plan12-check-findings`.
+From the clean final Plan 12 commit, invoke it with:
+
+```sh
+ramify-agent/node_modules/.bin/ramify-audit audit \
+  --request ramify-agent/audit/plan12-check-findings.request.json \
+  --cwd . --json
+```
+
 The request below remains the recorded Plan 8 claim.
 
 [`ramify-agent-suite.request.json`](ramify-agent-suite.request.json) is the

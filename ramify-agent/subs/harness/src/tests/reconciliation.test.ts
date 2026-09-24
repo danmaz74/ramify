@@ -580,6 +580,100 @@ describe('CF10: a missing fork point and a failed brief append', () => {
   }, 60_000);
 });
 
+describe('CF10: the brief append outcomes that land nothing', () => {
+  test('an append the executor fails is recorded as failed, the session is kept, and the next architect input carries the brief from the log', async () => {
+    const root = await reviewTarget(cleanups);
+    const run = await reviewRun(root, cleanups, {
+      ...correctionScenario,
+      agentReady: agent => {
+        const append = agent.appendContext.bind(agent);
+        agent.appendContext = async (ref, key, text) => {
+          if (key === 'brief:wi-001.rc01') throw new Error('the executor refused the append');
+          return append(ref, key, text);
+        };
+      },
+    });
+    const { service, runId, events, agent } = run;
+    expect(onlyRun(service, plan).state).toBe('completed');
+    const appended = eventsOf(events, 'reconciliation-brief-appended');
+    expect(appended.map(event => event.data)).toEqual([
+      { reconciliation: 'wi-001.rc01', session: expect.any(String), ref: null, outcome: 'failed', reason: 'the executor refused the append' },
+      { reconciliation: 'wi-001.rc02', session: appended[0]!.data.session, ref: expect.any(String), outcome: 'appended', reason: null },
+    ]);
+    // Unlike a lost session, a failed append keeps it: the correction turn
+    // continues it, and its input quotes the brief from the log.
+    expect(eventsOf(events, 'session-finished').some(event => event.data.session === appended[0]!.data.session && event.data.reason === 'lost')).toBe(false);
+    const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
+    expect(parentTurns[4]!.spec.session.mode).toBe('continue');
+    expect(parentTurns[4]!.inherited.some(text => text.includes('Reconciliation wi-001.rc01'))).toBe(false);
+    expect(parentTurns[4]!.spec.prompt).toContain('could not be appended to your session (failed: the executor refused the append)');
+    expect(parentTurns[4]!.spec.prompt).toContain('> Reconciliation wi-001.rc01 (round 1)');
+    expect(listOf(service, runId)[0]).toMatchObject({ id: 'cf-0001', standing: 'closed', reason: 'fixed-by-assessment' });
+  }, 60_000);
+
+  test('a round after the architect\'s session was lost has no session to append to, and records no-session', async () => {
+    const root = await reviewTarget(cleanups);
+    const options = [
+      { id: 'one-note', summary: 'Keep one note per review run', consequence: 'The plan stands.' },
+      { id: 'many-notes', summary: 'Allow several notes', consequence: 'The plan changes.' },
+    ];
+    const run = await reviewRun(root, cleanups, {
+      detached: true,
+      engineer: engineers.slice(0, 3),
+      reviewers: {
+        'rq-0001': review(changed[1], [concern(store, 'A review run should keep several notes', 'high')]),
+        'rq-0002': review(changed[2]),
+        'rq-0003': review(changed[3]),
+      },
+      agentReady: agent => {
+        const start = agent.startSession.bind(agent);
+        // The architect's session is lost before the first reconciliation forks it.
+        agent.startSession = spec => {
+          if (spec.prompt.startsWith('# Reconciliation wi-001.rc01') && spec.session.mode === 'fork') agent.forget(spec.session.from);
+          return start(spec);
+        };
+      },
+      reconcilers: {
+        'wi-001.rc01': reconcile(submission([
+          disposition('cf-0001', { action: 'request-user-decision', conflicts: [{ document: 'plan', text: 'A note belongs to exactly one review run.' }], options }),
+        ], { kind: 'await-user' })),
+        'wi-001.rc02': reconcile(submission([disposition('cf-0001', { action: 'waive', uncertainty: 'None: the user chose.' })], { kind: 'complete' })),
+      },
+    });
+    cleanups.push(() => run.service.close());
+    const { service, runId } = run;
+    const pending = () => {
+      const detail = service.checkFindings(plan, runId, { kind: 'detail', checkFinding: 'cf-0001' });
+      return detail?.ok === true && detail.view.kind === 'detail' && detail.view.summary.pendingUserDecision !== null ? detail.view.summary : undefined;
+    };
+    await until(() => pending() !== undefined);
+    const waiting = pending()!;
+    const answer = (expectedVersion: number) => service.execute({
+      commandId: `answer-${expectedVersion}`, expectedVersion, type: 'respond-to-check-finding',
+      payload: { planId: plan, jobId: runId, checkFinding: 'cf-0001', expectedRevision: waiting.revision, request: waiting.pendingUserDecision!, option: 'one-note', responder: 'reviewer' },
+    });
+    await answer(service.getRun(plan, runId)!.version).catch((error: unknown) => {
+      if (error instanceof CommandRejection && error.code === 'stale-version' && error.currentVersion !== undefined) return answer(error.currentVersion);
+      throw error;
+    });
+    await service.settled(plan, runId);
+    const events = await runEventsOnDisk(root, plan, runId);
+    expect(onlyRun(service, plan).state).toBe('completed');
+    // Round 1's append found the session lost and finished it; round 2 came
+    // straight after the answer, with no architect turn to start another.
+    expect(eventsOf(events, 'reconciliation-brief-appended').map(event => [event.data.reconciliation, event.data.outcome, event.data.session])).toEqual([
+      ['wi-001.rc01', 'session-lost', expect.any(String)],
+      ['wi-001.rc02', 'no-session', null],
+    ]);
+    expect(eventsOf(events, 'reconciliation-brief-appended')[1]!.data.reason).toContain('was not kept');
+    const record = await committed<ReconciliationAssessment>(root, runId, reconciliationLayout.assessment('wi-001.rc02'));
+    expect(record).toMatchObject({ parent: null, next: 'complete' });
+    // The decisions were committed all the same, and the gate completed the work item.
+    expect(listOf(service, runId)[0]).toMatchObject({ id: 'cf-0001', standing: 'closed', reason: 'waived' });
+    expect(eventsOf(events, 'work-item-completed')[0]!.data.unresolved).toBeUndefined();
+  }, 60_000);
+});
+
 /** A service opened over the crashed project, with the agent that held the architect's session. */
 async function restart(root: string, agent: ScriptedAgent) {
   const restarted = await openRuns(root, {

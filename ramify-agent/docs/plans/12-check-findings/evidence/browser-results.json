@@ -1,0 +1,43 @@
+{
+  "chromium": "/usr/bin/chromium",
+  "viewports": [
+    "1440x900",
+    "480x800"
+  ],
+  "checks": [
+    "the overview lists the notes module with its unsettled CheckFindings",
+    "the overview says a decision is requested of the person",
+    "review coverage is partial, never clean, with its counts",
+    "the work item's CheckFinding section is not painted as a failure",
+    "nine review requests, three questions per candidate",
+    "the partial scope review names what it did not inspect",
+    "a concern-raising review is complete with its concern",
+    "by default: the open signal and the reported material choice, not the deferral",
+    "the decision request quotes the conflicting plan text with its revision",
+    "a risk level is a badge, not a decision request",
+    "the material choice and the agent's waiver are separate elements",
+    "the settled toggle shows the deferral with its revisit condition",
+    "the list is in attention order: high, medium, low",
+    "the person's waiver is recorded with the person as its actor",
+    "the revoked waiver opens the signal again, and the history keeps it",
+    "the answered decision is settled by the next round under the person's choice",
+    "the reopened low-risk signal is left unresolved below the floor, without the latest-review marker",
+    "a completed run offers no command",
+    "the history shows the report, the request, the person's answer and the waiver with their actors",
+    "the report names its review attempt, request, iteration and candidate diff, and links the reader's session",
+    "narrow 480x800: the cards fit the viewport",
+    "no browser exceptions"
+  ],
+  "screenshots": [
+    "overview-1440x900.png",
+    "work-item-waiting-1440x900.png",
+    "work-item-completed-1440x900.png",
+    "work-item-narrow-480x800.png"
+  ],
+  "failure": null,
+  "fixture": {
+    "planId": "review-notes",
+    "runId": "20260924T190442Z-daa881",
+    "source": "one live run of scripted agents, scripted Git answers and scripted candidates, served by the real harness server with the built web client; commands sent through the page's own forms"
+  }
+}

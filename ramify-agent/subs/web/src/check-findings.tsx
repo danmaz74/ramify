@@ -130,7 +130,7 @@ export function WorkItemCheckFindings({ onOpenGate, ...scope }: Scope & { readon
   const { client, planId, runId, version, workItem } = scope;
   const reviews = useRunQuery(`reviews:${runId}:${workItem}`, version, () => client.getReviews(planId, runId, workItem));
   return (
-    <section className="check-findings" aria-label={`CheckFindings of ${workItem}`}>
+    <section className="work-item-check-findings" aria-label={`CheckFindings of ${workItem}`}>
       <h3>Reviews</h3>
       {reviews.status === 'loading' && <p className="muted">Loading the reviews…</p>}
       {reviews.status === 'failed' && <p className="failure" role="alert">Could not load the reviews: {reviews.error.message}</p>}

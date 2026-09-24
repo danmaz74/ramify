@@ -390,6 +390,8 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[reconciliation-refused].data.stage', values: ['assessment', 'completion'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
   { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['defer'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
   { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['session-lost'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a fork point that no longer exists starts fresh with the whole packet, and a brief that cannot be appended reaches the next architect input from the log' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['failed'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'an append the executor fails is recorded as failed, the session is kept, and the next architect input carries the brief from the log' },
+  { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['no-session'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a round after the architect\'s session was lost has no session to append to, and records no-session' },
   { union: 'record ramify-agent.reconciliation-assessment/1.actualStart', values: ['fresh'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a fork point that no longer exists starts fresh with the whole packet, and a brief that cannot be appended reaches the next architect input from the log' },
   { union: 'run log[reconciliation-brief-appended].data.outcome', values: ['already-present'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a crash after the parent append is recovered once from the committed assessment, and the repair keeps its intent' },
   { union: 'record ramify-agent.reconciliation-basis/1.requests[].result', values: ['not-verified'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a reader still running at the deadline is fenced and stopped, the queue stays open, and the correction\'s review still runs' },
@@ -661,10 +663,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.iteration-assignment/1.gate.checkpoint', values: ['readiness', 'work-item', 'final'],
     reason: 'An assignment\'s checkpoint is derived from its kind and is iteration, contract or breaking-iteration; the field shares the checkpoint vocabulary of GateAttempt, where these three are produced.',
-  },
-  {
-    union: 'run log[reconciliation-brief-appended].data.outcome', values: ['failed', 'no-session'],
-    reason: 'An append that throws is recorded as failed, and the scripted agent\'s appendContext answers without throwing; the local architect\'s session is kept after every request-completion, so a reconciliation always has one to append to or finds it lost (session-lost).',
   },
   {
     union: 'record ramify-agent.reconciliation-basis/1.requests[].result', values: ['partial'],
