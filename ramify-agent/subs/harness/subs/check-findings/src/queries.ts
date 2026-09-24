@@ -5,15 +5,18 @@ import {
   type CheckFindingQueryInput, type CheckFindingReason, type CheckFindingSelection, type CheckFindingStanding,
   type CheckFindingState, type CheckFindingSummary,
 } from './interfaces/check-findings.js';
-import { compareIds, sameOwner } from './identity.js';
+import { compareIds, idNumber, sameOwner } from './identity.js';
 import { currentRelations, sameIssueGroups } from './groups.js';
+import { credibilityRank, riskRank } from './signals.js';
 
 /*
  * Queries: bounded lists and one CheckFinding's detail, derived from the
  * replayed state alone. `attention` selects what a decision boundary must
  * consider: every open CheckFinding and every deferred one whose revisit the
  * harness found due. This module never evaluates a revisit condition or a
- * run phase; the caller supplies the due IDs.
+ * run phase; the caller supplies the due IDs. The attention order puts what
+ * is worth most attention first: the highest risk, then the most credible
+ * signal, then the most recent report.
  */
 
 /** Selects a bounded list or one CheckFinding's detail. */
@@ -32,15 +35,19 @@ function list(state: CheckFindingState, groups: readonly CheckFindingGroup[], qu
   const unknown = query.due.find(id => !state.findings.has(id));
   if (unknown !== undefined) return { ok: false, rejection: { code: 'unknown-check-finding', message: `due names ${unknown}, which is no CheckFinding` } };
   const due = new Set(query.due);
+  const order = query.order === 'attention' ? byAttention : byId;
   const owned = [...state.findings.values()]
     .filter(entry => query.owner === null || sameOwner(entry.owner, query.owner))
-    .sort((a, b) => compareIds(a.id, b.id));
+    .filter(entry => query.module === null || entry.modules.includes(query.module))
+    .sort(order);
   const selected = owned.filter(entry => {
     if (query.select === 'attention') return attentionOf(entry, due) !== null;
     return query.standings === null || query.standings.includes(entry.standing);
   });
-  const after = query.after;
-  const remaining = after === null ? selected : selected.filter(entry => compareIds(entry.id, after) > 0);
+  const remaining = continuing(state, selected, query.after, order);
+  if (remaining === undefined) {
+    return { ok: false, rejection: { code: 'unknown-check-finding', message: `after names ${query.after}, which is no CheckFinding` } };
+  }
   const page = remaining.slice(0, query.limit);
   const last = page.at(-1);
   return {
@@ -76,6 +83,41 @@ function detail(state: CheckFindingState, groups: readonly CheckFindingGroup[], 
   };
 }
 
+/**
+ * The selection after the cursor. The cursor is a position in the order, so a
+ * page continues after it even when the CheckFinding it names has left the
+ * selection since. In ID order any ID is a position; in attention order the
+ * CheckFinding must exist.
+ */
+function continuing(
+  state: CheckFindingState,
+  selected: readonly CheckFindingEntry[],
+  after: CheckFindingId | null,
+  order: (a: CheckFindingEntry, b: CheckFindingEntry) => number,
+): readonly CheckFindingEntry[] | undefined {
+  if (after === null) return selected;
+  const cursor = state.findings.get(after);
+  if (cursor === undefined) return order === byId ? selected.filter(entry => compareIds(entry.id, after) > 0) : undefined;
+  return selected.filter(entry => order(entry, cursor) > 0);
+}
+
+function byId(a: CheckFindingEntry, b: CheckFindingEntry): number {
+  return compareIds(a.id, b.id);
+}
+
+/** Highest risk first, then the most credible, then the most recent report, then ID. */
+function byAttention(a: CheckFindingEntry, b: CheckFindingEntry): number {
+  return riskRank(a.risk) - riskRank(b.risk)
+    || credibilityRank(a.credibility) - credibilityRank(b.credibility)
+    || latestReport(b) - latestReport(a)
+    || compareIds(a.id, b.id);
+}
+
+function latestReport(entry: CheckFindingEntry): number {
+  const latest = entry.reports.at(-1);
+  return latest === undefined ? 0 : idNumber(latest.id);
+}
+
 function attentionOf(entry: CheckFindingEntry, due: ReadonlySet<CheckFindingId>): 'open' | 'due' | null {
   if (entry.standing === 'open') return 'open';
   if (entry.standing === 'deferred' && due.has(entry.id)) return 'due';
@@ -107,6 +149,9 @@ function summaryOf(entry: CheckFindingEntry, groups: readonly CheckFindingGroup[
     verification: entry.verification,
     producers,
     title: first.observation.summary,
+    risk: entry.risk,
+    credibility: entry.credibility,
+    modules: entry.modules,
     latestSource: latest.source,
     reports: entry.reports.length,
     decisions: entry.decisions.length,
@@ -117,10 +162,10 @@ function summaryOf(entry: CheckFindingEntry, groups: readonly CheckFindingGroup[
   };
 }
 
-/** The latest decision reported as a material choice since the CheckFinding was last reopened. */
+/** The latest decision reported as a material choice since the CheckFinding was last reopened or its waiver revoked. */
 function materialChoiceOf(entry: CheckFindingEntry): CheckFindingMaterialChoice | null {
   for (const decision of [...entry.decisions].reverse()) {
-    if (decision.decision.action === 'reopen') return null;
+    if (decision.decision.action === 'reopen' || decision.decision.action === 'revoke-waiver') return null;
     if (decision.communication.mode === 'report') {
       const { choice, uncertainty, reason } = decision.communication;
       return { decision: decision.id, action: decision.decision.action, choice, uncertainty, reason };

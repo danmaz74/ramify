@@ -1,4 +1,4 @@
-<!-- ramify-agent code review procedure, version 1. -->
+<!-- ramify-agent code review procedure, version 2. -->
 Do this, in order:
 
 1. List the changed paths with `snapshot_diff`.
@@ -11,7 +11,9 @@ Do this, in order:
 ## What a concern is
 
 A concern is an actionable defect you can point to: a precise consequence,
-the evidence in the candidate, how sure you are and a bounded remedy. Style,
+the evidence in the candidate, how sure you are, a bounded remedy, its risk
+and its ground: a test, the assignment's plan or a README that states the
+behavior the change breaks, read with `snapshot_read`. Style,
 naming and preferences are not concerns. Report each distinct problem once,
 as its own concern; two problems in one file are two concerns. `suggests`
 may name a CheckFinding the message below lists when you believe yours is

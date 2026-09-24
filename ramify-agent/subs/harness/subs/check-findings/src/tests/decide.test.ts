@@ -24,7 +24,7 @@ function claimed(): CheckFindingState {
 
 const verify = (revision: number, overrides: Partial<CheckFindingWitness> & { source: CheckFindingSource }, candidate = tree('t-04')) =>
   dispose('cf-0001', revision, decision(
-    { action: 'verify-by-check', candidate, witness: witness(overrides) },
+    { action: 'fix-by-check', candidate, witness: witness(overrides) },
     { actor: { kind: 'harness', reason: 'gate passed' }, source: candidate },
   ));
 
@@ -85,15 +85,15 @@ describe('judgments', () => {
   it('refuses a judgment that would supersede a factual obligation', () => {
     const state = commitAll([report(failed)]);
     expect(refusal(state, dispose('cf-0001', 1, decision({ action: 'supersede', reassessed: ['cfr-0001'], replacement: 'flaky' })))).toBe('factual-obligation');
-    expect(refusal(state, dispose('cf-0001', 1, decision({ action: 'verify-by-assessment', reassessed: ['cfr-0001'] })))).toBe('verification-kind-mismatch');
+    expect(refusal(state, dispose('cf-0001', 1, decision({ action: 'fix-by-assessment', reassessed: ['cfr-0001'] })))).toBe('verification-kind-mismatch');
   });
 
   it('keeps a claimed repair of a judgment open until a fresh assessment verifies it', () => {
     let state = commitAll([report(judged)]);
     state = commit(state, dispose('cf-0001', 1, decision({ action: 'claim-repair', candidate: tree('t-04'), change: 'wi-001.i04' })));
     expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'open', reason: 'repair-claimed' });
-    state = commit(state, dispose('cf-0001', 2, decision({ action: 'verify-by-assessment', reassessed: ['cfr-0001'] })));
-    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'verified-by-assessment' });
+    state = commit(state, dispose('cf-0001', 2, decision({ action: 'fix-by-assessment', reassessed: ['cfr-0001'] })));
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'fixed-by-assessment' });
   });
 });
 
@@ -105,7 +105,7 @@ describe('factual verification', () => {
 
   it('verifies with a complete pass of the same obligation on the acceptance candidate', () => {
     const state = commit(claimed(), verify(3, { source: tree('t-04') }));
-    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'verified-by-check', settledBy: 'cfd-0003' });
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'fixed-by-check', settledBy: 'cfd-0003' });
   });
 
   it('refuses every witness that is not the same obligation passing on the candidate', () => {
@@ -130,7 +130,7 @@ describe('factual verification', () => {
 
   it('refuses a check witness for a judgment', () => {
     const state = commitAll([report(judged)]);
-    expect(refusal(state, dispose('cf-0001', 1, decision({ action: 'verify-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) }))))
+    expect(refusal(state, dispose('cf-0001', 1, decision({ action: 'fix-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) }))))
       .toBe('verification-kind-mismatch');
   });
 
@@ -148,37 +148,92 @@ describe('factual verification', () => {
     expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'open', reason: 'obligation-revised' });
     expect(refusal(state, verify(4, { source: tree('t-04') }))).toBe('obligation-changed');
     state = commit(state, verify(4, { source: tree('t-04'), obligation: { subject: 'scenario:sc-004', revision: 2 } }));
-    expect(state.findings.get('cf-0001')?.decisions.map(held => held.decision.action)).toEqual(['plan-repair', 'claim-repair', 'revise-obligation', 'verify-by-check']);
+    expect(state.findings.get('cf-0001')?.decisions.map(held => held.decision.action)).toEqual(['plan-repair', 'claim-repair', 'revise-obligation', 'fix-by-check']);
   });
 
-  it('refuses to accept or defer a required obligation, and permits it for one that is not required', () => {
+  it('refuses to waive or defer a required obligation, and permits it for one that is not required', () => {
     const required = commitAll([report(failed)]);
-    const accept = decision({ action: 'accept', authority, uncertainty: 'low' });
+    const waive = decision({ action: 'waive', authority, acceptedRisk: 'high', uncertainty: 'low' });
     const defer = decision({ action: 'defer', authority, responsible: workItem('wi-001'), revisit: { kind: 'follow-up', ref: 'plan-13' } });
-    expect(refusal(required, dispose('cf-0001', 1, accept))).toBe('required-obligation');
+    expect(refusal(required, dispose('cf-0001', 1, waive))).toBe('required-obligation');
     expect(refusal(required, dispose('cf-0001', 1, defer))).toBe('required-obligation');
+    // Not even the user waives a required check here; its gate decides it.
+    expect(refusal(required, dispose('cf-0001', 1, { ...waive, actor: { kind: 'user', name: 'dan' } }))).toBe('required-obligation');
     const optional = commitAll([report(failure({ attempt: 'ga-0005', source: tree('t-02'), hash: 5, required: false }))]);
-    expect(refusal(optional, dispose('cf-0001', 1, accept))).toBeNull();
+    expect(refusal(optional, dispose('cf-0001', 1, waive))).toBeNull();
     expect(refusal(optional, dispose('cf-0001', 1, defer))).toBeNull();
+  });
+});
+
+describe('waivers', () => {
+  const waive = decision({ action: 'waive', authority, acceptedRisk: 'medium', uncertainty: 'the rounding helper may drift' });
+
+  it('closes as waived with the actor, the accepted risk and the reason, and refuses a reopening', () => {
+    let state = commitAll([report(judged)]);
+    state = commit(state, dispose('cf-0001', 1, waive));
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'waived', settledBy: 'cfd-0001', revision: 2 });
+    expect(state.findings.get('cf-0001')?.decisions[0]).toMatchObject({ actor: { role: 'local-architect' }, decision: { acceptedRisk: 'medium' } });
+    expect(refusal(state, dispose('cf-0001', 2, decision({ action: 'reopen', cause: { kind: 'decision' } })))).toBe('waived');
+    expect(refusal(state, dispose('cf-0001', 2, waive))).toBe('invalid-transition');
+  });
+
+  it('opens again only by a revocation, which keeps the waiver in the history and clears the repair', () => {
+    let state = commitAll([report(judged)]);
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'plan-repair', repair: { kind: 'intent', ref: 'i' } })));
+    state = commit(state, dispose('cf-0001', 2, waive));
+    state = commit(state, dispose('cf-0001', 3, decision(
+      { action: 'revoke-waiver', reason: 'the rounding helper did drift' },
+      { actor: { kind: 'user', name: 'dan' } },
+    )));
+    const entry = state.findings.get('cf-0001');
+    expect(entry).toMatchObject({ standing: 'open', reason: 'waiver-revoked', revision: 4, settledBy: null, repair: null });
+    expect(entry?.decisions.map(held => held.decision.action)).toEqual(['plan-repair', 'waive', 'revoke-waiver']);
+    // Open again, it can be waived again.
+    expect(refusal(state, dispose('cf-0001', 4, waive))).toBeNull();
+  });
+
+  it('refuses to revoke what is not a waiver', () => {
+    let state = commitAll([report(judged)]);
+    const revoke = (revision: number) => dispose('cf-0001', revision, decision({ action: 'revoke-waiver', reason: 'r' }));
+    expect(refusal(state, revoke(1))).toBe('not-waived');
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'supersede', reassessed: ['cfr-0001'], replacement: 'r' })));
+    expect(refusal(state, revoke(2))).toBe('not-waived');
+  });
+
+  it('waives a deferral directly', () => {
+    let state = commitAll([report(judged)]);
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'defer', authority, responsible: workItem('wi-001'), revisit: { kind: 'condition', condition: 'c' } })));
+    state = commit(state, dispose('cf-0001', 2, waive));
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'waived' });
+  });
+
+  it('records a risk correction with any action, and the latest correction is the current risk', () => {
+    let state = commitAll([report(judged)]);
+    expect(state.findings.get('cf-0001')?.risk).toBe('medium');
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'plan-repair', repair: { kind: 'intent', ref: 'i' } }, { risk: 'high' })));
+    expect(state.findings.get('cf-0001')?.risk).toBe('high');
+    state = commit(state, dispose('cf-0001', 2, decision({ action: 'waive', authority, acceptedRisk: 'low', uncertainty: 'u' }, { risk: 'low' })));
+    expect(state.findings.get('cf-0001')).toMatchObject({ risk: 'low', reason: 'waived' });
+    expect(state.findings.get('cf-0001')?.decisions.map(held => held.risk)).toEqual(['high', 'low']);
   });
 });
 
 describe('transitions', () => {
   it('reopens a closed CheckFinding at a new revision and keeps every earlier decision', () => {
     let state = commitAll([report(judged)]);
-    state = commit(state, dispose('cf-0001', 1, decision({ action: 'accept', authority, uncertainty: 'low' })));
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'supersede', reassessed: ['cfr-0001'], replacement: 'the coupon path returns early' })));
     expect(refusal(state, dispose('cf-0001', 2, decision({ action: 'plan-repair', repair: { kind: 'intent', ref: 'i' } })))).toBe('invalid-transition');
     state = commit(state, dispose('cf-0001', 2, decision({ action: 'reopen', cause: { kind: 'decision' } })));
     const entry = state.findings.get('cf-0001');
     expect(entry).toMatchObject({ standing: 'open', reason: 'reopened', revision: 3, settledBy: null });
-    expect(entry?.decisions.map(held => held.decision.action)).toEqual(['accept', 'reopen']);
+    expect(entry?.decisions.map(held => held.decision.action)).toEqual(['supersede', 'reopen']);
   });
 
   it('refuses to reopen an open CheckFinding', () => {
     expect(refusal(commitAll([report(judged)]), dispose('cf-0001', 1, decision({ action: 'reopen', cause: { kind: 'decision' } })))).toBe('invalid-transition');
   });
 
-  it('reopens a deferral, and accepts or supersedes one directly', () => {
+  it('reopens a deferral, and supersedes one directly', () => {
     let state = commitAll([report(judged)]);
     state = commit(state, dispose('cf-0001', 1, decision({ action: 'defer', authority, responsible: workItem('wi-001'), revisit: { kind: 'condition', condition: 'c' } })));
     expect(refusal(state, dispose('cf-0001', 2, decision({ action: 'claim-repair', candidate: tree('t-04'), change: 'x' })))).toBe('invalid-transition');
@@ -195,7 +250,7 @@ describe('transitions', () => {
       options: [{ id: 'a', summary: 'A', consequence: 'x' }, { id: 'b', summary: 'B', consequence: 'y' }],
     })));
     expect(state.findings.get('cf-0001')).toMatchObject({ pendingUserDecision: 'cfd-0001', reason: 'awaiting-user-decision' });
-    expect(refusal(state, dispose('cf-0001', 2, decision({ action: 'accept', authority, uncertainty: 'low' })))).toBe('awaiting-user-decision');
+    expect(refusal(state, dispose('cf-0001', 2, decision({ action: 'waive', authority, acceptedRisk: 'low', uncertainty: 'low' })))).toBe('awaiting-user-decision');
     const answer = (option: string, request = 'cfd-0001', actor: 'user' | 'agent' = 'user') => dispose('cf-0001', 2, decision(
       { action: 'answer-user-decision', request, option },
       actor === 'user' ? { actor: { kind: 'user', name: 'dan' } } : {},
@@ -224,7 +279,7 @@ describe('transitions', () => {
       type: 'assess',
       commands: [
         dispose('cf-0001', 1, decision({ action: 'plan-repair', repair: { kind: 'intent', ref: 'i' } })),
-        dispose('cf-0001', 1, decision({ action: 'accept', authority, uncertainty: 'low' })),
+        dispose('cf-0001', 1, decision({ action: 'waive', authority, acceptedRisk: 'low', uncertainty: 'low' })),
       ],
     });
     expect(decided.ok ? null : decided.rejection).toEqual({

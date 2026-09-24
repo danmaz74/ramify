@@ -62,8 +62,12 @@ export function concern(options: ConcernOptions = {}): BoundReport {
       rationale: 'read the frozen candidate diff',
       uncertainty: 'moderate',
       remedy: 'a bounded change in the named file',
+      risk: 'medium',
+      ground: null,
     },
     suggests: null,
+    credibility: 'ungrounded',
+    modules: ['project/cart'],
   };
 }
 
@@ -80,6 +84,8 @@ export function failure(options: { readonly attempt: string; readonly subject: s
     observation: { kind: 'check-failed', summary: `${options.subject} failed at its step 3`, evidence: [], locations: [] },
     judgment: null,
     suggests: null,
+    credibility: 'objective',
+    modules: ['project/checkout'],
   };
 }
 

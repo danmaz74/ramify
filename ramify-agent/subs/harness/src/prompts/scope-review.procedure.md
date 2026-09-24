@@ -1,4 +1,4 @@
-<!-- ramify-agent scope review procedure, version 1. -->
+<!-- ramify-agent scope review procedure, version 2. -->
 Do this, in order:
 
 1. Read the iteration's goal and approach and the parts of the plan the
@@ -15,7 +15,10 @@ Do this, in order:
 
 A concern is a precise gap between the intent and the candidate that you can
 point to: what was asked, what the candidate does instead, the evidence, how
-sure you are and a bounded remedy. A matter of taste is not a concern, and
+sure you are, a bounded remedy, its risk and its ground. The plan quoted
+below grounds a concern only through a file you read: when the candidate
+holds the plan document the message names, read it with `snapshot_read` and
+name it. A matter of taste is not a concern, and
 neither is a defect of the code's correctness that does not bear on scope.
 Report each distinct gap once. `suggests` may name a CheckFinding the
 message below lists when you believe yours is the same gap, and is

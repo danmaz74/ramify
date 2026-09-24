@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
@@ -125,6 +126,11 @@ export interface SnapshotTools {
   readonly definitions: readonly ToolDefinition[];
   /** Every changed path whose content or patch a tool answered: the paths the reviewer may name as inspected. */
   inspected(): ReadonlySet<string>;
+  /**
+   * Every file `snapshot_read` answered, changed or not, with the `sha256:`
+   * of its content: the paths the reviewer may name as a concern's ground.
+   */
+  read(): ReadonlyMap<string, string>;
   /** Every refused path, in order. */
   denials(): ReadonlyArray<{ readonly tool: string; readonly denial: SnapshotDenial; readonly path: string }>;
 }
@@ -133,6 +139,7 @@ export interface SnapshotTools {
 export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSource, projectRoot: string): SnapshotTools {
   const changed = new Set(snapshot.changes.map(change => change.path));
   const inspected = new Set<string>();
+  const read = new Map<string, string>();
   const denials: Array<{ tool: string; denial: SnapshotDenial; path: string }> = [];
 
   const refuse = (tool: string, path: unknown, resolved: Extract<SnapshotPath, { ok: false }>): ToolResult => {
@@ -173,7 +180,7 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     return { text: [...children].sort().join('\n') || '(empty)' };
   });
 
-  const read = tool(snapshotToolNames.read, 'Read one file of the audited candidate, with line numbers. startLine counts from 1.', readInput, async (input, signal) => {
+  const readFile = tool(snapshotToolNames.read, 'Read one file of the audited candidate, with line numbers. startLine counts from 1.', readInput, async (input, signal) => {
     const resolved = resolveSnapshotPath(snapshot, input.path);
     if (!resolved.ok) return refuse(snapshotToolNames.read, input.path, resolved);
     if (resolved.kind === 'directory') return { text: `${resolved.path} is a directory; list it with ${snapshotToolNames.list}`, isError: true };
@@ -182,6 +189,7 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
     }
     const content = await source.readBlob(projectRoot, snapshot.commit, resolved.path, signal);
     if (content.includes('\0')) return { text: `${resolved.path} is a binary file of ${resolved.entry.bytes ?? 'unknown'} bytes` };
+    read.set(resolved.path, `sha256:${createHash('sha256').update(content).digest('hex')}`);
     const lines = content.split('\n');
     if (lines.at(-1) === '') lines.pop();
     const start = input.startLine ?? 1;
@@ -223,8 +231,9 @@ export function snapshotTools(snapshot: CandidateSnapshot, source: CandidateSour
   });
 
   return {
-    definitions: [list, read, search, diff],
+    definitions: [list, readFile, search, diff],
     inspected: () => inspected,
+    read: () => read,
     denials: () => denials,
   };
 }

@@ -9,7 +9,8 @@ import { resolveChangedPath, resolveSnapshotPath, snapshotToolNames, type Candid
  * The schema holds the shape; the rules below hold what it cannot: every
  * changed path is named once, as inspected or as missing with a reason; a
  * path named inspected was actually answered by a snapshot tool during this
- * attempt; and every concern points at the candidate. An agent's word that
+ * attempt; every concern points at the candidate; and a concern's ground is
+ * a file `snapshot_read` answered during this attempt. An agent's word that
  * it read something is never the evidence that it did.
  */
 
@@ -24,6 +25,8 @@ export interface ReviewEvidence {
   readonly snapshot: CandidateSnapshot;
   /** The changed paths a snapshot tool answered the content or patch of during this attempt. */
   readonly inspected: ReadonlySet<string>;
+  /** Every file `snapshot_read` answered during this attempt, with the hash of its content. */
+  readonly read: ReadonlyMap<string, string>;
   readonly maxConcerns: number;
 }
 
@@ -77,6 +80,18 @@ export function validateReview(input: unknown, evidence: ReviewEvidence): Submis
         errors.push({ path: `${where}.endLine`, message: 'The range ends before it starts', expected: `at least ${location.startLine}` });
       }
     });
+    if (concern.ground !== null) {
+      const resolved = resolveSnapshotPath(evidence.snapshot, concern.ground.path);
+      if (!resolved.ok || resolved.kind !== 'file' || !evidence.read.has(resolved.path)) {
+        errors.push({
+          path: `concerns.${index}.ground.path`,
+          message: resolved.ok
+            ? `"${resolved.path}" was not read with ${snapshotToolNames.read} during this review; an earlier conversation, a search or a patch is not a read of the file`
+            : resolved.text,
+          expected: `a file of the candidate this review read with ${snapshotToolNames.read}, or a null ground`,
+        });
+      }
+    }
   });
 
   return errors.length === 0 ? { ok: true, value: submission } : { ok: false, errors };

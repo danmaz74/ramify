@@ -27,7 +27,8 @@ fixes its schemas, events and worked stream.
 
 `src/interfaces/check-findings.ts` holds the Zod schemas and types: opaque
 sources, owners, producers, obligations, actors, authorities and evidence;
-reports; decisions and their actions; relations; commands; events
+risk levels, grounds and credibility; reports; decisions and their actions;
+relations; commands; events
 (`check-finding-event` version 1); state; rejections; and queries and views
 (`check-finding-view/1`). Every ID is allocated from the replayed state:
 `cf-0001` for a CheckFinding, `cfr-`, `cfd-` and `cfl-` for its reports,
@@ -54,21 +55,40 @@ names the revision it considered; any other is `stale-revision`.
 - The standing is `open`, `deferred` or `closed`, always with its reason.
   Planning or claiming a repair keeps it open. A pending user decision admits
   only the user's answer.
-- An `assessment` CheckFinding closes by a fresh assessment, a superseding
-  judgment or an accepted choice. A `check` CheckFinding closes only by a
+- An `assessment` CheckFinding is fixed by a fresh assessment, superseded by
+  a replacing judgment, or waived. A `check` CheckFinding is fixed only by a
   witness of the same producer, subject, obligation revision and selection,
   run completely and passing on the acceptance candidate, which is not the
   source the failure was observed on; a judgment cannot supersede it, and a
-  required one cannot be accepted or deferred. An authorized obligation
+  required one cannot be waived or deferred. An authorized obligation
   revision is its own decision and leaves it open for the new obligation.
+- A waiver records the authority, the risk accepted and the uncertainty. It
+  is a settlement: a later report of the same issue adds evidence and never
+  reopens it, `reopen` is refused, and only `revoke-waiver` opens it again.
 - Reopening raises the revision and keeps every earlier decision. A same-key
-  report reopens a CheckFinding a check verified, or one closed on another
-  source; on the same source it adds evidence to an accepted choice. A
-  deferral stays deferred.
+  report reopens a CheckFinding a check fixed, or one closed other than by a
+  waiver on another source; on the same source it adds evidence. A deferral
+  stays deferred.
 - A relation names both CheckFindings at their current revisions, of one
   owner. The latest assessment of a pair is current. `same-issue` groups them
   under the earlier ID while each keeps its reports, decisions and
-  obligation; the other relations group nothing.
+  obligation; the other relations group nothing. When the canonical of the
+  resulting group is waived, the harness actor waives each open member the
+  relation newly joins, under the canonical's waiver, so a re-raise of a
+  waived issue stays settled; a member awaiting a user's answer or bound to a
+  required check stays open.
+
+## Risk, credibility and modules
+
+Every judgment carries the reporter's `risk`, `high`, `medium` or `low`, and
+the `ground` it named, or none; a failed check without a judgment is `high`
+for a required check and `medium` otherwise. Any decision may correct the
+risk, and the latest correction is the current risk. The harness binds each
+report's `credibility`, the provenance class of its ground (`objective` for a
+failed check), and its `modules`. A CheckFinding is `objective-reproduced`
+with two or more objective reports, else as credible as its most credible
+report, and concerns the union of its reports' modules. `signals.ts` derives
+all three after every event; none forms identity.
 
 ## Replay and queries
 
@@ -76,9 +96,11 @@ names the revision it considered; any other is `stale-revision`.
 or revision do not follow (`replay-conflict`); `replayCheckFindingEvents`
 folds a sequence from `emptyCheckFindingState()` or a given state.
 `selectCheckFindings(state, query)` returns a page of summaries ordered by
-ID, at most 100 (50 by default), with the selected total, the next cursor and
-the owner's counts by standing and reason; or one CheckFinding's detail with
-up to 200 reports and decisions and their totals. The `attention` selection is
+ID, or with `order: attention` by risk, then credibility, then the latest
+report, at most 100 (50 by default), with the selected total, the next cursor
+and the counts by standing and reason of the owner, narrowed to one `module`
+when the query names one; or one CheckFinding's detail with up to 200 reports
+and decisions and their totals. The `attention` selection is
 every open CheckFinding and each deferred one the caller names as due; this
 module never evaluates a revisit condition.
 
@@ -87,7 +109,10 @@ module never evaluates a revisit condition.
 `src/tests/` covers exact and conflicting replay, issue-key attachment and
 its scopes, ambiguous keys, distinct same-file concerns, every witness
 refusal, supersession without a code change, repair claims awaiting their
-witness, user decisions, obligation revision, reopening, same-issue grouping
-that keeps factual obligations, query bounds and attention, and the worked
+witness, user decisions, obligation revision, reopening, waivers that a
+re-raise by key or by relation leaves settled and a revocation reopens, risk
+corrections, credibility and module derivation, same-issue grouping that
+keeps factual obligations, query bounds, attention order and module
+narrowing, and the worked
 stream of the contract appendix, replayed from its JSON lines into identical
 state and views. A purity test verifies that the module imports only `zod`.

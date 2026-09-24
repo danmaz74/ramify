@@ -48,10 +48,10 @@ describe('same-issue relations', () => {
     state = commit(state, dispose('cf-0001', 2, decision({ action: 'claim-repair', candidate: tree('t-04'), change: 'wi-001.i04' })));
     expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'open', reason: 'repair-claimed' });
     state = commit(state, dispose('cf-0001', 3, decision(
-      { action: 'verify-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) },
+      { action: 'fix-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) },
       { actor: { kind: 'harness', reason: 'ga-0009 passed' } },
     )));
-    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'verified-by-check' });
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'fixed-by-check' });
   });
 
   it('does not group related-but-distinct, distinct or uncertain pairs', () => {
@@ -86,5 +86,66 @@ describe('same-issue relations', () => {
     expect(refusal(state, relate(['cf-0004', 1], ['cf-0002', 1], 'same-issue'))).toBe('cross-owner');
     expect(refusal(state, relate(['cf-0002', 2], ['cf-0001', 1], 'same-issue'))).toBe('stale-revision');
     expect(refusal(state, relate(['cf-0009', 1], ['cf-0001', 1], 'same-issue'))).toBe('unknown-check-finding');
+  });
+});
+
+describe('a re-raise joined to a waived issue', () => {
+  const authority = { kind: 'work-item-assessment', ref: 'wi-001.rc01' } as const;
+  const waived = (): CheckFindingState => {
+    let state = commitAll([
+      report(concern({ attempt: 'rq-0001.a01', key: 'c1', summary: 'Configuration is read in a loop', hash: 1, risk: 'low' })),
+    ]);
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'waive', authority, acceptedRisk: 'low', uncertainty: 'the value is cached' })));
+    return commit(state, report(concern({ attempt: 'rq-0005.a01', key: 'c1', summary: 'Configuration is still read in a loop', hash: 5, suggests: 'cf-0001', source: tree('t-05') })));
+  };
+
+  it('waives the newly joined open member as the harness, under the canonical\'s waiver', () => {
+    const decided = decideCheckFindingChange(waived(), relate(['cf-0002', 1], ['cf-0001', 2], 'same-issue'));
+    if (!decided.ok) throw new Error(decided.rejection.message);
+    expect(decided.events.map(event => event.type)).toEqual(['check-finding-related', 'check-finding-decided']);
+    expect(decided.touched).toEqual(['cf-0002', 'cf-0001']);
+    const state = commit(waived(), relate(['cf-0002', 1], ['cf-0001', 2], 'same-issue'));
+    const member = state.findings.get('cf-0002');
+    expect(member).toMatchObject({ standing: 'closed', reason: 'waived', revision: 2, settledBy: 'cfd-0002' });
+    expect(member?.decisions[0]).toMatchObject({
+      actor: { kind: 'harness' },
+      communication: { mode: 'quiet' },
+      decision: { action: 'waive', authority: { kind: 'governing-record', ref: 'cfd-0001' }, acceptedRisk: 'medium', uncertainty: 'the value is cached' },
+    });
+    // Revoking the member's waiver reopens it alone; the canonical's stands.
+    const revoked = commit(state, dispose('cf-0002', 2, decision({ action: 'revoke-waiver', reason: 'this one differs' }, { actor: { kind: 'user', name: 'dan' } })));
+    expect([revoked.findings.get('cf-0001')?.reason, revoked.findings.get('cf-0002')?.reason]).toEqual(['waived', 'waiver-revoked']);
+  });
+
+  it('waives nothing when the canonical is not waived, or a relation other than same-issue joins them', () => {
+    let state = waived();
+    state = commit(state, dispose('cf-0001', 2, decision({ action: 'revoke-waiver', reason: 'r' })));
+    const joined = decideCheckFindingChange(state, relate(['cf-0002', 1], ['cf-0001', 3], 'same-issue'));
+    expect(joined.ok && joined.events.map(event => event.type)).toEqual(['check-finding-related']);
+    const related = decideCheckFindingChange(waived(), relate(['cf-0002', 1], ['cf-0001', 2], 'related-but-distinct'));
+    expect(related.ok && related.events.map(event => event.type)).toEqual(['check-finding-related']);
+  });
+
+  it('leaves a required check and a member awaiting the user open when they join a waived issue', () => {
+    let state = waived();
+    state = commit(state, report(failure({ attempt: 'ga-0009', source: tree('t-05'), hash: 9 })));
+    state = commit(state, dispose('cf-0002', 1, decision({
+      action: 'request-user-decision', authority,
+      conflicts: [{ text: 'Configuration is read once.', document: 'plan.md#R7', revision: '1' }],
+      options: [{ id: 'a', summary: 'A', consequence: 'x' }, { id: 'b', summary: 'B', consequence: 'y' }],
+    })));
+    state = commit(state, relate(['cf-0002', 2], ['cf-0001', 2], 'same-issue'));
+    state = commit(state, relate(['cf-0003', 1], ['cf-0001', 2], 'same-issue'));
+    expect(['cf-0002', 'cf-0003'].map(id => state.findings.get(id)?.reason)).toEqual(['awaiting-user-decision', 'new']);
+    expect(groupOf(state, 'cf-0003')).toEqual({ canonical: 'cf-0001', members: ['cf-0001', 'cf-0002', 'cf-0003'] });
+  });
+
+  it('waives every open member a relation joins at once, and none it had joined before', () => {
+    let state = waived();
+    state = commit(state, report(concern({ attempt: 'rq-0006.a01', key: 'c1', summary: 'A third raise', hash: 6, source: tree('t-06') })));
+    // cf-0002 and cf-0003 form a group first; one relation then joins both to the waived cf-0001.
+    state = commit(state, relate(['cf-0003', 1], ['cf-0002', 1], 'same-issue'));
+    state = commit(state, relate(['cf-0002', 1], ['cf-0001', 2], 'same-issue'));
+    expect(['cf-0002', 'cf-0003'].map(id => [state.findings.get(id)?.reason, state.findings.get(id)?.decisions[0]?.id])).toEqual([['waived', 'cfd-0002'], ['waived', 'cfd-0003']]);
   });
 });

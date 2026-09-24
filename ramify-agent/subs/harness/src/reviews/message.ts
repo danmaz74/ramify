@@ -25,6 +25,8 @@ export interface ReviewBriefing {
   readonly checkFindings: ReadonlyArray<{ readonly id: string; readonly standing: string; readonly title: string }>;
   /** Scope: the plan excerpts the assignment cites, as the request binds them. */
   readonly requirements?: readonly CapturedInput[] | undefined;
+  /** Scope: the run's plan document as the candidate holds it, which a concern can name as its ground; null when it holds none. */
+  readonly planDocument?: string | null | undefined;
 }
 
 const questions = { code: 'Code review', scope: 'Scope review', design: 'Design review' } as const;
@@ -54,6 +56,9 @@ export function reviewMessage(briefing: ReviewBriefing): string {
     const requirements = briefing.requirements ?? [];
     if (requirements.length === 0) lines.push('The assignment cites no part of the plan; judge the candidate against the assignment\'s own goal.', '');
     for (const requirement of requirements) lines.push(`### ${requirement.ref} (sha256 ${requirement.hash.slice(0, 12)})`, '', requirement.text, '');
+    lines.push(briefing.planDocument === undefined || briefing.planDocument === null
+      ? 'The candidate holds no copy of the plan, so the plan itself cannot be a concern\'s ground here.'
+      : `The candidate holds the plan as \`${briefing.planDocument}\`. To name it as a concern's ground, read it with \`snapshot_read\`.`, '');
   }
   if (kind === 'design') {
     lines.push('## The guidance this design is judged against', '',

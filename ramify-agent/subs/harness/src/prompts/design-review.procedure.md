@@ -1,4 +1,4 @@
-<!-- ramify-agent design review procedure, version 1. -->
+<!-- ramify-agent design review procedure, version 2. -->
 Do this, in order:
 
 1. Make sure you know the guidance the message below lists. If this session
@@ -15,7 +15,9 @@ Do this, in order:
 
 A concern is a design problem the guidance lets you name: the rule or
 responsibility it departs from, cited by the guidance file, the consequence,
-the evidence in the candidate, how sure you are and a bounded remedy.
+the evidence in the candidate, how sure you are, a bounded remedy and its
+risk. Its ground is that guidance file, read with `snapshot_read` in this
+review even if an earlier conversation already showed it to you.
 Correctness defects and scope gaps belong to other reviews. Report each
 distinct problem once. `suggests` may name a CheckFinding the message below
 lists when you believe yours is the same problem, and is otherwise null.

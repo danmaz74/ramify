@@ -347,9 +347,9 @@ describe('CF06 and CF11: crashes around the commit keep exactly-once history', (
     expect(summary).toMatchObject({ ok: true, view: { items: [{ id: 'cf-0001', standing: 'open', awaiting: 'assessment' }] } });
 
     committed(await commitCheckFindingChange(restarted, recorded([
-      dispose('cf-0001', 3, decision({ action: 'verify-by-assessment', reassessed: ['cfr-0001'] }, { source: { kind: 'tree', id: 't-04' } })),
+      dispose('cf-0001', 3, decision({ action: 'fix-by-assessment', reassessed: ['cfr-0001'] }, { source: { kind: 'tree', id: 't-04' } })),
     ], { kind: 'recovery', detail: 'fresh assessment' })));
-    expect(checkFindingStateOf(restarted.log.ledger).findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'verified-by-assessment' });
+    expect(checkFindingStateOf(restarted.log.ledger).findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'fixed-by-assessment' });
   });
 });
 

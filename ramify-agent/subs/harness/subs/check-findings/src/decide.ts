@@ -63,6 +63,12 @@ function decideReport(state: CheckFindingState, report: CheckFindingReportInput)
   if (report.verification.kind === 'check' && report.verification.producer !== report.producer) {
     return reject('invalid-report', `a ${report.producer} report cannot name ${report.verification.producer} as the producer that verifies it`);
   }
+  if ((report.observation.kind === 'check-failed') !== (report.credibility === 'objective')) {
+    return reject('invalid-report', 'a failed check is objective, and a review concern is credited by its ground');
+  }
+  if (report.observation.kind === 'review-concern' && (report.judgment?.ground === null) !== (report.credibility === 'ungrounded')) {
+    return reject('invalid-report', 'a review concern is ungrounded exactly when its judgment names no ground');
+  }
   if (report.suggests !== null && !state.findings.has(report.suggests)) {
     return reject('unknown-check-finding', `the report suggests ${report.suggests}, which is no CheckFinding`);
   }
@@ -82,9 +88,9 @@ function decideReport(state: CheckFindingState, report: CheckFindingReportInput)
 /**
  * Attaches a report to the CheckFinding its issue key names. A closed one is
  * reopened when the report contradicts what closed it: any report after a
- * check verified it, or a report on another source than the closing decision
- * considered. A report on the same source adds evidence without reopening an
- * accepted choice, and a deferral stays deferred.
+ * check fixed it, or a report on another source than the closing decision
+ * considered. A report on the same source adds evidence without reopening,
+ * a waiver is never reopened by a report, and a deferral stays deferred.
  */
 function attach(state: CheckFindingState, entry: CheckFindingEntry, report: CheckFindingReport): CheckFindingChange {
   const events: CheckFindingEvent[] = [{
@@ -92,14 +98,16 @@ function attach(state: CheckFindingState, entry: CheckFindingEntry, report: Chec
     data: { version: checkFindingEventVersion, checkFinding: entry.id, revision: entry.revision + 1, report },
   }];
   const closing = entry.standing === 'closed' ? entry.decisions.find(decision => decision.id === entry.settledBy) : undefined;
-  if (closing !== undefined && (closing.decision.action === 'verify-by-check' || !sameSource(closing.source, report.source))) {
+  const contradicts = closing !== undefined && closing.decision.action !== 'waive'
+    && (closing.decision.action === 'fix-by-check' || !sameSource(closing.source, report.source));
+  if (closing !== undefined && contradicts) {
     const decision: CheckFindingDecision = {
       id: decisionId(state.counters.decisions + 1),
       considered: entry.revision + 1,
       actor: { kind: 'harness', reason: `report ${report.id} of the same issue key contradicts ${closing.id}` },
       source: report.source,
-      rationale: closing.decision.action === 'verify-by-check'
-        ? `${report.producer} observed the obligation fail again after ${closing.id} verified it`
+      rationale: closing.decision.action === 'fix-by-check'
+        ? `${report.producer} observed the obligation fail again after ${closing.id} fixed it`
         : `${report.producer} reported the issue on a source other than the one ${closing.id} considered`,
       evidence: report.observation.evidence,
       communication: { mode: 'quiet' },
@@ -135,7 +143,10 @@ function refusalOf(entry: CheckFindingEntry, input: CheckFindingDecisionInput): 
   // Where each action may start from.
   if (action.action === 'reopen') {
     if (standing === 'open') return reject('invalid-transition', `${id} is open; only a closed or deferred CheckFinding is reopened`);
-  } else if (action.action === 'supersede' || action.action === 'accept') {
+    if (entry.reason === 'waived') return reject('waived', `${id} is waived; only a revocation of ${entry.settledBy} reopens it`);
+  } else if (action.action === 'revoke-waiver') {
+    if (entry.reason !== 'waived') return reject('not-waived', `${id} is ${standing} (${entry.reason}), not waived; there is no waiver to revoke`);
+  } else if (action.action === 'supersede' || action.action === 'waive') {
     if (standing === 'closed') return reject('invalid-transition', `${id} is closed (${entry.reason}); reopen it before a new disposition`);
   } else if (standing !== 'open') {
     return reject('invalid-transition', `${id} is ${standing} (${entry.reason}); ${action.action} applies to an open CheckFinding`);
@@ -145,8 +156,9 @@ function refusalOf(entry: CheckFindingEntry, input: CheckFindingDecisionInput): 
     case 'plan-repair':
     case 'claim-repair':
     case 'reopen':
+    case 'revoke-waiver':
       return null;
-    case 'verify-by-check': {
+    case 'fix-by-check': {
       if (verification.kind !== 'check') return reject('verification-kind-mismatch', `${id} is verified by assessment, not by a check`);
       const witness = action.witness;
       if (witness.producer !== verification.producer) return reject('producer-mismatch', `${id} is verified by ${verification.producer}; the witness is from ${witness.producer}`);
@@ -171,7 +183,7 @@ function refusalOf(entry: CheckFindingEntry, input: CheckFindingDecisionInput): 
       if (witness.outcome !== 'passed') return reject('not-passed', `the witness ${witness.outcome === 'failed' ? 'failed' : 'was inconclusive'}`);
       return null;
     }
-    case 'verify-by-assessment':
+    case 'fix-by-assessment':
     case 'supersede': {
       if (verification.kind !== 'assessment') {
         return action.action === 'supersede'
@@ -182,10 +194,10 @@ function refusalOf(entry: CheckFindingEntry, input: CheckFindingDecisionInput): 
       if (unknown !== undefined) return reject('unknown-report', `${unknown} is no report of ${id}`);
       return null;
     }
-    case 'accept':
+    case 'waive':
     case 'defer':
       if (verification.kind === 'check' && verification.required) {
-        return reject('required-obligation', `${id} is an obligation of a required check; ${action.action === 'accept' ? 'accepting' : 'deferring'} it would evade it`);
+        return reject('required-obligation', `${id} is an obligation of a required check; ${action.action === 'waive' ? 'waiving' : 'deferring'} it would evade it; its gate decides it`);
       }
       return null;
     case 'request-user-decision': {
@@ -236,7 +248,56 @@ function decideRelation(state: CheckFindingState, relation: CheckFindingRelation
     if (grouped || already) return reject('relation-cycle', `${from.id} and ${to.id} already belong to one same-issue group`);
   }
   const id = relationId(state.counters.relations + 1);
-  return accepted([{ type: 'check-finding-related', data: { version: checkFindingEventVersion, relation: { ...relation, id } } }], [from.id, to.id]);
+  const related: CheckFindingEvent = { type: 'check-finding-related', data: { version: checkFindingEventVersion, relation: { ...relation, id } } };
+  const applied = applyCheckFindingEvent(state, related);
+  if (!applied.ok) return { ok: false, rejection: applied.rejection };
+  const waived = relation.relation === 'same-issue' ? waiveJoined(state, applied.state, from.id, relation) : [];
+  return accepted([related, ...waived.map(entry => entry.event)], [from.id, to.id, ...waived.map(entry => entry.checkFinding)]);
+}
+
+/**
+ * A same-issue relation that joins open CheckFindings to a group whose
+ * canonical is waived settles them too: the harness waives each newly joined
+ * open member under the canonical's waiver, so a re-raise of a waived issue
+ * stays settled. A member that awaits a user's answer, or carries a required
+ * check's obligation, is left open: no waiver may evade either.
+ */
+function waiveJoined(
+  before: CheckFindingState,
+  after: CheckFindingState,
+  member: CheckFindingId,
+  relation: CheckFindingRelationInput,
+): Array<{ readonly checkFinding: CheckFindingId; readonly event: CheckFindingEvent }> {
+  const group = sameIssueGroups(after.relations).find(held => held.members.includes(member));
+  const canonical = group === undefined ? undefined : after.findings.get(group.canonical);
+  if (group === undefined || canonical === undefined || canonical.reason !== 'waived') return [];
+  const waiver = canonical.decisions.find(decision => decision.id === canonical.settledBy);
+  if (waiver === undefined || waiver.decision.action !== 'waive') return [];
+  const earlier = sameIssueGroups(before.relations).find(held => held.members.includes(canonical.id))?.members ?? [canonical.id];
+  const events: Array<{ readonly checkFinding: CheckFindingId; readonly event: CheckFindingEvent }> = [];
+  let current = after;
+  for (const id of group.members) {
+    const entry = current.findings.get(id);
+    if (entry === undefined || earlier.includes(id) || entry.standing !== 'open' || entry.pendingUserDecision !== null) continue;
+    if (entry.verification.kind === 'check' && entry.verification.required) continue;
+    const decision: CheckFindingDecision = {
+      id: decisionId(current.counters.decisions + 1),
+      considered: entry.revision,
+      actor: { kind: 'harness', reason: `${id} joins ${canonical.id}, which ${waiver.id} waived` },
+      source: relation.source,
+      rationale: `The same-issue relation joins ${id} to ${canonical.id}; a re-raised waived issue stays waived under ${waiver.id} until that waiver is revoked`,
+      evidence: relation.evidence,
+      communication: { mode: 'quiet' },
+      decision: { action: 'waive', authority: { kind: 'governing-record', ref: waiver.id }, acceptedRisk: entry.risk, uncertainty: waiver.decision.uncertainty },
+    };
+    const event: CheckFindingEvent = { type: 'check-finding-decided', data: { version: checkFindingEventVersion, checkFinding: id, revision: entry.revision + 1, decision } };
+    const applied = applyCheckFindingEvent(current, event);
+    // The decision follows the state it was derived from, so replay accepts it.
+    if (!applied.ok) throw new Error(`the waiver of ${id} does not follow its state: ${applied.rejection.message}`);
+    current = applied.state;
+    events.push({ checkFinding: id, event });
+  }
+  return events;
 }
 
 function isPair(relation: CheckFindingRelationInput, a: CheckFindingId, b: CheckFindingId): boolean {

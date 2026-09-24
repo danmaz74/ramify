@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decideCheckFindingChange } from '../decide.js';
 import { emptyCheckFindingState } from '../replay.js';
 import {
-  commit, commitAll, concern, decision, dispose, failure, hashOf, report, tree, witness, workItem,
+  commit, commitAll, concern, decision, dispose, failure, ground, hashOf, report, tree, witness, workItem,
 } from './fixtures/builders.js';
 
 const first = concern({ attempt: 'rq-0001.a01', key: 'c1', summary: 'The discount is applied twice', hash: 1 });
@@ -120,6 +120,20 @@ describe('judgmental reports', () => {
     expect(mixed.ok ? null : mixed.rejection.code).toBe('invalid-report');
   });
 
+  it('refuses a report whose credibility does not fit its kind or its ground', () => {
+    const refused = (input: Parameters<typeof report>[0]) => {
+      const decided = decideCheckFindingChange(emptyCheckFindingState(), report(input));
+      return decided.ok ? null : decided.rejection.code;
+    };
+    expect(refused({ ...first, credibility: 'objective' })).toBe('invalid-report');
+    expect(refused({ ...failure({ attempt: 'ga-0005', source: tree('t-02'), hash: 5 }), credibility: 'human-reviewed' })).toBe('invalid-report');
+    // Without a ground a concern is ungrounded, and with one it is not.
+    expect(refused({ ...first, credibility: 'agent-generated' })).toBe('invalid-report');
+    const grounded = concern({ attempt: 'rq-0001.a01', key: 'c1', summary: 's', hash: 1, ground: ground('docs/a.principles.md', 9) });
+    expect(refused({ ...grounded, credibility: 'ungrounded' })).toBe('invalid-report');
+    expect(refused({ ...grounded, credibility: 'human-reviewed' })).toBeNull();
+  });
+
   it('refuses a malformed command with the path of the offending value', () => {
     const malformed = decideCheckFindingChange(emptyCheckFindingState(), report({ ...first, contentHash: 'abc' }));
     expect(malformed.ok ? null : malformed.rejection.code).toBe('invalid-command');
@@ -128,10 +142,10 @@ describe('judgmental reports', () => {
 });
 
 describe('reopening by a same-key report', () => {
-  it('reopens a verified CheckFinding when its obligation fails again, preserving the verification', () => {
+  it('reopens a fixed CheckFinding when its obligation fails again, preserving the fix', () => {
     let state = commitAll([report(failure({ attempt: 'ga-0005', source: tree('t-02'), hash: 5 }))]);
     state = commit(state, dispose('cf-0001', 1, decision(
-      { action: 'verify-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) },
+      { action: 'fix-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) },
       { actor: { kind: 'harness', reason: 'ga-0009 passed' } },
     )));
     const decided = decideCheckFindingChange(state, report(failure({ attempt: 'ga-0011', source: tree('t-06'), hash: 11 })));
@@ -139,19 +153,34 @@ describe('reopening by a same-key report', () => {
     state = commit(state, report(failure({ attempt: 'ga-0011', source: tree('t-06'), hash: 11 })));
     const entry = state.findings.get('cf-0001');
     expect(entry).toMatchObject({ standing: 'open', reason: 'reopened', revision: 4 });
-    expect(entry?.decisions.map(held => [held.decision.action, held.actor.kind])).toEqual([['verify-by-check', 'harness'], ['reopen', 'harness']]);
+    expect(entry?.decisions.map(held => [held.decision.action, held.actor.kind])).toEqual([['fix-by-check', 'harness'], ['reopen', 'harness']]);
     expect(entry?.decisions[1]?.decision).toEqual({ action: 'reopen', cause: { kind: 'report', report: 'cfr-0002' } });
   });
 
-  it('adds evidence to an accepted choice from the same source, and reopens it from another source', () => {
+  it('keeps a waived CheckFinding closed when its issue key reports again, from any source, until a revocation', () => {
     let state = commitAll([report(failure({ attempt: 'ga-0005', source: tree('t-02'), hash: 5, required: false }))]);
     state = commit(state, dispose('cf-0001', 1, decision(
-      { action: 'accept', authority: { kind: 'work-item-assessment', ref: 'a' }, uncertainty: 'low' },
+      { action: 'waive', authority: { kind: 'work-item-assessment', ref: 'a' }, acceptedRisk: 'medium', uncertainty: 'low' },
       { source: tree('t-02') },
     )));
     state = commit(state, report(failure({ attempt: 'ga-0006', source: tree('t-02'), hash: 6, required: false })));
-    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'accepted', revision: 3 });
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'waived', revision: 3 });
     state = commit(state, report(failure({ attempt: 'ga-0007', source: tree('t-03'), hash: 7, required: false })));
+    const entry = state.findings.get('cf-0001');
+    expect(entry).toMatchObject({ standing: 'closed', reason: 'waived', revision: 4, settledBy: 'cfd-0001' });
+    // The re-raises are evidence: three objective reports, and no harness decision.
+    expect([entry?.reports.length, entry?.decisions.length, entry?.credibility]).toEqual([3, 1, 'objective-reproduced']);
+    state = commit(state, dispose('cf-0001', 4, decision({ action: 'revoke-waiver', reason: 'it keeps failing' }, { actor: { kind: 'user', name: 'dan' } })));
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'open', reason: 'waiver-revoked', revision: 5 });
+  });
+
+  it('adds evidence to a judgment closed on the same source, and reopens it from another source', () => {
+    const keyed = (attempt: string, hash: number, source: string) => concern({ attempt, key: 'c1', summary: 'The discount is applied twice', hash, source: tree(source), issueKey: 'discount' });
+    let state = commitAll([report(keyed('rq-0001.a01', 1, 't-01'))]);
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'fix-by-assessment', reassessed: ['cfr-0001'] }, { source: tree('t-02') })));
+    state = commit(state, report(keyed('rq-0002.a01', 2, 't-02')));
+    expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'fixed-by-assessment', revision: 3 });
+    state = commit(state, report(keyed('rq-0003.a01', 3, 't-03')));
     expect(state.findings.get('cf-0001')).toMatchObject({ standing: 'open', reason: 'reopened', revision: 5 });
   });
 });

@@ -106,7 +106,7 @@ export const globalForkPackage = 'global-fork/1';
 export const localArchitectPackage = 'local-architect/2';
 export const engineerPackage = 'engineer/2';
 export const contractEngineerPackage = 'contract-engineer/1';
-export const reviewerPackage = 'reviewer/2';
+export const reviewerPackage = 'reviewer/3';
 
 /**
  * Loads every package a run offers. A role with no package yet has no entry:

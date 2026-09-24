@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { z } from 'zod';
-import { checkFindingIdSchema, checkFindingLocationSchema } from '../../subs/check-findings/src/interfaces/check-findings.js';
+import { checkFindingIdSchema, checkFindingLocationSchema, checkFindingRiskSchema } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { sha256Schema } from '../interfaces/protocol/evidence.js';
 import { reviewKindSchema, reviewPolicyVersion, sessionIdSchema } from '../run/records.js';
 
@@ -113,6 +113,18 @@ export const reviewAttemptSchema = z.object({
 }).strict();
 export type ReviewAttempt = z.infer<typeof reviewAttemptSchema>;
 
+/**
+ * What a reviewer names as grounding a concern: a file of the candidate it
+ * read with `snapshot_read` during this attempt, and optionally the words
+ * it relies on. The harness hashes the file and classifies its provenance;
+ * the reviewer never states how credible it is.
+ */
+export const reviewGroundSchema = z.object({
+  path: z.string().min(1),
+  quote: z.string().max(1000).optional(),
+}).strict();
+export type ReviewGround = z.infer<typeof reviewGroundSchema>;
+
 /** One concern of a reviewer's submission, as the agent writes it. */
 export const reviewConcernSchema = z.object({
   summary: z.string().min(1).max(4000),
@@ -122,6 +134,10 @@ export const reviewConcernSchema = z.object({
   remedy: z.string().min(1).max(4000),
   locations: z.array(checkFindingLocationSchema).min(1).max(50),
   suggests: checkFindingIdSchema.nullable(),
+  /** The harm if the concern is real, as the reviewer proposes it. */
+  risk: checkFindingRiskSchema,
+  /** What grounds the concern, or null when nothing the reviewer read does. */
+  ground: reviewGroundSchema.nullable(),
 }).strict();
 export type ReviewConcern = z.infer<typeof reviewConcernSchema>;
 

@@ -632,7 +632,15 @@ reviews' settlement bound before the final gate stop each of them. A reader
 has no built-in tool and no working directory of the project's: its four
 snapshot tools answer the audited commit from Git's objects alone, through
 the evidence child's candidate source, and refuse an absolute path, a path
-out of the candidate, a symbolic link and a generated view. Its terminal
+out of the candidate, a symbolic link and a generated view. Each concern
+carries the reviewer's risk level and names its ground, a file the reviewer
+read with `snapshot_read` in that attempt, or none. The harness binds the
+rest: the ground's hash, its credibility from the file's provenance (a
+principles document, the run's plan directory or a feature file the harness
+wrote is human-reviewed; any other file is agent-generated; no ground is
+ungrounded), and the modules that own the concern's locations on the
+candidate's own module declarations, else the work item's module
+(`src/reviews/signals.ts`). Its terminal
 attempt, its submission and the CheckFindings its concerns open are one
 line through the CheckFinding transition; a result that arrives after its
 request settled or its run ended is fenced and appends nothing. The gate's

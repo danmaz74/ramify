@@ -415,7 +415,7 @@ describe('the prompt package', () => {
     // A reviewer submits its review; a design orientation submits what it
     // read. One procedure per question, each a file the hash covers.
     const reviewer = manifest.packages['reviewer']!;
-    expect(reviewer.package).toBe('reviewer/2');
+    expect(reviewer.package).toBe('reviewer/3');
     expect(reviewer.submissionKinds).toEqual(['review', 'orientation']);
     const procedures = reviewer.files.filter(file => file.kind === 'procedure').map(file => file.path.split('/').at(-1)).sort();
     expect(procedures).toEqual(['code-review.procedure.md', 'design-review.procedure.md', 'scope-review.procedure.md']);

@@ -8,7 +8,7 @@ import type { scriptedCandidates } from './helpers/candidates.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { completionProposed, submit, write } from './helpers/iterations.js';
 import {
-  attemptRecord, escape, eventsOf, gate, limit, notesDirectory, plan, reviewRun, reviewTarget, store, tool,
+  attemptRecord, escape, eventsOf, gate, limit, notes, notesDirectory, plan, reviewRun, reviewTarget, store, tool,
 } from './helpers/reviews.js';
 import { onlyRun, runPath } from './helpers/runs.js';
 
@@ -83,6 +83,8 @@ describe('CF05: readers beside the writer, confined to the audited candidate', (
             remedy: 'Count code points in limit.ts',
             locations: [{ path: limit, startLine: 1, endLine: 1 }],
             suggests: null,
+            risk: 'medium',
+            ground: { path: limit, quote: 'text.length <= 50' },
           }] } },
         ],
         'rq-0003': [
@@ -168,7 +170,10 @@ describe('CF05: readers beside the writer, confined to the audited candidate', (
       producer: 'review:code', attempt: 'rq-0002.a01', reportKey: 'concern-01', source: { kind: 'tree', id: 'tree-02' }, issueKey: null,
       owner: { kind: 'work-item', workItem: 'wi-001' },
       observation: { kind: 'review-concern', evidence: [{ kind: 'review-submission', ref: reviewLayout.submission('rq-0002.a01'), hash: expect.stringMatching(/^sha256:/u) }] },
-      judgment: { actor: { kind: 'agent', role: 'reviewer', invocation: concern.invocation } },
+      judgment: { actor: { kind: 'agent', role: 'reviewer', invocation: concern.invocation }, risk: 'medium', ground: { ref: limit, hash: expect.stringMatching(/^sha256:/u) } },
+      // The candidate declares no module, so the concern falls back to its work item's module.
+      credibility: 'agent-generated',
+      modules: [notes],
     }] } } });
     expect(JSON.parse(await readFile(runPath(root, plan, runId, reviewLayout.submission('rq-0002.a01')), 'utf8')))
       .toMatchObject({ schema: 'ramify-agent.review-submission/1', attempt: 'rq-0002.a01', inspected: [limit] });

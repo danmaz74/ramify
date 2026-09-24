@@ -3,14 +3,16 @@ import type {
   CheckFindingReport, CheckFindingState,
 } from './interfaces/check-findings.js';
 import { checkFindingId, decisionId, ingestionKey, relationId, reportId, scopedIssueKey } from './identity.js';
+import { currentCredibility, currentRisk, modulesOf } from './signals.js';
 
 /*
  * Replay: the state accepted events derive. Each event is checked only for
  * what makes the history consistent (its IDs are the next ones, its revision
  * follows, what it names exists); whether a decision was allowed was settled
  * when it was decided, and the log holds only what was accepted. Standing,
- * reason, pending request and planned repair are derived here and nowhere
- * else, so a rebuilt projection and a live one cannot differ.
+ * reason, pending request, planned repair, risk, credibility and modules are
+ * derived here and nowhere else, so a rebuilt projection and a live one
+ * cannot differ.
  */
 
 /** The state before any event. */
@@ -37,7 +39,7 @@ export function applyCheckFindingEvent(state: CheckFindingState, event: CheckFin
       if (checkFinding !== expected) return conflict(`check-finding-opened allocates ${checkFinding}, but the next CheckFinding is ${expected}`);
       const reportCheck = checkReport(state, report);
       if (reportCheck !== null) return conflict(reportCheck);
-      const entry: CheckFindingEntry = {
+      const entry = signalled({
         id: checkFinding,
         revision: 1,
         owner: report.owner,
@@ -50,7 +52,7 @@ export function applyCheckFindingEvent(state: CheckFindingState, event: CheckFin
         pendingUserDecision: null,
         repair: null,
         settledBy: null,
-      };
+      });
       return {
         ok: true,
         state: {
@@ -70,7 +72,7 @@ export function applyCheckFindingEvent(state: CheckFindingState, event: CheckFin
       if (scoped === null || !entry.issueKeys.includes(scoped)) {
         return conflict(`check-finding-reported attaches ${report.id} to ${checkFinding}, whose issue keys do not include the report's`);
       }
-      const next: CheckFindingEntry = { ...entry, revision, reports: [...entry.reports, report] };
+      const next = signalled({ ...entry, revision, reports: [...entry.reports, report] });
       return {
         ok: true,
         state: { ...withReport(state, next, report), counters: { ...state.counters, reports: state.counters.reports + 1 } },
@@ -86,7 +88,7 @@ export function applyCheckFindingEvent(state: CheckFindingState, event: CheckFin
       const expected = decisionId(state.counters.decisions + 1);
       if (decision.id !== expected) return conflict(`check-finding-decided allocates ${decision.id}, but the next decision is ${expected}`);
       const findings = new Map(state.findings);
-      findings.set(checkFinding, decided({ ...entry, revision, decisions: [...entry.decisions, decision] }, decision));
+      findings.set(checkFinding, signalled(decided({ ...entry, revision, decisions: [...entry.decisions, decision] }, decision)));
       return {
         ok: true,
         state: { ...state, applied: state.applied + 1, findings, counters: { ...state.counters, decisions: state.counters.decisions + 1 } },
@@ -139,6 +141,11 @@ function withReport(state: CheckFindingState, entry: CheckFindingEntry, report: 
   return { ...state, applied: state.applied + 1, findings, ingested };
 }
 
+/** The entry with the risk, credibility and modules its reports and decisions derive. */
+function signalled(entry: Omit<CheckFindingEntry, 'risk' | 'credibility' | 'modules'>): CheckFindingEntry {
+  return { ...entry, risk: currentRisk(entry.reports, entry.decisions), credibility: currentCredibility(entry.reports), modules: modulesOf(entry.reports) };
+}
+
 /** The entry after one decision: its standing, reason, pending request, repair and verification. */
 function decided(entry: CheckFindingEntry, decision: CheckFindingDecision): CheckFindingEntry {
   const action = decision.decision;
@@ -148,14 +155,16 @@ function decided(entry: CheckFindingEntry, decision: CheckFindingDecision): Chec
       return { ...entry, standing: 'open', reason: 'repair-planned', repair: action.repair };
     case 'claim-repair':
       return { ...entry, standing: 'open', reason: 'repair-claimed' };
-    case 'verify-by-check':
-      return { ...entry, ...settled, standing: 'closed', reason: 'verified-by-check' };
-    case 'verify-by-assessment':
-      return { ...entry, ...settled, standing: 'closed', reason: 'verified-by-assessment' };
+    case 'fix-by-check':
+      return { ...entry, ...settled, standing: 'closed', reason: 'fixed-by-check' };
+    case 'fix-by-assessment':
+      return { ...entry, ...settled, standing: 'closed', reason: 'fixed-by-assessment' };
     case 'supersede':
       return { ...entry, ...settled, standing: 'closed', reason: 'superseded' };
-    case 'accept':
-      return { ...entry, ...settled, standing: 'closed', reason: 'accepted' };
+    case 'waive':
+      return { ...entry, ...settled, standing: 'closed', reason: 'waived' };
+    case 'revoke-waiver':
+      return { ...entry, standing: 'open', reason: 'waiver-revoked', repair: null, settledBy: null };
     case 'defer':
       return { ...entry, ...settled, standing: 'deferred', reason: 'deferred' };
     case 'request-user-decision':

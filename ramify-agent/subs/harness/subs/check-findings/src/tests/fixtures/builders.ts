@@ -1,7 +1,8 @@
 import type {
   CheckFindingAction, CheckFindingCommand, CheckFindingCommunication, CheckFindingDecisionInput, CheckFindingEvent,
-  CheckFindingId, CheckFindingOwner, CheckFindingRelationKind, CheckFindingReportInput, CheckFindingSource,
-  CheckFindingState, CheckFindingVerification, CheckFindingWitness,
+  CheckFindingGround, CheckFindingId, CheckFindingOwner, CheckFindingRelationKind, CheckFindingReportCredibility,
+  CheckFindingReportInput, CheckFindingRisk, CheckFindingSource, CheckFindingState, CheckFindingVerification,
+  CheckFindingWitness,
 } from '../../interfaces/check-findings.js';
 import { decideCheckFindingChange } from '../../decide.js';
 import { applyCheckFindingEvent, emptyCheckFindingState } from '../../replay.js';
@@ -40,9 +41,22 @@ export interface ConcernOptions {
   readonly hash: number;
   readonly suggests?: CheckFindingId;
   readonly invocation?: string;
+  readonly risk?: CheckFindingRisk;
+  /** What the reviewer named as grounding it; none by default. */
+  readonly ground?: CheckFindingGround | null;
+  /** The harness's class of the ground; `ungrounded` without one and `agent-generated` with one by default. */
+  readonly credibility?: CheckFindingReportCredibility;
+  readonly modules?: readonly string[];
+  readonly issueKey?: string | null;
 }
 
-/** A reviewer's concern: judgmental, verified by assessment, with no producer issue key. */
+/** A ground the harness bound: a path and a fixed hash. */
+export const ground = (ref: string, seed: number): CheckFindingGround => ({ ref, hash: hashOf(seed) });
+
+/**
+ * A reviewer's concern: judgmental, verified by assessment, with no producer
+ * issue key, medium risk and no ground unless the options say otherwise.
+ */
 export function concern(options: ConcernOptions): CheckFindingReportInput {
   return {
     producer: options.producer ?? 'review:code',
@@ -51,7 +65,7 @@ export function concern(options: ConcernOptions): CheckFindingReportInput {
     contentHash: hashOf(options.hash),
     owner: options.owner ?? workItem('wi-001'),
     source: options.source ?? tree('t-01'),
-    issueKey: null,
+    issueKey: options.issueKey ?? null,
     verification: assessment,
     observation: {
       kind: 'review-concern',
@@ -65,8 +79,12 @@ export function concern(options: ConcernOptions): CheckFindingReportInput {
       rationale: 'read the frozen candidate diff',
       uncertainty: 'moderate',
       remedy: 'a bounded change in the named file',
+      risk: options.risk ?? 'medium',
+      ground: options.ground ?? null,
     },
     suggests: options.suggests ?? null,
+    credibility: options.credibility ?? ((options.ground ?? null) === null ? 'ungrounded' : 'agent-generated'),
+    modules: [...(options.modules ?? ['project/cart'])],
   };
 }
 
@@ -80,9 +98,10 @@ export interface FailureOptions {
   readonly hash: number;
   readonly issueKey?: string | null;
   readonly owner?: CheckFindingOwner;
+  readonly modules?: readonly string[];
 }
 
-/** A failed scenario check promoted with its stable issue key. */
+/** A failed scenario check promoted with its stable issue key: objective, with no judgment. */
 export function failure(options: FailureOptions): CheckFindingReportInput {
   const subject = options.subject ?? 'scenario:sc-004';
   return {
@@ -102,6 +121,8 @@ export function failure(options: FailureOptions): CheckFindingReportInput {
     },
     judgment: null,
     suggests: null,
+    credibility: 'objective',
+    modules: [...(options.modules ?? ['project/checkout'])],
   };
 }
 

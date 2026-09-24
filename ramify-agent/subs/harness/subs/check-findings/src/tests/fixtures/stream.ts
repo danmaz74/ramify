@@ -3,17 +3,20 @@ import type {
   CheckFindingStanding,
 } from '../../interfaces/check-findings.js';
 import {
-  concern, decision, dispose, failure, hashOf, relate, report, tree, witness, workItem,
+  concern, decision, dispose, failure, ground, hashOf, relate, report, tree, witness, workItem,
 } from './builders.js';
 
 /*
  * The worked stream of the contract appendix: one work item, `wi-001`, over
  * five candidate trees `t-01` to `t-05`. It holds two unrelated concerns in
  * one file, two parallel reports about one behavior, one stable producer
- * issue key, an accepted choice, a later contradiction and a deferred
- * revisit, with the exact replay, the conflicting replay and two refused
- * witnesses between them. Each step names what the decision must return;
- * the expected views below are literal data, not the query's own output.
+ * issue key, a waiver, a later contradiction that revokes it, a deferred
+ * revisit and a re-raise of a waived issue that stays waived, with the exact
+ * replay, the conflicting replay and two refused witnesses between them.
+ * Each step names what the decision must return; the expected views below
+ * are literal data, not the query's own output. The appendix's step 21, a
+ * correction below the round's floor, is refused by the harness before this
+ * module decides anything, so it is not a step here.
  */
 
 export interface StreamStep {
@@ -24,8 +27,12 @@ export interface StreamStep {
     | { readonly rejection: CheckFindingRejectionCode };
 }
 
-const codeReview1 = concern({ attempt: 'rq-0001.a01', key: 'concern-01', summary: 'The discount is applied twice when a coupon is present', hash: 1 });
+const codeReview1 = concern({
+  attempt: 'rq-0001.a01', key: 'concern-01', summary: 'The discount is applied twice when a coupon is present', hash: 1,
+  risk: 'high', ground: ground('src/tests/cart.test.ts', 2002),
+});
 const workItemAuthority = { kind: 'work-item-assessment', ref: 'wi-001/assessment-1' } as const;
+const reRaised = relate(['cf-0007', 1], ['cf-0006', 2], 'same-issue', 'the handler reads its configuration on every loop pass');
 
 export const fixtureStream: readonly StreamStep[] = [
   {
@@ -35,13 +42,14 @@ export const fixtureStream: readonly StreamStep[] = [
   },
   {
     name: 'code review: an unrelated simplification in the same file',
-    command: report(concern({ attempt: 'rq-0001.a01', key: 'concern-02', summary: 'Rounding is duplicated beside the shared helper', hash: 2 })),
+    command: report(concern({ attempt: 'rq-0001.a01', key: 'concern-02', summary: 'Rounding is duplicated beside the shared helper', hash: 2, risk: 'low' })),
     expect: { events: ['check-finding-opened'] },
   },
   {
     name: 'scope review of iteration 1: the default currency contradicts R2',
     command: report(concern({
       producer: 'review:scope', attempt: 'rq-0002.a01', key: 'concern-01', summary: 'The new EUR default currency contradicts requirement R2', hash: 3, invocation: 'inv-0011',
+      risk: 'high', ground: ground('plans/checkout/plan.md', 2003), credibility: 'human-reviewed',
     })),
     expect: { events: ['check-finding-opened'] },
   },
@@ -76,6 +84,7 @@ export const fixtureStream: readonly StreamStep[] = [
     name: 'design review: the handler reads configuration in a loop',
     command: report(concern({
       producer: 'review:design', attempt: 'rq-0009.a01', key: 'concern-01', summary: 'The handler reads configuration on every loop pass', source: tree('t-03'), hash: 9, invocation: 'inv-0013', path: 'src/handler.ts',
+      risk: 'low', ground: ground('docs/handler-notes.md', 2009), modules: ['project/handler'],
     })),
     expect: { events: ['check-finding-opened'] },
   },
@@ -94,7 +103,7 @@ export const fixtureStream: readonly StreamStep[] = [
           revisit: { kind: 'condition', condition: 'when a later iteration changes the rounding helpers' },
         })),
         dispose('cf-0003', 1, decision(
-          { action: 'accept', authority: workItemAuthority, uncertainty: 'R2 names a locale fallback without its order' },
+          { action: 'waive', authority: workItemAuthority, acceptedRisk: 'high', uncertainty: 'R2 names a locale fallback without its order' },
           {
             communication: {
               mode: 'report',
@@ -104,9 +113,10 @@ export const fixtureStream: readonly StreamStep[] = [
             },
           },
         )),
-        dispose('cf-0004', 1, decision({ action: 'accept', authority: workItemAuthority, uncertainty: 'as cf-0003' })),
+        dispose('cf-0004', 1, decision({ action: 'waive', authority: workItemAuthority, acceptedRisk: 'medium', uncertainty: 'as cf-0003' })),
         dispose('cf-0006', 1, decision(
-          { action: 'supersede', reassessed: ['cfr-0007'], replacement: 'The loop reads a value cached before it starts; there is no repeated read' },
+          { action: 'waive', authority: workItemAuthority, acceptedRisk: 'low', uncertainty: 'the configuration is small and read from memory' },
+          { rationale: 'A low risk, grounded only in an agent\'s note; the repeated read costs nothing measurable' },
         )),
         dispose('cf-0005', 2, decision({ action: 'plan-repair', repair: { kind: 'intent', ref: 'wi-001.rc01' } })),
       ],
@@ -138,7 +148,7 @@ export const fixtureStream: readonly StreamStep[] = [
   {
     name: 'a pass of another scenario is no witness',
     command: dispose('cf-0005', 4, decision(
-      { action: 'verify-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04'), obligation: { subject: 'scenario:sc-005', revision: 1 } }) },
+      { action: 'fix-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04'), obligation: { subject: 'scenario:sc-005', revision: 1 } }) },
       { actor: { kind: 'harness', reason: 'gate ga-0009 passed' }, source: tree('t-04') },
     )),
     expect: { rejection: 'wrong-subject' },
@@ -146,7 +156,7 @@ export const fixtureStream: readonly StreamStep[] = [
   {
     name: 'a partial run of sc-004 is no witness',
     command: dispose('cf-0005', 4, decision(
-      { action: 'verify-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04'), coverage: 'partial' }) },
+      { action: 'fix-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04'), coverage: 'partial' }) },
       { actor: { kind: 'harness', reason: 'gate ga-0009 passed' }, source: tree('t-04') },
     )),
     expect: { rejection: 'insufficient-coverage' },
@@ -154,20 +164,20 @@ export const fixtureStream: readonly StreamStep[] = [
   {
     name: 'sc-004 passes completely on the acceptance candidate t-04',
     command: dispose('cf-0005', 4, decision(
-      { action: 'verify-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) },
+      { action: 'fix-by-check', candidate: tree('t-04'), witness: witness({ source: tree('t-04') }) },
       { actor: { kind: 'harness', reason: 'gate ga-0009 passed' }, source: tree('t-04') },
     )),
     expect: { events: ['check-finding-decided'] },
   },
   {
-    name: 'a fresh assessment verifies the discount repair',
-    command: dispose('cf-0001', 3, decision({ action: 'verify-by-assessment', reassessed: ['cfr-0001'] }, { source: tree('t-04') })),
+    name: 'a fresh assessment finds the discount fixed',
+    command: dispose('cf-0001', 3, decision({ action: 'fix-by-assessment', reassessed: ['cfr-0001'] }, { source: tree('t-04') })),
     expect: { events: ['check-finding-decided'] },
   },
   {
-    name: 'a later contradiction: R2 revision 2 forbids the locale fallback the accepted choice relied on',
+    name: 'a later contradiction: R2 revision 2 forbids the locale fallback the waiver relied on',
     command: dispose('cf-0003', 2, decision(
-      { action: 'reopen', cause: { kind: 'decision' } },
+      { action: 'revoke-waiver', reason: 'R2 revision 2 removes the locale fallback the waiver relied on' },
       { source: tree('t-05'), rationale: 'R2 revision 2 requires the configured locale first', evidence: [{ kind: 'document', ref: 'plan.md#R2@2', hash: hashOf(52) }] },
     )),
     expect: { events: ['check-finding-decided'] },
@@ -185,7 +195,23 @@ export const fixtureStream: readonly StreamStep[] = [
     }, { source: tree('t-05') })),
     expect: { events: ['check-finding-decided'] },
   },
+  {
+    name: 'design review of t-05 raises the configuration read again, suggesting cf-0006',
+    command: report(concern({
+      producer: 'review:design', attempt: 'rq-0012.a01', key: 'concern-01', summary: 'The handler still reads configuration inside its loop', source: tree('t-05'), hash: 12,
+      invocation: 'inv-0015', path: 'src/handler.ts', risk: 'low', modules: ['project/handler'], suggests: 'cf-0006',
+    })),
+    expect: { events: ['check-finding-opened'] },
+  },
+  {
+    name: 'the last round finds cf-0007 is cf-0006 again: the waiver settles the re-raise',
+    command: { type: 'assess', commands: [{ type: 'relate', relation: { ...reRaised.relation, source: tree('t-05') } }] },
+    expect: { events: ['check-finding-related', 'check-finding-decided'] },
+  },
 ];
+
+/** The three steps the second reconciliation commits as one assessment. */
+export const secondReconciliation = { from: 15, to: 18 } as const;
 
 export interface ExpectedFinding {
   readonly id: CheckFindingId;
@@ -198,14 +224,15 @@ export interface ExpectedFinding {
 
 /** What every CheckFinding of the stream must derive to. */
 export const expectedFindings: readonly ExpectedFinding[] = [
-  { id: 'cf-0001', revision: 4, standing: 'closed', reason: 'verified-by-assessment', reports: 1, decisions: 3 },
+  { id: 'cf-0001', revision: 4, standing: 'closed', reason: 'fixed-by-assessment', reports: 1, decisions: 3 },
   { id: 'cf-0002', revision: 2, standing: 'deferred', reason: 'deferred', reports: 1, decisions: 1 },
   { id: 'cf-0003', revision: 4, standing: 'open', reason: 'awaiting-user-decision', reports: 1, decisions: 3 },
-  { id: 'cf-0004', revision: 2, standing: 'closed', reason: 'accepted', reports: 1, decisions: 1 },
-  { id: 'cf-0005', revision: 5, standing: 'closed', reason: 'verified-by-check', reports: 2, decisions: 3 },
-  { id: 'cf-0006', revision: 2, standing: 'closed', reason: 'superseded', reports: 1, decisions: 1 },
+  { id: 'cf-0004', revision: 2, standing: 'closed', reason: 'waived', reports: 1, decisions: 1 },
+  { id: 'cf-0005', revision: 5, standing: 'closed', reason: 'fixed-by-check', reports: 2, decisions: 3 },
+  { id: 'cf-0006', revision: 2, standing: 'closed', reason: 'waived', reports: 1, decisions: 1 },
+  { id: 'cf-0007', revision: 2, standing: 'closed', reason: 'waived', reports: 1, decisions: 1 },
 ];
 
-export const expectedCounters = { findings: 6, reports: 7, decisions: 12, relations: 2 } as const;
-/** Events accepted by the stream: six opened, one reported, twelve decided and two related. */
-export const expectedEventCount = 21;
+export const expectedCounters = { findings: 7, reports: 8, decisions: 13, relations: 3 } as const;
+/** Events accepted by the stream: seven opened, one reported, thirteen decided and three related. */
+export const expectedEventCount = 24;

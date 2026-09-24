@@ -15,7 +15,7 @@ import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
 import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
 import type {
-  CheckFindingCommand, CheckFindingQueryInput, CheckFindingSelection,
+  CheckFindingCommand, CheckFindingGround, CheckFindingQueryInput, CheckFindingReportCredibility, CheckFindingSelection,
 } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import type { CheckFindingCause } from '../check-findings/records.js';
 import { checkFindingStateOf } from '../check-findings/state.js';
@@ -31,7 +31,8 @@ import {
 import { orientationKey, planExcerpts, readGuidance, type CapturedInput } from '../reviews/inputs.js';
 import { orientationMessage, reviewMessage } from '../reviews/message.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
-import { openCandidateSnapshot, snapshotTools, type CandidateSnapshot } from '../reviews/snapshot.js';
+import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
+import { openCandidateSnapshot, resolveSnapshotPath, snapshotTools, type CandidateSnapshot, type SnapshotTools } from '../reviews/snapshot.js';
 import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
 import {
   orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
@@ -45,7 +46,7 @@ import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRe
 import { Mutex, PriorityMutex } from '../jobs/mutex.js';
 import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planStateDirectory } from '../jobs/records.js';
 import { ensureStateDirectory } from '../store/state-directory.js';
-import { readPlan } from '../plans/discover.js';
+import { planPath, readPlan } from '../plans/discover.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReviewerPrompt, sha256, type LoadedPackage,
@@ -899,6 +900,7 @@ export class RunService {
         assignment: assignment.success ? assignment.data : null,
         checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
         requirements,
+        planDocument: snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null,
       }),
       start: start.start,
       ...(start.fork === undefined ? {} : { fork: start.fork }),
@@ -907,7 +909,7 @@ export class RunService {
       description: reviewSubmissionDescription,
       inputSchema: reviewJsonSchema,
       submissionSchema: 'ramify-agent.review-submission/1',
-      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), maxConcerns: policy.maxConcerns }),
+      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), read: tools.read(), maxConcerns: policy.maxConcerns }),
       keep: () => finished('work-closed'),
       scope: { write: null, measurement: null, size: null },
       reader: true,
@@ -934,9 +936,45 @@ export class RunService {
       // not take is a fresh start, and is never measured as a fork.
       actualStart: result.actual === undefined ? null : result.actual === 'fork' ? 'fork' as const : 'fresh' as const,
     };
-    const committed = await this.finishReview(run, request, attemptBody, outcome.result, settles,
-      result.ended === 'submitted' ? result.value : undefined);
+    const submission = result.ended === 'submitted' ? result.value : undefined;
+    // What the harness binds to each concern is read here, before the
+    // transition takes the run mutex.
+    const bindings = submission === undefined || submission.concerns.length === 0
+      ? []
+      : await this.concernBindings(run, request, snapshot, tools, submission);
+    const committed = await this.finishReview(run, request, attemptBody, outcome.result, settles, submission, bindings);
     return committed === 'committed';
+  }
+
+  /**
+   * The ground, credibility and modules of each concern of a valid
+   * submission, in concern order. The ground is the file the reviewer named,
+   * with the hash of what `snapshot_read` answered; its credibility is the
+   * provenance class of that file; the modules own the concern's locations
+   * on the candidate's own module tree, else the work item's module. A
+   * candidate whose module declarations cannot be read leaves only that
+   * fallback, with a warning.
+   */
+  private async concernBindings(run: Run, request: ReviewRequest, snapshot: CandidateSnapshot, tools: SnapshotTools, submission: ReviewSubmission): Promise<ConcernBinding[]> {
+    const index = await candidateModuleIndex(this.candidates, this.projectRoot, snapshot).catch(error => {
+      this.warn(`Run ${run.record.jobId}: the module declarations of ${request.key.candidate} could not be read, so ${request.id}'s concerns name only their work item's module: ${message(error)}`);
+      return null;
+    });
+    const ledger = run.log.ledger.replay();
+    const workItemModule = committedRecords(ledger).workItems.find(item => item.id === request.workItem)?.module ?? null;
+    const provenance = { planId: run.record.planId, featureFiles: new Set(trackedScenarios(ledger).records.map(record => record.file)) };
+    const read = tools.read();
+    return submission.concerns.map(concern => {
+      const resolved = concern.ground === null ? null : resolveSnapshotPath(snapshot, concern.ground.path);
+      const path = resolved?.ok === true ? resolved.path : null;
+      const hash = path === null ? undefined : read.get(path);
+      const ground = path === null || hash === undefined ? null : { ref: path, hash };
+      return {
+        ground,
+        credibility: groundCredibility(ground?.ref ?? null, provenance),
+        modules: concernModules(index, concern.locations, workItemModule),
+      };
+    });
   }
 
   /**
@@ -1068,7 +1106,11 @@ export class RunService {
     result: ReviewResult,
     settles: boolean,
     submission?: ReviewSubmission,
+    bindings: readonly ConcernBinding[] = [],
   ): Promise<'committed' | 'fenced'> {
+    if ((submission?.concerns.length ?? 0) !== bindings.length) {
+      throw new Error(`${attempt.id} submitted ${submission?.concerns.length ?? 0} concerns, and ${bindings.length} were bound`);
+    }
     const finishedAt = this.now().toISOString();
     const record: ReviewSubmissionRecord | undefined = submission === undefined
       ? undefined
@@ -1100,9 +1142,13 @@ export class RunService {
           rationale: concern.rationale,
           uncertainty: concern.uncertainty,
           remedy: concern.remedy,
+          risk: concern.risk,
+          ground: bindings[index]!.ground,
         },
         // A hint only, and only toward a CheckFinding of the same work item.
         suggests: concern.suggests !== null && sameWorkItem(state.findings.get(concern.suggests)?.owner, request.workItem) ? concern.suggests : null,
+        credibility: bindings[index]!.credibility,
+        modules: [...bindings[index]!.modules],
       } satisfies BoundReport));
       return {
         commands,
@@ -6121,6 +6167,13 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  */
 /** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
 type ReviewInputs = Pick<ReviewRequest, 'requirements' | 'guidance' | 'forkPoint'>;
+
+/** What the harness binds to one concern of a valid submission. */
+interface ConcernBinding {
+  readonly ground: CheckFindingGround | null;
+  readonly credibility: CheckFindingReportCredibility;
+  readonly modules: readonly string[];
+}
 
 /** The start a request intends: a fork for every question with a fork point, fresh for code review. */
 function requestedStartOf(request: ReviewRequest): 'fresh' | 'fork' {

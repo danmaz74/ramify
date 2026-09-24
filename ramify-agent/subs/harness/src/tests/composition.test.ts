@@ -298,6 +298,10 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['recovery'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
   { union: 'run log[check-findings-recorded].data.checkFindings[].type', values: ['check-finding-opened'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  { union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-opened].data.report.credibility', values: ['objective'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  // Plan 12 iteration 4b: a driven review's concerns, with the reviewer's risk and the harness's credibility.
+  { union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-opened].data.report.judgment.risk', values: ['high', 'medium', 'low'], file: 'subs/harness/src/tests/review-signals.test.ts', test: 'the harness classifies what each concern names, on the candidate\'s own module tree, and refuses a ground the reviewer did not read' },
+  { union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-opened].data.report.credibility', values: ['human-reviewed', 'agent-generated', 'ungrounded'], file: 'subs/harness/src/tests/review-signals.test.ts', test: 'the harness classifies what each concern names, on the candidate\'s own module tree, and refuses a ground the reviewer did not read' },
   { union: 'run log[check-findings-recorded].data.checkFindings[].type', values: ['check-finding-decided'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
   { union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-opened].data.report.owner.kind', values: ['work-item'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-opened].data.report.source.kind', values: ['tree'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
@@ -500,7 +504,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'verify-by-check', 'verify-by-assessment', 'supersede', 'accept', 'defer', 'request-user-decision', 'answer-user-decision', 'reopen', 'revise-obligation'],
+    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'fix-by-check', 'fix-by-assessment', 'supersede', 'waive', 'revoke-waiver', 'defer', 'request-user-decision', 'answer-user-decision', 'reopen', 'revise-obligation'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
@@ -508,15 +512,15 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[verify-by-check].witness.coverage', values: ['complete', 'partial', 'not-run'],
+    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['complete', 'partial', 'not-run'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[verify-by-check].witness.outcome', values: ['passed', 'failed', 'inconclusive'],
+    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['passed', 'failed', 'inconclusive'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[accept].authority.kind', values: ['work-item-assessment', 'user-decision', 'governing-record'],
+    union: 'run log[check-findings-recorded].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['work-item-assessment', 'user-decision', 'governing-record'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {

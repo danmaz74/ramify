@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkFindingQueryLimits, type CheckFindingState } from '../interfaces/check-findings.js';
 import { selectCheckFindings } from '../queries.js';
 import { emptyCheckFindingState } from '../replay.js';
-import { commit, commitAll, concern, decision, dispose, report, workItem } from './fixtures/builders.js';
+import { commit, commitAll, concern, decision, dispose, failure, ground, report, tree, workItem } from './fixtures/builders.js';
 
 function many(count: number): CheckFindingState {
   return commitAll(Array.from({ length: count }, (_, index) => report(concern({
@@ -36,15 +36,15 @@ describe('list bounds', () => {
 
   it('counts every CheckFinding of the owner whatever the page selects', () => {
     let state = many(4);
-    state = commit(state, dispose('cf-0001', 1, decision({ action: 'accept', authority: { kind: 'work-item-assessment', ref: 'a' }, uncertainty: 'low' })));
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'waive', authority: { kind: 'work-item-assessment', ref: 'a' }, acceptedRisk: 'low', uncertainty: 'low' })));
     const list = listOf(state, { kind: 'list', select: 'attention', owner: workItem('wi-001') });
     expect(list.items.map(item => item.id)).toEqual(['cf-0003']);
-    expect(list.counts).toEqual({ total: 2, standings: { open: 1, deferred: 0, closed: 1 }, reasons: { accepted: 1, new: 1 } });
+    expect(list.counts).toEqual({ total: 2, standings: { open: 1, deferred: 0, closed: 1 }, reasons: { waived: 1, new: 1 } });
   });
 
   it('filters by standing when selecting all', () => {
     let state = many(3);
-    state = commit(state, dispose('cf-0002', 1, decision({ action: 'accept', authority: { kind: 'work-item-assessment', ref: 'a' }, uncertainty: 'low' })));
+    state = commit(state, dispose('cf-0002', 1, decision({ action: 'waive', authority: { kind: 'work-item-assessment', ref: 'a' }, acceptedRisk: 'low', uncertainty: 'low' })));
     expect(listOf(state, { kind: 'list', select: 'all', standings: ['closed'] }).items.map(item => item.id)).toEqual(['cf-0002']);
   });
 });
@@ -67,7 +67,7 @@ describe('attention', () => {
 
   it('is empty when nothing is open or due, so the caller can take the ordinary gate path', () => {
     let state = many(1);
-    state = commit(state, dispose('cf-0001', 1, decision({ action: 'accept', authority: { kind: 'work-item-assessment', ref: 'a' }, uncertainty: 'low' })));
+    state = commit(state, dispose('cf-0001', 1, decision({ action: 'waive', authority: { kind: 'work-item-assessment', ref: 'a' }, acceptedRisk: 'low', uncertainty: 'low' })));
     const list = listOf(state, { kind: 'list', select: 'attention', owner: workItem('wi-001') });
     expect([list.total, list.items]).toEqual([0, []]);
     expect(listOf(emptyCheckFindingState(), { kind: 'list', select: 'attention' }).total).toBe(0);
@@ -79,12 +79,74 @@ describe('attention', () => {
   });
 });
 
+describe('attention order and modules', () => {
+  /** Six concerns of one owner across two modules, with every risk and credibility the order compares. */
+  function signals(): CheckFindingState {
+    return commitAll([
+      report(concern({ attempt: 'rq-0001.a01', key: 'c1', summary: 'Low, ungrounded', hash: 1, risk: 'low' })),
+      report(concern({ attempt: 'rq-0001.a01', key: 'c2', summary: 'High, agent-generated', hash: 2, risk: 'high', ground: ground('src/tests/a.test.ts', 12) })),
+      report(concern({
+        attempt: 'rq-0001.a01', key: 'c3', summary: 'High, human-reviewed', hash: 3, risk: 'high',
+        ground: ground('docs/cart.principles.md', 13), credibility: 'human-reviewed', modules: ['project/pricing'],
+      })),
+      report(concern({ attempt: 'rq-0001.a01', key: 'c4', summary: 'Medium, ungrounded', hash: 4, modules: ['project/cart', 'project/pricing'] })),
+      report(concern({ attempt: 'rq-0002.a01', key: 'c1', summary: 'Low, ungrounded, later', hash: 5, risk: 'low' })),
+      report(failure({ attempt: 'ga-0005', source: tree('t-02'), hash: 6, required: false, modules: ['project/pricing'] })),
+    ]);
+  }
+
+  it('orders by risk, then credibility, then the latest report, and pages after a position in that order', () => {
+    const state = signals();
+    const ordered = listOf(state, { kind: 'list', select: 'all', order: 'attention' });
+    // cf-0006 is a non-required failed check: medium, objective.
+    expect(ordered.items.map(item => [item.id, item.risk, item.credibility])).toEqual([
+      ['cf-0003', 'high', 'human-reviewed'],
+      ['cf-0002', 'high', 'agent-generated'],
+      ['cf-0006', 'medium', 'objective'],
+      ['cf-0004', 'medium', 'ungrounded'],
+      ['cf-0005', 'low', 'ungrounded'],
+      ['cf-0001', 'low', 'ungrounded'],
+    ]);
+    const first = listOf(state, { kind: 'list', select: 'all', order: 'attention', limit: 2 });
+    expect([first.items.map(item => item.id), first.next]).toEqual([['cf-0003', 'cf-0002'], 'cf-0002']);
+    const second = listOf(state, { kind: 'list', select: 'all', order: 'attention', after: 'cf-0002', limit: 2 });
+    expect([second.items.map(item => item.id), second.next]).toEqual([['cf-0006', 'cf-0004'], 'cf-0004']);
+    const unknown = selectCheckFindings(state, { kind: 'list', select: 'all', order: 'attention', after: 'cf-0009' });
+    expect(unknown.ok ? null : unknown.rejection.code).toBe('unknown-check-finding');
+  });
+
+  it('ranks a reproduced objective signal first, and follows a risk correction over the reporter\'s level', () => {
+    let state = signals();
+    state = commit(state, report(failure({ attempt: 'ga-0007', source: tree('t-03'), hash: 7, required: false, modules: ['project/pricing'] })));
+    expect(state.findings.get('cf-0006')).toMatchObject({ credibility: 'objective-reproduced', risk: 'medium' });
+    state = commit(state, dispose('cf-0005', 1, decision({ action: 'plan-repair', repair: { kind: 'intent', ref: 'i' } }, { risk: 'high' })));
+    expect(state.findings.get('cf-0005')?.risk).toBe('high');
+    const ordered = listOf(state, { kind: 'list', select: 'all', order: 'attention' });
+    expect(ordered.items.map(item => item.id)).toEqual(['cf-0003', 'cf-0002', 'cf-0005', 'cf-0006', 'cf-0004', 'cf-0001']);
+    // A later report does not undo the correction: the latest correction stands.
+    expect(state.findings.get('cf-0005')?.reports.at(-1)?.judgment?.risk).toBe('low');
+  });
+
+  it('narrows a list and its counts to the CheckFindings that concern one module', () => {
+    const state = signals();
+    const pricing = listOf(state, { kind: 'list', select: 'all', module: 'project/pricing' });
+    expect(pricing.items.map(item => [item.id, item.modules])).toEqual([
+      ['cf-0003', ['project/pricing']], ['cf-0004', ['project/cart', 'project/pricing']], ['cf-0006', ['project/pricing']],
+    ]);
+    expect(pricing.counts.total).toBe(3);
+    // A CheckFinding of two modules counts in both, so the module counts do not sum to the owner's.
+    expect(listOf(state, { kind: 'list', select: 'all', module: 'project/cart' }).counts.total).toBe(4);
+    expect(listOf(state, { kind: 'list', select: 'all' }).counts.total).toBe(6);
+    expect(listOf(state, { kind: 'list', select: 'all', module: 'project/none' }).total).toBe(0);
+  });
+});
+
 describe('detail', () => {
   it('bounds the history it returns and states the totals', () => {
     let state = many(1);
     for (let revision = 1; revision < 1 + 2 * 110; revision += 2) {
-      state = commit(state, dispose('cf-0001', revision, decision({ action: 'accept', authority: { kind: 'work-item-assessment', ref: 'a' }, uncertainty: 'low' })));
-      state = commit(state, dispose('cf-0001', revision + 1, decision({ action: 'reopen', cause: { kind: 'decision' } })));
+      state = commit(state, dispose('cf-0001', revision, decision({ action: 'waive', authority: { kind: 'work-item-assessment', ref: 'a' }, acceptedRisk: 'low', uncertainty: 'low' })));
+      state = commit(state, dispose('cf-0001', revision + 1, decision({ action: 'revoke-waiver', reason: 'a later report contradicts it' })));
     }
     const detail = selectCheckFindings(state, { kind: 'detail', checkFinding: 'cf-0001' });
     if (!detail.ok || detail.view.kind !== 'detail') throw new Error('no detail');

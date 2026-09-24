@@ -1,6 +1,6 @@
 # Plan 12 contract appendix
 
-**Status:** fixed by iteration 1, 2026-09-24. **Owner of each part:** named in its section.
+**Status:** fixed by iteration 1, 2026-09-24; renames, signal fields and module attribution implemented by iteration 4b. **Owner of each part:** named in its section.
 
 This appendix makes the [plan's](main-plan.md) contracts table exact before
 producers depend on it. Section 1 is implemented by the pure
@@ -13,7 +13,7 @@ this appendix is more precise, it records a decision within them. A later
 iteration that must change a contract here records the change and its reason
 in `results.md` and updates this appendix in the same commit.
 
-## 1. The CheckFinding domain (iteration 1, implemented)
+## 1. The CheckFinding domain (iterations 1 and 4b, implemented)
 
 **Owner:** `subs/harness/subs/check-findings/`. **Canonical schemas:**
 [`src/interfaces/check-findings.ts`](../../../subs/harness/subs/check-findings/src/interfaces/check-findings.ts).
@@ -114,6 +114,15 @@ and the harness-bound `credibility` and `modules` (iteration 4b).
    or more objective reports. `modules` is a list of module paths, possibly
    empty. A CheckFinding's current risk is its latest risk correction, else
    its latest report's risk; its modules are the union of its reports'.
+   As implemented: a report without a judgment (a failed check) proposes
+   `high` for a required check and `medium` otherwise. `invalid-report` also
+   refuses a `check-failed` report that is not `objective`, a
+   `review-concern` that is, and a `review-concern` whose credibility is
+   `ungrounded` without a null ground or the reverse. Without two objective
+   reports a CheckFinding is as credible as its most credible report; its
+   modules keep the order in which its reports first name them. The child
+   derives risk, credibility and modules after every event (`signals.ts`)
+   and holds them on the replayed entry.
 
 An authorized obligation revision adds the scoped keys of the new obligation
 to the CheckFinding, keeping the old ones. A report of the new obligation that
@@ -127,8 +136,10 @@ the case the refusal exists for.
 `communication` is `{ mode: 'quiet' }` or `{ mode: 'report', choice,
 uncertainty, reason }`, which the views show as a material choice. `risk`,
 optional, corrects the CheckFinding's risk level with the action (iteration
-4b). The names below are those of iteration 4b; iterations 1–4 implemented
-`verify-by-check`, `verify-by-assessment` and `accept`, which 4b renames.
+4b). Iterations 1–4 implemented `verify-by-check`, `verify-by-assessment`
+and `accept`; iteration 4b renamed them to the names below. A waiver's
+`acceptedRisk` is a risk level, `high | medium | low`; `waived` and
+`not-waived` are rejection codes.
 
 Common refusals, in order: `unknown-check-finding`; `stale-revision`
 (expected ≠ current); `awaiting-user-decision` (a pending request admits only
@@ -168,7 +179,14 @@ with one exception (iteration 4b): a `same-issue` relation whose canonical is
 waived also emits, as the harness actor, a `waive` on each newly joined open
 member with authority `{ kind: 'governing-record', ref: <the canonical's
 waiver decision> }`, so a re-raise of a waived issue settles. A required
-check is never joined that way; its `waive` refusal stands.
+check is never joined that way; its `waive` refusal stands. As implemented:
+a newly joined member is one of the resulting group that was not in the
+canonical's group before the relation; the relation itself is always
+accepted, and a member that is a required check or awaits a user's answer
+stays open. The waiver's source and evidence are the relation's, its
+`acceptedRisk` the member's current risk, its `uncertainty` the canonical
+waiver's, and it comes after the `check-finding-related` event in the same
+decision, with the next decision ID.
 
 `assess { commands[1..100] }` holds `dispose` and `relate` commands, decided
 in order against the state the earlier ones leave. The first refusal refuses
@@ -203,7 +221,11 @@ not hold, and a relation naming an unknown CheckFinding.
 named in `due`, marked `open` or `due`. Pages are ordered by ID, or with
 `order: attention` by risk (high first), then credibility (§1.4 rule 7,
 `objective-reproduced` first), then the latest report ID descending, then
-ID; `next` is the last shown ID when more remain. `counts` covers every
+ID; `next` is the last shown ID when more remain. `order` defaults to `id`.
+`after` is a position in the order: with `order: attention` it must name an
+existing CheckFinding (else `unknown-check-finding`), and the page continues
+after that CheckFinding's current place even when it has left the
+selection. `module` selects the CheckFindings whose modules include it. `counts` covers every
 CheckFinding of the owner, and of the module when one is given (total, per
 standing, per reason) whatever the page selects. A summary carries ID,
 revision, owner, standing, reason, `awaiting` (`assessment`, `repair`,
@@ -440,7 +462,11 @@ A concern with an empty or unsupported location, or a submission naming
 inspected paths outside the candidate diff, is `invalid-output`. A `ground`
 path must be a path of the candidate that `snapshot_read` answered during the
 attempt, else `invalid-output`; the reviewer names what it actually read, or
-null. An empty
+null. As implemented (iteration 4b), a refused ground is a validation error
+returned to the reviewer like any other, so it can read the file and submit
+again; `invalid-output` follows only when the submissions run out. A binary
+file, which `snapshot_read` does not answer with content, is no ground. An
+empty
 `concerns` with `missing` empty is a clean covered scope; with `missing`
 non-empty it is `partial`.
 
@@ -478,6 +504,8 @@ key has none.
 | `suggests` | the concern's hint, dropped when it names no CheckFinding of the same owner |
 | `credibility` | harness classification of the ground path (iteration 4b): `human-reviewed` for a path matching `**/*.principles.md`, a document of the run's plan directory, a feature file the harness wrote or an approved requirement record; `agent-generated` for any other path; `ungrounded` for null. The classifier is one function with these four rules; it is not a registry. |
 | `modules` | `ownerOf` (`kpi/lines.ts`) for each location against the candidate's module index at `request.tree`, deduplicated; the work item's module when no location falls inside a module; empty only for a run-level owner (iteration 4b) |
+
+§3.7 records how iteration 4b implements the last three rows.
 
 ### 3.5 The implemented code review (iteration 3)
 
@@ -626,6 +654,38 @@ service's review section; the pi adapter's fork.
   directory rather than its parent's. Isolation is the fork's tool set:
   pi offers exactly the spec's tools, and the fork still holds whatever its
   parent read before the point.
+
+### 3.7 Concern signals (iteration 4b, implemented)
+
+**Files:** `src/reviews/records.ts` (`reviewGroundSchema`, the concern's
+`risk` and `ground`), `snapshot.ts` (`SnapshotTools.read()`: every file
+`snapshot_read` answered, with the `sha256:` of its content),
+`submission.ts` (the ground rule), `signals.ts` (`groundCredibility`,
+`candidateModuleIndex`, `concernModules`), `message.ts` (the scope question
+names the plan document when the candidate holds it); the run service's
+`concernBindings`; the prompt package `reviewer/3`.
+
+- **Ground.** `ref` is the resolved candidate path, `hash` the `sha256:` of
+  the content `snapshot_read` answered for it in the attempt. `quote` stays
+  in the submission record only.
+- **Credibility.** `groundCredibility(path, { planId, featureFiles })`:
+  `human-reviewed` for a basename ending `.principles.md`, a path under
+  `plans/<planId>/` outside its `.harness/`, or a path among the tracked
+  scenario records' `file`s; `agent-generated` otherwise; `ungrounded` for
+  null. The approved-requirement rule has nothing to match: the run's
+  records live in its gitignored state directory, which no audited
+  candidate holds, so no ground a reviewer read can name one.
+- **Modules.** `candidateModuleIndex` reads the candidate's own
+  `module.ramify` files from Git's objects: the root's, then recursively each
+  `<dir>/subs/<name>/module.ramify` of a module, named by declared-name path
+  (`root/child/…`, as the architect view names them), each owning its `src/`,
+  `module.ramify` and `README.md`. A declaration anywhere else declares
+  nothing. `concernModules` applies `ownerOf` to each location, keeping
+  location order, else the work item's module from the committed work-item
+  record. A candidate whose declarations cannot be read leaves only that
+  fallback, with a warning.
+- **Sequencing.** The bindings are read after the reviewer's invocation and
+  before the transition takes the run mutex; `build` only maps them.
 
 ## 4. Policy (iterations 3–5)
 
@@ -913,7 +973,7 @@ producers exist.
 | 18 | same assessment: the fix would change an approved obligation | accepted | decided `cf-0003`@4 `cfd-0012` request-user-decision (`follow-r2`, `keep-eur`) | same line as 16 |
 | 19 | design review `rq-0012.a01` on `t-05`: configuration read in a loop again, `suggests: cf-0006` | accepted | opened `cf-0007`@1 `cfr-0008` | `review-attempt-finished` |
 | 20 | reconciliation `wi-001.rc03`, round 3, floor `none`: `cf-0007` is `cf-0006` again | accepted | related `cfl-0003` `cf-0007`→`cf-0006` same-issue; decided `cf-0007`@2 `cfd-0013` waive (harness, governing record `cfd-0005`) | `reconciliation-assessed` |
-| 21 | same assessment: a `plan-repair` for `cf-0003` | `correction-floor` | none | none |
+| 21 | same assessment: a `plan-repair` for `cf-0003` | `correction-floor` (harness, before the child) | none | none |
 
 Final state, 24 events: `cf-0001` closed `fixed-by-assessment` @4;
 `cf-0002` deferred @2; `cf-0003` open `awaiting-user-decision` @4 pending
@@ -928,7 +988,14 @@ unresolved, reason `rounds-exhausted`. The stream test replays the events
 from their JSON lines into identical state and views, and shows that steps
 16–18 decided as one `assess` produce the same events. Iterations 1–4
 implemented steps 1–18 under the earlier names with `cf-0006` superseded;
-iteration 4b renames them, waives `cf-0006` and adds steps 19–21.
+iteration 4b renamed them, waived `cf-0006` and added steps 19 and 20. Step
+21 is the harness's refusal before the child decides anything (§6), so the
+child's fixture holds steps 1–20 and iteration 5's reconciliation tests
+own step 21. The fixture's risks are `cf-0001` and `cf-0003` high,
+`cf-0004` medium, `cf-0002`, `cf-0006` and `cf-0007` low, and `cf-0005`
+high as a required check; with `order: attention` every CheckFinding lists
+as `cf-0005`, `cf-0003`, `cf-0001`, `cf-0004`, `cf-0006`, `cf-0007`,
+`cf-0002`.
 
 Event 1 as the child returns it:
 

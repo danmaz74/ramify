@@ -98,7 +98,7 @@ export type CheckFindingObligation = z.infer<typeof checkFindingObligationSchema
  * integration. `assessment` is a fresh reasoned judgment; `check` is a rerun
  * of the same obligation by the same producer with comparable inputs
  * (`selection` is the selection and configuration identity), and `required`
- * says the obligation belongs to a required check, which no acceptance or
+ * says the obligation belongs to a required check, which no waiver or
  * deferral may evade.
  */
 export const checkFindingVerificationSchema = z.discriminatedUnion('kind', [
@@ -132,6 +132,37 @@ export const checkFindingAuthoritySchema = z.object({
 }).strict();
 export type CheckFindingAuthority = z.infer<typeof checkFindingAuthoritySchema>;
 
+// Risk, ground and credibility.
+
+/**
+ * The harm if the signal is real: the reporter proposes it, and the
+ * assessing architect may correct it by a recorded decision. It orders
+ * attention; it never escalates to a user by itself.
+ */
+export const checkFindingRiskSchema = z.enum(['high', 'medium', 'low']);
+export type CheckFindingRisk = z.infer<typeof checkFindingRiskSchema>;
+
+/**
+ * What grounds a judgment: the reference the reporter named, with the hash
+ * of the bytes the harness bound it to. The harness classifies it into the
+ * report's credibility; the reporter never declares that.
+ */
+export const checkFindingGroundSchema = z.object({ ref, hash: hashSchema }).strict();
+export type CheckFindingGround = z.infer<typeof checkFindingGroundSchema>;
+
+/**
+ * How far a signal is to be trusted, by the provenance of what grounds it,
+ * most credible first: an objective signal a check observed more than once,
+ * one it observed once, a judgment grounded in human-reviewed material, one
+ * grounded in agent-generated material, and one with no ground. Only a view
+ * derives `objective-reproduced`; a report carries one of the other four.
+ */
+export const checkFindingCredibilitySchema = z.enum(['objective-reproduced', 'objective', 'human-reviewed', 'agent-generated', 'ungrounded']);
+export type CheckFindingCredibility = z.infer<typeof checkFindingCredibilitySchema>;
+/** The credibility the harness binds to one report. */
+export const checkFindingReportCredibilitySchema = checkFindingCredibilitySchema.exclude(['objective-reproduced']);
+export type CheckFindingReportCredibility = z.infer<typeof checkFindingReportCredibilitySchema>;
+
 // Reports.
 
 /** What was observed: a failed check execution, or a concern a reviewer asserted. */
@@ -143,13 +174,19 @@ export const checkFindingObservationSchema = z.object({
 }).strict();
 export type CheckFindingObservation = z.infer<typeof checkFindingObservationSchema>;
 
-/** An attributed interpretation: the consequence, why, how sure, and a bounded remedy. */
+/**
+ * An attributed interpretation: the consequence, why, how sure, a bounded
+ * remedy, the risk the reporter proposes and what the reporter named as
+ * grounding it, or null.
+ */
 export const checkFindingJudgmentSchema = z.object({
   actor: checkFindingActorSchema,
   consequence: prose,
   rationale: prose,
   uncertainty: prose,
   remedy: prose.nullable(),
+  risk: checkFindingRiskSchema,
+  ground: checkFindingGroundSchema.nullable(),
 }).strict();
 export type CheckFindingJudgment = z.infer<typeof checkFindingJudgmentSchema>;
 
@@ -160,7 +197,11 @@ export type CheckFindingJudgment = z.infer<typeof checkFindingJudgmentSchema>;
  * key with an equal hash is a replay, with another hash a conflict.
  * `issueKey` is a trusted producer's stable issue identity, scoped by owner
  * and verification obligation; `suggests` is a reviewer's hint of an existing
- * CheckFinding and never attaches the report.
+ * CheckFinding and never attaches the report. `credibility` and `modules` are
+ * the harness's: the provenance class of the judgment's ground (`objective`
+ * for a failed check), and the modules that own the report's locations on
+ * its own source, else the owner work item's module. They never form
+ * identity.
  */
 export const checkFindingReportInputSchema = z.object({
   producer: checkFindingProducerSchema,
@@ -174,6 +215,8 @@ export const checkFindingReportInputSchema = z.object({
   observation: checkFindingObservationSchema,
   judgment: checkFindingJudgmentSchema.nullable(),
   suggests: checkFindingIdSchema.nullable(),
+  credibility: checkFindingReportCredibilitySchema,
+  modules: z.array(ref).max(50),
 }).strict();
 export type CheckFindingReportInput = z.infer<typeof checkFindingReportInputSchema>;
 
@@ -245,16 +288,23 @@ export type CheckFindingReopenCause = z.infer<typeof checkFindingReopenCauseSche
 export const checkFindingActionSchema = z.discriminatedUnion('action', [
   /** Stays open; links the correction that will repair it. */
   z.object({ action: z.literal('plan-repair'), repair: checkFindingRepairSchema }).strict(),
-  /** Stays open until verified; names what changed and the candidate it claims repaired. */
+  /** Stays open until fixed; names what changed and the candidate it claims repaired. */
   z.object({ action: z.literal('claim-repair'), candidate: checkFindingSourceSchema, change: ref }).strict(),
-  /** Closes a `check` CheckFinding with a matching witness on the acceptance candidate. */
-  z.object({ action: z.literal('verify-by-check'), candidate: checkFindingSourceSchema, witness: checkFindingWitnessSchema }).strict(),
-  /** Closes an `assessment` CheckFinding with a fresh assessment of the named reports. */
-  z.object({ action: z.literal('verify-by-assessment'), reassessed: z.array(checkFindingReportIdSchema).min(1).max(100) }).strict(),
+  /** Closes a `check` CheckFinding as fixed, with a matching witness on the acceptance candidate. */
+  z.object({ action: z.literal('fix-by-check'), candidate: checkFindingSourceSchema, witness: checkFindingWitnessSchema }).strict(),
+  /** Closes an `assessment` CheckFinding as fixed, with a fresh assessment of the named reports. */
+  z.object({ action: z.literal('fix-by-assessment'), reassessed: z.array(checkFindingReportIdSchema).min(1).max(100) }).strict(),
   /** Closes an `assessment` CheckFinding with a replacing judgment; no code change is claimed. */
   z.object({ action: z.literal('supersede'), reassessed: z.array(checkFindingReportIdSchema).min(1).max(100), replacement: prose }).strict(),
-  /** Closes as accepted, with authority and uncertainty. Claims no repair and changes no gate. */
-  z.object({ action: z.literal('accept'), authority: checkFindingAuthoritySchema, uncertainty: prose }).strict(),
+  /**
+   * Closes as waived: the signal is understood and the code stays as it is,
+   * with the authority, the risk accepted and the uncertainty. Claims no
+   * repair and changes no gate. A later report of the same issue never
+   * reopens it; only a revocation does.
+   */
+  z.object({ action: z.literal('waive'), authority: checkFindingAuthoritySchema, acceptedRisk: checkFindingRiskSchema, uncertainty: prose }).strict(),
+  /** Open again after a waiver, with the reason; the waiver stays in the history. */
+  z.object({ action: z.literal('revoke-waiver'), reason: prose }).strict(),
   /** Deferred, with a responsible owner and a revisit. Claims nothing fixed. */
   z.object({ action: z.literal('defer'), authority: checkFindingAuthoritySchema, responsible: checkFindingOwnerSchema, revisit: checkFindingRevisitSchema }).strict(),
   /** Stays open and awaits a user's answer. */
@@ -266,7 +316,7 @@ export const checkFindingActionSchema = z.discriminatedUnion('action', [
   }).strict(),
   /** A user's answer to the pending request, naming it and one of its options. */
   z.object({ action: z.literal('answer-user-decision'), request: checkFindingDecisionIdSchema, option: name }).strict(),
-  /** Open again at a new revision; every earlier decision stays in the history. */
+  /** Open again at a new revision; every earlier decision stays in the history. A waiver is revoked instead. */
   z.object({ action: z.literal('reopen'), cause: checkFindingReopenCauseSchema }).strict(),
   /** An authorized change of the obligation a `check` CheckFinding must be verified against. */
   z.object({
@@ -291,7 +341,8 @@ export type CheckFindingCommunication = z.infer<typeof checkFindingCommunication
 
 /**
  * One decision as submitted: who, against which current source, why, on what
- * evidence, how it is communicated, and the action.
+ * evidence, how it is communicated, and the action. `risk`, when present,
+ * corrects the CheckFinding's risk level with the action.
  */
 export const checkFindingDecisionInputSchema = z.object({
   actor: checkFindingActorSchema,
@@ -299,6 +350,7 @@ export const checkFindingDecisionInputSchema = z.object({
   rationale: prose,
   evidence: z.array(checkFindingEvidenceSchema).max(50),
   communication: checkFindingCommunicationSchema,
+  risk: checkFindingRiskSchema.optional(),
   decision: checkFindingActionSchema,
 }).strict();
 export type CheckFindingDecisionInput = z.infer<typeof checkFindingDecisionInputSchema>;
@@ -409,11 +461,12 @@ export type CheckFindingStanding = z.infer<typeof checkFindingStandingSchema>;
 /** Why a CheckFinding stands where it does. */
 export const checkFindingReasonSchema = z.enum([
   // open
-  'new', 'repair-planned', 'repair-claimed', 'awaiting-user-decision', 'user-decision-answered', 'reopened', 'obligation-revised',
+  'new', 'repair-planned', 'repair-claimed', 'awaiting-user-decision', 'user-decision-answered', 'reopened', 'waiver-revoked',
+  'obligation-revised',
   // deferred
   'deferred',
   // closed
-  'verified-by-check', 'verified-by-assessment', 'superseded', 'accepted',
+  'fixed-by-check', 'fixed-by-assessment', 'superseded', 'waived',
 ]);
 export type CheckFindingReason = z.infer<typeof checkFindingReasonSchema>;
 
@@ -438,10 +491,16 @@ export interface CheckFindingEntry {
   readonly issueKeys: readonly string[];
   /** The request awaiting a user's answer, while one does. */
   readonly pendingUserDecision: CheckFindingDecisionId | null;
-  /** The repair planned since the CheckFinding was last opened or reopened. */
+  /** The repair planned since the CheckFinding was last opened, reopened or its waiver revoked. */
   readonly repair: CheckFindingRepair | null;
   /** The decision that closed or deferred it, while it is closed or deferred. */
   readonly settledBy: CheckFindingDecisionId | null;
+  /** Its latest risk correction, else its latest report's risk. */
+  readonly risk: CheckFindingRisk;
+  /** `objective-reproduced` with two or more objective reports, else the most credible of its reports'. */
+  readonly credibility: CheckFindingCredibility;
+  /** The union of its reports' modules, in order. */
+  readonly modules: readonly string[];
 }
 
 /** Where an ingestion key led. */
@@ -474,6 +533,8 @@ export const checkFindingRejectionCodeSchema = z.enum([
   'unknown-report',
   'stale-revision',
   'invalid-transition',
+  'waived',
+  'not-waived',
   'awaiting-user-decision',
   'no-pending-user-decision',
   'unknown-option',
@@ -538,15 +599,19 @@ export const checkFindingQueryLimits = { defaultLimit: 50, maxLimit: 100, detail
  * A bounded list or one CheckFinding's detail. `attention` selects the open
  * CheckFindings and the deferred ones whose revisit the harness found due
  * (`due`); `all` selects every standing, optionally narrowed by `standings`.
- * Pages are ordered by ID and continue after `after`.
+ * `module` narrows either to the CheckFindings that concern that module.
+ * Pages are ordered by ID, or with `order: attention` by risk, credibility
+ * and recency, and continue after the CheckFinding `after` names.
  */
 export const checkFindingQuerySchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('list'),
     owner: checkFindingOwnerSchema.nullable().default(null),
+    module: ref.nullable().default(null),
     select: z.enum(['attention', 'all']),
     standings: z.array(checkFindingStandingSchema).min(1).nullable().default(null),
     due: z.array(checkFindingIdSchema).max(checkFindingQueryLimits.maxDue).default([]),
+    order: z.enum(['id', 'attention']).default('id'),
     after: checkFindingIdSchema.nullable().default(null),
     limit: z.int().min(1).max(checkFindingQueryLimits.maxLimit).default(checkFindingQueryLimits.defaultLimit),
   }).strict(),
@@ -585,17 +650,20 @@ export interface CheckFindingSummary {
   readonly producers: readonly CheckFindingProducer[];
   /** The first report's observation summary. */
   readonly title: string;
+  readonly risk: CheckFindingRisk;
+  readonly credibility: CheckFindingCredibility;
+  readonly modules: readonly string[];
   readonly latestSource: CheckFindingSource;
   readonly reports: number;
   readonly decisions: number;
   readonly group: CheckFindingGroup | null;
   readonly pendingUserDecision: CheckFindingDecisionId | null;
   readonly repair: CheckFindingRepair | null;
-  /** The latest decision reported as a material choice since the last reopening. */
+  /** The latest decision reported as a material choice since the last reopening or revocation. */
   readonly materialChoice: CheckFindingMaterialChoice | null;
 }
 
-/** Counts over every CheckFinding of the queried owner, whatever the page shows. */
+/** Counts over every CheckFinding of the queried owner and module, whatever the page shows. */
 export interface CheckFindingCounts {
   readonly total: number;
   readonly standings: Readonly<Record<CheckFindingStanding, number>>;
