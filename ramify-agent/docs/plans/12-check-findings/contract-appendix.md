@@ -74,7 +74,8 @@ and locations at most 50 per list.
 A report carries `producer`, `attempt`, `reportKey`, `contentHash`, `owner`,
 `source`, `issueKey`, `verification`, `observation` (`check-failed` or
 `review-concern`, summary, evidence, locations), `judgment` (actor,
-consequence, rationale, uncertainty, remedy) and `suggests`.
+consequence, rationale, uncertainty, remedy, `risk`, `ground`), `suggests`,
+and the harness-bound `credibility` and `modules` (iteration 4b).
 
 1. **Ingestion key** `(producer, attempt, reportKey)`. Same key and same
    `contentHash`: accepted with no events, `replayed: true`, naming the
@@ -98,10 +99,21 @@ consequence, rationale, uncertainty, remedy) and `suggests`.
    rule names the report's own producer.
 6. **Reopening by report.** Attaching to a closed CheckFinding also emits a
    harness-actor `reopen` decision (cause `{ kind: 'report', report }`) when
-   the closing decision was `verify-by-check`, or when the report's source
-   differs from the closing decision's source. On the same source any other
-   closure, such as an accepted choice, stays closed with the added evidence.
-   A deferred CheckFinding stays deferred.
+   the closing decision was `fix-by-check`, or when the report's source
+   differs from the closing decision's source. A waived CheckFinding stays
+   closed whatever the source, with the added evidence; on the same source
+   any other closure stays closed with the added evidence too. A deferred
+   CheckFinding stays deferred.
+7. **Risk, ground, credibility and modules** (iteration 4b). `risk` is
+   `high | medium | low`, the reporter's proposal. `ground` is `{ ref, hash }`
+   or null: the reference the reporter named as grounding the concern.
+   `credibility` is bound by the harness, never by the reporter: `objective`
+   for a `check-failed` report; for a `review-concern`, `human-reviewed`,
+   `agent-generated` or `ungrounded` from the ground's provenance class
+   (§3.4). A view derives `objective-reproduced` for a CheckFinding with two
+   or more objective reports. `modules` is a list of module paths, possibly
+   empty. A CheckFinding's current risk is its latest risk correction, else
+   its latest report's risk; its modules are the union of its reports'.
 
 An authorized obligation revision adds the scoped keys of the new obligation
 to the CheckFinding, keeping the old ones. A report of the new obligation that
@@ -111,9 +123,12 @@ the case the refusal exists for.
 ### 1.5 Decisions
 
 `dispose { checkFinding, expectedRevision, decision }` where `decision` is
-`{ actor, source, rationale, evidence, communication, decision: action }`.
+`{ actor, source, rationale, evidence, communication, risk?, decision: action }`.
 `communication` is `{ mode: 'quiet' }` or `{ mode: 'report', choice,
-uncertainty, reason }`, which the views show as a material choice.
+uncertainty, reason }`, which the views show as a material choice. `risk`,
+optional, corrects the CheckFinding's risk level with the action (iteration
+4b). The names below are those of iteration 4b; iterations 1–4 implemented
+`verify-by-check`, `verify-by-assessment` and `accept`, which 4b renames.
 
 Common refusals, in order: `unknown-check-finding`; `stale-revision`
 (expected ≠ current); `awaiting-user-decision` (a pending request admits only
@@ -123,14 +138,15 @@ its answer); then the action's own.
 | --- | --- | --- | --- |
 | `plan-repair { repair: assignment \| intent }` | open | open, `repair-planned` | `invalid-transition` |
 | `claim-repair { candidate, change }` | open | open, `repair-claimed` | `invalid-transition` |
-| `verify-by-check { candidate, witness }` | open | closed, `verified-by-check` | `verification-kind-mismatch`, `producer-mismatch`, `wrong-subject`, `obligation-changed`, `incomparable-inputs` (selection), `source-mismatch` (witness source ≠ candidate), `failure-source` (witness on the source of the latest failure), `not-executed` (`not-run`), `insufficient-coverage` (`partial`), `not-passed` (`failed` or `inconclusive`) |
-| `verify-by-assessment { reassessed }` | open | closed, `verified-by-assessment` | `verification-kind-mismatch`, `unknown-report` |
+| `fix-by-check { candidate, witness }` | open | closed, `fixed-by-check` | `verification-kind-mismatch`, `producer-mismatch`, `wrong-subject`, `obligation-changed`, `incomparable-inputs` (selection), `source-mismatch` (witness source ≠ candidate), `failure-source` (witness on the source of the latest failure), `not-executed` (`not-run`), `insufficient-coverage` (`partial`), `not-passed` (`failed` or `inconclusive`) |
+| `fix-by-assessment { reassessed }` | open | closed, `fixed-by-assessment` | `verification-kind-mismatch`, `unknown-report` |
 | `supersede { reassessed, replacement }` | open, deferred | closed, `superseded` | `factual-obligation` for a `check` rule, `unknown-report` |
-| `accept { authority, uncertainty }` | open, deferred | closed, `accepted` | `required-obligation` for a required check |
+| `waive { authority, acceptedRisk, uncertainty }` | open, deferred | closed, `waived` | `required-obligation` for a required check |
+| `revoke-waiver { reason }` | closed, `waived` | open, `waiver-revoked`; repair cleared | `not-waived` |
 | `defer { authority, responsible, revisit }` | open | deferred, `deferred` | `required-obligation` for a required check |
 | `request-user-decision { authority, conflicts[1..20], options[2..10] }` | open | open, `awaiting-user-decision` | `invalid-command` for repeated option IDs |
 | `answer-user-decision { request, option }` | open, pending | open, `user-decision-answered` | `no-pending-user-decision`, `insufficient-authority` (actor not `user`), `unknown-option` |
-| `reopen { cause }` | closed, deferred | open, `reopened`; repair cleared | `invalid-transition` from open |
+| `reopen { cause }` | closed, deferred | open, `reopened`; repair cleared | `invalid-transition` from open, `waived` for a waived CheckFinding |
 | `revise-obligation { authority, from, to }` | open | open, `obligation-revised`; rule's obligation becomes `to` | `verification-kind-mismatch`, `obligation-changed` (`from` ≠ current), `invalid-command` (`to` = `from`), `insufficient-authority` (`work-item-assessment`) |
 
 Other open reasons: `new` on opening. A witness is refused in the order of
@@ -147,7 +163,12 @@ shared, evidence, rationale }` with `relation` one of `same-issue`,
 belong to one group. The latest assessment of a pair is its current
 relation. Groups are the connected components of current `same-issue`
 pairs, with the earliest ID as canonical. Each member keeps its reports,
-decisions, standing and verification rule; a group never closes a member.
+decisions, standing and verification rule; a group never closes a member,
+with one exception (iteration 4b): a `same-issue` relation whose canonical is
+waived also emits, as the harness actor, a `waive` on each newly joined open
+member with authority `{ kind: 'governing-record', ref: <the canonical's
+waiver decision> }`, so a re-raise of a waived issue settles. A required
+check is never joined that way; its `waive` refusal stands.
 
 `assess { commands[1..100] }` holds `dispose` and `relate` commands, decided
 in order against the state the earlier ones leave. The first refusal refuses
@@ -175,16 +196,19 @@ not hold, and a relation naming an unknown CheckFinding.
 
 | Query | Fields | Bounds |
 | --- | --- | --- |
-| `list` | `owner` (null = all), `select: attention \| all`, `standings` (with `all`), `due` (IDs), `after` (cursor), `limit` | limit 1–100, default 50; `due` at most 500; an unknown due ID is `unknown-check-finding` |
+| `list` | `owner` (null = all), `module` (null = all; iteration 4b), `select: attention \| all`, `standings` (with `all`), `due` (IDs), `order: id \| attention` (iteration 4b), `after` (cursor), `limit` | limit 1–100, default 50; `due` at most 500; an unknown due ID is `unknown-check-finding` |
 | `detail` | `checkFinding` | the latest 200 reports and decisions, with totals |
 
 `attention` is every open CheckFinding of the owner and each deferred one
-named in `due`, marked `open` or `due`. Pages are ordered by ID;
-`next` is the last shown ID when more remain. `counts` covers every
-CheckFinding of the owner (total, per standing, per reason) whatever the page
-selects. A summary carries ID, revision, owner, standing, reason, `awaiting`
-(`assessment`, `repair`, `witness`, `user-decision`; null unless open),
-`attention`, verification, producers, title (first observation summary),
+named in `due`, marked `open` or `due`. Pages are ordered by ID, or with
+`order: attention` by risk (high first), then credibility (§1.4 rule 7,
+`objective-reproduced` first), then the latest report ID descending, then
+ID; `next` is the last shown ID when more remain. `counts` covers every
+CheckFinding of the owner, and of the module when one is given (total, per
+standing, per reason) whatever the page selects. A summary carries ID,
+revision, owner, standing, reason, `awaiting` (`assessment`, `repair`,
+`witness`, `user-decision`; null unless open), `attention`, verification,
+producers, title (first observation summary), risk, credibility, modules,
 latest source, report and decision counts, group, pending user decision,
 repair, and the latest material choice since the last reopening. A detail
 adds the bounded histories and every current relation naming it.
@@ -211,7 +235,7 @@ const checkFindingEventsField = z.array(checkFindingEventSchema).max(100);
 | `review-attempt-finished` (new) | review concerns promoted with the terminal attempt | iteration 3, implemented |
 | `reconciliation-assessed` (new) | the architect's relations and dispositions | iteration 5 |
 | `iteration-closed` (existing, optional field) | `claim-repair` for each CheckFinding whose repair intent the accepted iteration resolves | iteration 5 |
-| `gate-attempted` (existing, optional field) | factual promotion and `verify-by-check` from that gate | iteration 6 |
+| `gate-attempted` (existing, optional field) | factual promotion and `fix-by-check` from that gate | iteration 6 |
 
 ```ts
 const checkFindingCauseSchema = z.discriminatedUnion('kind', [
@@ -406,12 +430,17 @@ export const reviewSubmissionSchema = z.object({
     remedy: z.string().min(1).max(4000),
     locations: z.array(checkFindingLocationSchema).min(1).max(50),
     suggests: checkFindingIdSchema.nullable(),
+    risk: z.enum(['high', 'medium', 'low']),                                        // iteration 4b
+    ground: z.object({ path: z.string().min(1), quote: z.string().max(1000).optional() }).strict().nullable(),  // iteration 4b
   }).strict()).max(20),
 }).strict();
 ```
 
 A concern with an empty or unsupported location, or a submission naming
-inspected paths outside the candidate diff, is `invalid-output`. An empty
+inspected paths outside the candidate diff, is `invalid-output`. A `ground`
+path must be a path of the candidate that `snapshot_read` answered during the
+attempt, else `invalid-output`; the reviewer names what it actually read, or
+null. An empty
 `concerns` with `missing` empty is a clean covered scope; with `missing`
 non-empty it is `partial`.
 
@@ -445,8 +474,10 @@ key has none.
 | `issueKey` | `null` |
 | `verification` | `{ kind: 'assessment' }` |
 | `observation` | `review-concern`; summary; evidence `[{ kind: 'review-submission', ref: <submission path>, hash }]`; locations |
-| `judgment` | actor `{ kind: 'agent', role: 'reviewer', invocation }`; consequence, rationale, uncertainty, remedy |
+| `judgment` | actor `{ kind: 'agent', role: 'reviewer', invocation }`; consequence, rationale, uncertainty, remedy; `risk` and `ground` from the concern, `ground.hash` the candidate's blob hash of the path (iteration 4b) |
 | `suggests` | the concern's hint, dropped when it names no CheckFinding of the same owner |
+| `credibility` | harness classification of the ground path (iteration 4b): `human-reviewed` for a path matching `**/*.principles.md`, a document of the run's plan directory, a feature file the harness wrote or an approved requirement record; `agent-generated` for any other path; `ungrounded` for null. The classifier is one function with these four rules; it is not a registry. |
+| `modules` | `ownerOf` (`kpi/lines.ts`) for each location against the candidate's module index at `request.tree`, deduplicated; the work item's module when no location falls inside a module; empty only for a run-level owner (iteration 4b) |
 
 ### 3.5 The implemented code review (iteration 3)
 
@@ -601,7 +632,8 @@ service's review section; the pi adapter's fork.
 The run policy becomes `run-policy/3`; `run-policy/2` runs remain readable.
 
 ```ts
-limits: { …existing, reconciliationRoundsPerWorkItem: z.int().positive().optional() },
+limits: { …existing, reconciliationRoundsPerWorkItem: z.int().positive().optional(),
+  laterRoundMinimumRisk: z.enum(['medium', 'high']).optional() },   // iteration 5: the correction floor after round 1
 reviews: z.object({
   version: z.literal('review-policy/1'),
   kinds: z.array(reviewKindSchema).min(1),
@@ -624,6 +656,7 @@ reviews: z.object({
 | `settleMs` from the completion request | 900 000 |
 | `maxConcerns` per submission | 20 |
 | `reconciliationRoundsPerWorkItem` | 3 |
+| `laterRoundMinimumRisk` | `medium` |
 
 A policy without `reviews` means the run records no requests: every review
 and CheckFinding coverage view answers `unavailable`, never clean.
@@ -669,16 +702,21 @@ export const reconciliationBasisSchema = z.object({
   round: z.int().positive(),                       // ≤ reconciliationRoundsPerWorkItem
   source: z.object({ commit: text, tree: text }).strict(),
   requests: z.array(z.object({ request: text, attempt: text.nullable(), result: z.enum(['complete', 'partial', 'not-verified']) }).strict()),
-  checkFindings: z.array(checkFindingAtSchema),    // the complete attention set, all pages
+  checkFindings: z.array(checkFindingAtSchema),    // the complete attention set, all pages, in attention order
   due: z.array(checkFindingIdSchema),
   applied: z.int().nonnegative(),                  // CheckFinding state version at capture
   forkPoint: forkPointSchema,
+  floor: z.enum(['any', 'non-low', 'none']),       // what a correction may be planned for this round
 }).strict();
 ```
 
+The floor is `any` in round 1, `non-low` (a risk at least
+`laterRoundMinimumRisk`) in later rounds, and `none` in the last round. The
+packet states it, and orders the signals by risk, credibility and recency.
+
 Events: `reconciliation-started { workItem, reconciliation, round }` with the
 basis; `reconciliation-assessed { workItem, reconciliation, invocation, next:
-'complete' | 'correct' | 'await-user', checkFindings }` with the assessment;
+'complete' | 'correct' | 'await-user' | 'unresolved', checkFindings }` with the assessment;
 the brief append is a ledger effect keyed `brief:<reconciliation>` whose
 completion is `reconciliation-brief-appended { reconciliation, session, ref,
 outcome }`. An empty attention set with every request settled appends no
@@ -688,7 +726,13 @@ The harness maps the architect's submission to one `assess` command: actor
 `{ kind: 'agent', role: 'local-architect', invocation }`, source
 `{ kind: 'tree', id: basis.source.tree }`, authority
 `{ kind: 'work-item-assessment', ref: <reconciliation> }`, and a correction
-as `plan-repair` with `{ kind: 'intent', ref: <reconciliation> }`. The next
+as `plan-repair` with `{ kind: 'intent', ref: <reconciliation> }`. Before
+the child decides, the harness refuses the submission as a whole for a
+`plan-repair` below the basis floor (`correction-floor`, naming the
+CheckFinding and its risk) and for a `waive` on a CheckFinding whose
+`modules` are not all the work item's module or its included children
+(`insufficient-authority`, naming the modules); a refused submission is
+returned to the fork once, then the attempt fails as invalid output. The next
 `iteration-assigned` for that work item resolves the intent; recovery creates
 it from the recorded assessment when absent. When the correction iteration
 closes accepted, `iteration-closed` carries `claim-repair` for each
@@ -698,10 +742,18 @@ CheckFinding planned under that intent, with `candidate` its audited tree and
 Validation under the mutex, both at `reconciliation-assessed` and before
 `work-item-completed`: the audited source is the basis source (or its
 recorded scenario-rendering lineage with verified expected bytes), every
-basis request is settled with the named attempt, every basis CheckFinding is
-still at its captured revision, and no CheckFinding of the owner outside the
-basis has become open or due. A mismatch refuses the assessment or the
-completion and starts a new round.
+basis request is settled with the named attempt, and every basis CheckFinding
+is still at its captured revision. A mismatch refuses the assessment or the
+completion and starts a new round when one remains. A CheckFinding of the
+owner that became open or due after the basis starts a new round when one
+remains and its risk clears the next round's floor; otherwise it stays open
+and completion proceeds. `work-item-completed` gains
+`unresolved: [{ checkFinding, reason }]` with reason `rounds-exhausted`
+(open at the last round's assessment), `below-floor` (open, not correctable
+in its round, and neither waived nor deferred) or `raised-after-last-round`
+(opened after the last basis). The projection marks an unresolved
+CheckFinding with that reason, and one of non-low risk with reason
+`raised-after-last-round` as surfaced by the latest review.
 
 ## 7. Scenario witness (iteration 6)
 
@@ -744,9 +796,14 @@ export const checkFindingSummarySchema = z.object({
   id: z.string(), revision: z.int().positive(), workItem: z.string().nullable(),
   standing: z.enum(['open', 'deferred', 'closed']),
   reason: z.enum(['new', 'repair-planned', 'repair-claimed', 'awaiting-user-decision', 'user-decision-answered',
-    'reopened', 'obligation-revised', 'deferred', 'verified-by-check', 'verified-by-assessment', 'superseded', 'accepted']),
+    'reopened', 'waiver-revoked', 'obligation-revised', 'deferred', 'fixed-by-check', 'fixed-by-assessment', 'superseded', 'waived']),
   awaiting: z.enum(['assessment', 'repair', 'witness', 'user-decision']).nullable(),
   verification: z.enum(['assessment', 'check']), required: z.boolean(),
+  risk: z.enum(['high', 'medium', 'low']),
+  credibility: z.enum(['objective-reproduced', 'objective', 'human-reviewed', 'agent-generated', 'ungrounded']),
+  modules: z.array(z.string()),
+  unresolved: z.enum(['rounds-exhausted', 'below-floor', 'raised-after-last-round']).nullable(),
+  waiver: z.object({ by: z.string(), reason: z.string(), acceptedRisk: z.string() }).strict().nullable(),
   producers: z.array(z.string()), title: z.string(), reports: z.int().nonnegative(), decisions: z.int().nonnegative(),
   group: z.object({ canonical: z.string(), members: z.array(z.string()) }).strict().nullable(),
   pendingUserDecision: z.string().nullable(),
@@ -758,9 +815,36 @@ export const checkFindingListResponseSchema = z.object({
   runId: runIdSchema, version: z.int().nonnegative(),
   coverage: reviewCoverageSchema,
   total: z.int().nonnegative(), shown: z.int().nonnegative(), next: z.string().nullable(),
-  counts: z.object({ open: z.int().nonnegative(), deferred: z.int().nonnegative(), closed: z.int().nonnegative() }).strict(),
+  counts: z.object({ open: z.int().nonnegative(), deferred: z.int().nonnegative(), closed: z.int().nonnegative(),
+    unresolved: z.int().nonnegative() }).strict(),
   items: z.array(checkFindingSummarySchema).max(checkFindingWireLimits.maxLimit),
 }).strict();
+
+// One row per module with at least one CheckFinding; a CheckFinding of two modules counts in both,
+// so the rows do not sum to the run's counts.
+export const checkFindingModuleCountsSchema = z.object({
+  protocol: z.literal(checkFindingProtocolVersion),
+  runId: runIdSchema, version: z.int().nonnegative(),
+  coverage: reviewCoverageSchema,
+  modules: z.array(z.object({ module: z.string(), open: z.int().nonnegative(), deferred: z.int().nonnegative(),
+    unresolved: z.int().nonnegative(), highestOpenRisk: z.enum(['high', 'medium', 'low']).nullable(),
+    pendingUserDecisions: z.int().nonnegative() }).strict()),
+}).strict();
+
+const userCheckFindingCommand = (type: string) => z.object({
+  commandId: commandIdSchema,
+  expectedVersion: jobVersionSchema,
+  type: z.literal(type),
+  payload: z.object({
+    planId: planIdSchema, jobId: jobIdSchema,
+    checkFinding: z.string().regex(/^cf-\d{4,}$/),
+    expectedRevision: z.int().positive(),
+    reason: z.string().min(1).max(4000),
+    responder: z.string().min(1).max(200),
+  }).strict(),
+}).strict();
+export const waiveCheckFindingCommandSchema = userCheckFindingCommand('waive-check-finding');
+export const revokeCheckFindingWaiverCommandSchema = userCheckFindingCommand('revoke-check-finding-waiver');
 
 // checkFindingDetailSchema: the summary, bounded report and decision views with totals,
 // relations, and links to work item, attempt, candidate diff and repair session.
@@ -784,13 +868,20 @@ export const respondToCheckFindingCommandSchema = z.object({
 ```
 
 Paths, beside the existing run paths:
-`GET …/runs/:runId/check-findings?version=&workItem=&select=attention|all&after=&limit=`,
+`GET …/runs/:runId/check-findings?version=&workItem=&module=&select=attention|all&order=id|attention&after=&limit=`,
+`GET …/runs/:runId/check-findings/modules?version=`,
 `GET …/runs/:runId/check-findings/:checkFinding?version=`,
-`GET …/runs/:runId/reviews?version=&workItem=`; the command goes to
+`GET …/runs/:runId/reviews?version=&workItem=`; the commands go to
 `POST /api/v1/commands`. A stale `version` is the existing `stale-version`
 409 with `currentVersion`. A stale `expectedRevision` or a request that is no
 longer pending is a refused command naming the CheckFinding's current
-revision. No other CheckFinding command exists.
+revision. A user waive maps to `waive` with actor `{ kind: 'user', name:
+responder }` and authority `{ kind: 'user-decision', ref: commandId }`,
+acceptedRisk the CheckFinding's current risk; a user revocation maps to
+`revoke-waiver`. A waive of a required check is refused by the child; a
+waive of a CheckFinding with a pending user decision also answers nothing and
+is refused as `awaiting-user-decision`. No other CheckFinding command
+exists; there is no generic mark-resolved.
 
 ## 9. The worked stream
 
@@ -811,25 +902,33 @@ producers exist.
 | 7 | `ga-0005` fails `scenario:sc-004` on `t-02` | accepted | opened `cf-0005`@1 `cfr-0005` | `gate-attempted` |
 | 8 | `ga-0007` fails it again on `t-03`: same issue key | accepted | reported `cf-0005`@2 `cfr-0006` | `gate-attempted` |
 | 9 | design review `rq-0009.a01`: configuration read in a loop | accepted | opened `cf-0006`@1 `cfr-0007` | `review-attempt-finished` |
-| 10 | reconciliation `wi-001.rc01` at `t-03`, one `assess` | accepted | related `cfl-0001` `cf-0004`→`cf-0003` same-issue; related `cfl-0002` `cf-0002`→`cf-0001` distinct; decided `cf-0001`@2 `cfd-0001` plan-repair (intent `wi-001.rc01`); `cf-0002`@2 `cfd-0002` defer; `cf-0003`@2 `cfd-0003` accept (material choice reported); `cf-0004`@2 `cfd-0004` accept; `cf-0006`@2 `cfd-0005` supersede; `cf-0005`@3 `cfd-0006` plan-repair | `reconciliation-assessed` |
+| 10 | reconciliation `wi-001.rc01` at `t-03`, round 1, floor `any`, one `assess` | accepted | related `cfl-0001` `cf-0004`→`cf-0003` same-issue; related `cfl-0002` `cf-0002`→`cf-0001` distinct; decided `cf-0001`@2 `cfd-0001` plan-repair (intent `wi-001.rc01`); `cf-0002`@2 `cfd-0002` defer; `cf-0003`@2 `cfd-0003` waive (material choice reported); `cf-0004`@2 `cfd-0004` waive; `cf-0006`@2 `cfd-0005` waive (low risk, agent-generated ground); `cf-0005`@3 `cfd-0006` plan-repair | `reconciliation-assessed` |
 | 11 | correction `wi-001.i04` closes accepted on `t-04`: claim for `cf-0001` | accepted | decided `cf-0001`@3 `cfd-0007` claim-repair | `iteration-closed` |
 | 12 | same closure: claim for `cf-0005` | accepted | decided `cf-0005`@4 `cfd-0008` claim-repair | same line as 11 |
 | 13 | witness of `scenario:sc-005` | `wrong-subject` | none | none |
 | 14 | partial run of `sc-004` | `insufficient-coverage` | none | none |
-| 15 | `ga-0009` passes `sc-004` completely on `t-04` | accepted | decided `cf-0005`@5 `cfd-0009` verify-by-check | `gate-attempted` |
-| 16 | reconciliation `wi-001.rc02`: fresh assessment of `cfr-0001` | accepted | decided `cf-0001`@4 `cfd-0010` verify-by-assessment | `reconciliation-assessed` |
-| 17 | same assessment: R2 revision 2 contradicts the accepted choice | accepted | decided `cf-0003`@3 `cfd-0011` reopen | same line as 16 |
+| 15 | `ga-0009` passes `sc-004` completely on `t-04` | accepted | decided `cf-0005`@5 `cfd-0009` fix-by-check | `gate-attempted` |
+| 16 | reconciliation `wi-001.rc02`, round 2, floor `non-low`: fresh assessment of `cfr-0001` | accepted | decided `cf-0001`@4 `cfd-0010` fix-by-assessment | `reconciliation-assessed` |
+| 17 | same assessment: R2 revision 2 contradicts the waiver | accepted | decided `cf-0003`@3 `cfd-0011` revoke-waiver | same line as 16 |
 | 18 | same assessment: the fix would change an approved obligation | accepted | decided `cf-0003`@4 `cfd-0012` request-user-decision (`follow-r2`, `keep-eur`) | same line as 16 |
+| 19 | design review `rq-0012.a01` on `t-05`: configuration read in a loop again, `suggests: cf-0006` | accepted | opened `cf-0007`@1 `cfr-0008` | `review-attempt-finished` |
+| 20 | reconciliation `wi-001.rc03`, round 3, floor `none`: `cf-0007` is `cf-0006` again | accepted | related `cfl-0003` `cf-0007`→`cf-0006` same-issue; decided `cf-0007`@2 `cfd-0013` waive (harness, governing record `cfd-0005`) | `reconciliation-assessed` |
+| 21 | same assessment: a `plan-repair` for `cf-0003` | `correction-floor` | none | none |
 
-Final state, 21 events: `cf-0001` closed `verified-by-assessment` @4;
+Final state, 24 events: `cf-0001` closed `fixed-by-assessment` @4;
 `cf-0002` deferred @2; `cf-0003` open `awaiting-user-decision` @4 pending
-`cfd-0012`; `cf-0004` closed `accepted` @2; `cf-0005` closed
-`verified-by-check` @5 with two reports; `cf-0006` closed `superseded` @2.
-Group `{ canonical: cf-0003, members: [cf-0003, cf-0004] }`. With `due:
-[cf-0002]` the attention set of `wi-001` is `cf-0002` (due) and `cf-0003`
-(open); without it, `cf-0003` alone. The stream test replays the events from
-their JSON lines into identical state and views, and shows that steps 16–18
-decided as one `assess` produce the same events.
+`cfd-0012`; `cf-0004` closed `waived` @2; `cf-0005` closed
+`fixed-by-check` @5 with two reports; `cf-0006` closed `waived` @2;
+`cf-0007` closed `waived` @2. Groups `{ canonical: cf-0003, members:
+[cf-0003, cf-0004] }` and `{ canonical: cf-0006, members: [cf-0006,
+cf-0007] }`. With `due: [cf-0002]` the attention set of `wi-001` is
+`cf-0003` (open, high) then `cf-0002` (due, low) in attention order; without
+it, `cf-0003` alone. After step 20 the work item completes with `cf-0003`
+unresolved, reason `rounds-exhausted`. The stream test replays the events
+from their JSON lines into identical state and views, and shows that steps
+16–18 decided as one `assess` produce the same events. Iterations 1–4
+implemented steps 1–18 under the earlier names with `cf-0006` superseded;
+iteration 4b renames them, waives `cf-0006` and adds steps 19–21.
 
 Event 1 as the child returns it:
 
@@ -864,9 +963,13 @@ Event 1 as the child returns it:
         "consequence": "The discount is applied twice when a coupon is present: the behavior differs from the assignment",
         "rationale": "read the frozen candidate diff",
         "uncertainty": "moderate",
-        "remedy": "a bounded change in the named file"
+        "remedy": "a bounded change in the named file",
+        "risk": "high",
+        "ground": { "ref": "src/tests/cart.test.ts", "hash": "sha256:00000000000000000000000000000000000000000000000000000000000007d2" }
       },
       "suggests": null,
+      "credibility": "agent-generated",
+      "modules": ["project/cart"],
       "id": "cfr-0001"
     }
   }
@@ -895,7 +998,12 @@ the agent's own judgment.
 | observation `evidence` | the harness's retained records: submission, diff, gate output, message stream |
 | judgment `actor` and decision `actor` | the invocation, role and assignment the harness started, or the user command's responder |
 | judgment prose, `suggests`, concern locations | the agent's own submission, validated for form only |
-| `authority` | the reconciliation being assessed, the answered user request, or a named governing record |
+| judgment `risk` | the reviewer's own proposal; a decision's `risk` is the assessing architect's correction |
+| judgment `ground` | the reviewer's own reference, validated as a candidate path it read; the hash is the candidate's |
+| `credibility` | the harness's classification of the ground's provenance, §3.4; `objective` for a check producer |
+| `modules` | `ownerOf` over the report's locations against the module index at the report's own tree, else the work item's module |
+| waive and revoke authority | the harness: a local architect's `modules` must all be its work item's module or included children; the global architect and the user cover every module; a revocation needs a rank at least the waiver actor's, user above global architect above local architect above harness |
+| `authority` | the reconciliation being assessed, the answered user request or command, or a named governing record |
 | `expectedRevision`, relation revisions | the captured reconciliation basis or the command's expected revision |
 | `repair` | the reconciliation intent or the committed assignment ID |
 | claim `candidate` and `change` | the accepted correction iteration's audited tree and ID |

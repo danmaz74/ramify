@@ -258,3 +258,15 @@ No baseline failures are carried into the plan.
 - **Policy and prompts:** `run-policy/3` with the three kinds is captured by production runs; test policies still request no reviews unless a test asks. `reviewer/2` is the package.
 - **Trusted inputs bound here:** request `requirements` and `guidance` hashes (re-read and compared at attempt time), fork points from the log, the orientation key, and actual start from the executor.
 - **Open gaps:** the probe did not fork a parent that pi was still writing to; a fork of a live architect session reads its file while it may be appended. Orientation cost and fork against fresh cost are unmeasured beyond the probe's token counts (iteration 8). The guidance selection is a heuristic, not a relevance judgment. The real model never called an unoffered built-in, so pi's refusal of one is evidenced by the scripted-provider test only. The scripted fake's fork inherits appended context, not turns, so the harness tests prove the pinned ref and the pi test and the probe prove the pinned history.
+
+## Principles revision (2026-09-24)
+
+Iteration 5 was stopped while in progress and its state committed unverified
+as `8183f0a`. The revised [CheckFinding principles](../../check-findings.principles.md)
+and the harness principle Trust Follows Provenance (`23a84bb` on
+`ramify-agent`) were merged in as `3202ce7`. The plan and the appendix were
+amended in the same change: `accept` becomes `waive` and is sticky,
+`verified` becomes `fixed`, reports carry `risk`, `ground`, `credibility` and
+`modules`, correction rounds have a floor, and exhaustion leaves signals
+unresolved. Iteration 4b (renames, signal fields, module attribution) comes
+next; iteration 5 then resumes from the wip commit against the amended §6.
