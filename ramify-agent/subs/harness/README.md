@@ -594,6 +594,11 @@ client draws on. It also runs one of the project's own commands, hashes
 the guarded files and holds the small git service the run branch needs.
 Neither child receives this module's vocabulary.
 
+The child `check-findings` decides CheckFinding identity, dispositions,
+replay and queries as pure functions over the references this module binds.
+It receives nothing from this module; its events are not yet in the run log
+(Plan 12 iteration 2).
+
 ## The run
 
 - **Commands.** `start-run` carries the plan, the agent and `reviewStop`,
