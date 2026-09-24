@@ -119,13 +119,17 @@ export const executionNodeSchema = z.discriminatedUnion('kind', [
     executor: z.enum(['pi', 'scripted']), workItem: executionElementKeySchema.nullable(),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('gate'), checkpoint: gateCheckpointSchema,
-    verdict: gateVerdictSchema, audit: executionAuditLifecycleSchema, repairRound: count,
+    /** Null while the attempt is active; no verdict has been established yet. */
+    verdict: gateVerdictSchema.nullable(), audit: executionAuditLifecycleSchema, repairRound: count,
     commit: text.nullable(), auditedCommit: text.nullable(), active: z.boolean(),
   }).strict(),
 ]).superRefine((node, context) => {
   if (!node.key.startsWith(`${node.kind}:`)) context.addIssue({ code: 'custom', path: ['key'], message: 'Key kind differs from node kind' });
   if (node.kind === 'requirement' && (node.state === 'verified') !== (node.verifiedRevision === node.currentRevision)) {
     context.addIssue({ code: 'custom', path: ['verifiedRevision'], message: 'Only the current verified revision is green' });
+  }
+  if (node.kind === 'gate' && node.active !== (node.verdict === null)) {
+    context.addIssue({ code: 'custom', path: ['verdict'], message: 'An active gate has no verdict; a settled gate has one' });
   }
   if (node.kind === 'capability') {
     const sum = node.scenarios.passed + node.scenarios.failed + node.scenarios.other + node.scenarios.noRealRun + node.scenarios.unavailable;

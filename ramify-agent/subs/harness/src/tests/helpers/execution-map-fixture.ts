@@ -182,3 +182,17 @@ export const executionMapFixturePage: ExecutionMapPage = {
   coverage: { nodes: { shown: executionMapFixtureNodes.length, total: executionMapFixtureNodes.length },
     links: { shown: executionMapFixtureLinks.length, total: executionMapFixtureLinks.length }, gaps: [] },
 };
+
+/** A separate page state before a running gate has produced any verdict. */
+export const executionMapRunningGateFixturePage: ExecutionMapPage = {
+  ...executionMapFixturePage,
+  cursor: null,
+  nextCursor: 'opaque-next-page',
+  current: { awaitedSession: null, runningGate: 'gate:ga-running', source: source(41) },
+  nodes: [{ ...base('gate:ga-running', 'Running committing gate', 41), kind: 'gate',
+    checkpoint: 'iteration', verdict: null, audit: 'not-started', repairRound: 0,
+    commit: null, auditedCommit: null, active: true }],
+  links: [],
+  coverage: { nodes: { shown: 1, total: executionMapFixtureNodes.length + 1 },
+    links: { shown: 0, total: executionMapFixtureLinks.length }, gaps: [] },
+};

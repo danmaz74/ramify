@@ -8,7 +8,7 @@ import { protocolPaths } from '../interfaces/protocol/paths.js';
 import {
   executionMapFixtureCapabilityDetail as capabilityDetail, executionMapFixtureIdentity as ids,
   executionMapFixturePage as page, executionMapFixtureScenarioDetail as scenarioDetail,
-  executionMapFixtureScript as script,
+  executionMapFixtureScript as script, executionMapRunningGateFixturePage as runningGatePage,
 } from './helpers/execution-map-fixture.js';
 
 const clone = () => structuredClone(page);
@@ -29,6 +29,20 @@ describe('execution-map/1 contract', () => {
     expect(script.sessionInvocations.filter(invocation => invocation.session === 'ses-local-status').map(invocation => invocation.action))
       .toEqual(['outline', 'assess-failure', 'resume']);
     expect(script.events.map(event => event.sequence)).toEqual([9, 13, 24, 27, 34, 37, 39, 40]);
+  });
+
+  it('represents a running gate without inventing a verdict', () => {
+    expect(executionMapPageSchema.parse(runningGatePage)).toEqual(runningGatePage);
+    const running = structuredClone(runningGatePage);
+    const gate = running.nodes[0]!;
+    if (gate.kind !== 'gate') throw new Error('Running gate fixture missing');
+    gate.verdict = 'not-verified';
+    expect(executionMapPageSchema.safeParse(running).success).toBe(false);
+    const settled = clone();
+    const settledGate = settled.nodes.find(node => node.key === ids.failedGate)!;
+    if (settledGate.kind !== 'gate') throw new Error('Settled gate fixture missing');
+    settledGate.verdict = null;
+    expect(executionMapPageSchema.safeParse(settled).success).toBe(false);
   });
 
   it('rejects duplicate keys and link IDs', () => {

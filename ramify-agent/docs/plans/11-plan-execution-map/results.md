@@ -15,7 +15,7 @@
 
 | Check | Result | Boundary and limit |
 | --- | --- | --- |
-| `npx vitest run subs/harness/src/tests/execution-map-contract.test.ts` | Pass, 9 tests | Runtime schema validation, fixture identity, gate/audit independence, duplicate and dangling references, mixed versions, page bounds, partial/unavailable records, exact capability keys, current activity, complete detail and stale error shape. No HTTP handler or durable-run projection yet. |
+| `npx vitest run subs/harness/src/tests/execution-map-contract.test.ts` | Pass, 10 tests | Runtime schema validation, fixture identity, active gate without a verdict, gate/audit independence, duplicate and dangling references, mixed versions, page bounds, partial/unavailable records, exact capability keys, current activity, complete detail and stale error shape. No HTTP handler or durable-run projection yet. |
 | `npm run type-check` in `ramify-agent/` | Pass | Harness, web and scripts TypeScript scopes. |
 | `npm run check:self` in `ramify-agent/` | Pass: 0 errors, 0 warnings; 186 analysis limits | Batch ownership and exposure analysis over 9 owners. Limits are signature inference coverage, including the new Zod schemas; this is not an executable acceptance run. |
 | `npm run build:web` in `ramify-agent/` | Pass | Build of the existing web app with the added token module. Vite reports a chunk-size advisory. No browser interaction has been tested. |
@@ -26,3 +26,7 @@
 Use `subs/harness/src/interfaces/protocol/execution-map.ts`, the path functions and `subs/harness/src/tests/helpers/execution-map-fixture.ts` as the public wire and independent expected data. Implement the census from durable run records, retaining every gate attempt and run session, and add the targeted complete capability/scenario detail projection. The fixture's scripted inputs are not themselves durable records; adapt them through existing run-test helpers rather than treating this contract test as projection acceptance. Keep gate verdict separate from audit lifecycle, preserve previous verified requirement revision after reopening, and report missing or partial source data explicitly. The current schema's per-page checks cannot by themselves prove snapshot-wide uniqueness or cursor ordering; the projection and HTTP layers must enforce those rules.
 
 The separate recorded `status-badge-tone` pi witness has not been replayed. Full harness, browser and audit acceptance remain iteration 9 work.
+
+### Gate-result correction
+
+The first contract required a gate verdict even while `active: true`, which would have forced the projection to invent a result before a running readiness or committing gate finished. The gate node now requires `verdict: null` exactly while active and requires a real verdict when settled. The fixture includes a separate running-gate page, and the focused test checks both invalid combinations. The audit lifecycle stays independent. This is an iteration 1 contract correction; it adds no projection or HTTP behavior. The focused Vitest run passed 10 tests; `npm run type-check` passed; `npm run check:self` passed with 0 errors, 0 warnings and 186 analysis limits.
