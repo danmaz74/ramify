@@ -865,3 +865,14 @@ Found in the web client while reading the run at a 1440 px viewport, and fixed i
 | ramify-audit | Not run here | The orchestrator re-audits. |
 
 **Audit follow-up.** The ramify-audit of `ea3ebda` (`refs/audited/runs/2026-09-24T20-32-03Z-ea3ebdad1`) failed one test, `capability-module-tree.test.tsx` "the Run route lifts the shell width cap …": the fix for defect 2 folded `.run-page > .area-wide` into one selector list with the header and tabs, so the test's exact rule no longer matched, although the widths were unchanged. That rule is restored on its own line, the header and tabs have their own rule, and the test also asserts that rule and the 80rem broad measure. All 16 web test files (151 tests) pass, as do `npm run test:browser:check-findings` (32 checks), type-check, `check:self` (0 errors, 0 warnings, 279 limits) and `build:web`. I had not run that test file before `ea3ebda`.
+
+## Audit after the follow-ups (2026-09-24)
+
+The follow-ups after `11688f9` (`55c647c`, `c63d613`, `ea3ebda`, `5b64b47`) were audited with `audit/plan12-check-findings.request.json` from the repository root, on a clean tree.
+
+| Commit | Overall | Agent suite | Evidence |
+| --- | --- | --- | --- |
+| `ea3ebda` | `fail`, 218 s | 1 failed, 1497 passed, 7 skipped: `capability-module-tree.test.tsx` asserted the `.run-page > .area-wide` rule that `ea3ebda` had merged into a selector list | `refs/audited/runs/2026-09-24T20-32-03Z-ea3ebdad1` |
+| `5b64b47` | **`pass`**, 216 s | 187 files passed, 2 skipped; 1498 tests passed, 7 skipped. Patch integrity, type-check, `check:self` (0 errors, 0 warnings, 279 analysis limits) and the parent daemon case pass | `refs/audited/runs/2026-09-24T20-37-09Z-5b64b477c`; Git note `git notes --ref=audit show 5b64b477cfdd57f2da501479aa91cd968098b5b2` |
+
+`5b64b47` is the latest audited implementation commit. The commit recording this result changes only this document.
