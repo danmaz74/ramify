@@ -1,6 +1,6 @@
 # Ramify implementation roadmap
 
-**Date:** 2026-09-16. **Status:** Plan 1 is complete. Its batch engine, CLI and
+**Date:** 2026-09-21. **Status:** Plan 1 is complete. Its batch engine, CLI and
 self-check are merged on `main`, where the unfiltered 308-instance gate passed
 on 2026-09-10; the [completion report](plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records the evidence and the inputs carried forward. Plan 2 is complete and
@@ -35,6 +35,15 @@ must receive a separate successor review before execution.
 adds one enforced rule to the model: an exposed symbol's declared signature
 companions must be type-available wherever the exposure makes the symbol
 visible. It is implemented on branch `feat/plan8-signature-companions`.
+
+**Revision, 2026-09-21:** the successor review of Plan 3 compared its draft
+with the materialized views and split the remainder by whether a view can hold
+it. [Plan 2D: view orientation](#plan-2d-view-orientation) adds the facts that
+serve each view's purpose without changing what any existing search returns,
+and is the next plan to execute. Everything else is the deferred
+[Plan 3 successor](#plan-3-project-inspection), reduced to an `explain` query
+with usage, staleness and an architect query as separable later parts.
+`ramify available`, availability search and the module summary are withdrawn.
 
 The intended system is defined in the [architecture documents](architecture/README.md).
 They own the decided process/client, resource and testing architecture, plus
@@ -184,7 +193,10 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | [5. Check fast after a write](#plan-5-fast-incremental-checks) | A retained analysis session inside the daemon answers an agent's post-write hook for the written file in tens of milliseconds, exactly as a batch check would. | Plan 2. | Brief below; [Detailed Plan 5](plans/iteration-5-fast-incremental-checks/main-plan.md), complete on 2026-09-14 on branch `close/plan5-completion`, not merged to `main`; its [completion report](plans/iteration-5-fast-incremental-checks/iterations/iteration13-results.md) records the delivered scope, the gates and the remaining gaps. |
 | [2A. Materialize API discovery](#plan-2a-materialized-api-discovery) | Complete: `ramify materialize` generates ordinary and testing foreign-API documentation beneath each module for explicit `rg` search. | Plan 5's retained session and contexts. | [Detailed Plan 2A](plans/iteration-2a-materialized-api-view/main-plan.md); [completion report](plans/iteration-2a-materialized-api-view/iterations/iteration10-results.md). |
 | [2B. Generated architect view](#plan-2b-generated-architect-view) | Complete: `ramify materialize --view architect` publishes `.ramify-architect/`, an agent-only view of modules, behavior-capable symbols, tests and observed use. Its agent trials falsified hypothesis H1 on cost: every core task was answered correctly from the view on both harnesses, but hit cost exceeded the thresholds. | Plans 2A and 6D. | [Detailed Plan 2B](plans/iteration-2b-generated-views/main-plan.md), complete on 2026-09-18 on branch `feat/plan2b-architect-view`, not merged to `main`; its [completion report](plans/iteration-2b-generated-views/iterations/iteration10-results.md) records the trials, the H1 verdict and the remaining gaps. |
-| [3. Understand a project](#plan-3-project-inspection) | Remaining project explanations, module summaries and usage queries are selected in a successor review after filesystem discovery exists. | Plan 2A. | The existing [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved but must be revised and reviewed before execution. |
+| [2C. Measure modules](#plan-2c-module-measurements) | Implemented: `ramify measure` and the architect view's `metrics` report per-owner and subtree context size at one revision. | Plans 2B and 2. | [Detailed Plan 2C](plans/iteration-2c-module-measurements/main-plan.md) and [completion report](plans/iteration-2c-module-measurements/iterations/iteration4-results.md). |
+| [2D. Orient from the views](#plan-2d-view-orientation) | **Next to execute.** Each API view gains a provider map outside its searched paths; the architect view gains tag kinds and the dependencies crossing each subtree's boundary. No existing generated document or record changes. | Plans 2A, 2B and 2C. | [Detailed Plan 2D](plans/iteration-2d-view-orientation/main-plan.md), draft awaiting contract review. |
+| 2E. Self-sufficient diagnostics | Every error, warning, analysis limit and not-checked reply of `ramify check` explains itself in its own text and fields, so a consumer relays it verbatim and keeps no per-code wording. No allowed or denied outcome changes. | Plan 2's resident check. Independent of Plan 2D. | [Detailed Plan 2E](plans/iteration-2e-diagnostic-messages/main-plan.md), draft awaiting contract review. |
+| [3. Understand a project](#plan-3-project-inspection) | Deferred: an `explain` query for why a named original is or is not available from a place, with missing exposure hops and the specifier to write; usage, staleness and an architect query as separable later parts. | Plans 2A and 2D. | [Successor draft](plans/iteration-3-inspection-successor/main-plan.md), high level, awaiting its review decisions. The pre-2A [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved as input and is not executed. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
 | [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
 | [8. Require signature companions](#plan-8-signature-companions) | Implemented: a module exposing a symbol must make the project symbols named in its declared signature type-available wherever the exposure makes it visible. Ramify reports the missing exposure at the exposure statement and never supplies it. | Plans 1 and 5. | [Detailed Plan 8](plans/iteration-8-signature-companions/main-plan.md), implemented on 2026-09-21 on branch `feat/plan8-signature-companions`, not merged to `main`; its [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md) records the evidence, the budget outcomes and the remaining gaps, and [iteration 6](plans/iteration-8-signature-companions/iterations/iteration6-results.md) meets the hook-latency and retained-fact budgets by identity accounting and a shared model. [Iteration 7](plans/iteration-8-signature-companions/iterations/iteration7-results.md) makes the reference example declare its signatures; the Plan 1 gate passes 274 of 308, and the remaining failures come from fixture F's `value` and the toolkit's own notes. |
@@ -196,7 +208,9 @@ retained session and executes before the separately reviewed Plan 3 successor.
 
 The table order is the proposed implementation order; Plan 5 keeps the
 number the withdrawn change-previews deliverable released and Plan 2A is an
-inserted predecessor rather than a renumbering. The explorer can be delivered
+inserted predecessor rather than a renumbering; Plans 2B, 2C and 2D continue
+that series. Plan 2D executes next; the Plan 3 successor waits and blocks
+nothing but Plan 4's explanation tools. The explorer can be delivered
 without MCP, and a check-only MCP adapter could be delivered after Plan 2. The
 planned Plan 4 also exposes the remaining inspection operations, so its full
 gate includes the reviewed Plan 3 successor. Keep any rescheduling explicit
@@ -508,13 +522,69 @@ document, per-owner values, memory samples and refreshed hit costs go to Plans 4
 and 7; Plan 2B's hit-cost overages remain deferred evidence rather than passing
 thresholds.
 
+## Plan 2D: View orientation
+
+**Detailed plan:** [Plan 2D: View orientation](plans/iteration-2d-view-orientation/main-plan.md),
+a draft awaiting contract review; implementation has not started. It is the
+next plan to execute. **Prerequisites:** Plan 2A's API view, Plan 2B's
+architect view and Plan 2C's view-byte measurement, all implemented.
+
+**Selection rule.** The user fixed each view's purpose on 2026-09-21. The
+architect view serves finding existing capabilities, mapping a potential
+capability to a module, deciding on a new module and deciding an iteration's
+scope: one module, or a module with some children and their whole subtrees. A
+module's API view orients an agent bound to that module: what it may use
+freely, and whose it is. A fact serving neither is not added, and an addition
+must not change what an existing search returns.
+
+**Working outcome.** Each published API view area gains a `README.md` beside
+`_meta.json`, outside the searched `external/` and `children/` paths, listing
+its provider modules with identifier, header tags, purpose, entry counts and
+path prefix. The architect view's `_meta.json` and `README.md` name every
+registry tag with its kind, and the `module.json` of every module with
+children carries the dependencies crossing its subtree's boundary.
+
+**Ownership and implementation.** `analysis` adds the provider facts to the
+API projection and the tag kinds and subtree aggregation to the architect
+projection and renderer; `daemon` renders and publishes the README through the
+path Plan 2C measures. No owner, command, operation or schema identity is
+added.
+
+**Acceptance and handoff.** VO01 to VO16. The first condition is the
+non-pollution invariant: against a baseline archived before any source edit,
+every generated API document and every JSONL record is byte-identical, and
+both documented API searches return identical output. Hit cost is re-measured
+with Plan 2C's recipe and reported as a delta; Plan 2B's deferred overages are
+not claimed as passed. Six review decisions are open, of which the subtree
+dependencies (RD-3) and keeping the schema identities (RD-5) can change scope.
+The map's contract, the tag-kind keys, the subtree semantics and the delta go
+to the Plan 3 successor and Plans 4 and 7.
+
 ## Plan 3: Project inspection
 
-**Detailed plan:** [Plan 3: Project inspection](plans/iteration-3-project-inspection/main-plan.md),
-preserved as a pre-Plan-2A draft. **Prerequisite:** Plan 2A must complete, then
-this plan must be revised and reviewed as a successor before any iteration is
-executed. Its current iteration dependencies and contracts are not execution
-instructions after the materialized-view decision.
+**Detailed plan:** the [successor draft](plans/iteration-3-inspection-successor/main-plan.md),
+high level and deferred; iteration files follow its review decisions. The
+pre-Plan-2A [Plan 3 draft](plans/iteration-3-project-inspection/main-plan.md)
+is preserved unchanged as its input, and its iteration dependencies and
+contracts are not execution instructions. **Prerequisites:** Plan 2A,
+complete, and [Plan 2D](#plan-2d-view-orientation). Nothing here is scheduled
+before Plan 2D completes.
+
+**Successor review, 2026-09-21.** The views deliver the available set, the
+module summary, module-level usage and unused exposed originals, so
+`ramify available`, availability search and the module summary are withdrawn
+and Plan 4 needs no tool for them. Plan 2D adds what fits a view. What
+remains does not fit one, being a verdict about one consumer and one original,
+dependent on the importing file, computed per question or useful only when
+current: availability reasons and tag-requirement verdicts, originals that
+exposure reaches but tags or testing origin block, missing exposure hops and
+proposed declarations, the import specifier, full declaration text, ineffective
+exposures, file-level usage with denied accesses, view staleness, and a
+filtered programmatic query over the architect facts. The draft proposes an
+`explain` query first, with usage, staleness and the architect query separable
+and tied to Plan 7's contract review and to the query-interface or split-view
+decision Plan 2B left to the user. The text below is retained as input to that
+plan, not as an approved contract.
 
 **Revision, 2026-09-11:** this brief was rewritten around the agent's use
 case. The earlier version described the backend of the explorer, whose
@@ -610,7 +680,8 @@ not completed by this plan.
 ## Plan 4: MCP access
 
 **Detailed plan:** not yet written. **Prerequisites:** Plan 2's local service;
-Plan 3's inspection contracts for this plan's full tool/resource set.
+the Plan 3 successor's `explain` contract for this plan's full tool/resource
+set. A check-only adapter needs neither Plan 2D nor the successor.
 
 **Working outcome.** An editor or agent host launches `ramify mcp` once,
 initializes a stdio session and performs checks, module inspection and
@@ -1118,6 +1189,7 @@ source/architecture document; do not depend on conversation history.
 | Plan 2 | Context/generation/revision and freshness contracts; local codecs/client; event ordering and distinct idle-exit/crash/explicit-stop rules; restricted fallback policy; daemon-owned direct-service harness; measured limits and per-platform transport details. | Plan 2A and Plans 3–6. |
 | Plan 2A | Availability enumeration and enforcement agreement; bounded symbol details; complete ordinary/testing projections; deterministic `.ramify` schema and transactional publisher; `ramify materialize` and agent `rg` workflow; scale/resource/platform evidence. | Plan 3 and agent hosts; Plan 4 does not duplicate its search surface. |
 | Plan 2C | Revision-bound per-owner/subtree context-size buckets, authoritative file inventory, path-attribution limits, bounded `measure` query/CLI, architect metrics policy and toolkit latency/memory/hit-cost evidence. | Plans 4 and 7 and agent consumers of module sizing. |
+| Plan 2D | API view provider-map contract, architect tag-kind keys and subtree dependency semantics, the non-pollution baseline and final archives, and the hit-cost delta against Plan 2C. | Plan 3 successor, Plans 4 and 7, and agent consumers of either view. |
 | Plan 3 | The reviewed remaining inspection/explanation schemas, owned-usage definitions and consumer fixtures after Plan 2A's providers and discovery surface are removed from its scope. | Plans 4–6. |
 | Plan 4 | MCP tool/resource schemas and host launch setup; protocol/session lifecycle; actual and in-memory protocol clients; capability and error mapping. | Plan 7; optional later MCP hosting. |
 | Plan 5 | The compact check reply and revision delta; the hook command and host adapter contract; the session and revision vocabulary; retained per-file targets, originals, forwarding paths, owned shim dependencies, inventory and coverage; the observed-input identity; hook latency budgets and hot/warm memory bounds; the Plan 2 supersession record. | Plan 2A; Plans 3, 4, 6 and 7; agent hook hosts. |
@@ -1197,6 +1269,7 @@ writing future plans; they do not block the current Plan 1 gate.
 
 | Work | Existing decision / remaining question | When to plan it |
 | --- | --- | --- |
+| Shared guidance discovery and sync | [Draft plan](plans/shared-guidance-sync/main-plan.md): Ramify supplies an opt-in command to select owner-authored guidance from pinned Git revisions and publish a reviewed local snapshot. The actual documents and profiles to adopt remain open for a separate content review. | Review the plan's catalog, authority, module and CLI contracts before implementation; no analysis-plan predecessor is required. |
 | Registry configuration serialization | Generic resolved registries and custom tag kinds are required in Plan 1. User-facing serialization, default replacement and configuration loading remain unspecified. | When projects need to supply registry definitions through ordinary CLI/service configuration. Review its source input, identity and invalidation effects before adoption. |
 | Project configuration and possible strict checking | Selected project files outside module source areas produce warnings by default. A future strict configuration might make those warnings fail a check; its syntax and exact scope are undecided and outside Plan 1. | When defining scope customization and warning control, review this option explicitly. It is separate from the reference harness's required conformance gate. |
 | Additional source adapters | The bounded source profile stays explicit. Vite macros, Jiti, compiled-source mapping and other tool-specific interpretation require real target/selection evidence; unsupported access is not automatically external. | Select concrete remaining S/K instances when expanding checking coverage for an actual project. Do not add a second resolver/checker in a client. |

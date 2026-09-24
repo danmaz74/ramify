@@ -3,6 +3,10 @@
 Design documents for the separate agent harness:
 
 - [Harness principles](harness.principles.md)
+- [CheckFinding principles](check-findings.principles.md), proposed rules for
+  evidence, agent judgment, automatic resolution and user attention
+- [CheckFinding architecture](architecture/check-findings.md), proposed CheckFinding
+  module, background reviews, durable dispositions and work-item reconciliation
 - [Decomposition hypothesis 3](decomposition/dan-hypothesis-3.md), initial draft:
   local coordinators, unified delegation and decisions recorded without review waits
 - [Autonomous implementation loop](architecture/autonomous-implementation-loop.md), proposed architecture (formerly hypothesis 3b):
@@ -31,6 +35,25 @@ Design documents for the separate agent harness:
   analysis for the capability registry: only top-level capabilities are
   required, a forecast is retired by deduction when the run completes, and
   early retirement is a placement decision
+- [Refactoring and debugging plans](analysis/2026-09-23-refactoring-and-debugging-plans.md),
+  draft analysis: debugging generalizes the capability requirement as a
+  correction, while refactoring is a plan kind of its own with target
+  assertions and a protected boundary
+- [Plan execution dashboard](analysis/2026-09-23-plan-execution-dashboard/README.md),
+  inventory of what the web client shows and the harness records, with
+  screenshots, and a [design proposal](analysis/2026-09-23-plan-execution-dashboard/design-proposal.md)
+  with a static [mockup](analysis/2026-09-23-plan-execution-dashboard/mockup.html):
+  an overview answering now, done, left and issues, a layered Map and a
+  Timeline sharing one selection; proposed
+- [Dashboard elements and their relationships](analysis/2026-09-24-dashboard-elements-and-relationships.md),
+  catalog of the elements a dashboard could display (capabilities, scenarios,
+  modules, exposed symbols and contracts, sessions by kind, gates and test
+  runs), what is known about each and how they relate, with where each fact
+  comes from and whether the protocol publishes it
+- [Plan execution decomposition map](analysis/2026-09-24-plan-execution-decomposition-map.proposal.md),
+  design proposal for capability-rooted work trees with scenario results and
+  full module paths, ordered iterations, local architect sessions, gate results
+  and movable live transcript windows
 - [Acceptance scenarios](analysis/2026-09-23-acceptance-scenarios.md),
   analysis recording Dan's decision that Gherkin scenarios are the plan's main
   acceptance gate: their origin and review, matching to entries, late binding,
@@ -60,6 +83,12 @@ Design documents for the separate agent harness:
 - [Lessons from cucumber-viz](cucumber-viz-lessons/README.md), analysis of what
   its agent studios teach about state, checks, planning and sessions, with the
   consequences proposed for Plan 3
+- [Implementation Studio adoption analysis](analysis/2026-09-24-implementation-studio-adoption.md),
+  ranked output-quality features, adaptation costs and a review-first delivery sequence
+- [Agent reviews and CheckFindings](analysis/2026-09-24-agent-reviews-and-checkfindings.md),
+  review points in the current run loop and their minimal CheckFinding integration
+- [Sealed-file edit hooks and justified saves](analysis/2026-09-24-sealed-file-edit-hooks.md),
+  analysis for a follow-up plan with immediate edit feedback and linked CheckFindings
 - [Plan 3: the autonomous implementation loop MVP](plans/03-autonomous-implementation-loop/main-plan.md),
   in implementation; its thirteen-iteration
   [index](plans/03-autonomous-implementation-loop/iterations/README.md) records
@@ -82,6 +111,9 @@ Design documents for the separate agent harness:
 - [Plan 7: commit-audit integration](plans/07-commit-audit-integration/main-plan.md),
   implemented commit-then-audit gates with revision-bound evidence; its
   completion gate is verified, while run delivery or merge remains out of scope
+- [Plan 8: baseline repairs](plans/08-baseline-repairs/main-plan.md),
+  both projects' suites and frozen gates made green, the capability views'
+  layout defects fixed, and an audited run of this project's suite; proposed
 - [Plan 9: session model and transcripts](plans/09-session-model-and-transcripts/main-plan.md),
   harness-owned sessions with lifecycle and lineage, a transcript per session,
   the session list, live transcripts, diagram markers, a lineage timeline and
@@ -96,6 +128,9 @@ Design documents for the separate agent harness:
   capability details, gate results, sessions and movable live transcript windows;
   [results](plans/11-plan-execution-map/results.md) include real-browser and
   scripted-run acceptance evidence
+- [Plan 12: CheckFindings and iteration reviews](plans/12-check-findings/main-plan.md),
+  proposed v1 implementation of durable CheckFindings, background code, scope
+  and design reviews, work-item reconciliation and selected factual evidence
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

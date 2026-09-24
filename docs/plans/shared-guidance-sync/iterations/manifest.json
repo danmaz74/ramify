@@ -1,0 +1,25 @@
+{
+  "createdAt": "2026-09-23T00:00:00.000Z",
+  "updatedAt": "2026-09-23T00:00:00.000Z",
+  "iterations": [
+    {
+      "file": "iteration1.md",
+      "index": 1,
+      "parallelGroup": null,
+      "title": "Guidance contracts and synthetic source fixtures"
+    },
+    {
+      "file": "iteration2.md",
+      "index": 2,
+      "parallelGroup": null,
+      "title": "Pinned source sync and offline snapshot checks"
+    },
+    {
+      "file": "iteration3.md",
+      "index": 3,
+      "parallelGroup": null,
+      "title": "CLI integration and executable acceptance"
+    }
+  ],
+  "planPath": "main-plan.md"
+}

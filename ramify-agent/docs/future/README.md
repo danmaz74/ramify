@@ -128,17 +128,21 @@ lineage timeline. What remains:
 
 ### Check findings
 
-**Maturity:** Captured; explicitly deferred from the MVP.
+**Maturity:** Planned for v1; explicitly deferred from the MVP.
 
 Add a finding lifecycle similar to cucumber-viz, with stable finding identity,
 status, evidence, disposition and resolution history. The current architecture
 deliberately stops at an
 [append-only history of gate attempts](../architecture/autonomous-implementation-loop.md#harness-owned-testing-gates-and-repair),
 without finding adjudication, waivers or a separate resolution workflow.
+The [v1 implementation plan](../plans/12-check-findings/main-plan.md) adds
+iteration reviews and work-item reconciliation while leaving broader producer
+and delivery lifecycles for later work.
 
 ### Automated code reviews
 
-**Maturity:** Captured.
+**Maturity:** Planned for iteration code, scope and design reviews; other
+review types remain captured.
 
 Run automated reviews and present their actionable results. Treat reviews as
 producers of findings once the finding lifecycle exists, so review output does
