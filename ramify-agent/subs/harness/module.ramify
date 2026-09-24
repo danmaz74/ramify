@@ -30,6 +30,7 @@ expose-src * from "interfaces/protocol/queries.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/errors.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/jobs.ts" tagged [browser] to parent
 expose-src * from "interfaces/protocol/paths.ts" tagged [browser] to parent
+expose-src * from "interfaces/protocol/execution-map.ts" tagged [browser] to parent
 
 // The run protocol, beside the job protocol this module already owns: the
 // commands, the queries and every projection a client reads of a run.

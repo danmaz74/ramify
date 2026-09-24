@@ -40,6 +40,18 @@ expose-sub usageSchema from harness to descendants
 // protocol/paths.ts
 expose-sub apiPrefix, protocolPaths from harness to descendants
 
+// protocol/execution-map.ts
+expose-sub executionMapPolicySchema, executionMapLimits from harness to descendants
+expose-sub executionElementKindSchema, ExecutionElementKind, executionElementKeySchema, ExecutionElementKey from harness to descendants
+expose-sub executionSourceRefSchema, ExecutionSourceRef, executionModuleRelationSchema, ExecutionModuleRelation from harness to descendants
+expose-sub executionCountCoverageSchema, ExecutionCountCoverage, executionScenarioResultSchema, ExecutionScenarioResult from harness to descendants
+expose-sub executionRequirementStateSchema, executionAuditLifecycleSchema, ExecutionAuditLifecycle from harness to descendants
+expose-sub executionNodeSchema, ExecutionNode, executionLinkKindSchema, ExecutionLinkKind from harness to descendants
+expose-sub executionEndpointSchema, executionLinkSchema, ExecutionLink from harness to descendants
+expose-sub executionCurrentActivitySchema, executionMapQuerySchema, executionMapPageSchema, ExecutionMapPage from harness to descendants
+expose-sub executionCapabilityDetailSchema, ExecutionCapabilityDetail from harness to descendants
+expose-sub executionScenarioDetailSchema, ExecutionScenarioDetail from harness to descendants
+
 // protocol/runs.ts
 expose-sub runIdSchema, RunId, roleSchema, Role, runAgentSchema, RunAgent from harness to descendants
 expose-sub startRunCommandSchema, StartRunCommand, runCommandSchema, RunCommand from harness to descendants

@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan execution dashboard mockup</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f9f9f7; --panel: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --now: #2a78d6; --now-soft: #cde2fb;
+    --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --bad: #d03b3b; --todo: #c3c2b7; --todo-soft: #eeede8;
+    --role-initial: #4a3aa7; --role-fork: #e87ba4; --role-local: #eb6834; --role-engineer: #1baf7a; --role-contract: #eda100;
+    --dim: 0.32;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); line-height: 1.45;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #0d0d0d; --panel: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --line: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.12);
+      --now: #3987e5; --now-soft: #184f95; --todo: #4a4a47; --todo-soft: #262624;
+      --role-initial: #9085e9; --role-fork: #d55181; --role-local: #d95926; --role-engineer: #199e70; --role-contract: #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #0d0d0d; --panel: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --line: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.12);
+    --now: #3987e5; --now-soft: #184f95; --todo: #4a4a47; --todo-soft: #262624;
+    --role-initial: #9085e9; --role-fork: #d55181; --role-local: #d95926; --role-engineer: #199e70; --role-contract: #c98500;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); }
+  a { color: var(--now); }
+  code, .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.9em; }
+  button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.25rem 0.7rem; cursor: pointer; }
+  button[aria-pressed="true"] { border-color: var(--now); color: var(--now); font-weight: 600; }
+  .topbar { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; padding: 0.55rem 1rem; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  .brand { font-weight: 700; }
+  .topbar .spacer { flex: 1; }
+  .banner { background: var(--now-soft); color: var(--ink); border-bottom: 1px solid var(--line); padding: 0.4rem 1rem; font-size: 0.85rem; }
+  .crumbs { padding: 0.6rem 1rem 0; color: var(--ink-2); font-size: 0.9rem; }
+  .crumbs code { color: var(--ink); }
+  .run-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; padding: 0.2rem 1rem 0.5rem; }
+  .run-head h1 { font-size: 1.35rem; margin: 0; }
+  .pill { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0.05rem 0.5rem; border-radius: 999px; border: 1px solid var(--ring); }
+  .pill-running { background: var(--now-soft); color: var(--ink); } .pill-completed { color: var(--good); } .pill-failed { color: var(--bad); }
+  .tabs { display: flex; gap: 0.25rem; padding: 0 1rem; border-bottom: 1px solid var(--line); }
+  .tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 0.4rem 0.8rem; color: var(--ink-2); }
+  .tab[aria-selected="true"] { border-bottom-color: var(--now); color: var(--ink); font-weight: 600; }
+  .url { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; color: var(--muted); padding: 0.3rem 1rem 0; }
+  main { padding: 0.75rem 1rem 3rem; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0.75rem; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 0.9rem; min-width: 0; }
+  .card h2 { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.45rem; font-weight: 600; }
+  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; } .c7 { grid-column: span 7; } .c8 { grid-column: span 8; } .c9 { grid-column: span 9; } .c12 { grid-column: span 12; }
+  @media (max-width: 1100px) { .c3, .c4, .c5 { grid-column: span 6; } .c7, .c8, .c9 { grid-column: span 12; } }
+  @media (max-width: 720px) { .grid > * { grid-column: span 12; } }
+  .hero { font-size: 2rem; font-weight: 600; line-height: 1.1; }
+  .sub { color: var(--ink-2); font-size: 0.88rem; }
+  .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  /* stepper */
+  .stepper { display: flex; align-items: center; gap: 0; padding: 0.35rem 1rem 0.6rem; font-size: 0.8rem; color: var(--ink-2); flex-wrap: wrap; }
+  .step { display: flex; align-items: center; gap: 0.35rem; }
+  .step .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--axis); background: var(--panel); }
+  .step.done .dot { background: var(--good); border-color: var(--good); }
+  .step.now .dot { background: var(--now); border-color: var(--now); box-shadow: 0 0 0 4px var(--now-soft); animation: pulse 1.6s infinite; }
+  .step.skipped { color: var(--muted); }
+  .step .bar { width: 44px; height: 2px; background: var(--axis); margin: 0 0.4rem; }
+  .step.done .bar { background: var(--good); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px var(--now-soft);} 50% { box-shadow: 0 0 0 6px var(--now-soft);} }
+  /* stacked bars */
+  .sbar { display: grid; grid-template-columns: 11rem 1fr 4.5rem; align-items: center; gap: 0.6rem; margin: 0.3rem 0; font-size: 0.85rem; }
+  .sbar .track { display: flex; height: 14px; gap: 2px; background: var(--todo-soft); border-radius: 4px; overflow: hidden; }
+  .sbar .seg { height: 100%; }
+  .sbar .seg:first-child { border-radius: 4px 0 0 4px; } .sbar .seg:last-child { border-radius: 0 4px 4px 0; }
+  .sbar .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.75rem; color: var(--ink-2); margin-top: 0.4rem; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 0.3rem; }
+  .sw.dotted { border: 1.5px dashed var(--warn); background: transparent; }
+  .sw.hollow { border: 1.5px solid var(--axis); background: transparent; }
+  /* lists */
+  ul.plain { list-style: none; padding: 0; margin: 0; }
+  ul.plain li { padding: 0.18rem 0; font-size: 0.86rem; display: flex; gap: 0.45rem; align-items: baseline; flex-wrap: wrap; }
+  ul.plain li .mono, ul.plain li .chip { white-space: nowrap; }
+  .glyph { display: inline-block; width: 10px; height: 10px; flex: none; }
+  .glyph.blocking { background: var(--bad); border-radius: 50%; }
+  .glyph.attention { background: var(--warn); border-radius: 50%; }
+  .glyph.caution { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--warn); }
+  .glyph.info { background: var(--muted); border-radius: 50%; width: 6px; height: 6px; margin: 0 2px; }
+  .sev { display: inline-flex; gap: 0.35rem; align-items: center; font-size: 0.8rem; color: var(--ink-2); margin-right: 0.8rem; }
+  .sev b { color: var(--ink); }
+  .chip { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0 0.4rem; border-radius: 4px; color: #fff; }
+  .chip-initial { background: var(--role-initial);} .chip-fork { background: var(--role-fork);} .chip-local { background: var(--role-local);} .chip-engineer { background: var(--role-engineer);} .chip-contract { background: var(--role-contract);}
+  .chip-initial, .chip-fork, .chip-local, .chip-engineer, .chip-contract { color: #0b0b0b; }
+  .chip-initial { color: #fff; }
+  .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--now); box-shadow: 0 0 0 3px var(--now-soft); animation: pulse 1.6s infinite; margin: 0 0.3rem; }
+  .stat { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+  .stat div { font-size: 0.8rem; color: var(--ink-2); }
+  .stat div b { display: block; font-size: 1.2rem; font-weight: 600; color: var(--ink); }
+  .link { color: var(--now); cursor: pointer; text-decoration: underline; text-decoration-color: var(--ring); }
+  /* entry tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.45rem; }
+  .tile { border: 1px solid var(--line); border-left: 4px solid var(--todo); border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem; cursor: pointer; background: var(--panel); }
+  .tile.completed { border-left-color: var(--good);} .tile.working { border-left-color: var(--now);}
+  .tile .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dots { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; }
+  .sd { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--axis); background: transparent; }
+  .sd.bound { border-color: var(--warn);} .sd.declared { border-color: var(--warn); background: var(--warn);} .sd.implemented { border-color: var(--good); background: var(--good);} .sd.pending { }
+  .tile .marks { display: flex; gap: 0.3rem; align-items: center; margin-top: 2px; color: var(--ink-2); }
+  /* map */
+  .map { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0.75rem; }
+  .map > *, .split > * { min-width: 0; }
+  @media (max-width: 1000px) { .map { grid-template-columns: 1fr; } }
+  .layer { margin-bottom: 0.75rem; }
+  .layer h3 { font-size: 0.85rem; margin: 0 0 0.3rem; display: flex; gap: 0.6rem; align-items: baseline; }
+  .layer h3 .sub { font-weight: 400; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--ink); }
+  svg .svgmono { font-family: ui-monospace, Menlo, monospace; }
+  .node { cursor: pointer; }
+  .dimmed { opacity: var(--dim); }
+  .related-ring { stroke: var(--now); stroke-width: 2.5; }
+  .selected-ring { stroke: var(--now); stroke-width: 3; }
+  .wrow { display: grid; grid-template-columns: 5.2rem 6px 1fr auto; gap: 0.5rem; align-items: center; padding: 0.22rem 0.3rem; border-bottom: 1px solid var(--line); font-size: 0.82rem; cursor: pointer; }
+  .wrow.selected { background: var(--now-soft); }
+  .wrow .st { width: 6px; height: 22px; border-radius: 2px; background: var(--todo); }
+  .wrow .st.completed { background: var(--good);} .wrow .st.working { background: var(--now);} .wrow .st.yielded { background: var(--warn); background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--panel) 3px 5px); }
+  .wrow .its { display: flex; gap: 4px; align-items: center; }
+  .ib { width: 18px; height: 16px; border-radius: 3px; font-size: 0.65rem; text-align: center; line-height: 16px; color: #fff; background: var(--todo); font-weight: 700; }
+  .ib.accepted { background: var(--good);} .ib.partial, .ib.unsuitable { background: var(--serious);} .ib.open { background: var(--now);}
+  .gt { width: 6px; height: 12px; border-radius: 2px; background: var(--good); } .gt.failed { background: var(--bad);} .gt.running { background: var(--now);} .gt.not-verified { background: var(--warn);}
+  .gt.wi { width: 10px; }
+  .detail { position: sticky; top: 4rem; align-self: start; font-size: 0.85rem; }
+  .detail h4 { margin: 0.6rem 0 0.2rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: 6rem 1fr; gap: 0.15rem 0.5rem; margin: 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; min-width: 0; }
+  .ctx { border-top: 1px solid var(--line); margin-top: 0.5rem; padding-top: 0.5rem; }
+  /* timeline */
+  .tl-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.5rem; overflow: hidden; }
+  .tl-tools { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; font-size: 0.8rem; color: var(--ink-2); margin-bottom: 0.4rem; }
+  .lane-label { font-size: 11px; fill: var(--ink-2); }
+  .lane-band { fill: var(--todo-soft); opacity: 0.55; }
+  .axis-line { stroke: var(--axis); stroke-width: 1; }
+  .grid-line { stroke: var(--line); stroke-width: 1; }
+  .seg { cursor: pointer; }
+  .note { font-size: 0.78rem; color: var(--muted); }
+  .kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 0.3rem; font-size: 0.75rem; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0.75rem; }
+  @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="brand">ramify-agent</span>
+  <span class="sub">plan execution dashboard, static mockup</span>
+  <span class="spacer"></span>
+  <span class="sub">Run:</span>
+  <button id="run-small" aria-pressed="true">status-badge-tone (real, finished)</button>
+  <button id="run-large" aria-pressed="false">checkout-redesign (invented, live)</button>
+  <button id="theme">Theme: auto</button>
+</div>
+<div class="banner" id="banner"></div>
+<div class="crumbs" id="crumbs"></div>
+<div class="run-head" id="run-head"></div>
+<div class="stepper" id="stepper"></div>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" data-view="overview" aria-selected="true">Overview</button>
+  <button class="tab" role="tab" data-view="map" aria-selected="false">Map</button>
+  <button class="tab" role="tab" data-view="timeline" aria-selected="false">Timeline</button>
+  <button class="tab" role="tab" data-view="lists" aria-selected="false">Lists and pages</button>
+</div>
+<div class="url" id="url"></div>
+<main id="main"></main>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------------------
+// Data. The small run is the real run 20260923T164537Z-dbf0c2 of the plan
+// status-badge-tone, times as seconds after 16:45:37.594Z. The large run is
+// INVENTED to show the design at scale; every value in it is made up.
+// ---------------------------------------------------------------------------
+const ROLES = { 'initial-architect': 'initial', 'global-fork': 'fork', 'local-architect': 'local', engineer: 'engineer', 'contract-engineer': 'contract' };
+const ROLE_LABEL = { 'initial-architect': 'initial architect', 'global-fork': 'global fork', 'local-architect': 'local architect', engineer: 'engineer', 'contract-engineer': 'contract engineer' };
+
+const smallRun = {
+  key: 'small', invented: false, plan: 'status-badge-tone', planTitle: 'Status badge tone', id: '20260923T164537Z-dbf0c2',
+  state: 'completed', phase: 'ended', start: '2026-09-23T16:45:37.594Z', end: 717.4, now: 717.4, reviewStop: false,
+  phases: [ ['analysis', 0, 184.2], ['review', null, null], ['readiness', 184.2, 194.7], ['working', 194.7, 707.5], ['final', 707.5, 717.4], ['ended', 717.4, 717.4] ],
+  limits: null,
+  modules: [
+    ['collection-review', null], ['collection-review/integration-tests', 'collection-review'], ['collection-review/workspace', 'collection-review'],
+    ['collection-review/workspace/catalog', 'collection-review/workspace'], ['collection-review/workspace/catalog/core', 'collection-review/workspace/catalog'],
+    ['collection-review/workspace/catalog/ui', 'collection-review/workspace/catalog'], ['collection-review/workspace/contracts', 'collection-review/workspace'],
+    ['collection-review/workspace/reviews', 'collection-review/workspace'], ['collection-review/workspace/reviews/core', 'collection-review/workspace/reviews'],
+    ['collection-review/workspace/reviews/core/controller', 'collection-review/workspace/reviews/core'], ['collection-review/workspace/reviews/core/tasks', 'collection-review/workspace/reviews/core'],
+    ['collection-review/workspace/reviews/ui', 'collection-review/workspace/reviews'], ['collection-review/workspace/reviews/ui/pure-ui', 'collection-review/workspace/reviews/ui'],
+    ['collection-review/workspace/reviews/validation', 'collection-review/workspace/reviews'], ['collection-review/workspace/shared-ui', 'collection-review/workspace'],
+  ].map(([id, parent]) => ({ id, parent, name: id.split('/').pop() })),
+  capabilities: [
+    { id: 'render-status-badge-tone', entry: true, tentative: false, state: 'completed', reason: 'wi-001 passed its work-item gate ga-0003', owner: 'collection-review/workspace/shared-ui', dependsOn: [], workItems: ['wi-001'], evidence: ['ga-0003'], scenarios: ['sc-001', 'sc-002'] },
+    { id: 'status-badge-wording', entry: false, tentative: false, state: 'todo', reason: 'No work started (reuse by ld-wi-001-01)', owner: 'collection-review/workspace/shared-ui', dependsOn: [], workItems: [], evidence: [], scenarios: [] },
+    { id: 'status-badge-tone-rendering', entry: false, tentative: true, state: 'todo', reason: 'Forecast by hypothesis; no work derives from a hypothesis', owner: 'collection-review/workspace/shared-ui', involved: ['collection-review/workspace/catalog/ui', 'collection-review/workspace/reviews/ui/pure-ui'], dependsOn: [], workItems: [], evidence: [], scenarios: [] },
+  ],
+  scenarios: [
+    { id: 'sc-001', name: 'A badge given a tone carries that tone in its markup', kind: 'entry', state: 'implemented', entry: 'render-status-badge-tone', workItem: 'wi-001', owner: 'collection-review/workspace/shared-ui', gates: [['ga-0002', 'passed'], ['ga-0003', 'passed'], ['ga-0004', 'passed']], declared: 646.2, implemented: 658.3 },
+    { id: 'sc-002', name: 'A badge given no tone carries neutral', kind: 'entry', state: 'implemented', entry: 'render-status-badge-tone', workItem: 'wi-001', owner: 'collection-review/workspace/shared-ui', gates: [['ga-0002', 'passed'], ['ga-0003', 'passed'], ['ga-0004', 'passed']], declared: 646.2, implemented: 658.3 },
+  ],
+  workItems: [
+    { id: 'wi-001', capability: 'render-status-badge-tone', module: 'collection-review/workspace/shared-ui', origin: 'entry', state: 'completed', from: 194.7, to: 707.5, waitingFor: null,
+      iterations: [{ id: 'wi-001.i01', kind: 'ordinary', outcome: 'accepted', from: 462.6, to: 658.5, gates: ['ga-0002'], invocations: ['inv-0003'] }], gates: ['ga-0003'] },
+  ],
+  gates: [
+    { id: 'ga-0001', checkpoint: 'readiness', subject: {}, verdict: 'passed', from: 184.2, to: 193.6, inferredStart: true, repairRound: 0 },
+    { id: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-001', iteration: 'wi-001.i01' }, verdict: 'passed', from: 650.3, to: 658.3, repairRound: 0 },
+    { id: 'ga-0003', checkpoint: 'work-item', subject: { workItem: 'wi-001' }, verdict: 'passed', from: 697.2, to: 707.5, repairRound: 0 },
+    { id: 'ga-0004', checkpoint: 'final', subject: {}, verdict: 'passed', from: 707.8, to: 717.3, repairRound: 0 },
+  ],
+  sessions: [
+    { id: 'ses-0001', role: 'initial-architect', state: 'finished', workItem: null, invocations: [{ id: 'inv-0001', from: 0.5, to: 184.2, outcome: 'submitted' }] },
+    { id: 'ses-0002', role: 'local-architect', state: 'finished', workItem: 'wi-001', invocations: [{ id: 'inv-0002', from: 199.7, to: 462.5, outcome: 'submitted' }, { id: 'inv-0004', from: 661.9, to: 696.4, outcome: 'submitted', continued: true }] },
+    { id: 'ses-0003', role: 'engineer', state: 'finished', workItem: 'wi-001', iteration: 'wi-001.i01', invocations: [{ id: 'inv-0003', from: 463.5, to: 645.7, outcome: 'submitted' }] },
+  ],
+  issues: [
+    { n: 1, severity: 'caution', group: 'scope', kind: 'guarding-partial', subject: { kind: 'invocation', id: 'inv-0003', session: 'ses-0003', workItem: 'wi-001' }, summary: 'Guarding partial: shell was not guarded', at: 645.7 },
+    { n: 2, severity: 'caution', group: 'scope', kind: 'excursion', subject: { kind: 'invocation', id: 'inv-0003', session: 'ses-0003', workItem: 'wi-001' }, summary: 'Reads outside the scope: collection-review, collection-review/integration-tests', at: 645.7 },
+    { n: 3, severity: 'caution', group: 'scope', kind: 'coverage-gap', subject: { kind: 'invocation', id: 'inv-0003', session: 'ses-0003', workItem: 'wi-001' }, summary: 'Coverage gaps: changed-paths-unknown (2), unguarded-shell (1)', at: 645.7 },
+    { n: 4, severity: 'caution', group: 'architecture', kind: 'coverage-partial', subject: { kind: 'run', id: 'run' }, summary: 'Module comparison coverage partial: the initial architect view reports 11 cut fields and 2 unavailable details', at: 184.2 },
+  ],
+  tokens: { input: 101031, cacheRead: 836480, cacheWrite: 0, output: 17582 },
+};
+
+// --- Invented large run -----------------------------------------------------
+function makeLargeRun() {
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const R = { key: 'large', invented: true, plan: 'checkout-redesign', planTitle: 'Checkout redesign', id: '20260925T081200Z-4a91c0', state: 'running', phase: 'working', start: '2026-09-25T08:12:00.000Z', end: null, reviewStop: true,
+    limits: { repairRounds: 3, iterationsPerWorkItem: 12, invocations: 400, runHours: 8 } };
+  const modNames = ['shop', 'shop/checkout', 'shop/checkout/cart', 'shop/checkout/pricing', 'shop/checkout/payment', 'shop/checkout/ui', 'shop/checkout/ui/steps', 'shop/catalog', 'shop/catalog/core', 'shop/catalog/ui', 'shop/customers', 'shop/customers/addresses', 'shop/orders', 'shop/orders/core', 'shop/orders/fulfilment', 'shop/shared-ui', 'shop/contracts', 'shop/integration-tests', 'shop/promotions', 'shop/promotions/coupons'];
+  R.modules = modNames.map(id => ({ id, parent: id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : null, name: id.split('/').pop() }));
+  const entryDefs = [
+    ['place-order', 'shop/checkout', 7], ['apply-coupon', 'shop/promotions/coupons', 4], ['cart-total', 'shop/checkout/cart', 5], ['choose-address', 'shop/customers/addresses', 4],
+    ['pay-by-card', 'shop/checkout/payment', 6], ['order-confirmation-email', 'shop/orders/core', 3], ['checkout-steps-ui', 'shop/checkout/ui/steps', 5], ['reserve-stock', 'shop/orders/fulfilment', 3], ['price-with-tax', 'shop/checkout/pricing', 4],
+  ];
+  const lowerDefs = [
+    ['coupon-validation', 'shop/promotions/coupons'], ['coupon-lookup', 'shop/promotions/coupons'], ['line-item-total', 'shop/checkout/cart'], ['cart-persistence', 'shop/checkout/cart'], ['tax-rate-lookup', 'shop/checkout/pricing'], ['rounding-policy', 'shop/checkout/pricing'],
+    ['address-validation', 'shop/customers/addresses'], ['address-book', 'shop/customers'], ['card-tokenization', 'shop/checkout/payment'], ['payment-gateway-client', 'shop/checkout/payment'], ['payment-fake', 'shop/contracts'], ['order-record', 'shop/orders/core'],
+    ['order-number', 'shop/orders/core'], ['email-template', 'shop/shared-ui'], ['email-sender', 'shop/orders/core'], ['step-navigation', 'shop/checkout/ui/steps'], ['progress-indicator', 'shop/shared-ui'], ['stock-ledger', 'shop/orders/fulfilment'],
+    ['reservation-timeout', 'shop/orders/fulfilment'], ['catalog-price', 'shop/catalog/core'], ['currency-format', 'shop/shared-ui'], ['badge-tone', 'shop/shared-ui'], ['checkout-summary-panel', 'shop/checkout/ui'], ['order-status-tone', 'shop/shared-ui'], ['promo-banner', 'shop/promotions'],
+  ];
+  R.phases = [['analysis', 0, 251], ['review', 251, 402], ['readiness', 402, 419], ['working', 419, null], ['final', null, null], ['ended', null, null]];
+  R.capabilities = []; R.scenarios = []; R.workItems = []; R.gates = []; R.sessions = []; R.issues = [];
+  let sc = 0, wi = 0, ga = 0, ses = 0, inv = 0, isn = 0;
+  const idn = (p, n, w = 3) => `${p}-${String(n).padStart(w, '0')}`;
+  const capById = id => R.capabilities.find(c => c.id === id);
+  R.sessions.push({ id: idn('ses', ++ses, 4), role: 'initial-architect', state: 'suspended', workItem: null, invocations: [{ id: idn('inv', ++inv, 4), from: 1, to: 251, outcome: 'submitted' }] });
+  const lowerByEntry = {};
+  entryDefs.forEach(([id, owner, nsc], ei) => {
+    const cap = { id, entry: true, tentative: false, state: 'todo', owner, dependsOn: [], workItems: [], evidence: [], scenarios: [], reason: '' };
+    const lowers = lowerDefs.slice(ei * 3, ei * 3 + 3).map(d => d[0]); cap.dependsOn = lowers; lowerByEntry[id] = lowers;
+    for (let k = 0; k < nsc; k++) { const s = { id: idn('sc', ++sc), name: `${id.replace(/-/g, ' ')} scenario ${k + 1}`, kind: 'entry', state: 'pending', entry: id, workItem: null, owner, gates: [] }; R.scenarios.push(s); cap.scenarios.push(s.id); }
+    R.capabilities.push(cap);
+  });
+  lowerDefs.forEach(([id, owner], li) => R.capabilities.push({ id, entry: false, tentative: li % 7 === 6, state: 'todo', owner, dependsOn: li % 4 === 3 ? [lowerDefs[(li + 5) % lowerDefs.length][0]] : [], workItems: [], evidence: [], scenarios: [], reason: '' }));
+  R.scenarios.push({ id: idn('sc', ++sc), name: 'A coupon lowers the order total shown at confirmation', kind: 'integration', state: 'pending', entry: null, subEntries: ['apply-coupon', 'cart-total', 'place-order'], owner: 'shop', workItem: null, gates: [] });
+  R.scenarios.push({ id: idn('sc', ++sc), name: 'Paying reserves stock before the confirmation email', kind: 'integration', state: 'pending', entry: null, subEntries: ['pay-by-card', 'reserve-stock', 'order-confirmation-email'], owner: 'shop', workItem: null, gates: [] });
+  // The work queue: entries in order, with delegated and follow-up items between them.
+  const wiPlan = [];
+  const groupOf = ([id, owner], ei) => { const g = [{ capability: id, module: owner, origin: 'entry', ei }]; lowerByEntry[id].forEach((l, k) => { if ((ei + k) % 2 === 0) g.push({ capability: l, module: capById(l).owner, origin: 'delegated', ei }); }); if (ei % 3 === 1) g.push({ capability: id, module: owner, origin: 'follow-up', ei }); return g; };
+  entryDefs.slice(0, 6).forEach((e, ei) => wiPlan.push(...groupOf(e, ei)));
+  while (wiPlan.length < 31) wiPlan.push({ capability: lowerDefs[(wiPlan.length * 7) % lowerDefs.length][0], module: lowerDefs[(wiPlan.length * 7) % lowerDefs.length][1], origin: 'delegated', ei: 5 });
+  entryDefs.slice(6).forEach((e, k) => wiPlan.push(...groupOf(e, 6 + k)));
+  wiPlan.length = 40;
+  // Schedule everything with no horizon on four lanes, then cut at "now".
+  const lanes = [421, 421, 421, 421];
+  wiPlan.forEach((p, i) => {
+    const lane = lanes.indexOf(Math.min(...lanes)); let t = Math.max(lanes[lane], 421 + i * 45);
+    const w = { id: idn('wi', ++wi), capability: p.capability, module: p.module, origin: p.origin, state: 'completed', from: t, to: null, iterations: [], gates: [], waitingFor: null };
+    capById(p.capability).workItems.push(w.id);
+    const la = { id: idn('ses', ++ses, 4), role: 'local-architect', state: 'finished', workItem: w.id, invocations: [] }; R.sessions.push(la);
+    let cur = t + 3; la.invocations.push({ id: idn('inv', ++inv, 4), from: cur, to: cur + 60 + rnd() * 90, outcome: 'submitted' }); cur = la.invocations[0].to + 2;
+    const nIt = 1 + (rnd() < 0.35 ? 1 : 0);
+    for (let k = 0; k < nIt; k++) {
+      const it = { id: `${w.id}.i${String(k + 1).padStart(2, '0')}`, kind: k === 0 ? 'ordinary' : pick(['ordinary', 'repair', 'verification']), outcome: 'accepted', from: cur, to: null, gates: [], invocations: [] };
+      const eng = { id: idn('ses', ++ses, 4), role: 'engineer', state: 'finished', workItem: w.id, iteration: it.id, invocations: [] }; R.sessions.push(eng);
+      const eid = idn('inv', ++inv, 4); const d = 90 + rnd() * 160; eng.invocations.push({ id: eid, from: cur + 1, to: cur + 1 + d, outcome: 'submitted' }); it.invocations.push(eid); cur = cur + 2 + d;
+      const rounds = i === 28 ? 3 : (rnd() < 0.18 ? 2 : 1);
+      for (let r = 0; r < rounds; r++) {
+        const g = { id: idn('ga', ++ga, 4), checkpoint: 'iteration', subject: { workItem: w.id, iteration: it.id }, verdict: r < rounds - 1 ? 'failed' : 'passed', from: cur + 1, to: cur + 9 + rnd() * 6, repairRound: r };
+        R.gates.push(g); it.gates.push(g.id); cur = g.to + 1;
+        if (g.verdict === 'failed') { R.issues.push({ n: ++isn, severity: 'attention', group: 'verification', kind: 'gate-failed', subject: { kind: 'gate', id: g.id, workItem: w.id }, summary: `Gate ${g.id} (iteration ${it.id}) failed, repair round ${r + 1} of 3`, at: g.to });
+          const rid = idn('inv', ++inv, 4); const rd = 60 + rnd() * 90; eng.invocations.push({ id: rid, from: cur, to: cur + rd, outcome: 'submitted', continued: true }); it.invocations.push(rid); cur += rd + 1; }
+      }
+      it.to = cur; const lid = idn('inv', ++inv, 4); la.invocations.push({ id: lid, from: cur + 1, to: cur + 20 + rnd() * 40, outcome: 'submitted', continued: true }); cur = la.invocations[la.invocations.length - 1].to + 1;
+      w.iterations.push(it);
+    }
+    const g = { id: idn('ga', ++ga, 4), checkpoint: 'work-item', subject: { workItem: w.id }, verdict: 'passed', from: cur + 1, to: cur + 12, repairRound: 0 };
+    R.gates.push(g); w.gates.push(g.id); w.to = g.to; lanes[lane] = g.to + 8;
+    R.workItems.push(w);
+  });
+  // "now": a moment at which 29 work items are complete.
+  const starts = R.workItems.map(w => w.from).sort((a, b) => a - b); const now = Math.round(starts[33] + 90); R.now = now;
+  const wiOf = id => R.workItems.find(w => w.id === id);
+  R.workItems.forEach(w => {
+    if (w.from > now) { w.state = 'todo'; w.from = null; w.to = null; w.iterations = []; w.gates = []; return; }
+    if (w.to <= now) return;
+    w.state = 'working'; w.to = null;
+    w.iterations = w.iterations.filter(it => it.from <= now); w.iterations.forEach(it => { if (it.to > now) { it.to = null; it.outcome = 'open'; } });
+    w.gates = w.gates.filter(g => R.gates.find(x => x.id === g).from <= now);
+  });
+  R.gates = R.gates.filter(g => !g.subject.workItem || (wiOf(g.subject.workItem).state !== 'todo' && g.from <= now));
+  R.gates.forEach(g => { if (g.to > now) { g.verdict = 'running'; g.to = null; } });
+  R.workItems.forEach(w => { w.iterations.forEach(it => { it.gates = it.gates.filter(g => R.gates.some(x => x.id === g)); }); });
+  R.sessions = R.sessions.filter(s => !s.workItem || wiOf(s.workItem).state !== 'todo');
+  R.sessions.forEach(s => { s.invocations = s.invocations.filter(i => i.from <= now); s.invocations.forEach(i => { if (i.to > now) { i.to = null; i.outcome = null; } }); const w = s.workItem ? wiOf(s.workItem) : null; s.state = s.invocations.some(i => i.to == null) ? 'live' : (w && w.state !== 'completed' && s.role === 'local-architect') ? 'suspended' : (s.role === 'initial-architect' ? 'suspended' : 'finished'); });
+  R.sessions = R.sessions.filter(s => s.invocations.length);
+  // A working item with nothing live and no running gate: either yielded or its local architect is awaited.
+  let yielded = 0;
+  R.workItems.filter(w => w.state === 'working').forEach(w => { const live = R.sessions.some(s => s.workItem === w.id && s.state === 'live'); const running = R.gates.some(g => g.subject.workItem === w.id && g.verdict === 'running'); if (live || running) return; if (yielded < 2) { yielded++; w.state = 'yielded'; w.waitingFor = `rq-00${yielded + 3} (${lowerByEntry[entryDefs[(yielded * 4) % 9][0]][1]})`; return; } const la = R.sessions.find(s => s.workItem === w.id && s.role === 'local-architect'); if (la) { const last = la.invocations[la.invocations.length - 1]; last.to = null; last.outcome = null; la.state = 'live'; } });
+  // Two of the most recently completed items instead wait for a requirement: their work-item gate has not run.
+  [...R.workItems].filter(w => w.state === 'completed' && w.origin === 'delegated').sort((a, b) => b.to - a.to).slice(0, 2 - yielded).forEach(w => { yielded++; w.state = 'yielded'; w.to = null; R.gates = R.gates.filter(g => !w.gates.includes(g.id)); w.gates = []; w.waitingFor = `rq-00${yielded + 3} (${lowerByEntry[entryDefs[(yielded * 4) % 9][0]][0]})`; const la = R.sessions.find(s => s.workItem === w.id && s.role === 'local-architect'); if (la) la.state = 'suspended'; });
+  R.issues = R.issues.filter(i => i.at <= now && (!i.subject.workItem || wiOf(i.subject.workItem).state !== 'todo'));
+  R.gates.unshift({ id: 'ga-0000', checkpoint: 'readiness', subject: {}, verdict: 'passed', from: 402, to: 419, inferredStart: true, repairRound: 0 });
+  // Global forks and contract engineers at fixed moments.
+  for (let f = 0; f < 6; f++) { const t = 600 + f * 800; if (t > now) break; const wiId = R.workItems.filter(w => w.from != null)[(f * 5 + 2) % 29].id; R.sessions.push({ id: idn('ses', ++ses, 4), role: 'global-fork', state: 'finished', workItem: wiId, invocations: [{ id: idn('inv', ++inv, 4), from: t, to: Math.min(now, t + 70 + f * 9), outcome: 'submitted', fork: true }] }); }
+  for (let c = 0; c < 3; c++) { const t = 1500 + c * 1400; if (t > now) break; const wiId = R.workItems.filter(w => w.from != null)[(c * 7 + 4) % 29].id; R.sessions.push({ id: idn('ses', ++ses, 4), role: 'contract-engineer', state: 'finished', workItem: wiId, invocations: [{ id: idn('inv', ++inv, 4), from: t, to: t + 150 + c * 40, outcome: 'submitted' }] }); }
+  R.sessions.sort((a, b) => a.invocations[0].from - b.invocations[0].from);
+  // Capability and scenario states follow their work items.
+  R.capabilities.forEach(c => { const ws = c.workItems.map(wiOf); c.state = ws.length && ws.every(w => w.state === 'completed') ? 'completed' : ws.some(w => w.state !== 'todo') ? 'working' : 'todo'; if (c.state === 'completed') c.evidence = ws.map(w => w.gates[0]).filter(Boolean); });
+  R.scenarios.filter(s => s.kind === 'entry').forEach((s, k) => { const c = capById(s.entry); const w = c.workItems.length ? wiOf(c.workItems[0]) : null; s.workItem = w ? w.id : null; s.state = !w || w.state === 'todo' ? 'pending' : w.state === 'completed' ? 'implemented' : ['declared', 'bound', 'pending'][k % 3]; if (s.state === 'implemented') s.gates = w.gates.map(x => [x, 'passed']); });
+  // More issues, on real elements of the invented run.
+  const eng = R.sessions.filter(s => s.role === 'engineer' && s.invocations[0].to != null);
+  const pushI = (sev, group, kind, s, summary, at) => { if (at <= now) R.issues.push({ n: ++isn, severity: sev, group, kind, subject: s, summary, at }); };
+  const fork = R.sessions.find(s => s.role === 'global-fork');
+  if (fork) pushI('attention', 'sessions', 'degraded-start', { kind: 'invocation', id: fork.invocations[0].id, session: fork.id }, 'Degraded start: the requested fork was made fresh (point unavailable)', fork.invocations[0].to);
+  const at = s => s.invocations[0].to;
+  pushI('caution', 'sessions', 'budget-reached', { kind: 'invocation', id: eng[5].invocations[0].id, session: eng[5].id, workItem: eng[5].workItem }, 'Context budget reached at 178 k of 200 k tokens; the report was delivered', at(eng[5]));
+  pushI('caution', 'scope', 'guard-denied', { kind: 'invocation', id: eng[9].invocations[0].id, session: eng[9].id, workItem: eng[9].workItem }, 'Guard denied 3 writes outside the scope (blocked-scope)', at(eng[9]));
+  pushI('caution', 'scope', 'excursion', { kind: 'invocation', id: eng[12].invocations[0].id, session: eng[12].id, workItem: eng[12].workItem }, 'Reads outside the scope: shop/catalog/core', at(eng[12]));
+  pushI('info', 'architecture', 'module-created', { kind: 'module', id: 'shop/checkout/pricing', workItem: 'wi-021' }, 'Module shop/checkout/pricing was created by wi-021 (decision gd-003)', 3100);
+  pushI('caution', 'sessions', 'compaction', { kind: 'invocation', id: eng[3].invocations[0].id, session: eng[3].id, workItem: eng[3].workItem }, 'Compaction (threshold): 161 k to 74 k tokens', at(eng[3]));
+  pushI('attention', 'work', 'iteration-partial', { kind: 'iteration', id: R.workItems[7].iterations[0] ? R.workItems[7].iterations[0].id : 'wi-008.i01', workItem: R.workItems[7].id }, 'Iteration returned partial: "the coupon lookup needs a provider fake"', 2900);
+  pushI('caution', 'verification', 'scenario-undefined', { kind: 'scenario', id: 'sc-012', workItem: R.workItems[4].id }, 'Scenario sc-012 has an undefined step in ga-0031 (quick)', 2450);
+  pushI('info', 'run', 'analysis-approved', { kind: 'run', id: 'run' }, 'Analysis approved by dan at 08:18:42 (review stop)', 402);
+  pushI('caution', 'scope', 'hook-findings', { kind: 'invocation', id: eng[14].invocations[0].id, session: eng[14].id, workItem: eng[14].workItem }, 'Post-write check reported 2 findings (later resolved)', at(eng[14]));
+  pushI('caution', 'sessions', 'retry', { kind: 'invocation', id: eng[16].invocations[0].id, session: eng[16].id, workItem: eng[16].workItem }, 'Executor retried the model call twice (provider 529)', at(eng[16]));
+  pushI('attention', 'work', 'scenario-withdrawn', { kind: 'scenario', id: 'sc-021', workItem: R.workItems[9].id }, 'Scenario sc-021 was withdrawn to pending (placement request)', 3500);
+  pushI('info', 'architecture', 'module-created', { kind: 'module', id: 'shop/promotions', workItem: 'wi-004' }, 'Module shop/promotions was created by wi-004', 1800);
+  R.issues.sort((a, b) => a.at - b.at);
+  R.tokens = { input: 4213880, cacheRead: 31022416, cacheWrite: 812304, output: 611922 };
+  R.capabilities.forEach(c => { if (c.entry) { const done = c.scenarios.filter(s => R.scenarios.find(x => x.id === s).state === 'implemented').length; c.reason = c.state === 'completed' ? `${c.workItems[0]} passed its work-item gate` : c.state === 'working' ? `${c.workItems[0]} is working (${done} of ${c.scenarios.length} scenarios implemented)` : 'No work started'; } else c.reason = c.tentative ? 'Forecast by hypothesis; no work derives from it' : (c.state === 'completed' ? 'Verified by its work item’s gate' : c.state === 'working' ? 'Work in progress' : 'Registered by a placement decision; no work started'); });
+  return R;
+}
+const RUNS = { small: smallRun, large: makeLargeRun() };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function clock(run, sec) { const d = new Date(new Date(run.start).getTime() + sec * 1000); return d.toISOString().slice(11, 19); }
+function dur(sec) { if (sec == null) return ''; sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return h ? `${h} h ${String(m).padStart(2, '0')} m` : m ? `${m} m ${String(s).padStart(2, '0')} s` : `${s} s`; }
+function stateColor(st) { return { completed: 'var(--good)', passed: 'var(--good)', accepted: 'var(--good)', implemented: 'var(--good)', working: 'var(--now)', running: 'var(--now)', open: 'var(--now)', live: 'var(--now)', failed: 'var(--bad)', yielded: 'var(--warn)', declared: 'var(--warn)', bound: 'var(--warn)', 'not-verified': 'var(--warn)', partial: 'var(--serious)', unsuitable: 'var(--serious)' }[st] || 'var(--todo)'; }
+function roleVar(role) { return `var(--role-${ROLES[role]})`; }
+function fmtK(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1e3 ? Math.round(n / 1e3) + ' k' : String(n); }
+const SEV_ORDER = { blocking: 0, attention: 1, caution: 2, info: 3 };
+
+// Related set: everything joined to the selection through the work item.
+function relatedSet(run, sel) {
+  const out = new Set(); if (!sel) return out;
+  const add = (k, id) => id && out.add(`${k}:${id}`);
+  const byWi = id => run.workItems.find(w => w.id === id);
+  const wiClosure = w => { if (!w) return; add('work-item', w.id); add('capability', w.capability); add('module', w.module); w.iterations.forEach(it => { add('iteration', it.id); it.gates.forEach(g => add('gate', g)); it.invocations.forEach(i => add('invocation', i)); }); w.gates.forEach(g => add('gate', g)); run.sessions.filter(s => s.workItem === w.id).forEach(s => { add('session', s.id); s.invocations.forEach(i => add('invocation', i.id)); }); run.scenarios.filter(s => s.workItem === w.id).forEach(s => add('scenario', s.id)); };
+  const capClosure = c => { if (!c) return; add('capability', c.id); add('module', c.owner); (c.involved || []).forEach(m => add('module', m)); c.scenarios.forEach(s => add('scenario', s)); c.workItems.forEach(w => wiClosure(byWi(w))); c.dependsOn.forEach(d => add('capability', d)); run.capabilities.filter(x => x.dependsOn.includes(c.id)).forEach(x => add('capability', x.id)); };
+  switch (sel.kind) {
+    case 'capability': capClosure(run.capabilities.find(c => c.id === sel.id)); break;
+    case 'scenario': { const s = run.scenarios.find(x => x.id === sel.id); if (!s) break; add('scenario', s.id); add('module', s.owner); if (s.entry) add('capability', s.entry); (s.subEntries || []).forEach(e => add('capability', e)); s.gates.forEach(([g]) => add('gate', g)); wiClosure(byWi(s.workItem)); break; }
+    case 'module': { add('module', sel.id); run.capabilities.filter(c => c.owner === sel.id || (c.involved || []).includes(sel.id)).forEach(c => add('capability', c.id)); run.workItems.filter(w => w.module === sel.id).forEach(w => wiClosure(w)); run.scenarios.filter(s => s.owner === sel.id).forEach(s => add('scenario', s.id)); run.modules.filter(m => m.parent === sel.id || m.id === (run.modules.find(x => x.id === sel.id) || {}).parent).forEach(m => add('module', m.id)); break; }
+    case 'work-item': wiClosure(byWi(sel.id)); break;
+    case 'iteration': { const w = run.workItems.find(x => x.iterations.some(i => i.id === sel.id)); wiClosure(w); break; }
+    case 'gate': { const g = run.gates.find(x => x.id === sel.id); if (!g) break; add('gate', g.id); if (g.subject.workItem) wiClosure(byWi(g.subject.workItem)); run.scenarios.filter(s => s.gates.some(([x]) => x === g.id)).forEach(s => add('scenario', s.id)); break; }
+    case 'session': { const s = run.sessions.find(x => x.id === sel.id); if (!s) break; add('session', s.id); s.invocations.forEach(i => add('invocation', i.id)); if (s.workItem) wiClosure(byWi(s.workItem)); break; }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// State and routing (the proposed URL grammar, inside this mockup's hash)
+// ---------------------------------------------------------------------------
+const state = { runKey: 'small', view: 'overview', sel: null, window: null };
+function href() { const r = RUNS[state.runKey]; const base = `#/plans/${r.plan}/runs/${r.id}`; const q = state.sel ? `?sel=${state.sel.kind}:${state.sel.id}` : ''; return state.view === 'overview' ? base + q : `${base}/${state.view}${q}`; }
+function navigate(patch) { Object.assign(state, patch); history.replaceState(null, '', href()); render(); }
+function select(kind, id) { navigate({ sel: (state.sel && state.sel.kind === kind && state.sel.id === id) ? null : { kind, id } }); }
+function parseHash() { const m = /^#\/plans\/([^/]+)\/runs\/([^/?]+)(?:\/(map|timeline|lists))?(?:\?sel=([a-z-]+):([^&]+))?/.exec(location.hash); if (!m) return; const key = Object.keys(RUNS).find(k => RUNS[k].id === m[2]); if (key) state.runKey = key; state.view = m[3] || 'overview'; state.sel = m[4] ? { kind: m[4], id: decodeURIComponent(m[5]) } : null; }
+
+// ---------------------------------------------------------------------------
+// Frame
+// ---------------------------------------------------------------------------
+function renderFrame(run) {
+  $('#banner').textContent = run.invented ? 'This run is INVENTED to show the design at scale: 9 entries, ' + run.workItems.length + ' work items, ' + run.sessions.length + ' sessions, ' + run.sessions.reduce((n, s) => n + s.invocations.length, 0) + ' invocations. Nothing in it was recorded.' : 'Real run 20260923T164537Z-dbf0c2 of the plan status-badge-tone, from the captured protocol answers in api-examples/.';
+  $('#crumbs').innerHTML = `<span class="link">Plans</span> › <span class="link">${esc(run.planTitle)}</span> › Run <code>${esc(run.id)}</code>`;
+  const elapsed = run.end != null ? dur(run.end) : dur(run.now);
+  $('#run-head').innerHTML = `<h1>${esc(run.planTitle)}</h1><span class="mono sub">${esc(run.id)}</span><span class="pill pill-${run.state}">${run.state}</span><span class="sub">${run.end != null ? 'took ' + elapsed : 'running for ' + elapsed}</span><span class="sub">read at version ${run.invented ? 1412 : 39}</span>${run.state === 'running' ? '<button>Stop</button>' : ''}`;
+  $('#stepper').innerHTML = run.phases.map(([name, from, to], i) => { const skipped = name === 'review' && !run.reviewStop; const cls = skipped ? 'skipped' : (from == null ? '' : (name === run.phase ? 'now' : 'done')); const label = skipped ? 'review skipped' : (from == null ? name : `${name} ${clock(run, from)}${name === run.phase && run.state === 'running' ? ' (now)' : ''}`); return `<span class="step ${cls}"><span class="dot"></span>${esc(label)}${i < run.phases.length - 1 ? '<span class="bar"></span>' : ''}</span>`; }).join('');
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === state.view)));
+  $('#run-small').setAttribute('aria-pressed', String(state.runKey === 'small')); $('#run-large').setAttribute('aria-pressed', String(state.runKey === 'large'));
+  $('#url').textContent = 'URL ' + href();
+}
+
+// ---------------------------------------------------------------------------
+// Overview
+// ---------------------------------------------------------------------------
+function stackedBar(label, segs, total) {
+  const done = segs[0][1];
+  return `<div class="sbar"><span>${label}</span><div class="track">${segs.filter(([, n]) => n > 0).map(([st, n]) => `<div class="seg link" title="${st}: ${n}" style="flex:${n};background:${stateColor(st)}"></div>`).join('')}</div><span class="n">${done} / ${total}</span></div>`;
+}
+function renderOverview(run) {
+  const caps = run.capabilities.filter(c => c.entry);
+  const cnt = (arr, key) => arr.reduce((m, x) => (m[x[key]] = (m[x[key]] || 0) + 1, m), {});
+  const cs = cnt(caps, 'state'), ss = cnt(run.scenarios, 'state'), ws = cnt(run.workItems, 'state'), gs = cnt(run.gates, 'verdict');
+  const sevCount = cnt(run.issues, 'severity');
+  const issuesRanked = [...run.issues].sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity] || b.at - a.at);
+  const live = run.sessions.filter(s => s.state === 'live');
+  const runningGate = run.gates.find(g => g.verdict === 'running');
+  const sesByState = cnt(run.sessions, 'state');
+  // NOW / OUTCOME
+  let nowCard;
+  if (run.state === 'running') {
+    const rows = [];
+    live.forEach(s => { const i = s.invocations[s.invocations.length - 1]; rows.push(`<li><span class="live"></span><span class="chip chip-${ROLES[s.role]}">${ROLE_LABEL[s.role]}</span><span class="link mono" data-sel="session:${s.id}">${s.id}</span> <span class="mono">${i.id}</span> on <span class="link mono" data-sel="work-item:${s.workItem}">${s.iteration || s.workItem}</span><span class="sub">since ${dur(run.now - i.from)} · last entry 6 s ago</span></li>`); });
+    if (runningGate) rows.push(`<li><span class="live"></span>gate <span class="link mono" data-sel="gate:${runningGate.id}">${runningGate.id}</span> ${runningGate.checkpoint} on <span class="mono">${runningGate.subject.iteration || runningGate.subject.workItem || 'the run'}</span><span class="sub">since ${dur(run.now - runningGate.from)}${runningGate.repairRound ? ` · repair round ${runningGate.repairRound + 1} of 3` : ''}</span></li>`);
+    run.workItems.filter(w => w.state === 'yielded').forEach(w => rows.push(`<li><span class="glyph attention" style="background:var(--warn)"></span><span class="link mono" data-sel="work-item:${w.id}">${w.id}</span> yielded: waits for <span class="mono">${esc(w.waitingFor)}</span></li>`));
+    if (live.length) rows.push(`<li><span class="glyph info"></span>writer held by <span class="mono">${live.find(s => s.role === 'engineer') ? live.find(s => s.role === 'engineer').invocations.slice(-1)[0].id : 'nobody'}</span></li>`);
+    nowCard = `<div class="card c4"><h2>Now</h2><ul class="plain">${rows.join('') || '<li class="sub">Idle between steps</li>'}</ul></div>`;
+  } else {
+    nowCard = `<div class="card c4"><h2>Outcome</h2><div class="hero" style="color:var(--good)">Completed</div><p class="sub" style="margin:.3rem 0">after ${run.workItems.length} work item${run.workItems.length > 1 ? 's' : ''} in ${dur(run.end)}. Final gate <span class="link mono" data-sel="gate:ga-0004">ga-0004</span> passed in full mode with ${run.scenarios.length} scenarios. Commit <code>e99fee0</code> (the diff is not recorded).</p></div>`;
+  }
+  const progress = `<div class="card c8"><h2>Progress</h2>
+    ${stackedBar('Top-level capabilities', [['completed', cs.completed || 0], ['working', cs.working || 0], ['todo', cs.todo || 0]], caps.length)}
+    ${stackedBar('Scenarios', [['implemented', ss.implemented || 0], ['declared', ss.declared || 0], ['bound', ss.bound || 0], ['pending', ss.pending || 0]], run.scenarios.length)}
+    ${stackedBar('Work items', [['completed', ws.completed || 0], ['working', ws.working || 0], ['yielded', ws.yielded || 0], ['todo', ws.todo || 0]], run.workItems.length)}
+    <div class="legend"><span><i class="sw" style="background:var(--good)"></i>completed / implemented</span><span><i class="sw" style="background:var(--now)"></i>working</span><span><i class="sw" style="background:var(--warn)"></i>declared, bound, yielded</span><span><i class="sw" style="background:var(--todo)"></i>todo / pending</span></div></div>`;
+  // LEFT
+  const leftEntries = caps.filter(c => c.state !== 'completed');
+  const leftWi = run.workItems.filter(w => w.state !== 'completed');
+  const forecasts = run.capabilities.filter(c => c.tentative);
+  const leftCard = `<div class="card c4"><h2>Left to do</h2>${leftEntries.length ? `<div class="sub">${leftEntries.length} of ${caps.length} top-level capabilities</div><ul class="plain">${leftEntries.slice(0, 4).map(c => { const done = c.scenarios.filter(s => run.scenarios.find(x => x.id === s).state === 'implemented').length; return `<li><i class="sw" style="background:${stateColor(c.state)}"></i><span class="link" data-sel="capability:${c.id}">${c.id}</span><span class="sub">scenarios ${done} / ${c.scenarios.length}</span></li>`; }).join('')}${leftEntries.length > 4 ? `<li class="sub">and ${leftEntries.length - 4} more</li>` : ''}</ul><div class="sub" style="margin-top:.3rem">${leftWi.length} work items queued, working or yielded <span class="note">(queue order is not recorded)</span></div>` : `<div class="hero" style="font-size:1.1rem">Nothing required is left.</div>`}
+    ${forecasts.length ? `<div class="sub" style="margin-top:.3rem">${forecasts.length} forecast${forecasts.length > 1 ? 's' : ''} not required: ${forecasts.slice(0, 2).map(f => `<span class="link mono" data-sel="capability:${f.id}">${f.id}</span>`).join(', ')}${forecasts.length > 2 ? ', …' : ''}</div>` : ''}
+    ${run.limits ? `<div class="sub" style="margin-top:.4rem">${(() => { const g = [...run.gates].sort((a, b) => b.repairRound - a.repairRound)[0]; return `highest repair round ${g.repairRound + 1} of ${run.limits.repairRounds} (${g.subject.iteration || g.id})`; })()} · invocations ${run.sessions.reduce((n, s) => n + s.invocations.length, 0)} of ${run.limits.invocations} · run time ${dur(run.now)} of ${run.limits.runHours} h <span class="note">(limits: once the harness publishes them)</span></div>` : ''}</div>`;
+  const issuesCard = `<div class="card c8"><h2>Issues</h2><div class="row" style="margin-bottom:.3rem">${['blocking', 'attention', 'caution', 'info'].map(s => `<span class="sev"><i class="glyph ${s}"></i>${s} <b>${sevCount[s] || 0}</b></span>`).join('')}</div><ul class="plain">${issuesRanked.slice(0, 5).map(i => `<li><i class="glyph ${i.severity}"></i><span style="flex:1">${esc(i.summary)}</span><span class="link mono" data-sel="${i.subject.workItem ? 'work-item:' + i.subject.workItem : (i.subject.session ? 'session:' + i.subject.session : i.subject.kind + ':' + i.subject.id)}">${i.subject.id}</span><span class="sub mono">${clock(run, i.at)}</span></li>`).join('')}</ul>${run.issues.length > 5 ? `<div class="sub"><span class="link">all ${run.issues.length} issues</span></div>` : ''}</div>`;
+  const gatesCard = `<div class="card c3"><h2>Gates</h2><div class="stat"><div><b>${run.gates.length}</b>attempts</div><div><b style="color:var(--good)">${gs.passed || 0}</b>passed</div><div><b style="color:var(--bad)">${gs.failed || 0}</b>failed</div>${gs.running ? `<div><b style="color:var(--now)">${gs.running}</b>running</div>` : ''}</div><div class="sub" style="margin-top:.3rem">readiness attempts 1 · last: <span class="link mono" data-sel="gate:${run.gates[run.gates.length - 1].id}">${run.gates[run.gates.length - 1].id}</span> ${run.gates[run.gates.length - 1].verdict}</div></div>`;
+  const roleCounts = run.sessions.reduce((m, s) => (m[s.role] = (m[s.role] || 0) + 1, m), {});
+  const sessionsCard = `<div class="card c3"><h2>Sessions</h2><div class="stat">${['live', 'suspended', 'finished', 'interrupted'].map(st => `<div><b style="color:${st === 'live' ? 'var(--now)' : st === 'interrupted' ? 'var(--bad)' : 'inherit'}">${sesByState[st] || 0}</b>${st}</div>`).join('')}</div><div class="row" style="margin-top:.4rem">${Object.keys(roleCounts).map(r => `<span class="chip chip-${ROLES[r]}">${ROLE_LABEL[r]} ×${roleCounts[r]}</span>`).join('')}</div><div class="sub" style="margin-top:.3rem">${run.invented ? 4 : 0} degraded starts</div></div>`;
+  const tokensCard = `<div class="card c3"><h2>Tokens</h2><div class="stat"><div><b>${fmtK(run.tokens.input)}</b>input</div><div><b>${fmtK(run.tokens.cacheRead)}</b>cache read</div><div><b>${fmtK(run.tokens.cacheWrite)}</b>cache write</div><div><b>${fmtK(run.tokens.output)}</b>output</div></div><div class="note" style="margin-top:.3rem">by category; never summed, never priced</div></div>`;
+  const tiles = `<div class="card c12"><h2>Entry map <span class="sub" style="text-transform:none;letter-spacing:0">${caps.length} top-level capabilities · select one to open the map on it</span></h2><div class="tiles">${[...caps].sort((a, b) => ({ working: 0, todo: 1, completed: 2 }[a.state] - { working: 0, todo: 1, completed: 2 }[b.state])).map(c => { const scs = c.scenarios.map(s => run.scenarios.find(x => x.id === s)); const hasLive = run.sessions.some(s => s.state === 'live' && c.workItems.includes(s.workItem)); const iss = run.issues.filter(i => c.workItems.includes(i.subject.workItem)); const top = iss.length ? iss.reduce((a, b) => SEV_ORDER[a.severity] < SEV_ORDER[b.severity] ? a : b).severity : null; return `<div class="tile ${c.state}" data-open="capability:${c.id}" title="${esc(c.reason)}"><div class="name">${c.id}</div><div class="dots">${scs.length > 12 ? `<span class="sub">${scs.filter(s => s.state === 'implemented').length} / ${scs.length} scenarios</span>` : scs.map(s => `<i class="sd ${s.state}" title="${s.id} ${s.state}"></i>`).join('')}</div><div class="marks">${hasLive ? '<span class="live"></span>' : ''}${top ? `<i class="glyph ${top}"></i>` : ''}<span class="sub">${c.state}${c.workItems.length ? ' · ' + c.workItems.length + ' wi' : ''}</span></div></div>`; }).join('')}</div></div>`;
+  const activity = `<div class="card c12"><h2>Activity <span class="sub" style="text-transform:none;letter-spacing:0">the whole run; drag a range or select to open the timeline</span></h2><div id="activity"></div></div>`;
+  $('#main').innerHTML = `<div class="grid">${nowCard}${progress}${leftCard}${issuesCard}${gatesCard}${sessionsCard}${tokensCard}${'<div class="card c3"><h2>Reads</h2><div class="sub">Open the <span class="link" data-view="lists">lists and pages</span>: work, scenarios, gates, sessions, capabilities, modules, decisions, issues, events, measurements.</div></div>'}${tiles}${activity}</div>`;
+  $('#activity').innerHTML = timelineSvg(run, { mini: true, width: $('#activity').clientWidth || 1200 });
+  $('#main').querySelectorAll('[data-open]').forEach(el => el.addEventListener('click', () => { const [k, id] = el.dataset.open.split(':'); navigate({ view: 'map', sel: { kind: k, id } }); }));
+  wireSel();
+}
+function wireSel() { $('#main').querySelectorAll('[data-sel]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); const i = el.dataset.sel.indexOf(':'); select(el.dataset.sel.slice(0, i), el.dataset.sel.slice(i + 1)); })); $('#main').querySelectorAll('[data-view]').forEach(el => el.addEventListener('click', () => navigate({ view: el.dataset.view }))); }
+
+// ---------------------------------------------------------------------------
+// Map: modules layer (stand-in for the toolkit canvas), capabilities layer, work layer
+// ---------------------------------------------------------------------------
+function cls(rel, sel, key) { if (!sel) return ''; if (`${sel.kind}:${sel.id}` === key) return 'selected'; return rel.has(key) ? 'related' : 'dimmed'; }
+function ringAttr(c) { return c === 'selected' ? 'class="selected-ring"' : c === 'related' ? 'class="related-ring"' : ''; }
+function modulesLayer(run, rel, sel) {
+  // tidy tree layout: depth rows, leaves left to right; collapse untouched branches by default on the large run
+  const touched = new Set(); run.capabilities.forEach(c => { touched.add(c.owner); (c.involved || []).forEach(touched.add, touched); }); run.workItems.forEach(w => touched.add(w.module)); run.scenarios.forEach(s => touched.add(s.owner));
+  const byId = Object.fromEntries(run.modules.map(m => [m.id, { ...m, children: [] }])); run.modules.forEach(m => { if (m.parent && byId[m.parent]) byId[m.parent].children.push(byId[m.id]); });
+  const roots = run.modules.filter(m => !m.parent).map(m => byId[m.id]);
+  const hasTouchedBelow = n => touched.has(n.id) || n.children.some(hasTouchedBelow);
+  const collapse = run.modules.length > 16;
+  const rowsOf = n => run.capabilities.filter(c => c.owner === n.id || (c.involved || []).includes(n.id));
+  const W = 150, gapX = 14, gapY = 46; let x = 0; const nodes = [];
+  const place = (n, depth) => { const rows = rowsOf(n); const hidden = collapse && !hasTouchedBelow(n); const kids = hidden ? [] : n.children; const h = 26 + rows.length * 16 + (hidden && n.children.length ? 14 : 0); let x0 = x; const placed = kids.map(k => place(k, depth + 1)); const cx = placed.length ? (placed[0].cx + placed[placed.length - 1].cx) / 2 : (x += W + gapX, x - (W + gapX) + W / 2); const node = { n, depth, rows, h, cx, hidden, hiddenCount: hidden ? n.children.length : 0, kids: placed }; nodes.push(node); return node; };
+  roots.forEach(r => place(r, 0));
+  const depthH = []; nodes.forEach(n => { depthH[n.depth] = Math.max(depthH[n.depth] || 0, n.h); }); const yOf = d => depthH.slice(0, d).reduce((a, b) => a + b + gapY, 10);
+  const totalH = yOf(depthH.length) + 10, totalW = x + 10;
+  let svg = `<div style="overflow:auto;max-height:440px"><svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" role="img" aria-label="Modules layer">`;
+  nodes.forEach(n => n.kids.forEach(k => { const c = (rel.has(`module:${n.n.id}`) && rel.has(`module:${k.n.id}`)) || !sel ? 'var(--axis)' : 'var(--line)'; svg += `<path d="M${n.cx} ${yOf(n.depth) + n.h} V${yOf(k.depth) - gapY / 2} H${k.cx} V${yOf(k.depth)}" fill="none" stroke="${c}" stroke-width="1.2"/>`; }));
+  nodes.forEach(n => { const key = `module:${n.n.id}`; const c = cls(rel, sel, key); const st = n.rows.some(r => r.state === 'completed' && r.owner === n.n.id) ? 'var(--good)' : n.rows.some(r => r.state === 'working' && r.owner === n.n.id) ? 'var(--now)' : n.rows.length ? 'var(--todo)' : 'var(--line)'; const y = yOf(n.depth); const iss = run.issues.filter(i => i.subject.kind === 'module' && i.subject.id === n.n.id).length;
+    svg += `<g class="node ${c === 'dimmed' ? 'dimmed' : ''}" data-sel="${key}"><rect x="${n.cx - W / 2}" y="${y}" width="${W}" height="${n.h}" rx="6" fill="var(--panel)" stroke="var(--line)" ${n.rows.length ? '' : 'opacity="0.7"'}/><rect x="${n.cx - W / 2}" y="${y}" width="4" height="${n.h}" rx="2" fill="${st}"/>${c === 'selected' || c === 'related' ? `<rect x="${n.cx - W / 2 - 1.5}" y="${y - 1.5}" width="${W + 3}" height="${n.h + 3}" rx="7" fill="none" ${ringAttr(c)}/>` : ''}<text x="${n.cx - W / 2 + 10}" y="${y + 16}" font-size="11" font-weight="600">${esc(n.n.name)}</text>${iss ? `<circle cx="${n.cx + W / 2 - 10}" cy="${y + 11}" r="4" fill="var(--muted)"/>` : ''}${n.rows.map((r, i) => { const rk = `capability:${r.id}`; const rc = cls(rel, sel, rk); const own = r.owner === n.n.id; return `<g class="node" data-sel="${rk}" ${rc === 'dimmed' ? 'opacity="0.35"' : ''}><rect x="${n.cx - W / 2 + 8}" y="${y + 22 + i * 16}" width="${W - 16}" height="14" rx="3" fill="${rc === 'selected' ? 'var(--now-soft)' : 'transparent'}"/><circle cx="${n.cx - W / 2 + 15}" cy="${y + 29 + i * 16}" r="4" fill="${own ? stateColor(r.state) : 'transparent'}" stroke="${own ? stateColor(r.state) : 'var(--axis)'}" ${r.tentative ? 'stroke-dasharray="2 1.5"' : ''}/><text x="${n.cx - W / 2 + 23}" y="${y + 33 + i * 16}" font-size="9.5" class="svgmono">${esc(r.id.length > 21 ? r.id.slice(0, 20) + '…' : r.id)}</text></g>`; }).join('')}${n.hidden && n.hiddenCount ? `<text x="${n.cx - W / 2 + 10}" y="${y + n.h - 4}" font-size="9" fill="var(--muted)">+${n.hiddenCount} untouched</text>` : ''}</g>`; });
+  svg += '</svg></div>';
+  return `<div class="layer card"><h3>Modules <span class="sub">the toolkit's <code>ramify.ts/module-tree</code> canvas, reused; this SVG stands in for it (the canvas pans and zooms; this scrolls). Left rule: strongest state among owned rows. A hollow dot is an initial "involved" association; a dashed dot is a forecast.${collapse ? ' Untouched branches collapsed.' : ''}</span></h3>${svg}</div>`;
+}
+function capabilitiesLayer(run, rel, sel) {
+  const entries = run.capabilities.filter(c => c.entry); const big = run.capabilities.length > 30;
+  const expanded = new Set(sel && sel.kind === 'capability' ? [sel.id, ...(run.capabilities.find(c => c.id === sel.id) ? [] : [])] : []);
+  if (sel && sel.kind === 'capability') { const c = run.capabilities.find(x => x.id === sel.id); if (c && !c.entry) entries.forEach(e => { if (e.dependsOn.includes(c.id)) expanded.add(e.id); }); }
+  // columns: integration scenarios (col 0), entries (col 1), lower level (col 2..)
+  const integ = run.scenarios.filter(s => s.kind === 'integration');
+  const shown = big ? run.capabilities.filter(c => c.entry || entries.some(e => expanded.has(e.id) && e.dependsOn.includes(c.id))) : run.capabilities;
+  const depth = {}; const d = c => { if (depth[c.id] != null) return depth[c.id]; depth[c.id] = 0; const deps = c.dependsOn.map(x => shown.find(y => y.id === x)).filter(Boolean); depth[c.id] = deps.length ? 1 + Math.max(...deps.map(d)) : 0; return depth[c.id]; };
+  shown.forEach(d); const maxD = Math.max(0, ...Object.values(depth));
+  const NW = 196, NH = 58, gx = 60, gy = 14; const colX = k => 20 + (integ.length ? 1 : 0) * (NW + gx) + (maxD - k) * (NW + gx);
+  const cols = {}; shown.forEach(c => { (cols[depth[c.id]] ||= []).push(c); });
+  const pos = {}; let maxRows = 0; Object.entries(cols).forEach(([k, arr]) => { arr.sort((a, b) => (b.entry - a.entry)); arr.forEach((c, i) => { pos[c.id] = { x: colX(+k), y: 30 + i * (NH + gy) }; }); maxRows = Math.max(maxRows, arr.length); });
+  integ.forEach((s, i) => { pos[s.id] = { x: 20, y: 30 + i * (NH + gy) }; });
+  const H = 40 + Math.max(maxRows, integ.length) * (NH + gy), Wt = colX(0) + NW + 20;
+  let svg = `<div style="overflow:auto;max-height:560px"><svg viewBox="0 0 ${Wt} ${H}" width="${Wt}" height="${H}" role="img" aria-label="Capabilities layer">`;
+  for (let k = 0; k <= maxD; k++) svg += `<text x="${colX(k) + NW / 2}" y="16" font-size="9" text-anchor="middle" fill="var(--muted)" letter-spacing="1">DEPTH ${k}</text>`;
+  if (integ.length) svg += `<text x="${20 + NW / 2}" y="16" font-size="9" text-anchor="middle" fill="var(--muted)" letter-spacing="1">INTEGRATION SCENARIOS</text>`;
+  // edges
+  shown.forEach(c => c.dependsOn.forEach(dep => { const t = shown.find(x => x.id === dep); if (!t) return; const a = pos[c.id], b = pos[dep]; const both = rel.has(`capability:${c.id}`) && rel.has(`capability:${dep}`); const tent = c.tentative || t.tentative; svg += `<path d="M${a.x} ${a.y + NH / 2} C${a.x - gx / 2} ${a.y + NH / 2} ${b.x + NW + gx / 2} ${b.y + NH / 2} ${b.x + NW} ${b.y + NH / 2}" fill="none" stroke="${!sel || both ? (tent ? 'var(--warn)' : 'var(--axis)') : 'var(--line)'}" stroke-width="1.4" ${tent ? 'stroke-dasharray="4 3"' : ''} marker-end="url(#arr)"/>`; }));
+  integ.forEach(s => s.subEntries.forEach(e => { const a = pos[s.id], b = pos[e]; if (!b) return; const both = rel.has(`scenario:${s.id}`) && rel.has(`capability:${e}`); svg += `<path d="M${a.x + NW} ${a.y + NH / 2} C${a.x + NW + gx / 2} ${a.y + NH / 2} ${b.x - gx / 2} ${b.y + NH / 2} ${b.x} ${b.y + NH / 2}" fill="none" stroke="${!sel || both ? 'var(--warn)' : 'var(--line)'}" stroke-width="1.2" stroke-dasharray="3 3"/>`; }));
+  svg += `<defs><marker id="arr" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--axis)"/></marker></defs>`;
+  shown.forEach(c => { const p = pos[c.id]; const key = `capability:${c.id}`; const k = cls(rel, sel, key); const scs = c.scenarios.map(s => run.scenarios.find(x => x.id === s)); const live = run.sessions.filter(s => s.state === 'live' && c.workItems.includes(s.workItem)); const iss = run.issues.filter(i => c.workItems.includes(i.subject.workItem)); const top = iss.length ? iss.reduce((a, b) => SEV_ORDER[a.severity] < SEV_ORDER[b.severity] ? a : b).severity : null; const lower = big && c.entry ? c.dependsOn.length : 0; const lowerDone = big && c.entry ? c.dependsOn.filter(x => (run.capabilities.find(y => y.id === x) || {}).state === 'completed').length : 0;
+    svg += `<g class="node ${k === 'dimmed' ? 'dimmed' : ''}" data-sel="${key}"><rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="6" fill="${c.tentative ? 'var(--todo-soft)' : 'var(--panel)'}" stroke="${c.tentative ? 'var(--warn)' : 'var(--line)'}" ${c.tentative ? 'stroke-dasharray="4 3"' : ''}/><rect x="${p.x}" y="${p.y}" width="${c.entry ? 6 : 4}" height="${NH}" rx="2" fill="${stateColor(c.state)}"/>${k === 'selected' || k === 'related' ? `<rect x="${p.x - 1.5}" y="${p.y - 1.5}" width="${NW + 3}" height="${NH + 3}" rx="7" fill="none" ${ringAttr(k)}/>` : ''}<text x="${p.x + 12}" y="${p.y + 15}" font-size="10.5" font-weight="600" class="svgmono">${esc(c.id.length > 26 ? c.id.slice(0, 25) + '…' : c.id)}</text><text x="${p.x + 12}" y="${p.y + 28}" font-size="9" fill="var(--ink-2)">${c.entry ? 'entry · ' : ''}${c.tentative ? 'forecast · ' : ''}${c.state}${c.workItems.length ? ` · ${c.workItems.length} wi` : ''}${lower ? ` · depends on ${lower} (${lowerDone} done)` : ''}</text>${scs.length > 12 ? `<rect x="${p.x + 12}" y="${p.y + 36}" width="120" height="6" rx="3" fill="var(--todo-soft)"/><rect x="${p.x + 12}" y="${p.y + 36}" width="${120 * scs.filter(s => s.state === 'implemented').length / scs.length}" height="6" rx="3" fill="var(--good)"/><text x="${p.x + 138}" y="${p.y + 42}" font-size="8.5" fill="var(--ink-2)">${scs.filter(s => s.state === 'implemented').length}/${scs.length} sc</text>` : scs.map((s, i) => `<circle class="node" data-sel="scenario:${s.id}" cx="${p.x + 16 + i * 12}" cy="${p.y + 40}" r="4" fill="${s.state === 'implemented' ? 'var(--good)' : s.state === 'declared' ? 'var(--warn)' : 'transparent'}" stroke="${s.state === 'implemented' ? 'var(--good)' : s.state === 'pending' ? 'var(--axis)' : 'var(--warn)'}" stroke-width="1.5" ${rel.has(`scenario:${s.id}`) && sel ? 'stroke-width="2.5"' : ''}><title>${s.id} ${s.state}</title></circle>`).join('')}<text x="${p.x + 12}" y="${p.y + 53}" font-size="8.5" fill="var(--muted)" class="svgmono">${esc(c.owner.split('/').slice(-2).join('/'))}</text>${live.length ? `<circle cx="${p.x + NW - 12}" cy="${p.y + 12}" r="4" fill="var(--now)"><animate attributeName="r" values="3.5;5;3.5" dur="1.6s" repeatCount="indefinite"/></circle>` : ''}${top ? `<circle cx="${p.x + NW - 12}" cy="${p.y + (live.length ? 26 : 12)}" r="4" fill="${top === 'info' ? 'var(--muted)' : top === 'caution' ? 'transparent' : 'var(--warn)'}" stroke="var(--warn)" stroke-width="1.5"/>` : ''}${big && c.entry ? `<text x="${p.x + NW - 12}" y="${p.y + 53}" font-size="9" text-anchor="end" fill="var(--now)">${expanded.has(c.id) ? 'collapse' : 'expand'}</text>` : ''}</g>`; });
+  integ.forEach(s => { const p = pos[s.id]; const key = `scenario:${s.id}`; const k = cls(rel, sel, key); svg += `<g class="node ${k === 'dimmed' ? 'dimmed' : ''}" data-sel="${key}"><rect x="${p.x}" y="${p.y + 6}" width="${NW}" height="${NH - 12}" rx="20" fill="var(--panel)" stroke="${stateColor(s.state) === 'var(--todo)' ? 'var(--axis)' : stateColor(s.state)}" stroke-width="1.5"/>${k === 'selected' || k === 'related' ? `<rect x="${p.x - 1.5}" y="${p.y + 4.5}" width="${NW + 3}" height="${NH - 9}" rx="21" fill="none" ${ringAttr(k)}/>` : ''}<text x="${p.x + 14}" y="${p.y + 24}" font-size="10" font-weight="600" class="svgmono">${s.id} <tspan font-weight="400" fill="var(--ink-2)">${s.state}</tspan></text><text x="${p.x + 14}" y="${p.y + 37}" font-size="8.5" fill="var(--ink-2)">${esc(s.name.length > 38 ? s.name.slice(0, 37) + '…' : s.name)}</text><text x="${p.x + 14}" y="${p.y + 47}" font-size="8" fill="var(--muted)">owner ${esc(s.owner)} · ${s.subEntries.length} sub-scenarios</text></g>`; });
+  svg += '</svg></div>';
+  return `<div class="layer card"><h3>Capabilities <span class="sub">consumer → dependency, columns by depth. Entries carry their scenario dots; an integration scenario is its own node linked to its sub-scenarios' entries.${big ? ` Above 30 capabilities only entries show; ${expanded.size ? 'the selected entry is expanded' : 'select an entry to expand its dependencies'}.` : ''}</span></h3>${svg}</div>`;
+}
+function workLayer(run, rel, sel) {
+  const order = { working: 0, yielded: 1, todo: 2, completed: 3 };
+  const items = [...run.workItems].sort((a, b) => order[a.state] - order[b.state] || (a.from ?? 1e9) - (b.from ?? 1e9));
+  const big = items.length > 20; const completed = items.filter(w => w.state === 'completed'); const showCompleted = !big || (sel && completed.some(w => rel.has(`work-item:${w.id}`)));
+  const rows = items.filter(w => w.state !== 'completed' || showCompleted && (!big || rel.has(`work-item:${w.id}`)));
+  const html = rows.map(w => { const key = `work-item:${w.id}`; const k = cls(rel, sel, key); const sess = run.sessions.filter(s => s.workItem === w.id); const its = w.iterations.map(it => `<span class="ib ${it.outcome}" title="${it.id} ${it.kind}: ${it.outcome}">${it.kind[0].toUpperCase()}</span>${it.gates.map(g => { const gg = run.gates.find(x => x.id === g); return `<span class="gt ${gg.verdict} node" data-sel="gate:${g}" title="${g} ${gg.checkpoint}: ${gg.verdict}"></span>`; }).join('')}`).join('<span class="sub">›</span>') + (w.gates.length ? '<span class="sub">›</span>' + w.gates.map(g => { const gg = run.gates.find(x => x.id === g); return `<span class="gt wi ${gg.verdict} node" data-sel="gate:${g}" title="${g} work-item gate: ${gg.verdict}"></span>`; }).join('') : '');
+    return `<div class="wrow ${k}" data-sel="${key}"><span class="mono">${w.id}</span><span class="st ${w.state}"></span><span><span class="link mono" data-sel="capability:${w.capability}">${w.capability}</span> <span class="sub">${w.origin} · ${esc(w.module.split('/').slice(-2).join('/'))}${w.waitingFor ? ' · waits for ' + esc(w.waitingFor) : ''}</span><div class="its">${its || '<span class="sub">no iteration yet</span>'}</div></span><span class="row">${sess.map(s => `<span class="chip chip-${ROLES[s.role]} node" data-sel="session:${s.id}" title="${s.id} ${s.state}">${ROLE_LABEL[s.role].split(' ').map(x => x[0]).join('')}${s.state === 'live' ? ' ●' : ''}</span>`).join('')}</span></div>`; }).join('');
+  return `<div class="layer card"><h3>Work <span class="sub">work items with their iterations (box: kind, color: outcome) and gate attempts (ticks); session chips at the right.${big ? ` ${completed.length} completed items collapsed; they appear when related to the selection.` : ''}</span></h3>${html}${big && !showCompleted ? `<div class="sub" style="padding:.3rem">${completed.length} completed work items collapsed · <span class="link">show</span></div>` : ''}<div class="legend"><span><i class="sw" style="background:var(--good)"></i>accepted / passed</span><span><i class="sw" style="background:var(--now)"></i>open / running</span><span><i class="sw" style="background:var(--bad)"></i>failed</span><span><i class="sw" style="background:var(--serious)"></i>partial / unsuitable</span><span>O ordinary · R repair · V verification</span></div></div>`;
+}
+function detailPanel(run, rel, sel) {
+  if (!sel) return `<div class="card detail"><h2>Detail</h2><div class="sub">Select a module, capability, scenario, work item, gate or session. Related elements light up in every layer; the rest dim.</div><div class="ctx"><h4>Legend</h4><div class="legend"><span><i class="sw" style="background:var(--good)"></i>completed</span><span><i class="sw" style="background:var(--now)"></i>working / live</span><span><i class="sw" style="background:var(--warn)"></i>declared, bound, yielded</span><span><i class="sw" style="background:var(--todo)"></i>todo</span><span><i class="sw dotted"></i>forecast</span></div><div class="legend" style="margin-top:.3rem">${Object.keys(ROLES).map(r => `<span class="chip chip-${ROLES[r]}">${ROLE_LABEL[r]}</span>`).join('')}</div></div></div>`;
+  const groups = {}; rel.forEach(k => { const [kind, id] = [k.slice(0, k.indexOf(':')), k.slice(k.indexOf(':') + 1)]; if (k === `${sel.kind}:${sel.id}`) return; (groups[kind] ||= []).push(id); });
+  let head = '', kv = '';
+  const item = { capability: run.capabilities.find(c => c.id === sel.id), scenario: run.scenarios.find(s => s.id === sel.id), 'work-item': run.workItems.find(w => w.id === sel.id), gate: run.gates.find(g => g.id === sel.id), session: run.sessions.find(s => s.id === sel.id), module: run.modules.find(m => m.id === sel.id) }[sel.kind];
+  if (!item) head = `<div class="sub">${sel.kind} ${sel.id}</div>`;
+  else if (sel.kind === 'capability') kv = `<dt>state</dt><dd><i class="sw" style="background:${stateColor(item.state)}"></i>${item.state}${item.tentative ? ' (forecast)' : ''}</dd><dt>reason</dt><dd>${esc(item.reason)}</dd><dt>owner</dt><dd class="mono">${esc(item.owner)}</dd><dt>scenarios</dt><dd>${item.scenarios.filter(s => run.scenarios.find(x => x.id === s).state === 'implemented').length} of ${item.scenarios.length} implemented</dd>`;
+  else if (sel.kind === 'scenario') kv = `<dt>state</dt><dd>${item.state}</dd><dt>name</dt><dd>${esc(item.name)}</dd><dt>owner</dt><dd class="mono">${esc(item.owner)}</dd><dt>gates</dt><dd>${item.gates.map(([g, st]) => `<span class="link mono" data-sel="gate:${g}">${g}</span> ${st}`).join('<br>') || 'none yet'}</dd>`;
+  else if (sel.kind === 'work-item') kv = `<dt>state</dt><dd>${item.state}${item.waitingFor ? ', waits for ' + esc(item.waitingFor) : ''}</dd><dt>origin</dt><dd>${item.origin}</dd><dt>started</dt><dd>${item.from != null ? clock(run, item.from) : 'not started'}</dd><dt>iterations</dt><dd>${item.iterations.map(i => `${i.id} ${i.kind}: ${i.outcome}`).join('<br>') || 'none'}</dd>`;
+  else if (sel.kind === 'gate') kv = `<dt>checkpoint</dt><dd>${item.checkpoint}</dd><dt>verdict</dt><dd><i class="sw" style="background:${stateColor(item.verdict)}"></i>${item.verdict}${item.repairRound ? `, repair round ${item.repairRound + 1}` : ''}</dd><dt>subject</dt><dd class="mono">${item.subject.iteration || item.subject.workItem || 'the run'}</dd><dt>duration</dt><dd>${item.to == null ? 'running since ' + dur(run.now - item.from) : dur(item.to - item.from)}${item.inferredStart ? ' (start inferred)' : ''}</dd><dt>commands</dt><dd>tests · type-check · ramify-check · scenarios <span class="note">(per-test results are not recorded)</span></dd>`;
+  else if (sel.kind === 'session') kv = `<dt>role</dt><dd><span class="chip chip-${ROLES[item.role]}">${ROLE_LABEL[item.role]}</span></dd><dt>state</dt><dd>${item.state}</dd><dt>work</dt><dd class="mono">${item.iteration || item.workItem || 'the run'}</dd><dt>chapters</dt><dd>${item.invocations.map(i => `<span class="link mono">${i.id}</span> ${i.to == null ? 'live, ' + dur(run.now - i.from) : dur(i.to - i.from)}`).join('<br>')}</dd>`;
+  else if (sel.kind === 'module') kv = `<dt>placement</dt><dd>declared</dd><dt>parent</dt><dd class="mono">${esc(item.parent || 'root')}</dd>`;
+  const iss = run.issues.filter(i => i.subject.id === sel.id || i.subject.workItem === sel.id || i.subject.session === sel.id);
+  const order = ['capability', 'scenario', 'module', 'work-item', 'iteration', 'gate', 'session', 'invocation'];
+  return `<div class="card detail"><h2>${sel.kind}</h2><div class="hero" style="font-size:1.05rem" class="mono">${esc(sel.id)}</div>${head}<dl class="kv">${kv}</dl>${iss.length ? `<h4>Issues</h4><ul class="plain">${iss.map(i => `<li><i class="glyph ${i.severity}"></i>${esc(i.summary)}</li>`).join('')}</ul>` : ''}<h4>Related</h4>${order.filter(k => groups[k]).map(k => `<div><span class="sub">${k}</span> ${groups[k].slice(0, 8).map(id => k === 'invocation' || k === 'iteration' ? `<span class="mono">${id}</span>` : `<span class="link mono" data-sel="${k}:${id}">${id}</span>`).join(', ')}${groups[k].length > 8 ? ` <span class="sub">and ${groups[k].length - 8} more</span>` : ''}</div>`).join('')}<div class="ctx"><span class="link">Open page</span> · <span class="link" data-view="${state.view === 'map' ? 'timeline' : 'map'}">${state.view === 'map' ? 'See on the timeline' : 'See on the map'}</span> · <span class="link" data-clear="1">clear</span></div></div>`;
+}
+function renderMap(run) {
+  const rel = relatedSet(run, state.sel);
+  $('#main').innerHTML = `<div class="map"><div>${modulesLayer(run, rel, state.sel)}${capabilitiesLayer(run, rel, state.sel)}${workLayer(run, rel, state.sel)}<div class="card layer"><h3>Context <span class="sub">where the selection sits in time; opens the timeline</span></h3><div id="ctx"></div></div></div>${detailPanel(run, rel, state.sel)}</div>`;
+  $('#ctx').innerHTML = timelineSvg(run, { mini: true, width: $('#ctx').clientWidth || 900, rel, sel: state.sel });
+  // Bring the selection into view in each scrolling layer, as the toolkit canvas centres a node.
+  if (state.sel) $('#main').querySelectorAll('svg g.node').forEach(g => { const key = g.dataset.sel; if (key === `${state.sel.kind}:${state.sel.id}` || (rel.has(key) && key.startsWith('module:') && !g.closest('svg').querySelector(`[data-sel="${state.sel.kind}:${state.sel.id}"]`))) { const box = g.closest('div'); const r = g.getBoundingClientRect(), b = box.getBoundingClientRect(); box.scrollLeft += r.left - b.left - b.width / 2 + r.width / 2; box.scrollTop += r.top - b.top - b.height / 2 + r.height / 2; } });
+  wireSel(); $('#main').querySelectorAll('[data-clear]').forEach(el => el.addEventListener('click', () => navigate({ sel: null })));
+}
+
+// ---------------------------------------------------------------------------
+// Timeline
+// ---------------------------------------------------------------------------
+function timelineSvg(run, opt) {
+  const { mini = false, width = 1000, rel = new Set(), sel = null, compress = true } = opt;
+  const end = run.end ?? run.now;
+  // idle compression: gaps > 120 s with no invocation and no gate
+  const busy = []; run.sessions.forEach(s => s.invocations.forEach(i => busy.push([i.from, i.to ?? end]))); run.gates.forEach(g => busy.push([g.from, g.to ?? end])); busy.sort((a, b) => a[0] - b[0]);
+  const idle = []; let cur = 0; busy.forEach(([a, b]) => { if (a - cur > 120 && compress && !mini) idle.push([cur, a]); cur = Math.max(cur, b); });
+  const CUT = 40; // px per compressed gap
+  const left = mini ? 104 : 150, right = 20; const plotW = width - left - right;
+  const compressed = idle.reduce((n, [a, b]) => n + (b - a), 0); const scale = (plotW - idle.length * CUT) / Math.max(1, end - compressed);
+  const X = t => { let x = left; let prev = 0; for (const [a, b] of idle) { if (t <= a) return x + (t - prev) * scale; x += (a - prev) * scale + CUT; prev = b; if (t <= b) return x - CUT / 2; } return x + (t - prev) * scale; };
+  const lanes = []; // {label, y, h, draw}
+  const LH = mini ? 10 : 22, GAP = mini ? 3 : 6; let y = mini ? 4 : 30;
+  const add = (label, h, draw, group) => { lanes.push({ label, y, h, draw, group }); y += h + GAP; };
+  const dimOf = key => sel && !rel.has(key) && `${sel.kind}:${sel.id}` !== key ? 'opacity="0.3"' : '';
+  // phases
+  add('phases', LH, (yy, h) => run.phases.filter(p => p[1] != null && !(p[0] === 'review' && !run.reviewStop)).map(([n, a, b]) => `<rect x="${X(a)}" y="${yy}" width="${Math.max(2, X(b ?? end) - X(a))}" height="${h}" rx="3" fill="${n === run.phase && run.state === 'running' ? 'var(--now-soft)' : 'var(--todo-soft)'}" stroke="var(--line)"/><text x="${X(a) + 4}" y="${yy + h * 0.68}" font-size="${mini ? 8 : 10}" fill="var(--ink-2)">${n}</text>`).join(''), 'run');
+  // gates
+  add('gates', LH, (yy, h) => run.gates.map(g => { const key = `gate:${g.id}`; const w = Math.max(3, X(g.to ?? end) - X(g.from)); return `<g class="seg node" data-sel="${key}" ${dimOf(key)}><rect x="${X(g.from)}" y="${yy + 2}" width="${w}" height="${h - 4}" rx="2" fill="${stateColor(g.verdict)}" ${g.inferredStart ? 'stroke="var(--axis)" stroke-dasharray="2 2"' : ''}/>${!mini && w > 30 ? `<text x="${X(g.from) + 3}" y="${yy + h * 0.68}" font-size="9" fill="#fff">${g.id.slice(3)}</text>` : ''}<title>${g.id} ${g.checkpoint}: ${g.verdict}${g.repairRound ? ' (repair round ' + (g.repairRound + 1) + ')' : ''}</title></g>`; }).join(''), 'run');
+  // issues lane
+  add('issues', mini ? 8 : 14, (yy, h) => run.issues.map(i => `<g class="node" data-sel="${i.subject.workItem ? 'work-item:' + i.subject.workItem : i.subject.session ? 'session:' + i.subject.session : i.subject.kind + ':' + i.subject.id}">${i.severity === 'caution' ? `<path d="M${X(i.at)} ${yy + 1} l5 ${h - 2} h-10 z" fill="none" stroke="var(--warn)" stroke-width="1.5"/>` : `<circle cx="${X(i.at)}" cy="${yy + h / 2}" r="${i.severity === 'info' ? 2.5 : 4.5}" fill="${i.severity === 'blocking' ? 'var(--bad)' : i.severity === 'attention' ? 'var(--warn)' : 'var(--muted)'}"/>`}<title>${esc(i.summary)}</title></g>`).join(''), 'run');
+  // work items
+  const wis = run.workItems.filter(w => w.from != null); const bigW = wis.length > 12;
+  const openW = wis.filter(w => w.state !== 'completed' || (sel && rel.has(`work-item:${w.id}`)));
+  const drawWi = w => (yy, h) => { const key = `work-item:${w.id}`; const x0 = X(w.from), x1 = X(w.to ?? end); let s = `<g class="seg node" data-sel="${key}" ${dimOf(key)}><rect x="${x0}" y="${yy + h / 2 - 2}" width="${Math.max(2, x1 - x0)}" height="4" rx="2" fill="${w.state === 'yielded' ? 'var(--warn)' : 'var(--todo)'}"/>`; w.iterations.forEach(it => { s += `<rect x="${X(it.from)}" y="${yy + 3}" width="${Math.max(3, X(it.to ?? end) - X(it.from))}" height="${h - 6}" rx="3" fill="${stateColor(it.outcome)}" opacity="0.85"><title>${it.id} ${it.kind}: ${it.outcome}</title></rect>`; it.gates.forEach(g => { const gg = run.gates.find(x => x.id === g); s += `<rect x="${X(gg.from) - 1}" y="${yy + h - 5}" width="3" height="6" fill="${stateColor(gg.verdict)}"/>`; }); }); w.gates.forEach(g => { const gg = run.gates.find(x => x.id === g); s += `<rect x="${X(gg.from) - 2}" y="${yy + h - 6}" width="4" height="8" fill="${stateColor(gg.verdict)}"/>`; }); return s + `<title>${w.id} ${w.capability}: ${w.state}</title></g>`; };
+  if (!mini) { openW.forEach(w => add(`${w.id} ${w.state}`, LH, drawWi(w), 'work')); if (bigW) { const done = wis.filter(w => w.state === 'completed' && !openW.includes(w)); add(`${done.length} completed`, LH, (yy, h) => done.map(w => `<rect class="node" data-sel="work-item:${w.id}" x="${X(w.from)}" y="${yy + 4}" width="${Math.max(2, X(w.to) - X(w.from))}" height="${h - 8}" rx="2" fill="var(--good)" opacity="0.35"><title>${w.id} ${w.capability}</title></rect>`).join(''), 'work'); } }
+  // sessions by role
+  const roles = Object.keys(ROLES);
+  roles.forEach(role => { const ss = run.sessions.filter(s => s.role === role); if (!ss.length) return; const dense = mini || ss.length > 12;
+    if (dense) { const buckets = Math.max(20, Math.floor(plotW / 6)); const counts = new Array(buckets).fill(0); ss.forEach(s => s.invocations.forEach(i => { const a = Math.floor((i.from / end) * buckets), b = Math.min(buckets - 1, Math.floor(((i.to ?? end) / end) * buckets)); for (let k = a; k <= b; k++) counts[k]++; })); const mx = Math.max(1, ...counts); const h = mini ? 12 : 34;
+      add(`${mini ? ROLE_LABEL[role].replace('initial architect', 'initial arch.').replace('local architect', 'local arch.').replace('contract engineer', 'contract eng.') : ROLE_LABEL[role]} (${ss.length})`, h, (yy, hh) => counts.map((c, k) => { const t0 = (k / buckets) * end, t1 = ((k + 1) / buckets) * end; const bh = (c / mx) * (hh - 2); return c ? `<rect x="${X(t0)}" y="${yy + hh - bh}" width="${Math.max(1, X(t1) - X(t0) - 1)}" height="${bh}" fill="${roleVar(role)}" opacity="0.8"><title>${ROLE_LABEL[role]}: ${c} live at ${clock(run, t0)}</title></rect>` : ''; }).join('') + (sel ? ss.filter(s => rel.has(`session:${s.id}`) || `${sel.kind}:${sel.id}` === `session:${s.id}`).map(s => s.invocations.map(i => `<rect x="${X(i.from)}" y="${yy - 1}" width="${Math.max(2, X(i.to ?? end) - X(i.from))}" height="${hh + 2}" fill="none" stroke="var(--now)" stroke-width="2"/>`).join('')).join('') : ''), 'sessions'); }
+    else ss.forEach(s => add(`${s.id}${s.workItem ? ' · ' + s.workItem : ''}`, LH, (yy, h) => { const key = `session:${s.id}`; let out = `<g ${dimOf(key)}>`; for (let k = 0; k < s.invocations.length - 1; k++) out += `<line x1="${X(s.invocations[k].to)}" x2="${X(s.invocations[k + 1].from)}" y1="${yy + h / 2}" y2="${yy + h / 2}" stroke="var(--axis)" stroke-dasharray="3 3"/>`; if (s.state === 'suspended' && s.invocations.slice(-1)[0].to != null) out += `<line x1="${X(s.invocations.slice(-1)[0].to)}" x2="${X(end)}" y1="${yy + h / 2}" y2="${yy + h / 2}" stroke="var(--warn)" stroke-dasharray="3 3"/>`; s.invocations.forEach(i => { const w = Math.max(3, X(i.to ?? end) - X(i.from)); out += `<g class="seg node" data-sel="${key}"><rect x="${X(i.from)}" y="${yy + 2}" width="${w}" height="${h - 4}" rx="3" fill="${roleVar(role)}" ${i.to == null ? 'stroke="var(--now)" stroke-width="2" stroke-dasharray="4 2"' : ''}/>${w > 44 ? `<text x="${X(i.from) + 4}" y="${yy + h * 0.68}" font-size="9.5" fill="#0b0b0b" class="svgmono">${i.id}</text>` : ''}<title>${i.id} ${ROLE_LABEL[role]} ${i.to == null ? 'live' : dur(i.to - i.from)}</title></g>`; }); return out + '</g>'; }, 'sessions', role)); });
+  const H = y + (mini ? 14 : 20);
+  let svg = `<svg viewBox="0 0 ${width} ${H}" width="${width}" height="${H}" role="img" aria-label="Timeline">`;
+  // grid, axis
+  const ticks = mini ? 6 : 12; for (let k = 0; k <= ticks; k++) { const t = (end / ticks) * k; svg += `<line class="grid-line" x1="${X(t)}" x2="${X(t)}" y1="${mini ? 0 : 22}" y2="${H - 16}"/><text x="${X(t)}" y="${H - 4}" font-size="9" text-anchor="middle" fill="var(--muted)">${clock(run, t).slice(0, 5)}</text>`; }
+  idle.forEach(([a, b]) => { const x = X(a + 1) ; svg += `<rect x="${x - CUT / 2 + 2}" y="${mini ? 0 : 22}" width="${CUT - 4}" height="${H - 38}" fill="var(--paper)"/><path d="M${x - 3} ${mini ? 0 : 22} q3 6 0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12 t0 12" fill="none" stroke="var(--axis)"/><text x="${x}" y="${H - 20}" font-size="8" text-anchor="middle" fill="var(--muted)">${dur(b - a)} idle</text>`; });
+  lanes.forEach((l, i) => { if (!mini && i % 2) svg += `<rect class="lane-band" x="${left}" y="${l.y - 1}" width="${plotW}" height="${l.h + 2}"/>`; svg += `<text class="lane-label" x="${left - 6}" y="${l.y + l.h * 0.68}" text-anchor="end" font-size="${mini ? 8 : 11}">${esc(l.label.length > 22 ? l.label.slice(0, 21) + '…' : l.label)}</text>`; if (l.group === 'sessions' && !mini && lanes[i - 1] && lanes[i - 1].group !== 'sessions') svg += ''; svg += l.draw(l.y, l.h); });
+  if (run.state === 'running') svg += `<line x1="${X(run.now)}" x2="${X(run.now)}" y1="${mini ? 0 : 18}" y2="${H - 14}" stroke="var(--now)" stroke-width="2"/><text x="${X(run.now) - 4}" y="${mini ? 8 : 14}" font-size="${mini ? 8 : 10}" text-anchor="end" fill="var(--now)" font-weight="600">now</text>`;
+  svg += '</svg>';
+  return svg;
+}
+function renderTimeline(run) {
+  const rel = relatedSet(run, state.sel);
+  const roleGroups = Object.keys(ROLES).map(r => ({ r, n: run.sessions.filter(s => s.role === r).length })).filter(x => x.n);
+  $('#main').innerHTML = `<div class="split"><div class="tl-wrap"><div class="tl-tools"><span>Axis: real time, idle stretches longer than 2 minutes folded (toggle <span class="kbd">raw</span>)</span><span>·</span><span>window: whole run (drag the brush in the design; static here)</span><span>·</span><span>groups: run, work items, sessions by role${run.sessions.length > 12 ? ' (density lanes above 12 sessions per role; expand a role to see its lanes)' : ''}</span></div><div id="tl"></div><div class="legend" style="margin-top:.4rem"><span>phases</span><span><i class="sw" style="background:var(--good)"></i>gate passed</span><span><i class="sw" style="background:var(--bad)"></i>gate failed</span><span><i class="sw" style="background:var(--now)"></i>running / open</span><span><i class="sw hollow" style="border-style:dashed"></i>readiness start inferred</span>${roleGroups.map(g => `<span><i class="sw" style="background:${roleVar(g.r)}"></i>${ROLE_LABEL[g.r]} (${g.n})</span>`).join('')}<span><i class="glyph attention"></i> attention</span><span><i class="glyph caution"></i> caution</span><span><i class="glyph info"></i> info</span></div></div><div><div class="card layer"><h3>Context <span class="sub">the selection's related elements; opens the map</span></h3>${state.sel ? `<div class="row">${[...rel].slice(0, 24).map(k => { const i = k.indexOf(':'); const kind = k.slice(0, i), id = k.slice(i + 1); return kind === 'invocation' || kind === 'iteration' ? `<span class="mono sub">${id}</span>` : `<span class="link mono" data-sel="${k}">${id}</span>`; }).join(' ')}</div>` : '<div class="sub">Nothing selected.</div>'}</div>${detailPanel(run, rel, state.sel)}</div></div>`;
+  $('#tl').innerHTML = timelineSvg(run, { width: Math.max(700, $('#tl').clientWidth || 900), rel, sel: state.sel });
+  wireSel(); $('#main').querySelectorAll('[data-clear]').forEach(el => el.addEventListener('click', () => navigate({ sel: null })));
+}
+
+// ---------------------------------------------------------------------------
+// Lists and pages (level 2 and 3), sketched
+// ---------------------------------------------------------------------------
+function renderLists(run) {
+  const w = run.workItems[0]; const g = run.gates.find(x => x.subject.workItem === w.id) || run.gates[0];
+  $('#main').innerHTML = `<div class="grid">
+    <div class="card c12"><h2>Level 2: lists</h2><div class="row">${['work', 'scenarios', 'gates', 'sessions', 'capabilities', 'modules', 'decisions', 'issues', 'events', 'measurements', 'analysis'].map(l => `<span class="kbd mono">#/plans/${run.plan}/runs/…/${l}</span>`).join('')}</div><p class="sub">Each list: state-count filter chips carried in the URL (<code>?state=</code>), sortable columns that never wrap mid-word, "showing N of total" on bounded answers, and every id a link to its page. The former Overview panels become the Issues, Events and Analysis lists.</p></div>
+    <div class="card c6"><h2>Level 3: work item page</h2><div class="sub mono">#/plans/${run.plan}/runs/${run.id}/work/${w.id}</div><div class="crumbs" style="padding:0.3rem 0">Plans › ${esc(run.planTitle)} › Run › Work item <code>${w.id}</code></div><dl class="kv detail" style="position:static"><dt>state</dt><dd>${w.state}</dd><dt>capability</dt><dd><span class="link mono">${w.capability}</span></dd><dt>module</dt><dd><span class="link mono">${esc(w.module)}</span></dd><dt>origin</dt><dd>${w.origin}</dd><dt>iterations</dt><dd>${w.iterations.map(i => `<b>${i.id}</b> ${i.kind}, ${i.outcome}; gates ${i.gates.map(x => `<span class="link mono">${x}</span>`).join(', ')}; chapters ${i.invocations.map(x => `<span class="link mono">${x}</span>`).join(', ')}`).join('<br>') || 'none yet'}</dd><dt>work-item gates</dt><dd>${w.gates.map(x => `<span class="link mono">${x}</span>`).join(', ') || 'none yet'}</dd></dl><h4 style="font-size:.72rem;text-transform:uppercase;color:var(--muted);margin:.6rem 0 .2rem">Where in time</h4><div id="wit"></div><h4 style="font-size:.72rem;text-transform:uppercase;color:var(--muted);margin:.6rem 0 .2rem">Related</h4><div class="sub">scenarios ${run.scenarios.filter(s => s.workItem === w.id).map(s => `<span class="link mono">${s.id}</span>`).join(', ') || 'none'} · sessions ${run.sessions.filter(s => s.workItem === w.id).map(s => `<span class="link mono">${s.id}</span>`).join(', ') || 'none'}</div></div>
+    <div class="card c6"><h2>Level 3: gate page</h2><div class="sub mono">#/plans/${run.plan}/runs/${run.id}/gates/${g.id}</div><dl class="kv detail" style="position:static"><dt>checkpoint</dt><dd>${g.checkpoint}</dd><dt>subject</dt><dd><span class="link mono">${g.subject.iteration || g.subject.workItem || 'the run'}</span></dd><dt>verdict</dt><dd><i class="sw" style="background:${stateColor(g.verdict)}"></i>${g.verdict}, next accept</dd><dt>duration</dt><dd>${g.to != null ? dur(g.to - g.from) : 'running'}</dd><dt>commands</dt><dd><b>tests</b> passed · exit 0 · 3.9 s <span class="note">(per-test results are not recorded; only the exit code is read)</span><br><b>type-check</b> passed · 2.1 s<br><b>ramify-check</b> passed · 1.4 s · <span class="link">full output (1.8 MB)</span> <span class="note">once served</span><br><b>scenarios</b> passed · quick · ${run.scenarios.filter(s => s.gates.some(([x]) => x === g.id)).map(s => `<span class="link mono">${s.id}</span> passed`).join(', ') || 'none selected'}</dd><dt>output tail</dt><dd><pre class="mono" style="margin:0;padding:.4rem;border:1px solid var(--line);border-radius:6px;font-size:.72rem;white-space:pre-wrap"> ✓ src/tests/status-badge.test.tsx (4 tests) 21ms\n Test Files  1 passed (1)\n      Tests  4 passed (4)</pre><span class="note">ANSI rendered as color, never as escape codes</span></dd></dl></div>
+    <div class="card c6"><h2>Level 3: scenario page</h2><div class="sub mono">…/scenarios/${run.scenarios[0].id}</div><dl class="kv detail" style="position:static"><dt>name</dt><dd>${esc(run.scenarios[0].name)}</dd><dt>state</dt><dd>${run.scenarios[0].state}</dd><dt>history</dt><dd>${run.scenarios[0].declared != null ? `declared ${clock(run, run.scenarios[0].declared)} by <span class="link mono">inv-0003</span><br>implemented ${clock(run, run.scenarios[0].implemented)} by <span class="link mono">ga-0002</span>` : 'from events (declared, due, implemented, withdrawn)'}</dd><dt>entry</dt><dd><span class="link mono">${run.scenarios[0].entry || 'integration'}</span></dd><dt>gates</dt><dd>${run.scenarios[0].gates.map(([x, st]) => `<span class="link mono">${x}</span> ${st}`).join('<br>') || 'none yet'}</dd><dt>text</dt><dd><pre class="mono" style="margin:0;font-size:.72rem;white-space:pre-wrap">${run.invented ? `Scenario: ${esc(run.scenarios[0].name)}\n  (invented run: no frozen text)` : `Scenario: A badge given a tone carries that tone in its markup\n  Given a badge for a passed review with the tone "warning"\n  When the badge is rendered\n  Then its markup carries the tone "warning"\n  And it still reads "Passed"`}</pre></dd></dl></div>
+    <div class="card c6"><h2>Level 3: capability page</h2><div class="sub mono">…/capabilities/${run.capabilities[0].id}</div><dl class="kv detail" style="position:static"><dt>state</dt><dd>${run.capabilities[0].state}: ${esc(run.capabilities[0].reason)}</dd><dt>kind</dt><dd>top-level (entry)</dd><dt>owner</dt><dd><span class="link mono">${esc(run.capabilities[0].owner)}</span></dd><dt>depends on</dt><dd>${run.capabilities[0].dependsOn.map(d => `<span class="link mono">${d}</span>`).join(', ') || 'nothing recorded'}</dd><dt>scenarios</dt><dd>${run.capabilities[0].scenarios.map(s => { const x = run.scenarios.find(y => y.id === s); return `<i class="sd ${x.state}" style="display:inline-block"></i> <span class="link mono">${s}</span>`; }).join(' ')}</dd><dt>work items</dt><dd>${run.capabilities[0].workItems.map(x => `<span class="link mono">${x}</span>`).join(', ')}</dd><dt>evidence</dt><dd>${run.capabilities[0].evidence.map(x => `<span class="link mono">${x}</span>`).join(', ') || 'none yet'}</dd></dl><p class="note">Level 4 stays as today: the transcript page (with a chapter table of contents and an entry-type filter added), the captured plan, output tails.</p></div>
+  </div>`;
+  $('#wit').innerHTML = timelineSvg(run, { mini: true, width: $('#wit').clientWidth || 500, rel: relatedSet(run, { kind: 'work-item', id: w.id }), sel: { kind: 'work-item', id: w.id } });
+}
+
+// ---------------------------------------------------------------------------
+function render() { const run = RUNS[state.runKey]; renderFrame(run); ({ overview: renderOverview, map: renderMap, timeline: renderTimeline, lists: renderLists })[state.view](run); }
+document.addEventListener('DOMContentLoaded', () => {
+  parseHash(); render();
+  $('#run-small').addEventListener('click', () => navigate({ runKey: 'small', sel: null }));
+  $('#run-large').addEventListener('click', () => navigate({ runKey: 'large', sel: null }));
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => navigate({ view: t.dataset.view })));
+  const themes = ['auto', 'light', 'dark']; let ti = 0;
+  $('#theme').addEventListener('click', () => { ti = (ti + 1) % 3; const t = themes[ti]; if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); $('#theme').textContent = 'Theme: ' + t; });
+  window.addEventListener('hashchange', () => { parseHash(); render(); });
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 150); });
+});
+</script>
+</body>
+</html>

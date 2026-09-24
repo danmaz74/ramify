@@ -30,6 +30,17 @@ export const protocolPaths = {
   runScenarios: (planId: string, runId: string): string => `${run(planId, runId)}/scenarios`,
   runGate: (planId: string, runId: string, gate: string): string => `${run(planId, runId)}/gates/${encodeURIComponent(gate)}`,
   runMetrics: (planId: string, runId: string): string => `${run(planId, runId)}/metrics`,
+  /** A page of the execution-map/1 snapshot at one committed run version. */
+  runExecutionMap: (planId: string, runId: string, version: number, cursor?: string, limit?: number): string => {
+    const query = new URLSearchParams({ version: String(version) });
+    if (cursor !== undefined) query.set('cursor', cursor);
+    if (limit !== undefined) query.set('limit', String(limit));
+    return `${run(planId, runId)}/execution-map?${query}`;
+  },
+  runExecutionCapability: (planId: string, runId: string, capability: string, version: number): string =>
+    `${run(planId, runId)}/execution-map/capabilities/${encodeURIComponent(capability)}?version=${version}`,
+  runExecutionScenario: (planId: string, runId: string, scenario: string, version: number): string =>
+    `${run(planId, runId)}/execution-map/scenarios/${encodeURIComponent(scenario)}?version=${version}`,
   /** Every session of the project, a page of at most 200 from `offset`. */
   sessions: (offset = 0): string => `${apiPrefix}/sessions?offset=${offset}`,
   /** A run's sessions, with their invocations, lineage and the diagram elements each reaches. */
