@@ -34,6 +34,8 @@ The retained `status-badge-tone` pi run remains a separate compatibility witness
 
 Iteration 2 added the compact gate subject/cause/evidence fields, iteration outcome/module/scope exceptions, session reach/invocations, and the `capability-record` source-ref kind. These are additive to the settled identity, version and active-verdict rules. The gate's retained evidence refs do **not** contain audit overall outcome, so the projection reports that audit result as `unavailable` until an exact result is durably published.
 
+Iteration 6 added `detail.gates[]` to the targeted available scenario detail. It carries every retained result for that scenario in committed attempt order. The run-wide scenario list is capped at 500 rows, so it cannot serve as complete history for a selected scenario beyond the cap. The compact execution-map index still omits Gherkin and result-history bodies.
+
 ## Visual tokens
 
 `subs/web/src/execution-map-tokens.ts` fixes tokens for later components. These are foreground/accent colors against the listed background, not a license to put small text on saturated fills. The five statuses have text labels and marker shapes. Direct recorded module participation uses violet with a `worked in` label; neutral slate means no recorded work, while unavailable data uses a labeled diagonal hatch. Role marks carry both the icon name and label in the marker, shelf, time rail and window header. The initial architect cyan is deliberately distinct from participation violet. The contract engineer's umber is close to attention amber, so its link icon and role label are mandatory.

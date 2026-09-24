@@ -4,6 +4,7 @@ import { entryAssignmentsSchema, gateAttemptSchema, gateAuditOutcomeSchema } fro
 import { iterationAssignmentSchema, iterationResultSchema } from '../work/iterations.js';
 import { executionCapabilityDetailSchema, executionNodeSchema, executionScenarioDetailSchema } from '../interfaces/protocol/execution-map.js';
 import { executionCapabilityDetailOf, executionCoreOf, executionScenarioDetailOf } from '../projections/execution-map.js';
+import { scenarioListOf } from '../projections/scenarios.js';
 import { runView } from '../projections/inputs.js';
 import { at, constructedRun, hash, item, registered, reviews, type Line } from './helpers/constructed.js';
 
@@ -18,7 +19,7 @@ const entries = entryAssignmentsSchema.parse({ schema: 'ramify-agent.entry-assig
   entries: [{ capability: 'full-description', description, owner: reviews, requirementRefs: [], acceptanceRefs: [], citations: [] }],
 });
 
-function gate(id: string, status: 'passed' | 'failed', dryRun: boolean, checkpoint: 'iteration' | 'readiness' | 'final' = 'iteration') {
+function gate(id: string, status: 'passed' | 'failed', dryRun: boolean, checkpoint: 'iteration' | 'readiness' | 'final' = 'iteration', scenarioId = 'sc-001') {
   return gateAttemptSchema.parse({
     schema: 'ramify-agent.gate-attempt/3', id, checkpoint,
     subject: checkpoint === 'iteration' ? { workItem: 'wi-001', iteration: 'wi-001.i01' } : {},
@@ -29,9 +30,9 @@ function gate(id: string, status: 'passed' | 'failed', dryRun: boolean, checkpoi
       kind: 'scenarios', command: { argv: ['cucumber'], cwd: '/project', env: [], envAdditions: {}, timeoutMs: 1000 },
       startedAt: '2026-09-24T00:00:00.000Z', elapsedMs: 1, exitCode: status === 'passed' ? 0 : 1,
       outcome: status, runnerError: null, output: { path: 'gate.log', bytes: 0, truncated: false, tail: '' },
-      scenarios: { mode: 'full', selection: { kind: 'identity', scenarios: ['sc-001'] }, dryRun, excluded: 0,
+      scenarios: { mode: 'full', selection: { kind: 'identity', scenarios: [scenarioId] }, dryRun, excluded: 0,
         setup: null, teardown: null, runs: [{ module: reviews, exit: status === 'passed' ? 0 : 1, profile: 'profile', messages: 'messages' }],
-        scenarios: [{ id: 'sc-001', run: reviews, status, file: scenario.file, line: 1, binding: [],
+        scenarios: [{ id: scenarioId, run: reviews, status, file: scenario.file, line: 1, binding: [],
           ...(status === 'failed' ? { failure: { step: source[3], message: 'failed' } } : {}), undefined: [] }],
         untracked: { passed: 0, skipped: 0, failed: 0 }, failures: status === 'passed' ? [] : ['failed'] },
     }], verdict: status, cause: status === 'failed' ? 'in-scope' : null, next: status === 'failed' ? 'repair' : 'accept',
@@ -66,6 +67,25 @@ function assignment(id: string, workItem: string, revision: number) {
 }
 
 describe('execution core from committed run records', () => {
+  it('targets ordered gate history for a scenario beyond the capped list', () => {
+    const many = Array.from({ length: 501 }, (_, index) => {
+      const id = `sc-${String(index + 1).padStart(3, '0')}`;
+      return { path: `scenarios/${id}.json`, body: scenarioRecordSchema.parse({ ...scenario, id }) };
+    });
+    const run = constructedRun([
+      { type: 'analysis-accepted', data: {}, records: many },
+      { type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-last/attempt.json', body: gate('ga-last', 'failed', false, 'iteration', 'sc-501') }] },
+      { type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-repaired/attempt.json', body: gate('ga-repaired', 'passed', false, 'iteration', 'sc-501') }] },
+    ]);
+    const view = runView(run);
+    expect(scenarioListOf(view).scenarios).toHaveLength(500);
+    expect(scenarioListOf(view).scenarios.some(row => row.id === 'sc-501')).toBe(false);
+    const detail = executionScenarioDetailSchema.parse(executionScenarioDetailOf(view, 'sc-501')).detail;
+    expect(detail.state).toBe('available');
+    if (detail.state === 'available') expect(detail.gates.map(row => [row.gate, row.status])).toEqual([
+      ['ga-last', 'failed'], ['ga-repaired', 'passed'],
+    ]);
+  });
   it('reads old gates without an audit fact and a failed published audit independently of verdict', () => {
     const old = gate('ga-old', 'failed', false);
     const failedAudit = gate('ga-audit-failed', 'failed', false);

@@ -4,6 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
+import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
 import { Markdown } from './markdown.js';
@@ -31,6 +32,7 @@ const areas = [
   ['scenarios', 'Scenarios'],
   ['checks', 'Checks'],
   ['progress', 'Progress'],
+  ['execution', 'Execution map'],
   ['sessions', 'Sessions'],
   ['measurements', 'Measurements'],
 ] as const;
@@ -62,6 +64,7 @@ export function RunPage({ client, planId, runId, interval }: {
   const connection = useConnection(client);
   const [area, setArea] = useState<Area>('overview');
   const [workItem, setWorkItem] = useState<string | undefined>(undefined);
+  const [gateSelection, setGateSelection] = useState<string | undefined>(undefined);
   const [moduleSelection, setModuleSelection] = useState<ModuleCapabilitySelection | null>(null);
   const version = run?.version;
   const props: AreaProps = { client, planId, runId, version };
@@ -89,12 +92,13 @@ export function RunPage({ client, planId, runId, interval }: {
       {area === 'decisions' && <HypothesesAndDecisions {...props} />}
       {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} />}
       {area === 'scenarios' && <Scenarios {...props} />}
-      {area === 'checks' && <Checks {...props} events={events} />}
+      {area === 'checks' && <Checks {...props} events={events} selected={gateSelection} onSelect={setGateSelection} />}
       {area === 'progress' && (
         <Progress {...props} moduleSelection={moduleSelection} onSelectModule={setModuleSelection}
           onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
       )}
       {area === 'sessions' && <RunSessions {...props} />}
+      {area === 'execution' && <ExecutionMapArea {...props} events={events} onOpenGate={gate => { setGateSelection(gate); setArea('checks'); }} />}
       {area === 'measurements' && <Measurements {...props} />}
     </section>
   );
@@ -524,9 +528,9 @@ function Scenarios({ client, planId, runId, version }: AreaProps) {
 
 // Checks
 
-function Checks({ client, planId, runId, version, events }: AreaProps & { readonly events: readonly ProjectedRunEvent[] }) {
+function Checks({ client, planId, runId, version, events, selected, onSelect }: AreaProps & {
+  readonly events: readonly ProjectedRunEvent[]; readonly selected: string | undefined; readonly onSelect: (gate: string) => void }) {
   const attempts = events.filter(event => event.transition === 'gate-attempted' || event.transition === 'readiness-passed');
-  const [selected, setSelected] = useState<string | undefined>(undefined);
   return (
     <div className="area" aria-label="Checks">
       {attempts.length === 0 ? <p className="muted">No gate has run yet.</p> : (
@@ -535,7 +539,7 @@ function Checks({ client, planId, runId, version, events }: AreaProps & { readon
             const gate = event.refs.find(ref => ref.kind === 'gate')!.id;
             return (
               <li key={`${event.sequence}`}>
-                <button type="button" className="link" aria-pressed={selected === gate} onClick={() => setSelected(gate)}>{gate}</button>
+                <button type="button" className="link" aria-pressed={selected === gate} onClick={() => onSelect(gate)}>{gate}</button>
                 <span>{event.summary}</span>
               </li>
             );

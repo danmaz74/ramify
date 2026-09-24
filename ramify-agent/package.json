@@ -19,6 +19,7 @@
     "@cucumber/gherkin": "42.0.0",
     "@cucumber/messages": "34.2.0",
     "@earendil-works/pi-coding-agent": "0.85.1",
+    "@xyflow/react": "12.11.6",
     "express": "5.2.1",
     "ramify-audit": "0.1.0",
     "ramify.ts": "file:..",

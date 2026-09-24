@@ -3,7 +3,7 @@ import { modulePathSchema, moduleTreeResponseSchema } from './evidence.js';
 import { jobVersionSchema } from './jobs.js';
 import {
   capabilityStateSchema, gateCauseSchema, gateCheckpointSchema, gateVerdictSchema, roleSchema,
-  scenarioKindSchema, scenarioStatusSchema, trackedScenarioStateSchema, workItemStateSchema,
+  scenarioGateResultSchema, scenarioKindSchema, scenarioStatusSchema, trackedScenarioStateSchema, workItemStateSchema,
 } from './runs.js';
 import { sessionReachSchema, sessionStateSchema } from './sessions.js';
 
@@ -325,6 +325,8 @@ export const executionScenarioDetailSchema = z.object({
   detail: z.discriminatedUnion('state', [
     z.object({ state: z.literal('available'), name: text,
       source: z.array(z.string()).min(1),
+      /** Every retained attempt for this scenario, in committed attempt order; never the capped scenario list. */
+      gates: z.array(scenarioGateResultSchema),
       record: executionSourceRefSchema }).strict(),
     z.object({ state: z.literal('unavailable'), reason: text }).strict(),
   ]),

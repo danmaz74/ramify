@@ -355,8 +355,8 @@ test('CM12: a 60-row module keeps every row, in a node tall enough for them all,
   expect(document.querySelector('.react-flow__controls')).toBeTruthy();
 });
 
-// CM01: the capability view uses the packaged canvas only. Every source of
-// the web module outside its tests, read as text.
+// CM01: the capability view uses the packaged canvas only. Plan 11's separate
+// execution map owns a direct React Flow viewport; it does not copy this tree.
 const webSource = join(dirname(fileURLToPath(import.meta.url)), '..');
 function sources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -372,7 +372,7 @@ function leavesProject(from: string, target: string): boolean {
   return target.startsWith('.') && !new URL(target, `file:///project/subs/web/src/${from}`).pathname.startsWith('/project/');
 }
 
-test('CM01: the web module imports the canvas and its styles only from the package, and copies no tree or React Flow code', () => {
+test('CM01: the capability module tree imports its canvas and styles only from the package', () => {
   const files = webFiles;
   expect(files.map(file => file.path)).toEqual(expect.arrayContaining(['capability-module-tree.tsx', 'run-page.tsx', 'styles.css', 'examples/capability-module-example.tsx']));
   expect(files.some(file => file.path.startsWith('tests/'))).toBe(false);
@@ -384,9 +384,9 @@ test('CM01: the web module imports the canvas and its styles only from the packa
     ['capability-module-tree.tsx', 'ramify.ts/module-tree'],
     ['styles.css', 'ramify.ts/module-tree.css'],
   ]);
-  expect(imports.filter(([, target]) => target!.startsWith('@xyflow'))).toEqual([]);
-  // No shell CSS, no React Flow class names, no explorer model, no rejected prototype.
-  for (const file of files) {
+  expect(imports.filter(([, target]) => target!.startsWith('@xyflow'))).toEqual([['execution-map.tsx', '@xyflow/react']]);
+  // The capability view still has no copied shell CSS or React Flow internals.
+  for (const file of files.filter(file => file.path !== 'execution-map.tsx')) {
     expect(file.text, file.path).not.toMatch(/\.module-tree__|react-flow__|\bnodrag\b|\bnopan\b|ProjectExplorerModel|module-activity|ModuleActivity/);
   }
 });

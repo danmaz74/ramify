@@ -160,7 +160,7 @@ describe('execution-map/1 contract', () => {
       key: 'capability:status-badge', detail: { state: 'available', level: 'entry', description: 'Full entry description.', source: record } }).success).toBe(true);
     expect(executionScenarioDetailSchema.safeParse({ schema: 'execution-map/1', runVersion: 42,
       key: 'scenario:sc-status', detail: { state: 'available', name: 'Renders the status badge',
-        source: ['Scenario: Renders the status badge', '  Given a valid status', '  Then the badge is visible'], record } }).success).toBe(true);
+        source: ['Scenario: Renders the status badge', '  Given a valid status', '  Then the badge is visible'], gates: [], record } }).success).toBe(true);
     expect(executionScenarioDetailSchema.safeParse({ schema: 'execution-map/1', runVersion: 42,
       key: 'scenario:sc-missing', detail: { state: 'unavailable', reason: 'Frozen source was not retained.' } }).success).toBe(true);
     expect(executionScenarioDetailSchema.safeParse({ schema: 'execution-map/1', runVersion: 42,

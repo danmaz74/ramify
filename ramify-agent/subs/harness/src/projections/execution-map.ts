@@ -6,7 +6,7 @@ import { gateCheckpointSchema } from '../interfaces/protocol/runs.js';
 import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { capabilityProgressOf } from './progress.js';
-import { scenariosOf } from './scenarios.js';
+import { gatesByScenario, scenariosOf } from './scenarios.js';
 import { runSessionViews } from './sessions.js';
 import { allWorkItemsOf, capabilityOfItem } from './work.js';
 import type { RunView } from './inputs.js';
@@ -457,7 +457,7 @@ export function executionScenarioDetailOf(view: RunView, scenario: string): Exec
   const source = scenarioSources(view).get(scenario);
   if (record !== undefined && source !== undefined && record.source.length > 0 && record.name.length > 0) {
     return { schema: 'execution-map/1', runVersion, key: key('scenario', scenario),
-      detail: { state: 'available', name: record.name, source: [...record.source], record: source } };
+      detail: { state: 'available', name: record.name, source: [...record.source], gates: gatesByScenario(view).get(scenario) ?? [], record: source } };
   }
   return { schema: 'execution-map/1', runVersion, key: key('scenario', scenario),
     detail: { state: 'unavailable', reason: `No retained frozen source for scenario ${scenario}.` } };

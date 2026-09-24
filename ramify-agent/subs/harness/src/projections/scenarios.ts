@@ -82,7 +82,7 @@ export function scenarioCheckViewOf(summary: ScenarioCheckSummary): ScenarioChec
 }
 
 /** Every gate attempt that ran each scenario, in the order the attempts were first committed. */
-function gatesByScenario(view: RunView): Map<string, ScenarioGateResult[]> {
+export function gatesByScenario(view: RunView): Map<string, ScenarioGateResult[]> {
   const byScenario = new Map<string, ScenarioGateResult[]>();
   for (const { body: gate } of view.gates.values()) {
     for (const command of gate.commands) {

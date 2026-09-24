@@ -143,6 +143,7 @@ export const executionMapFixtureScenarioDetail: ExecutionScenarioDetail = {
   schema: 'execution-map/1', runVersion: version, key: 'scenario:sc-status',
   detail: { state: 'available', name: 'Renders the status badge',
     source: ['Scenario: Renders the status badge', '  Given a valid status', '  When the badge renders', '  Then the visible tone and text match the status'],
+    gates: [],
     record: { kind: 'tracked-scenario', id: 'sc-status', sequence: 4, revision: null } },
 };
 

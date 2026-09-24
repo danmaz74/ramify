@@ -131,3 +131,27 @@ Use `RunQueries.executionMap` as the unpaged query. Its `moduleMap` carries curr
 ### Handoff to iteration 6
 
 Use `ProtocolClient.getExecutionMap(planId, runId)` for the complete, coherent execution and module census; `freshness` is independent of run progress. The map's `coverage` counts include every session and gate node, and `moduleMap.modules[].direct` is fully reassembled from relation pages. Fetch full descriptions through `getExecutionCapability` and frozen Gherkin through `getExecutionScenario` at the displayed `runVersion`. A stale-version retry is bounded, so UI state must show its error if changes keep occurring. A partial line summary retains its known subtotal and gap text; an unavailable tree stays explicit. No execution canvas or browser interaction was added here; those are iterations 6–9.
+
+## Iteration 6 — execution canvas and evidence drill-down
+
+**Starting commit:** `b9eeffcb1b9bc31043ccea06c86b83681663559e` (iteration 5 handoff).
+
+### Delivered
+
+- The Run page has an Execution map area built with a direct, pinned `@xyflow/react@12.11.6` dependency, matching the packaged Ramify canvas. `npm ls @xyflow/react --all` resolves both direct and toolkit consumers to 12.11.6. The canvas uses read-only custom cards, controlled pan/zoom, Fit and Relayout controls, stable old positions across run-version updates, a run band, two entry roots, a canonical provider card, typed reference/cycle edges, ordered iterations, local architect lanes, requirement branches and all session/gate markers. The full census remains in a shelf when branches are collapsed.
+- Cards and detail show full associated module paths, named scenarios, complete targeted capability descriptions and frozen Gherkin, current capability reason, scenario result summaries, verified/current-revision requirement counts, independent gate verdict and audit marks, inline repair chains with round number, and explicit unavailable and coverage facts. The gate detail can open the existing full Checks answer. An active gate explains that the settled check body is pending. The time rail follows event order and marks selected evidence; no wall-time gap folding was added. Now targets only the recorded awaited session or running gate, and only those markers pulse; reduced motion leaves a static outline. Role SVG glyphs, labels and accents remain separate from status color.
+- The existing scenario list is capped at 500, so the targeted scenario detail now includes every retained gate result for that scenario in committed order. A constructed 501-scenario test proves history for the item beyond the list cap. The module-tree CM01 test was narrowed to its original ownership claim: the separate execution canvas is allowed its Plan 11 direct React Flow dependency.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| Focused web and execution-map Vitest files | Pass: 16 files, 144 tests | Covers two roots, shared provider/cycle references, iteration order, local architect lane, collapsed shelf access, full detail, independent gate/audit, repair chain, 20/21 scenario marks, Now focus, keyboard-reachable card controls, pan/zoom state, stable positions, and targeted scenario history beyond the 500-row list cap. React Flow was mocked for component assertions; real-browser layout and interaction remain iteration 9 work. |
+| `npm run type-check` | Pass | Harness, web and scripts TypeScript scopes. |
+| `npm run build:web` | Pass | Vite built the client; `npm ls` reports the same 12.11.6 React Flow version for the direct and toolkit consumers. The large-chunk advisory remains. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings; 189 analysis limits | Ownership/exposure analysis over 9 owners; limits are inference coverage. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Handoff to iterations 7–9
+
+`ExecutionMapArea` owns selected execution key, collapsed branches, card positions and viewport; the companion map can connect its selection at that boundary in iteration 7. The module tree and direct/descendant highlight counts are not yet rendered. Sessions currently open the existing full-page transcript; iteration 8 replaces that activation with multiple floating windows and a shared live update coordinator. Browser viewport, drag/zoom/focus, contrast and reduced-motion behavior need real-browser acceptance in iteration 9. The full suite, scripted-run witness and final-commit audit remain iteration 9 gates.
