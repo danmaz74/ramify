@@ -1,6 +1,6 @@
 # Plan 12 contract appendix
 
-**Status:** fixed by iteration 1, 2026-09-24; renames, signal fields and module attribution implemented by iteration 4b. **Owner of each part:** named in its section.
+**Status:** fixed by iteration 1, 2026-09-24; renames, signal fields and module attribution implemented by iteration 4b; the scenario witness by iteration 6 (§7.1). **Owner of each part:** named in its section.
 
 This appendix makes the [plan's](main-plan.md) contracts table exact before
 producers depend on it. Section 1 is implemented by the pure
@@ -257,7 +257,7 @@ const checkFindingEventsField = z.array(checkFindingEventSchema).max(100);
 | `review-attempt-finished` (new) | review concerns promoted with the terminal attempt | iteration 3, implemented |
 | `reconciliation-assessed` (new) | the architect's relations and dispositions | iteration 5 |
 | `iteration-closed` (existing, optional field) | `claim-repair` for each CheckFinding whose repair intent the accepted iteration resolves | iteration 5 |
-| `gate-attempted` (existing, optional field) | factual promotion and `fix-by-check` from that gate | iteration 6 |
+| `gate-attempted` (existing, optional field) | factual promotion and `fix-by-check` from that gate | iteration 6, implemented (§7.1) |
 
 ```ts
 const checkFindingCauseSchema = z.discriminatedUnion('kind', [
@@ -899,6 +899,105 @@ passing gate's audited tree. Two passing focused results may support a
 provisional intermittent classification, which is not a disposition here and
 never a required-gate pass. Untracked project scenarios are counted on gate
 attempts and never promoted.
+
+### 7.1 The implemented scenario witness (iteration 6)
+
+**Files:** `src/checks/scenario-findings.ts` (observations, promotion,
+witnesses, classification, the line's notes), the run service's
+`scenarioGateFindings` and `gateAttempted` (the gate effect's `perform` and
+`complete`), and the scenarios child's reducer (`unfinished`).
+
+**Supported producer shape.** A committing gate attempt with a work item
+(`iteration`, `contract`, `breaking-iteration` and `work-item` checkpoints)
+whose `scenarios` command carries a summary of an executing (not dry) run.
+Each tracked scenario it observed is one observation: every result in the
+summary, and every scenario an `identity` selection named with no result.
+
+| Observation | Coverage | Outcome |
+| --- | --- | --- |
+| result `passed`, stream holds it whole | `complete` | `passed` |
+| result `failed`, `undefined`, `pending` or `ambiguous`, whole | `complete` | `failed` |
+| result `skipped` (no step ran an assertion) | `partial` | `inconclusive` |
+| result with `unfinished` (a pickle never started or a step has no result) | `partial` | `failed` when a finished step failed, else `inconclusive` |
+| named by an identity selection, no result (a timed-out or unlaunched run, a missing stream, a scenario the run did not execute) | `not-run` | `inconclusive` |
+
+A scenario of an `all` or `all-untagged` run with no result is not observed:
+nothing says it was selected. The reducer's result gains optional
+`unfinished: { pickles, steps, observed }`, present only when the stream
+does not hold the scenario whole; `observed` is the worst status of the
+steps that finished.
+
+**Selection and breadth.** `selection` is `<mode>/<run module>@<first 16 hex
+of the SHA-256 of the canonical JSON of the mode's command argv>`: the
+conditions the scenario itself ran under. The support files, setup and
+teardown are the run's captured configuration, the same for every gate of
+the run. What else the run selected is the observation's breadth (the
+module run's identity list, `all-untagged` or `all`); a witness whose run is
+not at least as broad as the run that observed the CheckFinding's latest
+failure is offered with coverage `partial`, so the child refuses it as
+`insufficient-coverage` (a narrower selection). An identity run covers
+another identity run that selected a subset, `all-untagged` covers any
+identity run, `all` covers everything.
+
+**Promotion.** In a gate whose verdict is not `passed`, a failed
+observation is promoted only when the owner's CheckFinding for
+`scenario:<id>` exists (the report attaches, and after a `fix-by-check`
+reopens it), or an earlier committed gate attempt of the same work item
+observed the same scenario failed; then the line reports the latest nine
+earlier failures and the current one, oldest first. A first failure, an
+inconclusive observation and the project's own scenarios are never
+promoted. Each report binds: `producer` `check:scenario`; `attempt` the
+gate; `reportKey` and `issueKey` `scenario:<id>`; `owner` the gate's work
+item; `source` the tree of that gate's audited commit; `verification`
+`{ kind: 'check', producer, obligation: { subject: 'scenario:<id>',
+revision: 1 }, selection, required: true }`; `observation` `check-failed`
+with a one-line summary, the gate record and the run's message stream as
+evidence and the feature file and line as its location; `judgment` null
+(so the child proposes `high`); `credibility` `objective`; `modules` the
+scenario's owner module.
+
+**Witness.** In a gate whose verdict is `passed`, for each open scenario
+CheckFinding of the work item whose scenario the gate observed: the adapter
+attests the obligation `{ scenario:<id>, 1 }` only when the result names the
+feature file the record names and the attempt's guarded comparison reported
+no change to it; otherwise it notes `obligation-changed` itself. The
+witness names the gate as its attempt, the observation's selection,
+coverage and outcome, and `source` and `candidate` the audited tree. The
+decision's actor is `harness`. The child then refuses a changed or revised
+obligation, another mode or module run (`incomparable-inputs`), the tree of
+the latest failure (`failure-source`), `not-run`, `partial` and a result
+that did not pass. An unobserved scenario is never offered.
+
+**Classification.** `classifyScenarioAttempts(outcomes)` over the attempts
+of one scenario on one tree: `intermittent` (provisional) for at least one
+failure and two complete passes, `reproduced` for two failures and no pass,
+else `inconclusive`. A witness refused as `failure-source` carries the
+classification of the attempts on that tree; it never fixes a CheckFinding
+and never passes a gate.
+
+**The gate's line.** `gate-attempted` gains two optional fields:
+`checkFindings` (the carrier array) and `scenarioFindings: { refused:
+{ reason: 'source-unavailable' | 'transition-refused', message } | null,
+notes: [{ scenario, checkFinding | null, step: 'promotion' | 'witness',
+code, classification? }] }`, present only when there is something to say.
+A note's `code` is the child's rejection code, or `event-bound` (the line
+already carries 100 events) or `source-unavailable` (a failure's tree was
+not read). `perform` reads the tracked scenarios, every earlier gate
+attempt of the work item and the trees a promotion or witness needs through
+the candidate source, outside the mutex, and reads no tree when the gate has
+nothing to promote or witness; `complete` plans against the state under
+the mutex, deciding every command in order, and commits with
+`decideCheckFindingTransaction`. A tree that cannot be read, or a refused
+transition, commits the attempt with `scenarioFindings.refused` and a
+warning. The verdict and `next` are the attempt's own and are decided
+before any of this.
+
+**Unpromoted.** First failures of a work item, inconclusive observations
+(timeouts, launch errors, missing streams, cut-short results that observed
+no failure), dry runs, the project's own scenarios (counted on the attempt),
+readiness and final gates, a gate whose scenario check had nothing to
+select, and every other command of a gate (tests, type check, Ramify check, harness
+rules, guarded changes) stay on their gate attempts.
 
 ## 8. Public wire (iteration 7)
 

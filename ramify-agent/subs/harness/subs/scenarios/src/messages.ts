@@ -30,6 +30,18 @@ export const scenarioRunResultSchema = z.object({
   failure: z.object({ step: z.string(), message: z.string() }).strict().optional(),
   /** Step texts no definition matched. */
   undefined: z.array(z.string()),
+  /**
+   * Present only when the stream does not hold the whole scenario: `pickles`
+   * of its pickles never started and `steps` of its executed steps have no
+   * result, which `status` counts as failed. `observed` is the worst status
+   * of the steps that did finish, so a reader can tell a failure the run
+   * observed from an execution gap.
+   */
+  unfinished: z.object({
+    pickles: z.int().nonnegative(),
+    steps: z.int().nonnegative(),
+    observed: scenarioRunStatusSchema,
+  }).strict().optional(),
 }).strict();
 export type ScenarioRunResult = z.infer<typeof scenarioRunResultSchema>;
 
@@ -163,7 +175,7 @@ export function summarizeScenarioRun(stream: string, tracked: readonly TrackedSc
       excluded.push(id);
       continue;
     }
-    scenarios.push(resultOf(id, entry.executed, executions, definitions, keywords));
+    scenarios.push(resultOf(id, entry.executed, entry.pickles.length - entry.executed.length, executions, definitions, keywords));
   }
   const order = (a: string, b: string): number => a.localeCompare(b, 'en', { numeric: true });
   scenarios.sort((a, b) => order(a.id, b.id));
@@ -184,11 +196,14 @@ function executionStatus(execution: Execution): ScenarioRunStatus {
 function resultOf(
   id: string,
   executed: readonly Pickle[],
+  unstarted: number,
   executions: ReadonlyMap<string, Execution>,
   definitions: ReadonlyMap<string, StepDefinition>,
   keywords: ReadonlyMap<string, { keyword: string; line: number }>,
 ): ScenarioRunResult {
   let status: ScenarioRunStatus = 'passed';
+  let observed: ScenarioRunStatus = 'passed';
+  let unfinishedSteps = 0;
   const binding: { step: string; definition: string }[] = [];
   const seenBindings = new Set<string>();
   const undefinedSteps: string[] = [];
@@ -201,6 +216,8 @@ function resultOf(
       const result = execution.results.get(testStep.id);
       const stepStatus: ScenarioRunStatus = result ? statusOf(result) : 'failed';
       status = worse(status, stepStatus);
+      if (result) observed = worse(observed, stepStatus);
+      else unfinishedSteps += 1;
       const pickleStep = testStep.pickleStepId === undefined ? undefined : steps.get(testStep.pickleStepId);
       const said = pickleStep ? spoken(pickleStep, keywords) : 'a hook';
       for (const definitionId of testStep.stepDefinitionIds ?? []) {
@@ -228,6 +245,7 @@ function resultOf(
     line: scenarioNode?.line ?? 1,
     binding,
     undefined: undefinedSteps,
+    ...(unstarted === 0 && unfinishedSteps === 0 ? {} : { unfinished: { pickles: unstarted, steps: unfinishedSteps, observed } }),
   };
   return failure && failure.status === status ? { ...result, failure: { step: failure.step, message: failure.message } } : result;
 }

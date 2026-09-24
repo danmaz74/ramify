@@ -19,6 +19,7 @@ import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
 import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
 import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
+import { gateCheckFindingOutcomeSchema } from '../checks/scenario-findings.js';
 import {
   reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewOrientationRecordedDataSchema, reviewRequestRecordedDataSchema,
 } from '../reviews/records.js';
@@ -494,13 +495,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** The durable intent of a verified committing gate's commit-and-audit effect. */
   event('gate-started', z.object({ gate: text, checkpoint: text }).strict()),
   event('gate-committing', z.object({ gate: text, checkpoint: text }).strict()),
-  /** A gate finished and commits its one complete `GateAttempt`. */
+  /**
+   * A gate finished and commits its one complete `GateAttempt`. A committing
+   * gate of a work item also carries what its scenario check means for the
+   * work item's CheckFindings: a repeated failure promoted, a witness that
+   * fixes one, and what was left out. The verdict never depends on them.
+   */
   event('gate-attempted', z.object({
     gate: text,
     checkpoint: text,
     verdict: z.enum(['passed', 'failed', 'not-verified']),
     next: text,
     committing: z.boolean().optional(),
+    checkFindings: checkFindingEventsField.optional(),
+    scenarioFindings: gateCheckFindingOutcomeSchema.optional(),
   }).strict()),
   /**
    * CheckFinding events committed by a path with no run event of its own:

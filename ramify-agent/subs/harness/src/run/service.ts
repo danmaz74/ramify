@@ -11,6 +11,10 @@ import { acceptedCommit } from '../checks/accepted.js';
 import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection } from '../checks/selection.js';
+import {
+  planScenarioFindings, scenarioGatesToRead, scenarioObservations,
+  type GateCheckFindingOutcome, type ScenarioFindingNote, type ScenarioGateInputs, type ScenarioObservation,
+} from '../checks/scenario-findings.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
 import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
@@ -128,6 +132,7 @@ import { extractPlanScenarios, type PlanScenarioExtraction } from '../../subs/sc
 import type { RenderedFeatureFile } from '../../subs/scenarios/src/rendering.js';
 import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
+import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
 import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from './policy.js';
@@ -6235,7 +6240,7 @@ export class RunService {
       ...(earlierAttempts(run, identity.id, identity.subject ?? {}).length === 0 ? {} : { earlier: earlierAttempts(run, identity.id, identity.subject ?? {}) }),
     });
     const operation = gateOperation(prepared, message);
-    const effect = run.log.ledger.effect<GateAttempt>({
+    const effect = run.log.ledger.effect<{ readonly attempt: GateAttempt; readonly findings: ScenarioGateFindings }>({
       key: `gate-commit:${identity.id}`,
       serialize: work => run.mutex.run(work),
       intent: () => ({
@@ -6261,29 +6266,124 @@ export class RunService {
         if (attempt.verdict === 'passed' && (attempt.audited !== sourceCommit || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} passed without published evidence for ${sourceCommit}`);
         }
-        return attempt;
+        // What the scenario check means for the work item's CheckFindings
+        // is read here, outside the mutex; the completion decides it.
+        return { attempt, findings: await this.scenarioGateFindings(run, attempt) };
       },
-      complete: attempt => {
+      complete: ({ attempt, findings }) => {
         const { auditOverall, ...durableAttempt } = attempt;
         if (auditOverall != null && (attempt.audited === null || attempt.evidence === null)) {
           throw new Error(`Gate ${attempt.id} has an audit outcome without its published commit`);
         }
-        return {
-          event: run.log.next({ type: 'gate-attempted', data: { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next } }),
-          records: [
-            { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
-            ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
-              body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
-          ],
-        };
+        return this.gateAttempted(run, attempt, findings, [
+          { path: runLayout.gate(attempt.id), id: attempt.id, revision: 1, body: durableAttempt },
+          ...(auditOverall == null ? [] : [{ path: runLayout.gateAuditOutcome(attempt.id), id: attempt.id, revision: 1,
+            body: { schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall: auditOverall, audited: attempt.audited } }]),
+        ]);
       },
     });
     run.gating = effect;
     try {
-      return await effect;
+      return (await effect).attempt;
     } finally {
       if (run.gating === effect) run.gating = undefined;
     }
+  }
+
+  /**
+   * What a committing gate's scenario check means for its work item's
+   * CheckFindings, read before its completion takes the mutex (Plan 12
+   * iteration 6): the tracked scenarios it observed, every earlier attempt
+   * of the work item, and the audited tree of each attempt a promotion or a
+   * witness needs. Null when there is nothing to promote or witness, which
+   * reads no tree; unavailable when a tree cannot be read, which the
+   * completion records and the attempt survives.
+   */
+  private async scenarioGateFindings(run: Run, attempt: GateAttempt): Promise<ScenarioGateFindings> {
+    const workItem = attempt.subject.workItem;
+    if (workItem === undefined || attempt.audited === null) return null;
+    try {
+      const tracked = trackedScenarios(run.log.ledger.replay()).records.map(record => ({ id: record.id, owner: record.owner, file: record.file }));
+      const observations = scenarioObservations(attempt, tracked);
+      if (observations.length === 0) return null;
+      const earlier = run.log.all('gate-attempted').flatMap(event => {
+        const body = event.data.gate === attempt.id ? undefined : gateBodyOf(run, event.data.gate);
+        return body === undefined || body.subject.workItem !== workItem ? [] : [{ body, observations: scenarioObservations(body, tracked) }];
+      });
+      const needed = scenarioGatesToRead(checkFindingStateOf(run.log.ledger), workItem, attempt.verdict, observations,
+        earlier.map(entry => ({ gate: entry.body.id, observations: entry.observations })));
+      if (needed === null) return null;
+      const trees = new Map<string, string>();
+      const treeOf = async (commit: string): Promise<string> => {
+        const known = trees.get(commit);
+        if (known !== undefined) return known;
+        const tree = await this.candidates.commitTree(this.projectRoot, commit);
+        trees.set(commit, tree);
+        return tree;
+      };
+      const observed = async (body: GateAttempt, entries: readonly ScenarioObservation[], read: boolean) => ({
+        gate: body.id,
+        tree: read && body.audited !== null ? await treeOf(body.audited) : null,
+        observations: entries,
+        record: runLayout.gate(body.id),
+        output: runLayout.gateOutput(body.id),
+      });
+      const current = await observed(attempt, observations, true);
+      return {
+        workItem,
+        verdict: attempt.verdict,
+        changedFiles: attempt.guardedChanges.map(change => change.path),
+        current: { ...current, tree: current.tree! },
+        earlier: await Promise.all(earlier.map(entry => observed(entry.body, entry.observations, needed.includes(entry.body.id)))),
+        tracked,
+      };
+    } catch (error) {
+      return { unavailable: `The audited tree a scenario CheckFinding of gate ${attempt.id} needs could not be read: ${message(error)}` };
+    }
+  }
+
+  /**
+   * The `gate-attempted` line of a committing gate: its attempt and records,
+   * and the CheckFinding part its scenario check decides under the mutex.
+   * The attempt and its verdict are committed whatever that part does; a
+   * part refused as a whole is recorded on the event with its reason, and a
+   * scenario left out as a note.
+   */
+  private gateAttempted(run: Run, attempt: GateAttempt, findings: ScenarioGateFindings, records: CommitRecord[]): Transaction<RunEvent> {
+    const data = { gate: attempt.id, checkpoint: attempt.checkpoint, verdict: attempt.verdict, next: attempt.next };
+    const plain = (outcome?: GateCheckFindingOutcome): Transaction<RunEvent> => ({
+      event: run.log.next({ type: 'gate-attempted', data: { ...data, ...(outcome === undefined ? {} : { scenarioFindings: outcome }) } }),
+      records,
+    });
+    if (findings === null) return plain();
+    if ('unavailable' in findings) {
+      this.warn(`Run ${run.record.jobId}: ${findings.unavailable}; the gate is committed without its CheckFinding part`);
+      return plain({ refused: { reason: 'source-unavailable', message: findings.unavailable }, notes: [] });
+    }
+    let notes: ScenarioFindingNote[] = [];
+    const decided = decideCheckFindingTransaction(run.log, ({ state }) => {
+      const plan = planScenarioFindings(state, findings);
+      notes = [...plan.notes];
+      return {
+        commands: plan.commands,
+        compose: outcome => ({
+          event: {
+            type: 'gate-attempted',
+            data: {
+              ...data,
+              ...(outcome.events.length === 0 ? {} : { checkFindings: [...outcome.events] }),
+              ...(notes.length === 0 ? {} : { scenarioFindings: { refused: null, notes } }),
+            },
+          },
+          records,
+        }),
+      };
+    });
+    if (decided.kind === 'transaction') return decided.transaction;
+    if (decided.kind === 'replayed') return plain(notes.length === 0 ? undefined : { refused: null, notes });
+    const refusal = `${decided.refusal.reason}: ${decided.refusal.message}`;
+    this.warn(`Run ${run.record.jobId}: the CheckFinding part of gate ${attempt.id} was refused (${refusal}); the gate is committed without it`);
+    return plain({ refused: { reason: 'transition-refused', message: refusal }, notes });
   }
 
   /**
@@ -6916,6 +7016,9 @@ function earlierAttempts(run: Run, attemptId: string, attemptSubject: GateAttemp
       return [{ id: body.id, verdict: body.verdict, cause: body.cause }];
     });
 }
+
+/** What a committing gate's completion decides its CheckFinding part from; see `scenarioGateFindings`. */
+type ScenarioGateFindings = ScenarioGateInputs | { readonly unavailable: string } | null;
 
 /** One gate attempt as the log committed it, without reading the file again. */
 function gateBodyOf(run: Run, id: string): GateAttempt | undefined {

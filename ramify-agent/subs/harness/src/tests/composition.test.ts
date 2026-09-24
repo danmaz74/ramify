@@ -318,6 +318,22 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[review-attempt-started].data.requestedStart', values: ['fresh'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
   { union: 'run log[review-attempt-finished].data.result', values: ['complete', 'partial'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: "two readers overlap the third iteration's writer, read only their own candidates, and every escape is refused" },
   { union: 'run log[review-attempt-finished].data.result', values: ['not-verified'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
+  // Plan 12 iteration 6: the scenario producer's promotions, witnesses and what a gate's line leaves out.
+  { union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-reported'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['fix-by-check'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['complete'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['passed'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'two failures across repair rounds make one reproduced CheckFinding in the second gate\'s line, the third gate fixes it, and every verdict is the checks\' own' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['source-unavailable'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'an audited tree that cannot be read refuses the part with its reason on the gate\'s line; the verdict and the run go on' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['witness'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].step', values: ['promotion'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a line holds at most 100 CheckFinding events; a scenario that does not fit is named and left for its next failure' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['failure-source'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['incomparable-inputs', 'insufficient-coverage', 'obligation-changed'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a narrower run, another mode, a pass on the failure\'s own tree and a changed obligation do not fix it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['not-executed', 'not-passed'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a witness that did not run, ran in part or did not pass is refused by the child' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0', values: ['awaiting-user-decision'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'an open CheckFinding awaiting a user\'s answer is not fixed by a gate' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|1', values: ['event-bound'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a line holds at most 100 CheckFinding events; a scenario that does not fit is named and left for its next failure' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|1', values: ['source-unavailable'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'a failure whose audited tree was not read is named and left out, and the other scenarios go on' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].classification', values: ['inconclusive'], file: 'subs/harness/src/tests/scenario-findings-run.test.ts', test: 'failed twice and passed on one unchanged tree: the gate passes and implements the scenario, the CheckFinding stays open with its classification, and a later changed candidate fixes it' },
+  { union: 'run log[gate-attempted].data.scenarioFindings.notes[].classification', values: ['intermittent'], file: 'subs/harness/src/tests/scenario-findings.test.ts', test: 'two passes on the failure\'s own tree are provisionally intermittent, and still fix nothing' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['invalid-output', 'timed-out', 'unavailable'], file: 'subs/harness/src/tests/review-attempts.test.ts', test: 'malformed output is retried once, a hung reader times out and an unreadable candidate is unavailable' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['stopped'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'two live readers are stopped with the writer, each attempt is settled before job-stopped, and a reader that ignores its stop ingests nothing' },
   { union: 'run log[review-attempt-finished].data.reason', values: ['deadline'], file: 'subs/harness/src/tests/review-lifecycle.test.ts', test: 'the settlement bound stops a reader that never answers, and the run completes with no reader left' },
@@ -517,7 +533,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "The cause of a user's answer to a pending CheckFinding decision, whose command Plan 12 iteration 7 adds; nothing records one yet.",
   },
   {
-    union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-reported', 'check-finding-related'],
+    union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-related'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
@@ -537,7 +553,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'fix-by-check', 'fix-by-assessment', 'supersede', 'waive', 'revoke-waiver', 'defer', 'request-user-decision', 'answer-user-decision', 'reopen', 'revise-obligation'],
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'fix-by-assessment', 'supersede', 'waive', 'revoke-waiver', 'defer', 'request-user-decision', 'answer-user-decision', 'reopen', 'revise-obligation'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
@@ -545,12 +561,12 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['complete', 'partial', 'not-run'],
-    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.coverage', values: ['partial', 'not-run'],
+    reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers partial and unrun witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
   },
   {
-    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['passed', 'failed', 'inconclusive'],
-    reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[fix-by-check].witness.outcome', values: ['failed', 'inconclusive'],
+    reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers failed and inconclusive witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
   },
   {
     union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['work-item-assessment', 'user-decision', 'governing-record'],
@@ -567,6 +583,15 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'run log[iteration-closed].data.checkFindings[][check-finding-related].data.relation.relation', values: ['same-issue', 'related-but-distinct', 'distinct', 'uncertain'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
+  },
+  {
+    union: 'run log[gate-attempted].data.scenarioFindings.refused.reason', values: ['transition-refused'],
+    reason: 'The scenario adapter decides every command of a gate\'s CheckFinding part in order before the transition decides them again, and leaves out each one the child refuses, so the transition has nothing left to refuse. The value keeps an unexpected refusal from failing the gate; it has never been reached.',
+  },
+  {
+    union: 'run log[gate-attempted].data.scenarioFindings.notes[].code|0',
+    values: ['invalid-command', 'invalid-report', 'report-key-conflict', 'ambiguous-issue-key', 'unknown-check-finding', 'unknown-report', 'stale-revision', 'invalid-transition', 'waived', 'not-waived', 'no-pending-user-decision', 'unknown-option', 'insufficient-authority', 'verification-kind-mismatch', 'factual-obligation', 'required-obligation', 'producer-mismatch', 'wrong-subject', 'source-mismatch', 'relation-self', 'cross-owner', 'relation-cycle', 'replay-conflict', 'invalid-query'],
+    reason: 'A note carries the child\'s own rejection code. The scenario adapter reports only a failure of a tracked scenario it bound itself, attaching to the one CheckFinding its key names, and offers a witness only of the same scenario for an open scenario CheckFinding of its own work item, so none of these refusals can follow; the child\'s own tests produce each one.',
   },
   {
     union: 'run log[iteration-closed].data.outcome', values: ['superseded'],

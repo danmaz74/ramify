@@ -207,8 +207,13 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) started`, ref('gate', event.data.gate)];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
-    case 'gate-attempted':
-      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}`, ref('gate', event.data.gate)];
+    case 'gate-attempted': {
+      const carried = event.data.checkFindings?.length ?? 0;
+      const refused = event.data.scenarioFindings?.refused;
+      const findings = carried > 0 ? `, with ${counted(carried, 'CheckFinding event', 'CheckFinding events')}`
+        : refused ? `; its CheckFinding part was refused (${refused.reason})` : '';
+      return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}${findings}`, ref('gate', event.data.gate)];
+    }
     case 'check-findings-recorded': {
       // CheckFindings have no reference kind on the wire yet; the page names the count and the cause.
       const cause = event.data.cause;

@@ -113,8 +113,12 @@ when its identity tag names a record and it sits in the file that record
 names. Tracked scenarios the run did not execute are listed as excluded; the
 project's own scenarios are counted as passed, skipped or failed. A line that
 is not JSON is reported and the rest is read, and a step the stream never
-finished did not pass. Whether the check passes is the caller's, since it
-also weighs the exit code, the selection and the mode.
+finished did not pass. A scenario the stream does not hold whole also
+carries `unfinished`: how many of its pickles never started and of its steps
+have no result, and the worst status of the steps that did finish, so a
+reader can tell a failure the run observed from a gap in the stream.
+Whether the check passes is the caller's, since it also weighs the exit
+code, the selection and the mode.
 
 ## Composition failures
 

@@ -22,6 +22,7 @@ import {
 import { passingScenarioSummary, type DirectCheckScript, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
+import { treeCandidates } from './helpers/candidates.js';
 import {
   addModule, assign, byRole, completionProposed, installMiniRunner, outline, partialReport, submit, treeInputs, write,
 } from './helpers/iterations.js';
@@ -138,6 +139,7 @@ async function run(root: string, script: Parameters<typeof byRole>[0], commits: 
     inputs: treeInputs(),
     git,
     readinessExecution: directReadinessExecution(),
+    candidates: treeCandidates(root),
     ...(options.checkScript === undefined ? {} : { checkScript: options.checkScript }),
   });
   if (options.detached !== true) cleanups.push(() => opened.service.close());

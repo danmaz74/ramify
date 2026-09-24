@@ -192,7 +192,30 @@ describe('a damaged stream', () => {
     const lastStep = lines.map((line, index) => (line.startsWith('{"testStepFinished"') ? index : -1)).filter((index) => index >= 0).at(-1)!;
     const summary = summarizeScenarioRun(lines.slice(0, lastStep).join('\n'), tracked);
     expect(summary.scenarios[0]).toMatchObject({ id: 'sc-001', status: 'failed', failure: { step: 'Then the shelf lists 1 book', message: 'The stream has no result for this step' } });
+    // The gap is recorded apart from what the run observed: the finished
+    // steps passed, so this is no failure a reader may count.
+    expect(summary.scenarios[0]!.unfinished).toEqual({ pickles: 0, steps: 1, observed: 'passed' });
     expect(summary.finished).toBeNull();
+  });
+
+  test('a stream that lost one step\'s result keeps the observed failure beside the gap', () => {
+    const lines = stream('failing').trimEnd().split('\n');
+    const first = lines.findIndex((line) => line.startsWith('{"testStepFinished"'));
+    const summary = summarizeScenarioRun(lines.filter((_, index) => index !== first).join('\n'), tracked);
+    expect(summary.scenarios[0]).toMatchObject({ id: 'sc-002', status: 'failed', unfinished: { pickles: 0, steps: 1, observed: 'failed' } });
+  });
+
+  test('an outline cut before its second example names the pickle that never started', () => {
+    const lines = stream('outline').trimEnd().split('\n');
+    const starts = lines.map((line, index) => (line.startsWith('{"testCaseStarted"') ? index : -1)).filter((index) => index >= 0);
+    const summary = summarizeScenarioRun(lines.slice(0, starts[1]).join('\n'), tracked);
+    expect(summary.scenarios[0]).toMatchObject({ id: 'sc-006', unfinished: { pickles: 1, steps: 0 } });
+  });
+
+  test('a complete stream records no gap', () => {
+    for (const name of ['passing', 'failing', 'outline']) {
+      expect(summarize(name).scenarios.every((scenario) => scenario.unfinished === undefined)).toBe(true);
+    }
   });
 
   test('an empty stream is an unfinished run with nothing in it', () => {

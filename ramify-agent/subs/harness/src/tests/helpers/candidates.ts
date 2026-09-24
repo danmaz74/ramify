@@ -99,3 +99,31 @@ export function testReviewPolicy(extra: Partial<ReviewPolicy> = {}): ReviewPolic
     ...extra,
   };
 }
+
+/**
+ * Git's answer to the one question a scenario gate asks of its audited
+ * commits: the tree of each, `tree-of-<commit>`, for a scenario that states
+ * no candidate files. Every other read fails, as for an unknown commit.
+ */
+export function treeCandidates(root: string): ScriptedCandidates {
+  const calls: string[] = [];
+  const failing = new Set<string>();
+  const refused = (operation: string) => async (): Promise<never> => {
+    throw new Error(`fatal: this scenario answers no ${operation}`);
+  };
+  return {
+    calls,
+    fail(operation, commit) { failing.add(`${operation} ${commit}`); },
+    async commitTree(project, commit) {
+      expect(project).toBe(root);
+      calls.push(`commitTree ${commit}`);
+      if (failing.has(`commitTree ${commit}`)) throw new Error(`fatal: commitTree of ${commit} cannot be answered`);
+      return `tree-of-${commit}`;
+    },
+    treeEntries: refused('treeEntries'),
+    readBlob: refused('readBlob'),
+    grepTree: refused('grepTree'),
+    diffNameStatus: refused('diffNameStatus'),
+    diffPatch: refused('diffPatch'),
+  };
+}

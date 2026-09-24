@@ -671,6 +671,28 @@ changed source or request set, or a new or changed signal that warrants a
 round that remains, refuses the completion and reconciles again, and
 otherwise the work item completes naming each signal it leaves unresolved.
 
+`src/checks/scenario-findings.ts` is the one factual producer: the scenario
+check of a committing gate that has a work item. A failed tracked scenario
+stays on its gate attempt, where the immediate repair answers it, unless it
+needs continuity: it failed an earlier gate of the same work item too, or a
+CheckFinding for it exists. Then the gate's own `gate-attempted` line
+carries a report of each of those failures, oldest first, under the issue
+key `scenario:<id>`: an objective, required, high-risk signal whose
+repeated failures make it reproduced. A passing gate is the witness: for
+each open scenario CheckFinding of its work item that its scenario check
+observed, it offers the same scenario at its frozen obligation, on the
+audited tree being accepted, with the coverage and outcome the message
+stream established, and the child decides whether that fixes it. A run
+narrower than the one that observed the failure covers it only in part,
+and a pass on the tree of the latest failure is intermittent evidence,
+classified and never a fix. What was left out is a note on the line, and a
+part that cannot be decided, such as an audited tree Git cannot read, is
+refused on the line while the attempt and its verdict are committed as
+they were. The trees and earlier attempts are read before the completion
+takes the mutex. The verdict is decided first and never reads any of this.
+The project's own scenarios are counted, never identified; a dry run, the
+readiness and final gates and every other command stay on their attempts.
+
 `src/probes/pi-fork.probe.ts` is a development probe, run by hand with a
 real model and never by the test suite: it forks a pinned pi session point
 as a reviewer confined to an audited Git candidate and reports the start
