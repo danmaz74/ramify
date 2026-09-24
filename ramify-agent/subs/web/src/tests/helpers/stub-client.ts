@@ -1,4 +1,8 @@
+import type {
+  CheckFindingDetail, CheckFindingListResponse, CheckFindingModuleCounts, ReviewListResponse,
+} from '../../../../harness/src/interfaces/protocol/check-findings.js';
 import type { ModuleTree } from '../../../../harness/src/interfaces/protocol/evidence.js';
+import type { CheckFindingPathQuery } from '../../../../harness/src/interfaces/protocol/paths.js';
 import type { ExecutionCapabilityDetail, ExecutionScenarioDetail } from '../../../../harness/src/interfaces/protocol/execution-map.js';
 import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
@@ -32,6 +36,17 @@ export interface StubRun {
   executionCapabilities?: Record<string, ExecutionCapabilityDetail>;
   executionScenarios?: Record<string, ExecutionScenarioDetail>;
   metrics?: MetricsResponse;
+  /** CheckFinding lists by `<workItem>|<module>|<select>`, the absent filters empty and the select defaulting to attention. */
+  checkFindings?: Record<string, CheckFindingListResponse>;
+  checkFindingDetails?: Record<string, CheckFindingDetail>;
+  checkFindingModules?: CheckFindingModuleCounts;
+  /** Review lists by work item, `` for the run's. */
+  reviews?: Record<string, ReviewListResponse>;
+}
+
+/** The key a stub run's CheckFinding list is answered by. */
+export function checkFindingKey(query: CheckFindingPathQuery): string {
+  return `${query.workItem ?? ''}|${query.module ?? ''}|${query.select ?? 'attention'}`;
 }
 
 /** A protocol client answering from memory, with a settable connection state. */
@@ -44,6 +59,8 @@ export class StubClient implements ProtocolClient {
   state: ConnectionState = 'connected';
   calls: string[] = [];
   commands: RunCommandInput[] = [];
+  /** Refusals the next commands receive, in order, before any is answered with a receipt. */
+  commandRefusals: ClientError[] = [];
   receipt: Receipt = { commandId: 'c', jobId: '20260921T080000Z-c0ffee', sequence: 1, acceptedAt: '2026-09-21T08:00:00.000Z' };
   tree: ModuleTree = { status: 'unavailable', message: 'The architect view has not been materialized yet.' };
   sessionList: SessionListResponse = { sessions: [], total: 0, offset: 0, next: null, unserved: [] };
@@ -132,6 +149,37 @@ export class StubClient implements ProtocolClient {
     return this.answer(runId, run => run.executionScenarios?.[scenario], `execution scenario ${scenario}`);
   }
   async getGate(_planId: string, runId: string, gate: string) { this.calls.push(`getGate:${runId}:${gate}`); return this.answer(runId, run => run.gates?.[gate], `gate ${gate}`); }
+  // A run with no CheckFinding answers stated is one that recorded none and requested no reviews.
+  async getCheckFindings(_planId: string, runId: string, query: CheckFindingPathQuery): Promise<CheckFindingListResponse> {
+    const key = checkFindingKey(query);
+    this.calls.push(`getCheckFindings:${runId}:${key}`);
+    const run = this.run(runId);
+    if (run.checkFindings === undefined) {
+      return { protocol: 'check-findings/1', runId, version: run.snapshot.version, coverage: { state: 'unavailable', reason: 'no-review-policy' },
+        query: { workItem: query.workItem ?? null, module: query.module ?? null, select: query.select ?? 'attention', order: 'attention' },
+        total: 0, shown: 0, next: null, counts: { total: 0, open: 0, deferred: 0, closed: 0, fixed: 0, waived: 0, superseded: 0, unresolved: 0, awaitingUser: 0 }, items: [] };
+    }
+    return this.answer(runId, current => current.checkFindings?.[key], `CheckFindings ${key}`);
+  }
+  async getCheckFinding(_planId: string, runId: string, checkFinding: string) {
+    this.calls.push(`getCheckFinding:${runId}:${checkFinding}`);
+    return this.answer(runId, run => run.checkFindingDetails?.[checkFinding], `CheckFinding ${checkFinding}`);
+  }
+  async getCheckFindingModules(_planId: string, runId: string): Promise<CheckFindingModuleCounts> {
+    this.calls.push(`getCheckFindingModules:${runId}`);
+    const run = this.run(runId);
+    return run.checkFindingModules
+      ?? { protocol: 'check-findings/1', runId, version: run.snapshot.version, coverage: { state: 'unavailable', reason: 'no-review-policy' }, modules: [] };
+  }
+  async getReviews(_planId: string, runId: string, workItem?: string): Promise<ReviewListResponse> {
+    this.calls.push(`getReviews:${runId}:${workItem ?? ''}`);
+    const run = this.run(runId);
+    if (run.reviews === undefined) {
+      return { protocol: 'check-findings/1', runId, version: run.snapshot.version, coverage: { state: 'unavailable', reason: 'no-review-policy' },
+        workItem: workItem ?? null, total: 0, shown: 0, next: null, requests: [] };
+    }
+    return this.answer(runId, current => current.reviews?.[workItem ?? ''], `reviews of ${workItem ?? 'the run'}`);
+  }
   async getMetrics(_planId: string, runId: string) { this.calls.push(`getMetrics:${runId}`); return this.answer(runId, run => run.metrics, 'metrics'); }
 
   async listSessions(offset = 0): Promise<SessionListResponse> {
@@ -180,6 +228,8 @@ export class StubClient implements ProtocolClient {
     this.calls.push(`sendCommand:${command.type}`);
     this.commands.push(command);
     if (this.failure) throw this.failure;
+    const refusal = this.commandRefusals.shift();
+    if (refusal) throw refusal;
     return { ...this.receipt, commandId: command.commandId };
   }
 

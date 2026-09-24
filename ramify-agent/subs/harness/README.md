@@ -35,6 +35,16 @@ signatures name, and the `session` command's entry with the types it names:
     evaluation evidence beside them, with the limit of each list. Each answer
     is a projection; the durable records and the internal event union stay
     private, so the log can change without changing the wire.
+  - `check-findings.ts` holds the CheckFinding protocol (Plan 12): review
+    coverage, which is unavailable, never clean, for a run whose policy
+    requested no reviews; bounded, versioned lists of a run's CheckFindings
+    by work item or module, ordered by risk, then credibility, then recency;
+    one CheckFinding's history with the attempts, candidate diffs and repair
+    sessions it links to; the unsettled counts of every module; the review
+    requests; and a person's three commands, answering a pending decision,
+    waiving and revoking a waiver, each against the CheckFinding's revision.
+    It redefines the projection it serves and names no internal type;
+    `runs.ts` includes its commands in the run's command union.
   - `transcripts.ts` holds the entry schema of a session's transcript: its
     numbered entries, each block's header and body, and where a body is
     stored. It is not exposed yet; the session queries will expose it.
@@ -693,6 +703,24 @@ takes the mutex. The verdict is decided first and never reads any of this.
 The project's own scenarios are counted, never identified; a dry run, the
 readiness and final gates and every other command stay on their attempts.
 
+`src/projections/check-findings.ts` answers the CheckFinding protocol from
+the committed run alone: the state replayed from the log's carriers, the
+child's attention order, the review coverage from the review events, and
+each work item's `work-item-completed` for the reason an open signal was
+left unresolved. A signal opened or reopened after its work item completed
+is `raised-after-last-round`, and an unresolved signal of non-low risk that
+surfaced in its work item's latest review, or after its last round, is
+marked. Each summary names the commands a person may send now; the command
+path checks them again. A person's answer, waiver or revocation
+(`src/check-findings/user-commands.ts`) becomes one child decision with the
+person as its actor, validated under the run mutex against the run's
+version and the CheckFinding's revision, with the harness's authority
+rules: the user may waive any signal but a required check, which the child
+refuses, and a revocation needs a rank at least the waiver's actor's. It
+is committed on a `check-findings-recorded` line that holds the accepted
+command, so a retry after a restart receives its original receipt; a run
+that has ended accepts none.
+
 `src/probes/pi-fork.probe.ts` is a development probe, run by hand with a
 real model and never by the test suite: it forks a pinned pi session point
 as a reviewer confined to an audited Git candidate and reports the start
@@ -708,7 +736,10 @@ pi actually made and what the snapshot tools answered.
   the run was working when it was given (`duringRun`); it is refused before
   the analysis is accepted, during the final verification and for a run that
   failed, stopped or was interrupted, and accepted after completion, the one
-  event that may follow `job-completed`.
+  event that may follow `job-completed`. `respond-to-check-finding`,
+  `waive-check-finding` and `revoke-check-finding-waiver` expect the run's
+  version and the CheckFinding's revision; there is no command that marks a
+  CheckFinding resolved.
 - **The review stop.** With `reviewStop`, `analysis-accepted` is followed by
   `review-requested` and the phase `awaiting-review`. The run stays
   `running` and keeps the project, starts no session and writes nothing to

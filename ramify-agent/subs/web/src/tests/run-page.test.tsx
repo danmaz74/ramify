@@ -5,10 +5,11 @@ import {
   moduleCapabilityComparisonResponseSchema, runSnapshotSchema, scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
   type RunSnapshot, type WorkItemSummary,
 } from '../../../harness/src/interfaces/protocol/runs.js';
+import { checkFindingListResponseSchema, checkFindingModuleCountsSchema } from '../../../harness/src/interfaces/protocol/check-findings.js';
 import { ClientError } from '../client.js';
 import { RunPage } from '../run-page.js';
 import { architect, globalFork, liveEngineer } from './helpers/sessions.js';
-import { StubClient, type StubRun } from './helpers/stub-client.js';
+import { checkFindingKey, StubClient, type StubRun } from './helpers/stub-client.js';
 
 // Progress → By module draws the packaged React Flow canvas, which jsdom cannot measure.
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); });
@@ -728,4 +729,42 @@ test('Run → Sessions draws the timeline, each segment opening its chapter; Mea
   fireEvent.click(screen.getByRole('tab', { name: 'Measurements' }));
   await screen.findByLabelText('Metrics');
   expect(screen.queryByRole('table', { name: 'Sessions' })).toBeNull();
+});
+
+test('a work item\'s CheckFindings sit in its history, and the overview shows the modules\' unsettled counts', async () => {
+  const signal = {
+    id: 'cf-0001', revision: 2, workItem: 'wi-001', standing: 'open', reason: 'awaiting-user-decision', awaiting: 'user-decision', verification: 'assessment',
+    obligation: null, required: false, risk: 'medium', credibility: 'human-reviewed', modules: ['collection-review/workspace/reviews'], unresolved: null,
+    latestReview: false, settlement: null, materialChoice: null, repair: null, producers: ['review:scope'], title: 'The API conflicts with the plan',
+    reports: 1, decisions: 1, group: null, userCommands: ['respond'],
+    pendingUserDecision: { request: 'cfd-0001', by: { kind: 'agent', role: 'local-architect', invocation: 'inv-0020' }, rationale: 'A strong conflict',
+      conflicts: [{ text: 'The API returns a list.', document: 'plans/review-notes/plan.md', revision: 'sha256:plan' }],
+      options: [{ id: 'keep', summary: 'Keep', consequence: 'Unmet' }, { id: 'list', summary: 'List', consequence: 'Callers change' }] },
+  };
+  const coverage = { state: 'available', requested: 3, complete: 3, partial: 0, notVerified: 0, pending: 0 } as const;
+  const run: StubRun = {
+    ...stubRun(),
+    workItems: workItemListResponseSchema.parse({ workItems: [workItemSummary], total: 1 }),
+    workItem: { 'wi-001': workItemResponseSchema.parse({ workItem: workItemSummary, outlines: [], iterations: [], gates: [], requirements: [], requests: [] }) },
+    checkFindings: { [checkFindingKey({ workItem: 'wi-001', select: 'reported' })]: checkFindingListResponseSchema.parse({
+      protocol: 'check-findings/1', runId, version: 12, coverage, query: { workItem: 'wi-001', module: null, select: 'reported', order: 'attention' },
+      total: 1, shown: 1, next: null, counts: { total: 1, open: 1, deferred: 0, closed: 0, fixed: 0, waived: 0, superseded: 0, unresolved: 0, awaitingUser: 1 }, items: [signal],
+    }) },
+    checkFindingModules: checkFindingModuleCountsSchema.parse({ protocol: 'check-findings/1', runId, version: 12, coverage,
+      modules: [{ module: 'collection-review/workspace/reviews', open: 1, deferred: 0, unresolved: 0, highestOpenRisk: 'medium', pendingUserDecisions: 1 }] }),
+  };
+  const client = clientWith(run);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  const modules = await screen.findByRole('table', { name: 'CheckFindings by module' });
+  expect(within(modules).getByRole('button', { name: 'collection-review/workspace/reviews' })).toBeTruthy();
+  expect(screen.getByText(/A decision is requested of you/)).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Work items' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'wi-001' }));
+  const history = await screen.findByLabelText('Work item wi-001');
+  const findings = await within(history).findByLabelText('CheckFindings of wi-001');
+  expect(within(findings).getByLabelText('Review coverage').textContent).toMatch(/^Review coverage/);
+  const card = await within(findings).findByRole('listitem', { name: 'CheckFinding cf-0001' });
+  expect(within(card).getByRole('group', { name: 'Decision requested' })).toBeTruthy();
+  expect(client.calls).toContain(`getReviews:${runId}:wi-001`);
 });

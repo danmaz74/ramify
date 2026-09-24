@@ -1,6 +1,6 @@
 # Plan 12 contract appendix
 
-**Status:** fixed by iteration 1, 2026-09-24; renames, signal fields and module attribution implemented by iteration 4b; the scenario witness by iteration 6 (§7.1). **Owner of each part:** named in its section.
+**Status:** fixed by iteration 1, 2026-09-24; renames, signal fields and module attribution implemented by iteration 4b; the scenario witness by iteration 6 (§7.1); the public wire and commands by iteration 7 (§8.1). **Owner of each part:** named in its section.
 
 This appendix makes the [plan's](main-plan.md) contracts table exact before
 producers depend on it. Section 1 is implemented by the pure
@@ -1107,6 +1107,28 @@ waive of a CheckFinding with a pending user decision also answers nothing and
 is refused as `awaiting-user-decision`. No other CheckFinding command
 exists; there is no generic mark-resolved.
 
+### 8.1 The implemented wire (iteration 7)
+
+The exact Zod is
+[`interfaces/protocol/check-findings.ts`](../../../subs/harness/src/interfaces/protocol/check-findings.ts),
+exposed `tagged [browser]` and re-exposed by the root with every name it
+exports; the projections are `src/projections/check-findings.ts`, the
+command mapping and authority rules `src/check-findings/user-commands.ts`.
+It keeps §8's shape, with these decisions:
+
+| Part | As implemented |
+| --- | --- |
+| Paths | `protocolPaths.runCheckFindings(planId, runId, { version?, workItem?, module?, select?, order?, after?, limit? })`, `runCheckFindingModules(planId, runId, version?)`, `runCheckFinding(planId, runId, id, version?)`, `runReviews(planId, runId, { version?, workItem?, after?, limit? })`; the query type `CheckFindingPathQuery` is exported from `paths.ts`. `version` is optional; given and not the run's, the answer is `stale-version` 409 with `currentVersion` (`ProjectionError` gained that code). Limits 1–100, default 50; an unknown `select`, `order`, `after` or a malformed count is `invalid-request`; a detail ID that is no CheckFinding is `not-found`. |
+| Select | `attention` (open), `reported` (open, and settled ones whose latest decision since the last reopening was reported as a material choice) and `all`. The wire default is `attention`; the web asks for `reported` by default and `all` behind its toggle. The page cursor is a position in the order, as the child's. |
+| List | Adds `query { workItem, module, select, order }`. `counts` is `{ total, open, deferred, closed, fixed, waived, superseded, unresolved, awaitingUser }` over every CheckFinding of the owner and module, whatever the page shows. `coverage` is the work item's when one is named, else the run's. |
+| Summary | §8's fields, with `obligation` (`<subject>@<revision>` for a check), `latestReview`, `userCommands` (`respond`, `waive`, `revoke`: what the harness would accept from a person now; none once the run has ended), a structured `pendingUserDecision { request, by, rationale, conflicts, options }` instead of its ID, and `settlement` in place of `waiver`: a union of `fixed-by-check` (with the witness), `fixed-by-assessment`, `superseded`, `waived` (actor, reason, accepted risk, uncertainty) and `deferred` (reason, revisit), null while open. Actors are `{ kind: agent, role, invocation } \| { kind: user, name } \| { kind: harness, reason }`. |
+| Unresolved | The reason `work-item-completed` named for an open signal of that work item; an open signal of a completed work item that it did not name, opened or reopened afterwards, is `raised-after-last-round`. `latestReview` marks an unresolved signal of non-low risk that is `raised-after-last-round` or whose first report came from a review of its work item's latest reviewed iteration. |
+| Detail | The summary, reports and decisions (latest 200 each, with totals) as wire views, the current relations, `attempts` (per report: review attempt and request, iteration, gate, reviewer session and invocation, and the candidate diff `{ base, commit, tree }`; a gate's audited commit for a check) and `repairs` (per `plan-repair` or `claim-repair`: the reconciliation, the correction iteration its `corrects` or `change` names, and that iteration's sessions). |
+| Module counts | As §8, rows sorted by module path. |
+| Reviews | `reviewListResponseSchema`: `protocol, runId, version, coverage, workItem, total, shown, next, requests`; each request with its base and candidate commit, the settling result or null while pending, and each attempt's state, sessions, requested and actual start, result and reason, inspected, missing and concern counts and CheckFindings. Coverage is `records-unreadable` when a review record the log holds fails its schema. |
+| Commands | The three schemas of §8, in `runCommandSchema`. Each is decided in `commitCheckFindingChange`'s `build` under the run mutex: the run's version (rule 3, `stale-version`), then the CheckFinding (`not-found`), its revision (`conflict`, evidence `cf-0001 is at revision N`), a request that is no longer pending (`conflict`) and authority (the user may waive any signal and revoke any waiver; `mayRevoke` needs a rank at least the waiver's actor's). The child command is `dispose` with actor `user { name: responder }`, the latest report's source, rationale the note or reason, evidence `{ kind: user-command, ref: commandId }`, quiet communication: `answer-user-decision`, `waive { authority: { user-decision, commandId }, acceptedRisk: current risk }` or `revoke-waiver`. A child refusal is `conflict`, or `invalid-request` for an unknown option; an ended run is `conflict`. |
+| Durable acceptance | The line is `check-findings-recorded` with the new cause `{ kind: 'user-command', command: AcceptedCommand }`; its sequence is the receipt's. Recovery remembers these commands like `stop-requested`, so a retry after a restart returns the original receipt. `user-response` remains for the service's own callers. |
+
 ## 9. The worked stream
 
 `src/tests/fixtures/stream.ts` in the child. One work item `wi-001`; trees
@@ -1233,7 +1255,7 @@ the agent's own judgment.
 | judgment `ground` | the reviewer's own reference, validated as a candidate path it read; the hash is the candidate's |
 | `credibility` | the harness's classification of the ground's provenance, §3.4; `objective` for a check producer |
 | `modules` | `ownerOf` over the report's locations against the module index at the report's own tree, else the work item's module |
-| waive and revoke authority | the harness: a local architect's `modules` must all be its work item's module or included children; the global architect and the user cover every module; a revocation needs a rank at least the waiver actor's, user above global architect above local architect above harness |
+| waive and revoke authority | the harness: a local architect's `modules` must all be its work item's module or included children; the global architect and the user cover every module; a revocation needs a rank at least the waiver actor's, user above global architect above local architect above harness (`mayWaive`, `mayRevoke`, iteration 7) |
 | `authority` | the reconciliation being assessed, the answered user request or command, or a named governing record |
 | `expectedRevision`, relation revisions | the captured reconciliation basis or the command's expected revision |
 | `repair` | the reconciliation intent or the committed assignment ID |

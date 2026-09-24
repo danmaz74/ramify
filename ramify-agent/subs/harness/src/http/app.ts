@@ -2,6 +2,10 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { z } from 'zod';
+import {
+  checkFindingDetailSchema, checkFindingListResponseSchema, checkFindingModuleCountsSchema, checkFindingOrderSchema,
+  checkFindingSelectSchema, checkFindingWireIdSchema, checkFindingWireLimits, reviewListResponseSchema,
+} from '../interfaces/protocol/check-findings.js';
 import { errorHttpStatus, errorResponseSchema, type ErrorCode } from '../interfaces/protocol/errors.js';
 import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
 import { executionCapabilityDetailSchema, executionMapPageSchema, executionScenarioDetailSchema } from '../interfaces/protocol/execution-map.js';
@@ -56,6 +60,7 @@ type PlanRequest = Request<{ planId: string }>;
 type RunRequest = Request<{ planId: string; runId: string }>;
 type WorkItemRequest = Request<{ planId: string; runId: string; workItem: string }>;
 type GateRequest = Request<{ planId: string; runId: string; gate: string }>;
+type CheckFindingRequest = Request<{ planId: string; runId: string; checkFinding: string }>;
 type ExecutionCapabilityRequest = Request<{ planId: string; runId: string; capability: string }>;
 type ExecutionScenarioRequest = Request<{ planId: string; runId: string; scenario: string }>;
 type RunSessionRequest = Request<{ planId: string; runId: string; session: string }>;
@@ -185,6 +190,43 @@ export function createApp(options: AppOptions): express.Express {
       send(response, executionScenarioDetailSchema, detail);
     });
 
+  // CheckFindings and reviews: bounded, versioned, with the run's review coverage.
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/check-findings`, async (request: RunRequest, response) => {
+    const version = optionalCounter(request.query['version'], 'version');
+    const query = {
+      workItem: optionalText(request.query['workItem'], 'workItem'),
+      module: optionalText(request.query['module'], 'module'),
+      select: enumerated(checkFindingSelectSchema, request.query['select'], 'select') ?? 'attention',
+      order: enumerated(checkFindingOrderSchema, request.query['order'], 'order') ?? 'attention',
+      after: optionalCheckFinding(request.query['after'], 'after'),
+      limit: bounded(request.query['limit'], 'limit', checkFindingWireLimits.maxLimit) ?? checkFindingWireLimits.defaultLimit,
+    };
+    send(response, checkFindingListResponseSchema, await projected(() => queries.checkFindings(request.params.planId, request.params.runId, query, version)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/check-findings/modules`, async (request: RunRequest, response) => {
+    const version = optionalCounter(request.query['version'], 'version');
+    send(response, checkFindingModuleCountsSchema, await projected(() => queries.checkFindingModules(request.params.planId, request.params.runId, version)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/check-findings/:checkFinding`, async (request: CheckFindingRequest, response) => {
+    const version = optionalCounter(request.query['version'], 'version');
+    const { planId, runId, checkFinding } = request.params;
+    if (!checkFindingWireIdSchema.safeParse(checkFinding).success) throw new ProtocolFailure('not-found', `Run ${runId} has no CheckFinding ${checkFinding}`);
+    send(response, checkFindingDetailSchema, await projected(() => queries.checkFinding(planId, runId, checkFinding, version)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/reviews`, async (request: RunRequest, response) => {
+    const version = optionalCounter(request.query['version'], 'version');
+    const query = {
+      workItem: optionalText(request.query['workItem'], 'workItem'),
+      after: optionalText(request.query['after'], 'after'),
+      limit: bounded(request.query['limit'], 'limit', checkFindingWireLimits.maxLimit) ?? checkFindingWireLimits.defaultLimit,
+    };
+    send(response, reviewListResponseSchema, await projected(() => queries.reviews(request.params.planId, request.params.runId, query, version)));
+  });
+
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/gates/:gate`, async (request: GateRequest, response) => {
     send(response, gateResponseSchema, await projected(() => queries.gate(request.params.planId, request.params.runId, request.params.gate)));
   });
@@ -262,7 +304,7 @@ export function createApp(options: AppOptions): express.Express {
       const receipt = await runs.execute(parsed.data);
       send(response.status(202), commandResponseSchema, { receipt });
     } catch (error) {
-      if (error instanceof CommandRejection) throw new ProtocolFailure(error.code, error.message, error.currentVersion);
+      if (error instanceof CommandRejection) throw new ProtocolFailure(error.code, error.message, error.currentVersion, error.evidence);
       throw error;
     }
   });
@@ -314,6 +356,39 @@ function requiredCounter(value: unknown, name: string): number {
   return counter(value, name);
 }
 
+function optionalCounter(value: unknown, name: string): number | undefined {
+  return value === undefined ? undefined : counter(value, name);
+}
+
+/** A count from 1 to `maximum`, or undefined when the query leaves it out. */
+function bounded(value: unknown, name: string, maximum: number): number | undefined {
+  if (value === undefined) return undefined;
+  const given = counter(value, name);
+  if (given < 1 || given > maximum) throw new ProtocolFailure('invalid-request', `"${name}" must be from 1 to ${maximum}`);
+  return given;
+}
+
+/** A non-empty text field of at most 500 characters, or null when the query leaves it out. */
+function optionalText(value: unknown, name: string): string | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'string' || value.length === 0 || value.length > 500) throw new ProtocolFailure('invalid-request', `"${name}" must be one non-empty value`);
+  return value;
+}
+
+function optionalCheckFinding(value: unknown, name: string): string | null {
+  const given = optionalText(value, name);
+  if (given !== null && !checkFindingWireIdSchema.safeParse(given).success) throw new ProtocolFailure('invalid-request', `"${name}" must name a CheckFinding, cf-0001`);
+  return given;
+}
+
+/** One value of an enumeration, or undefined when the query leaves it out. */
+function enumerated<T extends string>(schema: z.ZodType<T>, value: unknown, name: string): T | undefined {
+  if (value === undefined) return undefined;
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new ProtocolFailure('invalid-request', `"${name}" is not one of its values`);
+  return parsed.data;
+}
+
 /** A poll's cursors: `<session>:<after>`, comma-separated, each session once, at most 50. */
 function sessionCursors(value: unknown): SessionCursor[] {
   if (value === undefined || value === '') return [];
@@ -342,7 +417,7 @@ async function projected<T>(query: () => Promise<T>): Promise<T> {
   try {
     return await query();
   } catch (error) {
-    if (error instanceof ProjectionError) throw new ProtocolFailure(error.code, error.message, undefined, error.evidence);
+    if (error instanceof ProjectionError) throw new ProtocolFailure(error.code, error.message, error.currentVersion, error.evidence);
     if (error instanceof ExecutionPageError) throw new ProtocolFailure(error.code, error.message, error.currentVersion);
     throw error;
   }

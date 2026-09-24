@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { commandIdSchema } from '../interfaces/protocol/jobs.js';
+import { acceptedCommandSchema, commandIdSchema } from '../interfaces/protocol/jobs.js';
 import {
   checkFindingDecisionSchema, checkFindingEventSchema, checkFindingIdSchema, checkFindingRelationSchema, checkFindingReportSchema,
   type CheckFindingEvent,
@@ -25,11 +25,15 @@ export const checkFindingEventsField = z.array(checkFindingEventSchema).max(maxi
 /**
  * Why a `check-findings-recorded` line was written: every path that has no
  * run event of its own, such as recovery, a user's answer or a factual
- * promotion outside a gate.
+ * promotion outside a gate. `user-command` holds the accepted protocol
+ * command of a person's answer, waiver or revocation, so a retry after a
+ * restart receives its original receipt; `user-response` names a response
+ * recorded by the service's own callers.
  */
 export const checkFindingCauseSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('recovery'), detail: text }).strict(),
   z.object({ kind: z.literal('user-response'), command: commandIdSchema }).strict(),
+  z.object({ kind: z.literal('user-command'), command: acceptedCommandSchema }).strict(),
   z.object({ kind: z.literal('producer'), producer: text, attempt: text }).strict(),
 ]);
 export type CheckFindingCause = z.infer<typeof checkFindingCauseSchema>;

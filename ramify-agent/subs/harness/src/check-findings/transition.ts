@@ -68,7 +68,8 @@ export interface CheckFindingPlan {
 /**
  * Validates the captured basis against the log as it stands and returns the
  * plan, or why the basis no longer holds. Called under the mutex; it reads
- * and decides, and never performs slow work.
+ * and decides, and never performs slow work. A build that throws appends
+ * nothing, and its error reaches the caller, as a refused command's does.
  */
 export type CheckFindingBuild = (basis: CheckFindingBasis) => CheckFindingPlan | { readonly stale: string };
 

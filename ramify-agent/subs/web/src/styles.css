@@ -673,3 +673,35 @@ button.link[aria-pressed='true'] { font-weight: 700; }
   .transcript-window-panel .transcript-window-body { overflow: auto; }
   .session-reading-compact .transcript { height: 55vh; }
 }
+
+/* CheckFindings beside their work item. A risk is a label; a decision
+ * request is a framed question; each settlement reads apart from the rest. */
+.check-findings { margin-top: 0.8rem; border-top: 1px solid var(--line); }
+.review-coverage { margin: 0.2rem 0 0.5rem; }
+.review-coverage-complete { color: var(--good); }
+.review-coverage-partial, .review-coverage-pending { color: var(--warn); }
+.review-coverage-unavailable { color: var(--bad); }
+.review-attempt { display: block; font-size: 0.85rem; }
+.check-finding-counts { font-size: 0.9rem; color: var(--muted); }
+.check-finding-cards { display: grid; gap: 0.6rem; }
+.check-finding p { margin: 0.2rem 0; }
+.check-finding-signal { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.check-finding-signal .badge { margin-left: 0; }
+.check-finding-signal .module-name { font-size: 0.8rem; color: var(--muted); }
+.badge.risk-high { background: #f6dcd9; color: var(--bad); }
+.badge.risk-medium { background: #f7ecd4; color: var(--warn); }
+.badge.risk-low { background: #eceff2; color: var(--muted); }
+.badge.required { background: #dde8f6; color: var(--accent); }
+.standing { font-weight: 600; }
+.standing-closed { color: var(--good); }
+.unresolved { color: var(--warn); }
+.unresolved-latest { border-left: 3px solid var(--bad); padding-left: 0.5rem; color: var(--bad); }
+.decision-request { border: 2px solid var(--accent); border-radius: 6px; padding: 0.4rem 0.7rem; margin: 0.4rem 0; background: #f2f6fc; }
+.decision-request blockquote { margin: 0.2rem 0 0; padding-left: 0.6rem; border-left: 3px solid var(--line); }
+.decision-request .option { display: block; margin: 0.2rem 0; }
+.decision-request fieldset, .reason-command fieldset { border: none; padding: 0; margin: 0.3rem 0; display: grid; gap: 0.3rem; }
+.material-choice { border-left: 3px solid var(--accent); padding-left: 0.5rem; }
+.settlement { border-left: 3px solid var(--good); padding-left: 0.5rem; }
+.settlement.waiver { border-left-color: var(--warn); }
+.check-finding-history { font-size: 0.9rem; border-top: 1px dashed var(--line); margin-top: 0.4rem; }
+.check-finding-history h4 { margin: 0.5rem 0 0.2rem; color: var(--muted); }

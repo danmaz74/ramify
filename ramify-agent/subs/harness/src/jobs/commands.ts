@@ -27,7 +27,13 @@ export interface CommandLike {
 
 /** A command the harness refused, with the protocol's error code. */
 export class CommandRejection extends Error {
-  constructor(readonly code: ErrorCode, message: string, readonly currentVersion?: number) {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+    readonly currentVersion?: number,
+    /** What establishes the refusal, such as the current revision of the subject it named. */
+    readonly evidence?: readonly string[],
+  ) {
     super(message);
     this.name = 'CommandRejection';
   }

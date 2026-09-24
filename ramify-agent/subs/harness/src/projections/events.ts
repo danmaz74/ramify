@@ -219,7 +219,8 @@ function describe(event: RunEvent): [string, Ref[]] {
       const cause = event.data.cause;
       const why = cause.kind === 'recovery' ? `recovery: ${cause.detail}`
         : cause.kind === 'user-response' ? `a response, command ${cause.command}`
-          : `${cause.producer} attempt ${cause.attempt}`;
+          : cause.kind === 'user-command' ? `a person's command ${cause.command.commandId}`
+            : `${cause.producer} attempt ${cause.attempt}`;
       return [`${counted(event.data.checkFindings.length, 'CheckFinding event was', 'CheckFinding events were')} recorded (${why})`, []];
     }
     case 'review-request-recorded':

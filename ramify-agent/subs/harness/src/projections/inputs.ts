@@ -49,9 +49,11 @@ export interface CommittedRun {
 /** A query the projection cannot answer, with the protocol's code and the evidence for it. */
 export class ProjectionError extends Error {
   constructor(
-    readonly code: 'not-found' | 'unreadable' | 'unsupported-version' | 'invalid-request',
+    readonly code: 'not-found' | 'unreadable' | 'unsupported-version' | 'invalid-request' | 'stale-version',
     message: string,
     readonly evidence: readonly string[] = [],
+    /** The run's version, on a `stale-version` refusal of a query that named another. */
+    readonly currentVersion?: number,
   ) {
     super(message);
     this.name = 'ProjectionError';

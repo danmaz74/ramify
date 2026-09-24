@@ -46,13 +46,27 @@ run.
   dependency cycle, resolved or not), then state, current work, waits,
   counts, failure, the review and the event feed; the plan and entries,
   with the review of the scenarios; hypotheses as forecasts with standing
-  and revision beside the decisions; work items; the scenarios; checks with
+  and revision beside the decisions; work items, each with its reviews and
+  CheckFindings (`src/check-findings.tsx`); the scenarios; checks with
   bounded output tails and each scenario check's summary; capability
   progress; the run's sessions, each opening its transcript and each
   invocation its chapter; and the metrics with the evaluation evidence. The
   connection to the harness is shown apart from the run's state.
+  The overview also shows the unsettled CheckFindings of every module,
+  each opening that module's list.
   `src/run-progress.ts` reads the event page after a cursor, as Plan 1's page
   did, and reads each area again when the run's version moves.
+- `src/check-findings.tsx` shows a work item's review coverage and requests
+  (clean, complete with concerns, partial, not verified, pending, or
+  unavailable, which is never clean) and its CheckFindings in the harness's
+  order: open ones and reported material choices by default, settled ones
+  behind a toggle. Standing, a factual verification, a waiver with its
+  actor, a material choice, an unresolved reason with the latest review's
+  marker and a decision request are shown apart; a risk level is a label
+  and never a question. Each CheckFinding's history sits beside its
+  attempts, candidate diffs and repair sessions. The only actions are the
+  typed commands the harness names for a CheckFinding, sent against its
+  revision; the page decides no disposition.
 - Progress has two views, and only the selected one is mounted. By module,
   the default (`src/capability-module-tree.tsx`), draws the harness's
   module-capability comparison in the module-tree canvas Ramify packages as

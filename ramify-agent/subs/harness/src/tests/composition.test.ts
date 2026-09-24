@@ -182,6 +182,9 @@ describe('no query appends an event', () => {
         await queries.capabilities(plan, run.runId);
         await queries.scenarios(plan, run.runId);
         await queries.metrics(plan, run.runId);
+        await queries.checkFindings(plan, run.runId, { workItem: null, module: null, select: 'all', order: 'attention', after: null, limit: 100 });
+        await queries.checkFindingModules(plan, run.runId);
+        await queries.reviews(plan, run.runId, { workItem: null, after: null, limit: 100 });
         const page = await queries.events(plan, run.runId, 0);
         for (const gate of new Set(page.events.flatMap(event => event.refs.filter(ref => ref.kind === 'gate').map(ref => ref.id)))) {
           await queries.gate(plan, run.runId, gate);
@@ -297,6 +300,12 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   // Plan 12: CheckFindings committed through a driven run's own transition, and iteration reviews.
   { union: 'run log.type', values: ['check-findings-recorded'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  // Plan 12 iteration 7: a person's CheckFinding commands.
+  { union: 'command.type', values: ['respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-command'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['waive', 'revoke-waiver', 'answer-user-decision'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['user-decision'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
+  { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-response'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['recovery'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'a crash rebuilds CheckFindings and their record copies from the log, and a restart calls no agent' },
   { union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-opened'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.credibility', values: ['objective'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
@@ -529,10 +538,6 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
   {
-    union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-response'],
-    reason: "The cause of a user's answer to a pending CheckFinding decision, whose command Plan 12 iteration 7 adds; nothing records one yet.",
-  },
-  {
     union: 'run log[iteration-closed].data.checkFindings[].type', values: ['check-finding-related'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
@@ -553,7 +558,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
-    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'fix-by-assessment', 'supersede', 'waive', 'revoke-waiver', 'defer', 'request-user-decision', 'answer-user-decision', 'reopen', 'revise-obligation'],
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['claim-repair', 'fix-by-assessment', 'supersede', 'defer', 'request-user-decision', 'reopen', 'revise-obligation'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {
@@ -569,7 +574,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'A witness the child accepts executed its obligation completely and passed. The scenario adapter offers failed and inconclusive witnesses, and the child refuses them before anything reaches the log; the refusal stays a note on the gate\'s line (scenario-findings.test.ts).',
   },
   {
-    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['work-item-assessment', 'user-decision', 'governing-record'],
+    union: 'run log[iteration-closed].data.checkFindings[][check-finding-decided].data.decision.decision[waive].authority.kind', values: ['work-item-assessment', 'governing-record'],
     reason: "A CheckFinding event the check-findings child decides and the run log carries unchanged; the child's own tests produce every value. No harness path produces it yet: the reconciliation, the scenario witness and the user's answer that do are Plan 12 iterations 5 to 7.",
   },
   {

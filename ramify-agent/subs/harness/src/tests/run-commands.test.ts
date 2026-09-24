@@ -160,8 +160,15 @@ describe('the command schema', () => {
     }).success).toBe(false);
   });
 
-  test('the run serves start-run, Plan 1\'s stop-job and approve-analysis, and nothing else', () => {
-    expect(runCommandSchema.options.map(option => option.shape.type.value)).toEqual(['start-run', 'stop-job', 'approve-analysis']);
+  test('the run serves start-run, Plan 1\'s stop-job, approve-analysis and the three CheckFinding commands, and nothing else', () => {
+    expect(runCommandSchema.options.map(option => option.shape.type.value)).toEqual([
+      'start-run', 'stop-job', 'approve-analysis', 'respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver',
+    ]);
+    // There is no command that marks a CheckFinding resolved.
+    expect(runCommandSchema.safeParse({
+      commandId: 'c2', expectedVersion: 3, type: 'resolve-check-finding',
+      payload: { planId: 'review-notes', jobId: 'run-1', checkFinding: 'cf-0001', expectedRevision: 1, responder: 'dan' },
+    }).success).toBe(false);
     expect(runCommandSchema.safeParse({
       commandId: 'c1', expectedVersion: 0, type: 'start-mapping', payload: { planId: 'review-notes' },
     }).success).toBe(false);

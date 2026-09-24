@@ -38,6 +38,8 @@ import {
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { recordSettledSnapshot } from './mutations.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
+import { userCheckFindingChange, userRejectionCode } from '../check-findings/user-commands.js';
+import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import { canonicalJson } from '../jobs/commands.js';
 import {
   concernKey, reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas,
@@ -54,7 +56,7 @@ import {
   orientationJsonSchema, orientationSubmissionDescription, orientationToolName, reviewJsonSchema, reviewSubmissionDescription,
   reviewToolName, validateOrientation, validateReview,
 } from '../reviews/submission.js';
-import type { Receipt } from '../interfaces/protocol/jobs.js';
+import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
@@ -2071,6 +2073,7 @@ export class RunService {
         if (event.type === 'job-started' || event.type === 'stop-requested' || event.type === 'analysis-approved') {
           this.commands.remember(event.data.command);
         }
+        if (event.type === 'check-findings-recorded' && event.data.cause.kind === 'user-command') this.commands.remember(event.data.cause.command);
       }
     }
     return report;
@@ -2357,6 +2360,10 @@ export class RunService {
         case 'start-run': return this.start(command, admitted.contentHash);
         case 'stop-job': return this.stop(command, admitted.contentHash);
         case 'approve-analysis': return this.approve(command, admitted.contentHash);
+        case 'respond-to-check-finding':
+        case 'waive-check-finding':
+        case 'revoke-check-finding-waiver':
+          return this.checkFindingCommand(command, admitted.contentHash);
       }
     });
   }
@@ -2597,6 +2604,47 @@ export class RunService {
     });
     run.notify();
     return receipt;
+  }
+
+  /**
+   * A person's answer, waiver or revocation of one CheckFinding. Under the
+   * run's lock it expects the run's version and the CheckFinding's revision
+   * the person saw, validates the person's authority, and commits the one
+   * decision the child accepts on a `check-findings-recorded` line that holds
+   * the accepted command. A refusal appends nothing. A work item waiting for
+   * the answer reads the state again.
+   */
+  private async checkFindingCommand(command: CheckFindingUserCommand, contentHash: string): Promise<Receipt> {
+    const { planId, jobId } = command.payload;
+    const run = this.runs.get(key(planId, jobId));
+    if (!run) throw new CommandRejection('not-found', `No run ${jobId} for plan "${planId}"`);
+    const at = this.now();
+    let accepted: AcceptedCommand | undefined;
+    const committed = await commitCheckFindingChange(run, ({ log, state }) => {
+      this.commands.requireVersion(command, log.version);
+      const change = userCheckFindingChange(command, state.findings.get(command.payload.checkFinding));
+      if (!change.ok) throw new CommandRejection(change.code, change.message, undefined, change.evidence);
+      const receipt = this.commands.accept(command, contentHash, jobId, log.nextSequence, at);
+      accepted = receipt;
+      return {
+        commands: [change.command],
+        compose: decided => ({ event: { type: 'check-findings-recorded', data: { cause: { kind: 'user-command', command: receipt }, checkFindings: [...decided.events] } } }),
+      };
+    }, at);
+    if (committed.kind === 'refused') {
+      const { refusal } = committed;
+      if (refusal.reason === 'run-ended') throw new CommandRejection('conflict', `The run has ended; its CheckFindings accept no command. ${refusal.message}`);
+      if (refusal.reason === 'check-finding') {
+        const entry = checkFindingStateOf(run.log.ledger).findings.get(command.payload.checkFinding);
+        throw new CommandRejection(userRejectionCode(refusal.rejection), refusal.message, undefined,
+          entry === undefined ? [] : [`${entry.id} is at revision ${entry.revision}`]);
+      }
+      throw new CommandRejection('conflict', refusal.message);
+    }
+    if (committed.kind !== 'committed' || accepted === undefined) throw new CommandRejection('internal', 'The CheckFinding command committed nothing');
+    this.commands.remember(accepted);
+    run.notify();
+    return accepted.receipt;
   }
 
   // The run itself

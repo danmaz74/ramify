@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import {
+  respondToCheckFindingCommandSchema, revokeCheckFindingWaiverCommandSchema, waiveCheckFindingCommandSchema,
+} from './check-findings.js';
 import { moduleTreeResponseSchema, viewIdentitySchema } from './evidence.js';
 import { jobIdSchema, planIdSchema } from './ids.js';
 import { commandIdSchema, jobStateSchema, jobVersionSchema, stopJobCommandSchema } from './jobs.js';
@@ -80,9 +83,13 @@ export type ApproveAnalysisCommand = z.infer<typeof approveAnalysisCommandSchema
 /**
  * The commands a run serves. `stop-job` is Plan 1's, unchanged: a run is a
  * job, and it takes over that lifecycle of commands, receipts, versions and
- * stop.
+ * stop. The three CheckFinding commands are a person's answer, waiver and
+ * revocation, each against a CheckFinding's revision.
  */
-export const runCommandSchema = z.discriminatedUnion('type', [startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema]);
+export const runCommandSchema = z.discriminatedUnion('type', [
+  startRunCommandSchema, stopJobCommandSchema, approveAnalysisCommandSchema,
+  respondToCheckFindingCommandSchema, waiveCheckFindingCommandSchema, revokeCheckFindingWaiverCommandSchema,
+]);
 /** A command as the harness receives it, with every default applied. */
 export type RunCommand = z.infer<typeof runCommandSchema>;
 /** A command as a client may send it: a field with a default may be left out. */

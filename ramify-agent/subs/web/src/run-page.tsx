@@ -4,6 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
+import { ModuleCheckFindings, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
@@ -68,6 +69,7 @@ export function RunPage({ client, planId, runId, interval }: {
   const [moduleSelection, setModuleSelection] = useState<ModuleCapabilitySelection | null>(null);
   const version = run?.version;
   const props: AreaProps = { client, planId, runId, version };
+  const openGate = (gate: string) => { setGateSelection(gate); setArea('checks'); };
 
   return (
     <section className="page run-page">
@@ -87,10 +89,10 @@ export function RunPage({ client, planId, runId, interval }: {
           <button key={id} type="button" role="tab" aria-selected={area === id} className={area === id ? 'tab tab-selected' : 'tab'} onClick={() => setArea(id)}>{label}</button>
         ))}
       </nav>
-      {run && area === 'overview' && <Overview client={client} run={run} events={events} onApproved={refresh} />}
+      {run && area === 'overview' && <Overview client={client} run={run} events={events} onApproved={refresh} onOpenGate={openGate} />}
       {area === 'plan' && <PlanAndEntries {...props} run={run} onApproved={refresh} />}
       {area === 'decisions' && <HypothesesAndDecisions {...props} />}
-      {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} />}
+      {area === 'work' && <WorkItems {...props} selected={workItem} onSelect={setWorkItem} onOpenGate={openGate} />}
       {area === 'scenarios' && <Scenarios {...props} />}
       {area === 'checks' && <Checks {...props} events={events} selected={gateSelection} onSelect={setGateSelection} />}
       {area === 'progress' && (
@@ -98,7 +100,7 @@ export function RunPage({ client, planId, runId, interval }: {
           onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
       )}
       {area === 'sessions' && <RunSessions {...props} />}
-      {area === 'execution' && <ExecutionMapArea {...props} events={events} onOpenGate={gate => { setGateSelection(gate); setArea('checks'); }} />}
+      {area === 'execution' && <ExecutionMapArea {...props} events={events} onOpenGate={openGate} />}
       {area === 'measurements' && <Measurements {...props} />}
     </section>
   );
@@ -106,11 +108,12 @@ export function RunPage({ client, planId, runId, interval }: {
 
 // Overview
 
-function Overview({ client, run, events, onApproved }: {
+function Overview({ client, run, events, onApproved, onOpenGate }: {
   readonly client: ProtocolClient;
   readonly run: RunSnapshot;
   readonly events: readonly ProjectedRunEvent[];
   readonly onApproved: () => void;
+  readonly onOpenGate: (gate: string) => void;
 }) {
   const [stop, setStop] = useState<{ status: 'idle' | 'sending' | 'sent' } | { status: 'failed'; message: string }>({ status: 'idle' });
   const stopRun = async () => {
@@ -165,6 +168,7 @@ function Overview({ client, run, events, onApproved }: {
         )}
       </section>
       <ReviewPanel client={client} run={run} onApproved={onApproved} />
+      <ModuleCheckFindings client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />
       <section className="panel" aria-labelledby="events-heading">
         <h2 id="events-heading">Events</h2>
         <ol className="feed" aria-label="Run events">
@@ -431,9 +435,10 @@ function Decision({ decision }: { readonly decision: DecisionView }) {
 
 // Work items
 
-function WorkItems({ client, planId, runId, version, selected, onSelect: setSelected }: AreaProps & {
+function WorkItems({ client, planId, runId, version, selected, onSelect: setSelected, onOpenGate }: AreaProps & {
   readonly selected: string | undefined;
   readonly onSelect: (workItem: string) => void;
+  readonly onOpenGate: (gate: string) => void;
 }) {
   const list = useRunQuery(`work-items:${runId}`, version, () => client.getWorkItems(planId, runId));
   return (
@@ -452,12 +457,12 @@ function WorkItems({ client, planId, runId, version, selected, onSelect: setSele
           </ul>
         )}
       </Loading>
-      {selected && <WorkItemDetail client={client} planId={planId} runId={runId} version={version} workItem={selected} />}
+      {selected && <WorkItemDetail client={client} planId={planId} runId={runId} version={version} workItem={selected} onOpenGate={onOpenGate} />}
     </div>
   );
 }
 
-function WorkItemDetail({ client, planId, runId, version, workItem }: AreaProps & { readonly workItem: string }) {
+function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }: AreaProps & { readonly workItem: string; readonly onOpenGate: (gate: string) => void }) {
   const state = useRunQuery(`work-item:${runId}:${workItem}`, version, () => client.getWorkItem(planId, runId, workItem));
   return (
     <section className="panel" aria-label={`Work item ${workItem}`}>
@@ -506,6 +511,7 @@ function WorkItemDetail({ client, planId, runId, version, workItem }: AreaProps 
                 <ul>{data.requests.map(request => <li key={request.id}>{request.id}: {request.question} → {request.decision ?? 'no decision yet'}</li>)}</ul>
               </>
             )}
+            <WorkItemCheckFindings client={client} planId={planId} runId={runId} version={version} workItem={workItem} onOpenGate={onOpenGate} />
           </>
         )}
       </Loading>

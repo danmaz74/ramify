@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptedAgent, ScriptStep } from '../../subs/agent/src/scripted.js';
 import type { CheckFindingSummary } from '../../subs/check-findings/src/interfaces/check-findings.js';
+import { CommandRejection } from '../jobs/commands.js';
 import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { reduceSessions } from '../run/sessions.js';
@@ -406,15 +407,18 @@ describe('CF12: a strong authority conflict asks the user, with exact references
     expect(before.slice(assessedAt).some(event => event.type === 'gate-attempted' || event.type === 'work-item-completed')).toBe(false);
     expect(before[assessedAt]).toMatchObject({ data: { next: 'await-user' } });
 
-    // A person answers; the next round assesses the answer and settles it.
-    const answered = await service.recordCheckFindings(plan, runId, {
-      cause: { kind: 'user-response', command: 'answer-1' },
-      commands: [dispose('cf-0001', waiting.summary.revision, decision(
-        { action: 'answer-user-decision', request: waiting.summary.pendingUserDecision!, option: 'one-note' },
-        { actor: { kind: 'user', name: 'reviewer' } },
-      ))],
+    // A person answers through the protocol's command; the next round assesses the answer and settles it.
+    // A reader may still append while the person answers; the answer is sent again at the version its refusal names.
+    const answer = (expectedVersion: number) => service.execute({
+      commandId: `answer-${expectedVersion}`, expectedVersion, type: 'respond-to-check-finding',
+      payload: { planId: plan, jobId: runId, checkFinding: 'cf-0001', expectedRevision: waiting.summary.revision, request: waiting.summary.pendingUserDecision!, option: 'one-note', responder: 'reviewer' },
     });
-    expect(answered?.kind).toBe('committed');
+    const receipt = await answer(service.getRun(plan, runId)!.version).catch((error: unknown) => {
+      if (error instanceof CommandRejection && error.code === 'stale-version' && error.currentVersion !== undefined) return answer(error.currentVersion);
+      throw error;
+    });
+    expect((await runEventsOnDisk(root, plan, runId)).find(event => event.sequence === receipt.sequence))
+      .toMatchObject({ type: 'check-findings-recorded', data: { cause: { kind: 'user-command', command: { commandId: receipt.commandId } } } });
     await service.settled(plan, runId);
     const events = await runEventsOnDisk(root, plan, runId);
     expect(onlyRun(service, plan).state).toBe('completed');
