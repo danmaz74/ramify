@@ -15,6 +15,10 @@ import {
   scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
 } from '../../subs/scenarios/src/states.js';
 import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/src/ledger.js';
+import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
+import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
+import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
+import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
 
 /*
  * The run log, `events.jsonl`: state transitions only, and the canonical
@@ -25,6 +29,12 @@ import { LedgerCorruptError, openLedger, type Ledger } from '../../subs/ledger/s
  *
  * Observations are not here. Each invocation has its own observation log,
  * which no state derives from.
+ *
+ * CheckFindings are here, carried: a run event that commits CheckFinding
+ * events holds them, in order, in its `checkFindings` array, and their state
+ * is replayed from those arrays alone. Only the CheckFinding transition
+ * builds such an event, so every carried event was decided by the
+ * `check-findings` child against the log it follows.
  */
 
 const eventBase = {
@@ -454,6 +464,15 @@ export const runEventSchema = z.discriminatedUnion('type', [
     next: text,
     committing: z.boolean().optional(),
   }).strict()),
+  /**
+   * CheckFinding events committed by a path with no run event of its own:
+   * recovery, a user's answer, or a producer outside a gate. The cause names
+   * which.
+   */
+  event('check-findings-recorded', z.object({
+    cause: checkFindingCauseSchema,
+    checkFindings: checkFindingEventsField.min(1),
+  }).strict()),
   event('stop-requested', z.object({ command: acceptedCommandSchema }).strict()),
   /** Requires a passing `final` gate on the current tree; an empty queue alone never satisfies it. */
   event('job-completed', z.object({ gate: text, commit: z.string().nullable(), workItems: z.int().nonnegative() }).strict()),
@@ -482,6 +501,17 @@ function mayFollow(ended: RunEvent, type: RunEventType): boolean {
 /** An event to append: its type and data. The log assigns the sequence and time. */
 export type RunEventInput = { [T in RunEventType]: { readonly type: T; readonly data: RunEventOf<T>['data'] } }[RunEventType];
 
+/** The run event types that carry CheckFinding events in their `checkFindings` array. */
+export type CheckFindingCarrierType = {
+  [T in RunEventType]: 'checkFindings' extends keyof RunEventOf<T>['data'] ? T : never
+}[RunEventType];
+
+/** The CheckFinding events one run event carries, in order; none for any other event. */
+export function carriedCheckFindings(event: Pick<RunEvent, 'data'> | RunEventInput): readonly CheckFindingEvent[] {
+  const data = event.data as { readonly checkFindings?: readonly CheckFindingEvent[] };
+  return data.checkFindings ?? [];
+}
+
 /** A log line that is not a valid event in sequence. */
 export class CorruptRunLogError extends Error {
   constructor(path: string, line: number, reason: string) {
@@ -507,10 +537,15 @@ export class RunLog {
     readonly ledger: Ledger<RunEvent>,
   ) {}
 
-  static async open(path: string, runId: string): Promise<RunLog> {
+  /**
+   * Opens and validates the log: sequence, run, terminal order, and that the
+   * carried CheckFinding events replay. `fs` is the ledger's file system
+   * seam, for a test that fails one of its operations.
+   */
+  static async open(path: string, runId: string, fs?: LedgerFileSystem): Promise<RunLog> {
     let ledger: Ledger<RunEvent>;
     try {
-      ledger = await openLedger({ logPath: path, recordsRoot: dirname(path), eventSchema: runEventSchema });
+      ledger = await openLedger({ logPath: path, recordsRoot: dirname(path), eventSchema: runEventSchema, ...(fs === undefined ? {} : { fs }) });
     } catch (error) {
       if (error instanceof LedgerCorruptError) throw new CorruptRunLogError(error.path, error.line, error.reason);
       throw error;
@@ -522,6 +557,14 @@ export class RunLog {
       const ended = terminalOf(events.slice(0, index));
       if (ended && !mayFollow(ended, current.type)) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
     });
+    const carriers = events.filter(current => carriedCheckFindings(current).length > 0);
+    const replayed = replayCheckFindingEvents(carriers.flatMap(carriedCheckFindings));
+    if (!replayed.ok) {
+      // Name the line that carries the refused event.
+      let remaining = replayed.event;
+      const line = carriers.find(current => (remaining -= carriedCheckFindings(current).length) < 0);
+      throw new CorruptRunLogError(path, line?.sequence ?? 0, `its CheckFinding events do not replay: ${replayed.rejection.message}`);
+    }
     return new RunLog(path, runId, ledger);
   }
 
@@ -571,8 +614,24 @@ export class RunLog {
     return current;
   }
 
-  /** The event a caller is about to commit with its records, refused after a terminal event. */
+  /**
+   * The event a caller is about to commit with its records, refused after a
+   * terminal event. It carries no CheckFinding event: those are decided by
+   * the CheckFinding transition, which builds its event with `carrier`.
+   */
   next(input: RunEventInput, at: Date = new Date()): RunEvent {
+    if (carriedCheckFindings(input).length > 0) {
+      throw new Error(`Run ${this.runId}: ${input.type} carries CheckFinding events, which only the CheckFinding transition commits`);
+    }
+    return this.carrier(input, at);
+  }
+
+  /**
+   * The event that carries decided CheckFinding events, refused after a
+   * terminal event. Only `check-findings/transition.ts` calls it, under the
+   * run mutex, with the events the child decided against this log.
+   */
+  carrier(input: RunEventInput, at: Date = new Date()): RunEvent {
     const ended = this.terminal;
     if (ended && !mayFollow(ended, input.type)) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
     return runEvent(this.runId, this.nextSequence, input, at);

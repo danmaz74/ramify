@@ -4,7 +4,8 @@
 
 This appendix makes the [plan's](main-plan.md) contracts table exact before
 producers depend on it. Section 1 is implemented by the pure
-`harness/check-findings` child and its tests; sections 2–8 specify harness
+`harness/check-findings` child and its tests, section 2 by the harness's
+`src/check-findings/` integration (iteration 2); sections 3–8 specify harness
 contracts that later iterations implement. The
 [architecture](../../architecture/check-findings.md) and the
 [principles](../../check-findings.principles.md) keep their authority; where
@@ -188,10 +189,12 @@ latest source, report and decision counts, group, pending user decision,
 repair, and the latest material choice since the last reopening. A detail
 adds the bounded histories and every current relation naming it.
 
-## 2. Ledger composition (iteration 2)
+## 2. Ledger composition (iteration 2, implemented)
 
-**Owner:** harness `run/log.ts`, `run/records.ts`, a new `check-findings/`
-integration folder. CheckFinding state is replayed only from the run log.
+**Owner:** harness `run/log.ts` and the integration folder
+[`src/check-findings/`](../../../subs/harness/src/check-findings/)
+(`records.ts`, `report.ts`, `state.ts`, `transition.ts`). CheckFinding state
+is replayed only from the run log.
 
 ### 2.1 Carrier events
 
@@ -230,7 +233,7 @@ same transaction, for readers; replay never reads these files.
 
 | Record | Path under the run directory | Schema literal | Ledger `id`, `revision` |
 | --- | --- | --- | --- |
-| Report | `check-findings/<cf>/reports/<cfr>.json` | `ramify-agent.check-finding-report/1` | `cfr`, 1 |
+| Report | `check-findings/<cf>/reports/<cfr>.json` | `ramify-agent.check-finding-report/1` (body: report plus `checkFinding` and `revision`) | `cfr`, 1 |
 | Decision | `check-findings/<cf>/decisions/<cfd>.json` | `ramify-agent.check-finding-decision/1` (body: decision plus `checkFinding` and `revision`) | `cfd`, 1 |
 | Relation | `check-findings/relations/<cfl>.json` | `ramify-agent.check-finding-relation/1` | `cfl`, 1 |
 
@@ -255,6 +258,62 @@ as an invalid submission before anything is appended.
 
 Direct ledger paths that change the same basis (gate attempts, iteration
 closures, work-item completion) take the same mutex.
+
+### 2.4 The implemented interface
+
+`RunLog.next` and `RunLog.append` refuse an input whose `checkFindings` is
+non-empty; only the transition builds a carrier, with `RunLog.carrier`.
+`RunLog.open` replays every carried event and refuses a log whose events do
+not replay (`CorruptRunLogError` naming the carrier's line), so a run is
+never served with a history the child would not accept.
+
+```ts
+// src/check-findings/transition.ts
+interface CheckFindingTarget { readonly mutex: Mutex; readonly log: RunLog }       // the service's Run is one
+type CheckFindingBuild = (basis: { log: RunLog; state: CheckFindingState }) =>
+  | { commands: readonly CheckFindingCommand[]; compose: (decided: CheckFindingDecided) => { event: CheckFindingCarrierInput; records?: CommitRecord[] } }
+  | { stale: string };
+interface CheckFindingDecided { events: CheckFindingEvent[]; outcomes: { touched: CheckFindingId[]; replayed: boolean }[] } // one outcome per command
+function commitCheckFindingChange(target, build, at?): Promise<
+  | { kind: 'committed'; event: RunEvent; decided }
+  | { kind: 'replayed'; decided }
+  | { kind: 'refused'; refusal: { reason: 'run-ended' | 'stale-basis' | 'check-finding' | 'partial-replay' | 'too-many-events' | 'too-large'; message; command?; rejection? } }>;
+function decideCheckFindingTransaction(log, build, at?): /* the same, without appending; for a caller that already holds the mutex, such as a ledger effect's completion */;
+
+// src/check-findings/report.ts
+type BoundReport = Omit<CheckFindingReportInput, 'contentHash'>;
+function checkFindingContentHash(report): string;   // §1.4 rule 2
+function reportCommand(report: BoundReport): { type: 'report'; report: CheckFindingReportInput };
+
+// src/check-findings/state.ts
+function checkFindingStateOf(ledger): CheckFindingState;          // replayed once per process, then advanced line by line
+function replayCheckFindingState(entries): CheckFindingState;     // from the empty state
+
+// RunService
+recordCheckFindings(planId, runId, { cause, commands }): Promise<CheckFindingCommit | undefined>; // a check-findings-recorded line
+checkFindings(planId, runId, query): CheckFindingSelection | undefined;                          // the child's selection
+```
+
+Rules the transition adds to §2.3:
+
+- `build` runs under the mutex, reads only the log and the state, and
+  returns `stale` when what the slow work captured no longer holds. It never
+  performs slow work.
+- Commands are decided in order, each against the state the earlier ones
+  leave; the first refusal refuses the transition (`check-finding` with the
+  0-based `command` and the child's rejection).
+- When every command is an exact report replay the result is `replayed` and
+  nothing is appended. When only some are, the transition is refused as
+  `partial-replay`: one line never commits half of an earlier one.
+- A report is idempotent by its ingestion key. A decision is not: a
+  redelivered decision meets `stale-revision`, because it names the revision
+  it was decided at. A carrier that must be idempotent by a key of its own,
+  such as a review attempt or a reconciliation, checks the log for that key
+  in `build`.
+- `compose` must carry exactly the decided events; the transition adds a
+  record copy of each after the carrier's own records. More than 100 events
+  are refused as `too-many-events`; a line over the ledger's 8 MiB bound is
+  refused as `too-large` before any byte is written.
 
 ## 3. Review requests and attempts (iterations 3–4)
 

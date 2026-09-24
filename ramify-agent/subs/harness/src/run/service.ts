@@ -13,6 +13,13 @@ import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
+import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
+import type {
+  CheckFindingCommand, CheckFindingQueryInput, CheckFindingSelection,
+} from '../../subs/check-findings/src/interfaces/check-findings.js';
+import type { CheckFindingCause } from '../check-findings/records.js';
+import { checkFindingStateOf } from '../check-findings/state.js';
+import { commitCheckFindingChange, type CheckFindingBuild, type CheckFindingCommit } from '../check-findings/transition.js';
 import { recordSettledSnapshot } from './mutations.js';
 import type { Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
@@ -774,6 +781,44 @@ export class RunService {
   committed(planId: string, runId: string) {
     const run = this.runs.get(key(planId, runId));
     return run && { record: run.record, directory: run.directory, entries: run.log.ledger.replay() };
+  }
+
+  /**
+   * Commits CheckFinding commands on a path with no run event of its own,
+   * such as recovery or a user's answer, as one `check-findings-recorded`
+   * line under the run mutex. An exact redelivery appends nothing; a
+   * refusal appends nothing and says why. Undefined for an unknown run.
+   */
+  async recordCheckFindings(
+    planId: string,
+    runId: string,
+    change: { readonly cause: CheckFindingCause; readonly commands: readonly CheckFindingCommand[] },
+  ): Promise<CheckFindingCommit | undefined> {
+    const run = this.runs.get(key(planId, runId));
+    if (run === undefined) return undefined;
+    return await this.commitCheckFindings(run, () => ({
+      commands: change.commands,
+      compose: decided => ({ event: { type: 'check-findings-recorded', data: { cause: change.cause, checkFindings: [...decided.events] } } }),
+    }));
+  }
+
+  /**
+   * The run's CheckFindings, as the child selects them from the state
+   * replayed from its log: a bounded list or one detail. Undefined for an
+   * unknown run.
+   */
+  checkFindings(planId: string, runId: string, query: CheckFindingQueryInput): CheckFindingSelection | undefined {
+    const run = this.runs.get(key(planId, runId));
+    return run && selectCheckFindings(checkFindingStateOf(run.log.ledger), query);
+  }
+
+  /**
+   * The one CheckFinding transition of a run, for every producer and
+   * decision path: see `check-findings/transition.ts`. Slow work is done
+   * before it; `build` validates what that work captured under the mutex.
+   */
+  private async commitCheckFindings(run: Run, build: CheckFindingBuild): Promise<CheckFindingCommit> {
+    return await commitCheckFindingChange(run, build, this.now());
   }
 
   /** The runs of one plan, newest first, as `committed` answers each. */

@@ -206,6 +206,14 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-attempted':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.verdict}, next ${event.data.next}`, ref('gate', event.data.gate)];
+    case 'check-findings-recorded': {
+      // CheckFindings have no reference kind on the wire yet; the page names the count and the cause.
+      const cause = event.data.cause;
+      const why = cause.kind === 'recovery' ? `recovery: ${cause.detail}`
+        : cause.kind === 'user-response' ? `a response, command ${cause.command}`
+          : `${cause.producer} attempt ${cause.attempt}`;
+      return [`${counted(event.data.checkFindings.length, 'CheckFinding event was', 'CheckFinding events were')} recorded (${why})`, []];
+    }
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':

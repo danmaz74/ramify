@@ -103,7 +103,7 @@ describe('the run log', () => {
       'evidence-reopened', 'revision-needed', 'dependency-cycle-detected',
       'work-item-completed',
       'writer-acquired', 'writer-released',
-      'gate-started', 'gate-committing', 'gate-attempted', 'stop-requested',
+      'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
@@ -966,6 +966,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'gate-started': { gate: 'ga-0001', checkpoint: 'readiness' },
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },
     'gate-attempted': { gate: 'ga-0001', checkpoint: 'final', verdict: 'passed', next: 'accept' },
+    'check-findings-recorded': { cause: { kind: 'recovery', detail: 'd' }, checkFindings: [] },
     'job-completed': { gate: 'ga-0001', commit: null, workItems: 0 },
     'job-failed': { reason: 'internal', message: '', evidence: [] },
     'job-stopped': { settled: false },

@@ -83,7 +83,11 @@ export function commandHash(command: CommandLike): string {
   return createHash('sha256').update(canonicalJson(content)).digest('hex');
 }
 
-function canonicalJson(value: unknown): string {
+/**
+ * JSON with object keys sorted by UTF-16 code unit, array order kept, no
+ * whitespace, and undefined properties omitted; `null` is kept.
+ */
+export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value !== null && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

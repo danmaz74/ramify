@@ -596,8 +596,15 @@ Neither child receives this module's vocabulary.
 
 The child `check-findings` decides CheckFinding identity, dispositions,
 replay and queries as pure functions over the references this module binds.
-It receives nothing from this module; its events are not yet in the run log
-(Plan 12 iteration 2).
+It receives nothing from this module. Its events travel in the run log in a
+`checkFindings` array on the run event that commits them, and `src/check-findings/`
+is the one transition that decides and appends them: under the run mutex it
+refuses a terminal run, replays the current state, revalidates the basis the
+producer's slow work captured, asks the child to decide, and appends the
+carrier with a record copy of every event as one ledger line. An exact
+redelivery of a report appends nothing. The state and its key indexes are
+replayed from the log after a restart; the record copies are materialized
+like any other record.
 
 ## The run
 
