@@ -863,3 +863,5 @@ Found in the web client while reading the run at a 1440 px viewport, and fixed i
 | `npm run build:web` | Pass | Vite chunk-size advisory only. |
 | `git diff --check` | Clean | |
 | ramify-audit | Not run here | The orchestrator re-audits. |
+
+**Audit follow-up.** The ramify-audit of `ea3ebda` (`refs/audited/runs/2026-09-24T20-32-03Z-ea3ebdad1`) failed one test, `capability-module-tree.test.tsx` "the Run route lifts the shell width cap …": the fix for defect 2 folded `.run-page > .area-wide` into one selector list with the header and tabs, so the test's exact rule no longer matched, although the widths were unchanged. That rule is restored on its own line, the header and tabs have their own rule, and the test also asserts that rule and the 80rem broad measure. All 16 web test files (151 tests) pass, as do `npm run test:browser:check-findings` (32 checks), type-check, `check:self` (0 errors, 0 warnings, 279 limits) and `build:web`. I had not run that test file before `ea3ebda`.

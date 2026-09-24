@@ -243,7 +243,8 @@ h1 { font-size: 1.5rem; margin: 0.5rem 0; }
 main.route-run { max-width: none; }
 .run-page > * { max-width: 52rem; }
 .run-page > .area-broad { max-width: 80rem; }
-.run-page > .area-wide, .run-page > .page-header, .run-page > .tabs { max-width: none; }
+.run-page > .area-wide { max-width: none; }
+.run-page > .page-header, .run-page > .tabs { max-width: none; }
 .connection-line { font-size: 0.9rem; color: var(--muted); margin: 0.25rem 0 0.5rem; }
 .connection-line-lost, .connection-line-disconnected { color: var(--bad); }
 .tabs .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 0.4rem 0.8rem; }
