@@ -677,4 +677,11 @@ These go to the follow-up plan.
 
 ### Final audit
 
-_Placeholder for the orchestrator: the result of `ramify-agent/node_modules/.bin/ramify-audit audit --request ramify-agent/audit/plan12-check-findings.request.json --cwd . --json` on the final Plan 12 commit (overall verdict, per-check results, suite counts, duration, run ref and Git note). Not run by iteration 8._
+Both runs use `audit/plan12-check-findings.request.json` from the repository root, with a clean tree. The first audit, on `de84358`, failed as described above.
+
+| Commit | Overall | Checks | Agent suite | Evidence |
+| --- | --- | --- | --- | --- |
+| `de84358` | `fail`, 202 s | Patch integrity, type-check, `check:self` and the parent daemon case pass; the agent suite fails | 186 files passed, 1 failed, 2 skipped; 1483 tests passed, 1 failed, 7 skipped | `refs/audited/runs/2026-09-24T19-13-10Z-de8435816` |
+| `11688f9` | **`pass`**, 202 s | All five checks pass: patch integrity, agent type-check, agent suite, agent `check:self` (0 errors, 0 warnings, 277 analysis limits; 10 owners, 450 source files; 0 denied accesses) and the parent daemon case | 187 files passed, 2 skipped; 1484 tests passed, 7 skipped | `refs/audited/runs/2026-09-24T19-25-48Z-11688f993`; Git note `git notes --ref=audit show 11688f993e503eed6c83b6ab11a0963dd9d1da16` |
+
+`11688f9` is the audited final implementation commit, and its passing run is the plan's full-suite evidence. The commit recording this result changes only this document. The `review-lifecycle.test.ts` overflow flake above passed in this audit and remains an open item. The live-model trial remains pending the user's approval.modules/.bin/ramify-audit audit --request ramify-agent/audit/plan12-check-findings.request.json --cwd . --json` on the final Plan 12 commit (overall verdict, per-check results, suite counts, duration, run ref and Git note). Not run by iteration 8._
