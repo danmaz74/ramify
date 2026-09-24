@@ -108,6 +108,32 @@ async function committed<T>(root: string, runId: string, path: string): Promise<
   return JSON.parse(await readFile(runPath(root, plan, runId, path), 'utf8')) as T;
 }
 
+/**
+ * A person's answer to a pending decision, sent at the run's version and
+ * sent again at the version each refusal names. The run may still append
+ * after the decision becomes visible (the brief's completion, a lost
+ * session's end), and each append moves the version; the CheckFinding's
+ * revision is what guards the decision itself.
+ */
+async function answerAtCurrentVersion(
+  service: Awaited<ReturnType<typeof reviewRun>>['service'],
+  runId: string,
+  payload: { readonly checkFinding: string; readonly expectedRevision: number; readonly request: string; readonly option: string },
+) {
+  let expectedVersion = service.getRun(plan, runId)!.version;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await service.execute({
+        commandId: `answer-${payload.checkFinding}-${expectedVersion}`, expectedVersion, type: 'respond-to-check-finding',
+        payload: { planId: plan, jobId: runId, responder: 'reviewer', ...payload },
+      });
+    } catch (error) {
+      if (!(error instanceof CommandRejection) || error.code !== 'stale-version' || error.currentVersion === undefined || attempt >= 10) throw error;
+      expectedVersion = error.currentVersion;
+    }
+  }
+}
+
 const reconcilerSessions = (agent: ScriptedAgent) => agent.sessions.filter(session => session.spec.prompt.startsWith('# Reconciliation'));
 
 describe('CF08: nothing to assess', () => {
@@ -409,13 +435,8 @@ describe('CF12: a strong authority conflict asks the user, with exact references
 
     // A person answers through the protocol's command; the next round assesses the answer and settles it.
     // A reader may still append while the person answers; the answer is sent again at the version its refusal names.
-    const answer = (expectedVersion: number) => service.execute({
-      commandId: `answer-${expectedVersion}`, expectedVersion, type: 'respond-to-check-finding',
-      payload: { planId: plan, jobId: runId, checkFinding: 'cf-0001', expectedRevision: waiting.summary.revision, request: waiting.summary.pendingUserDecision!, option: 'one-note', responder: 'reviewer' },
-    });
-    const receipt = await answer(service.getRun(plan, runId)!.version).catch((error: unknown) => {
-      if (error instanceof CommandRejection && error.code === 'stale-version' && error.currentVersion !== undefined) return answer(error.currentVersion);
-      throw error;
+    const receipt = await answerAtCurrentVersion(service, runId, {
+      checkFinding: 'cf-0001', expectedRevision: waiting.summary.revision, request: waiting.summary.pendingUserDecision!, option: 'one-note',
     });
     expect((await runEventsOnDisk(root, plan, runId)).find(event => event.sequence === receipt.sequence))
       .toMatchObject({ type: 'check-findings-recorded', data: { cause: { kind: 'user-command', command: { commandId: receipt.commandId } } } });
@@ -648,13 +669,10 @@ describe('CF10: the brief append outcomes that land nothing', () => {
     };
     await until(() => pending() !== undefined);
     const waiting = pending()!;
-    const answer = (expectedVersion: number) => service.execute({
-      commandId: `answer-${expectedVersion}`, expectedVersion, type: 'respond-to-check-finding',
-      payload: { planId: plan, jobId: runId, checkFinding: 'cf-0001', expectedRevision: waiting.revision, request: waiting.pendingUserDecision!, option: 'one-note', responder: 'reviewer' },
-    });
-    await answer(service.getRun(plan, runId)!.version).catch((error: unknown) => {
-      if (error instanceof CommandRejection && error.code === 'stale-version' && error.currentVersion !== undefined) return answer(error.currentVersion);
-      throw error;
+    // The decision is visible once the assessment is committed; the brief's
+    // completion and the lost session's end are appended after it.
+    await answerAtCurrentVersion(service, runId, {
+      checkFinding: 'cf-0001', expectedRevision: waiting.revision, request: waiting.pendingUserDecision!, option: 'one-note',
     });
     await service.settled(plan, runId);
     const events = await runEventsOnDisk(root, plan, runId);

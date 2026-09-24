@@ -661,6 +661,20 @@ These go to the follow-up plan.
   - The candidate diff is shown as commits, not patch text.
   - The credibility classifier trusts `plans/<planId>/` as human-reviewed.
 
+### Audit follow-up: the `no-session` test's answer
+
+**Found by the final audit of `de84358`:** 1 failed, 1483 passed, 7 skipped, run ref `refs/audited/runs/2026-09-24T19-13-10Z-de8435816`. The failing case was `reconciliation.test.ts` "a round after the architect's session was lost has no session to append to, and records no-session", refused with `stale-version: The job is at version 78, not 77`.
+
+**Cause: a test race, not a harness defect.** The pending decision becomes visible when `reconciliation-assessed` commits (sequence 76 in this run). The run then appends two more lines: the brief effect's completion, `reconciliation-brief-appended` with `session-lost` (77), and the lost session's `session-finished` (78). The test sent the answer at the version it read and resent it only once, at the version the refusal named. Under the audit's four workers, both appends landed between its reads: 76 was refused at 77, and the resend at 77 was refused at 78. The harness behaved as specified. A command must name the run's current version (the harness's rule 3), the refusal names that version, and the CheckFinding's revision still guards the decision. Iteration 5's CF12 test resends once too, but only one line follows its assessment (the brief lands, and no session ends).
+
+**Fix, test only:** `reconciliation.test.ts` gains `answerAtCurrentVersion`, which resends at each refusal's version, at most 10 times. Both the `no-session` case and the CF12 case use it. No harness source changed.
+
+**Confirmed under load:** 12 of 12 passes of `reconciliation.test.ts`. They ran as 3 concurrent Vitest processes, 4 rounds, each with `check-findings-composition`, `acceptance-trial` and `run-recovery` at `--maxWorkers=4`, plus 5 passes in a 10-file run-driving batch. The race was not reproduced on demand before the fix; the log ordering above matches the audit's refusal exactly.
+
+**Other iteration 8 tests checked for the same pattern:** the sibling `failed` case sends no command. The composition, crash-sweep, shutdown, tight-policy and real-Git tests send no person's command. The browser witness answers through the web, which resends once. That run is quiescent while it waits for the person, so only one line can come between a list's read and a click.
+
+**Seen once, not addressed:** `review-lifecycle.test.ts` "a request beyond the queue's bound is finished as overflowed and never run" (iteration 3) failed once in about 22 loaded runs of heavy batches (413 ms, not a timeout). It passed in every later run, and its message was not captured. A likely cause, unverified, is that under load the first reader may not have started before the third request arrives, so the second request would overflow instead of the third.
+
 ### Final audit
 
 _Placeholder for the orchestrator: the result of `ramify-agent/node_modules/.bin/ramify-audit audit --request ramify-agent/audit/plan12-check-findings.request.json --cwd . --json` on the final Plan 12 commit (overall verdict, per-check results, suite counts, duration, run ref and Git note). Not run by iteration 8._
