@@ -99,6 +99,32 @@ export const contextPolicySchema = z.object({
   reportReserveTokens: z.int().nonnegative(),
 }).strict();
 
+/** The review questions a run can ask of one audited iteration candidate. */
+export const reviewKindSchema = z.enum(['code', 'scope', 'design']);
+export type ReviewKind = z.infer<typeof reviewKindSchema>;
+
+/** The version of the review policy and prompt contract a request is keyed by. */
+export const reviewPolicyVersion = 'review-policy/1';
+
+/**
+ * How a run reviews its passing iterations: which questions, how many
+ * readers beside the one writer, how many requests may wait, how many
+ * retries follow an execution or validation failure, how long one attempt
+ * may run, how long a work item waits for its reviews from its completion
+ * request, and how many concerns one submission may carry.
+ */
+export const reviewPolicySchema = z.object({
+  version: z.literal(reviewPolicyVersion),
+  kinds: z.array(reviewKindSchema).min(1),
+  concurrency: z.int().positive(),
+  queue: z.int().positive(),
+  retries: z.int().nonnegative(),
+  attemptMs: z.int().positive(),
+  settleMs: z.int().positive(),
+  maxConcerns: z.int().positive(),
+}).strict();
+export type ReviewPolicy = z.infer<typeof reviewPolicySchema>;
+
 /**
  * The bounds and commands a run ran under, captured in `job.json` and not
  * configurable while it runs, so that an exhaustion is reproducible.
@@ -125,10 +151,30 @@ export const runPolicySchema = z.object({
     maxPlacementRequests: z.int().positive(),
     maxInvocationsPerRun: z.int().positive(),
     runAbsoluteMs: z.int().positive(),
+    /** Assessment and correction rounds of one work item's reconciliation; absent before `run-policy/3`. */
+    reconciliationRoundsPerWorkItem: z.int().positive().optional(),
   }).strict(),
-  context: z.record(roleSchema, contextPolicySchema),
+  /**
+   * The context policy of each role. The reviewer's is absent from a run
+   * captured before `run-policy/3`, which reviews nothing; every other role
+   * must have one.
+   */
+  context: z.object({
+    'initial-architect': contextPolicySchema,
+    'global-fork': contextPolicySchema,
+    'local-architect': contextPolicySchema,
+    engineer: contextPolicySchema,
+    'contract-engineer': contextPolicySchema,
+    reviewer: contextPolicySchema.optional(),
+  }).strict() satisfies z.ZodType<Partial<Record<Role, z.infer<typeof contextPolicySchema>>>>,
   /** A transcript body larger than `inlineBodyBytes` is stored in the content store, not in its entry. */
   transcript: z.object({ inlineBodyBytes: z.int().positive() }).strict(),
+  /**
+   * The iteration reviews a run requests and how it runs them. A policy
+   * without it records no review request, and every review coverage view of
+   * the run answers unavailable, never clean.
+   */
+  reviews: reviewPolicySchema.optional(),
   commands: z.object({
     typeCheck: checkCommandSchema,
     allTests: checkCommandSchema,

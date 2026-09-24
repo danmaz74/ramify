@@ -214,6 +214,15 @@ function describe(event: RunEvent): [string, Ref[]] {
           : `${cause.producer} attempt ${cause.attempt}`;
       return [`${counted(event.data.checkFindings.length, 'CheckFinding event was', 'CheckFinding events were')} recorded (${why})`, []];
     }
+    case 'review-request-recorded':
+      return [`A ${event.data.kind} review ${event.data.request} was requested of iteration ${event.data.iteration}'s audited candidate`, [...ref('work-item', event.data.workItem), ...ref('gate', event.data.gate), ...ref('commit', event.data.candidate)]];
+    case 'review-attempt-started':
+      return [`Review attempt ${event.data.attempt} started`, [...ref('invocation', event.data.invocation), ...ref('session', event.data.session)]];
+    case 'review-attempt-finished': {
+      const result = event.data.result === 'not-verified' ? `not verified (${event.data.reason ?? 'no reason'})` : event.data.result;
+      const concerns = event.data.checkFindings.length === 0 ? '' : `, with ${counted(event.data.checkFindings.length, 'CheckFinding event', 'CheckFinding events')}`;
+      return [`Review attempt ${event.data.attempt} finished: ${result}${event.data.settles ? '' : ', to be retried'}${concerns}`, []];
+    }
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':

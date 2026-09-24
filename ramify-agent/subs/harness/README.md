@@ -606,6 +606,25 @@ redelivery of a report appends nothing. The state and its key indexes are
 replayed from the log after a restart; the record copies are materialized
 like any other record.
 
+`src/reviews/` holds iteration code review (Plan 12). Every iteration that
+closes accepted after an engineer's passing gate has one request per review
+kind recorded before the driver passes it, keyed by the iteration, its
+audited commit, the kind and the review policy; recovery records a request
+the log is owed. A request is run by a reader beside the run's one writer:
+the run keeps a registry of open invocations, at most one writer and the
+policy's bounded readers, and a stop, a failure, a shutdown and the
+reviews' settlement bound before the final gate stop each of them. A reader
+has no built-in tool and no working directory of the project's: its four
+snapshot tools answer the audited commit from Git's objects alone, through
+the evidence child's candidate source, and refuse an absolute path, a path
+out of the candidate, a symbolic link and a generated view. Its terminal
+attempt, its submission and the CheckFindings its concerns open are one
+line through the CheckFinding transition; a result that arrives after its
+request settled or its run ended is fenced and appends nothing. The gate's
+commit and audit run outside the run mutex, which is held for the effect's
+intent and completion, so a reader's result is not held back by a slow
+audit.
+
 ## The run
 
 - **Commands.** `start-run` carries the plan, the agent and `reviewStop`,

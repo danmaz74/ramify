@@ -347,20 +347,26 @@ export async function openLedger<E>(options: OpenLedgerOptions<E>): Promise<Ledg
       const completion = lines.find((line) => line.effect?.phase === 'completion' && line.effect.key === spec.key);
       if (completion !== undefined) return completion.effect!.result as R;
 
-      const started = lines.some((line) => line.effect?.phase === 'intent' && line.effect.key === spec.key);
-      if (!started) {
+      const held = spec.serialize ?? (<T>(work: () => Promise<T>) => work());
+      await held(async () => {
+        const started = lines.some((line) => line.effect?.phase === 'intent' && line.effect.key === spec.key);
+        if (started) return;
+        const intent = typeof spec.intent === 'function' ? spec.intent() : spec.intent;
         await serialized(async () => {
-          const line = await appendLine(spec.intent, { key: spec.key, phase: 'intent' });
+          const line = await appendLine(intent, { key: spec.key, phase: 'intent' });
           await materializeLine(line);
         });
-      }
+      });
       const result = await spec.perform(spec.key);
       if (JSON.stringify(result ?? null) === undefined) {
         throw new TypeError(`The result of effect "${spec.key}" has no JSON representation`);
       }
-      await serialized(async () => {
-        const line = await appendLine(spec.complete(result), { key: spec.key, phase: 'completion', result: result ?? null });
-        await materializeLine(line);
+      await held(async () => {
+        const completion = spec.complete(result);
+        await serialized(async () => {
+          const line = await appendLine(completion, { key: spec.key, phase: 'completion', result: result ?? null });
+          await materializeLine(line);
+        });
       });
       return result;
     },

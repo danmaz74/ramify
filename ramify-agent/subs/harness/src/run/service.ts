@@ -1,8 +1,8 @@
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { mkdir, readFile, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
-import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
+import { gitCandidateSource, gitService, GitError, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -21,6 +21,17 @@ import type { CheckFindingCause } from '../check-findings/records.js';
 import { checkFindingStateOf } from '../check-findings/state.js';
 import { commitCheckFindingChange, type CheckFindingBuild, type CheckFindingCommit } from '../check-findings/transition.js';
 import { recordSettledSnapshot } from './mutations.js';
+import { reportCommand, type BoundReport } from '../check-findings/report.js';
+import { canonicalJson } from '../jobs/commands.js';
+import {
+  concernKey, reviewAttemptId, reviewLayout, reviewRequestId, reviewRequestSchema, reviewSchemas,
+  type NotVerifiedReason, type ReviewAttempt, type ReviewRequest, type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
+} from '../reviews/records.js';
+import { reviewMessage } from '../reviews/message.js';
+import { ReviewQueue } from '../reviews/scheduler.js';
+import { openCandidateSnapshot, snapshotTools, type CandidateSnapshot } from '../reviews/snapshot.js';
+import { reviewCoverage, reviewStateOf, unsettledRequests, type ReviewCoverage } from '../reviews/state.js';
+import { reviewJsonSchema, reviewSubmissionDescription, reviewToolName, validateReview } from '../reviews/submission.js';
 import type { Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
@@ -32,7 +43,7 @@ import { ensureStateDirectory } from '../store/state-directory.js';
 import { readPlan } from '../plans/discover.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderGlobalForkPrompt,
-  renderInitialArchitectPrompt, renderLocalArchitectPrompt, sha256, type LoadedPackage,
+  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderReviewerPrompt, sha256, type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
 import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
@@ -77,7 +88,7 @@ import {
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
-  iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, moduleNoticeSchema,
+  iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, iterationSchemas, moduleNoticeSchema,
   workItemOfIteration,
   type IterationAssignment, type IterationResult, type ModuleNotice,
 } from '../work/iterations.js';
@@ -100,7 +111,7 @@ import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoin
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import { ObservationLog } from './observations.js';
 import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
-import { defaultRunPolicy, discoverNestedPackages } from './policy.js';
+import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from './policy.js';
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
@@ -203,6 +214,8 @@ export interface RunServiceOptions {
   readonly ramify: RamifyCli;
   /** External Git operations. Lifecycle tests supply scripted answers, like their agent port. */
   readonly git?: GitService | undefined;
+  /** Where a review reads its frozen candidate from: Git's objects by default; tests script it like Git. */
+  readonly candidates?: CandidateSource | undefined;
   /** How committing checkpoint commands run. */
   readonly checkExecution: CheckExecutionPort;
   /**
@@ -240,6 +253,8 @@ export interface RunRecoveryReport {
   readonly invocations: string[];
   /** Run directories that could not be loaded and are not served. */
   readonly skipped: string[];
+  /** Review requests an accepted iteration was owed and recovery recorded, and attempts it finished as not verified. */
+  readonly reviews: string[];
 }
 
 const key = (planId: string, runId: string) => `${planId}/${runId}`;
@@ -286,6 +301,19 @@ interface InvocationRequest<T> {
   readonly equip?: ((session: EquipContext) => Equipment) | undefined;
   /** A session that ended for a reason only the caller can name, such as a tool's exhausted bound. */
   readonly endedAs?: (() => InvocationOutcome['ended'] | undefined) | undefined;
+  /**
+   * Whether this invocation is a reader beside the writer: it holds no
+   * writer, a run-wide bound it meets refuses it without failing the run,
+   * and a session of it that does not become idle blocks no writer, since it
+   * was given nothing that writes or starts a process.
+   */
+  readonly reader?: boolean | undefined;
+  /** The session's working directory; the project root when absent. A reader's is an empty directory of its own. */
+  readonly workingDirectory?: string | undefined;
+  /** A tighter absolute bound than the run policy's, such as a review attempt's. */
+  readonly absoluteMs?: number | undefined;
+  /** Called once `invocation-started` is committed and before the session starts, such as to commit what the invocation is for. */
+  readonly onStarted?: ((invocation: string, session: SessionId) => Promise<void>) | undefined;
   /** A session mode the caller could not honor, recorded on the invocation. */
   readonly degraded?: { readonly requested: 'fresh' | 'continued' | 'fork'; readonly reason: string } | undefined;
   /** The session a continued start joins; a fresh or forked start opens a new one. */
@@ -360,16 +388,39 @@ interface InvocationResult<T> {
   readonly session: SessionId;
   /** Whether the harness kept the session to use it again. */
   readonly kept: boolean;
+  /** The bound or fault that interrupted it, where one did. */
+  readonly interruption?: InvocationOutcome['interruption'];
+  /** The mode the executor actually started the session in; absent where none started. */
+  readonly actual?: 'fresh' | 'continue' | 'fork' | undefined;
+}
+
+/** One invocation the run has open: the writer or a reader, and its session once it started. */
+interface LiveInvocation {
+  readonly role: Role;
+  readonly reader: boolean;
+  session: AgentSession | undefined;
+  readonly done: Promise<void>;
 }
 
 class Run {
   readonly mutex = new Mutex();
-  session: AgentSession | undefined;
+  /**
+   * Serializes the start of invocations: each one's identifier and its
+   * session's are counted from the log, so two starts must not count the
+   * same prefix. Nothing slow runs under it.
+   */
+  readonly starting = new Mutex();
+  /** Every invocation the run has open, by ID: at most one writer, and the readers beside it. */
+  readonly live = new Map<string, LiveInvocation>();
   stopRequested: boolean;
   /** Settles when the run's driver has nothing left to do. */
   done: Promise<void> = Promise.resolve();
-  /** Settles when the invocation the run has open is closed. */
-  invocationDone: Promise<void> = Promise.resolve();
+  /** The run's review readers, once it reviews; undefined for a run whose policy requests none. */
+  reviews: ReviewQueue | undefined;
+  /** Why the run stopped its readers, which a reader stopped for it records as its attempt's reason. */
+  readerStop: NotVerifiedReason | undefined;
+  /** The commit-and-audit effect in flight, which the run's terminal event waits for. */
+  gating: Promise<unknown> | undefined;
   /** The writer of the run; one at a time, and the log says which. */
   readonly writer: WriterOwnership;
   index: ArchitectIndex | null = null;
@@ -394,6 +445,18 @@ class Run {
 
   get key(): string {
     return key(this.record.planId, this.record.jobId);
+  }
+
+  /** The sessions of every open invocation, the writer's and the readers'. */
+  sessions(filter: (live: LiveInvocation) => boolean = () => true): AgentSession[] {
+    return [...this.live.values()].filter(filter).flatMap(live => (live.session === undefined ? [] : [live.session]));
+  }
+
+  /** Settles once the driver, every open invocation and every review attempt have finished. */
+  async idle(): Promise<void> {
+    await this.done;
+    await this.reviews?.settled();
+    while (this.live.size > 0) await Promise.all([...this.live.values()].map(live => live.done));
   }
 
   /** Settles at the next `notify`: an approval, a stop or the service closing. */
@@ -421,9 +484,11 @@ export class RunService {
   private closing: Promise<void> | undefined;
 
   private readonly git: GitService;
+  private readonly candidates: CandidateSource;
 
   private constructor(private readonly options: RunServiceOptions) {
     this.git = options.git ?? gitService;
+    this.candidates = options.candidates ?? gitCandidateSource;
   }
 
   /**
@@ -482,7 +547,10 @@ export class RunService {
    * session. A session whose invocation is still awaited is left live: its
    * end is that invocation's own.
    */
-  private endRun(run: Run, terminal: RunEventInput, opening: SessionFinishReason = 'run-ended'): Promise<'committed' | 'ended'> {
+  private async endRun(run: Run, terminal: RunEventInput, opening: SessionFinishReason = 'run-ended'): Promise<'committed' | 'ended'> {
+    // A gate's commit and audit run outside the mutex; its attempt is
+    // committed before anything ends the run, as when the mutex held it.
+    await run.gating?.catch(() => undefined);
     return run.mutex.run(async () => {
       if (run.log.terminal) return 'ended';
       const sessions = this.sessionsOf(run);
@@ -565,10 +633,359 @@ export class RunService {
     }
   }
 
+  // Reviews
+
+  /**
+   * The run's review readers, created when its driver starts for a run whose
+   * policy requests reviews. Each wake starts what the policy has room for.
+   */
+  private startReviews(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>): void {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined || run.reviews !== undefined) return;
+    run.reviews = new ReviewQueue({
+      concurrency: policy.concurrency,
+      queue: policy.queue,
+      unsettled: () => unsettledRequests(run.log.events).map(request => request.id),
+      attempt: request => this.runReviewAttempt(run, agent, packages, request),
+      overflow: async request => {
+        await this.finishUnsettledReviews(run, () => ({ reason: 'queue-overflow', detail: `More than ${policy.queue} review requests were waiting; this one was not run` }), [request]);
+      },
+      warn: text => this.warn(`Run ${run.record.jobId}: ${text}`),
+    });
+    run.reviews.wake();
+  }
+
+  /**
+   * The iterations that closed accepted after an engineer's passing gate,
+   * which are the ones a review request is owed for: their audited commit,
+   * gate and assignment. Contract iterations establish agreements and are
+   * not reviewed in this version.
+   */
+  private reviewableClosings(run: Run): Array<{ readonly workItem: string; readonly iteration: string; readonly gate: string; readonly commit: string }> {
+    const assigned = new Set(run.log.all('iteration-assigned').map(event => event.data.iteration));
+    return run.log.all('iteration-closed').flatMap(event => (
+      event.data.outcome === 'accepted' && event.data.gate !== null && event.data.commit !== null && assigned.has(event.data.iteration)
+        ? [{ workItem: event.data.workItem, iteration: event.data.iteration, gate: event.data.gate, commit: event.data.commit }]
+        : []));
+  }
+
+  /**
+   * Records every review request owed for one accepted iteration, once per
+   * key, before the driver passes it. The candidate's tree is read first,
+   * outside the mutex; the key is checked and the identifier counted under
+   * it. Answers the requests it recorded: none for a key already recorded,
+   * a run that has ended, or a candidate whose tree cannot be read, which
+   * is warned about.
+   */
+  private async requestReviews(run: Run, closed: { readonly workItem: string; readonly iteration: string; readonly gate: string; readonly commit: string }): Promise<string[]> {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined) return [];
+    let tree: string;
+    try {
+      tree = await this.candidates.commitTree(this.projectRoot, closed.commit);
+    } catch (error) {
+      // A request binds its tree; without one there is nothing to review
+      // against, and the gap is the missing request, stated here.
+      this.warn(`Run ${run.record.jobId}: no review of ${closed.iteration} was requested; the tree of ${closed.commit} could not be read: ${message(error)}`);
+      return [];
+    }
+    const number = Number.parseInt(closed.iteration.slice(closed.iteration.lastIndexOf('.i') + 2), 10);
+    const base = this.acceptedBefore(run, closed.gate);
+    const recorded: string[] = [];
+    for (const kind of policy.kinds) {
+      const outcome = await run.mutex.run(async () => {
+        if (run.log.terminal) return null;
+        const existing = [...reviewStateOf(run.log.events).values()]
+          .find(request => request.iteration === closed.iteration && request.candidate === closed.commit && request.kind === kind);
+        if (existing !== undefined) return null;
+        const id = reviewRequestId(run.log.count('review-request-recorded') + 1);
+        const request = reviewRequestSchema.parse({
+          schema: 'ramify-agent.review-request/1',
+          id,
+          key: { iteration: closed.iteration, candidate: closed.commit, kind, policy: policy.version },
+          workItem: closed.workItem,
+          assignment: iterationLayout.assignment(closed.workItem, number),
+          base,
+          gate: closed.gate,
+          tree,
+          requirements: [],
+          guidance: [],
+          forkPoint: { kind: 'none' },
+        } satisfies ReviewRequest);
+        await commitRecord(run.log.ledger, {
+          event: run.log.next({
+            type: 'review-request-recorded',
+            data: { request: id, workItem: closed.workItem, iteration: closed.iteration, kind, gate: closed.gate, candidate: closed.commit },
+          }),
+          records: [{ path: reviewLayout.request(id), id, revision: 1, body: request }],
+        });
+        return id;
+      });
+      if (outcome !== null) recorded.push(outcome);
+    }
+    run.reviews?.wake();
+    return recorded;
+  }
+
+  /** A record body as the log committed it, never the materialized file. */
+  private committedBody(run: Run, path: string): unknown {
+    for (const entry of run.log.ledger.replay()) {
+      for (const record of entry.transaction.records) if (record.path === path) return record.body;
+    }
+    return undefined;
+  }
+
+  /**
+   * One attempt of one request, from its snapshot to its terminal record.
+   * Answers whether a terminal record was committed: an attempt fenced by a
+   * settled request, a run that ended or a service that is closing commits
+   * nothing, and its reader's session was stopped and closed like any other.
+   */
+  private async runReviewAttempt(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, id: string): Promise<boolean> {
+    const policy = run.record.policy.reviews;
+    const state = reviewStateOf(run.log.events).get(id);
+    if (policy === undefined || state === undefined || state.settledBy !== null) return false;
+    if (this.ignoring(run) || run.reviews?.accepting !== true) return false;
+    const request = reviewRequestSchema.parse(this.committedBody(run, reviewLayout.request(id)));
+    const attempt = reviewAttemptId(id, state.attempts.length + 1);
+    const queuedAt = state.attempts.at(-1)?.finished?.at ?? state.recordedAt;
+    const retryLeft = state.attempts.filter(entry => entry.finished !== null && !entry.finished.settles).length < policy.retries;
+    const base = { id: attempt, request: id, queuedAt, requestedStart: 'fresh' as const };
+    const unavailable = (detail: string) => this.finishReview(run, request, {
+      ...base, startedAt: null, invocation: null, session: null, actualStart: null,
+    }, { result: 'not-verified', reason: 'unavailable', detail }, true);
+
+    const loaded = packages.get('reviewer');
+    if (loaded === undefined || request.key.kind !== 'code') {
+      return await unavailable(loaded === undefined ? 'No prompt package is loaded for the reviewer' : `This harness has no ${request.key.kind} review yet`) === 'committed';
+    }
+    let snapshot: CandidateSnapshot;
+    try {
+      snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: request.key.candidate, base: request.base });
+    } catch (error) {
+      return await unavailable(`The audited candidate could not be read: ${message(error)}`) === 'committed';
+    }
+    const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
+    const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
+    const tools = snapshotTools(snapshot, this.candidates, this.projectRoot);
+    const workspace = run.path(join(dirname(reviewLayout.attempt(attempt)), 'workspace'));
+    await mkdir(workspace, { recursive: true });
+
+    let started: { invocation: string; session: SessionId; at: string } | undefined;
+    const result = await this.runInvocation<ReviewSubmission>(run, agent, {
+      role: 'reviewer',
+      work: { workItem: request.workItem, iteration: request.key.iteration },
+      attempt: state.attempts.length + 1,
+      loaded,
+      systemPrompt: renderReviewerPrompt(loaded, '(no working directory: the audited candidate only)'),
+      prompt: reviewMessage({
+        request,
+        snapshot,
+        assignment: assignment.success ? assignment.data : null,
+        checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
+      }),
+      start: { mode: 'fresh' },
+      toolName: reviewToolName,
+      description: reviewSubmissionDescription,
+      inputSchema: reviewJsonSchema,
+      submissionSchema: 'ramify-agent.review-submission/1',
+      validate: input => validateReview(input, { snapshot, inspected: tools.inspected(), maxConcerns: policy.maxConcerns }),
+      keep: () => finished('work-closed'),
+      scope: { write: null, measurement: null, size: null },
+      reader: true,
+      workingDirectory: workspace,
+      absoluteMs: policy.attemptMs,
+      equip: () => ({ builtinTools: [], tools: [...tools.definitions] }),
+      onStarted: async (invocation, session) => {
+        const at = this.now();
+        await this.write(run, { type: 'review-attempt-started', data: { request: id, attempt, invocation, session, requestedStart: 'fresh' } }, [], at);
+        started = { invocation, session, at: at.toISOString() };
+      },
+    });
+    // A closing service records nothing more; recovery finishes the attempt.
+    if (this.closed) return false;
+
+    const outcome = reviewOutcome(result, run.readerStop);
+    const settles = !(outcome.retryable && retryLeft && !this.ignoring(run) && run.reviews?.accepting === true);
+    const attemptBody = {
+      ...base,
+      startedAt: started?.at ?? null,
+      invocation: started?.invocation ?? null,
+      session: started?.session ?? null,
+      actualStart: result.actual === undefined ? null : result.actual === 'fork' ? 'fork' as const : 'fresh' as const,
+    };
+    const committed = await this.finishReview(run, request, attemptBody, outcome.result, settles,
+      result.ended === 'submitted' ? result.value : undefined);
+    return committed === 'committed';
+  }
+
+  /**
+   * Commits one terminal attempt: its record, its valid submission and one
+   * report per concern, as one line through the CheckFinding transition. A
+   * request already settled or an attempt already finished is fenced, and a
+   * terminal run refuses it; neither appends anything. A concern set the
+   * transition refuses leaves the attempt not verified, never clean.
+   */
+  private async finishReview(
+    run: Run,
+    request: ReviewRequest,
+    attempt: Omit<ReviewAttempt, 'schema' | 'result' | 'settles' | 'checkFindings' | 'finishedAt'>,
+    result: ReviewResult,
+    settles: boolean,
+    submission?: ReviewSubmission,
+  ): Promise<'committed' | 'fenced'> {
+    const finishedAt = this.now().toISOString();
+    const record: ReviewSubmissionRecord | undefined = submission === undefined
+      ? undefined
+      : { schema: 'ramify-agent.review-submission/1', attempt: attempt.id, ...submission };
+    const evidenceHash = record === undefined ? null : `sha256:${sha256(canonicalJson(record))}`;
+    const commit = await this.commitCheckFindings(run, ({ log, state }) => {
+      const current = reviewStateOf(log.events).get(request.id);
+      if (current === undefined) return { stale: `No review request ${request.id} is recorded` };
+      if (current.settledBy !== null) return { stale: `${request.id} was settled by ${current.settledBy}; the result of ${attempt.id} is fenced` };
+      if (current.attempts.some(entry => entry.id === attempt.id && entry.finished !== null)) return { stale: `${attempt.id} has already finished; its later result is fenced` };
+      const concerns = record?.concerns ?? [];
+      const commands = concerns.map((concern, index) => reportCommand({
+        producer: `review:${request.key.kind}`,
+        attempt: attempt.id,
+        reportKey: concernKey(index),
+        owner: { kind: 'work-item', workItem: request.workItem },
+        source: { kind: 'tree', id: request.tree },
+        issueKey: null,
+        verification: { kind: 'assessment' },
+        observation: {
+          kind: 'review-concern',
+          summary: concern.summary,
+          evidence: [{ kind: 'review-submission', ref: reviewLayout.submission(attempt.id), hash: evidenceHash }],
+          locations: concern.locations,
+        },
+        judgment: {
+          actor: { kind: 'agent', role: 'reviewer', invocation: attempt.invocation ?? 'none' },
+          consequence: concern.consequence,
+          rationale: concern.rationale,
+          uncertainty: concern.uncertainty,
+          remedy: concern.remedy,
+        },
+        // A hint only, and only toward a CheckFinding of the same work item.
+        suggests: concern.suggests !== null && sameWorkItem(state.findings.get(concern.suggests)?.owner, request.workItem) ? concern.suggests : null,
+      } satisfies BoundReport));
+      return {
+        commands,
+        compose: decided => {
+          const touched = [...new Set(decided.outcomes.flatMap(outcome => outcome.touched))];
+          const body: ReviewAttempt = { schema: 'ramify-agent.review-attempt/1', ...attempt, finishedAt, result, settles, checkFindings: touched };
+          return {
+            event: {
+              type: 'review-attempt-finished',
+              data: {
+                request: request.id, attempt: attempt.id, result: result.result,
+                reason: result.result === 'not-verified' ? result.reason : null, settles, checkFindings: [...decided.events],
+              },
+            },
+            records: [
+              { path: reviewLayout.attempt(attempt.id), id: attempt.id, revision: 1, body },
+              ...(record === undefined ? [] : [{ path: reviewLayout.submission(attempt.id), id: attempt.id, revision: 1, body: record }]),
+            ],
+          };
+        },
+      };
+    });
+    if (commit.kind === 'committed' || commit.kind === 'replayed') return 'committed';
+    if (commit.refusal.reason === 'run-ended' || commit.refusal.reason === 'stale-basis') return 'fenced';
+    // The concerns could not be promoted as submitted; the attempt covers
+    // nothing then, and says why.
+    return await this.finishReview(run, request, attempt, {
+      result: 'not-verified', reason: 'invalid-output', detail: `Its concerns were refused: ${commit.refusal.message}`,
+    }, settles);
+  }
+
+  /**
+   * Finishes every unsettled request, or those named, as not verified: an
+   * attempt a reader started and never finished, whose later result is then
+   * fenced, or a new one that never started. Each settles its request.
+   */
+  private async finishUnsettledReviews(
+    run: Run,
+    why: (request: ReturnType<typeof unsettledRequests>[number], running: boolean) => { readonly reason: NotVerifiedReason; readonly detail: string },
+    only?: readonly string[],
+  ): Promise<string[]> {
+    const finishedIds: string[] = [];
+    for (const state of unsettledRequests(run.log.events)) {
+      if (only !== undefined && !only.includes(state.id)) continue;
+      const body = this.committedBody(run, reviewLayout.request(state.id));
+      const parsed = reviewRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        this.warn(`Run ${run.record.jobId}: review request ${state.id} cannot be read, so it was left unsettled`);
+        continue;
+      }
+      const open = state.attempts.find(entry => entry.started !== null && entry.finished === null);
+      const { reason, detail } = why(state, open !== undefined);
+      const attempt = open?.id ?? reviewAttemptId(state.id, state.attempts.length + 1);
+      const outcome = await this.finishReview(run, parsed.data, {
+        id: attempt,
+        request: state.id,
+        queuedAt: state.attempts.filter(entry => entry.id !== attempt).at(-1)?.finished?.at ?? state.recordedAt,
+        startedAt: open?.started?.at ?? null,
+        invocation: open?.started?.invocation ?? null,
+        session: (open?.started?.session ?? null) as SessionId | null,
+        requestedStart: 'fresh',
+        actualStart: null,
+      }, { result: 'not-verified', reason, detail }, true);
+      if (outcome === 'committed') finishedIds.push(attempt);
+    }
+    return finishedIds;
+  }
+
+  /**
+   * Waits for the run's reviews before its final gate, at most the policy's
+   * settlement bound, then stops what is still running and finishes it as
+   * not verified at the deadline, so the run completes with every request
+   * settled and no reader left.
+   */
+  private async settleReviews(run: Run): Promise<void> {
+    const policy = run.record.policy.reviews;
+    if (policy === undefined || run.reviews === undefined) return;
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      run.reviews.settled(),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, policy.settleMs); }),
+    ]);
+    clearTimeout(timer);
+    await this.stopReaders(run, 'deadline', run.record.policy.limits.stopSettleMs);
+  }
+
+  /**
+   * Recovery of a run's reviews: every request an accepted iteration is owed
+   * and has not is recorded once, and every request left unsettled is
+   * finished as not verified, since a recovered run is interrupted and runs
+   * nothing more. An attempt whose reader was running is one whose session
+   * was lost with the harness.
+   */
+  private async recoverReviews(run: Run): Promise<string[]> {
+    if (run.record.policy.reviews === undefined) return [];
+    const recovered: string[] = [];
+    for (const closed of this.reviewableClosings(run)) {
+      for (const request of await this.requestReviews(run, closed)) recovered.push(`review request ${request} of ${closed.iteration}`);
+    }
+    const finishedIds = await this.finishUnsettledReviews(run, (_request, running) => (running
+      ? { reason: 'execution-failed', detail: 'The harness stopped while this attempt ran; its reader\'s session was lost with it' }
+      : { reason: 'stopped', detail: 'The harness stopped before this review ran; a recovered run is interrupted and runs nothing more' }));
+    for (const attempt of finishedIds) recovered.push(`review attempt ${attempt}, finished as not verified`);
+    return recovered;
+  }
+
+  /** The run's review requests and coverage, from its log; undefined for an unknown run. */
+  reviews(planId: string, runId: string, workItem?: string): { readonly coverage: ReviewCoverage; readonly requests: ReturnType<typeof unsettledRequests> } | undefined {
+    const run = this.runs.get(key(planId, runId));
+    if (run === undefined) return undefined;
+    const requests = [...reviewStateOf(run.log.events).values()].filter(request => workItem === undefined || request.workItem === workItem);
+    return { coverage: reviewCoverage(run.record.policy, run.log.events, workItem), requests };
+  }
+
   // Loading and recovery
 
   private async load(): Promise<RunRecoveryReport> {
-    const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [] };
+    const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [], reviews: [] };
     for (const { planId, jobId } of await listJobDirectories(this.projectRoot)) {
       const directory = runDirectory(this.projectRoot, planId, jobId);
       const recordPath = join(directory, runLayout.record);
@@ -600,6 +1017,9 @@ export class RunService {
         for (const scenario of await this.completeWithdrawals(run)) report.effects.push(`${run.key}: the withdrawal of ${scenario}`);
         for (const decision of await this.completeDeliveries(run)) report.effects.push(`${run.key}: the delivery of decision ${decision}`);
         for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
+        // A request an accepted iteration is owed is recorded once, and
+        // every unsettled one is finished: the run runs nothing more.
+        for (const review of await this.recoverReviews(run)) report.reviews.push(`${run.key}: ${review}`);
         // Every session the run still keeps is finished as a run end
         // finishes it, and one opened whose first invocation never started
         // was interrupted with it, so a recovered run holds no suspended
@@ -847,7 +1267,7 @@ export class RunService {
   /** Settles when the run's driver has nothing left to do. For tests and shutdown. */
   async settled(planId: string, runId: string): Promise<void> {
     const run = this.runs.get(key(planId, runId));
-    if (run) await run.done;
+    if (run) await run.idle();
   }
 
   private runsOf(planId: string): Run[] {
@@ -1036,28 +1456,53 @@ export class RunService {
   }
 
   /**
-   * Ends a stopped run: asks the session to stop, waits for it at most the
-   * bound, and marks the run stopped whether or not it became idle. Whatever
-   * the session produces afterwards is rejected.
+   * Ends a stopped run: asks every open session to stop, the writer's and
+   * each reader's, waits for them at most the bound, finishes every review
+   * request still unsettled as stopped, and marks the run stopped whether or
+   * not they became idle. Whatever a session produces afterwards is rejected.
    */
   private async endStopped(run: Run): Promise<void> {
     const grace = this.options.stopGraceMs ?? run.record.policy.limits.stopSettleMs;
-    let settled = true;
-    if (run.session) {
-      let timer: NodeJS.Timeout | undefined;
-      settled = await Promise.race([
-        run.session.stop().then(() => true, () => true),
-        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), grace); }),
-      ]);
-      clearTimeout(timer);
-    }
-    // The run's terminal event is its last write, so an invocation the
-    // driver has open is closed before it.
-    let timer: NodeJS.Timeout | undefined;
-    await Promise.race([run.invocationDone, new Promise<void>(resolve => { timer = setTimeout(resolve, grace); })]);
-    clearTimeout(timer);
+    const settled = await this.stopReaders(run, 'stopped', grace, true);
     if (this.closed) return;
     await this.endRun(run, { type: 'job-stopped', data: { settled } });
+  }
+
+  /**
+   * Stops the run's readers, and with `writer` its writer too: no attempt
+   * starts from here on, every open session is asked to stop, and each open
+   * invocation and review attempt is awaited at most `grace`. A request still
+   * unsettled then is finished as not verified with `reason`, so the run's
+   * terminal event follows a complete review history. Answers whether every
+   * session stopped within the bound.
+   */
+  private async stopReaders(run: Run, reason: NotVerifiedReason, grace: number, writer = false): Promise<boolean> {
+    run.readerStop ??= reason;
+    run.reviews?.close();
+    const sessions = run.sessions(live => writer || live.reader);
+    let timer: NodeJS.Timeout | undefined;
+    const settled = sessions.length === 0 || await Promise.race([
+      Promise.all(sessions.map(session => session.stop().then(() => true, () => true))).then(() => true),
+      new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), grace); }),
+    ]);
+    clearTimeout(timer);
+    // The run's terminal event is its last write, so the invocations it has
+    // open, and the attempts that record their readers' results, close first.
+    const open = [...run.live.values()].filter(live => writer || live.reader).map(live => live.done);
+    await Promise.race([
+      Promise.all([...open, run.reviews?.settled()]),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, grace); }),
+    ]);
+    clearTimeout(timer);
+    if (!this.closed && run.record.policy.reviews !== undefined) {
+      await this.finishUnsettledReviews(run, (_request, running) => ({
+        reason,
+        detail: reason === 'deadline'
+          ? (running ? 'The reviews\' settlement bound passed while this attempt ran; its reader was stopped' : 'The reviews\' settlement bound passed before this review ran')
+          : (running ? 'The run stopped while this attempt ran; its reader was stopped' : 'The run stopped before this review ran'),
+      }));
+    }
+    return settled;
   }
 
   /**
@@ -1104,6 +1549,7 @@ export class RunService {
     // of the run itself has happened yet.
     await this.afterWrite('job-created', run.record.jobId);
     if (this.ignoring(run)) return;
+    this.startReviews(run, agent, packages);
     const accepted = await this.analyse(run, agent, packages, baseline);
     if (!accepted || this.ignoring(run)) return;
 
@@ -1119,6 +1565,11 @@ export class RunService {
     const worked = await this.takeWorkItems(run, agent, packages, baseline);
     if (!worked || this.ignoring(run)) return;
 
+    // Every review settles, or is finished at its bound, before the final
+    // gate: the run completes with no reader left and no request pending.
+    await this.settleReviews(run);
+    if (this.ignoring(run)) return;
+
     await this.finalGate(run);
   }
 
@@ -1132,20 +1583,48 @@ export class RunService {
    * closing event is the last write of the invocation.
    */
   private async runInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<InvocationResult<T>> {
+    // The start is serialized with every other start, since the identifiers
+    // are counted from the log; the session itself runs outside it, so a
+    // reader and the writer run at once.
+    const started = await run.starting.run(() => this.startInvocation(run, agent, request));
+    if ('refused' in started) {
+      // A run that has spent its bounds starts nothing more. The writer's
+      // path fails the run with the counter as evidence; a reader is only
+      // refused, and the next writer invocation meets the same bound.
+      if (request.reader !== true) await this.fail(run, 'limit-exceeded', started.refused);
+      return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
+    }
+    try {
+      return await this.runSession(run, agent, started.id, started.session, started.observations, started.transcript, request);
+    } finally {
+      started.closed();
+    }
+  }
+
+  /**
+   * Everything before an invocation's session starts, under `run.starting`:
+   * the run-wide bounds, the identifiers, the events that license it, its
+   * transcript's start and, for the writer, the writer's acquisition.
+   */
+  private async startInvocation<T>(run: Run, agent: AgentPort, request: InvocationRequest<T>): Promise<
+    | { readonly refused: string }
+    | { readonly id: string; readonly session: SessionId; readonly observations: ObservationLog; readonly transcript: InvocationTranscript; readonly closed: () => void }
+  > {
     // The run-wide bounds are read before an invocation is started, so a run
-    // that has spent them starts nothing more: it fails with the counter as
-    // evidence. The absolute bound is checked at each invocation boundary;
-    // an invocation already running is bounded by its own limits below.
+    // that has spent them starts nothing more. The absolute bound is checked
+    // at each invocation boundary; an invocation already running is bounded
+    // by its own limits below.
     const limits = run.record.policy.limits;
     const invocations = run.log.count('invocation-started');
     // The time the run waited for a person at its review stop is not its own.
     const now = this.now().getTime();
     const age = now - Date.parse(run.record.createdAt) - reviewPauseMs(run.log.events, now);
     if (invocations + 1 > limits.maxInvocationsPerRun || age > limits.runAbsoluteMs) {
-      await this.fail(run, 'limit-exceeded', invocations + 1 > limits.maxInvocationsPerRun
-        ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
-        : `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`);
-      return { id: '', ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session: '', kept: false };
+      return {
+        refused: invocations + 1 > limits.maxInvocationsPerRun
+          ? `The run has made ${invocations} invocations; the policy allows ${limits.maxInvocationsPerRun}`
+          : `The run has run for ${age} ms; the policy allows ${limits.runAbsoluteMs}`,
+      };
     }
     const id = invocationId(invocations + 1);
     // A fresh or forked start opens a session; a continued one joins the
@@ -1174,59 +1653,65 @@ export class RunService {
     await mkdir(run.path(runLayout.session(id)), { recursive: true });
     const observations = await ObservationLog.open(run.path(runLayout.observations(id)));
 
-    // Appended before `startSession`, so a stop that arrives between this
-    // event and the session's start applies to a known invocation.
+    // Registered before any event, so a stop that arrives between the
+    // invocation's start and its session's applies to a known invocation.
     let closed = () => undefined as void;
-    run.invocationDone = new Promise<void>(resolve => { closed = () => resolve(); });
-    if (opens) {
-      await this.write(run, {
-        type: 'session-opened',
-        data: {
-          session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null,
-          ...(request.start.mode === 'fork' ? { fork: request.fork! } : {}),
-          ...(request.replaces === undefined ? {} : { replaces: request.replaces }),
-          ...(request.requestedBy === undefined ? {} : { requestedBy: request.requestedBy }),
-        },
-      });
-      await this.afterWrite('session-opened', run.record.jobId);
-    }
-    await this.write(run, {
-      type: 'invocation-started',
-      data: {
-        invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued',
-        ...(continues === undefined ? {} : { continues }),
-      },
-    }, [
-      { path: runLayout.invocation(id), id, revision: 1, body: invocation },
-    ]);
-    // The transcript's start holds the prompts, and is written before the
-    // session starts, so a crash before the first reply still leaves them.
-    const transcript = this.invocationTranscript(run, session, id, observations);
-    await transcript.started({
-      role: request.role,
-      work: request.work,
-      start: opens ? 'opened' : 'continued',
-      requested: request.start.mode,
-      continues,
-      fork: request.start.mode === 'fork' ? request.fork : undefined,
-      replaces: opens ? request.replaces : undefined,
-      requestedBy: opens ? request.requestedBy : undefined,
-      executor: agent.name,
-      model: this.options.model ?? null,
-      systemPrompt: request.systemPrompt,
-      prompt: request.prompt,
-    });
-    if (request.writer === true) {
-      // The writer is acquired before the session starts, so a stop that
-      // arrives between them applies to a writer the log already names.
-      run.writer.acquire(id);
-      await this.write(run, { type: 'writer-acquired', data: { invocation: id, scopeRevision: request.scope.write } });
-      await this.afterWrite('writer-acquired', run.record.jobId);
-    }
-    try {
-      return await this.runSession(run, agent, id, session, observations, transcript, request);
-    } finally {
+    run.live.set(id, { role: request.role, reader: request.reader === true, session: undefined, done: new Promise<void>(resolve => { closed = () => resolve(); }) });
+    const release = () => {
+      run.live.delete(id);
       closed();
+    };
+    try {
+      if (opens) {
+        await this.write(run, {
+          type: 'session-opened',
+          data: {
+            session, role: request.role, work: request.work, executor: agent.name, model: this.options.model ?? null,
+            ...(request.start.mode === 'fork' ? { fork: request.fork! } : {}),
+            ...(request.replaces === undefined ? {} : { replaces: request.replaces }),
+            ...(request.requestedBy === undefined ? {} : { requestedBy: request.requestedBy }),
+          },
+        });
+        await this.afterWrite('session-opened', run.record.jobId);
+      }
+      await this.write(run, {
+        type: 'invocation-started',
+        data: {
+          invocation: id, role: request.role, session, work: request.work, start: opens ? 'opened' : 'continued',
+          ...(continues === undefined ? {} : { continues }),
+        },
+      }, [
+        { path: runLayout.invocation(id), id, revision: 1, body: invocation },
+      ]);
+      // The transcript's start holds the prompts, and is written before the
+      // session starts, so a crash before the first reply still leaves them.
+      const transcript = this.invocationTranscript(run, session, id, observations);
+      await transcript.started({
+        role: request.role,
+        work: request.work,
+        start: opens ? 'opened' : 'continued',
+        requested: request.start.mode,
+        continues,
+        fork: request.start.mode === 'fork' ? request.fork : undefined,
+        replaces: opens ? request.replaces : undefined,
+        requestedBy: opens ? request.requestedBy : undefined,
+        executor: agent.name,
+        model: this.options.model ?? null,
+        systemPrompt: request.systemPrompt,
+        prompt: request.prompt,
+      });
+      if (request.writer === true) {
+        // The writer is acquired before the session starts, so a stop that
+        // arrives between them applies to a writer the log already names.
+        run.writer.acquire(id);
+        await this.write(run, { type: 'writer-acquired', data: { invocation: id, scopeRevision: request.scope.write } });
+        await this.afterWrite('writer-acquired', run.record.jobId);
+      }
+      await request.onStarted?.(id, session);
+      return { id, session, observations, transcript, closed: release };
+    } catch (error) {
+      release();
+      throw error;
     }
   }
 
@@ -1274,7 +1759,7 @@ export class RunService {
       index: run.index,
       scope: request.guarded,
     });
-    const context = run.record.policy.context[request.role];
+    const context = contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context, transcript });
     const equipment: Equipment = request.equip?.({
       invocation: id,
@@ -1285,12 +1770,14 @@ export class RunService {
     }) ?? {};
 
     // Every port event is activity; `touch` is what the idle bound resets.
-    const bounds = new InvocationBounds(run.record.policy.limits);
+    const bounds = new InvocationBounds(request.absoluteMs === undefined
+      ? run.record.policy.limits
+      : { ...run.record.policy.limits, invocationAbsoluteMs: Math.min(run.record.policy.limits.invocationAbsoluteMs, request.absoluteMs) });
     let budget: InvocationOutcome['budget'] | undefined;
 
     const spec: SessionSpec = {
       role: request.role,
-      scope: { workingDirectory: this.projectRoot },
+      scope: { workingDirectory: request.workingDirectory ?? this.projectRoot },
       systemPrompt: request.systemPrompt,
       prompt: request.prompt,
       session: request.start,
@@ -1328,9 +1815,10 @@ export class RunService {
         interruption: 'adapter-fault',
         error: `The agent session could not start: ${message(error)}`,
       }, undefined, transcript);
-      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept };
+      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept, interruption: 'adapter-fault' };
     }
-    run.session = agentSession;
+    const live = run.live.get(id);
+    if (live !== undefined) live.session = agentSession;
     // A start the executor could not honor is known only now, after the
     // invocation's start is committed; its end records it.
     const degraded: DegradeRelation | undefined = request.start.mode !== 'fresh' && agentSession.start.mode !== request.start.mode
@@ -1356,7 +1844,7 @@ export class RunService {
 
     // An architect writes nothing, so it holds no writer; its settlement is
     // still the harness's own observation of the session.
-    const settled = await this.settleSession(run, id, agentSession);
+    const settled = await this.settleSession(run, id, agentSession, request.reader === true);
     // `onEvent` cannot be async at the port boundary. Its ordered writes must
     // still finish before gaps are derived and before this driver can settle.
     await recorder.drain();
@@ -1413,6 +1901,8 @@ export class RunService {
       outcomeKind: interruption === undefined ? outcome.kind : 'failed',
       session,
       kept: keptAs.kept,
+      ...(interruption === undefined ? {} : { interruption }),
+      actual: agentSession.start.mode,
     };
   }
 
@@ -3016,6 +3506,9 @@ export class RunService {
             commit: gate.audited,
             ...(proposal.recommendation === undefined ? {} : { recommendation: proposal.recommendation }),
           });
+          // The candidate's reviews are requested before the driver passes
+          // it; they run beside the next iteration's writer.
+          if (closed.commit !== null) await this.requestReviews(run, { workItem: item.id, iteration: assignment.id, gate: gate.id, commit: closed.commit });
           await this.finishSession(run, session, 'work-closed');
           // The evidence this acceptance discharges: a provider that ran the
           // agreed suite against the real implementation has conformed, and a
@@ -4309,7 +4802,7 @@ export class RunService {
    * session idle, and every process group it registered killed and gone.
    * Neither `stop()` resolving nor the agent's word is evidence.
    */
-  private async settleSession(run: Run, id: string, session: AgentSession) {
+  private async settleSession(run: Run, id: string, session: AgentSession, reader = false) {
     if (run.writer.held === id) {
       const released = await run.writer.release(id, session);
       // The release is in the log before anything else may write or check:
@@ -4323,7 +4816,11 @@ export class RunService {
     }
     const idle = await session.settled().catch(() => 'timed-out' as const);
     const settled = { confirmed: idle === 'settled', at: this.now().toISOString(), groupsKilled: 0, lateWrites: [] as string[] };
-    if (!settled.confirmed) {
+    // A reader was given no tool that writes or starts a process, so its
+    // session not becoming idle leaves the tree as the writer's settlement
+    // found it; it is recorded on its outcome and blocks no writer. Its
+    // session stays the run's to stop at a stop or a shutdown.
+    if (!settled.confirmed && !reader) {
       run.writer.markUnsettled(id, 'its session did not become idle within the implementation\'s bound');
     }
     return settled;
@@ -4547,6 +5044,15 @@ export class RunService {
    * operation, not a partial attempt. Recovery finds the commit by its run
    * and gate trailers and re-audits it; completion writes the immutable
    * attempt exactly once.
+   *
+   * The run mutex is held while the intent is appended and again while the
+   * completion is, and not while the commit and audit run: a reader's
+   * result arriving during a slow audit is committed at once instead of
+   * waiting for it. Nothing a reader commits is part of what the gate
+   * verified or decides, the driver is the only writer of gates and
+   * iterations, and a terminal event waits for the effect (`endRun`), so the
+   * attempt and its verdict are exactly what holding the mutex throughout
+   * produced.
    */
   private async commitGate(
     run: Run,
@@ -4557,7 +5063,8 @@ export class RunService {
     recordedMessage?: string,
   ): Promise<GateAttempt> {
     const identity = prepared.request;
-    const invocations = run.log.all('invocation-started').map(event => event.data.invocation);
+    // A reader contributed nothing to the source this commit holds.
+    const invocations = run.log.all('invocation-started').filter(event => event.data.role !== 'reviewer').map(event => event.data.invocation);
     const message = recordedMessage ?? commitMessage({
       runId: run.record.jobId, planId: run.record.planId,
       gate: {
@@ -4571,12 +5078,13 @@ export class RunService {
       ...(earlierAttempts(run, identity.id, identity.subject ?? {}).length === 0 ? {} : { earlier: earlierAttempts(run, identity.id, identity.subject ?? {}) }),
     });
     const operation = gateOperation(prepared, message);
-    return run.mutex.run(() => run.log.ledger.effect<GateAttempt>({
+    const effect = run.log.ledger.effect<GateAttempt>({
       key: `gate-commit:${identity.id}`,
-      intent: {
+      serialize: work => run.mutex.run(work),
+      intent: () => ({
         event: run.log.next({ type: 'gate-committing', data: { gate: identity.id, checkpoint: prepared.checkpoint } }),
         records: [{ path: runLayout.gateOperation(identity.id), id: identity.id, revision: 1, body: operation }],
-      },
+      }),
       perform: async () => {
         await this.afterWrite('gate-attempted', run.record.jobId);
         // The feature files go into the gate's commit as the states now
@@ -4612,7 +5120,13 @@ export class RunService {
           ],
         };
       },
-    }));
+    });
+    run.gating = effect;
+    try {
+      return await effect;
+    } finally {
+      if (run.gating === effect) run.gating = undefined;
+    }
   }
 
   /**
@@ -5053,6 +5567,9 @@ export class RunService {
   }
 
   private async fail(run: Run, reason: RunFailureReason, text: string, evidence: readonly string[] = []): Promise<void> {
+    // A failure is the run's final decision; its readers are stopped and
+    // their requests finished first, so no review is left running past it.
+    if (run.reviews !== undefined && !run.log.terminal) await this.stopReaders(run, 'stopped', run.record.policy.limits.stopSettleMs);
     await this.endRun(run, { type: 'job-failed', data: { reason, message: text, evidence: [...evidence] } });
   }
 
@@ -5082,7 +5599,8 @@ export class RunService {
       const drivers = [...this.runs.values()];
       const active = drivers.filter(run => !run.log.terminal);
       for (const run of active) {
-        void run.session?.stop().catch(() => undefined);
+        run.reviews?.close();
+        for (const session of run.sessions()) void session.stop().catch(() => undefined);
         run.notify();
       }
 
@@ -5090,7 +5608,7 @@ export class RunService {
         const bound = Math.max(...drivers.map(run => run.record.policy.limits.stopSettleMs));
         let timer: NodeJS.Timeout | undefined;
         const quiescent = await Promise.race([
-          Promise.all(drivers.map(run => run.done)).then(() => true),
+          Promise.all(drivers.map(run => run.idle())).then(() => true),
           new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), bound); }),
         ]);
         clearTimeout(timer);
@@ -5531,4 +6049,48 @@ function message(error: unknown): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms).unref());
+}
+
+/** Whether a CheckFinding's owner is this work item. */
+function sameWorkItem(owner: { readonly kind: string; readonly workItem?: string } | undefined, workItem: string): boolean {
+  return owner?.kind === 'work-item' && owner.workItem === workItem;
+}
+
+/**
+ * What one reviewer invocation's end means for its attempt: covered scope,
+ * or why none, and whether another attempt could do better. Invalid output,
+ * a failed execution and a timeout may be retried; an unavailable input or
+ * a stop may not.
+ */
+function reviewOutcome(
+  result: InvocationResult<ReviewSubmission>,
+  stop: NotVerifiedReason | undefined,
+): { readonly result: ReviewResult; readonly retryable: boolean } {
+  const notVerified = (reason: NotVerifiedReason, detail: string, retryable: boolean) => ({ result: { result: 'not-verified' as const, reason, detail }, retryable });
+  if (result.id === '') return notVerified('unavailable', 'The run\'s invocation bounds refused the reviewer', false);
+  switch (result.ended) {
+    case 'submitted': {
+      const submission = result.value;
+      if (submission === undefined) return notVerified('invalid-output', 'The reviewer ended without an accepted submission', true);
+      const inspected = submission.inspected.map(path => ({ path }));
+      return {
+        result: submission.missing.length === 0
+          ? { result: 'complete', inspected, concerns: submission.concerns.length }
+          : { result: 'partial', inspected, missing: submission.missing.map(entry => ({ path: entry.path, reason: entry.reason })), concerns: submission.concerns.length },
+        retryable: false,
+      };
+    }
+    case 'invalid-submission':
+      return notVerified('invalid-output', 'Every submission the reviewer made was invalid, up to the bound', true);
+    case 'ended':
+      return notVerified('invalid-output', 'The reviewer ended without a submission', true);
+    case 'context-budget-reached':
+      return notVerified('execution-failed', 'The reviewer reached its context budget before it submitted', true);
+    case 'failed':
+      return result.interruption === 'idle-timeout' || result.interruption === 'absolute-timeout'
+        ? notVerified('timed-out', `The reviewer met its ${result.interruption === 'idle-timeout' ? 'idle' : 'attempt'} bound`, true)
+        : notVerified('execution-failed', `The reviewer's session failed${result.interruption === undefined ? '' : ` (${result.interruption})`}`, true);
+    case 'stopped':
+      return notVerified(stop ?? 'stopped', stop === 'deadline' ? 'The reviews\' settlement bound passed while this attempt ran' : 'The run stopped its readers while this attempt ran', false);
+  }
 }

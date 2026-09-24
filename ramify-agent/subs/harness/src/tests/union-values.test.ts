@@ -103,7 +103,8 @@ describe('the run log', () => {
       'evidence-reopened', 'revision-needed', 'dependency-cycle-detected',
       'work-item-completed',
       'writer-acquired', 'writer-released',
-      'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded', 'stop-requested',
+      'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded',
+      'review-request-recorded', 'review-attempt-started', 'review-attempt-finished', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
@@ -784,7 +785,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer']);
   });
 
   test('every failure reason and every phase is named', () => {
@@ -967,6 +968,9 @@ function sampleData(type: RunEvent['type']): unknown {
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },
     'gate-attempted': { gate: 'ga-0001', checkpoint: 'final', verdict: 'passed', next: 'accept' },
     'check-findings-recorded': { cause: { kind: 'recovery', detail: 'd' }, checkFindings: [] },
+    'review-request-recorded': { request: 'rq-0001', workItem: 'wi-001', iteration: 'wi-001.i01', kind: 'code', gate: 'ga-0002', candidate: 'c1' },
+    'review-attempt-started': { request: 'rq-0001', attempt: 'rq-0001.a01', invocation: 'inv-0004', session: 'ses-0004', requestedStart: 'fresh' },
+    'review-attempt-finished': { request: 'rq-0001', attempt: 'rq-0001.a01', result: 'complete', reason: null, settles: true, checkFindings: [] },
     'job-completed': { gate: 'ga-0001', commit: null, workItems: 0 },
     'job-failed': { reason: 'internal', message: '', evidence: [] },
     'job-stopped': { settled: false },

@@ -208,7 +208,7 @@ const checkFindingEventsField = z.array(checkFindingEventSchema).max(100);
 | Run event | Carries | Introduced by |
 | --- | --- | --- |
 | `check-findings-recorded` (new) | `{ cause, checkFindings: min(1) }` for every path without its own event: recovery, user answers, a factual promotion outside a gate | iteration 2 |
-| `review-attempt-finished` (new) | review concerns promoted with the terminal attempt | iteration 3 |
+| `review-attempt-finished` (new) | review concerns promoted with the terminal attempt | iteration 3, implemented |
 | `reconciliation-assessed` (new) | the architect's relations and dispositions | iteration 5 |
 | `iteration-closed` (existing, optional field) | `claim-repair` for each CheckFinding whose repair intent the accepted iteration resolves | iteration 5 |
 | `gate-attempted` (existing, optional field) | factual promotion and `verify-by-check` from that gate | iteration 6 |
@@ -317,7 +317,8 @@ Rules the transition adds to §2.3:
 
 ## 3. Review requests and attempts (iterations 3–4)
 
-**Owner:** harness `src/reviews/`.
+**Owner:** harness `src/reviews/`. Code review is implemented by iteration 3;
+§3.5 records its exact interface and where it refines §3.1–3.4.
 
 ### 3.1 Identifiers and records
 
@@ -443,6 +444,87 @@ key has none.
 | `judgment` | actor `{ kind: 'agent', role: 'reviewer', invocation }`; consequence, rationale, uncertainty, remedy |
 | `suggests` | the concern's hint, dropped when it names no CheckFinding of the same owner |
 
+### 3.5 The implemented code review (iteration 3)
+
+**Files:** `src/reviews/records.ts` (schemas, IDs, layout, event data),
+`state.ts` (requests and attempts replayed from the log, coverage),
+`scheduler.ts` (the bounded reader queue), `snapshot.ts` (candidate
+snapshot and its four tools), `submission.ts` (the submission's rules),
+`message.ts` (the reviewer's first message); the prompt package
+`reviewer/1` (`prompts/reviewer.system.md`, `code-review.procedure.md`); the
+run service's review section; the evidence child's `CandidateSource`.
+
+Refinements of §3.1–3.4:
+
+- **Records** carry their `schema` literal; the submission record adds
+  `attempt`. The registry keys are `reviewRequest`, `reviewAttempt` and
+  `reviewSubmission`. `reviewKindSchema`, `reviewPolicyVersion` and
+  `reviewPolicySchema` live in `run/records.ts`, beside the run policy that
+  captures them.
+- **`review-attempt-started`** is `{ request, attempt, invocation, session,
+  requestedStart }`. The executor's actual start is known only after the
+  session starts, so the terminal attempt record carries `actualStart`.
+- **`review-attempt-finished`** is `{ request, attempt, result: complete |
+  partial | not-verified, reason: notVerifiedReason | null, settles,
+  checkFindings }`; the attempt record holds the full result.
+- **Eligibility.** A request is owed for every `iteration-closed` with
+  outcome `accepted`, a gate and a commit, whose iteration was licensed by
+  `iteration-assigned`. Contract iterations (`contract-requested`) are not
+  reviewed in v1. One request per kind in the captured policy's `kinds`;
+  `base` is the accepted boundary before the gate, `tree` is Git's tree of
+  the audited commit, `assignment` the assignment record's path.
+- **Reader.** Role `reviewer`, a fresh session, no built-in tool, a working
+  directory of its own under the attempt, and four harness tools:
+  `snapshot_list`, `snapshot_read`, `snapshot_search`, `snapshot_diff`.
+  They answer the audited commit from Git's objects only and refuse an
+  absolute path, a path out of the candidate, `.git`, a generated view
+  (`.ramify-architect`, `.ramify`), a symbolic link anywhere on the path and
+  a submodule. The invocation's absolute bound is `min(invocationAbsoluteMs,
+  attemptMs)`. A reader holds no writer; a run-wide bound refuses it without
+  failing the run; a session of it that does not become idle blocks no
+  writer.
+- **Submission rules** beyond the schema: at most `maxConcerns` concerns;
+  every changed path of the diff named exactly once, as inspected or as
+  missing; a path named inspected must have been answered by
+  `snapshot_read` or `snapshot_diff` during the attempt; a concern location
+  is a file of the candidate or a path the diff deleted, with `endLine ≥
+  startLine`.
+- **Results.** Submitted: `complete` with no missing path, else `partial`.
+  Every submission rejected up to the bound, or an end without one:
+  `invalid-output`. Idle or attempt bound: `timed-out`. A failed session or
+  a context budget reached: `execution-failed`. An unreadable candidate, no
+  reviewer package, a kind this harness cannot review yet, or a run-wide
+  bound: `unavailable`. A reader stopped by the run: `stopped`, or
+  `deadline` at the settlement bound. Invalid output, timed-out and
+  execution failure are retried while `retries` remain and the run accepts
+  attempts; every other result settles its request.
+- **Commit and fence.** One `commitCheckFindingChange` per terminal
+  attempt: `build` refuses (stale) a request already settled and an attempt
+  already finished; the commands are one `report` per concern bound per
+  §3.4, with the evidence hash `sha256:` over the canonical JSON of the
+  submission record. A refused concern set is recommitted as
+  `invalid-output` without concerns; `run-ended` and `stale-basis` are the
+  fence, and append nothing.
+- **Lifecycle.** The queue starts at most `concurrency` attempts and
+  finishes waiting requests beyond `queue` as `queue-overflow`. Before the
+  final gate the run waits at most `settleMs` for its reviews, then stops
+  every reader and finishes what remains as `deadline`. A stop, and a
+  failure, stop every reader (and the writer, for a stop), wait the stop
+  bound, and finish every unsettled request as `stopped` before the
+  terminal event. A closing service records nothing. Recovery records every
+  request owed and finishes each unsettled one: `execution-failed` for an
+  attempt whose reader was running, `stopped` for one never started; the
+  recovered run is interrupted and runs nothing more.
+- **Query.** `RunService.reviews(planId, runId, workItem?)` answers the
+  requests from the log and the coverage `{ state: available, requested,
+  complete, partial, notVerified, pending }`, or `{ state: unavailable,
+  reason: no-review-policy }` for a run whose policy has no `reviews`.
+- **Gate mutex.** The ledger's `EffectSpec` gains `serialize`, the caller's
+  own serialization held while the intent is built and appended and while
+  the completion is, and not while `perform` runs; `intent` may be built
+  under it. The gate's commit-and-audit effect uses the run mutex so, and a
+  terminal event waits for the effect in flight.
+
 ## 4. Policy (iterations 3–5)
 
 The run policy becomes `run-policy/3`; `run-policy/2` runs remain readable.
@@ -463,7 +545,7 @@ reviews: z.object({
 
 | Value | Initial trial value |
 | --- | --- |
-| `kinds` | `code`, `scope`, `design` |
+| `kinds` | `code`, `scope`, `design`; `code` alone until iteration 4 adds the other two |
 | `concurrency` (readers beside the one writer) | 2 |
 | `queue` | 12 |
 | `retries` after an execution or validation failure | 1 |
@@ -473,7 +555,13 @@ reviews: z.object({
 | `reconciliationRoundsPerWorkItem` | 3 |
 
 A policy without `reviews` means the run records no requests: every review
-and CheckFinding coverage view answers `unavailable`, never clean. Overflow
+and CheckFinding coverage view answers `unavailable`, never clean.
+
+Iteration 3 implements `run-policy/3` as above (`defaultReviewPolicy`,
+`reconciliationRoundsPerWorkItem: 3`). The role union gains `reviewer`, and
+the policy's `context` becomes an object of the five earlier roles with an
+optional `reviewer`, so a `run-policy/2` record still reads and still
+requires every role it could invoke. Overflow
 finishes the attempt as `queue-overflow`; an attempt or retry that cannot
 finish before its work item's deadline finishes at once as
 `no-time-before-deadline`. The writer has scheduling priority.

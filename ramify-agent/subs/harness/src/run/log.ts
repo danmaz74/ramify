@@ -19,6 +19,9 @@ import type { LedgerFileSystem } from '../../subs/ledger/src/fs.js';
 import { replayCheckFindingEvents } from '../../subs/check-findings/src/replay.js';
 import type { CheckFindingEvent } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { checkFindingCauseSchema, checkFindingEventsField } from '../check-findings/records.js';
+import {
+  reviewAttemptFinishedFields, reviewAttemptStartedDataSchema, reviewRequestRecordedDataSchema,
+} from '../reviews/records.js';
 
 /*
  * The run log, `events.jsonl`: state transitions only, and the canonical
@@ -473,6 +476,21 @@ export const runEventSchema = z.discriminatedUnion('type', [
     cause: checkFindingCauseSchema,
     checkFindings: checkFindingEventsField.min(1),
   }).strict()),
+  /**
+   * Commits one `ReviewRequest`: a review question over the audited
+   * candidate of an iteration that closed accepted, recorded before the
+   * driver passes it, or by recovery from that `iteration-closed`.
+   */
+  event('review-request-recorded', reviewRequestRecordedDataSchema),
+  /** A review attempt's reader session is about to start; the invocation is already started. */
+  event('review-attempt-started', reviewAttemptStartedDataSchema),
+  /**
+   * Commits one terminal `ReviewAttempt`, its valid submission and the
+   * CheckFindings its concerns open, as one line. A result that arrives
+   * after its request settled, or after its attempt finished, is fenced
+   * and never appended.
+   */
+  event('review-attempt-finished', z.object({ ...reviewAttemptFinishedFields, checkFindings: checkFindingEventsField }).strict()),
   event('stop-requested', z.object({ command: acceptedCommandSchema }).strict()),
   /** Requires a passing `final` gate on the current tree; an empty queue alone never satisfies it. */
   event('job-completed', z.object({ gate: text, commit: z.string().nullable(), workItems: z.int().nonnegative() }).strict()),

@@ -372,6 +372,102 @@ async function fileBytes(path: string): Promise<number | null> {
   }
 }
 
+// A committed candidate, read from Git's objects rather than from a working
+// directory. A later writer changing the tree, the index or the generated
+// views cannot change what these answer, and nothing here follows a
+// symbolic link: a link is an entry whose content is its target's name.
+
+/** One entry of a commit's tree: a regular or executable file, a symbolic link, or a submodule. */
+export interface TreeEntry {
+  readonly path: string;
+  readonly kind: 'file' | 'executable' | 'symlink' | 'submodule';
+  /** The blob's size in bytes; null for a submodule. */
+  readonly bytes: number | null;
+}
+
+/** One line a search matched in a commit. */
+export interface TreeMatch {
+  readonly path: string;
+  readonly line: number;
+  readonly text: string;
+}
+
+/** The tree a commit names. */
+export async function commitTree(root: string, commit: string, signal?: AbortSignal): Promise<string> {
+  const run = await gitOk(root, ['rev-parse', '--verify', `${commit}^{tree}`], signal);
+  return run.stdout.trim();
+}
+
+/** Every entry of a commit's tree, recursively, in Git's order. */
+export async function treeEntries(root: string, commit: string, signal?: AbortSignal): Promise<TreeEntry[]> {
+  const run = await gitOk(root, ['ls-tree', '-r', '-z', '-l', '--full-tree', commit], signal);
+  const entries: TreeEntry[] = [];
+  for (const field of run.stdout.split('\0')) {
+    if (field === '') continue;
+    const tab = field.indexOf('\t');
+    if (tab < 0) continue;
+    const [mode, , , size] = field.slice(0, tab).split(/\s+/);
+    const path = field.slice(tab + 1);
+    const kind = mode === '120000' ? 'symlink' : mode === '160000' ? 'submodule' : mode === '100755' ? 'executable' : 'file';
+    const bytes = Number.parseInt(size ?? '', 10);
+    entries.push({ path, kind, bytes: Number.isNaN(bytes) ? null : bytes });
+  }
+  return entries;
+}
+
+/** The content of one blob of a commit, as text. The caller bounds its size from `treeEntries`. */
+export async function readBlob(root: string, commit: string, path: string, signal?: AbortSignal): Promise<string> {
+  const run = await gitOk(root, ['cat-file', 'blob', `${commit}:${path}`], signal);
+  return run.stdout;
+}
+
+/**
+ * The lines of a commit's text files that match an extended regular
+ * expression, beneath `paths` or everywhere. No match is an empty answer,
+ * not an error.
+ */
+export async function grepTree(root: string, commit: string, pattern: string, paths: readonly string[] = [], signal?: AbortSignal): Promise<TreeMatch[]> {
+  const run = await git(root, ['grep', '-n', '--null', '-I', '--no-color', '-E', '-e', pattern, commit, '--', ...paths], signal);
+  if (run.exitCode === 1) return [];
+  if (run.exitCode !== 0) {
+    throw new GitError(`\`git grep\` exited with ${run.exitCode}`, {
+      argv: ['git', 'grep', pattern, commit], outcome: { kind: 'completed', exitCode: run.exitCode }, output: run.stderr.trim().slice(-2000),
+    });
+  }
+  const prefix = `${commit}:`;
+  const matches: TreeMatch[] = [];
+  for (const line of run.stdout.split('\n')) {
+    if (line === '') continue;
+    const [name, number, ...text] = line.split('\0');
+    if (name === undefined || number === undefined) continue;
+    matches.push({ path: name.startsWith(prefix) ? name.slice(prefix.length) : name, line: Number.parseInt(number, 10), text: text.join('\0') });
+  }
+  return matches;
+}
+
+/** The unified diff between two commits, of one path or of all of them. */
+export async function diffPatch(root: string, from: string, to: string, path?: string, signal?: AbortSignal): Promise<string> {
+  const run = await gitOk(root, ['diff', '--no-color', '--no-renames', '--no-ext-diff', from, to, '--', ...(path === undefined ? [] : [path])], signal);
+  return run.stdout;
+}
+
+/**
+ * The read-only boundary a review snapshot is served from: one committed
+ * candidate and its diff from a base, by Git's objects alone. Consumer tests
+ * inject scripted answers, as they do for `GitService`.
+ */
+export interface CandidateSource {
+  readonly commitTree: typeof commitTree;
+  readonly treeEntries: typeof treeEntries;
+  readonly readBlob: typeof readBlob;
+  readonly grepTree: typeof grepTree;
+  readonly diffNameStatus: typeof diffNameStatus;
+  readonly diffPatch: typeof diffPatch;
+}
+
+/** The process-backed candidate source. */
+export const gitCandidateSource: CandidateSource = { commitTree, treeEntries, readBlob, grepTree, diffNameStatus, diffPatch };
+
 /**
  * The external Git boundary. Inject scripted answers in consumer tests;
  * never reproduce repository behavior in a test double. Each function keeps

@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkCommand, type CheckCommand } from '../checks/records.js';
 import type { Role } from '../interfaces/protocol/runs.js';
-import { roles, runPolicySchema, type RunPolicy } from './records.js';
+import { reviewPolicyVersion, roles, runPolicySchema, type ReviewPolicy, type RunPolicy } from './records.js';
 
 /*
  * The policy one run runs under. It is hardcoded, captured in `job.json`
@@ -16,8 +16,8 @@ import { roles, runPolicySchema, type RunPolicy } from './records.js';
  * own settings, built again at the moment of the spawn.
  */
 
-/** The version this policy is recorded under. */
-export const runPolicyVersion = 'run-policy/2';
+/** The version this policy is recorded under. `run-policy/2` runs, without reviews, stay readable. */
+export const runPolicyVersion = 'run-policy/3';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {
@@ -40,6 +40,25 @@ export const defaultLimits: RunPolicy['limits'] = {
   maxPlacementRequests: 32,
   maxInvocationsPerRun: 400,
   runAbsoluteMs: 28_800_000,
+  reconciliationRoundsPerWorkItem: 3,
+};
+
+/**
+ * The first trial's review policy (Plan 12): two readers beside the writer,
+ * twelve waiting requests, one retry, ten minutes an attempt and fifteen a
+ * work item's wait. Only code review is implemented so far; the scope and
+ * design questions join `kinds` when their prompts exist. These are limits
+ * to measure, not claims about throughput.
+ */
+export const defaultReviewPolicy: ReviewPolicy = {
+  version: reviewPolicyVersion,
+  kinds: ['code'],
+  concurrency: 2,
+  queue: 12,
+  retries: 1,
+  attemptMs: 600_000,
+  settleMs: 900_000,
+  maxConcerns: 20,
 };
 
 /**
@@ -48,13 +67,27 @@ export const defaultLimits: RunPolicy['limits'] = {
  * no window is reported. Neither has a default: a role that forgot its
  * policy would otherwise be compacted silently.
  */
-export const defaultContextPolicies: Record<Role, RunPolicy['context'][Role]> = {
+export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context'][Role]>> = {
   'initial-architect': { compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 },
   'local-architect': { compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 },
   'global-fork': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 16_000 },
   engineer: { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
   'contract-engineer': { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
+  // A reviewer reads a bounded diff and submits; running out of room is an
+  // execution failure of its attempt, never a compacted half-review.
+  reviewer: { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
 };
+
+/**
+ * The context policy a run captured for one role. A run captured before the
+ * role existed never invokes it, so a missing entry is a defect, not a
+ * default to fall back to.
+ */
+export function contextPolicyOf(policy: RunPolicy, role: Role): NonNullable<RunPolicy['context'][Role]> {
+  const context = policy.context[role];
+  if (context === undefined) throw new Error(`The run's policy (${policy.version}) has no context policy for the ${role}`);
+  return context;
+}
 
 /**
  * The transcript policy. A body larger than this is stored once in the
@@ -189,6 +222,7 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
     limits: defaultLimits,
     context,
     transcript: defaultTranscriptPolicy,
+    reviews: defaultReviewPolicy,
     commands: {
       typeCheck: npmCommand(projectRoot, ['run', 'type-check'], commandTimeouts.typeCheck),
       allTests: npmCommand(projectRoot, ['test'], commandTimeouts.allTests),

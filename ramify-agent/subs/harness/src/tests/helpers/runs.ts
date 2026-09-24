@@ -106,6 +106,12 @@ export interface TestPolicyOptions {
   /** A command that never answers, so its checkpoint records a timeout. */
   readonly timingOut?: 'allTests' | undefined;
   readonly nested?: ReadonlyArray<{ directory: string; testScript: string | null }> | undefined;
+  /**
+   * The review policy the run captures. A test policy requests no reviews
+   * unless it says so, so the invocations and events of every other
+   * scenario are the ones it states.
+   */
+  readonly reviews?: RunPolicy['reviews'];
 }
 
 /**
@@ -133,8 +139,10 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
     }
     return exits(options.failing === name ? 1 : 0, projectRoot);
   };
+  const { reviews: _reviews, ...unreviewed } = base;
   return {
-    ...base,
+    ...unreviewed,
+    ...(options.reviews === undefined ? {} : { reviews: options.reviews }),
     commands: {
       ...base.commands,
       allTests: command('allTests'),

@@ -144,6 +144,14 @@ identity, so neither the project's hooks nor the person's configuration can
 fail it; it refuses any branch that is not a run branch, and a tree with
 nothing to commit is `null` rather than an empty commit.
 
+`CandidateSource` is a second, read-only boundary over the same Git: one
+committed candidate read from Git's objects, never from a working
+directory. `commitTree`, `treeEntries`, `readBlob`, `grepTree` and
+`diffPatch`, with `diffNameStatus`, are what a review snapshot is served
+from; a symbolic link is an entry whose content is its target's name and is
+never followed. `gitCandidateSource` is its process adapter, and review
+tests script it as they script `GitService`.
+
 ## What is still elsewhere
 
 `mapping/validate.ts` decides what a map submission may cite and stays with

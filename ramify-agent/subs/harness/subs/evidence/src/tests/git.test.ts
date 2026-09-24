@@ -1,7 +1,8 @@
 import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GitError, gitService as git } from '../git.js';
+import { GitError, gitCandidateSource as candidate, gitService as git } from '../git.js';
+import { symlink } from 'node:fs/promises';
 import { testRepository, withoutGitConfiguration } from './helpers/git.js';
 import type { TestRepository } from './helpers/git.js';
 import { temporaryDirectory } from './helpers/temporary.js';
@@ -104,6 +105,35 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
         { path: 'subs/notes/module.ramify', added: 2, deleted: 0, binary: false, bytes: null },
         { path: 'subs/notes/src/notes.ts', added: 1, deleted: 0, binary: false, bytes: null },
       ]);
+    });
+  });
+
+  it('serves a committed candidate from Git objects, whatever the working tree holds afterwards', async () => {
+    await withRepository(async repository => {
+      const root = repository.root;
+      const base = await git.currentHead(root);
+      await repository.write('src/one.ts', 'export const one = 1;\n// hello\n');
+      await symlink('../../outside.txt', join(root, 'src', 'link'));
+      await repository.git('add', '--all');
+      await repository.git('-c', 'user.name=f', '-c', 'user.email=f@l', 'commit', '--message', 'candidate');
+      const commit = (await repository.git('rev-parse', 'HEAD')).trim();
+
+      // A later writer changes the file and adds another; the candidate does not move.
+      await repository.write('src/one.ts', 'export const one = 2;\n');
+      await repository.write('src/two.ts', 'export const two = 2;\n');
+
+      expect(await candidate.commitTree(root, commit)).toBe((await repository.git('rev-parse', `${commit}^{tree}`)).trim());
+      expect(await candidate.treeEntries(root, commit)).toEqual([
+        { path: 'README.md', kind: 'file', bytes: 8 },
+        { path: 'src/link', kind: 'symlink', bytes: 17 },
+        { path: 'src/one.ts', kind: 'file', bytes: 31 },
+      ]);
+      expect(await candidate.readBlob(root, commit, 'src/one.ts')).toBe('export const one = 1;\n// hello\n');
+      expect(await candidate.grepTree(root, commit, 'hel+o', ['src'])).toEqual([{ path: 'src/one.ts', line: 2, text: '// hello' }]);
+      expect(await candidate.grepTree(root, commit, 'absent')).toEqual([]);
+      expect(await candidate.diffNameStatus(root, base, commit)).toEqual([{ status: 'A', path: 'src/link' }, { status: 'A', path: 'src/one.ts' }]);
+      expect(await candidate.diffPatch(root, base, commit, 'src/one.ts')).toContain('+export const one = 1;');
+      await expect(candidate.readBlob(root, commit, 'src/two.ts')).rejects.toBeInstanceOf(GitError);
     });
   });
 

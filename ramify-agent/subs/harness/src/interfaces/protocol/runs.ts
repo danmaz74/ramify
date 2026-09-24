@@ -25,7 +25,8 @@ export type RunId = z.infer<typeof runIdSchema>;
 /**
  * The roles a run invokes. The long-lived global parent is no role: briefs
  * append to it without inference, and its maintenance is recorded against
- * the fork that performed it.
+ * the fork that performed it. A reviewer reads one frozen candidate beside
+ * the run's one writer and writes nothing.
  */
 export const roleSchema = z.enum([
   'initial-architect',
@@ -33,6 +34,7 @@ export const roleSchema = z.enum([
   'local-architect',
   'engineer',
   'contract-engineer',
+  'reviewer',
 ]);
 export type Role = z.infer<typeof roleSchema>;
 

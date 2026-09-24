@@ -30,5 +30,9 @@ expose-src guardedFilesHash from "guarded-files.ts" to parent
 expose-src GitError, CommitTrailer, isCleanRepository, createRunBranch, commitAccepted, findCommitByTrailer, findCommitByTrailers, changedPaths, diffNumstat from "git.ts" to parent
 expose-src commitNameStatus, diffNameStatus, worktreeLineChanges, changedEntries from "git.ts" to parent
 
+// A committed candidate read from Git's objects, which a review snapshot is
+// served from: its tree, its files, a search and its diff from a base.
+expose-src CandidateSource, gitCandidateSource, TreeEntry, TreeMatch, commitTree, treeEntries, readBlob, grepTree, diffPatch from "git.ts" to parent
+
 // Consumers inject this boundary; real Git integration tests live with the adapter.
 expose-src GitService, gitService, currentHead from "git.ts" to parent

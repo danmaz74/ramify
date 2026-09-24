@@ -381,7 +381,7 @@ describe('a rejected submission in a run', () => {
 describe('the prompt package', () => {
   test('offers exactly the submission members this iteration produces', async () => {
     const { manifest } = await loadPromptPackages();
-    expect(Object.keys(manifest.packages).sort()).toEqual(['contract-engineer', 'engineer', 'global-fork', 'initial-architect', 'local-architect']);
+    expect(Object.keys(manifest.packages).sort()).toEqual(['contract-engineer', 'engineer', 'global-fork', 'initial-architect', 'local-architect', 'reviewer']);
     const initial = manifest.packages['initial-architect']!;
     expect(initial.package).toBe('initial-architect/2');
     expect(initial.submissionKinds).toEqual(['initial-analysis']);
@@ -411,6 +411,12 @@ describe('the prompt package', () => {
     expect(contract.submissionKinds).toEqual(['established', 'incomplete']);
     expect(contract.files.some(file => file.kind === 'skill' && file.path.endsWith('contract.skill.md'))).toBe(true);
     expect(contract.hash).toMatch(/^[0-9a-f]{64}$/);
+
+    // A reviewer's one submission is its review.
+    const reviewer = manifest.packages['reviewer']!;
+    expect(reviewer.package).toBe('reviewer/1');
+    expect(reviewer.submissionKinds).toEqual(['review']);
+    expect(reviewer.files.some(file => file.kind === 'procedure' && file.path.endsWith('code-review.procedure.md'))).toBe(true);
   });
 
   test('asks for the entry assignments, which become the work items', async () => {

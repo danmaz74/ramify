@@ -8,6 +8,7 @@ import { localArchitectJsonSchema, localArchitectSubmissionKinds, localArchitect
 import { engineerJsonSchema, engineerSubmissionKinds, engineerToolName } from '../work/engineer.js';
 import { forkJsonSchema, forkSubmissionKinds, forkToolName } from '../architecture/submission.js';
 import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '../contracts/submission.js';
+import { reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
 import { promptPackageManifestSchema, type PromptPackageManifest } from '../run/records.js';
 
 /*
@@ -35,6 +36,8 @@ const engineerSystemFile = fileURLToPath(new URL('./engineer.system.md', import.
 const engineerProcedureFile = fileURLToPath(new URL('./engineer.procedure.md', import.meta.url));
 const contractSystemFile = fileURLToPath(new URL('./contract-engineer.system.md', import.meta.url));
 const contractProcedureFile = fileURLToPath(new URL('./contract.procedure.md', import.meta.url));
+const reviewerSystemFile = fileURLToPath(new URL('./reviewer.system.md', import.meta.url));
+const codeReviewProcedureFile = fileURLToPath(new URL('./code-review.procedure.md', import.meta.url));
 
 /** The contract skill the harness supplies with a contract iteration. */
 const contractSkillFile = fileURLToPath(new URL('./contract.skill.md', import.meta.url));
@@ -49,6 +52,7 @@ const submissionSchemaNames = {
   'local-architect': 'local-architect.schema.json',
   engineer: 'engineer.schema.json',
   'contract-engineer': 'contract-engineer.schema.json',
+  reviewer: 'review.schema.json',
 } as const;
 
 export function sha256(content: string | Uint8Array): string {
@@ -90,6 +94,7 @@ export const globalForkPackage = 'global-fork/1';
 export const localArchitectPackage = 'local-architect/2';
 export const engineerPackage = 'engineer/2';
 export const contractEngineerPackage = 'contract-engineer/1';
+export const reviewerPackage = 'reviewer/1';
 
 /**
  * Loads every package a run offers. A role with no package yet has no entry:
@@ -105,6 +110,7 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['local-architect', await loadLocalArchitect(options)],
     ['engineer', await loadEngineer(options)],
     ['contract-engineer', await loadContractEngineer(options)],
+    ['reviewer', await loadReviewer(options)],
   ]);
   const manifest = promptPackageManifestSchema.parse({
     schema: 'ramify-agent.prompt-manifest/1',
@@ -198,6 +204,22 @@ function loadContractEngineer(options: PromptPackageOptions): Promise<LoadedPack
     schema: contractJsonSchema,
     submissionKinds: [...contractSubmissionKinds],
     extraSkillFile: contractSkillFile,
+    options,
+  });
+}
+
+/**
+ * The reviewer's package: code review of one frozen candidate. Its one
+ * submission is the review; it offers no union.
+ */
+function loadReviewer(options: PromptPackageOptions): Promise<LoadedPackage> {
+  return loadPackage({
+    role: 'reviewer',
+    name: reviewerPackage,
+    systemFile: reviewerSystemFile,
+    procedureFile: codeReviewProcedureFile,
+    schema: reviewJsonSchema,
+    submissionKinds: ['review'],
     options,
   });
 }
@@ -300,6 +322,11 @@ function render(loaded: LoadedPackage, projectRoot: string, submissionTool: stri
     submissionTool,
     submissionSchema: loaded.submissionSchema.trim(),
   });
+}
+
+/** The rendered system prompt of one reviewer. It is never stored either. */
+export function renderReviewerPrompt(loaded: LoadedPackage, projectRoot: string): string {
+  return render(loaded, projectRoot, reviewToolName);
 }
 
 /** The identity of what one invocation was given, beside the package's own hash. */
