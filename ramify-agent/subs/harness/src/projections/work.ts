@@ -78,10 +78,15 @@ function summaryOf(view: RunView, item: WorkItem, states: ItemState): WorkItemSu
   };
 }
 
+/** Every work item, unbounded, for projections that provide their own paging. */
+export function allWorkItemsOf(view: RunView): WorkItemSummary[] {
+  const states = itemStates(view);
+  return view.records.workItems.map(item => summaryOf(view, item, states));
+}
+
 /** Every work item, at most 200, in the order the log committed them. */
 export function workItemsOf(view: RunView): { workItems: WorkItemSummary[]; total: number } {
-  const states = itemStates(view);
-  const all = view.records.workItems.map(item => summaryOf(view, item, states));
+  const all = allWorkItemsOf(view);
   return { workItems: all.slice(0, runQueryLimits.workItems), total: all.length };
 }
 

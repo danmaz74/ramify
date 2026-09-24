@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { modulePathSchema, moduleTreeResponseSchema } from './evidence.js';
 import { jobVersionSchema } from './jobs.js';
 import {
-  capabilityStateSchema, gateCheckpointSchema, gateVerdictSchema, roleSchema,
+  capabilityStateSchema, gateCauseSchema, gateCheckpointSchema, gateVerdictSchema, roleSchema,
   scenarioKindSchema, scenarioStatusSchema, trackedScenarioStateSchema, workItemStateSchema,
 } from './runs.js';
-import { sessionStateSchema } from './sessions.js';
+import { sessionReachSchema, sessionStateSchema } from './sessions.js';
 
 /** A browser-safe, read-only projection of one committed run version. */
 export const executionMapPolicySchema = z.literal('execution-map/1');
@@ -35,7 +35,7 @@ export type ExecutionElementKey = z.infer<typeof executionElementKeySchema>;
 
 export const executionSourceRefSchema = z.object({
   kind: z.enum([
-    'run-event', 'analysis-entry', 'tracked-scenario', 'capability-progress', 'work-item',
+    'run-event', 'analysis-entry', 'capability-record', 'tracked-scenario', 'capability-progress', 'work-item',
     'iteration-assignment', 'placement-request', 'placement-decision', 'contract',
     'requirement', 'session', 'gate', 'audit', 'line-event', 'module-tree',
   ]),
@@ -90,6 +90,7 @@ const nodeBase = {
 export const executionNodeSchema = z.discriminatedUnion('kind', [
   z.object({ ...nodeBase, kind: z.literal('capability'), level: z.enum(['entry', 'lower']),
     state: capabilityStateSchema, reason: text, owner: modulePathSchema.nullable(),
+    proposed: z.object({ parent: modulePathSchema, directory: text, purpose: text, tags: z.array(z.string()) }).strict().nullable(),
     scenarios: z.object({ coverage: executionCountCoverageSchema,
       passed: count, failed: count, other: count, noRealRun: count, unavailable: count }).strict(),
     directRequirements: z.object({ coverage: executionCountCoverageSchema, verified: count,
@@ -104,6 +105,9 @@ export const executionNodeSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('iteration'), workItem: executionElementKeySchema,
     ordinal: z.int().positive(), outlineRevision: z.int().positive(), state: z.enum(['assigned', 'working', 'completed', 'failed']),
+    outcome: z.enum(['accepted', 'partial', 'unsuitable', 'exhausted', 'superseded']).nullable(),
+    module: modulePathSchema.nullable(),
+    scopeExceptions: z.array(z.object({ path: text, purpose: text }).strict()),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('placement-request'), state: z.enum(['open', 'decided', 'unavailable']),
     requestedBy: executionElementKeySchema,
@@ -116,12 +120,15 @@ export const executionNodeSchema = z.discriminatedUnion('kind', [
     verifiedRevision: z.int().positive().nullable(),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('session'), role: roleSchema, state: sessionStateSchema,
-    executor: z.enum(['pi', 'scripted']), workItem: executionElementKeySchema.nullable(),
+    executor: text, workItem: executionElementKeySchema.nullable(),
+    reach: sessionReachSchema, invocations: z.array(text),
   }).strict(),
   z.object({ ...nodeBase, kind: z.literal('gate'), checkpoint: gateCheckpointSchema,
     /** Null while the attempt is active; no verdict has been established yet. */
     verdict: gateVerdictSchema.nullable(), audit: executionAuditLifecycleSchema, repairRound: count,
     commit: text.nullable(), auditedCommit: text.nullable(), active: z.boolean(),
+    subject: z.object({ workItem: text.nullable(), iteration: text.nullable() }).strict(),
+    cause: gateCauseSchema.nullable(), evidencePresent: z.boolean(),
   }).strict(),
 ]).superRefine((node, context) => {
   if (!node.key.startsWith(`${node.kind}:`)) context.addIssue({ code: 'custom', path: ['key'], message: 'Key kind differs from node kind' });

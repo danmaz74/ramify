@@ -30,3 +30,32 @@ The separate recorded `status-badge-tone` pi witness has not been replayed. Full
 ### Gate-result correction
 
 The first contract required a gate verdict even while `active: true`, which would have forced the projection to invent a result before a running readiness or committing gate finished. The gate node now requires `verdict: null` exactly while active and requires a real verdict when settled. The fixture includes a separate running-gate page, and the focused test checks both invalid combinations. The audit lifecycle stays independent. This is an iteration 1 contract correction; it adds no projection or HTTP behavior. The focused Vitest run passed 10 tests; `npm run type-check` passed; `npm run check:self` passed with 0 errors, 0 warnings and 186 analysis limits.
+
+## Iteration 2 — core execution index and complete descriptions
+
+**Starting commit:** `e50fa5c641a83734e34c470a60d560206006bf07` (iteration 1 handoff).
+
+### Delivered
+
+- `executionCoreOf` projects an unpaged census directly from `RunView` and the committed records, rather than the capped work-item, scenario or session list answers. It includes accepted entry and registered lower capability cards with current owner and proposed module path, named tracked scenarios, latest non-dry-run scenario result, work items, assignment order and outline revision, every settled gate attempt plus a recorded running gate, and every run session including finished/replaced ones. It retains exact iteration outcome, module path, scope extras, session reach and invocation IDs, and gate subject/cause/evidence presence. Core `tracks-scenario`, `started-for`, `assigned-iteration`, `session-for` and `gate-for` links use typed source refs. Later causal links remain iteration 3 work.
+- `executionCapabilityDetailOf` returns the full accepted entry description or registered lower-level behavior; `executionScenarioDetailOf` returns the entire frozen `source[]`. Missing retained detail is explicit `unavailable`. `RunQueries` exposes these read-only operations and the complete core index internally; versioned HTTP paging remains iteration 5.
+- `allWorkItemsOf` separates unbounded projection input from the existing bounded list response. The index checks snapshot-wide node/link uniqueness and endpoint existence before returning ordered streams.
+- The browser-safe node contract gained the capability's proposed module, compact gate subject/cause/evidence presence, iteration outcome/module/scope exceptions, session reach/invocations, and a `capability-record` source-ref kind. These additive fields close omissions in the iteration 1 contract while preserving keys, run versions and the active-gate `verdict: null` rule.
+
+### Verification
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| Focused `execution-map-contract`, `execution-map-projection` and `execution-map-durable` Vitest files | Pass, 16 tests | Contract corrections; two accepted roots and one lower provider; ordered iterations; dry-run versus later real failure; complete descriptions; all gate/session records; 205 work items beyond the old cap; replay from the persisted ledger after service restart. The constructed run supplies deliberate edge cases, while the service run supplies the disk/restart witness. |
+| Related `scenario-projections` and `run-projections` Vitest files | Pass, included in a 25-test run | Existing scenario and gate query behavior remains compatible. |
+| `npm run type-check` | Pass | Harness, web and scripts TypeScript scopes. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings; 186 analysis limits | Ownership/exposure check over 9 owners. The limits are signature inference coverage, not executable acceptance. |
+| `git diff --check` | Pass | Source and documentation whitespace. |
+
+### Audit result provider gap and handoff
+
+The gate verdict and audit outcome are distinct. The current `GateAttempt` retains `audited` and `GateEvidence` publication refs but **no audit overall result**. The audit adapter receives `result.summary.overall` (`pass` or `fail`) in `subs/harness/subs/audit/src/check-execution.ts`; it currently returns only the refs in `CheckExecutionResult`. Published evidence can accompany a failed audit, so neither evidence presence nor the gate verdict establishes a green audit ring. The core projection reports `audit: unavailable` with a named gap for an evidence-present gate, `incomplete` when `gate-committing` or a commit identity is recorded without publication, `not-started` where none of those start facts is recorded, and `not-applicable` for readiness.
+
+**Required successor work before the gate marker is accepted:** the harness/audit owner must carry the exact `result.summary.overall` through `CheckExecutionResult` into a versioned durable outcome associated with the gate attempt (a new gate record version with backward reading for v3, or a separate committed audit-outcome record). The projection can then map exact `pass`/`fail` to `passed`/`failed`; it must not derive either from the gate verdict. Iteration 3 is the earliest dependency-safe place to add this provider fact while it adds causal gate links; if deferred, iteration 9's audit acceptance remains open. The final browser witness needs one failed gate with a passing audit and one audit failure independently of the gate verdict.
+
+Iteration 3 should add the remaining typed provider, repair, request, verification and cycle links and requirement states to this index. It should preserve source order and reuse these canonical keys; it should also add exact awaited-session/running-gate activity from the log without inferring a readiness gate from an open phase. The existing scripted two-root fixture is a contract witness, not a replayed durable run. The separate `status-badge-tone` pi witness still has not been replayed; full harness, browser and audit acceptance remain iteration 9 work.

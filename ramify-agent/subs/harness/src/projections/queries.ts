@@ -8,6 +8,7 @@ import type { RunEvent } from '../run/log.js';
 import { runLayout } from '../run/records.js';
 import { analysisOf, decisionsOf } from './analysis.js';
 import { eventPage } from './events.js';
+import { executionCapabilityDetailOf, executionCoreOf, executionScenarioDetailOf } from './execution-map.js';
 import { ProjectionError, readRunFile, runView, unservedRun, unservedRuns, type CommittedRun, type RunView } from './inputs.js';
 import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
@@ -102,6 +103,21 @@ export class RunQueries {
   /** Every tracked acceptance scenario with its state, origin, owner, file and the gates that ran it. */
   async scenarios(planId: string, runId: string): Promise<ScenarioListResponse> {
     return scenarioListOf(await this.view(planId, runId));
+  }
+
+  /** The complete unpaged execution census; the versioned HTTP page is added in iteration 5. */
+  async executionCore(planId: string, runId: string) {
+    return executionCoreOf(await this.view(planId, runId));
+  }
+
+  /** A capability's full accepted entry description or registered behavior. */
+  async executionCapabilityDetail(planId: string, runId: string, capability: string) {
+    return executionCapabilityDetailOf(await this.view(planId, runId), capability);
+  }
+
+  /** A scenario's complete frozen Gherkin block. */
+  async executionScenarioDetail(planId: string, runId: string, scenario: string) {
+    return executionScenarioDetailOf(await this.view(planId, runId), scenario);
   }
 
   async gate(planId: string, runId: string, gate: string): Promise<GateResponse> {

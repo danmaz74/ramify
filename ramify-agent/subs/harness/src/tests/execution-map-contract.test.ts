@@ -45,6 +45,27 @@ describe('execution-map/1 contract', () => {
     expect(executionMapPageSchema.safeParse(settled).success).toBe(false);
   });
 
+  it('requires compact gate subject and evidence, iteration scope, and session reach', () => {
+    const gate = clone();
+    const gateNode = gate.nodes.find(node => node.key === ids.failedGate)!;
+    if (gateNode.kind !== 'gate') throw new Error('Gate fixture missing');
+    expect(gateNode).toMatchObject({ subject: { workItem: 'wi-status' }, evidencePresent: true });
+    delete (gateNode as Partial<typeof gateNode>).subject;
+    expect(executionMapPageSchema.safeParse(gate).success).toBe(false);
+
+    const iteration = clone();
+    const iterationNode = iteration.nodes.find(node => node.kind === 'iteration')!;
+    if (iterationNode.kind !== 'iteration') throw new Error('Iteration fixture missing');
+    delete (iterationNode as Partial<typeof iterationNode>).scopeExceptions;
+    expect(executionMapPageSchema.safeParse(iteration).success).toBe(false);
+
+    const session = clone();
+    const sessionNode = session.nodes.find(node => node.kind === 'session')!;
+    if (sessionNode.kind !== 'session') throw new Error('Session fixture missing');
+    delete (sessionNode as Partial<typeof sessionNode>).reach;
+    expect(executionMapPageSchema.safeParse(session).success).toBe(false);
+  });
+
   it('rejects duplicate keys and link IDs', () => {
     const duplicateNode = clone();
     duplicateNode.nodes.push(duplicateNode.nodes[0]!);
