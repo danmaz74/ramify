@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { ScriptedAgent, ScriptedAgentOptions, ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 import type { RunEvent } from '../../run/log.js';
-import type { ReviewPolicy } from '../../run/records.js';
+import type { ReviewPolicy, RunPolicy } from '../../run/records.js';
 import type { RunWrite } from '../../run/service.js';
 import type { CheckExecutionPort } from '../../checks/execution.js';
 import { reviewLayout, type ReviewAttempt } from '../../reviews/records.js';
@@ -29,7 +29,14 @@ export const limit = `${notesDirectory}/src/limit.ts`;
 export const escape = `${notesDirectory}/src/escape`;
 export const base = 'revision-00';
 export const materialized = 'scenarios-00';
-const unchanged: GateCommit = { commit: null };
+/** A commit boundary where Git reports the tree unchanged. */
+export const unchanged: GateCommit = { commit: null };
+/** What Git answers the three iteration gates. */
+export const revisionGates: readonly GateCommit[] = [
+  { commit: 'revision-01', changes: [{ status: 'A', path: store }] },
+  { commit: 'revision-02', changes: [{ status: 'A', path: limit }] },
+  { commit: 'revision-03', changes: [{ status: 'M', path: store }, { status: 'A', path: `${notesDirectory}/src/index.ts` }] },
+];
 
 export async function reviewTarget(cleanups: Array<() => Promise<void>>) {
   const fixture = await copyFixture();
@@ -88,6 +95,16 @@ export interface ReviewRun {
   readonly architect?: ReadonlyArray<readonly ScriptStep[]>;
   /** The run's `now`, for a scenario that moves the clock. */
   readonly now?: () => Date;
+  /**
+   * The local architect's reconciliation forks, by reconciliation ID
+   * (`wi-001.rc01`), or `<id>#<n>` for the nth start of one. A fork with none
+   * scripted ends without a submission.
+   */
+  readonly reconcilers?: Readonly<Record<string, readonly ScriptStep[]>>;
+  /** What Git answers at each commit boundary after the scenarios' commit, in place of the three revisions and two unchanged trees. */
+  readonly gates?: readonly GateCommit[];
+  /** Run limits beside the test policy's, such as the reconciliation rounds. */
+  readonly limits?: Partial<RunPolicy['limits']>;
 }
 
 /** Drives one work item of three iterations with the reviewers each request's prompt selects, to the run's end. */
@@ -96,11 +113,7 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     head: base,
     commits: [
       scenariosCommit(plan, materialized, base),
-      { commit: 'revision-01', changes: [{ status: 'A', path: store }] },
-      { commit: 'revision-02', changes: [{ status: 'A', path: limit }] },
-      { commit: 'revision-03', changes: [{ status: 'M', path: store }, { status: 'A', path: `${notesDirectory}/src/index.ts` }] },
-      unchanged,
-      unchanged,
+      ...(scenario.gates ?? [...revisionGates, unchanged, unchanged]),
     ],
   });
   const scripted = scenario.commits ?? candidates();
@@ -116,7 +129,14 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     ],
     engineer: scenario.engineer.map(turn => [...turn]),
   }) as (spec: SessionSpec) => readonly ScriptStep[];
+  const reconcilerStarts = new Map<string, number>();
   const script = (spec: SessionSpec): readonly ScriptStep[] => {
+    const reconciliation = /^# Reconciliation (\S+)/u.exec(spec.prompt)?.[1];
+    if (spec.role === 'local-architect' && reconciliation !== undefined) {
+      const starts = (reconcilerStarts.get(reconciliation) ?? 0) + 1;
+      reconcilerStarts.set(reconciliation, starts);
+      return scenario.reconcilers?.[`${reconciliation}#${starts}`] ?? scenario.reconcilers?.[reconciliation] ?? [{ kind: 'end', message: `no reconciliation scripted for ${reconciliation}` }];
+    }
     if (spec.role !== 'reviewer') return roles(spec);
     // A design orientation is scripted as `orientation`, by the order it started in.
     const request = spec.prompt.startsWith('Design orientation.')
@@ -133,7 +153,10 @@ export async function reviewRun(root: string, cleanups: Array<() => Promise<void
     git: git.git,
     candidates: source,
     readinessExecution: directReadinessExecution(),
-    policy: projectRoot => testPolicy(projectRoot, { reviews: testReviewPolicy(scenario.policy) }),
+    policy: projectRoot => {
+      const policy = testPolicy(projectRoot, { reviews: testReviewPolicy(scenario.policy) });
+      return { ...policy, limits: { ...policy.limits, ...scenario.limits } };
+    },
     ...(scenario.afterWrite === undefined ? {} : { afterWrite: scenario.afterWrite }),
     ...(scenario.stopGraceMs === undefined ? {} : { stopGraceMs: scenario.stopGraceMs }),
     ...(scenario.checkExecution === undefined ? {} : { checkExecution: scenario.checkExecution }),

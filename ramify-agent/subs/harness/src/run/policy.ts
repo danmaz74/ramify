@@ -41,6 +41,7 @@ export const defaultLimits: RunPolicy['limits'] = {
   maxInvocationsPerRun: 400,
   runAbsoluteMs: 28_800_000,
   reconciliationRoundsPerWorkItem: 3,
+  laterRoundMinimumRisk: 'medium',
 };
 
 /**

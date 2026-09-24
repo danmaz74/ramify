@@ -648,6 +648,29 @@ commit and audit run outside the run mutex, which is held for the effect's
 intent and completion, so a reader's result is not held back by a slow
 audit.
 
+At a work item's completion request, `src/reviews/reconciliation.ts` and
+the run service's reconciliation section settle its review requests, waiting
+at most the policy's settlement bound from the request and then finishing
+what is left as not verified at the deadline and stopping those readers
+only; the queue stays open. An empty attention set goes to the work item's
+gate with no agent call. Otherwise one round records its basis (the audited
+source, the settled requests, the attention set in risk and credibility
+order, and the round's correction floor) and forks the local architect at
+the point after its completion request, fresh with the same packet where
+that point is gone. Its one submission relates, disposes of each signal and
+names the next action; the harness refuses a correction below the floor and
+a waiver outside the work item's module before the child decides, binds
+actor, source, authority, revisions and the repair intent, and commits the
+assessment under the mutex as the intent of a ledger effect whose effect
+appends the brief to the architect's own session, keyed by the round. A
+correction is assigned by that session as an ordinary iteration, which
+resolves the intent and, when it closes accepted, claims the repair on its
+`iteration-closed`. A user decision waits for its answer before the next
+round. Before `work-item-completed` the basis is validated once more; a
+changed source or request set, or a new or changed signal that warrants a
+round that remains, refuses the completion and reconciles again, and
+otherwise the work item completes naming each signal it leaves unresolved.
+
 `src/probes/pi-fork.probe.ts` is a development probe, run by hand with a
 real model and never by the test suite: it forks a pinned pi session point
 as a reviewer confined to an audited Git candidate and reports the start

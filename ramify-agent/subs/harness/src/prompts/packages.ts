@@ -9,6 +9,7 @@ import { engineerJsonSchema, engineerSubmissionKinds, engineerToolName } from '.
 import { forkJsonSchema, forkSubmissionKinds, forkToolName } from '../architecture/submission.js';
 import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '../contracts/submission.js';
 import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
+import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 
 /*
@@ -32,6 +33,7 @@ const forkSystemFile = fileURLToPath(new URL('./global-fork.system.md', import.m
 const forkProcedureFile = fileURLToPath(new URL('./global-fork.procedure.md', import.meta.url));
 const localSystemFile = fileURLToPath(new URL('./local-architect.system.md', import.meta.url));
 const localProcedureFile = fileURLToPath(new URL('./local-architect.procedure.md', import.meta.url));
+const reconciliationProcedureFile = fileURLToPath(new URL('./reconciliation.procedure.md', import.meta.url));
 const engineerSystemFile = fileURLToPath(new URL('./engineer.system.md', import.meta.url));
 const engineerProcedureFile = fileURLToPath(new URL('./engineer.procedure.md', import.meta.url));
 const contractSystemFile = fileURLToPath(new URL('./contract-engineer.system.md', import.meta.url));
@@ -94,6 +96,11 @@ export interface LoadedPackage {
     readonly procedures: Readonly<Record<ReviewKind, string>>;
     readonly orientation: { readonly system: string; readonly submissionSchema: string };
   } | undefined;
+  /**
+   * The local architect's reconciliation fork: its procedure and its
+   * submission. Only the local architect's package has them.
+   */
+  readonly reconciliation?: { readonly procedure: string; readonly submissionSchema: string } | undefined;
 }
 
 export interface PromptPackageOptions {
@@ -103,7 +110,7 @@ export interface PromptPackageOptions {
 /** The versions of the packages this iteration ships. */
 export const initialArchitectPackage = 'initial-architect/2';
 export const globalForkPackage = 'global-fork/1';
-export const localArchitectPackage = 'local-architect/2';
+export const localArchitectPackage = 'local-architect/3';
 export const engineerPackage = 'engineer/2';
 export const contractEngineerPackage = 'contract-engineer/1';
 export const reviewerPackage = 'reviewer/3';
@@ -169,18 +176,26 @@ function loadGlobalFork(options: PromptPackageOptions): Promise<LoadedPackage> {
 /**
  * The local architect's package. It offers the members of the union this
  * iteration produces; a member a package does not offer is one the role
- * never sees, so no run can produce it.
+ * never sees, so no run can produce it. Its reconciliation fork has a
+ * procedure and a submission of its own, both part of the hash.
  */
-function loadLocalArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
-  return loadPackage({
+async function loadLocalArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
+  const reconciliation = await readFile(reconciliationProcedureFile, 'utf8');
+  const reconciliationSchema = `${JSON.stringify(reconciliationJsonSchema, null, 2)}\n`;
+  const loaded = await loadPackage({
     role: 'local-architect',
     name: localArchitectPackage,
     systemFile: localSystemFile,
     procedureFile: localProcedureFile,
     schema: localArchitectJsonSchema,
-    submissionKinds: [...localArchitectSubmissionKinds],
+    submissionKinds: [...localArchitectSubmissionKinds, 'reconciliation'],
+    extraFiles: [
+      describe(reconciliationProcedureFile, reconciliation, 'procedure'),
+      { path: 'reconciliation.schema.json', hash: sha256(reconciliationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(reconciliationSchema) },
+    ],
     options,
   });
+  return { ...loaded, reconciliation: { procedure: withoutVersionComment(reconciliation).trim(), submissionSchema: reconciliationSchema } };
 }
 
 /**
@@ -336,6 +351,13 @@ export function renderGlobalForkPrompt(loaded: LoadedPackage, projectRoot: strin
 /** The rendered system prompt of a local architect. It is never stored either. */
 export function renderLocalArchitectPrompt(loaded: LoadedPackage, projectRoot: string): string {
   return render(loaded, projectRoot, localArchitectToolName);
+}
+
+/** The rendered system prompt of a local architect's reconciliation fork. It is never stored either. */
+export function renderReconciliationPrompt(loaded: LoadedPackage, projectRoot: string): string {
+  const reconciliation = loaded.reconciliation;
+  if (reconciliation === undefined) throw new Error(`The ${loaded.package} package has no reconciliation procedure`);
+  return render({ ...loaded, procedure: reconciliation.procedure, submissionSchema: reconciliation.submissionSchema }, projectRoot, reconciliationToolName);
 }
 
 /** The rendered system prompt of an engineer. It is never stored either. */

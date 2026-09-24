@@ -104,15 +104,16 @@ describe('the run log', () => {
       'work-item-completed',
       'writer-acquired', 'writer-released',
       'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded',
-      'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished', 'stop-requested',
+      'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished',
+      'reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended', 'reconciliation-refused', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
-    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']);
+    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
@@ -978,6 +979,10 @@ function sampleData(type: RunEvent['type']): unknown {
     'review-attempt-started': { request: 'rq-0001', attempt: 'rq-0001.a01', invocation: 'inv-0004', session: 'ses-0004', requestedStart: 'fresh' },
     'review-orientation-recorded': { key: 'b'.repeat(64), request: 'rq-0003', invocation: 'inv-0005', session: 'ses-0005', outcome: 'oriented' },
     'review-attempt-finished': { request: 'rq-0001', attempt: 'rq-0001.a01', result: 'complete', reason: null, settles: true, checkFindings: [] },
+    'reconciliation-started': { workItem: 'wi-001', reconciliation: 'wi-001.rc01', round: 1 },
+    'reconciliation-assessed': { workItem: 'wi-001', reconciliation: 'wi-001.rc01', invocation: 'inv-0009', next: 'complete', checkFindings: [] },
+    'reconciliation-brief-appended': { reconciliation: 'wi-001.rc01', session: 'ses-0002', ref: 'r', outcome: 'appended', reason: null },
+    'reconciliation-refused': { workItem: 'wi-001', reconciliation: null, stage: 'completion', reason: 'a CheckFinding became open after the basis' },
     'job-completed': { gate: 'ga-0001', commit: null, workItems: 0 },
     'job-failed': { reason: 'internal', message: '', evidence: [] },
     'job-stopped': { settled: false },

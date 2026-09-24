@@ -14,17 +14,29 @@ import { resolveTestSelection } from '../checks/selection.js';
 import type { GuardedScope } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
 import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
+import { decideCheckFindingChange } from '../../subs/check-findings/src/decide.js';
 import type {
-  CheckFindingCommand, CheckFindingGround, CheckFindingQueryInput, CheckFindingReportCredibility, CheckFindingSelection,
+  CheckFindingAt, CheckFindingCommand, CheckFindingGround, CheckFindingId, CheckFindingQueryInput, CheckFindingReportCredibility, CheckFindingRisk,
+  CheckFindingSelection, CheckFindingState, CheckFindingSummary,
 } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import type { CheckFindingCause } from '../check-findings/records.js';
 import { checkFindingStateOf } from '../check-findings/state.js';
-import { commitCheckFindingChange, type CheckFindingBuild, type CheckFindingCommit } from '../check-findings/transition.js';
+import {
+  commitCheckFindingChange, decideCheckFindingTransaction, type CheckFindingBuild, type CheckFindingCommit,
+} from '../check-findings/transition.js';
+import {
+  attentionAt, basisChange, briefText as reconciliationBrief, needsLaterRound, reconciliationAssessmentSchema, reconciliationBasisSchema,
+  reconciliationId, reconciliationJsonSchema, reconciliationLayout, reconciliationSubmissionDescription, reconciliationToolName, roundFloor,
+  validateReconciliation,
+  type AttentionEntry, type BasisRequest, type BoundReconciliation, type BriefAppendOutcome, type ReconciliationAssessment,
+  type ReconciliationBasis, type ReconciliationSubmission, type UnresolvedReason,
+} from '../reviews/reconciliation.js';
+import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { recordSettledSnapshot } from './mutations.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
 import { canonicalJson } from '../jobs/commands.js';
 import {
-  concernKey, reviewAttemptId, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas,
+  concernKey, reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas,
   type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
   type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
 } from '../reviews/records.js';
@@ -49,7 +61,8 @@ import { ensureStateDirectory } from '../store/state-directory.js';
 import { planPath, readPlan } from '../plans/discover.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderGlobalForkPrompt,
-  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReviewerPrompt, sha256, type LoadedPackage,
+  renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
+  type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
 import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
@@ -106,7 +119,7 @@ import {
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
-import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing } from '../work/session.js';
+import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type ReconciliationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
@@ -120,7 +133,7 @@ import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
 import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from './policy.js';
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
-  commitForMaterialization, commitForScenarios, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
+  commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
   incompleteScenarios, trackedScenarios, withdrawalMessage, withdrawnTrailerValue, withStates, writtenScenarios,
   type FeatureRerendering,
 } from './feature-files.js';
@@ -320,6 +333,12 @@ interface InvocationRequest<T> {
   readonly absoluteMs?: number | undefined;
   /** Called once `invocation-started` is committed and before the session starts, such as to commit what the invocation is for. */
   readonly onStarted?: ((invocation: string, session: SessionId) => Promise<void>) | undefined;
+  /**
+   * Whether the invocation, once started, ends at once as stopped with no
+   * session: a reader whose request its work item's deadline settled while
+   * it was being started. Asked after `onStarted`.
+   */
+  readonly fenced?: (() => boolean) | undefined;
   /** A session mode the caller could not honor, recorded on the invocation. */
   readonly degraded?: { readonly requested: 'fresh' | 'continued' | 'fork'; readonly reason: string } | undefined;
   /** The session a continued start joins; a fresh or forked start opens a new one. */
@@ -350,6 +369,49 @@ type SessionKeeping = { readonly kept: true } | { readonly kept: false; readonly
 
 const kept: SessionKeeping = { kept: true };
 const finished = (reason: SessionFinishReason): SessionKeeping => ({ kept: false, finished: reason });
+
+/** The reconciliation rounds of a run whose policy predates them. */
+const defaultReconciliationRounds = 3;
+
+/**
+ * The local architect's own session while its work item reconciles: the
+ * harness's session and the executor's latest point, which a brief append
+ * moves, and the rounds whose brief did not land, which its next input carries.
+ */
+interface ParentSession {
+  session: SessionId | undefined;
+  ref: string | undefined;
+  readonly undelivered: string[];
+}
+
+/**
+ * What a work item's completion is validated against before
+ * `work-item-completed`: the source, the settled requests and the attention
+ * set its last reconciliation left, and whether decisions were made against
+ * that source, which its scenario-rendering lineage must then preserve.
+ */
+interface CompletionBasis {
+  readonly commit: string;
+  readonly requests: readonly BasisRequest[];
+  readonly checkFindings: readonly CheckFindingAt[];
+  readonly decided: boolean;
+}
+
+/** What a reconciliation leads to: the work item's gate, or a correction its architect assigns. */
+type Reconciled =
+  | { readonly kind: 'gate'; readonly basis: CompletionBasis }
+  | { readonly kind: 'correct'; readonly reconciliation: string };
+
+/** What a reconciliation brief's append did; the completion of its effect. */
+interface BriefAppend {
+  readonly session: SessionId | null;
+  readonly ref: string | null;
+  readonly outcome: BriefAppendOutcome;
+  readonly reason: string | null;
+}
+
+/** An assessment whose basis no longer held when it was to be committed; nothing was appended. */
+class AssessmentRefusedError extends Error {}
 
 /**
  * What one iteration ended with: the result that closed it, and the need it
@@ -602,7 +664,12 @@ export class RunService {
     const briefs = run.log.all('brief-appended')
       .filter(event => event.data.session === session && event.sequence > ended)
       .map(event => event.data.decision);
-    return { from: point, reason, briefs };
+    // A reconciliation's brief is appended to the local architect's own
+    // session; the append is the executor's and names no harness point.
+    const reconciled = run.log.all('reconciliation-brief-appended')
+      .filter(event => event.data.session === session && event.sequence > ended && (event.data.outcome === 'appended' || event.data.outcome === 'already-present'))
+      .map(event => event.data.reconciliation);
+    return { from: point, reason, briefs: [...briefs, ...reconciled] };
   }
 
   /** The transcript of one of the run's sessions. */
@@ -878,8 +945,10 @@ export class RunService {
       return await unavailable(`The ${kind} review's captured inputs could not be read as recorded: ${message(error)}`) === 'committed';
     }
     const start = await this.reviewStart(run, agent, loaded, request, guidance);
-    // An orientation made first may have met a stop or the deadline.
+    // An orientation made first may have met a stop or the deadline, and
+    // its work item's deadline may have settled the request meanwhile.
     if (this.closed || this.ignoring(run) || run.reviews?.accepting !== true) return false;
+    if (reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
 
     const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, request.assignment));
     const held = selectCheckFindings(checkFindingStateOf(run.log.ledger), { kind: 'list', owner: { kind: 'work-item', workItem: request.workItem }, select: 'all', limit: 100 });
@@ -888,6 +957,8 @@ export class RunService {
     await mkdir(workspace, { recursive: true });
 
     let started: { invocation: string; session: SessionId; at: string } | undefined;
+    /** Set when the request was settled before this attempt's start could be recorded. */
+    let fenced = false;
     const result = await this.runInvocation<ReviewSubmission>(run, agent, {
       role: 'reviewer',
       work: { workItem: request.workItem, iteration: request.key.iteration },
@@ -916,14 +987,22 @@ export class RunService {
       workingDirectory: workspace,
       absoluteMs: policy.attemptMs,
       equip: () => ({ builtinTools: [], tools: [...tools.definitions] }),
+      // The start is recorded only for a request still unsettled, under the
+      // mutex its deadline settles it under; a settled one's reader never starts.
       onStarted: async (invocation, session) => {
         const at = this.now();
-        await this.write(run, { type: 'review-attempt-started', data: { request: id, attempt, invocation, session, requestedStart } }, [], at);
-        started = { invocation, session, at: at.toISOString() };
+        const recorded = await run.mutex.run(async () => {
+          if (run.log.terminal !== undefined || reviewStateOf(run.log.events).get(id)?.settledBy !== null) return false;
+          await run.log.append({ type: 'review-attempt-started', data: { request: id, attempt, invocation, session, requestedStart } }, at);
+          return true;
+        });
+        if (recorded) started = { invocation, session, at: at.toISOString() };
+        else fenced = true;
       },
+      fenced: () => fenced,
     });
     // A closing service records nothing more; recovery finishes the attempt.
-    if (this.closed) return false;
+    if (this.closed || fenced) return false;
 
     const outcome = reviewOutcome(result, run.readerStop);
     const settles = !(outcome.retryable && retryLeft && !this.ignoring(run) && run.reviews?.accepting === true);
@@ -1240,6 +1319,73 @@ export class RunService {
   }
 
   /**
+   * Settles one work item's review requests at its completion request: it
+   * waits for them until their deadline, the completion request plus the
+   * policy's settlement bound, and then finishes what is left as not
+   * verified at the deadline and stops its readers. The run's queue stays
+   * open for the rest of the run. Answers false once the run has ended.
+   */
+  private async settleWorkItemReviews(run: Run, workItem: string): Promise<boolean> {
+    const policy = run.record.policy.reviews;
+    const queue = run.reviews;
+    if (policy === undefined || queue === undefined) return !this.ignoring(run);
+    for (;;) {
+      if (this.ignoring(run)) return false;
+      // Both waits are registered before the log is read, so an attempt that
+      // ends, or a stop that lands, in between still wakes this one.
+      const ended = queue.changed();
+      const stopped = run.changed();
+      const unsettled = unsettledRequests(run.log.events).filter(request => request.workItem === workItem);
+      if (unsettled.length === 0) return true;
+      const deadlines = unsettled.map(request => this.reviewDeadline(run, request.id)).filter((deadline): deadline is number => deadline !== null);
+      const deadline = deadlines.length === 0 ? this.now().getTime() + policy.settleMs : Math.max(...deadlines);
+      const remaining = deadline - this.now().getTime();
+      if (remaining <= 0) {
+        await this.stopWorkItemReaders(run, workItem, run.record.policy.limits.stopSettleMs);
+        return !this.ignoring(run);
+      }
+      queue.wake();
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([ended, stopped, new Promise<void>(resolve => { timer = setTimeout(resolve, remaining); })]);
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * The deadline of one work item's reviews. Every request of it still
+   * unsettled is finished as not verified at the deadline, which fences any
+   * later result of its attempt, and each reader still running for one is
+   * asked to stop and awaited at most `grace`; the harness owns its cleanup
+   * until it settles. The queue, and every other work item's requests, are
+   * left as they are.
+   */
+  private async stopWorkItemReaders(run: Run, workItem: string, grace: number): Promise<void> {
+    const unsettled = unsettledRequests(run.log.events).filter(request => request.workItem === workItem);
+    if (unsettled.length === 0) return;
+    const running = unsettled.flatMap(request => request.attempts
+      .filter(attempt => attempt.started !== null && attempt.finished === null)
+      .map(attempt => attempt.started!.invocation));
+    await this.finishUnsettledReviews(run, (_request, open) => ({
+      reason: 'deadline',
+      detail: open
+        ? `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this attempt was still running, and its reader was stopped`
+        : `${workItem}'s reviews had to settle by its completion request plus the settlement bound; this review had not run`,
+    }), unsettled.map(request => request.id));
+    const readers = running.flatMap(invocation => {
+      const live = run.live.get(invocation);
+      return live === undefined ? [] : [live];
+    });
+    if (readers.length === 0) return;
+    for (const reader of readers) void reader.session?.stop().catch(() => undefined);
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      Promise.all(readers.map(reader => reader.done)),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, grace); }),
+    ]);
+    clearTimeout(timer);
+  }
+
+  /**
    * Recovery of a run's reviews: every request an accepted iteration is owed
    * and has not is recorded once, and every request left unsettled is
    * finished as not verified, since a recovered run is interrupted and runs
@@ -1265,6 +1411,606 @@ export class RunService {
     if (run === undefined) return undefined;
     const requests = [...reviewStateOf(run.log.events).values()].filter(request => workItem === undefined || request.workItem === workItem);
     return { coverage: reviewCoverage(run.record.policy, run.log.events, workItem), requests };
+  }
+
+  // Reconciliation
+
+  /**
+   * The work item's review requests and attention set as the log stands:
+   * each settled request with the attempt that settled it, the requests
+   * still unsettled, every open CheckFinding of the work item in attention
+   * order, and the revision of every one of its CheckFindings. This version
+   * evaluates no revisit condition, so no deferral is due.
+   */
+  private basisState(run: Run, workItem: string): {
+    readonly requests: BasisRequest[];
+    readonly unsettled: string[];
+    readonly attention: Map<CheckFindingId, AttentionEntry>;
+    readonly revisions: Map<CheckFindingId, number>;
+    readonly due: CheckFindingId[];
+    readonly state: CheckFindingState;
+  } {
+    const requests: BasisRequest[] = [];
+    const unsettled: string[] = [];
+    for (const request of reviewStateOf(run.log.events).values()) {
+      if (request.workItem !== workItem) continue;
+      const settling = request.attempts.find(attempt => attempt.id === request.settledBy)?.finished;
+      if (request.settledBy === null || settling == null) unsettled.push(request.id);
+      else requests.push({ request: request.id, attempt: request.settledBy, result: settling.result });
+    }
+    const state = checkFindingStateOf(run.log.ledger);
+    const due: CheckFindingId[] = [];
+    const attention = new Map<CheckFindingId, AttentionEntry>();
+    for (const summary of this.ownerCheckFindings(state, workItem, 'attention', due)) {
+      attention.set(summary.id, { revision: summary.revision, reason: summary.reason, awaiting: summary.awaiting, risk: summary.risk, modules: summary.modules });
+    }
+    const revisions = new Map(this.ownerCheckFindings(state, workItem, 'all').map(summary => [summary.id, summary.revision]));
+    return { requests, unsettled, attention, revisions, due, state };
+  }
+
+  /** Every CheckFinding of one work item the query selects, all pages, in attention order. */
+  private ownerCheckFindings(state: CheckFindingState, workItem: string, select: 'attention' | 'all', due: readonly CheckFindingId[] = []): CheckFindingSummary[] {
+    const items: CheckFindingSummary[] = [];
+    let after: CheckFindingId | null = null;
+    for (;;) {
+      const page = selectCheckFindings(state, {
+        kind: 'list', owner: { kind: 'work-item', workItem }, select, due: [...due], after, limit: 100, order: 'attention',
+      });
+      if (!page.ok || page.view.kind !== 'list') return items;
+      items.push(...page.view.items);
+      if (page.view.next === null) return items;
+      after = page.view.next;
+    }
+  }
+
+  /** The `outline-revised` that commits the work item's latest completion request. */
+  private latestCompletion(run: Run, workItem: string): RunEventOf<'outline-revised'> | undefined {
+    return run.log.all('outline-revised').filter(event => event.data.workItem === workItem && event.data.architectRef !== undefined).at(-1);
+  }
+
+  /** The reconciliation of the work item's latest round, whose basis a completion's unresolved reasons are read against. */
+  private latestBasis(run: Run, workItem: string): ReconciliationBasis | undefined {
+    const started = run.log.all('reconciliation-started').filter(event => event.data.workItem === workItem).at(-1);
+    if (started === undefined) return undefined;
+    const parsed = reconciliationBasisSchema.safeParse(this.committedBody(run, reconciliationLayout.basis(started.data.reconciliation)));
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  /**
+   * The reconciliation whose repair intent the work item's next assignment
+   * resolves: its latest assessment, where that chose a correction and no
+   * assignment has resolved it yet.
+   */
+  private pendingCorrection(run: Run, workItem: string): string | undefined {
+    const assessed = run.log.all('reconciliation-assessed').filter(event => event.data.workItem === workItem).at(-1);
+    if (assessed === undefined || assessed.data.next !== 'correct') return undefined;
+    const resolved = run.log.all('iteration-assigned').some(event => event.data.corrects === assessed.data.reconciliation);
+    return resolved ? undefined : assessed.data.reconciliation;
+  }
+
+  /**
+   * Reconciles one work item that requested completion (appendix §6): its
+   * reviews settle, any user decision it waits for is answered, and its
+   * attention set is captured. An empty set goes to the work item's gate
+   * with no agent call. Otherwise one round forks the local architect at
+   * its completion request, within the round's floor, and the assessment it
+   * commits leads to the gate, to a correction, or to a user decision and
+   * another round. A refused basis or a fork that returns nothing is another
+   * round. A round after the first starts only for a signal that warrants
+   * one, and none starts once the rounds are spent: what is open then stays
+   * unresolved, and the gate alone decides. Null once the run has ended.
+   */
+  private async reconcileWorkItem(run: Run, agent: AgentPort, loaded: LoadedPackage, item: WorkItem, parent: ParentSession): Promise<Reconciled | null> {
+    const limit = run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds;
+    const minimum = run.record.policy.limits.laterRoundMinimumRisk ?? 'medium';
+    for (;;) {
+      if (!await this.settleWorkItemReviews(run, item.id)) return null;
+      if (!await this.awaitUserDecisions(run, item.id)) return null;
+      const commit = this.accepted(run);
+      const captured = this.basisState(run, item.id);
+      const rounds = run.log.all('reconciliation-started').filter(event => event.data.workItem === item.id).length;
+      const gate = (decided: boolean): Reconciled => ({
+        kind: 'gate',
+        basis: { commit, requests: captured.requests, checkFindings: attentionAt(captured.attention), decided },
+      });
+      // Nothing needs attention, the rounds are spent, or what is left does
+      // not warrant a later round: the gate follows, and what is open stays
+      // unresolved.
+      if (captured.attention.size === 0) return gate(false);
+      if (rounds >= limit || (rounds > 0 && !needsLaterRound(captured.attention.values(), minimum))) return gate(rounds > 0);
+
+      let tree: string;
+      try {
+        tree = await this.candidates.commitTree(this.projectRoot, commit);
+      } catch (error) {
+        await this.fail(run, 'internal', `The audited source ${commit} of ${item.id}'s reconciliation could not be read: ${message(error)}`);
+        return null;
+      }
+      const basis = await this.startReconciliation(run, item.id, rounds + 1, limit, { commit, tree }, captured);
+      if (basis === 'ended') return null;
+      if (basis === 'stale') continue;
+      const assessed = await this.assessReconciliation(run, agent, loaded, item, basis, captured.attention, parent, { limit, minimum });
+      if (assessed === null) return null;
+      if (assessed.kind === 'refused') {
+        await this.write(run, { type: 'reconciliation-refused', data: { workItem: item.id, reconciliation: basis.id, stage: 'assessment', reason: assessed.reason } });
+        if (this.ignoring(run)) return null;
+        continue;
+      }
+      if (assessed.next === 'correct') return { kind: 'correct', reconciliation: basis.id };
+      if (assessed.next === 'await-user') continue;
+      const after = this.basisState(run, item.id);
+      return { kind: 'gate', basis: { commit, requests: after.requests, checkFindings: attentionAt(after.attention), decided: true } };
+    }
+  }
+
+  /**
+   * Commits one round's `reconciliation-started` with its basis, after
+   * checking under the mutex that what was captured still holds. Stale when
+   * it does not, and nothing is appended.
+   */
+  private async startReconciliation(
+    run: Run,
+    workItem: string,
+    round: number,
+    limit: number,
+    source: { readonly commit: string; readonly tree: string },
+    captured: ReturnType<RunService['basisState']>,
+  ): Promise<ReconciliationBasis | 'stale' | 'ended'> {
+    const id = reconciliationId(workItem, round);
+    const pinned = this.latestCompletion(run, workItem)?.data.architectRef;
+    const forkPoint: ForkPoint = pinned === undefined || pinned === null
+      ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after its completion request' : 'No completion request of this work item recorded the local architect\'s point' }
+      : { kind: 'session', session: pinned.session, ref: pinned.ref };
+    const basis = reconciliationBasisSchema.parse({
+      schema: 'ramify-agent.reconciliation-basis/1',
+      id,
+      workItem,
+      round,
+      source,
+      requests: captured.requests,
+      checkFindings: attentionAt(captured.attention),
+      due: captured.due,
+      applied: captured.state.applied,
+      forkPoint,
+      floor: roundFloor(round, limit),
+    } satisfies ReconciliationBasis);
+    return await run.mutex.run(async () => {
+      if (run.log.terminal !== undefined) return 'ended' as const;
+      const now = this.basisState(run, workItem);
+      const changed = this.accepted(run) !== source.commit
+        || basisChange(basis, { source, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions }) !== null
+        || attentionAt(now.attention).some(entry => !basis.checkFindings.some(held => held.checkFinding === entry.checkFinding))
+        || run.log.all('reconciliation-started').some(event => event.data.reconciliation === id);
+      if (changed) return 'stale' as const;
+      await commitRecord(run.log.ledger, {
+        event: run.log.next({ type: 'reconciliation-started', data: { workItem, reconciliation: id, round } }),
+        records: [{ path: reconciliationLayout.basis(id), id, revision: 1, body: basis }],
+      });
+      return basis;
+    });
+  }
+
+  /**
+   * Waits while a CheckFinding of the work item awaits a user's answer: the
+   * answer is what the next round assesses. A stop or the service closing
+   * ends the wait. Answers false once the run has ended.
+   */
+  private async awaitUserDecisions(run: Run, workItem: string): Promise<boolean> {
+    for (;;) {
+      if (this.ignoring(run)) return false;
+      // Registered before the state is read, so an answer in between still wakes it.
+      const changed = run.changed();
+      const pending = [...checkFindingStateOf(run.log.ledger).findings.values()]
+        .some(entry => sameWorkItem(entry.owner, workItem) && entry.pendingUserDecision !== null);
+      if (!pending) return true;
+      await changed;
+    }
+  }
+
+  /**
+   * Where a reconciliation's fork starts: the local architect's point after
+   * its completion request, or fresh with the complete packet and the reason
+   * where that point is missing or unusable.
+   */
+  private reconciliationStart(run: Run, basis: ReconciliationBasis, completion: RunEventOf<'outline-revised'> | undefined): {
+    readonly start: SessionStart;
+    readonly fork?: ForkRelation | undefined;
+    readonly degraded?: { readonly requested: 'fork'; readonly reason: string } | undefined;
+  } {
+    const fresh = (reason: string) => ({ start: { mode: 'fresh' } as const, degraded: { requested: 'fork' as const, reason } });
+    const point = basis.forkPoint;
+    if (point.kind !== 'session') return fresh(point.kind === 'unavailable' ? point.reason : 'No point of the local architect was captured');
+    if (completion === undefined) return fresh('No completion request of this work item is recorded');
+    const from = { session: point.session as SessionId, invocation: completion.data.invocation };
+    const source = this.sessionsOf(run)?.get(from.session);
+    if (source === undefined || !source.invocations.includes(from.invocation) || source.awaiting === from.invocation) {
+      return fresh(`${from.session} has not reached the end of ${from.invocation}`);
+    }
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === from.invocation)?.sequence ?? 0;
+    const briefs = run.log.all('brief-appended')
+      .filter(event => event.data.session === from.session && event.sequence < ended)
+      .map(event => event.data.decision);
+    return { start: { mode: 'fork', from: point.ref }, fork: { from, reason: 'reconciliation', briefs } };
+  }
+
+  /** The one bounded packet of a round, from the log and the CheckFinding state. */
+  private reconciliationPacket(run: Run, item: WorkItem, basis: ReconciliationBasis, state: CheckFindingState, bounds: { readonly limit: number; readonly minimum: string }): ReconciliationPacket {
+    const reviews = reviewStateOf(run.log.events);
+    const requests: PacketRequest[] = basis.requests.map(entry => {
+      const request = reviews.get(entry.request);
+      const attempt = entry.attempt === null ? undefined : reviewAttemptSchema.safeParse(this.committedBody(run, reviewLayout.attempt(entry.attempt)));
+      return {
+        request: entry.request,
+        kind: request?.kind ?? 'unknown',
+        iteration: request?.iteration ?? 'unknown',
+        candidate: request?.candidate ?? 'unknown',
+        attempt: entry.attempt,
+        result: attempt?.success === true ? resultText(attempt.data.result) : entry.result,
+      };
+    });
+    const attention = basis.checkFindings.flatMap(entry => {
+      const detail = selectCheckFindings(state, { kind: 'detail', checkFinding: entry.checkFinding });
+      return detail.ok && detail.view.kind === 'detail' ? [detail.view] : [];
+    });
+    const inBasis = new Set(basis.checkFindings.map(entry => entry.checkFinding));
+    const iterations = run.log.all('iteration-assigned').filter(event => event.data.workItem === item.id).map(event => {
+      const number = Number.parseInt(event.data.iteration.slice(event.data.iteration.lastIndexOf('.i') + 2), 10);
+      const assignment = iterationAssignmentSchema.safeParse(this.committedBody(run, iterationLayout.assignment(item.id, number)));
+      const closed = run.log.all('iteration-closed').find(entry => entry.data.iteration === event.data.iteration);
+      return { id: event.data.iteration, goal: assignment.success ? assignment.data.goal : '(its assignment could not be read)', outcome: closed?.data.outcome ?? null };
+    });
+    const earlier = run.log.all('reconciliation-assessed').filter(event => event.data.workItem === item.id).flatMap(event => {
+      const record = reconciliationAssessmentSchema.safeParse(this.committedBody(run, reconciliationLayout.assessment(event.data.reconciliation)));
+      return record.success ? [{ id: record.data.id, next: record.data.next, brief: record.data.submission.brief }] : [];
+    });
+    return {
+      basis,
+      limit: bounds.limit,
+      laterRoundMinimumRisk: bounds.minimum,
+      module: item.module,
+      requests,
+      attention,
+      others: this.ownerCheckFindings(state, item.id, 'all').filter(summary => !inBasis.has(summary.id)),
+      iterations,
+      earlier,
+      refused: run.log.all('reconciliation-refused').filter(event => event.data.workItem === item.id)
+        .map(event => ({ reconciliation: event.data.reconciliation, reason: event.data.reason })),
+    };
+  }
+
+  /**
+   * One round's fork: the packet, a submission validated against the basis
+   * and the CheckFinding rules, and its commit. Refused when the fork ends
+   * without an assessment or its basis no longer holds when it commits; null
+   * once the run has ended.
+   */
+  private async assessReconciliation(
+    run: Run,
+    agent: AgentPort,
+    loaded: LoadedPackage,
+    item: WorkItem,
+    basis: ReconciliationBasis,
+    attention: ReadonlyMap<CheckFindingId, AttentionEntry>,
+    parent: ParentSession,
+    bounds: { readonly limit: number; readonly minimum: CheckFindingRisk },
+  ): Promise<{ readonly kind: 'refused'; readonly reason: string } | { readonly kind: 'assessed'; readonly next: ReconciliationAssessment['next'] } | null> {
+    const completion = this.latestCompletion(run, item.id);
+    const start = this.reconciliationStart(run, basis, completion);
+    const state = checkFindingStateOf(run.log.ledger);
+    const held = new Map(this.ownerCheckFindings(state, item.id, 'all').map(summary => [summary.id, summary.revision]));
+    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    let invocation: string | undefined;
+    let bound: BoundReconciliation | undefined;
+    const result = await this.runInvocation<ReconciliationSubmission>(run, agent, {
+      role: 'local-architect',
+      work: { workItem: item.id },
+      attempt: basis.round,
+      loaded,
+      systemPrompt: renderReconciliationPrompt(loaded, this.projectRoot),
+      prompt: reconciliationMessage(this.reconciliationPacket(run, item, basis, state, bounds)),
+      start: start.start,
+      ...(start.fork === undefined ? {} : { fork: start.fork }),
+      ...(start.degraded === undefined ? {} : { degraded: start.degraded }),
+      toolName: reconciliationToolName,
+      description: reconciliationSubmissionDescription,
+      inputSchema: reconciliationJsonSchema,
+      submissionSchema: 'ramify-agent.reconciliation-submission/1',
+      validate: async input => {
+        const checked = await validateReconciliation(input, {
+          id: basis.id,
+          workItem: item.id,
+          module: item.module,
+          floor: basis.floor,
+          laterRoundMinimumRisk: bounds.minimum,
+          attention,
+          held,
+          actor: { kind: 'agent', role: 'local-architect', invocation: invocation ?? 'none' },
+          source: { kind: 'tree', id: basis.source.tree },
+          evidence: submission => [{
+            kind: 'reconciliation-submission',
+            ref: runLayout.submission(invocation ?? 'none'),
+            hash: `sha256:${sha256(canonicalJson(submission))}`,
+          }],
+          document: async path => {
+            if (path === 'plan') return { text: plan, revision: `sha256:${sha256(plan)}` };
+            try {
+              return { text: await this.candidates.readBlob(this.projectRoot, basis.source.commit, path), revision: basis.source.commit };
+            } catch {
+              return null;
+            }
+          },
+          decide: command => {
+            const now = this.basisState(run, item.id);
+            if (basisChange(basis, { source: basis.source, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions }) !== null) return null;
+            const change = decideCheckFindingChange(now.state, command);
+            return change.ok ? null : change.rejection;
+          },
+        });
+        if (!checked.ok) return checked;
+        bound = checked.value;
+        return { ok: true, value: checked.value.submission };
+      },
+      // A fork is never continued: its brief is what reaches the architect's own session.
+      keep: () => finished('not-kept'),
+      scope: { write: null, measurement: null, size: null },
+      onStarted: async id => { invocation = id; },
+    });
+    if (this.ignoring(run)) return null;
+    if (result.ended !== 'submitted' || result.value === undefined || bound === undefined || invocation === undefined) {
+      return { kind: 'refused', reason: `The reconciliation fork${result.id === '' ? '' : ` ${result.id}`} ended without an assessment (${result.ended})` };
+    }
+    return await this.commitAssessment(run, agent, basis, {
+      invocation,
+      session: result.session,
+      requestedStart: start.start.mode === 'fork' || start.degraded !== undefined ? 'fork' : 'fresh',
+      actualStart: result.actual === undefined ? null : result.actual === 'fork' ? 'fork' : 'fresh',
+      bound,
+    }, parent);
+  }
+
+  /**
+   * Commits one assessment and appends its brief to the local architect's
+   * session, as the ledger's external effect keyed `brief:<reconciliation>`:
+   * the intent is `reconciliation-assessed` with its record and every
+   * CheckFinding event, decided under the mutex against the basis as it
+   * stands; the effect is the append; the completion says what the append
+   * did. The decisions are durable before any append, and a repeat after a
+   * crash appends the same key once.
+   */
+  private async commitAssessment(
+    run: Run,
+    agent: AgentPort,
+    basis: ReconciliationBasis,
+    fork: {
+      readonly invocation: string;
+      readonly session: SessionId;
+      readonly requestedStart: 'fresh' | 'fork';
+      readonly actualStart: 'fresh' | 'fork' | null;
+      readonly bound: BoundReconciliation;
+    },
+    parent: ParentSession,
+  ): Promise<{ readonly kind: 'refused'; readonly reason: string } | { readonly kind: 'assessed'; readonly next: ReconciliationAssessment['next'] }> {
+    const { submission, commands, conflicts } = fork.bound;
+    const parentRef = parent.session !== undefined && parent.ref !== undefined ? { session: parent.session, ref: parent.ref } : null;
+    let record: ReconciliationAssessment | undefined;
+    let appended: BriefAppend;
+    try {
+      appended = await run.log.ledger.effect<BriefAppend>({
+        key: `brief:${basis.id}`,
+        serialize: work => run.mutex.run(work),
+        intent: () => {
+          const decided = decideCheckFindingTransaction(run.log, ({ log }) => {
+            if (log.all('reconciliation-assessed').some(event => event.data.reconciliation === basis.id)) return { stale: `${basis.id} is already assessed` };
+            const latest = log.all('reconciliation-started').filter(event => event.data.workItem === basis.workItem).at(-1);
+            if (latest?.data.reconciliation !== basis.id) return { stale: `${basis.id} is not the work item's latest round` };
+            const now = this.basisState(run, basis.workItem);
+            const stale = this.accepted(run) !== basis.source.commit
+              ? `the accepted source is ${this.accepted(run)}, not ${basis.source.commit}`
+              : basisChange(basis, { source: basis.source, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions });
+            if (stale !== null) return { stale };
+            return {
+              commands: commands.length === 0 ? [] : [{ type: 'assess', commands: [...commands] }],
+              compose: decided => {
+                const events = decided.events;
+                record = reconciliationAssessmentSchema.parse({
+                  schema: 'ramify-agent.reconciliation-assessment/1',
+                  id: basis.id,
+                  workItem: basis.workItem,
+                  round: basis.round,
+                  invocation: fork.invocation,
+                  session: fork.session,
+                  requestedStart: fork.requestedStart,
+                  actualStart: fork.actualStart,
+                  submission,
+                  conflicts,
+                  next: submission.next.kind,
+                  checkFindings: [...new Set(decided.outcomes.flatMap(outcome => outcome.touched))],
+                  decisions: events.flatMap(event => (event.type === 'check-finding-decided' ? [event.data.decision.id] : [])),
+                  relations: events.flatMap(event => (event.type === 'check-finding-related' ? [event.data.relation.id] : [])),
+                  parent: parentRef,
+                  brief: reconciliationBrief({ id: basis.id, round: basis.round, source: basis.source, submission, events }),
+                } satisfies ReconciliationAssessment);
+                return {
+                  event: {
+                    type: 'reconciliation-assessed',
+                    data: { workItem: basis.workItem, reconciliation: basis.id, invocation: fork.invocation, next: submission.next.kind, checkFindings: [...events] },
+                  },
+                  records: [{ path: reconciliationLayout.assessment(basis.id), id: basis.id, revision: 1, body: record }],
+                };
+              },
+            };
+          }, this.now());
+          if (decided.kind === 'transaction') return decided.transaction;
+          throw new AssessmentRefusedError(decided.kind === 'refused' ? decided.refusal.message : `${basis.id} decided nothing new`);
+        },
+        perform: key => this.appendReconciliationBrief(agent, key, parentRef, record!.brief),
+        complete: result => ({
+          event: run.log.next({ type: 'reconciliation-brief-appended', data: { reconciliation: basis.id, ...result } }),
+          records: [],
+        }),
+      });
+    } catch (error) {
+      if (error instanceof AssessmentRefusedError) return { kind: 'refused', reason: error.message };
+      // The ledger measures a line before writing any of it.
+      if (error instanceof RangeError) return { kind: 'refused', reason: `The assessment does not fit one ledger line: ${error.message}` };
+      throw error;
+    }
+    await this.afterBriefAppend(run, basis.id, appended, record!.brief, parent);
+    return { kind: 'assessed', next: record!.next };
+  }
+
+  /** The brief's append to the local architect's session. A lost session, a failure and no session are outcomes, never thrown. */
+  private async appendReconciliationBrief(agent: AgentPort, key: string, parent: ArchitectRef | null, brief: string): Promise<BriefAppend> {
+    if (parent === null) return { session: null, ref: null, outcome: 'no-session', reason: 'The local architect\'s session was not kept after its completion request' };
+    try {
+      const answer = await agent.appendContext(parent.ref, key, brief);
+      if (answer.outcome === 'session-lost') return { session: parent.session, ref: null, outcome: 'session-lost', reason: 'The local architect\'s session can no longer be read' };
+      return { session: parent.session, ref: answer.ref, outcome: answer.outcome, reason: null };
+    } catch (error) {
+      return { session: parent.session, ref: null, outcome: 'failed', reason: message(error) };
+    }
+  }
+
+  /**
+   * What the architect's own session holds after the append: the point its
+   * next turn continues from, the note in its transcript, or, where the
+   * append did not land, the brief its next input carries from the log. A
+   * session that can no longer be read is finished as lost.
+   */
+  private async afterBriefAppend(run: Run, reconciliation: string, appended: BriefAppend, brief: string, parent: ParentSession): Promise<void> {
+    if (appended.outcome === 'appended' || appended.outcome === 'already-present') {
+      parent.ref = appended.ref ?? parent.ref;
+      const session = appended.session;
+      if (appended.outcome === 'appended' && session !== null) {
+        await recordAppend(this.transcriptOf(run, session), { kind: 'note-appended', text: brief }, null)
+          .catch(error => this.warn(`Run ${run.record.jobId}: the brief of ${reconciliation} is missing from ${session}'s transcript: ${message(error)}`));
+      }
+      return;
+    }
+    parent.undelivered.push(reconciliation);
+    if (appended.outcome === 'session-lost') {
+      await this.finishSession(run, parent.session, 'lost');
+      parent.session = undefined;
+      parent.ref = undefined;
+    }
+  }
+
+  /**
+   * What the local architect's next turn is told of a reconciliation: the
+   * correction it chose with the CheckFindings planned for repair, and the
+   * brief of every round whose append did not land, read from the log.
+   */
+  private reconciliationBriefing(run: Run, reconciliation: string, undelivered: readonly string[]): ReconciliationBriefing | undefined {
+    const read = (id: string) => {
+      const parsed = reconciliationAssessmentSchema.safeParse(this.committedBody(run, reconciliationLayout.assessment(id)));
+      return parsed.success ? parsed.data : undefined;
+    };
+    const record = read(reconciliation);
+    if (record === undefined) return undefined;
+    const state = checkFindingStateOf(run.log.ledger);
+    const repairs = [...state.findings.values()]
+      .filter(entry => entry.standing === 'open' && entry.repair?.kind === 'intent' && entry.repair.ref === reconciliation)
+      .map(entry => ({ checkFinding: entry.id, title: entry.reports[0]?.observation.summary ?? '' }));
+    const briefs = undelivered.flatMap(id => {
+      const undeliveredRecord = read(id);
+      return undeliveredRecord === undefined ? [] : [undeliveredRecord.brief];
+    });
+    const failure = run.log.all('reconciliation-brief-appended').filter(event => undelivered.includes(event.data.reconciliation)).at(-1);
+    return {
+      id: reconciliation,
+      next: record.next,
+      ...(record.submission.next.kind === 'correct' ? { goal: record.submission.next.goal } : {}),
+      repairs,
+      ...(briefs.length === 0 ? {} : { brief: briefs.join('\n\n') }),
+      ...(failure === undefined ? {} : { appendFailure: `${failure.data.outcome}${failure.data.reason === null ? '' : `: ${failure.data.reason}`}` }),
+    };
+  }
+
+  /**
+   * Commits `work-item-completed` where the completion basis still holds
+   * (appendix §6): the gate audited the reconciled source or its scenario
+   * rendering, every request of the work item is settled as the basis names
+   * it, every basis CheckFinding is at its captured revision, and nothing
+   * that warrants another round has become open. Where one of those fails
+   * and a round remains, the completion is refused and recorded, and the
+   * caller reconciles again; otherwise the work item completes, naming each
+   * CheckFinding left open and why.
+   */
+  private async completeWorkItem(run: Run, item: WorkItem, gate: GateAttempt, basis: CompletionBasis): Promise<'completed' | 'ended' | { readonly refused: string }> {
+    const limit = run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds;
+    const minimum = run.record.policy.limits.laterRoundMinimumRisk ?? 'medium';
+    // The lineage is read outside the mutex: both commits are immutable.
+    const lineage = basis.decided ? await this.sourceLineage(run, basis.commit, gate.audited) : null;
+    const outcome = await run.mutex.run(async () => {
+      if (run.log.terminal !== undefined) return 'ended' as const;
+      const now = this.basisState(run, item.id);
+      const rounds = run.log.all('reconciliation-started').filter(event => event.data.workItem === item.id).length;
+      const inBasis = new Set(basis.checkFindings.map(entry => entry.checkFinding));
+      const raised = [...now.attention].filter(([id]) => !inBasis.has(id)).map(([, entry]) => entry);
+      // A changed source or request set always refuses: the next capture
+      // binds the source and requests as they now stand. A changed or new
+      // CheckFinding refuses only where it warrants a round that remains.
+      const hard = lineage ?? basisChange({ source: { commit: basis.commit, tree: '' }, requests: basis.requests, checkFindings: [] },
+        { source: { commit: basis.commit, tree: '' }, requests: now.requests, unsettled: now.unsettled, revisions: now.revisions });
+      if (hard !== null) return { refused: hard };
+      const moved = basis.checkFindings.find(entry => now.revisions.get(entry.checkFinding) !== entry.revision);
+      const soft = moved !== undefined
+        ? `${moved.checkFinding} is at revision ${now.revisions.get(moved.checkFinding) ?? 'none'}, not ${moved.revision}`
+        : raised.length > 0 ? `${raised.length === 1 ? 'a CheckFinding' : `${raised.length} CheckFindings`} became open after the basis` : null;
+      // A first round is warranted by any signal; a later one by a signal that clears its start.
+      const warranted = (entries: readonly AttentionEntry[]) => (rounds === 0 ? entries.length > 0 : needsLaterRound(entries, minimum));
+      if (soft !== null && rounds < limit && warranted([...now.attention.values()])) return { refused: soft };
+      const unresolved = this.unresolvedOf(run, item.id, now.state, limit);
+      await run.log.append({
+        type: 'work-item-completed',
+        data: { workItem: item.id, gate: gate.id, ...(unresolved.length === 0 ? {} : { unresolved }) },
+      });
+      return 'completed' as const;
+    });
+    if (typeof outcome === 'object') {
+      await this.write(run, { type: 'reconciliation-refused', data: { workItem: item.id, reconciliation: this.latestBasis(run, item.id)?.id ?? null, stage: 'completion', reason: outcome.refused } });
+    }
+    return outcome;
+  }
+
+  /**
+   * Each open CheckFinding of a completing work item, and why it is left
+   * open: open at the last round's assessment, open below its round's floor,
+   * or opened after the last basis. Read under the mutex.
+   */
+  private unresolvedOf(run: Run, workItem: string, state: CheckFindingState, limit: number): Array<{ readonly checkFinding: CheckFindingId; readonly reason: UnresolvedReason }> {
+    const last = this.latestBasis(run, workItem);
+    const inLast = new Set(last?.checkFindings.map(entry => entry.checkFinding) ?? []);
+    return this.ownerCheckFindings(state, workItem, 'all').filter(summary => summary.standing === 'open').map(summary => ({
+      checkFinding: summary.id,
+      reason: !inLast.has(summary.id) ? 'raised-after-last-round' as const : last!.round >= limit ? 'rounds-exhausted' as const : 'below-floor' as const,
+    }));
+  }
+
+  /**
+   * Why the gate's audited commit is not the reconciled source, or null when
+   * it is, or when it differs from it only by the expected rendering of the
+   * tracked feature files, byte for byte.
+   */
+  private async sourceLineage(run: Run, from: string, to: string | null): Promise<string | null> {
+    if (to === null) return `the gate audited no commit, and the reconciled source is ${from}`;
+    if (to === from) return null;
+    try {
+      const changes = await this.candidates.diffNameStatus(this.projectRoot, from, to);
+      const tracked = trackedScenarios(run.log.ledger.replay());
+      const expected = new Map(expectedFeatureHashes(expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }))
+        .map(file => [file.path, file.hash]));
+      for (const change of changes) {
+        const hash = expected.get(change.path);
+        if (hash === undefined) return `${change.path} changed between the reconciled source ${from} and the gate's ${to}, and only a rendered feature file may`;
+        if (change.status === 'D' || featureContentHash(await this.candidates.readBlob(this.projectRoot, to, change.path)) !== hash) {
+          return `${change.path} at ${to} is not its expected rendering`;
+        }
+      }
+      return null;
+    } catch (error) {
+      return `the lineage from ${from} to ${to} could not be read: ${message(error)}`;
+    }
   }
 
   // Loading and recovery
@@ -1352,6 +2098,28 @@ export class RunService {
         }
         await this.appendBrief(run, agent, decision, null);
         performed.push(`the parent append of decision ${decision.id}`);
+        continue;
+      }
+      if (event.type === 'reconciliation-assessed') {
+        // The assessment is committed and its brief is not in the local
+        // architect's session yet. The append is keyed by the
+        // reconciliation, so performing it again appends it once.
+        const id = event.data.reconciliation;
+        const record = reconciliationAssessmentSchema.safeParse(this.committedBody(run, reconciliationLayout.assessment(id)));
+        const agent = this.options.agent;
+        if (!record.success || agent === undefined) {
+          this.warn(`Run ${run.record.jobId}: the brief of ${id} was left unappended: ${record.success ? 'no agent is configured' : 'its assessment cannot be read'}`);
+          continue;
+        }
+        await run.log.ledger.effect<BriefAppend>({
+          key: pending.key,
+          serialize: work => run.mutex.run(work),
+          // The intent is in the log already; the ledger never builds it again.
+          intent: () => { throw new Error(`The intent of ${pending.key} is already committed`); },
+          perform: key => this.appendReconciliationBrief(agent, key, record.data.parent, record.data.brief),
+          complete: result => ({ event: run.log.next({ type: 'reconciliation-brief-appended', data: { reconciliation: id, ...result } }), records: [] }),
+        });
+        performed.push(`the parent append of reconciliation ${id}`);
         continue;
       }
       if (event.type === 'scenarios-withdrawing') {
@@ -1501,10 +2269,13 @@ export class RunService {
   ): Promise<CheckFindingCommit | undefined> {
     const run = this.runs.get(key(planId, runId));
     if (run === undefined) return undefined;
-    return await this.commitCheckFindings(run, () => ({
+    const committed = await this.commitCheckFindings(run, () => ({
       commands: change.commands,
       compose: decided => ({ event: { type: 'check-findings-recorded', data: { cause: change.cause, checkFindings: [...decided.events] } } }),
     }));
+    // A work item waiting for a user's answer reads the state again.
+    if (committed.kind === 'committed') run.notify();
+    return committed;
   }
 
   /**
@@ -2014,7 +2785,7 @@ export class RunService {
     const keeping = (ended: InvocationOutcome['ended'], value: T | undefined): SessionKeeping =>
       (this.ignoring(run) ? finished('run-ended') : request.keep(ended, value));
     await this.afterWrite('invocation-started', run.record.jobId);
-    if (this.ignoring(run)) {
+    if (this.ignoring(run) || request.fenced?.() === true) {
       await this.endInvocation(run, id, session, keeping('stopped', undefined), stoppedOutcome(), undefined, transcript);
       return { id, ended: 'stopped', value: undefined, ref: '', outcomeKind: 'stopped', session, kept: false };
     }
@@ -2536,8 +3307,12 @@ export class RunService {
     let refusals = 0;
     let released = resumes;
     const bound = run.record.policy.limits.repairRoundsPerWorkItemGate;
+    /** The reconciliation that returns this work item to its architect: a correction, or a brief that did not land. */
+    let returned: string | undefined;
+    /** The rounds whose brief the architect's own session lacks, which its next input carries from the log. */
+    const undelivered: string[] = [];
 
-    for (;;) {
+    turns: for (;;) {
       if (this.ignoring(run)) return null;
       attempt += 1;
       const current = committedRecords(run.log.ledger.replay());
@@ -2606,6 +3381,7 @@ export class RunService {
           ...(revisionReports === undefined || revisionReports.length === 0 ? {} : { revisionsNeeded: revisionReports }),
         },
         ...(unresolvedRequest === undefined ? {} : { unresolvedRequest }),
+        ...(returned === undefined ? {} : { reconciliation: this.reconciliationBriefing(run, returned, undelivered) }),
         ...(integration === undefined ? {} : { integration }),
         ...(scenarios.length === 0 ? {} : { scenarios }),
         ...(failedGate === undefined ? {} : { failedGate }),
@@ -2628,6 +3404,8 @@ export class RunService {
       blocked = undefined;
       released = null;
       revisionReports = [];
+      returned = undefined;
+      undelivered.length = 0;
 
       const result = await this.runInvocation<LocalArchitectSubmission>(run, agent, {
         role: 'local-architect',
@@ -2813,27 +3591,57 @@ export class RunService {
       run.reviews?.wake();
       if (this.ignoring(run)) return null;
 
-      const gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
-      gateRound += 1;
-      if (gate === null) return null;
-      if (gate.verdict === 'passed') {
+      // Before the gate, the work item's reviews settle and what they
+      // raised is reconciled; a completion whose basis no longer holds is
+      // reconciled again, as often as rounds remain.
+      const parent: ParentSession = { session, ref: sessionRef, undelivered };
+      let gate: GateAttempt | null = null;
+      let refusedCompletions = 0;
+      for (;;) {
+        const reconciled = await this.reconcileWorkItem(run, agent, loaded, item, parent);
+        session = parent.session;
+        sessionRef = parent.ref;
+        if (reconciled === null) return null;
+        if (reconciled.kind === 'correct') {
+          // The architect's own session assigns the correction, through the
+          // ordinary gate and reviews.
+          returned = reconciled.reconciliation;
+          continuing = 'reconciliation';
+          continue turns;
+        }
+        if (undelivered.length > 0) returned = this.latestBasis(run, item.id)?.id;
+        gate = await this.workItemGate(run, item, result.id, gateRound, result.value.summary, lastAssignment);
+        gateRound += 1;
+        if (gate === null) return null;
+        if (gate.verdict !== 'passed') break;
         // A declared scenario the gate did not pass stays declared, and the
         // work item cannot complete around it.
         const unverified = this.unfinishedScenarios(run, item, ['pending', 'bound', 'declared']);
         if (unverified.length > 0) {
           refusals += 1;
-          blocked = unverified.map(entry => scenarioRefusal(entry, gate.id));
+          const refusingGate = gate.id;
+          blocked = unverified.map(entry => scenarioRefusal(entry, refusingGate));
           if (refusals > bound) {
             await this.refuseCompletion(run, item, refusals, blocked, { open: [], owed: false, scenarios: unverified });
             return null;
           }
-          continue;
+          continue turns;
         }
-        await this.write(run, { type: 'work-item-completed', data: { workItem: item.id, gate: gate.id } });
-        await this.afterWrite('work-item-completed', run.record.jobId);
-        await this.finishSession(run, session, 'work-closed');
-        return 'completed';
+        const completed = await this.completeWorkItem(run, item, gate, reconciled.basis);
+        if (completed === 'ended' || this.ignoring(run)) return null;
+        if (completed === 'completed') {
+          await this.afterWrite('work-item-completed', run.record.jobId);
+          await this.finishSession(run, session, 'work-closed');
+          return 'completed';
+        }
+        // Each refusal found another round warranted; the rounds bound them.
+        refusedCompletions += 1;
+        if (refusedCompletions > (run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds)) {
+          await this.fail(run, 'repair-exhausted', `${item.id}'s completion was refused ${refusedCompletions} times: ${completed.refused}`);
+          return null;
+        }
       }
+      if (gate === null) return null;
 
       failedGate = await this.diagnosticsOf(run, gate, 'local-architect');
       firstCause ??= { gate: gate.id, cause: gate.cause };
@@ -3449,8 +4257,13 @@ export class RunService {
       ? {
         type: 'iteration-assigned',
         // The architect's pinned point that produced this assignment is
-        // committed with it: the iteration's scope review forks it.
-        data: { workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions, architectRef },
+        // committed with it: the iteration's scope review forks it. The
+        // first assignment after a reconciliation chose a correction
+        // resolves that reconciliation's repair intent.
+        data: {
+          workItem: item.id, iteration: id, kind: assignment.kind, scopeRevision: scope.revision, invocation, decisions: localDecisions, architectRef,
+          ...(this.pendingCorrection(run, item.id) === undefined ? {} : { corrects: this.pendingCorrection(run, item.id)! }),
+        },
       }
       : {
         type: 'contract-requested',
@@ -4990,19 +5803,71 @@ export class RunService {
       artifacts: [],
     } satisfies IterationResult);
 
-    await this.write(run, {
-      type: 'iteration-closed',
-      data: {
-        workItem: item.id,
-        iteration: assignment.id,
-        outcome: result.outcome,
-        gate: result.gate,
-        commit: result.commit,
-        notices,
-      },
-    }, [{ path: iterationLayout.result(item.id, number), id: assignment.id, revision: 1, body: result }]);
+    const data = { workItem: item.id, iteration: assignment.id, outcome: result.outcome, gate: result.gate, commit: result.commit, notices };
+    const record = { path: iterationLayout.result(item.id, number), id: assignment.id, revision: 1, body: result };
+    const corrects = run.log.all('iteration-assigned').find(event => event.data.iteration === assignment.id)?.data.corrects;
+    if (result.outcome === 'accepted' && result.gate !== null && result.commit !== null && corrects !== undefined) {
+      await this.closeCorrection(run, item.id, { data, record, corrects, gate: result.gate, commit: result.commit, invocation: body.invocations.at(-1) ?? null });
+    } else {
+      await this.write(run, { type: 'iteration-closed', data }, [record]);
+    }
     await this.afterWrite('iteration-closed', run.record.jobId);
     return result;
+  }
+
+  /**
+   * Closes an accepted correction iteration with the repair claim of each
+   * CheckFinding still planned under the reconciliation intent it resolves,
+   * on the same line: the claim names the audited tree and the iteration,
+   * and each CheckFinding stays open until its verification rule is met.
+   * A claim the transition refuses leaves the iteration closed without it.
+   */
+  private async closeCorrection(
+    run: Run,
+    workItem: string,
+    closing: {
+      readonly data: Omit<RunEventOf<'iteration-closed'>['data'], 'checkFindings'>;
+      readonly record: CommitRecord;
+      readonly corrects: string;
+      readonly gate: string;
+      readonly commit: string;
+      readonly invocation: string | null;
+    },
+  ): Promise<void> {
+    let tree: string | undefined;
+    try {
+      tree = await this.candidates.commitTree(this.projectRoot, closing.commit);
+    } catch (error) {
+      this.warn(`Run ${run.record.jobId}: the tree of ${closing.commit} could not be read, so ${closing.data.iteration} claims no repair: ${message(error)}`);
+    }
+    if (tree !== undefined) {
+      const candidate = { kind: 'tree' as const, id: tree };
+      const committed = await this.commitCheckFindings(run, ({ state }) => ({
+        commands: [...state.findings.values()]
+          .filter(entry => entry.standing === 'open' && entry.reason === 'repair-planned' && entry.pendingUserDecision === null
+            && entry.repair?.kind === 'intent' && entry.repair.ref === closing.corrects && sameWorkItem(entry.owner, workItem))
+          .map(entry => ({
+            type: 'dispose' as const,
+            checkFinding: entry.id,
+            expectedRevision: entry.revision,
+            decision: {
+              actor: { kind: 'agent' as const, role: 'engineer', invocation: closing.invocation ?? 'none' },
+              source: candidate,
+              rationale: `The correction ${closing.data.iteration} of ${closing.corrects} closed accepted at gate ${closing.gate}, on the audited commit ${closing.commit}`,
+              evidence: [{ kind: 'gate-attempt', ref: runLayout.gate(closing.gate), hash: null }],
+              communication: { mode: 'quiet' as const },
+              decision: { action: 'claim-repair' as const, candidate, change: closing.data.iteration },
+            },
+          })),
+        compose: decided => ({
+          event: { type: 'iteration-closed', data: { ...closing.data, ...(decided.events.length === 0 ? {} : { checkFindings: [...decided.events] }) } },
+          records: [closing.record],
+        }),
+      }));
+      if (committed.kind !== 'refused' || committed.refusal.reason === 'run-ended') return;
+      this.warn(`Run ${run.record.jobId}: the repair claims of ${closing.data.iteration} were refused, so it closes without them: ${committed.refusal.message}`);
+    }
+    await this.write(run, { type: 'iteration-closed', data: closing.data }, [closing.record]);
   }
 
   /** Captures one writer invocation's line events from the two snapshots around it. */
@@ -6381,6 +7246,14 @@ function delay(ms: number): Promise<void> {
 }
 
 /** Whether a CheckFinding's owner is this work item. */
+/** A terminal review result as a reconciliation packet states it: covered scope, gaps and concerns. */
+function resultText(result: ReviewResult): string {
+  const concerns = (count: number) => `${count} concern${count === 1 ? '' : 's'}`;
+  if (result.result === 'complete') return `complete, ${concerns(result.concerns)}`;
+  if (result.result === 'partial') return `partial, ${concerns(result.concerns)}; not inspected: ${result.missing.map(entry => `${entry.path} (${entry.reason})`).join(', ')}`;
+  return `not verified (${result.reason}): ${result.detail}`;
+}
+
 function sameWorkItem(owner: { readonly kind: string; readonly workItem?: string } | undefined, workItem: string): boolean {
   return owner?.kind === 'work-item' && owner.workItem === workItem;
 }

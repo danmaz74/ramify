@@ -815,6 +815,71 @@ in its round, and neither waived nor deferred) or `raised-after-last-round`
 CheckFinding with that reason, and one of non-low risk with reason
 `raised-after-last-round` as surfaced by the latest review.
 
+### 6.1 The implemented reconciliation (iteration 5)
+
+**Files:** `src/reviews/reconciliation.ts` (IDs, layout, basis and
+assessment records, the fork's submission, its validation and binding,
+floors, the brief and the basis comparison), `reconciliation-message.ts`
+(the packet), the prompt `reconciliation.procedure.md` in the
+`local-architect/3` package, `reviews/scheduler.ts` (`changed()`), and the
+run service's reconciliation section.
+
+Refinements of §6:
+
+- **Submission** `reconciliationSubmissionSchema`: `relations[]` (`from`,
+  `to`, `relation`, `shared`, `evidence` references, `rationale`),
+  `dispositions[]` (`checkFinding`, `rationale`, `communication`, optional
+  `risk` correction, `action`: `repair`, `fixed { reassessed }`,
+  `supersede { reassessed, replacement }`, `waive { acceptedRisk?,
+  uncertainty }`, `defer { revisit }`, `request-user-decision { conflicts[{
+  document, text }], options }`, `leave`), `next` (`complete`, `correct {
+  goal }`, `await-user`, `unresolved`) and `brief`. `leave` records no
+  decision: it is allowed only below the round's floor, and the signal stays
+  open. `next` must follow the dispositions: a user decision, else a repair,
+  else a signal left open, else `complete`. `acceptedRisk` defaults to the
+  signal's current risk. A conflict's `revision` is the harness's: the
+  captured plan's `sha256:` for `plan`, else the basis commit for a file of
+  it; its text must occur verbatim in the document.
+- **Refusals before the child** are returned as validation errors with the
+  codes in their message (`correction-floor`, `insufficient-authority`),
+  with every other rule; the invocation's ordinary rejection bound
+  (`rejectedSubmissionsPerTurn`) applies, then the round is refused.
+- **Round start.** Round 1 starts for any signal. A later round starts only
+  when a signal of at least `laterRoundMinimumRisk` needs a disposition, or
+  a claimed repair or a user's answer awaits assessment. No round starts once
+  `reconciliationRoundsPerWorkItem` are spent. The floor is `none` in the last
+  round, which wins over `any` when there is one round.
+- **Due deferrals.** This version evaluates no revisit condition: `due` is
+  always `[]`, and a deferred signal is visible history only.
+- **Events.** `reconciliation-refused { workItem, reconciliation | null,
+  stage: assessment | completion, reason }` is added: a basis refused at the
+  commit of an assessment, a fork that ended without one, or a completion
+  refused before `work-item-completed`. `reconciliation-brief-appended`
+  carries `session` and `ref` (null where none), `outcome: appended |
+  already-present | session-lost | failed | no-session` and `reason`.
+  `iteration-assigned` gains optional `corrects` (the reconciliation whose
+  intent it resolves); `iteration-closed` carries the claims.
+  `work-item-completed.unresolved` is `[{ checkFinding, reason }]`, absent
+  when empty.
+- **Completion validation.** A changed audited source (other than the
+  expected rendering of tracked feature files, byte for byte) or request set
+  always refuses the completion; a basis signal at another revision, or a
+  new open signal, refuses it only when a round remains and the signals then
+  warrant one. After at most `reconciliationRoundsPerWorkItem` refusals of one
+  completion request the run fails as `repair-exhausted`.
+- **Unresolved reasons.** An open signal at completion is
+  `raised-after-last-round` when the latest round's basis did not hold it,
+  else `rounds-exhausted` when that round was the last, else `below-floor`.
+- **Brief.** The fork's brief follows the harness's list of recorded
+  decision and relation IDs and the signals left open. The append's
+  completion moves the executor's point of the architect's session, not a
+  harness point, as the engineer's continuation note does; the next
+  continuation lists the reconciliation among its `briefs`. A brief that did
+  not land is quoted in the next architect input from the committed
+  assessment record.
+- **Fork.** Reason `reconciliation`; continue reason `reconciliation` for
+  the architect's turn that assigns a correction.
+
 ## 7. Scenario witness (iteration 6)
 
 | Report or witness field | Value |

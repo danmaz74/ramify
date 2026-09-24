@@ -391,8 +391,9 @@ describe('the prompt package', () => {
     // Each role is offered exactly the members a run of this iteration
     // produces, and no other.
     const local = manifest.packages['local-architect']!;
-    expect(local.package).toBe('local-architect/2');
-    expect(local.submissionKinds).toEqual(['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved']);
+    expect(local.package).toBe('local-architect/3');
+    // The reconciliation fork's submission is the package's second.
+    expect(local.submissionKinds).toEqual(['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved', 'reconciliation']);
 
     const fork = manifest.packages['global-fork']!;
     expect(fork.package).toBe('global-fork/1');

@@ -153,6 +153,8 @@ export const runPolicySchema = z.object({
     runAbsoluteMs: z.int().positive(),
     /** Assessment and correction rounds of one work item's reconciliation; absent before `run-policy/3`. */
     reconciliationRoundsPerWorkItem: z.int().positive().optional(),
+    /** The least risk a correction after a work item's first reconciliation round may be planned for; absent before iteration 5. */
+    laterRoundMinimumRisk: z.enum(['medium', 'high']).optional(),
   }).strict(),
   /**
    * The context policy of each role. The reviewer's is absent from a run
@@ -494,18 +496,20 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
 /**
  * Why a suspended session is continued: its placement request was answered,
  * the iteration it assigned closed, its completion was refused while
- * evidence was owed, or a gate failed after its result and it repairs.
+ * evidence was owed, a gate failed after its result and it repairs, or the
+ * reconciliation of its completion request chose a correction.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**
  * Why a session is forked from another: a placement request forks the
  * architect context; a scope review forks the local architect at the point
  * that produced the assignment; a design review forks the orientation that
- * read its guidance.
+ * read its guidance; a reconciliation forks the local architect at the
+ * point after its completion request.
  */
-export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation']);
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
