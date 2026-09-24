@@ -100,7 +100,7 @@ export function ExecutionModules({ map, selectedModule, highlightedModules, onSe
             <li key={item.module}><code>{item.module}</code> proposed under <code>{item.parent}</code></li>)}</ul>}</>
         : nodes.length === 0 ? <p>No modules in the current tree.</p>
           : <div className="execution-modules-viewport" aria-label="Zoomable modules canvas"><ReactFlowProvider>
-            <ModuleTreeCanvas nodes={nodes} selectedNodeId={selectedModule} highlightedNodeIds={highlightedModules}
+            <ModuleTreeCanvas nodes={nodes} selectedNodeId={selectedModule} highlightedNodeIds={highlightedModules} showMiniMap={false}
               collapsedNodeIds={collapsed} ariaLabel="Current modules hierarchy" renderNodeBody={renderBody} ariaLabelOf={ariaLabelOf}
               onSelectNode={onSelectModule} onToggleCollapsed={toggle} />
           </ReactFlowProvider></div>}

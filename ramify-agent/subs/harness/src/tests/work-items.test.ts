@@ -83,7 +83,7 @@ describe('a run whose work items need no change', () => {
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
+      'gate-started', 'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
       // Each completion request declares its entry's scenario, and the
       // work item's gate implements it.
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',

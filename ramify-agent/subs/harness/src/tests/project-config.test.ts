@@ -232,7 +232,7 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     expect(snapshot.state).toBe('failed');
     expect(snapshot.failure?.reason).toBe('project-config-invalid');
     expect(snapshot.failure?.message).toContain('Readiness failed at project-config after 1 attempt: ramify-agent.json is missing at the project root');
-    expect(failures).toEqual([{ attempt: 1, step: 'project-config', detail: 'ramify-agent.json is missing at the project root', recovery: null, final: true }]);
+    expect(failures).toEqual([{ attempt: 1, gate: 'ga-0001', step: 'project-config', detail: 'ramify-agent.json is missing at the project root', recovery: null, final: true }]);
     expect(step('project-config').outcome).toBe('failed');
     expect(step('acceptance-runner')).toMatchObject({ outcome: 'not-verified' });
     expect(attempt.steps.filter(entry => entry.step.startsWith('baseline-')).every(entry => entry.outcome === 'not-verified')).toBe(true);
@@ -276,7 +276,7 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     expect(snapshot.state).toBe('failed');
     expect(snapshot.failure?.reason).toBe('acceptance-harness-missing');
     expect(step('project-config').outcome).toBe('passed');
-    expect(failures).toEqual([{ attempt: 1, step: 'acceptance-runner', detail: 'node_modules/.bin/cucumber-js is not installed', recovery: null, final: true }]);
+    expect(failures).toEqual([{ attempt: 1, gate: 'ga-0001', step: 'acceptance-runner', detail: 'node_modules/.bin/cucumber-js is not installed', recovery: null, final: true }]);
   }, 180_000);
 
   test('a mode whose npm script or executable does not exist fails acceptance-runner, naming each', async () => {

@@ -204,7 +204,9 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   useEffect(() => {
     if (!selected) return;
     const p = place.get(selected);
-    if (p && !layout.hidden.has(selected)) void flow.setCenter((effectivePositions.get(selected)?.x ?? p.x) + 120, (effectivePositions.get(selected)?.y ?? p.y) + 48, { zoom: Math.max(viewport.zoom, 0.8), duration: 300 });
+    if (p && !layout.hidden.has(selected)) void flow.setCenter((effectivePositions.get(selected)?.x ?? p.x) + 120, (effectivePositions.get(selected)?.y ?? p.y) + 48, {
+      zoom: Math.max(viewport.zoom, 0.8), duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 300,
+    });
   }, [selected, layout, place]);
   const active = new Set([map.current.awaitedSession, map.current.runningGate].filter((key): key is string => key !== null));
   const repairs = new Map(map.links.filter(l => l.kind === 'repair-of' && l.from.coverage !== 'unresolved' && l.to.coverage !== 'unresolved')
@@ -216,7 +218,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       related: directMatches.has(p.key),
       hasChildren: hasChildren.has(p.key),
       repairFrom: (() => { const prior = byKey.get(repairs.get(p.key) ?? ''); return prior?.kind === 'gate' ? prior.verdict === 'failed' ? '✗' : prior.verdict === 'passed' ? '✓' : '?' : null; })(),
-      onSelect: jump, onToggle: toggle }, draggable: false, selectable: false }));
+      onSelect: jump, onToggle: toggle }, draggable: false, selectable: true }));
   const visible = new Set(nodes.map(node => node.id));
   const edges: Edge[] = [];
   for (const p of layout.placements) if (p.parent && visible.has(p.parent)) edges.push({ id: `parent:${p.key}`, source: p.parent, target: p.key, type: 'smoothstep', selectable: false });
@@ -224,7 +226,8 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     edges.push({ id: link.id, source: link.from.key, target: link.to.key, type: 'smoothstep', label: link.kind,
       style: { strokeDasharray: '4 4', stroke: link.kind === 'repair-of' ? statusColor.failed : '#64748b' }, selectable: false });
   }
-  const focusNow = () => { const target = map.current.runningGate ?? map.current.awaitedSession; if (target) jump(target); };
+  const focusNow = () => { const target = map.current.runningGate ?? map.current.awaitedSession;
+    if (target) { onSelectModule(null); focus(target); } };
   const selectedNode = selected ? byKey.get(selected) : undefined;
   const selectedSequences = new Set(selectedNode?.sourceRefs.flatMap(ref => ref.sequence === null ? [] : [ref.sequence]) ?? []);
   return <div className="execution-area area-wide" aria-label="Execution map">
@@ -236,11 +239,15 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     <p className="muted">Version {map.runVersion}{map.freshness === 'stale' ? ' · stale connection' : ''}; nodes {map.coverage.nodes.shown} / {map.coverage.nodes.total}, links {map.coverage.links.shown} / {map.coverage.links.total}, {map.tree.status === 'available' ? `modules ${map.coverage.modules.shown} / ${map.coverage.modules.total}` : `recorded module rows ${map.coverage.modules.shown} / ${map.coverage.modules.total} (hierarchy unavailable)`}.
       {map.links.filter(link => link.from.coverage === 'unresolved' || link.to.coverage === 'unresolved').length > 0 &&
         ` Unresolved references: ${map.links.filter(link => link.from.coverage === 'unresolved' || link.to.coverage === 'unresolved').length}.`}
-      {map.coverage.gaps.length > 0 && ` Coverage gaps: ${map.coverage.gaps.join('; ')}.`}
+      {map.coverage.gaps.length > 0 && ` Coverage gaps: ${map.coverage.gaps.length}.`}
       {map.tree.status === 'unavailable' && ` Module tree unavailable: ${map.tree.message}.`}</p>
+    {map.coverage.gaps.length > 0 && <details className="execution-coverage-gaps">
+      <summary>Coverage gaps ({map.coverage.gaps.length}) · first: <span className="execution-coverage-preview">{map.coverage.gaps.slice(0, 2).join('; ')}</span></summary>
+      <ol>{map.coverage.gaps.map((gap, index) => <li key={`${index}:${gap}`}>{gap}</li>)}</ol>
+    </details>}
     <div className="execution-workspace"><div className="execution-maps"><div className="execution-viewport" aria-label="Zoomable execution canvas">
       <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} viewport={viewport} onMove={(_, next) => onViewport(next)}
-        nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2}>
+        nodesDraggable={false} nodesConnectable={false} elementsSelectable deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2}>
         <Background /><Controls showInteractive={false} />
       </ReactFlow></div>
       <ExecutionModules map={map} selectedModule={selectedModule} highlightedModules={highlightedModules}

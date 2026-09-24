@@ -390,6 +390,52 @@ async function expectTrial(trial: Trial, toolchain: Toolchain): Promise<void> {
     'collection-review/integration-tests 0', `${reviews} 0`, `${notes} 0`, `${tags} 0`,
   ].sort());
   expect(summary.scenarios.map(result => `${result.id} ${result.status}`).sort()).toEqual(['sc-001 passed', 'sc-002 passed', 'sc-003 passed']);
+  // Plan 11's disk-backed provider witness: query the same completed scripted
+  // run that drove real workflow records, then cross one bounded page boundary.
+  const queries = new RunQueries(service);
+  const execution = await queries.executionMap(plan, trial.runId);
+  expect(execution.nodes.filter(node => node.kind === 'capability' && node.level === 'entry').map(node => node.key))
+    .toEqual(['capability:review-note', 'capability:review-tags']);
+  expect(execution.nodes.filter(node => node.kind === 'capability' && node.level === 'lower').map(node => node.key))
+    .toContain('capability:note-limit');
+  expect(execution.nodes.filter(node => node.kind === 'session').length).toBeGreaterThan(0);
+  expect(execution.nodes.filter(node => node.kind === 'gate').length).toBeGreaterThan(1);
+  expect(execution.nodes.find(node => node.key === 'requirement:rq-001')).toMatchObject({ state: 'verified', providerStage: 'conformed' });
+  expect(execution.links.some(link => link.kind === 'provider-for' && link.from.key === 'capability:note-limit')).toBe(true);
+  expect((await queries.executionCapabilityDetail(plan, trial.runId, 'review-note', execution.runVersion)).detail.state).toBe('available');
+  const noteScenario = await queries.executionScenarioDetail(plan, trial.runId, 'sc-001', execution.runVersion);
+  expect(noteScenario.detail).toMatchObject({ state: 'available' });
+  if (noteScenario.detail.state === 'available') {
+    expect(noteScenario.detail.source.join('\n')).toContain('Scenario:');
+    expect(noteScenario.detail.gates.some(gate => !gate.dryRun && gate.status === 'passed')).toBe(true);
+  }
+  const firstPage = await queries.executionMapPage(plan, trial.runId, { version: execution.runVersion, limit: 1 });
+  expect(firstPage.nextCursor).not.toBeNull();
+  const secondPage = await queries.executionMapPage(plan, trial.runId,
+    { version: execution.runVersion, cursor: firstPage.nextCursor, limit: 1 });
+  expect(secondPage.cursor).toBe(firstPage.nextCursor);
+  expect(new Set([...firstPage.nodes, ...secondPage.nodes].map(node => node.key)).size)
+    .toBe(firstPage.nodes.length + secondPage.nodes.length);
+  if (process.env.PLAN11_EXECUTION_EXPORT) {
+    const pages = [];
+    let cursor: string | undefined;
+    do {
+      const page = await queries.executionMapPage(plan, trial.runId,
+        { version: execution.runVersion, cursor, limit: 10 });
+      pages.push(page);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    const capabilities = Object.fromEntries(await Promise.all(execution.nodes.filter(node => node.kind === 'capability').map(async node => [
+      node.key.slice('capability:'.length), await queries.executionCapabilityDetail(plan, trial.runId,
+        node.key.slice('capability:'.length), execution.runVersion),
+    ] as const)));
+    const scenarios = Object.fromEntries(await Promise.all(execution.nodes.filter(node => node.kind === 'scenario').map(async node => [
+      node.key.slice('scenario:'.length), await queries.executionScenarioDetail(plan, trial.runId,
+        node.key.slice('scenario:'.length), execution.runVersion),
+    ] as const)));
+    await writeFile(process.env.PLAN11_EXECUTION_EXPORT, JSON.stringify({ planId: plan, runId: trial.runId,
+      pages, capabilities, scenarios }, null, 2));
+  }
   if (toolchain.kind === 'installed') {
     // The real runner: every step bound to a definition the owner's step
     // files wrote or imported, and the project's own scenario passed over HTTP.

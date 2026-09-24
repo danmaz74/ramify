@@ -44,6 +44,8 @@ export interface ModuleTreeCanvasProps {
   readonly selectedNodeId: string | null;
   /** Directly related nodes highlighted alongside the primary selection. */
   readonly highlightedNodeIds?: ReadonlySet<string>;
+  /** Show the navigation minimap; compact companions can omit it. Defaults to true. */
+  readonly showMiniMap?: boolean;
   readonly collapsedNodeIds: ReadonlySet<string>;
   readonly ariaLabel: string;
   /** Contents of a node shell. Controls in it neither select, open, drag nor pan. */
@@ -259,6 +261,7 @@ export function ModuleTreeCanvas({
   rootNodeId,
   selectedNodeId,
   highlightedNodeIds,
+  showMiniMap = true,
   collapsedNodeIds,
   ariaLabel,
   renderNodeBody,
@@ -358,8 +361,8 @@ export function ModuleTreeCanvas({
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#dbe3f0" />
         <Controls showInteractive={false} />
-        <MiniMap style={{ bottom: 12 }} pannable zoomable nodeComponent={MiniMapTreeNode}
-          nodeColor={node => (node.data as CanvasNodeData).module?.color ?? PROJECT_COLOR} />
+        {showMiniMap && <MiniMap style={{ bottom: 12 }} pannable zoomable nodeComponent={MiniMapTreeNode}
+          nodeColor={node => (node.data as CanvasNodeData).module?.color ?? PROJECT_COLOR} />}
       </ReactFlow>
       </FocusIntoView.Provider>
       </NodeNames.Provider>

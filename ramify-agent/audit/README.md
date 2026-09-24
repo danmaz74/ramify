@@ -1,5 +1,19 @@
 # The ramify-agent suite audit request
 
+Plan 11's execution map uses [`plan11-execution-map.request.json`](plan11-execution-map.request.json).
+It retains the five checks below, binds the claim to `plan11-execution-map`, and
+raises only the complete agent suite's timeout from 300 to 600 seconds after a
+measured local full run of about 140 seconds. From the clean final Plan 11
+commit, invoke it with:
+
+```sh
+ramify-agent/node_modules/.bin/ramify-audit audit \
+  --request ramify-agent/audit/plan11-execution-map.request.json \
+  --cwd . --json
+```
+
+The request below remains the recorded Plan 8 claim.
+
 [`ramify-agent-suite.request.json`](ramify-agent-suite.request.json) is the
 ramify-audit request that binds the ramify-agent suite to one commit. It is
 recorded here so the request is reproducible from the repository rather than

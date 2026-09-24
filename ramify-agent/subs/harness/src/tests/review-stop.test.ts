@@ -106,7 +106,7 @@ describe('a run started with the review stop', () => {
     const events = await runEventsOnDisk(root, plan, receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
-      'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
+      'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
     ]);
     expect(events.find(event => event.type === 'analysis-approved')!.data).toMatchObject({
       reviewer: 'dana@example.com', note: 'The scenarios match the plan.', duringRun: false, command: { receipt: approved },

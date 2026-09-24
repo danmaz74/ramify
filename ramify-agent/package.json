@@ -5,7 +5,7 @@
   "description": "Agent harness for Ramify projects: architectural planning and module-scoped implementation sessions. A separate consumer of ramify.ts; ramify.ts never depends on it.",
   "type": "module",
   "scripts": {
-    "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
+    "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json",
     "test": "vitest run",
     "check:self": "ramify check --batch --root .",
     "build:web": "NODE_ENV=production vite build --config subs/web/vite.config.ts",
@@ -13,7 +13,8 @@
     "serve": "tsx src/main.ts serve",
     "real-session": "tsx scripts/real-session.ts",
     "session": "tsx src/main.ts session",
-    "trial": "tsx scripts/live-trial.ts"
+    "trial": "tsx scripts/live-trial.ts",
+    "test:browser:execution-map": "tsx scripts/browser-acceptance/run.ts"
   },
   "dependencies": {
     "@cucumber/gherkin": "42.0.0",
@@ -39,6 +40,7 @@
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
     "jsdom": "30.0.1",
+    "playwright-core": "1.63.0",
     "tsx": "4.23.13",
     "typescript": "7.0.2",
     "vite": "8.3.0",

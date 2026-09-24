@@ -140,3 +140,20 @@ test('ordinary version updates retain existing card positions and add a new run-
   expect(position('capability:status-badge')).toBe(first);
   expect(position('session:ses-new')).not.toBe(first);
 });
+
+test('a long coverage list keeps its count and first facts visible, with every gap expandable', async () => {
+  const gaps = Array.from({ length: 14 }, (_, i) => `Historical gate ga-${String(i + 1).padStart(4, '0')} has no audit result.`);
+  const altered = { ...map, coverage: { ...map.coverage, gaps } };
+  const c = { ...client(), getExecutionMap: async () => altered } as ProtocolClient;
+  render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);
+  const area = await screen.findByLabelText('Execution map');
+  expect(within(area).getByText(/Coverage gaps: 14/)).toBeTruthy();
+  const details = area.querySelector<HTMLDetailsElement>('.execution-coverage-gaps')!;
+  expect(details.open).toBe(false);
+  expect(details.querySelector('summary')?.textContent).toContain(gaps[0]);
+  expect(details.querySelector('summary')?.textContent).not.toContain(gaps[13]);
+  fireEvent.click(details.querySelector('summary')!);
+  expect(details.open).toBe(true);
+  expect(details.querySelectorAll('li')).toHaveLength(14);
+  expect(details.lastElementChild?.textContent).toContain(gaps[13]);
+});

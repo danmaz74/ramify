@@ -201,4 +201,4 @@ Run the full project tests, type check, web build, `check:self` and the recorded
 | EM11 | Gate verdict and audit remain distinct on a marker; repair rounds remain selectable. Expanded capability summaries and collapsed scenario marks explain current status without claiming unavailable counts. | 1–3, 6 |
 | EM12 | Now targets and motion follow recorded activity; hidden-match badges, line bars and transcript focus feedback remain keyboard-accessible and respect reduced motion. | 1, 3, 6–9 |
 
-This plan is an implementation contract and has no execution evidence yet.
+The implementation and executable acceptance are recorded in [results.md](results.md). The final commit's independent audit outcome is published as a Git note under `refs/notes/audit`.

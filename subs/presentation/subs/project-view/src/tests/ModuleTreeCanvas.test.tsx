@@ -397,6 +397,13 @@ describe('ModuleTreeCanvas interaction', () => {
     expect(query).toMatch(/\.module-tree__canvas \.react-flow__minimap\s*\{[^}]*display:\s*none/);
   });
 
+  it('can omit the minimap for a compact companion without changing the default', () => {
+    const view = render(<ModuleTreeCanvas {...props({ nodes: mixedNodes() })} showMiniMap={false} />);
+    expect(screen.queryByTestId('mock-minimap')).not.toBeInTheDocument();
+    view.rerender(<ModuleTreeCanvas {...props({ nodes: mixedNodes() })} />);
+    expect(screen.getByTestId('mock-minimap')).toBeInTheDocument();
+  });
+
   it('handles Enter, arrows and o on the shell, and opens by double-click', () => {
     const onSelectNode = vi.fn();
     const onToggleCollapsed = vi.fn();
