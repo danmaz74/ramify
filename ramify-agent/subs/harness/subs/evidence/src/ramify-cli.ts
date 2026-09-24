@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { childEnvironment } from './run-command.js';
+import { childEnvironment, outputCapBytes } from './run-command.js';
 
 /** The `ramify` executable this package depends on. */
 export const ramifyExecutable = fileURLToPath(new URL('../../../../../node_modules/.bin/ramify', import.meta.url));
@@ -69,7 +69,7 @@ export class RamifyCli {
     const env = childEnvironment(this.options.endpointDirectory ? { RAMIFY_ENDPOINT_DIR: this.options.endpointDirectory } : {});
     return new Promise(resolve => {
       execFile(this.options.executable ?? ramifyExecutable, [...args], {
-        cwd, env, signal, timeout: this.options.timeoutMs ?? 600_000, maxBuffer: 16 * 1024 * 1024,
+        cwd, env, signal, timeout: this.options.timeoutMs ?? 600_000, maxBuffer: outputCapBytes,
       }, (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : -1;
         resolve({ code, stdout: String(stdout), stderr: error !== null && code === -1 ? `${String(stderr)}${error.message}` : String(stderr) });

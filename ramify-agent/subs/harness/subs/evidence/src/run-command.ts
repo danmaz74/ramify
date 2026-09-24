@@ -36,8 +36,12 @@ export const processGroupCleanupScript = fileURLToPath(new URL('./run-command-wi
 /** The bound on the tail a caller receives, in bytes. The complete output is the file. */
 export const outputTailBytes = 8 * 1024;
 
-/** The bound on what one command may print before it is killed, in bytes. */
-export const outputCapBytes = 16 * 1024 * 1024;
+/**
+ * The bound on what one command may print before it is killed, in bytes. A
+ * complete Ramify check prints its whole JSON report, which passes 25 MB on a
+ * project of about 450 source files.
+ */
+export const outputCapBytes = 128 * 1024 * 1024;
 
 /**
  * How a command ended. `completed` is the only outcome with an exit code, and
