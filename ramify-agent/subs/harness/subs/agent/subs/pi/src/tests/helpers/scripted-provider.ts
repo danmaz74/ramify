@@ -65,10 +65,22 @@ export const calls = (...blocks: ReplyBlock[]): Reply => ({ kind: 'reply', block
 /** Streams nothing until the request is aborted. */
 export const hold: Reply = { kind: 'hold' };
 
+/** A tool declaration as a system message carries it. */
+type DeclaredTool = { readonly name: string; readonly parameters: unknown; readonly description: string };
+
 /** What the model was sent on each request. */
 export interface Request {
+  /**
+   * The prompt after replaying every system message in the request, as a
+   * provider without mid-conversation system messages receives it; undefined
+   * when the request holds none.
+   */
   readonly systemPrompt: string | undefined;
-  readonly tools: ReadonlyArray<{ readonly name: string; readonly parameters: unknown; readonly description: string }>;
+  /** How many system messages the request held; a forced prompt arrives as exactly one. */
+  readonly systemMessages: number;
+  /** The tools after replaying every system message's additions and removals. */
+  readonly tools: readonly DeclaredTool[];
+  /** The conversation, without the system messages. */
   readonly messages: Context['messages'];
   /** The thinking level pi asked for, or undefined when it asked for none. */
   readonly reasoning: unknown;
@@ -106,10 +118,12 @@ export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedO
   } as unknown as Model;
 
   const stream: StreamFunction = (requestModel, context, options?: StreamOptions) => {
+    const system = context.messages.filter(message => message.role === 'system') as unknown as readonly SystemMessage[];
     requests.push({
-      systemPrompt: context.systemPrompt,
-      tools: (context.tools ?? []).map(tool => ({ name: tool.name, parameters: tool.parameters, description: tool.description })),
-      messages: structuredClone(context.messages),
+      systemPrompt: system.length === 0 ? undefined : replayedPrompt(system),
+      systemMessages: system.length,
+      tools: replayedTools(system),
+      messages: structuredClone(context.messages.filter(message => message.role !== 'system')),
       reasoning: (options as { reasoning?: unknown } | undefined)?.reasoning,
     });
     const events = new ReplyStream();
@@ -129,6 +143,53 @@ export function scriptedProvider(steps: readonly ReplyStep[], options: ScriptedO
     streamSimple: stream,
   } as unknown as Provider;
   return { provider, model, requests, pending: () => queue.length, push: (...steps) => { queue.push(...steps); } };
+}
+
+/**
+ * A system message as pi sends it to a provider. Since pi 0.86 the prompt and
+ * the tool declarations travel in the transcript: a leading system message,
+ * and later ones that append text, patch named sections or change the tools.
+ */
+interface SystemMessage {
+  readonly role: 'system';
+  readonly content: string | ReadonlyArray<{ readonly type: string; readonly text?: string }>;
+  readonly sections?: Readonly<Record<string, string | null>>;
+  readonly toolsAdded?: readonly DeclaredTool[];
+  readonly toolsRemoved?: ReadonlyArray<{ readonly name: string }>;
+}
+
+function systemText(content: SystemMessage['content']): string {
+  return typeof content === 'string' ? content : content.filter(block => block.type === 'text').map(block => block.text ?? '').join('');
+}
+
+/**
+ * The prompt the system messages add up to, replayed as pi's own
+ * `getCurrentSystemPrompt` does: each message's text is appended and named
+ * sections are patched. pi keeps that helper in a package it does not export,
+ * so the replay is restated here.
+ */
+function replayedPrompt(system: readonly SystemMessage[]): string {
+  const content: string[] = [];
+  const sections = new Map<string, string>();
+  for (const message of system) {
+    const text = systemText(message.content);
+    if (text.length > 0) content.push(text);
+    for (const [name, value] of Object.entries(message.sections ?? {})) {
+      if (value === null) sections.delete(name);
+      else sections.set(name, value);
+    }
+  }
+  return [content.join('\n\n'), ...sections.values()].filter(part => part.length > 0).join('\n\n');
+}
+
+/** The tools the system messages add up to, after every addition and removal in order. */
+function replayedTools(system: readonly SystemMessage[]): DeclaredTool[] {
+  const tools = new Map<string, DeclaredTool>();
+  for (const message of system) {
+    for (const tool of message.toolsRemoved ?? []) tools.delete(tool.name);
+    for (const tool of message.toolsAdded ?? []) tools.set(tool.name, { name: tool.name, parameters: tool.parameters, description: tool.description });
+  }
+  return [...tools.values()];
 }
 
 /** A model runtime isolated in a temporary agent directory, with the scripted provider registered. */

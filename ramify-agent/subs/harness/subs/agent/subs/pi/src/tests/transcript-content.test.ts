@@ -113,8 +113,12 @@ describe('ST06: transcript content through the port', () => {
     expect(results[0]!.blocks).toEqual([{ type: 'text', text: expect.stringContaining('module demo') }]);
     expect(results[2]!.blocks).toEqual([{ type: 'text', text: 'The submission was accepted and recorded.' }]);
 
-    // The events hold every message pi's own file holds, and none of its opaque data.
-    const file = piFileMessages(harness.sessionDirectory);
+    // The events hold every conversation message pi's own file holds, and none
+    // of its opaque data. pi also records its own prompt and tool state as
+    // system messages, which the spec's prompt replaces on every request.
+    const recorded = piFileMessages(harness.sessionDirectory);
+    expect(recorded.some(message => message.role === 'system')).toBe(true);
+    const file = recorded.filter(message => message.role !== 'system');
     expect(all.map(event => event.role)).toEqual(file.map(message => (message.role === 'toolResult' ? 'tool-result' : message.role)));
     expect(results.map(event => event.callId)).toEqual(file.flatMap(message => (message.role === 'toolResult' ? [message.toolCallId] : [])));
     expect(JSON.stringify(file)).toContain('opaque-signature-one');

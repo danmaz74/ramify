@@ -689,6 +689,10 @@ function translate(event: AgentSessionEvent, emit: (event: AgentEvent) => void, 
     case 'message_end': {
       // pi reports the first prompt this way before it calls the model.
       const message = event.message as unknown as PiMessage;
+      // pi records its own prompt and tool state as system messages. The
+      // prompt the model receives is the spec's, replaced on every request,
+      // and the tools are the spec's, so these are not the session's messages.
+      if (message.role === 'system') return;
       emit(messageOf(message, to));
       if (message.role === 'assistant') to.observeContext();
       return;

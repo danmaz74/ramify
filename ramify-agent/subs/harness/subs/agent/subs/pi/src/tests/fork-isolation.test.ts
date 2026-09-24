@@ -76,8 +76,10 @@ test('a fork from a pinned point in another directory holds the parent\'s histor
   expect(first).toContain('the live tree');
   expect(first).not.toContain('BETA');
   expect(fork.scripted.requests[0]!.systemPrompt).toBe('You are the reviewer. Exactly this prompt.');
+  // The parent's recorded system messages do not reach the fork's request beside its own prompt.
+  expect(fork.scripted.requests[0]!.systemMessages).toBe(1);
   // Only the tools the fork was given are offered, whatever its parent had.
-  expect(fork.toolNames(0)).toEqual(['snapshot_read', 'submit_implementation_map']);
+  expect([...fork.toolNames(0)].sort()).toEqual(['snapshot_read', 'submit_implementation_map']);
   const finished = fork.events.filter(event => event.type === 'tool-finished');
   expect(finished).toContainEqual(expect.objectContaining({ callId: 'r-1', isError: true }));
   expect(finished).toContainEqual(expect.objectContaining({ callId: 'r-2', tool: 'snapshot_read', isError: false }));

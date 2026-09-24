@@ -92,6 +92,8 @@ describe('the pi adapter', () => {
     expect(harness.scripted.requests).toHaveLength(1);
     const [request] = harness.scripted.requests;
     expect(request!.systemPrompt).toBe('Line one.\nLine two, exact.');
+    // pi carries the prompt in system messages; a forced prompt arrives as the only one.
+    expect(request!.systemMessages).toBe(1);
     expect(request!.tools.map(tool => tool.name).sort()).toEqual(['grep', 'ls', 'read', 'submit_implementation_map']);
     const submission = request!.tools.find(tool => tool.name === 'submit_implementation_map')!;
     expect(submission.parameters).toEqual({ type: 'object', properties: { summary: {}, modules: {} } });

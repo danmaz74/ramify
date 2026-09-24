@@ -1,7 +1,7 @@
 # pi
 
 Implements the agent port on pi (`@earendil-works/pi-coding-agent`, pinned at
-0.85.1), in the harness's process. It hides the pi package, its session format
+0.87.1), in the harness's process. It hides the pi package, its session format
 and its login: nothing else in the project imports pi. `createPiAgent` returns
 an `AgentPort`; `piReadiness` says which model a session would run, or why
 none can run yet.
@@ -9,7 +9,10 @@ none can run yet.
 ## How a session runs
 
 - **Prompt.** The spec's system prompt is sent exactly: an inline extension
-  replaces pi's assembled prompt on every agent start. pi's discovery of
+  replaces pi's assembled prompt on every agent start. pi records its own
+  prompt and tool state as system messages in the session, and a replaced
+  prompt reaches the model as the request's only system message, holding the
+  spec's text and the current tools. pi's discovery of
   context files (`AGENTS.md`, `CLAUDE.md`), extensions, skills, prompt
   templates and themes is off, and settings are in memory, so nothing from
   the target project or the person's pi configuration enters the session.
@@ -68,10 +71,11 @@ none can run yet.
   receive the same action; `tool-finished` carries
   `reachedTool`, which is false for a call pi's own validation rejected, so
   every such rejection is counted without reading pi's message text.
-  `message_end` becomes `message` for every role: the first prompt, which pi
-  reports before the model call; each assistant message; each tool result,
-  as the agent saw it; and pi's `custom` messages, such as a brief, as the
-  user's. An assistant message carries its blocks: text, thinking (`redacted`
+  `message_end` becomes `message` for every conversation role: the first
+  prompt, which pi reports before the model call; each assistant message;
+  each tool result, as the agent saw it; and pi's `custom` messages, such as
+  a brief, as the user's. pi's `system` messages, which record its own prompt
+  and tool state, are left out. An assistant message carries its blocks: text, thinking (`redacted`
   when pi marks it so, otherwise `unmarked`, since pi does not say whether
   the provider summarized it) and tool calls with their actions. Its usage
   and detail follow: the model that answered, pi's provider thinking level,
@@ -93,7 +97,8 @@ none can run yet.
   here is evidence only: the harness confirms it by process group and a
   stable tree.
 - **Session record.** pi writes its own `.jsonl` into the job's `session/`
-  directory, starting with the first assistant message.
+  directory, starting with the first assistant message. It holds pi's
+  `system` messages beside the conversation.
 - **Support.** The adapter declares every entry of the port's
   `ExecutorSupport` available: pi observes usage, context and compaction,
   continues and forks a session at the entry a ref names, appends without a

@@ -62,7 +62,7 @@ so serve a copy of the fixture, never the fixture itself.
 A run on a real pi session needs a pi login, which the harness does not
 provide:
 
-1. From `ramify-agent/`, run `npx pi` (pi 0.85.1, the pinned dependency).
+1. From `ramify-agent/`, run `npx pi` (pi 0.87.1, the pinned dependency).
 2. Type `/login` and choose a subscription, such as Claude Pro/Max or
    ChatGPT Plus/Pro (Codex). pi's own documentation says Claude Pro/Max usage
    from a third-party harness is billed as extra usage, per token.
