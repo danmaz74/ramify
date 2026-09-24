@@ -16,6 +16,10 @@ import { useQuery } from './use-query.js';
 
 type CardData = { node: ExecutionNode | null; collapsed: boolean; hiddenCount: number; hiddenMatches: number; active: boolean;
   selected: boolean; related: boolean; flash: boolean; hasChildren: boolean; repairFrom: string | null;
+  /** When a running gate started, from its `gate-started` event; null when the event is not at hand. */
+  startedAt: string | null;
+  /** The module line, from `moduleText`. */
+  module: string;
   /** A work item the run holds for the person's decision, as the run's snapshot states it. */
   awaitingDecision: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void };
 type CardNode = Node<CardData, 'execution'>;
@@ -42,11 +46,49 @@ function countText(coverage: { state: string; known?: number; total?: number | n
   return `${coverage.known} / ${coverage.total ?? '?'}${coverage.state === 'partial' ? ' partial' : ''}`;
 }
 
-function moduleText(node: ExecutionNode): string {
-  if (node.kind === 'capability') return node.owner ?? 'module unavailable';
-  if (node.kind === 'work-item' || node.kind === 'iteration') return node.module ?? 'module unavailable';
-  if (node.kind === 'session' && node.reach.kind === 'work-item') return node.reach.module ?? 'module unavailable';
-  return node.modules.length ? node.modules.map(relation => `${relation.module} (${relation.role})`).join(', ') : 'run-wide or module unavailable';
+const moduleNotRecorded = 'Module not recorded';
+
+/**
+ * The module an element belongs to; a gate of a work item names the work item's module. A gate without a work item
+ * and a session that reaches the run are run-wide; any other missing module is not recorded.
+ */
+function moduleText(node: ExecutionNode, byKey: ReadonlyMap<string, ExecutionNode>): string {
+  if (node.kind === 'capability') return node.owner ?? moduleNotRecorded;
+  if (node.kind === 'work-item' || node.kind === 'iteration') return node.module ?? moduleNotRecorded;
+  if (node.kind === 'gate' && node.subject.workItem !== null && !node.modules.length) {
+    const item = byKey.get(`work-item:${node.subject.workItem}`);
+    return item?.kind === 'work-item' && item.module !== null ? item.module : moduleNotRecorded;
+  }
+  if (node.kind === 'session' && (node.reach.kind === 'work-item' || node.reach.kind === 'module')) return node.reach.module ?? moduleNotRecorded;
+  if (node.modules.length) return node.modules.map(relation => `${relation.module} (${relation.role})`).join(', ');
+  if ((node.kind === 'gate' && node.subject.workItem === null) || (node.kind === 'session' && node.reach.kind === 'run')) return 'Run-wide';
+  return moduleNotRecorded;
+}
+
+type GateNode = Extract<ExecutionNode, { kind: 'gate' }>;
+const verdictWords = { passed: 'Passed', failed: 'Failed', 'not-verified': 'Not verified' } as const;
+const verdictMarks = { passed: '✓', failed: '✗', 'not-verified': '?' } as const;
+const auditWords = { 'not-started': 'Audit not started', passed: 'Audit passed', failed: 'Audit failed',
+  incomplete: 'Audit incomplete', unavailable: 'Audit unavailable' } as const;
+
+/** A gate's repair chain, repair round and audit, each only where it applies: a first round and a gate without an audit say nothing. */
+function gateFacts(node: GateNode, repairFrom: string | null): string {
+  return [repairFrom ? `${repairFrom} → ${node.verdict ? verdictMarks[node.verdict] : '…'}` : null,
+    node.repairRound > 0 ? `Repair round ${node.repairRound}` : null,
+    !node.active && node.audit !== 'not-applicable' ? auditWords[node.audit] : null].filter(Boolean).join(' · ');
+}
+
+function elapsedText(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+    : `${Math.floor(seconds / 3600)}h ${Math.floor(seconds / 60) % 60}m`;
+}
+
+/** How long a running gate has run, counted each second from its start. */
+function Elapsed({ since }: { since: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+  return <> for {elapsedText(now - Date.parse(since))}</>;
 }
 
 function ScenarioSummary({ node, collapsed }: { node: Extract<ExecutionNode, { kind: 'capability' }>; collapsed: boolean }) {
@@ -65,7 +107,7 @@ function ScenarioSummary({ node, collapsed }: { node: Extract<ExecutionNode, { k
 }
 
 function ExecutionCard({ data }: NodeProps<CardNode>) {
-  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, awaitingDecision, onSelect, onToggle } = data;
+  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, startedAt, module, awaitingDecision, onSelect, onToggle } = data;
   if (node === null) return <div className="execution-card execution-run-band"><strong>Run band</strong><small>Initial architecture, integration and run-wide evidence</small><Handle type="source" position={Position.Right} isConnectable={false} /></div>;
   const role = node.kind === 'session' ? tokens.roleIdentity[node.role] : null;
   const roleAccent = node.kind === 'session' ? tokens.light.role[node.role] : null;
@@ -74,14 +116,16 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
   return <div className={`execution-card execution-${node.kind} execution-state-${status}${awaitingDecision ? ' execution-awaiting-decision' : ''}${active ? ' execution-live' : ''}${selected ? ' execution-selected' : ''}${related ? ' execution-related' : ''}${flash ? ' execution-flash' : ''}`}
     style={{ borderColor: statusColor[status], borderLeftColor: roleAccent ?? statusColor[status], color: statusColor[status] }}>
     <Handle type="target" position={Position.Left} isConnectable={false} />
-    <button type="button" className="execution-card-main nodrag nopan" onClick={() => onSelect(node.key)} aria-label={label}
+    <button type="button" className="execution-card-main nodrag" onClick={() => onSelect(node.key)} aria-label={label}
       aria-pressed={selected}>
-      <small className={roleAccent ? 'execution-role-label' : undefined} style={roleAccent ? { color: roleAccent } : undefined}>{node.kind === 'session' ? <><RoleIcon role={node.role} /> {role!.label}</> : node.kind.replace('-', ' ')}</small>
-      {node.kind === 'gate' ? <span className={`execution-gate-mark audit-${node.audit}`} aria-label={`Verdict ${node.verdict ?? 'running'}; audit ${node.audit}`}>
-        {node.verdict === 'passed' ? '✓' : node.verdict === 'failed' ? '✗' : node.verdict === null ? '…' : '?'}</span> : null}
+      {node.kind === 'gate'
+        // A gate's title names it a gate, so its first line is the verdict in words rather than the kind.
+        ? <small className={`execution-gate-mark audit-${node.audit}`} aria-label={`Verdict ${node.verdict ?? 'running'}; audit ${node.audit}`}>
+          {node.verdict === null ? <>Running{startedAt && <Elapsed since={startedAt} />}</> : verdictWords[node.verdict]}</small>
+        : <small className={roleAccent ? 'execution-role-label' : undefined} style={roleAccent ? { color: roleAccent } : undefined}>{node.kind === 'session' ? <><RoleIcon role={node.role} /> {role!.label}</> : node.kind.replace('-', ' ')}</small>}
       <strong>{node.label}</strong>
       {awaitingDecision && <small className="execution-decision-mark">{waitingLabel}</small>}
-      <small>{moduleText(node)}</small>
+      <small>{module}</small>
       {node.kind === 'session' && node.role === 'local-architect' && <small>Local architect lane · {node.invocations.length} invocation{node.invocations.length === 1 ? '' : 's'} across the work item</small>}
       {node.kind === 'iteration' && <small>Iteration {node.ordinal} · outline {node.outlineRevision} · {node.outcome ?? node.state}</small>}
       {node.kind === 'requirement' && <small>{node.state} · provider {node.providerStage} · revision {node.currentRevision}</small>}
@@ -89,9 +133,9 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
       {node.kind === 'scenario' && <small>{node.latestRealResult} · {node.state}</small>}
       {node.kind === 'capability' && <><small>{node.state} · {node.reason}</small><ScenarioSummary node={node} collapsed={collapsed} />
         {!collapsed && <small>Requirements: {node.directRequirements.verified} verified of {countText(node.directRequirements.coverage)} direct current-revision requirements</small>}</>}
-      {node.kind === 'gate' && <small>{repairFrom ? `${repairFrom} → ${node.verdict === 'passed' ? '✓' : node.verdict === 'failed' ? '✗' : '?'} · ` : ''}${node.checkpoint} · round {node.repairRound} · audit {node.audit}</small>}
+      {node.kind === 'gate' && gateFacts(node, repairFrom) && <small>{gateFacts(node, repairFrom)}</small>}
     </button>
-    {hasChildren && <button type="button" className="execution-expand nodrag nopan" onClick={() => onToggle(node.key)}
+    {hasChildren && <button type="button" className="execution-expand nodrag" onClick={() => onToggle(node.key)}
       aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${node.label}${hiddenMatches ? `, ${hiddenMatches} matches inside` : ''}`}
       aria-expanded={!collapsed}>{collapsed ? `▸ ${hiddenCount} inside${hiddenMatches ? ` · ${hiddenMatches} matches inside` : ''}` : '▾'}</button>}
     <Handle type="source" position={Position.Right} isConnectable={false} />
@@ -127,7 +171,7 @@ function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }:
           {scenario.state.data.detail.gates.length ? <ol>{scenario.state.data.detail.gates.map((g, i) => <li key={`${g.gate}:${i}`}>{g.gate}: {g.status}{g.dryRun ? ' (dry run)' : ''}; gate {g.verdict}; {g.checkpoint}</li>)}</ol>
             : <p>No recorded gate result.</p>}</> : <p>Full scenario unavailable: {scenario.state.data.detail.reason}</p>)}
       {scenario.state.status === 'failed' && <p role="alert">Could not read scenario: {scenario.state.error.message}</p>}</>}
-    {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}; audit {node.audit}; round {node.repairRound}; cause {node.cause ?? 'none'}.</p>
+    {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}{node.audit !== 'not-applicable' ? `; audit ${node.audit}` : ''}{node.repairRound > 0 ? `; repair round ${node.repairRound}` : ''}; cause {node.cause ?? 'none'}.</p>
       {node.active ? <p>The gate is running; its full check result will be available when this attempt settles.</p>
         : <button type="button" onClick={() => onOpenGate(node.key.slice('gate:'.length))}>Open full check and audit detail</button>}
       {gate.state.status === 'ready' && gate.state.data && <><p>Attempt commit {gate.state.data.commit ?? 'none'}; audited commit {gate.state.data.audited ?? 'none'}; audit evidence {gate.state.data.evidence?.runRef ?? 'not published'}.</p>
@@ -156,16 +200,21 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   const flow = useReactFlow<CardNode, Edge>();
   const [flash, setFlash] = useState<string | null>(null);
   // Cards differ in height (a capability's scenario summary, a gate's audit line), so the stack uses each card's
-  // measured height, or an estimate by kind until the canvas has measured it.
-  const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
-  const onNodesChange = (changes: NodeChange<CardNode>[]) => setHeights(current => {
-    let next: Map<string, number> | null = null;
-    for (const change of changes) if (change.type === 'dimensions' && change.dimensions && Math.abs((current.get(change.id) ?? -1) - change.dimensions.height) >= 1) {
+  // measured height, or an estimate by kind until the canvas has measured it. The cards are rebuilt on every render
+  // (each pan frame among them), so each carries its measured size back: a card without one is hidden, and its edges
+  // dropped, until the canvas measures it again.
+  const [measured, setMeasured] = useState<ReadonlyMap<string, { width: number; height: number }>>(new Map());
+  const onNodesChange = (changes: NodeChange<CardNode>[]) => setMeasured(current => {
+    let next: Map<string, { width: number; height: number }> | null = null;
+    for (const change of changes) if (change.type === 'dimensions' && change.dimensions) {
+      const known = current.get(change.id);
+      if (known && Math.abs(known.width - change.dimensions.width) < 1 && Math.abs(known.height - change.dimensions.height) < 1) continue;
       next ??= new Map(current);
-      next.set(change.id, change.dimensions.height);
+      next.set(change.id, { width: change.dimensions.width, height: change.dimensions.height });
     }
     return next ?? current;
   });
+  const heights = useMemo(() => new Map([...measured].map(([key, size]) => [key, size.height])), [measured]);
   const heightOf = useMemo(() => {
     const kinds = new Map(map.nodes.map(node => [node.key, node.kind]));
     return (key: string) => heights.get(key) ?? estimatedHeights[kinds.get(key) ?? 'run-band'] ?? estimatedCardHeight;
@@ -199,6 +248,9 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     const fresh = layout.placements.filter(p => !positions.has(p.key) && heights.has(p.key));
     if (fresh.length) onPositions(new Map([...positions, ...fresh.map(p => [p.key, effectivePositions.get(p.key)!] as const)]));
   }, [effectivePositions, positions, heights, layout, onPositions]);
+  // The canvas centres a card only when a person asks for it (a card, list or event jump, Now, Focus on map). A version
+  // update, an expanded branch or a measured card leaves the pan and zoom where the person put them.
+  const [centring, setCentring] = useState<{ key: string; nonce: number } | null>(null);
   const toggle = (key: string) => { const next = new Set(collapsed); if (next.has(key)) next.delete(key); else next.add(key); onCollapsed(next); };
   const focus = (key: string) => {
     let parent = place.get(key)?.parent;
@@ -206,6 +258,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     if (layout.hidden.has(key)) { const next = new Set(collapsed);
       while (parent && parent !== runBandKey) { next.delete(parent); parent = allPlace.get(parent)?.parent; } onCollapsed(next); }
     onSelect(key);
+    setCentring(previous => ({ key, nonce: (previous?.nonce ?? 0) + 1 }));
   };
   const jump = (key: string) => { onSelectModule(null); focus(key); if (key.startsWith('session:')) onOpenSession(key.slice('session:'.length)); };
   useEffect(() => {
@@ -219,23 +272,34 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       return () => clearTimeout(timer);
     }
   }, [focusRequest?.nonce]);
+  // A request waits until its card is placed: revealing a hidden card places it on a later render.
   useEffect(() => {
-    if (!selected) return;
-    const p = place.get(selected);
-    if (p && !layout.hidden.has(selected)) void flow.setCenter((effectivePositions.get(selected)?.x ?? p.x) + 120, (effectivePositions.get(selected)?.y ?? p.y) + 48, {
+    if (!centring) return;
+    const at = effectivePositions.get(centring.key);
+    if (!at || layout.hidden.has(centring.key)) return;
+    setCentring(null);
+    void flow.setCenter(at.x + 120, at.y + 48, {
       zoom: Math.max(viewport.zoom, 0.8), duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 300,
     });
-  }, [selected, layout, place]);
+  }, [centring, effectivePositions, layout]);
   const active = new Set([map.current.awaitedSession, map.current.runningGate].filter((key): key is string => key !== null));
   const repairs = new Map(map.links.filter(l => l.kind === 'repair-of' && l.from.coverage !== 'unresolved' && l.to.coverage !== 'unresolved')
     .map(l => [l.from.key, l.to.key]));
-  const nodes: CardNode[] = layout.placements.map(p => ({ id: p.key, type: 'execution', position: effectivePositions.get(p.key) ?? { x: p.x, y: p.y },
+  const eventTimes = useMemo(() => new Map(events.map(event => [event.sequence, event.at])), [events]);
+  const startedAt = (key: string) => {
+    const node = byKey.get(key);
+    const sequence = node?.kind === 'gate' && node.active ? node.sourceRefs[0]?.sequence : null;
+    return typeof sequence === 'number' ? eventTimes.get(sequence) ?? null : null;
+  };
+  const nodes: CardNode[] = layout.placements.map(p => ({ id: p.key, type: 'execution', position: effectivePositions.get(p.key) ?? { x: p.x, y: p.y }, measured: measured.get(p.key),
     data: { node: byKey.get(p.key) ?? null, collapsed: collapsed.has(p.key), hiddenCount: layout.hiddenCount.get(p.key) ?? 0,
       hiddenMatches: matchCounts.get(p.key) ?? 0, active: active.has(p.key), selected: selected === p.key,
       flash: flash === p.key,
       related: directMatches.has(p.key),
       hasChildren: hasChildren.has(p.key),
       awaitingDecision: byKey.get(p.key)?.kind === 'work-item' && waitingWorkItems.has(p.key.slice('work-item:'.length)),
+      startedAt: startedAt(p.key),
+      module: (() => { const node = byKey.get(p.key); return node ? moduleText(node, byKey) : ''; })(),
       repairFrom: (() => { const prior = byKey.get(repairs.get(p.key) ?? ''); return prior?.kind === 'gate' ? prior.verdict === 'failed' ? '✗' : prior.verdict === 'passed' ? '✓' : '?' : null; })(),
       onSelect: jump, onToggle: toggle }, draggable: false, selectable: true }));
   const visible = new Set(nodes.map(node => node.id));
@@ -275,7 +339,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       </div>
       <aside className="execution-side"><Detail node={selectedNode} map={map} client={client} planId={planId} runId={runId} onOpenGate={onOpenGate} onOpenSession={onOpenSession} />
         <section aria-label="All sessions"><h3>All sessions ({map.nodes.filter(n => n.kind === 'session').length})</h3><ul>{map.nodes.filter(n => n.kind === 'session').map(n => n.kind === 'session' &&
-          <li key={n.key}><button type="button" onClick={() => jump(n.key)}><span className="execution-role-label" style={{ color: tokens.light.role[n.role] }}><RoleIcon role={n.role} /> {tokens.roleIdentity[n.role].label}</span> · {n.label} · {n.state} · {n.workItem ?? n.reach.kind} · {moduleText(n)}</button>
+          <li key={n.key}><button type="button" onClick={() => jump(n.key)}><span className="execution-role-label" style={{ color: tokens.light.role[n.role] }}><RoleIcon role={n.role} /> {tokens.roleIdentity[n.role].label}</span> · {n.label} · {n.state} · {n.workItem ?? n.reach.kind} · {moduleText(n, byKey)}</button>
             {' '}<button type="button" onClick={() => onOpenSession(n.key.slice('session:'.length))}>Transcript</button></li>)}</ul></section>
         <section aria-label="All gates"><h3>All gates ({map.nodes.filter(n => n.kind === 'gate').length})</h3><ul>{map.nodes.filter(n => n.kind === 'gate').map(n => n.kind === 'gate' &&
           <li key={n.key}><button type="button" onClick={() => jump(n.key)}>{n.label} · {n.checkpoint} · {n.subject.workItem ?? 'run-wide'}{n.subject.iteration ? ` / ${n.subject.iteration}` : ''} · {n.verdict ?? 'running'} · audit {n.audit} · round {n.repairRound}</button></li>)}</ul></section>

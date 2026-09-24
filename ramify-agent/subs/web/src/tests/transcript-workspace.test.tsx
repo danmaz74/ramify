@@ -129,3 +129,12 @@ test('geometry clamps all edges and restores usable dimensions after viewport sh
   expect(clampWindowRect({ x: -90, y: -20, width: 120, height: 80 }, 900, 700))
     .toEqual({ x: 8, y: 8, width: 320, height: 220 });
 });
+
+test('windows are dragged and resized within the same 8px margin the geometry clamp keeps', () => {
+  const client = new StubClient();
+  render(<TranscriptWorkspace client={client} planId={planId} runId={runId} nodes={[]} windows={[windowState('ses-0001', 1)]}
+    onOpen={() => {}} onChange={() => {}} onClose={() => {}} onFocusMap={() => {}} interval={60000} />);
+  const bounds = screen.getByLabelText('Transcript windows').querySelector('.transcript-window-bounds');
+  expect(bounds).toBeTruthy();
+  expect(clampWindowRect({ x: 0, y: 0, width: 640, height: 560 }, 1440, 900)).toEqual({ x: 8, y: 8, width: 640, height: 560 });
+});

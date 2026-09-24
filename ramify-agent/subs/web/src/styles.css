@@ -45,16 +45,14 @@
 .execution-card-main:focus-visible, .execution-expand:focus-visible { outline: 3px solid #111827; outline-offset: 2px; }
 .execution-selected { box-shadow: 0 0 0 4px #64748b80; }
 .execution-related { box-shadow: 0 0 0 4px #6d28d980; }
-.execution-expand { position: absolute; right: 0; bottom: 0; padding: 0.05rem 0.3rem; border: 0; background: #fff; font-size: 0.7rem; }
+/* In the card's flow, below its text, so a long last line is never under it. */
+.execution-expand { display: block; margin: -0.2rem 0.3rem 0.2rem auto; padding: 0.05rem 0.3rem; border: 0; background: #fff; font-size: 0.7rem; }
 .execution-run-band { display: grid; align-content: center; padding: 0.5rem; border-color: #475569; color: #475569; }
 .execution-dots, .execution-segments { display: flex; gap: 2px; height: 8px; margin: 0.3rem 0; }
 .execution-dots i { display: block; width: 8px; height: 8px; border-radius: 50%; }
 .execution-segments i { display: block; height: 8px; }
-.execution-gate-mark { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border: 3px solid transparent; border-radius: 50%; font-size: 1.2rem; font-weight: 700; }
-.execution-gate-mark.audit-passed { border-color: #15803d; }
-.execution-gate-mark.audit-failed { border-color: #b91c1c; }
-.execution-gate-mark.audit-not-started { border-color: #475569; border-style: dotted; }
-.execution-gate-mark.audit-incomplete, .execution-gate-mark.audit-unavailable { border-style: dashed; border-color: #92400e; }
+/* A gate's verdict in words on its first line; its audit is a word on its facts line. */
+.execution-card-main .execution-gate-mark { font-weight: 700; }
 .execution-live { outline: 3px solid #1d4ed8; animation: execution-pulse 1600ms ease-in-out infinite; }
 .execution-awaiting-decision { box-shadow: 0 0 0 3px var(--ask), 0 1px 5px #0002; }
 .execution-decision-mark { display: block; margin: 0.1rem 0; padding: 0 0.35rem; border-radius: 4px; background: var(--ask); color: #fff; font-weight: 600; }
@@ -647,8 +645,11 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .element-session-interrupted { border-left: 3px solid var(--bad); padding-left: 0.4rem; }
 .element-sessions h4 { margin: 0.6rem 0 0.2rem; font-size: 0.85rem; color: var(--muted); }
 
-/* Transcript windows live in the viewport, outside both zoomed canvases. */
-.transcript-workspace { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+/* Transcript windows live in the viewport, outside both zoomed canvases. The workspace spans the viewport even as a
+ * child of the Run page, whose children keep a 52rem measure. */
+.transcript-workspace { position: fixed; inset: 0; max-width: none; z-index: 50; pointer-events: none; }
+/* The area a window may be dragged or resized in: the 8px margin `clampWindowRect` keeps. */
+.transcript-window-bounds { position: absolute; inset: 8px; pointer-events: none; }
 .transcript-window {
   box-sizing: border-box; display: flex; flex-direction: column; overflow: visible; pointer-events: auto;
   border: 1px solid #8390a0; border-radius: 9px; background: var(--panel);

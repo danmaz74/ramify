@@ -19,7 +19,7 @@ vi.mock('@xyflow/react', async () => {
         'aria-label': 'Mock flow', 'data-viewport': `${viewport.x},${viewport.y},${viewport.zoom}`,
       }, React.createElement('button', { onClick: () => onMove({}, { x: 20, y: 30, zoom: 1.5 }) }, 'Pan and zoom'),
       nodes.map((node: any) => React.createElement('div', { key: node.id, 'data-node': node.id,
-        'data-position': `${node.position.x},${node.position.y}` }, React.createElement(nodeTypes.execution, { id: node.id, data: node.data }))));
+        'data-position': `${node.position.x},${node.position.y}`, 'data-measured': node.measured ? `${node.measured.width},${node.measured.height}` : '' }, React.createElement(nodeTypes.execution, { id: node.id, data: node.data }))));
     },
     ReactFlowProvider: ({ children }: any) => children, Background: () => null, Controls: () => null, Handle: () => null,
     Position: { Left: 'left', Right: 'right' }, useReactFlow: () => flow,
@@ -226,4 +226,102 @@ test('a work item the run holds for the person\'s decision is marked on its card
   expect(card.textContent).toContain('Waiting for your decision');
   expect(canvas.querySelectorAll('.execution-awaiting-decision')).toHaveLength(1);
   expect(card.closest('.execution-card')!.classList.contains('execution-awaiting-decision')).toBe(true);
+});
+
+test('each card carries its measured size back to the canvas, so a re-render (a pan frame) does not hide it for re-measuring', async () => {
+  measured.height = key => key.startsWith('capability:') ? 226 : 97;
+  view();
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  await waitFor(() => expect(canvas.querySelector('[data-node="capability:status-badge"]')?.getAttribute('data-measured')).toBe('244,226'));
+  fireEvent.click(within(canvas).getByRole('button', { name: 'Pan and zoom' }));
+  expect(canvas.querySelector('[data-node="capability:status-badge"]')?.getAttribute('data-measured')).toBe('244,226');
+  expect(canvas.querySelector('[data-node="session:ses-initial"]')?.getAttribute('data-measured')).toBe('244,97');
+});
+
+test('the canvas centres a card only when asked, never after a pan, a version update or an expanded branch', async () => {
+  let answer = map;
+  const c = { ...client(), getExecutionMap: async () => answer } as ProtocolClient;
+  const props = { client: c, planId: 'nested-provider-map', runId: 'run-scripted-map', events: [], onOpenGate: vi.fn() };
+  const rendered = render(<ExecutionMapArea {...props} version={42} />);
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  await act(async () => {});
+  expect(flow.setCenter).not.toHaveBeenCalled();
+  fireEvent.click(within(canvas).getByRole('button', { name: /Status badge, capability/ }));
+  await waitFor(() => expect(flow.setCenter).toHaveBeenCalledTimes(1));
+  // The person pans away; a version update, a card growing and a collapsed branch leave the view where they put it.
+  fireEvent.click(within(canvas).getByRole('button', { name: 'Pan and zoom' }));
+  measured.height = key => key === 'capability:status-badge' ? 300 : 100;
+  answer = { ...map, runVersion: 43 };
+  rendered.rerender(<ExecutionMapArea {...props} version={43} />);
+  await waitFor(() => expect(document.querySelector('[data-node="capability:status-badge"]')?.getAttribute('data-measured')).toBe('244,300'));
+  fireEvent.click(within(canvas).getByRole('button', { name: 'Collapse Status badge' }));
+  await act(async () => {});
+  expect(within(canvas).queryByRole('button', { name: /Status engineer, session/ })).toBeNull();
+  expect(flow.setCenter).toHaveBeenCalledTimes(1);
+  expect(within(canvas).getByLabelText('Mock flow').getAttribute('data-viewport')).toBe('20,30,1.5');
+  // A jump to a card inside the collapsed branch reveals it and centres on it once.
+  fireEvent.click(within(screen.getByLabelText('All sessions')).getByRole('button', { name: /Status engineer/ }));
+  await waitFor(() => expect(flow.setCenter).toHaveBeenCalledTimes(2));
+  expect(within(canvas).getByRole('button', { name: /Status engineer, session/ })).toBeTruthy();
+  await act(async () => {});
+  expect(flow.setCenter).toHaveBeenCalledTimes(2);
+  fireEvent.click(within(canvas).getByRole('button', { name: /Status badge, capability/ }));
+  await waitFor(() => expect(flow.setCenter).toHaveBeenCalledTimes(3));
+});
+
+function gateView(nodes: ExecutionMapSnapshot['nodes'], events: { sequence: number; at: string }[] = []) {
+  const altered = { ...map, nodes };
+  const c = { ...client(), getExecutionMap: async () => altered } as ProtocolClient;
+  render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42}
+    events={events.map(event => ({ ...event, transition: 'gate-started', summary: 'Gate started', refs: [] }))} onOpenGate={vi.fn()} />);
+  return screen.findByLabelText('Zoomable execution canvas');
+}
+
+test('a running readiness gate card says Running and for how long, Run-wide, with no kind label, round or audit', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true, now: Date.parse('2026-09-24T21:45:12.000Z') });
+  try {
+    const readiness = { key: 'gate:ga-0001', label: 'Readiness gate ga-0001', runVersion: 42, modules: [],
+      sourceRefs: [{ kind: 'run-event' as const, id: 'ev-8', sequence: 8, revision: null }], kind: 'gate' as const, checkpoint: 'readiness' as const,
+      verdict: null, audit: 'not-applicable' as const, repairRound: 0, commit: null, auditedCommit: null, active: true,
+      subject: { workItem: null, iteration: null }, cause: null, evidencePresent: false };
+    const canvas = await gateView([...map.nodes, readiness], [{ sequence: 8, at: '2026-09-24T21:43:40.000Z' }]);
+    const card = within(canvas).getByRole('button', { name: /^Readiness gate ga-0001, gate/ });
+    expect(card.querySelector('.execution-gate-mark')?.textContent).toBe('Running for 1m 32s');
+    expect(within(card).getByText('Run-wide')).toBeTruthy();
+    expect(card.textContent).not.toMatch(/\$|readiness ·|round|audit|^gate/i);
+    expect([...card.querySelectorAll('small')].map(line => line.textContent)).toEqual(['Running for 1m 32s', 'Run-wide']);
+  } finally { vi.useRealTimers(); }
+});
+
+test('a settled gate card names its verdict in words, and its repair round and audit only where they apply', async () => {
+  const canvas = await gateView(map.nodes);
+  const failed = within(canvas).getByRole('button', { name: /Status iteration gate, failed, gate/ });
+  expect(failed.querySelector('.execution-gate-mark')?.textContent).toBe('Failed');
+  expect(failed.textContent).toContain('Audit passed');
+  expect(failed.textContent).not.toMatch(/round|\$|iteration ·/i);
+  const repaired = within(canvas).getByRole('button', { name: /Status iteration gate, repaired, gate/ });
+  expect(repaired.querySelector('.execution-gate-mark')?.textContent).toBe('Passed');
+  expect(repaired.textContent).toContain('✗ → ✓ · Repair round 1 · Audit incomplete');
+  // A gate of a work item names the work item's module.
+  expect(within(repaired).getByText('project/ui')).toBeTruthy();
+});
+
+test('a missing module reads Run-wide only for run-wide elements, and Module not recorded otherwise, as for a gate whose work item has none', async () => {
+  const gate = map.nodes.find(node => node.key === 'gate:ga-005')!;
+  const work = map.nodes.find(node => node.key === 'work-item:wi-status')!;
+  if (gate.kind !== 'gate' || work.kind !== 'work-item') throw new Error('fixture nodes missing');
+  const canvas = await gateView(map.nodes.map(node => node.key === gate.key ? { ...gate, modules: [] }
+    : node.key === work.key ? { ...work, module: null } : node));
+  expect(within(within(canvas).getByRole('button', { name: /Status iteration gate, failed, gate/ })).getByText('Module not recorded')).toBeTruthy();
+  expect(within(within(canvas).getByRole('button', { name: /^Implement status badge, work-item/ })).getByText('Module not recorded')).toBeTruthy();
+  expect(within(within(canvas).getByRole('button', { name: /^Initial architect, session/ })).getByText('Run-wide')).toBeTruthy();
+});
+
+test('a drag that starts on a card pans the canvas: its buttons refuse a node drag, not a pan', async () => {
+  view();
+  const canvas = await screen.findByLabelText('Zoomable execution canvas');
+  const main = within(canvas).getByRole('button', { name: /Status badge, capability/ });
+  expect(main.classList.contains('nodrag')).toBe(true);
+  expect(main.classList.contains('nopan')).toBe(false);
+  expect(within(canvas).getByRole('button', { name: 'Collapse Status badge' }).classList.contains('nopan')).toBe(false);
 });

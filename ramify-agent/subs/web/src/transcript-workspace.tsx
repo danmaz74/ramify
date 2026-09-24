@@ -62,6 +62,8 @@ export function TranscriptWorkspace({ client, planId, runId, nodes, windows, onO
   interval?: number;
 }) {
   const compact = useCompact();
+  // Dragging and resizing stop at the same margin `clampWindowRect` keeps, so a window does not jump when released.
+  const [bounds, setBounds] = useState<HTMLDivElement | null>(null);
   const readings = useTranscriptCoordinator(client, planId, runId, windows.map(item => item.id), interval);
   const sessions = new Map(nodes.filter((node): node is Extract<ExecutionNode, { kind: 'session' }> => node.kind === 'session')
     .map(node => [node.key.slice('session:'.length), node]));
@@ -78,6 +80,7 @@ export function TranscriptWorkspace({ client, planId, runId, nodes, windows, onO
     onOpen(route.session.session, route.anchor, link);
   };
   return <div className={`transcript-workspace${compact ? ' transcript-workspace-compact' : ''}`} aria-label="Transcript windows">
+    <div className="transcript-window-bounds" ref={setBounds} aria-hidden="true" />
     {compact && windows.length > 0 && <nav className="transcript-window-switcher" aria-label="Open transcripts">
       {windows.map(item => <button key={item.id} type="button" aria-current={top?.id === item.id ? 'page' : undefined} onClick={() => raise(item.id)}>{item.id}</button>)}
     </nav>}
@@ -126,7 +129,7 @@ export function TranscriptWorkspace({ client, planId, runId, nodes, windows, onO
       if (compact) return <section key={item.id} data-transcript-window={item.id} className="transcript-window transcript-window-panel" aria-label={`Transcript window ${item.id}`}
         style={{ display: top?.id === item.id ? 'flex' : 'none' }}>{header}{body}</section>;
       const rect = clampWindowRect(item.rect, window.innerWidth, window.innerHeight);
-      return <Rnd key={item.id} aria-label={`Transcript window ${item.id}`} data-transcript-window={item.id} className="transcript-window" bounds="window" minWidth={Math.min(320, window.innerWidth - 16)} minHeight={item.minimized ? 55 : Math.min(220, window.innerHeight - 16)}
+      return <Rnd key={item.id} aria-label={`Transcript window ${item.id}`} data-transcript-window={item.id} className="transcript-window" bounds={bounds ?? 'window'} minWidth={Math.min(320, window.innerWidth - 16)} minHeight={item.minimized ? 55 : Math.min(220, window.innerHeight - 16)}
         size={{ width: rect.width, height: item.minimized ? 55 : rect.height }} position={{ x: rect.x, y: rect.y }}
         dragHandleClassName="transcript-window-drag" cancel=".transcript-window-controls, button, a" disableDragging={item.maximized} enableResizing={!item.maximized && !item.minimized}
         style={{ zIndex: item.z }} onMouseDown={() => raise(item.id)}
