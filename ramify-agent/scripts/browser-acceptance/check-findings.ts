@@ -105,6 +105,10 @@ try {
   await itemMark.waitFor();
   check('the banner opens the Work items area with the waiting work item marked',
     await page.getByRole('tab', { name: 'Work items' }).getAttribute('aria-selected') === 'true' && await itemMark.innerText() === waitingLabel);
+  const right = async (selector: string) => { const box = await page.locator(selector).boundingBox(); return box ? box.x + box.width : 0; };
+  check('the run\'s header and tab bar span at least the broad Work items area, so its state badge is not mid-page',
+    await right('.run-page > .page-header') >= await right('.run-page > .area-broad') &&
+    await right('.run-page > .tabs') >= await right('.run-page > .area-broad'));
   const item = page.getByRole('region', { name: 'CheckFindings of wi-001' });
   const coverage = item.getByLabel('Review coverage');
   await coverage.waitFor();

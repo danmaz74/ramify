@@ -11,7 +11,7 @@ import { newCommandId, type ConnectionState, type ProtocolClient } from './clien
 import { DecisionBanner, DecisionFocusContext, DecisionWaitBadge } from './decision-waits.js';
 import { Markdown } from './markdown.js';
 import { chapterHref, routeHref } from './routes.js';
-import { figure, metricValue, RunState, StateBadge } from './run-labels.js';
+import { counted, figure, metricValue, RunState, StateBadge } from './run-labels.js';
 import { useRunProgress, useRunQuery } from './run-progress.js';
 import { ApproveForm, canApprove, reviewText, ReviewPanel, ScenarioCheckSummaryView, ScenarioReview, ScenarioTable } from './run-scenarios.js';
 import type { DiagramSessions } from './session-marks.js';
@@ -463,7 +463,7 @@ function WorkItems({ client, planId, runId, version, selected, onSelect: setSele
                 <StateBadge state={item.state} />
                 {waiting.has(item.id) && <DecisionWaitBadge />}
                 <code>{item.module}</code>
-                <span className="muted">{item.capability ?? ''} · {item.counts.iterations} iterations · {item.counts.gateAttempts} gates{item.waitingFor.length > 0 ? ` · waits for ${item.waitingFor.join(', ')}` : ''}{item.follows ? ` · follows ${item.follows}` : ''}</span>
+                <span className="muted">{item.capability ?? ''} · {counted(item.counts.iterations, 'iteration')} · {counted(item.counts.gateAttempts, 'gate')}{item.waitingFor.length > 0 ? ` · waits for ${item.waitingFor.join(', ')}` : ''}{item.follows ? ` · follows ${item.follows}` : ''}</span>
               </li>
             ))}
           </ul>
@@ -595,7 +595,7 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
               <div key={index} className="command">
                 <p><strong>{command.kind}</strong>: {command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
-                {command.selection && <p className="muted">Selection ({command.selection.policy}): {command.selection.resolved.length} files{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
+                {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
                 {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>

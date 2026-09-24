@@ -372,7 +372,7 @@ export function CapabilityDependencyGraph({ capabilities, total, onOpenWorkItem,
       </div>
       {sessions && <RunSessionStrip diagram={sessions} sessions={runLevel} />}
       <div className="capability-graph-scroll" tabIndex={0} aria-label="Scrollable capability dependency graph">
-        <div className="capability-graph-surface" style={{ width: layout.width, height: layout.height }} role="group" aria-label={`${capabilities.length} capabilities in ${layout.columns} dependency depth columns`}>
+        <div className="capability-graph-surface" style={{ width: layout.width, height: layout.height }} role="group" aria-label={`${capabilities.length} ${capabilities.length === 1 ? 'capability' : 'capabilities'} in ${layout.columns} dependency depth ${layout.columns === 1 ? 'column' : 'columns'}`}>
           {Array.from({ length: layout.columns }, (_, column) => (
             <div key={column} className="graph-column-label" style={{ left: horizontalPadding + column * (nodeWidth + columnGap), width: nodeWidth }}>
               Depth {column}

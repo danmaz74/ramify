@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow,
-  type Edge, type Node, type NodeProps, type Viewport } from '@xyflow/react';
+  type Edge, type Node, type NodeChange, type NodeProps, type Viewport } from '@xyflow/react';
 import type { ExecutionNode } from '../../harness/src/interfaces/protocol/execution-map.js';
 import type { ProjectedRunEvent } from '../../harness/src/interfaces/protocol/runs.js';
 import type { ProtocolClient } from './client.js';
 import type { ExecutionMapSnapshot } from './execution-map-client.js';
-import { executionLayout, runBandKey } from './execution-map-layout.js';
+import { estimatedCardHeight, executionLayout, runBandKey, settlePositions } from './execution-map-layout.js';
 import { ExecutionModules } from './execution-modules.js';
 import { executionMapVisualTokens as tokens } from './execution-map-tokens.js';
 import { waitingLabel } from './decision-waits.js';
@@ -98,6 +98,8 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
   </div>;
 }
 const nodeTypes = { execution: ExecutionCard };
+/** Heights of the cards of each kind in the real run's canvas, used until a card is measured. */
+const estimatedHeights: Partial<Record<ExecutionNode['kind'] | 'run-band', number>> = { 'run-band': 110, capability: 210, gate: 140, session: 100 };
 
 function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }: { node: ExecutionNode | undefined; map: ExecutionMapSnapshot;
   client: ProtocolClient; planId: string; runId: string; onOpenGate: (gate: string) => void; onOpenSession: (id: string) => void }) {
@@ -153,7 +155,22 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   viewport: Viewport; onViewport: (viewport: Viewport) => void }) {
   const flow = useReactFlow<CardNode, Edge>();
   const [flash, setFlash] = useState<string | null>(null);
-  const layout = useMemo(() => executionLayout(map.nodes, map.links, collapsed), [map.nodes, map.links, collapsed]);
+  // Cards differ in height (a capability's scenario summary, a gate's audit line), so the stack uses each card's
+  // measured height, or an estimate by kind until the canvas has measured it.
+  const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
+  const onNodesChange = (changes: NodeChange<CardNode>[]) => setHeights(current => {
+    let next: Map<string, number> | null = null;
+    for (const change of changes) if (change.type === 'dimensions' && change.dimensions && Math.abs((current.get(change.id) ?? -1) - change.dimensions.height) >= 1) {
+      next ??= new Map(current);
+      next.set(change.id, change.dimensions.height);
+    }
+    return next ?? current;
+  });
+  const heightOf = useMemo(() => {
+    const kinds = new Map(map.nodes.map(node => [node.key, node.kind]));
+    return (key: string) => heights.get(key) ?? estimatedHeights[kinds.get(key) ?? 'run-band'] ?? estimatedCardHeight;
+  }, [heights, map.nodes]);
+  const layout = useMemo(() => executionLayout(map.nodes, map.links, collapsed, heightOf), [map.nodes, map.links, collapsed, heightOf]);
   const allLayout = useMemo(() => executionLayout(map.nodes, map.links, new Set()), [map.nodes, map.links]);
   const allPlace = useMemo(() => new Map(allLayout.placements.map(p => [p.key, p])), [allLayout]);
   const hasChildren = useMemo(() => new Set(allLayout.placements.flatMap(p => p.parent ? [p.parent] : [])), [allLayout]);
@@ -176,16 +193,12 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     }
     return counts;
   }, [allPlace, collapsed, hiddenMatches]);
-  const effectivePositions = useMemo(() => {
-    const next = new Map(positions);
-    for (const p of layout.placements) if (!next.has(p.key)) {
-      let y = p.y;
-      while ([...next.values()].some(other => Math.abs(other.x - p.x) < 200 && Math.abs(other.y - y) < 110)) y += 128;
-      next.set(p.key, { x: p.x, y });
-    }
-    return next;
-  }, [layout, positions]);
-  useEffect(() => { if (effectivePositions.size > positions.size) onPositions(effectivePositions); }, [effectivePositions, positions, onPositions]);
+  const effectivePositions = useMemo(() => settlePositions(layout.placements, positions, heightOf), [layout, positions, heightOf]);
+  // A card's position is kept once the canvas has measured it; until then it follows the layout.
+  useEffect(() => {
+    const fresh = layout.placements.filter(p => !positions.has(p.key) && heights.has(p.key));
+    if (fresh.length) onPositions(new Map([...positions, ...fresh.map(p => [p.key, effectivePositions.get(p.key)!] as const)]));
+  }, [effectivePositions, positions, heights, layout, onPositions]);
   const toggle = (key: string) => { const next = new Set(collapsed); if (next.has(key)) next.delete(key); else next.add(key); onCollapsed(next); };
   const focus = (key: string) => {
     let parent = place.get(key)?.parent;
@@ -252,7 +265,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       <ol>{map.coverage.gaps.map((gap, index) => <li key={`${index}:${gap}`}>{gap}</li>)}</ol>
     </details>}
     <div className="execution-workspace"><div className="execution-maps"><div className="execution-viewport" aria-label="Zoomable execution canvas">
-      <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} viewport={viewport} onMove={(_, next) => onViewport(next)}
+      <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} viewport={viewport} onMove={(_, next) => onViewport(next)} onNodesChange={onNodesChange}
         nodesDraggable={false} nodesConnectable={false} elementsSelectable deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2}>
         <Background /><Controls showInteractive={false} />
       </ReactFlow></div>

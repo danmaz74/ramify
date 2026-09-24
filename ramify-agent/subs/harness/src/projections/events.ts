@@ -185,9 +185,9 @@ function describe(event: RunEvent): [string, Ref[]] {
         ref('invocation', event.data.invocation),
       ];
     case 'scenarios-materializing':
-      return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are being written onto the run branch`, []];
+      return [`${featureFiles(event.data.files.length)} being written onto the run branch`, []];
     case 'scenarios-materialized':
-      return [`The ${counted(event.data.files.length, 'feature file', 'feature files')} of the plan's scenarios are on the run branch`, ref('commit', event.data.commit)];
+      return [`${featureFiles(event.data.files.length)} on the run branch`, ref('commit', event.data.commit)];
     case 'scenario-declared':
       return [
         `Scenario ${event.data.scenario} was declared and is ${event.data.state}${event.data.state === 'bound' ? ', keeping its pending tag while its work item holds fakes' : ''}`,
@@ -274,6 +274,11 @@ const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => 
 
 /** The invocation a point names, where it names one. */
 const pointRefs = (point: SessionPoint | undefined): Ref[] => (point !== undefined && 'invocation' in point ? ref('invocation', point.invocation) : []);
+
+/** The plan's feature files as a sentence's subject and verb, which agree in number. */
+function featureFiles(count: number): string {
+  return count === 1 ? 'The feature file of the plan\'s scenarios is' : `The ${count} feature files of the plan's scenarios are`;
+}
 
 function unreachable(event: never): never {
   throw new Error(`No projection for event ${(event as RunEvent).type}`);

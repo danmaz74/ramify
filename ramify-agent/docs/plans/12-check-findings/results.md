@@ -736,7 +736,7 @@ Before this change the only signs of a pending decision were inside the run page
 | --- | --- | --- | --- | --- |
 | 1 | Appendix §6 said a harness-refused reconciliation submission (`correction-floor`, `insufficient-authority`) is returned to the fork once, then the attempt fails; §6.1 and iteration 5 use the ordinary rejection bound | Keep the ordinary bound (`rejectedSubmissionsPerTurn`, default 3), then the round is refused; §6 corrected | One refusal per fork leaves a model no room to correct a mis-typed disposition, the bound already governs every other submission, and the round count still bounds the loop. | appendix §6 |
 | 2 | Iteration 6's scenario selection identity `<mode>/<run module>@<command hash>`, with the selection kind as the observation's breadth, instead of the appendix's `<mode>/<selection kind>@<profile hash>` | Accept | A selection that carried the kind would let no work-item gate verify an iteration gate's failure, so correction rounds would be spent on a scenario that already passes; a narrower run is still refused as `insufficient-coverage`, so nothing is manufactured. | appendix §7 table |
-| 3 | Live-model trial (`npm run real-session -- --model openai-codex/gpt-5.6-luna`) | Not run here: the orchestrator runs the usual real test case after this commit, at Dan's request, and repairs what it shows | Its measurements (review tokens, orientation cost, queue delay, completion tail, start modes, CheckFindings with denominators) belong to that run's record. Nothing is invented here. | the orchestrator's run |
+| 3 | Live-model trial (`npm run real-session -- --model openai-codex/gpt-5.6-luna`) | Not run here: the orchestrator runs the usual real test case after this commit, at Dan's request, and repairs what it shows | Its measurements (review tokens, orientation cost, queue delay, completion tail, start modes, CheckFindings with denominators) belong to that run's record. Nothing is invented here. | run on `c63d613`: [Real pi run (2026-09-24)](#real-pi-run-2026-09-24) |
 | 4a | `reconciliation-refused` event (iteration 5) | Accept | A refused assessment or completion left no trace in the log otherwise; simplicity must not hide uncertainty. | — |
 | 4b | `leave` disposition, allowed only below the floor | Accept | "No signal is skipped": the fork states that it looked and may not correct; refusing it above the floor keeps `below-floor` and `rounds-exhausted` accurate. | — |
 | 4c | A later round also starts for a claimed repair or an answered user decision | Accept; the principles gain one clarifying clause | Without it a first-round correction of a low-risk signal would never be confirmed and its claim would stay open with no assessment; such a round may plan nothing below its floor, so the loop stays bounded. This is the one principles edit here, and the one most worth Dan's look. | principles, "Bound the correction loop" |
@@ -782,3 +782,84 @@ Before this change the only signs of a pending decision were inside the run page
 | `git diff --check` | Clean | |
 | ramify-audit | Not run here | The orchestrator re-audits. |
 | Live-model trial | Not run here | Item 3: the orchestrator's run, after this commit. |
+
+## Real pi run (2026-09-24)
+
+The orchestrator ran `npm run real-session -- --plan status-badge-tone --model openai-codex/gpt-5.6-sol:high` from `ramify-agent/` at `c63d613`, on a fresh copy of the fixture. No model was called again for this section or its fixes; the figures below are read from the run's records.
+
+- **Run:** `20260924T195135Z-473369`, completed in 8 minutes (19:51:35 to 19:59:42).
+- **Work:** 1 work item, 1 iteration, 8 invocations, 4 gate attempts (readiness `ga-0001`, iteration `ga-0002`, work item `ga-0003`, final `ga-0004`). Every gate passed at its first attempt. The engineer bound the 3 frozen scenarios, and `ga-0002` made all 3 `implemented`. The initial architect had one submission refused and corrected in the same invocation.
+- **Changed files:** `trial verify` found 2 modified and 2 added files, all inside the recorded write scope, and a clean tree.
+- **Where it is kept:** the copy is at `/tmp/ramify-agent-loop-trial-h4n4x9/collection-review`; the run's records are under its `plans/status-badge-tone/.harness/jobs/20260924T195135Z-473369/`.
+
+### Tokens and start modes
+
+From each invocation's `outcome.json`; "total" is the executor's total.
+
+| Invocation | Role and purpose | Start | Elapsed | Input | Output | Cache read | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `inv-0001` | initial architect | fresh | 126.5 s | 25,354 | 6,434 | 62,464 | 94,252 |
+| `inv-0002` | local architect, outline and assignment | fresh | 93.4 s | 25,892 | 4,288 | 125,824 | 156,004 |
+| `inv-0003` | engineer, `wi-001.i01` | fresh | 144.5 s | 22,088 | 4,197 | 188,544 | 214,829 |
+| `inv-0004` | reviewer, code review `rq-0001` | fresh | 53.2 s | 15,593 | 1,969 | 99,584 | 117,146 |
+| `inv-0005` | reviewer, scope review `rq-0002` | fork | 31.0 s | 23,721 | 1,189 | 57,088 | 81,998 |
+| `inv-0006` | local architect, completion request | continued | 15.0 s | 6,691 | 686 | 54,272 | 61,649 |
+| `inv-0007` | reviewer, design orientation | fresh | 6.3 s | 3,448 | 242 | 0 | 3,690 |
+| `inv-0008` | reviewer, design review `rq-0003` | fork | 31.8 s | 15,697 | 1,146 | 38,144 | 54,987 |
+| **All** | | | | 138,484 | 20,151 | 625,920 | 784,555 |
+
+- **Reviews:** `inv-0004`, `inv-0005`, `inv-0007` and `inv-0008` total 257,821 tokens, against the engineer's 214,829: the three reviews and the orientation cost about 1.2 times the implementation they judged. The orientation itself is 3,690 tokens.
+- **Every requested start was the actual start.** The scope review forked from the local architect's session `ses-0002` at `inv-0002`, the assignment point, before any later turn of that session. The design review forked from orientation `5c864f59b0d1…` (`inv-0007`, session `ses-0006`), which started fresh over the three selected guidance files. The code review started fresh, as specified. The local architect's completion continued `ses-0002`.
+- **No savings claim.** The fresh code review and the forked scope and design reviews answer different questions over different packets, so their tokens are not a matched fork-versus-fresh pair.
+
+### Reviews
+
+- **Requests.** All three bound candidate `2b28635` (the `ga-0002` commit) over base `b7d9dfd`, iteration `wi-001.i01`, under `review-policy/1`. The scope review bound `plan#request`, `plan#constraints` and `plan#acceptance`. The design review's guidance was three READMEs: the project root, `subs/workspace/` and `subs/workspace/subs/shared-ui/`.
+- **Results.** Each attempt finished `complete` at its first attempt, inspected all 4 changed files (`status-badge.tsx`, its test, the feature file and the step file), raised 0 concerns and reported 0 CheckFindings. The coverage is 3 requested, 3 complete, 0 partial, 0 not verified. A clean result is clean only for those 4 inspected paths.
+- **Queue and durations** (attempt records):
+
+  | Request | Queued | Started | Finished | Queue delay | Duration |
+  | --- | --- | --- | --- | --- | --- |
+  | `rq-0001` code | 19:58:11.593 | 19:58:11.852 | 19:59:05.076 | 0.3 s | 53.2 s |
+  | `rq-0002` scope | 19:58:11.598 | 19:58:11.884 | 19:58:42.930 | 0.3 s | 31.0 s |
+  | `rq-0003` design | 19:58:11.601 | 19:58:49.869 | 19:59:21.647 | 38.3 s | 31.8 s |
+
+  With two concurrent readers, `rq-0001` and `rq-0002` took both places. The design orientation (`inv-0007`, 19:58:43.457 to 19:58:49.832) started when `rq-0002` finished, and `rq-0003`'s attempt started when the orientation was recorded. Its 38.3 s delay is the queue plus the 6.3 s orientation.
+- **Completion tail.** The iteration closed at 19:58:10.930 and the local architect's completion request was committed at 19:58:29.955 (`outline-revised` revision 2), while the reviews ran. The work item then waited 51.7 s for the last review to finish (19:59:21.647); the work-item gate started committing at 19:59:22.397. Iteration close to the work-item gate took 71.5 s of the 8-minute run, 51.7 s of it waiting for reviews after the completion request.
+- **No reconciliation round (CF08).** With every request settled and no actionable CheckFinding, the harness went directly to the work-item gate, without an assessment fork. `ga-0003` and `ga-0004` passed.
+- **HTTP projections.** `/check-findings`, `/check-findings/modules`, `/reviews` and the run's `decisionRequests` agreed with the records: 0 CheckFindings, 3 complete reviews, nothing waiting.
+
+### Not exercised
+
+No review raised a concern, so no CheckFinding, reconciliation round, assessment, correction iteration, waiver or user decision ran with a real model; those remain covered only by scripted agents (CF01–CF17). The run had one work item and three reviews, so the review policy's values (two concurrent readers, twelve queued requests, the ten-minute attempt limit and the fifteen-minute settle deadline) remain unmeasured under contention; the single figure it gives is the 38.3 s design delay behind two readers. A retry, a queue overflow and a fresh fallback from a failed fork did not occur.
+
+### Defects found and fixed
+
+Found in the web client while reading the run at a 1440 px viewport, and fixed in `Plan 12: fix defects found by the real pi run`. Each was reproduced by a test that failed before its fix.
+
+1. **Execution map cards overlapped.** The readiness gate card `ga-0001`'s audit line ("… audit not-applicable") was under the next capability card, and "Render Status Badge With Tone" overlapped the gate card.
+   - **Cause:** pre-existing Plan 11 layout, not a Plan 12 regression. `executionLayout` placed every card on a fixed 128 px row, and new cards were checked against a fixed 110 px height; measured in the real run, capability cards are 193–226 px and gate cards 134–148 px. Plan 12 did not change `execution-map-layout.ts`; its execution-map change adds a waiting mark only to a work item held for the person's decision, and no card here had one. The Plan 11 browser fixture showed the same overlap once checked.
+   - **Fix:** the canvas records each card's measured height from React Flow's dimension changes (an estimate by kind until measured). `executionLayout` stacks each card below the previous one by that card's height plus a 24 px gap. `settlePositions` keeps Plan 11's rule that ordinary version updates retain positions: a kept card moves only when a card above it in its column has grown into it, and a new card takes its layout place or the first free place below it in its column. A card's position is kept once it has been measured.
+   - **Tests:** `execution-map.test.tsx` checks the layout's spacing against given heights, the settling of a grown card (the grown card and those above it stay; no two cards of a column meet), a new card's free place, and the canvas with measured heights before and after a version update. The retained-position test now reads positions after measurement. The Plan 11 browser witness checks that no two cards overlap initially, after a hidden branch is revealed and after live version updates; the first check fails on the old layout.
+2. **The header and tabs did not line up with the broad area.** After `c63d613` widened Work items to 80rem, the run header (title and state badge) and the tab bar stayed at the 52rem measure, so the badge sat mid-page; the full-width Progress, Sessions and Execution map areas had the same mismatch.
+   - **Fix:** on the Run page, the header and the tab bar span the page on every area; each area keeps its measure (52rem prose, 80rem broad, full wide). Sizing the header to the current area was rejected, since the tabs would move and rewrap whenever a tab is chosen.
+   - **Test:** the CheckFinding browser witness checks that the header and the tab bar reach at least the right edge of the Work items area. At 1440 px they now span 24–1416 px on every area, and at 480 px nothing scrolls horizontally.
+3. **"1 iterations".** The work-item row read "1 iterations · 2 gates".
+   - **Fix:** a shared `counted()` label in `run-labels.tsx` gives the row "1 iteration" and "1 gate". The same defect was fixed in its siblings: the sessions list's total, a check's selection file count, a file view's "the first line" and "1 line shown", and the capability graph's accessible name ("capability", "column").
+   - **Also:** the `scenarios-materializing` and `scenarios-materialized` summaries read "The 1 feature file … are", which Plan 10's real run had recorded. They now read "The feature file … is" for one file.
+   - **Tests:** `run-page.test.tsx` (singular and plural rows) and `union-values.test.ts` (both summaries for one and two files).
+
+### Verification of the fixes
+
+| Check | Result | Boundary and limit |
+| --- | --- | --- |
+| New tests before their fixes | Failed as the defects: overlapping cards (`capability:accessible-tone 2048-2274 meets scenario:sc-integration 2176-2273`), "1 iterations · 1 gates", "The 1 feature file … are" | The negative controls. |
+| `npx vitest run` over `execution-map`, `run-page`, `sessions-page`, `session-page`, `capability-graph`, `transcript-workspace`, `execution-modules` (web) and `union-values` (harness) | Pass, 8 files, 120 tests | jsdom with a mocked React Flow that reports measured heights; no browser, no model. |
+| `npm run test:browser:execution-map` | Pass, 47 checks (3 new overlap checks); Plan 11's evidence screenshots and `browser-results.json` refreshed | Headless Chromium over the synthetic and durable scripted fixtures. With the old layout restored, the first overlap check fails. |
+| `npm run test:browser:check-findings` | Pass, 32 checks (1 new width check); Plan 12's evidence screenshots refreshed | Headless Chromium against the real harness server and the rebuilt `dist/web`; scripted agents. |
+| The real run's pages, served with `serve --agent fake` on the kept copy after `npm run build:web` | No card overlap on the map initially, with every branch expanded, or after Relayout; header and tabs at 24–1416 px on Overview, Work items, Execution map and Progress; the row reads "1 iteration · 2 gates" | Read only: the run is completed, and the fake agent ran nothing. |
+| `npm run type-check` | Pass | Harness, web, scripts and browser-acceptance scopes. |
+| `npm run check:self` | Pass: 0 errors, 0 warnings, 279 analysis limits | 10 owners, 451 source files, 0 denied; unchanged. |
+| `npm run build:web` | Pass | Vite chunk-size advisory only. |
+| `git diff --check` | Clean | |
+| ramify-audit | Not run here | The orchestrator re-audits. |

@@ -829,3 +829,13 @@ test('a run that waits for the person\'s decision says so above every area and m
   expect(header.querySelector('.awaiting-decision')).toBeNull();
   expect(within(screen.getByLabelText('Work items')).queryByText('Waiting for your decision')).toBeNull();
 });
+
+test('a work item row counts its iterations and gates in the singular for one and the plural otherwise', async () => {
+  const single: WorkItemSummary = { ...workItemSummary, id: 'wi-002', counts: { ...workItemSummary.counts, iterations: 1, gateAttempts: 1 } };
+  const run: StubRun = { ...stubRun(), workItems: workItemListResponseSchema.parse({ workItems: [workItemSummary, single], total: 2 }) };
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Work items' }));
+  const rows = await within(screen.getByLabelText('Work items')).findAllByRole('listitem');
+  expect(rows[0]!.textContent).toContain('send-button · 2 iterations · 4 gates');
+  expect(rows[1]!.textContent).toContain('send-button · 1 iteration · 1 gate');
+});

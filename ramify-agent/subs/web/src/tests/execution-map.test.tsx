@@ -1,26 +1,31 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { ExecutionMapSnapshot } from '../execution-map-client.js';
 import type { ProtocolClient } from '../client.js';
-import { executionLayout } from '../execution-map-layout.js';
+import { cardGap, executionLayout, settlePositions } from '../execution-map-layout.js';
 import { ExecutionMapArea } from '../execution-map.js';
 import { canvasNodes, canvasLinks, canvasMap, capabilityDetail, scenarioDetail } from './helpers/execution-map-canvas.js';
 
 const flow = vi.hoisted(() => ({ setCenter: vi.fn(), fitView: vi.fn() }));
+/** The rendered height the mock canvas reports for a card, as React Flow reports what it measures; by default 100 px. */
+const measured = vi.hoisted(() => ({ height: (_key: string): number => 100 }));
 vi.mock('@xyflow/react', async () => {
   const React = await import('react');
   return {
-    ReactFlow: ({ nodes, nodeTypes, viewport, onMove }: any) => React.createElement('div', {
-      'aria-label': 'Mock flow', 'data-viewport': `${viewport.x},${viewport.y},${viewport.zoom}`,
-    }, React.createElement('button', { onClick: () => onMove({}, { x: 20, y: 30, zoom: 1.5 }) }, 'Pan and zoom'),
-    nodes.map((node: any) => React.createElement('div', { key: node.id, 'data-node': node.id,
-      'data-position': `${node.position.x},${node.position.y}` }, React.createElement(nodeTypes.execution, { id: node.id, data: node.data })))),
+    ReactFlow: ({ nodes, nodeTypes, viewport, onMove, onNodesChange }: any) => {
+      React.useEffect(() => { onNodesChange?.(nodes.map((node: any) => ({ id: node.id, type: 'dimensions', dimensions: { width: 244, height: measured.height(node.id) } }))); });
+      return React.createElement('div', {
+        'aria-label': 'Mock flow', 'data-viewport': `${viewport.x},${viewport.y},${viewport.zoom}`,
+      }, React.createElement('button', { onClick: () => onMove({}, { x: 20, y: 30, zoom: 1.5 }) }, 'Pan and zoom'),
+      nodes.map((node: any) => React.createElement('div', { key: node.id, 'data-node': node.id,
+        'data-position': `${node.position.x},${node.position.y}` }, React.createElement(nodeTypes.execution, { id: node.id, data: node.data }))));
+    },
     ReactFlowProvider: ({ children }: any) => children, Background: () => null, Controls: () => null, Handle: () => null,
     Position: { Left: 'left', Right: 'right' }, useReactFlow: () => flow,
   };
 });
-afterEach(() => { cleanup(); flow.setCenter.mockClear(); flow.fitView.mockClear(); });
+afterEach(() => { cleanup(); flow.setCenter.mockClear(); flow.fitView.mockClear(); measured.height = () => 100; });
 
 const map: ExecutionMapSnapshot = canvasMap;
 function client(): ProtocolClient {
@@ -47,6 +52,59 @@ test('typed layout keeps one shared provider and finite cycle references, with o
   expect(collapsed.hidden.has('scenario:sc-status')).toBe(true);
   expect(collapsed.hiddenCount.get('capability:status-badge')).toBeGreaterThan(1);
   expect(collapsed.placements.some(p => p.key === 'session:ses-initial')).toBe(true);
+});
+
+/** Every pair of rendered cards that share a column and whose measured extents meet. */
+function overlappingCards(height: (key: string) => number): string[] {
+  const cards = [...document.querySelectorAll('[data-node]')].map(element => {
+    const [x, y] = element.getAttribute('data-position')!.split(',').map(Number);
+    const key = element.getAttribute('data-node')!;
+    return { key, x: x!, top: y!, bottom: y! + height(key) };
+  });
+  return cards.flatMap((a, i) => cards.slice(i + 1).filter(b => Math.abs(a.x - b.x) < 244 && a.top < b.bottom && b.top < a.bottom)
+    .map(b => `${a.key} ${a.top}-${a.bottom} meets ${b.key} ${b.top}-${b.bottom}`));
+}
+
+test('cards taller than the old fixed row spacing never overlap, before and after a version update', async () => {
+  // As in the real run: capability cards measure about 220 px and gate cards about 150 px.
+  measured.height = key => key.startsWith('capability:') ? 226 : key.startsWith('gate:') ? 148 : 97;
+  let answer = map;
+  const c = { ...client(), getExecutionMap: async () => answer } as ProtocolClient;
+  const props = { client: c, planId: 'nested-provider-map', runId: 'run-scripted-map', events: [], onOpenGate: vi.fn() };
+  const rendered = render(<ExecutionMapArea {...props} version={42} />);
+  await waitFor(() => expect(document.querySelectorAll('[data-node]').length).toBeGreaterThan(5));
+  await waitFor(() => expect(overlappingCards(measured.height)).toEqual([]));
+  // A card grows after its position is kept: the cards below it in its column move down, the rest stay.
+  const before = new Map([...document.querySelectorAll('[data-node]')].map(e => [e.getAttribute('data-node')!, e.getAttribute('data-position')!]));
+  const grown = 'capability:status-badge';
+  measured.height = key => key === grown ? 400 : key.startsWith('capability:') ? 226 : key.startsWith('gate:') ? 148 : 97;
+  answer = { ...map, runVersion: 43 };
+  rendered.rerender(<ExecutionMapArea {...props} version={43} />);
+  await waitFor(() => expect(overlappingCards(measured.height)).toEqual([]));
+  const after = new Map([...document.querySelectorAll('[data-node]')].map(e => [e.getAttribute('data-node')!, e.getAttribute('data-position')!]));
+  expect(after.get(grown)).toBe(before.get(grown));
+  expect(after.get('run-band')).toBe(before.get('run-band'));
+});
+
+test('the layout stacks each card below the previous one by its own height, and settling keeps kept cards apart', () => {
+  const height = (key: string) => key.startsWith('capability:') ? 226 : key.startsWith('gate:') ? 148 : 97;
+  const { placements } = executionLayout(canvasNodes, canvasLinks, new Set(), height);
+  const stack = [...placements].sort((a, b) => a.y - b.y);
+  for (const [i, card] of stack.slice(1).entries()) expect(card.y).toBe(stack[i]!.y + height(stack[i]!.key) + cardGap);
+  // Kept positions from shorter cards: the grown card stays, and each card below it in its column moves just below.
+  const kept = new Map(placements.map(p => [p.key, { x: p.x, y: p.y }]));
+  const grown = stack.find(p => p.key.startsWith('capability:'))!;
+  const grownHeight = (key: string) => key === grown.key ? height(key) + 300 : height(key);
+  const settled = settlePositions(placements, kept, grownHeight);
+  expect(settled.get(grown.key)).toEqual(kept.get(grown.key));
+  for (const p of stack.filter(p => p.y < grown.y)) expect(settled.get(p.key)).toEqual(kept.get(p.key));
+  const cards = [...settled].map(([key, at]) => ({ key, ...at, bottom: at.y + grownHeight(key) }));
+  for (const a of cards) for (const b of cards) if (a !== b && Math.abs(a.x - b.x) < 244) expect(a.bottom + cardGap <= b.y || b.bottom + cardGap <= a.y).toBe(true);
+  // A card without a kept position takes the first free place below its layout position in its column.
+  const newcomer = stack.at(-1)!;
+  const withoutNewcomer = new Map([...kept].filter(([key]) => key !== newcomer.key).map(([key, at]) => [key, key === stack.at(-2)!.key ? { ...at, x: newcomer.x, y: newcomer.y } : at]));
+  const placed = settlePositions(placements, withoutNewcomer, height).get(newcomer.key)!;
+  expect(placed.y).toBe(newcomer.y + height(stack.at(-2)!.key) + cardGap);
 });
 
 test('a local architect marker opens a floating transcript with its full module path', async () => {
@@ -129,6 +187,8 @@ test('ordinary version updates retain existing card positions and add a new run-
   const rendered = render(<ExecutionMapArea {...props} version={42} />);
   const position = (key: string) => document.querySelector(`[data-node="${key}"]`)?.getAttribute('data-position');
   await waitFor(() => expect(position('capability:status-badge')).toBeTruthy());
+  // The canvas measures the cards after their first paint; positions are kept from then on.
+  await act(async () => {});
   const first = position('capability:status-badge');
   const initial = canvasNodes.find(n => n.key === 'session:ses-initial');
   if (initial?.kind !== 'session') throw new Error('fixture session missing');

@@ -12,6 +12,7 @@
     "the overview lists the notes module with its unsettled CheckFindings",
     "the overview says a decision is requested of the person",
     "the banner opens the Work items area with the waiting work item marked",
+    "the run's header and tab bar span at least the broad Work items area, so its state badge is not mid-page",
     "review coverage is partial, never clean, with its counts",
     "the work item's CheckFinding section is not painted as a failure",
     "nine review requests, three questions per candidate",
@@ -48,7 +49,7 @@
   "failure": null,
   "fixture": {
     "planId": "review-notes",
-    "runId": "20260924T194936Z-a2c787",
+    "runId": "20260924T202337Z-634284",
     "source": "one live run of scripted agents, scripted Git answers and scripted candidates, served by the real harness server with the built web client; commands sent through the page's own forms"
   }
 }

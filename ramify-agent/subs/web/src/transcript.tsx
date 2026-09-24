@@ -168,7 +168,7 @@ function rangeText(range: Range | null): string {
   if (range === null || (range.start === null && range.count === null)) return 'the whole file';
   if (range.start !== null && range.count !== null) return `lines ${range.start}–${range.start + range.count - 1}`;
   if (range.start !== null) return `from line ${range.start}`;
-  return `the first ${range.count} lines`;
+  return range.count === 1 ? 'the first line' : `the first ${range.count} lines`;
 }
 
 /**
@@ -188,7 +188,7 @@ export function FileView({ path, range, content }: { readonly path: string; read
   if (lines.length > 1 && lines.at(-1) === '') lines = lines.slice(0, -1);
   return (
     <figure className="file-view">
-      <figcaption><code>{path}</code> <span className="muted">{rangeText(range)}, {lines.length} lines shown</span></figcaption>
+      <figcaption><code>{path}</code> <span className="muted">{rangeText(range)}, {lines.length} {lines.length === 1 ? 'line' : 'lines'} shown</span></figcaption>
       <ol className="file-lines" start={start} aria-label={`${path}, from line ${start}`}>
         {lines.map((line, index) => <li key={index}><code>{line === '' ? ' ' : line}</code></li>)}
       </ol>

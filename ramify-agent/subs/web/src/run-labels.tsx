@@ -15,6 +15,11 @@ const stateLabels: Record<JobState, string> = {
   interrupted: 'interrupted',
 };
 
+/** A count with its noun, singular for one: `1 iteration`, `2 iterations`. */
+export function counted(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 /** A run's state, as the log states it. */
 export function RunState({ state }: { readonly state: JobState }) {
   return <span className={`badge run-state run-state-${state}`}>{stateLabels[state]}</span>;

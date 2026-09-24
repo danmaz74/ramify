@@ -864,6 +864,17 @@ describe('the run protocol a client reads', () => {
     expect([...kinds].sort()).toEqual([...runEventRefKindSchema.options].sort());
   });
 
+  test('the materialization summaries agree in number with their feature files', () => {
+    const summary = (type: 'scenarios-materializing' | 'scenarios-materialized', files: string[]) => projectEvent(runEventSchema.parse({
+      sequence: 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type, data: type === 'scenarios-materialized' ? { commit: 'c', files } : { files } })).summary;
+    const one = ['src/tests/features/p/e.feature'];
+    const two = [...one, 'src/tests/features/p/f.feature'];
+    expect(summary('scenarios-materializing', one)).toBe('The feature file of the plan\'s scenarios is being written onto the run branch');
+    expect(summary('scenarios-materialized', one)).toBe('The feature file of the plan\'s scenarios is on the run branch');
+    expect(summary('scenarios-materializing', two)).toBe('The 2 feature files of the plan\'s scenarios are being written onto the run branch');
+    expect(summary('scenarios-materialized', two)).toBe('The 2 feature files of the plan\'s scenarios are on the run branch');
+  });
+
   test('every event type of the run log has a projection that names its transition', () => {
     for (const option of runEventSchema.options) {
       const type = option.shape.type.value;
