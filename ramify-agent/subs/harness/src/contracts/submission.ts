@@ -5,6 +5,7 @@ import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { slugSchema } from '../analysis/records.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
+import { injectionSiteRule, moduleOwning } from '../work/scope.js';
 import { isFakeFile } from './naming.js';
 import { ancestorsOf, ownerOf } from './parity.js';
 import { contractAuthoritySchema, contractModeSchema, standsForSchema } from './records.js';
@@ -85,6 +86,8 @@ export const contractToolName = 'submit_contract_result';
 export interface ContractEvidence {
   /** The refreshed architect view, or null where the run has none. */
   readonly index: ArchitectIndex | null;
+  /** The consumer this iteration integrates the fake in. */
+  readonly consumer: string;
   /** Whether one project-relative path is a file of the tree as it stands. */
   readonly exists: (path: string) => Promise<boolean>;
 }
@@ -142,6 +145,22 @@ async function establishedErrors(value: EstablishedContract, evidence: ContractE
       path: entry.path,
       message: `"${entry.value}" is not a file of the tree; an agreement names the artifacts it wrote`,
       expected: 'a path the iteration wrote',
+    });
+  }
+
+  // An injection site is in the consumer, or on the provider side where the
+  // real behavior will act. Anywhere else is neither side of the seam.
+  if (index !== null) {
+    const consumer = findModule(index, evidence.consumer)?.module;
+    const provider = findModule(index, value.provider)?.module;
+    value.fakeInjections.forEach((site, position) => {
+      const owner = moduleOwning(index, toPosix(site));
+      if (owner !== undefined && (owner.module === consumer || owner.module === provider)) return;
+      errors.push({
+        path: `fakeInjections.${position}`,
+        message: `"${site}" lies in ${owner === undefined ? 'no module\'s own contents' : `the own contents of "${owner.module}"`}, and ${injectionSiteRule}`,
+        expected: `a file of ${evidence.consumer} or of ${value.provider}`,
+      });
     });
   }
 

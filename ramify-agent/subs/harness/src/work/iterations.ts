@@ -30,12 +30,14 @@ export function workItemOfIteration(id: IterationId): WorkItemId | null {
 }
 
 /**
- * What a location beyond the base was assigned for. `outside-modules` is a
- * path outside every module's own contents, such as a project script, where
- * only a change meets a plan requirement; it carries that requirement as its
- * reason.
+ * What a location beyond the base was assigned for. `fake-injection` is a
+ * file the agreement names as holding the fake, in the consumer or on the
+ * provider side, which a contract iteration may write. `outside-modules` is
+ * a path outside every module's own contents, such as a project script,
+ * where only a change meets a plan requirement; it carries that requirement
+ * as its reason.
  */
-export const extraPurposeSchema = z.enum(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'outside-modules']);
+export const extraPurposeSchema = z.enum(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection', 'outside-modules']);
 
 /**
  * What one iteration may write. `base` is the assigned module's own contents

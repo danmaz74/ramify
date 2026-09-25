@@ -104,7 +104,7 @@ describe('the contract names what each fake stands for', () => {
   async function evidence() {
     const fixture = await copyFixture();
     try {
-      return { index: await readDeclaredTree(fixture.root), exists: async () => true };
+      return { index: await readDeclaredTree(fixture.root), consumer: 'collection-review/workspace/reviews', exists: async () => true };
     } finally {
       await fixture.remove();
     }

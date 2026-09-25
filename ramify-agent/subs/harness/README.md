@@ -828,8 +828,11 @@ pi actually made and what the snapshot tools answered.
   That assignment is a committed record, so a caller that dies discovers the
   outcome without the original reply. The sub-session is an engineer
   invocation with the contract skill, scoped to the requesting consumer, the
-  contract, its conformance suite, its fake and the exposure declarations on
-  the path between the two sides. Only `established` followed by a passing
+  contract, its conformance suite, its fake, the injection sites the need
+  names (files of the consumer or of the provider that hold the fake, and
+  nothing else of the provider) and the exposure declarations on the path
+  between the two sides. A revision's scope holds the injection sites the
+  agreement in force recorded. Only `established` followed by a passing
   contract gate registers; `incomplete` registers nothing.
 - **Registration and scheduling.** `contract-registered` commits the
   contract, one obligation keyed `ob-<contract-id>`, one requirement per

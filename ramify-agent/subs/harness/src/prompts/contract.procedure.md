@@ -1,4 +1,4 @@
-<!-- ramify-agent contract procedure, version 2. -->
+<!-- ramify-agent contract procedure, version 3. -->
 Do this, in order:
 
 1. Read the need in the message below. It states behavior: use cases,
@@ -13,8 +13,11 @@ Do this, in order:
    side where the real behavior reaches the consumer as data through a path
    that already exists. Expose the fake exactly as the real export will be
    exposed, and no further. Existing behavior stays real: the fake replaces
-   only the missing part. If that seam lies outside your write scope, report
-   `incomplete` and name it; never widen the fake's exposure instead.
+   only the missing part. The files the message names as holding the fake
+   are writable; if the seam lies in a file it does not name, report
+   `incomplete` naming that file, so the consumer's engineer names it as an
+   injection site and the next contract iteration may write it. Never widen
+   the fake's exposure instead.
 6. Run `run_scope_tests` until the consumer's tests pass against the fake and
    the fake passes the conformance suite.
 7. Submit.

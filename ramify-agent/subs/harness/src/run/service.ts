@@ -125,7 +125,7 @@ import {
 } from '../work/iterations.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
+  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
@@ -453,6 +453,8 @@ interface IterationOutcome {
   readonly need?: {
     readonly need: NeedAsBehavior;
     readonly suggestedProvider?: string | undefined;
+    /** The files the fake must be injected in, as the engineer named them. */
+    readonly injectionSites?: readonly string[] | undefined;
     readonly invocation: string;
   } | undefined;
 }
@@ -4652,7 +4654,12 @@ export class RunService {
         consumer: item.module,
         provider: revised.provider,
         providerDirectory,
-        rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake and this consumer's integration. ${body.scope.rationale}`,
+        // The agreement in force names where its fake is held; the revision
+        // rewrites the fake where it is.
+        injectionSites: [...committed.requirements.values()]
+          .filter(requirement => contractOfObligation(requirement.obligation) === revised.id)
+          .flatMap(requirement => requirement.evidence.fakeInjections),
+        rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake, the files that hold it and this consumer's integration. ${body.scope.rationale}`,
       })
       : await resolveWriteScope({
         projectRoot: this.projectRoot,
@@ -4971,6 +4978,11 @@ export class RunService {
           kind: assignment.kind,
           openFindings: await tools.findingsAtCompletion(input),
           scenarios: this.declarationContext(run, item),
+          seams: {
+            index: run.index,
+            consumer: item.module,
+            providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
+          },
         }),
         acceptedText: value => {
           const check = tools.completionCheck();
@@ -5056,6 +5068,7 @@ export class RunService {
           need: {
             need,
             ...(result.value.suggestedProvider === undefined ? {} : { suggestedProvider: result.value.suggestedProvider }),
+            ...(result.value.injectionSites === undefined ? {} : { injectionSites: result.value.injectionSites }),
             invocation: result.id,
           },
         };
@@ -5264,6 +5277,7 @@ export class RunService {
     request: {
       readonly need: NeedAsBehavior;
       readonly suggestedProvider?: string | undefined;
+      readonly injectionSites?: readonly string[] | undefined;
       readonly invocation: string;
       readonly requestedBy: string;
     },
@@ -5292,6 +5306,15 @@ export class RunService {
     if (providerDirectory === null) {
       return { findings: [`the refreshed architect view has no directory for "${entry.owner}", so no contract scope could be captured`] };
     }
+    // The submission judged each site against the view it had; the owner
+    // the registry resolves now is the one the scope opens.
+    const misplaced = (request.injectionSites ?? []).filter(site => {
+      const owner = index === null ? undefined : moduleOwning(index, site);
+      return owner === undefined || (owner.module !== item.module && owner.module !== entry.owner);
+    });
+    if (misplaced.length > 0) {
+      return { findings: [`the injection site${misplaced.length === 1 ? '' : 's'} ${misplaced.map(site => `"${site}"`).join(', ')} ${misplaced.length === 1 ? 'lies' : 'lie'} in neither ${item.module} nor ${entry.owner}, and ${injectionSiteRule}; no contract iteration was started`] };
+    }
 
     const outline = (records.outlines.get(item.id) ?? []).at(-1);
     if (outline === undefined) {
@@ -5311,7 +5334,8 @@ export class RunService {
       consumer: item.module,
       provider: entry.owner,
       providerDirectory,
-      rationale: `The agreement between ${item.module} and ${entry.owner}: the contract, its conformance suite, its fake, the consumer's integration and the exposure declarations on the path between them. The provider's implementation is not this iteration's.`,
+      injectionSites: request.injectionSites ?? [],
+      rationale: `The agreement between ${item.module} and ${entry.owner}: the contract, its conformance suite, its fake, the consumer's integration, the files the fake is injected in and the exposure declarations on the path between them. The rest of the provider's implementation is not this iteration's.`,
     });
 
     const subArtifacts = this.requiredArtifacts(committedRecords(run.log.ledger.replay()));
@@ -5383,6 +5407,8 @@ export class RunService {
       readonly consumer: string;
       readonly provider: string;
       readonly providerDirectory: string;
+      /** The files the agreement names as holding the fake, on either side. */
+      readonly injectionSites: readonly string[];
       readonly rationale: string;
     },
   ) {
@@ -5396,6 +5422,7 @@ export class RunService {
         { path: `${subject.providerDirectory}/src/interfaces`, purpose: 'contract', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/tests`, purpose: 'conformance', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/fakes`, purpose: 'fake', kind: 'directory' },
+        ...[...new Set(subject.injectionSites)].map(path => ({ path, purpose: 'fake-injection' as const })),
         ...declarationsBetween(index, subject.consumer, subject.provider).map(path => ({ path, purpose: 'exposure-declaration' as const })),
       ],
       read: [subject.provider, subject.consumer],
@@ -5484,6 +5511,7 @@ export class RunService {
         submissionSchema: 'ramify-agent.contract-submission/2',
         validate: input => validateContract(input, {
           index,
+          consumer: item.module,
               exists: (path: string) => stat(join(this.projectRoot, path)).then(found => found.isFile(), () => false),
         }),
         scope: {

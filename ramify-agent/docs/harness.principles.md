@@ -272,7 +272,9 @@ exactly the modules that will receive the real export receive the fake. A
 fake that reaches further is wired where the real provider never acts, and
 retiring it means re-plumbing its consumer. The agreement names the real
 export each fake stands for, and the gates verify the parity while the fake
-is registered.
+is registered. The agreement also names the files that hold the fake, on
+either side of the seam; the contract iteration may write exactly those
+files beyond its scope, and nothing else of the provider's internals.
 
 Retiring a fake is the harness's and its agents' concern: verification
 replaces it with the real provider and removes its exposure with it. Ramify,

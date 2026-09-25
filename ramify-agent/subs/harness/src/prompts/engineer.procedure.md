@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 4. -->
+<!-- ramify-agent engineer procedure, version 5. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -138,6 +138,14 @@ executable evidence that already exists. Do not design the interface: naming
 the design would decide for the other side, and a contract iteration exists
 to prevent that. Name the capability as the registry names it, or as it would
 be named.
+
+Where you know the files the fake must be injected in, name them in
+`injectionSites`: in your module, or on the provider side where the real
+behavior will act and reach your module as data through a path that already
+exists. Each lies in your module's or the provider's own contents; the
+contract iteration may write exactly those files beyond its scope, and a
+site elsewhere is refused. A contract iteration that reported `incomplete`
+naming such a seam is asking you for this.
 
 The harness resolves who owns the behavior and runs a contract iteration of
 its own. Its outcome is in the run's records, so you need no reply from it.

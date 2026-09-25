@@ -29,7 +29,7 @@ const validationDirectory = 'subs/workspace/subs/reviews/subs/validation';
 async function evidence(exists: (path: string) => Promise<boolean> = async () => true) {
   const fixture = await copyFixture();
   try {
-    return { index: await readDeclaredTree(fixture.root), exists };
+    return { index: await readDeclaredTree(fixture.root), consumer: reviews, exists };
   } finally {
     await fixture.remove();
   }
@@ -52,7 +52,7 @@ function established(extra: Record<string, unknown> = {}) {
       }],
       exposure: [{ path: 'subs/a/module.ramify', declaration: 'expose-src NoteLimit from "interfaces/note-limit.ts" to parent' }],
     },
-    fakeInjections: ['subs/b/src/notes.ts'],
+    fakeInjections: ['subs/workspace/subs/reviews/src/notes.ts'],
     summary: 'The agreement is established and the consumer runs against the fake.',
     ...extra,
   };
@@ -106,7 +106,7 @@ describe('the contract submission', () => {
     expect(unplaced.ok).toBe(false);
     if (!unplaced.ok) expect(unplaced.errors.map(error => error.path)).toContain('provider');
 
-    const absent = await validateContract(established(), { index: known.index, exists: async path => !path.endsWith('.fake.ts') });
+    const absent = await validateContract(established(), { index: known.index, consumer: reviews, exists: async path => !path.endsWith('.fake.ts') });
     expect(absent.ok).toBe(false);
     if (!absent.ok) expect(absent.errors[0]!.path).toBe('artifacts.fake.0.path');
 

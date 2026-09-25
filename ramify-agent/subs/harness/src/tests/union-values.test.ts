@@ -483,7 +483,7 @@ describe('the records this iteration establishes', () => {
   test('every iteration kind, extra purpose and result outcome is written and read back', async () => {
     const store = await ledger();
     expect(iterationKindSchema.options).toEqual(['ordinary', 'breaking', 'contract', 'verification', 'repair', 'integration']);
-    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'outside-modules']);
+    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection', 'outside-modules']);
 
     const outlineRef = { id: 'wi-001', revision: 1, hash: 'd'.repeat(64) };
     for (const [index, kind] of iterationKindSchema.options.entries()) {

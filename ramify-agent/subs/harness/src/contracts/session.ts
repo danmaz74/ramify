@@ -140,6 +140,13 @@ export function contractMessage(briefing: ContractBriefing): string {
     'Nothing else. The caller\'s writes are suspended while you work: one implementation writer at a time.',
     '',
   );
+  const injectionSites = assignment.scope.extra.filter(entry => entry.purpose === 'fake-injection').map(entry => entry.path);
+  lines.push(
+    injectionSites.length === 0
+      ? 'No file beyond these was named as holding the fake. If the seam where the real provider will act lies elsewhere, report `incomplete` and name that file: the consumer\'s engineer names it as an injection site in its next `contract-needed`, and the next contract iteration may write it.'
+      : `The agreement names ${injectionSites.map(site => `\`${site}\``).join(', ')} as holding the fake; ${injectionSites.length === 1 ? 'it is' : 'they are'} writable and nothing else of the provider is.`,
+    '',
+  );
 
   if (briefing.existingConsumers.length > 0) {
     lines.push('## Consumers this agreement already has', '');
