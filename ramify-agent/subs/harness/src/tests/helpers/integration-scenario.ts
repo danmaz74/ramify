@@ -1,3 +1,4 @@
+import { finalCandidate } from './final-candidate.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GateAttempt, ScenarioCheckSummary } from '../../checks/records.js';
@@ -192,11 +193,14 @@ export async function runIntegration(
   commits: readonly CommitResponse[],
   checkScript?: DirectCheckScript,
 ) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits] });
+  const before = commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? 'scenarios-00';
+  const candidate = finalCandidate(root, before, commits.at(-1)?.commit ?? before);
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits],
+    previews: candidate.previews });
   const opened = await openRuns(root, {
     script: byWork(script),
     inputs: treeInputs(),
-    git,
+    git, candidates: candidate.candidates,
     readinessExecution: directReadinessExecution(),
     ...(checkScript === undefined ? {} : { checkScript }),
   });

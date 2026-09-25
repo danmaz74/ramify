@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
@@ -126,11 +127,12 @@ function consumerModule(directory: string, name: string, file: string) {
 }
 
 async function run(root: string, plan: Parameters<typeof byWork>[0]) {
-  const gitScript = { head: base, checkpoints };
+  const candidate = finalCandidate(root, 'revision-11');
+  const gitScript = { head: base, checkpoints, previews: candidate.previews };
   const git = scriptedGit(root, gitScript);
   const agentScript = byWork(plan);
   const opened = await openRunsWithoutProcesses(root, git, {
-    inputs: treeInputs(),
+    inputs: treeInputs(), candidates: candidate.candidates,
     script: spec => {
       const steps = typeof agentScript === 'function' ? agentScript(spec) : agentScript;
       // The deterministic script declares when a writer runs. Select the
@@ -428,7 +430,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
     expectNoProcesses();
     expect(Object.keys(git.operations()).sort()).toEqual([
       'changedEntries', 'changedPaths', 'commitAccepted', 'createRunBranch',
-      'currentHead', 'diffNameStatus', 'findCommitByTrailers', 'isCleanRepository', 'worktreeLineChanges',
+      'currentHead', 'diffNameStatus', 'findCommitByTrailers', 'isCleanRepository', 'previewCandidateTree', 'worktreeLineChanges',
     ]);
     expect(ramify.count('materialize')).toBeGreaterThan(0);
     expect(ramify.calls.filter(call => call.operation === 'run' && call.argv[0] === '--version')).toHaveLength(1);

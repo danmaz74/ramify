@@ -145,7 +145,8 @@ describe('the integration work item', () => {
     expect(binder).toContain(`- Write one step file in \`${reviewsDirectory}/src/tests/steps/\``);
     expect(binder).not.toContain('## Binding a scenario');
     // The narrower scope was refused through the judge, with the one expected.
-    const architect = sessions.find(session => session.spec.prompt.startsWith('# Work item wi-003'))!;
+    const architect = sessions.find(session => session.spec.prompt.startsWith('# Work item wi-003')
+      && session.spec.submission.name === 'submit_work_item_result')!;
     const refused = JSON.parse((architect.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string; expected: string }> };
     expect(refused.errors).toEqual([{
       path: 'assignment.scope.base.includedChildren',

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { join } from 'node:path';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
@@ -62,9 +63,14 @@ const tagLimit: Seam = { ...noteLimit, consumerDirectory: tagsDirectory, consume
  * attempts it reports as an unchanged tree.
  */
 async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
+  const materialization = scenariosCommitted('review-notes');
+  const final = commits.findIndex(commit => commit.subject.startsWith('final verification'));
+  const before = commits.slice(0, final).flatMap(commit => commit.commit ?? []).at(-1) ?? materialization.commit!;
+  const candidate = final < 0 ? null : finalCandidate(root, before, commits[final]!.commit ?? before);
+  const git = answeredGit(root, { head: 'revision-00', commits: [materialization, ...commits],
+    previews: candidate?.previews ?? [] });
   const opened = await openRuns(root, {
-    script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+    script: byRole(plan), inputs: treeInputs(), git, ...(candidate === null ? {} : { candidates: candidate.candidates }), readinessExecution: directReadinessExecution(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));

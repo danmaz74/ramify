@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
@@ -89,11 +90,13 @@ async function run(
   answers: Omit<GateGitOptions, 'head'>,
   options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
 ) {
-  const scripted = gateGit(root, { head: base, ...answers });
+  const before = answers.commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? base;
+  const candidate = finalCandidate(root, before, answers.commits.at(-1)?.commit ?? before);
+  const scripted = gateGit(root, { head: base, previews: candidate.previews, ...answers });
   const opened = await openRuns(root, {
     script: byRole(plan),
     inputs: treeInputs(),
-    git: scripted.git,
+    git: scripted.git, candidates: candidate.candidates,
     readinessExecution: directReadinessExecution(),
     ...options,
   });
@@ -343,8 +346,9 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
   test('a session the implementation can no longer read is reconstructed, and the counters are kept', async () => {
     const root = await target();
     let firstIteration: string | undefined;
+    const candidate = finalCandidate(root, 'revision-01');
     const scripted = gateGit(root, {
-      head: base,
+      head: base, previews: candidate.previews,
       commits: [scenarios, unchanged, modified('revision-01', `${notesDirectory}/src/notes.ts`), unchanged, unchanged],
     });
     const opened = await openRuns(root, {
@@ -357,7 +361,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
         ],
       }),
       inputs: treeInputs(),
-      git: scripted.git,
+      git: scripted.git, candidates: candidate.candidates,
       readinessExecution: directReadinessExecution(),
       checkScript: ({ check, context }) => {
         if (context.checkpoint !== 'iteration') return {};
@@ -428,6 +432,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
       // them stands on the tree the run started from: the iteration's two
       // attempts, the work item's two and the run's own two.
       commits: [scenarios, unchanged, unchanged, unchanged, unchanged, unchanged, unchanged],
+      previews: [],
     }, {
       checkScript: ({ check }) => check.kind === 'tests'
         ? { outcome: { kind: 'timed-out', timeoutMs: check.command.timeoutMs } }
