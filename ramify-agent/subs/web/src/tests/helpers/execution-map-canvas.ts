@@ -6,11 +6,11 @@ const source = (sequence: number): ExecutionSourceRef => ({ kind: 'run-event', i
 const base = (key: string, label: string, sequence: number) => ({ key, label, runVersion: version, sourceRefs: [source(sequence)], modules: [] });
 const complete = (total: number) => ({ state: 'complete' as const, known: total, total });
 export const canvasNodes: ExecutionNode[] = [
-  { ...base('capability:status-badge', 'Status badge', 2), kind: 'capability', level: 'entry', state: 'working', reason: 'The reopened provider requirement needs verification.', owner: 'project/ui', proposed: null,
+  { ...base('capability:status-badge', 'status-badge', 2), kind: 'capability', level: 'entry', behavior: 'Shows the run\'s status as a badge.', state: 'working', reason: 'The reopened provider requirement needs verification.', owner: 'project/ui', proposed: null,
     scenarios: { coverage: complete(1), passed: 1, failed: 0, other: 0, noRealRun: 0, unavailable: 0 }, directRequirements: { coverage: complete(1), verified: 0, keys: ['requirement:req-status'] } },
-  { ...base('capability:accessible-tone', 'Accessible tone', 3), kind: 'capability', level: 'entry', state: 'working', reason: 'Its current scenario has not passed.', owner: 'project/accessibility', proposed: null,
+  { ...base('capability:accessible-tone', 'accessible-tone', 3), kind: 'capability', level: 'entry', behavior: 'Keeps the badge tone readable.', state: 'working', reason: 'Its current scenario has not passed.', owner: 'project/accessibility', proposed: null,
     scenarios: { coverage: complete(1), passed: 0, failed: 1, other: 0, noRealRun: 0, unavailable: 0 }, directRequirements: { coverage: complete(0), verified: 0, keys: [] } },
-  { ...base('capability:theme-tokens', 'Theme tokens', 11), kind: 'capability', level: 'lower', state: 'completed', reason: 'Provider conformance passed.', owner: 'project/theme', proposed: null,
+  { ...base('capability:theme-tokens', 'theme-tokens', 11), kind: 'capability', level: 'lower', behavior: 'Provides shared theme tokens.', state: 'completed', reason: 'Provider conformance passed.', owner: 'project/theme', proposed: null,
     scenarios: { coverage: complete(0), passed: 0, failed: 0, other: 0, noRealRun: 0, unavailable: 0 }, directRequirements: { coverage: complete(0), verified: 0, keys: [] } },
   { ...base('scenario:sc-status', 'Renders the status badge', 4), kind: 'scenario', scenarioKind: 'entry', state: 'implemented', latestRealResult: 'passed', entry: 'capability:status-badge', detailAvailable: true },
   { ...base('scenario:sc-accessible', 'Accessible tone is readable', 5), kind: 'scenario', scenarioKind: 'entry', state: 'implemented', latestRealResult: 'failed', entry: 'capability:accessible-tone', detailAvailable: true },

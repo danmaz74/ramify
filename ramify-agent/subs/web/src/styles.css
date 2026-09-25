@@ -53,6 +53,9 @@
 .execution-segments i { display: block; height: 8px; }
 /* A gate's verdict in words on its first line; its audit is a word on its facts line. */
 .execution-card-main .execution-gate-mark { font-weight: 700; }
+/* A capability is named by its id, with its behavior beneath in at most three lines; the detail panel has all of it. */
+.execution-capability-id { font-size: 0.82rem; overflow-wrap: anywhere; }
+.execution-card-main .execution-capability-behavior { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; color: #334155; }
 .execution-live { outline: 3px solid #1d4ed8; animation: execution-pulse 1600ms ease-in-out infinite; }
 .execution-awaiting-decision { box-shadow: 0 0 0 3px var(--ask), 0 1px 5px #0002; }
 .execution-decision-mark { display: block; margin: 0.1rem 0; padding: 0 0.35rem; border-radius: 4px; background: var(--ask); color: #fff; font-weight: 600; }

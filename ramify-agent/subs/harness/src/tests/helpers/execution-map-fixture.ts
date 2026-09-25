@@ -26,15 +26,15 @@ const fixtureLines = (added: number, deleted: number, textPaths: number, invocat
 
 export const executionMapFixtureNodes: ExecutionNode[] = [
   { ...base('capability:status-badge', 'Status badge', 2, [moduleAt('project/ui', 'owner', 2)]),
-    kind: 'capability', level: 'entry', state: 'working', reason: 'The reopened provider requirement needs verification.',
+    kind: 'capability', level: 'entry', behavior: 'Shows the run\'s status as a badge.', state: 'working', reason: 'The reopened provider requirement needs verification.',
     owner: 'project/ui', proposed: null, scenarios: { coverage: complete(1), passed: 1, failed: 0, other: 0, noRealRun: 0, unavailable: 0 },
     directRequirements: { coverage: complete(1), verified: 0, keys: ['requirement:req-status'] } },
   { ...base('capability:accessible-tone', 'Accessible tone', 3, [moduleAt('project/accessibility', 'owner', 3)]),
-    kind: 'capability', level: 'entry', state: 'working', reason: 'Its current scenario has not passed.',
+    kind: 'capability', level: 'entry', behavior: 'Keeps the badge tone readable.', state: 'working', reason: 'Its current scenario has not passed.',
     owner: 'project/accessibility', proposed: null, scenarios: { coverage: complete(1), passed: 0, failed: 1, other: 0, noRealRun: 0, unavailable: 0 },
     directRequirements: { coverage: complete(1), verified: 1, keys: ['requirement:req-accessible'] } },
   { ...base('capability:theme-tokens', 'Theme tokens', 11, [moduleAt('project/theme', 'provider', 11)]),
-    kind: 'capability', level: 'lower', state: 'completed', reason: 'Provider conformance passed.',
+    kind: 'capability', level: 'lower', behavior: 'Provides shared theme tokens.', state: 'completed', reason: 'Provider conformance passed.',
     owner: 'project/theme', proposed: null, scenarios: { coverage: complete(0), passed: 0, failed: 0, other: 0, noRealRun: 0, unavailable: 0 },
     directRequirements: { coverage: complete(0), verified: 0, keys: [] } },
   { ...base('scenario:sc-status', 'Renders the status badge', 4, [moduleAt('project/ui', 'owner', 4)]), kind: 'scenario', scenarioKind: 'entry',

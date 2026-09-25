@@ -53,9 +53,9 @@ try {
   await canvas.waitFor();
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
   check('desktop 1440x900: two entry roots and one canonical provider',
-    await canvas.getByRole('button', { name: /Status badge, capability/ }).count() === 1 &&
-    await canvas.getByRole('button', { name: /Accessible tone, capability/ }).count() === 1 &&
-    await canvas.getByRole('button', { name: /Theme tokens, capability/ }).count() === 1);
+    await canvas.getByRole('button', { name: /status-badge, capability/ }).count() === 1 &&
+    await canvas.getByRole('button', { name: /accessible-tone, capability/ }).count() === 1 &&
+    await canvas.getByRole('button', { name: /theme-tokens, capability/ }).count() === 1);
   check('all five session roles and both gates are reachable in the shelf',
     await page.getByLabel('All sessions').getByRole('listitem').count() === 5 &&
     await page.getByLabel('All gates').getByRole('listitem').count() === 2);
@@ -88,7 +88,7 @@ try {
   await page.waitForTimeout(150);
   check('real wheel zooms the execution map', (await transform(canvas)) !== beforeZoom);
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
-  await canvas.getByRole('button', { name: /Status badge, capability/ }).click();
+  await canvas.getByRole('button', { name: /status-badge, capability/ }).click();
   await page.getByText(/Render a status badge whose tone uses the shared theme contract/).waitFor();
   check('full capability description opens', true);
   await canvas.getByRole('button', { name: /Renders the status badge, scenario/ }).click();
@@ -135,17 +135,17 @@ try {
   await page.getByLabel('Details for module project/ui').waitFor();
   check('module selection works from the keyboard', true);
   await page.getByRole('button', { name: 'Fit', exact: true }).click();
-  await canvas.getByRole('button', { name: 'Collapse Status badge' }).click();
+  await canvas.getByRole('button', { name: 'Collapse status-badge' }).click();
   await uiModule.click();
   check('module click marks hidden matches on the collapsed branch',
-    await canvas.getByRole('button', { name: /Expand Status badge, [1-9] matches inside/ }).count() === 1 &&
+    await canvas.getByRole('button', { name: /Expand status-badge, [1-9] matches inside/ }).count() === 1 &&
     await page.getByLabel('Direct execution matches').getByText(/hidden; reveal/).count() > 0);
   await page.getByLabel('Direct execution matches').getByRole('button', { name: /Implement status badge.*hidden; reveal/ }).click();
   check('hidden-match jump reveals its execution node',
     await canvas.getByRole('button', { name: /Implement status badge, work-item/ }).count() === 1);
   check('after a branch is revealed no two execution map cards overlap', (await overlappingCards()).length === 0);
   await page.evaluate(() => window.acceptance.setScenarioCount(20));
-  await canvas.getByRole('button', { name: 'Collapse Status badge' }).click();
+  await canvas.getByRole('button', { name: 'Collapse status-badge' }).click();
   check('20 collapsed scenarios display dots', await canvas.locator('.execution-capability').first().locator('.execution-dots i').count() === 20);
   await page.evaluate(() => window.acceptance.setScenarioCount(21));
   await canvas.locator('.execution-capability').first().locator('.execution-segments').waitFor({ state: 'attached' });
@@ -253,11 +253,11 @@ try {
     await durablePage.getByLabel('All sessions').getByRole('listitem').count() > 0 &&
     await durablePage.getByLabel('All gates').getByRole('listitem').count() > 1);
   await durablePage.getByRole('button', { name: 'Fit', exact: true }).click();
-  await durableCanvas.getByRole('button', { name: /Review Note, capability/ }).focus();
+  await durableCanvas.getByRole('button', { name: /review-note, capability/ }).focus();
   await durablePage.keyboard.press('Enter');
-  await durablePage.getByLabel('Details for Review Note').waitFor();
+  await durablePage.getByLabel('Details for review-note').waitFor();
   check('durable capability detail opens at the exported run version',
-    (await durablePage.getByLabel('Details for Review Note').innerText()).includes('capability:review-note'));
+    (await durablePage.getByLabel('Details for review-note').innerText()).includes('capability:review-note'));
   await durablePage.screenshot({ path: resolve(artifacts, 'durable-scripted-run-1440x900.png'), fullPage: true });
   check('durable browser page has no exceptions', durableErrors.length === 0);
 } catch (error) {

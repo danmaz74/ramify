@@ -195,7 +195,9 @@ describe('execution core from committed run records', () => {
     expect(index.nodes.filter(node => node.kind === 'capability').map(node => [node.key, node.level])).toEqual([
       ['capability:full-description', 'entry'], ['capability:second-root', 'entry'], ['capability:shared-provider', 'lower'],
     ]);
+    // A capability is labelled with its id as registered, never a title made from it, and carries its registered behavior.
     expect(index.nodes.find(node => node.key === 'capability:shared-provider')).toMatchObject({
+      label: 'shared-provider', behavior: 'Full provider behavior.',
       owner: `${reviews}/theme`, proposed: { parent: reviews, directory: 'subs/reviews/subs/theme' },
     });
     expect(index.nodes.filter(node => node.kind === 'iteration').map(node => [node.key, node.ordinal, node.outlineRevision, node.state, node.module])).toEqual([
