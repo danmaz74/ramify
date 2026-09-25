@@ -2,16 +2,19 @@
   "revision": "e299a20cf7bd7974919f4bc09d7745683a717a45",
   "dirtyAtStart": true,
   "chromium": "/usr/bin/chromium",
-  "fixture": "/tmp/plan13-readiness-bI9vK6/projection.json",
+  "fixture": {
+    "path": "plan13-readiness-fixture.json",
+    "sha256": "9cfe3c97d7a6e7579bd703d0ab1830471c916ab7fce782c6d8dc39ce53cfd98e"
+  },
   "trial": {
-    "runId": "20260925T151525Z-e500ef",
+    "runId": "20260925T151640Z-654d88",
     "catalogHash": "17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336",
     "roundsClosed": 3,
     "assessments": 3,
     "candidate": "cand-003",
     "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
     "finalGate": "ga-0002",
-    "gateCommit": "a85dd2bc28df5b2f716ba9b7bf56791e7ed8d87f",
+    "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073",
     "deviations": 1,
     "acceptedAndRevokedCommands": 2
   },

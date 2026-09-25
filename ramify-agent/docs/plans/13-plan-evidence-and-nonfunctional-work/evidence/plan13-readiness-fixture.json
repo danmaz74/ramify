@@ -1,0 +1,4720 @@
+{
+  "source": {
+    "kind": "run-ledger-projection",
+    "test": "nonfunctional-deviation-runtime.test.ts"
+  },
+  "expected": {
+    "quote": "The service must answer within 50 milliseconds.",
+    "sourcePath": "plans/review-notes/plan.md"
+  },
+  "trial": {
+    "runId": "20260925T151640Z-654d88",
+    "catalogHash": "17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336",
+    "roundsClosed": 3,
+    "assessments": 3,
+    "candidate": "cand-003",
+    "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+    "finalGate": "ga-0002",
+    "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+    "deviations": 1,
+    "acceptedAndRevokedCommands": 2
+  },
+  "cases": {
+    "pending": {
+      "run": {
+        "jobId": "20260925T151640Z-654d88",
+        "planId": "review-notes",
+        "agent": "scripted",
+        "version": 47,
+        "state": "completed",
+        "phase": "ended",
+        "stopRequested": false,
+        "startedAt": "2026-09-25T15:16:40.576Z",
+        "updatedAt": "2026-09-25T15:16:59.913Z",
+        "endedAt": "2026-09-25T15:16:59.913Z",
+        "failure": null,
+        "current": null,
+        "waits": [],
+        "counts": {
+          "workItems": 0,
+          "completedWorkItems": 0,
+          "openRequirements": 0,
+          "invocations": 7,
+          "readinessAttempts": 1,
+          "gateAttempts": 2,
+          "scenarios": {
+            "pending": 0,
+            "bound": 0,
+            "declared": 0,
+            "implemented": 0
+          },
+          "degradedStarts": 0
+        },
+        "writer": {
+          "held": null,
+          "unsettled": null
+        },
+        "review": "not-reviewed",
+        "notices": [],
+        "decisionRequests": {
+          "open": 1,
+          "waiting": false,
+          "workItems": []
+        },
+        "planDeviations": {
+          "recorded": 1,
+          "toReview": 1
+        },
+        "environmentProblems": []
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "at": "2026-09-25T15:16:40.576Z",
+          "transition": "job-started",
+          "summary": "The run started",
+          "refs": []
+        },
+        {
+          "sequence": 2,
+          "at": "2026-09-25T15:16:40.576Z",
+          "transition": "document-manifest-committed",
+          "summary": "Captured 1 plan document",
+          "refs": []
+        },
+        {
+          "sequence": 3,
+          "at": "2026-09-25T15:16:40.816Z",
+          "transition": "session-opened",
+          "summary": "The initial-architect session ses-0001 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 4,
+          "at": "2026-09-25T15:16:40.818Z",
+          "transition": "invocation-started",
+          "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 5,
+          "at": "2026-09-25T15:16:40.857Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 6,
+          "at": "2026-09-25T15:16:40.873Z",
+          "transition": "analysis-accepted",
+          "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 7,
+          "at": "2026-09-25T15:16:41.083Z",
+          "transition": "gate-started",
+          "summary": "Gate ga-0001 (readiness) started",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 8,
+          "at": "2026-09-25T15:16:41.402Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 9,
+          "at": "2026-09-25T15:16:41.637Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 10,
+          "at": "2026-09-25T15:16:41.906Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 11,
+          "at": "2026-09-25T15:16:42.194Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 12,
+          "at": "2026-09-25T15:16:42.557Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 13,
+          "at": "2026-09-25T15:16:43.566Z",
+          "transition": "readiness-passed",
+          "summary": "Readiness passed at attempt 1",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 14,
+          "at": "2026-09-25T15:16:43.572Z",
+          "transition": "nonfunctional-phase-started",
+          "summary": "Non-functional assessment phase started with 3 rounds",
+          "refs": []
+        },
+        {
+          "sequence": 15,
+          "at": "2026-09-25T15:16:44.671Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-001 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 16,
+          "at": "2026-09-25T15:16:44.687Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 17,
+          "at": "2026-09-25T15:16:44.689Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 18,
+          "at": "2026-09-25T15:16:44.722Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 19,
+          "at": "2026-09-25T15:16:45.913Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-001 recorded for round 1",
+          "refs": []
+        },
+        {
+          "sequence": 20,
+          "at": "2026-09-25T15:16:45.929Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 21,
+          "at": "2026-09-25T15:16:45.933Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 22,
+          "at": "2026-09-25T15:16:45.949Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 23,
+          "at": "2026-09-25T15:16:47.042Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 1 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 24,
+          "at": "2026-09-25T15:16:48.135Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-002 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 25,
+          "at": "2026-09-25T15:16:48.138Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 26,
+          "at": "2026-09-25T15:16:48.139Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 27,
+          "at": "2026-09-25T15:16:48.144Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 28,
+          "at": "2026-09-25T15:16:49.267Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-002 recorded for round 2",
+          "refs": []
+        },
+        {
+          "sequence": 29,
+          "at": "2026-09-25T15:16:49.282Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 30,
+          "at": "2026-09-25T15:16:49.284Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 31,
+          "at": "2026-09-25T15:16:49.304Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 32,
+          "at": "2026-09-25T15:16:50.445Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 2 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 33,
+          "at": "2026-09-25T15:16:51.606Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-003 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 34,
+          "at": "2026-09-25T15:16:51.618Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 35,
+          "at": "2026-09-25T15:16:51.620Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 36,
+          "at": "2026-09-25T15:16:51.643Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 37,
+          "at": "2026-09-25T15:16:52.830Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-003 recorded for round 3",
+          "refs": []
+        },
+        {
+          "sequence": 38,
+          "at": "2026-09-25T15:16:52.834Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 39,
+          "at": "2026-09-25T15:16:52.835Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 40,
+          "at": "2026-09-25T15:16:52.841Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 41,
+          "at": "2026-09-25T15:16:53.972Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 3 closed: exhausted",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 42,
+          "at": "2026-09-25T15:16:55.163Z",
+          "transition": "nonfunctional-deviation-recorded",
+          "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
+          "refs": []
+        },
+        {
+          "sequence": 43,
+          "at": "2026-09-25T15:16:56.588Z",
+          "transition": "gate-committing",
+          "summary": "Gate ga-0002 (final) is committing before audit",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 44,
+          "at": "2026-09-25T15:16:58.569Z",
+          "transition": "gate-attempted",
+          "summary": "Gate ga-0002 (final): passed, next accept",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 45,
+          "at": "2026-09-25T15:16:58.785Z",
+          "transition": "candidate-bound-to-gate",
+          "summary": "Candidate cand-003 bound to gate ga-0002",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 46,
+          "at": "2026-09-25T15:16:59.908Z",
+          "transition": "session-finished",
+          "summary": "Session ses-0001 finished (run-ended)",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 47,
+          "at": "2026-09-25T15:16:59.913Z",
+          "transition": "job-completed",
+          "summary": "The run completed after 0 work items, with 1 plan deviation to review",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            },
+            {
+              "kind": "commit",
+              "id": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+            }
+          ]
+        }
+      ],
+      "readiness": {
+        "runId": "20260925T151640Z-654d88",
+        "version": 47,
+        "readiness": {
+          "status": "pending-review",
+          "candidate": {
+            "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+            "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+            "preparedAt": "2026-09-25T15:16:51.605Z"
+          },
+          "finalGate": "ga-0002",
+          "checkFindings": [
+            "cf-0001"
+          ],
+          "reason": "A plan deviation awaits user review",
+          "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+        }
+      },
+      "findings": {
+        "protocol": "check-findings/1",
+        "runId": "20260925T151640Z-654d88",
+        "version": 47,
+        "coverage": {
+          "state": "unavailable",
+          "reason": "no-review-policy"
+        },
+        "query": {
+          "workItem": null,
+          "module": null,
+          "select": "all",
+          "order": "attention"
+        },
+        "total": 1,
+        "shown": 1,
+        "next": null,
+        "counts": {
+          "total": 1,
+          "open": 1,
+          "deferred": 0,
+          "closed": 0,
+          "fixed": 0,
+          "waived": 0,
+          "superseded": 0,
+          "unresolved": 0,
+          "awaitingUser": 1
+        },
+        "items": [
+          {
+            "id": "cf-0001",
+            "revision": 2,
+            "workItem": null,
+            "standing": "open",
+            "reason": "awaiting-user-decision",
+            "awaiting": "user-decision",
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": null,
+            "pendingUserDecision": {
+              "request": "cfd-0001",
+              "by": {
+                "kind": "harness",
+                "reason": "a non-functional plan deviation is the person's to accept or reject"
+              },
+              "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+              "conflicts": [
+                {
+                  "text": "The service must answer within 50 milliseconds.",
+                  "document": "plans/review-notes/plan.md",
+                  "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                }
+              ],
+              "options": [
+                {
+                  "id": "accept",
+                  "summary": "Accept the deviation",
+                  "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                },
+                {
+                  "id": "reject",
+                  "summary": "Reject the deviation",
+                  "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                }
+              ]
+            },
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 1,
+            "group": null,
+            "userCommands": [
+              "respond",
+              "waive"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          }
+        ]
+      },
+      "details": {
+        "cf-0001": {
+          "protocol": "check-findings/1",
+          "runId": "20260925T151640Z-654d88",
+          "version": 47,
+          "summary": {
+            "id": "cf-0001",
+            "revision": 2,
+            "workItem": null,
+            "standing": "open",
+            "reason": "awaiting-user-decision",
+            "awaiting": "user-decision",
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": null,
+            "pendingUserDecision": {
+              "request": "cfd-0001",
+              "by": {
+                "kind": "harness",
+                "reason": "a non-functional plan deviation is the person's to accept or reject"
+              },
+              "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+              "conflicts": [
+                {
+                  "text": "The service must answer within 50 milliseconds.",
+                  "document": "plans/review-notes/plan.md",
+                  "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                }
+              ],
+              "options": [
+                {
+                  "id": "accept",
+                  "summary": "Accept the deviation",
+                  "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                },
+                {
+                  "id": "reject",
+                  "summary": "Reject the deviation",
+                  "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                }
+              ]
+            },
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 1,
+            "group": null,
+            "userCommands": [
+              "respond",
+              "waive"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          },
+          "reports": {
+            "total": 1,
+            "items": [
+              {
+                "id": "cfr-0001",
+                "producer": "plan:deviation",
+                "attempt": "inv-0006",
+                "source": {
+                  "kind": "document",
+                  "id": "plans/review-notes/plan.md@sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                },
+                "observation": {
+                  "kind": "plan-deviation",
+                  "summary": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+                  "locations": [
+                    {
+                      "path": "plans/review-notes/plan.md",
+                      "startLine": 3,
+                      "endLine": 3
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "kind": "plan-deviation",
+                      "ref": "deviations/nfd-001.json"
+                    }
+                  ]
+                },
+                "judgment": {
+                  "by": {
+                    "kind": "agent",
+                    "role": "nonfunctional-coordinator",
+                    "invocation": "inv-0006"
+                  },
+                  "consequence": "The requirement nfr-001 remains Use a cached read.",
+                  "rationale": "Assessment nfa-003 did not establish satisfaction; evidence: Observed 87 milliseconds.",
+                  "uncertainty": "Load varies",
+                  "remedy": null,
+                  "risk": "high",
+                  "ground": "deviations/nfd-001.json"
+                },
+                "credibility": "agent-generated",
+                "modules": []
+              }
+            ]
+          },
+          "decisions": {
+            "total": 1,
+            "items": [
+              {
+                "id": "cfd-0001",
+                "considered": 1,
+                "by": {
+                  "kind": "harness",
+                  "reason": "a non-functional plan deviation is the person's to accept or reject"
+                },
+                "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "request-user-decision",
+                  "authority": "governing-record deviations/nfd-001.json",
+                  "conflicts": [
+                    {
+                      "text": "The service must answer within 50 milliseconds.",
+                      "document": "plans/review-notes/plan.md",
+                      "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                    }
+                  ],
+                  "options": [
+                    {
+                      "id": "accept",
+                      "summary": "Accept the deviation",
+                      "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                    },
+                    {
+                      "id": "reject",
+                      "summary": "Reject the deviation",
+                      "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "relations": [],
+          "attempts": [
+            {
+              "report": "cfr-0001",
+              "kind": "other",
+              "attempt": "inv-0006",
+              "request": null,
+              "iteration": null,
+              "gate": null,
+              "session": null,
+              "invocation": null,
+              "candidate": {
+                "base": null,
+                "commit": null,
+                "tree": null
+              }
+            }
+          ],
+          "repairs": []
+        }
+      }
+    },
+    "accepted": {
+      "run": {
+        "jobId": "20260925T151640Z-654d88",
+        "planId": "review-notes",
+        "agent": "scripted",
+        "version": 48,
+        "state": "completed",
+        "phase": "ended",
+        "stopRequested": false,
+        "startedAt": "2026-09-25T15:16:40.576Z",
+        "updatedAt": "2026-09-25T15:16:59.968Z",
+        "endedAt": "2026-09-25T15:16:59.913Z",
+        "failure": null,
+        "current": null,
+        "waits": [],
+        "counts": {
+          "workItems": 0,
+          "completedWorkItems": 0,
+          "openRequirements": 0,
+          "invocations": 7,
+          "readinessAttempts": 1,
+          "gateAttempts": 2,
+          "scenarios": {
+            "pending": 0,
+            "bound": 0,
+            "declared": 0,
+            "implemented": 0
+          },
+          "degradedStarts": 0
+        },
+        "writer": {
+          "held": null,
+          "unsettled": null
+        },
+        "review": "not-reviewed",
+        "notices": [],
+        "decisionRequests": {
+          "open": 0,
+          "waiting": false,
+          "workItems": []
+        },
+        "planDeviations": {
+          "recorded": 1,
+          "toReview": 0
+        },
+        "environmentProblems": []
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "at": "2026-09-25T15:16:40.576Z",
+          "transition": "job-started",
+          "summary": "The run started",
+          "refs": []
+        },
+        {
+          "sequence": 2,
+          "at": "2026-09-25T15:16:40.576Z",
+          "transition": "document-manifest-committed",
+          "summary": "Captured 1 plan document",
+          "refs": []
+        },
+        {
+          "sequence": 3,
+          "at": "2026-09-25T15:16:40.816Z",
+          "transition": "session-opened",
+          "summary": "The initial-architect session ses-0001 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 4,
+          "at": "2026-09-25T15:16:40.818Z",
+          "transition": "invocation-started",
+          "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 5,
+          "at": "2026-09-25T15:16:40.857Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 6,
+          "at": "2026-09-25T15:16:40.873Z",
+          "transition": "analysis-accepted",
+          "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 7,
+          "at": "2026-09-25T15:16:41.083Z",
+          "transition": "gate-started",
+          "summary": "Gate ga-0001 (readiness) started",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 8,
+          "at": "2026-09-25T15:16:41.402Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 9,
+          "at": "2026-09-25T15:16:41.637Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 10,
+          "at": "2026-09-25T15:16:41.906Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 11,
+          "at": "2026-09-25T15:16:42.194Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 12,
+          "at": "2026-09-25T15:16:42.557Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 13,
+          "at": "2026-09-25T15:16:43.566Z",
+          "transition": "readiness-passed",
+          "summary": "Readiness passed at attempt 1",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 14,
+          "at": "2026-09-25T15:16:43.572Z",
+          "transition": "nonfunctional-phase-started",
+          "summary": "Non-functional assessment phase started with 3 rounds",
+          "refs": []
+        },
+        {
+          "sequence": 15,
+          "at": "2026-09-25T15:16:44.671Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-001 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 16,
+          "at": "2026-09-25T15:16:44.687Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 17,
+          "at": "2026-09-25T15:16:44.689Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 18,
+          "at": "2026-09-25T15:16:44.722Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 19,
+          "at": "2026-09-25T15:16:45.913Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-001 recorded for round 1",
+          "refs": []
+        },
+        {
+          "sequence": 20,
+          "at": "2026-09-25T15:16:45.929Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 21,
+          "at": "2026-09-25T15:16:45.933Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 22,
+          "at": "2026-09-25T15:16:45.949Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 23,
+          "at": "2026-09-25T15:16:47.042Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 1 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 24,
+          "at": "2026-09-25T15:16:48.135Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-002 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 25,
+          "at": "2026-09-25T15:16:48.138Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 26,
+          "at": "2026-09-25T15:16:48.139Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 27,
+          "at": "2026-09-25T15:16:48.144Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 28,
+          "at": "2026-09-25T15:16:49.267Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-002 recorded for round 2",
+          "refs": []
+        },
+        {
+          "sequence": 29,
+          "at": "2026-09-25T15:16:49.282Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 30,
+          "at": "2026-09-25T15:16:49.284Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 31,
+          "at": "2026-09-25T15:16:49.304Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 32,
+          "at": "2026-09-25T15:16:50.445Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 2 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 33,
+          "at": "2026-09-25T15:16:51.606Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-003 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 34,
+          "at": "2026-09-25T15:16:51.618Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 35,
+          "at": "2026-09-25T15:16:51.620Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 36,
+          "at": "2026-09-25T15:16:51.643Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 37,
+          "at": "2026-09-25T15:16:52.830Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-003 recorded for round 3",
+          "refs": []
+        },
+        {
+          "sequence": 38,
+          "at": "2026-09-25T15:16:52.834Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 39,
+          "at": "2026-09-25T15:16:52.835Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 40,
+          "at": "2026-09-25T15:16:52.841Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 41,
+          "at": "2026-09-25T15:16:53.972Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 3 closed: exhausted",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 42,
+          "at": "2026-09-25T15:16:55.163Z",
+          "transition": "nonfunctional-deviation-recorded",
+          "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
+          "refs": []
+        },
+        {
+          "sequence": 43,
+          "at": "2026-09-25T15:16:56.588Z",
+          "transition": "gate-committing",
+          "summary": "Gate ga-0002 (final) is committing before audit",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 44,
+          "at": "2026-09-25T15:16:58.569Z",
+          "transition": "gate-attempted",
+          "summary": "Gate ga-0002 (final): passed, next accept",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 45,
+          "at": "2026-09-25T15:16:58.785Z",
+          "transition": "candidate-bound-to-gate",
+          "summary": "Candidate cand-003 bound to gate ga-0002",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 46,
+          "at": "2026-09-25T15:16:59.908Z",
+          "transition": "session-finished",
+          "summary": "Session ses-0001 finished (run-ended)",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 47,
+          "at": "2026-09-25T15:16:59.913Z",
+          "transition": "job-completed",
+          "summary": "The run completed after 0 work items, with 1 plan deviation to review",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            },
+            {
+              "kind": "commit",
+              "id": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+            }
+          ]
+        },
+        {
+          "sequence": 48,
+          "at": "2026-09-25T15:16:59.968Z",
+          "transition": "check-findings-recorded",
+          "summary": "1 CheckFinding event was recorded (a person's command accept-nfr-1)",
+          "refs": []
+        }
+      ],
+      "readiness": {
+        "runId": "20260925T151640Z-654d88",
+        "version": 48,
+        "readiness": {
+          "status": "ready",
+          "candidate": {
+            "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+            "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+            "preparedAt": "2026-09-25T15:16:51.605Z"
+          },
+          "finalGate": "ga-0002",
+          "checkFindings": [
+            "cf-0001"
+          ],
+          "reason": "The final gate passed and every fixed obligation is satisfied or accepted at this revision",
+          "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+        }
+      },
+      "findings": {
+        "protocol": "check-findings/1",
+        "runId": "20260925T151640Z-654d88",
+        "version": 48,
+        "coverage": {
+          "state": "unavailable",
+          "reason": "no-review-policy"
+        },
+        "query": {
+          "workItem": null,
+          "module": null,
+          "select": "all",
+          "order": "attention"
+        },
+        "total": 1,
+        "shown": 1,
+        "next": null,
+        "counts": {
+          "total": 1,
+          "open": 0,
+          "deferred": 0,
+          "closed": 1,
+          "fixed": 0,
+          "waived": 1,
+          "superseded": 0,
+          "unresolved": 0,
+          "awaitingUser": 0
+        },
+        "items": [
+          {
+            "id": "cf-0001",
+            "revision": 3,
+            "workItem": null,
+            "standing": "closed",
+            "reason": "waived",
+            "awaiting": null,
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": {
+              "kind": "waived",
+              "decision": "cfd-0002",
+              "by": {
+                "kind": "user",
+                "name": "dan"
+              },
+              "reason": "dan accepted the plan deviation",
+              "acceptedRisk": "high",
+              "uncertainty": "The person accepted the plan deviation as recorded"
+            },
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 2,
+            "group": null,
+            "userCommands": [
+              "revoke"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          }
+        ]
+      },
+      "details": {
+        "cf-0001": {
+          "protocol": "check-findings/1",
+          "runId": "20260925T151640Z-654d88",
+          "version": 48,
+          "summary": {
+            "id": "cf-0001",
+            "revision": 3,
+            "workItem": null,
+            "standing": "closed",
+            "reason": "waived",
+            "awaiting": null,
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": {
+              "kind": "waived",
+              "decision": "cfd-0002",
+              "by": {
+                "kind": "user",
+                "name": "dan"
+              },
+              "reason": "dan accepted the plan deviation",
+              "acceptedRisk": "high",
+              "uncertainty": "The person accepted the plan deviation as recorded"
+            },
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 2,
+            "group": null,
+            "userCommands": [
+              "revoke"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          },
+          "reports": {
+            "total": 1,
+            "items": [
+              {
+                "id": "cfr-0001",
+                "producer": "plan:deviation",
+                "attempt": "inv-0006",
+                "source": {
+                  "kind": "document",
+                  "id": "plans/review-notes/plan.md@sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                },
+                "observation": {
+                  "kind": "plan-deviation",
+                  "summary": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+                  "locations": [
+                    {
+                      "path": "plans/review-notes/plan.md",
+                      "startLine": 3,
+                      "endLine": 3
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "kind": "plan-deviation",
+                      "ref": "deviations/nfd-001.json"
+                    }
+                  ]
+                },
+                "judgment": {
+                  "by": {
+                    "kind": "agent",
+                    "role": "nonfunctional-coordinator",
+                    "invocation": "inv-0006"
+                  },
+                  "consequence": "The requirement nfr-001 remains Use a cached read.",
+                  "rationale": "Assessment nfa-003 did not establish satisfaction; evidence: Observed 87 milliseconds.",
+                  "uncertainty": "Load varies",
+                  "remedy": null,
+                  "risk": "high",
+                  "ground": "deviations/nfd-001.json"
+                },
+                "credibility": "agent-generated",
+                "modules": []
+              }
+            ]
+          },
+          "decisions": {
+            "total": 2,
+            "items": [
+              {
+                "id": "cfd-0001",
+                "considered": 1,
+                "by": {
+                  "kind": "harness",
+                  "reason": "a non-functional plan deviation is the person's to accept or reject"
+                },
+                "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "request-user-decision",
+                  "authority": "governing-record deviations/nfd-001.json",
+                  "conflicts": [
+                    {
+                      "text": "The service must answer within 50 milliseconds.",
+                      "document": "plans/review-notes/plan.md",
+                      "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                    }
+                  ],
+                  "options": [
+                    {
+                      "id": "accept",
+                      "summary": "Accept the deviation",
+                      "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                    },
+                    {
+                      "id": "reject",
+                      "summary": "Reject the deviation",
+                      "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "cfd-0002",
+                "considered": 2,
+                "by": {
+                  "kind": "user",
+                  "name": "dan"
+                },
+                "rationale": "dan accepted the plan deviation",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "waive",
+                  "authority": "user-decision accept-nfr-1",
+                  "acceptedRisk": "high",
+                  "uncertainty": "The person accepted the plan deviation as recorded"
+                }
+              }
+            ]
+          },
+          "relations": [],
+          "attempts": [
+            {
+              "report": "cfr-0001",
+              "kind": "other",
+              "attempt": "inv-0006",
+              "request": null,
+              "iteration": null,
+              "gate": null,
+              "session": null,
+              "invocation": null,
+              "candidate": {
+                "base": null,
+                "commit": null,
+                "tree": null
+              }
+            }
+          ],
+          "repairs": []
+        }
+      }
+    },
+    "source-unavailable": {
+      "run": {
+        "jobId": "20260925T151640Z-654d88",
+        "planId": "review-notes",
+        "agent": "scripted",
+        "version": 49,
+        "state": "completed",
+        "phase": "ended",
+        "stopRequested": false,
+        "startedAt": "2026-09-25T15:16:40.576Z",
+        "updatedAt": "2026-09-25T15:16:59.980Z",
+        "endedAt": "2026-09-25T15:16:59.913Z",
+        "failure": null,
+        "current": null,
+        "waits": [],
+        "counts": {
+          "workItems": 0,
+          "completedWorkItems": 0,
+          "openRequirements": 0,
+          "invocations": 7,
+          "readinessAttempts": 1,
+          "gateAttempts": 2,
+          "scenarios": {
+            "pending": 0,
+            "bound": 0,
+            "declared": 0,
+            "implemented": 0
+          },
+          "degradedStarts": 0
+        },
+        "writer": {
+          "held": null,
+          "unsettled": null
+        },
+        "review": "not-reviewed",
+        "notices": [],
+        "decisionRequests": {
+          "open": 0,
+          "waiting": false,
+          "workItems": []
+        },
+        "planDeviations": {
+          "recorded": 1,
+          "toReview": 0
+        },
+        "environmentProblems": []
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "at": "2026-09-25T15:16:40.576Z",
+          "transition": "job-started",
+          "summary": "The run started",
+          "refs": []
+        },
+        {
+          "sequence": 2,
+          "at": "2026-09-25T15:16:40.576Z",
+          "transition": "document-manifest-committed",
+          "summary": "Captured 1 plan document",
+          "refs": []
+        },
+        {
+          "sequence": 3,
+          "at": "2026-09-25T15:16:40.816Z",
+          "transition": "session-opened",
+          "summary": "The initial-architect session ses-0001 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 4,
+          "at": "2026-09-25T15:16:40.818Z",
+          "transition": "invocation-started",
+          "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 5,
+          "at": "2026-09-25T15:16:40.857Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 6,
+          "at": "2026-09-25T15:16:40.873Z",
+          "transition": "analysis-accepted",
+          "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 7,
+          "at": "2026-09-25T15:16:41.083Z",
+          "transition": "gate-started",
+          "summary": "Gate ga-0001 (readiness) started",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 8,
+          "at": "2026-09-25T15:16:41.402Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 9,
+          "at": "2026-09-25T15:16:41.637Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 10,
+          "at": "2026-09-25T15:16:41.906Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 11,
+          "at": "2026-09-25T15:16:42.194Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 12,
+          "at": "2026-09-25T15:16:42.557Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 13,
+          "at": "2026-09-25T15:16:43.566Z",
+          "transition": "readiness-passed",
+          "summary": "Readiness passed at attempt 1",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 14,
+          "at": "2026-09-25T15:16:43.572Z",
+          "transition": "nonfunctional-phase-started",
+          "summary": "Non-functional assessment phase started with 3 rounds",
+          "refs": []
+        },
+        {
+          "sequence": 15,
+          "at": "2026-09-25T15:16:44.671Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-001 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 16,
+          "at": "2026-09-25T15:16:44.687Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 17,
+          "at": "2026-09-25T15:16:44.689Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 18,
+          "at": "2026-09-25T15:16:44.722Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 19,
+          "at": "2026-09-25T15:16:45.913Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-001 recorded for round 1",
+          "refs": []
+        },
+        {
+          "sequence": 20,
+          "at": "2026-09-25T15:16:45.929Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 21,
+          "at": "2026-09-25T15:16:45.933Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 22,
+          "at": "2026-09-25T15:16:45.949Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 23,
+          "at": "2026-09-25T15:16:47.042Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 1 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 24,
+          "at": "2026-09-25T15:16:48.135Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-002 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 25,
+          "at": "2026-09-25T15:16:48.138Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 26,
+          "at": "2026-09-25T15:16:48.139Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 27,
+          "at": "2026-09-25T15:16:48.144Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 28,
+          "at": "2026-09-25T15:16:49.267Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-002 recorded for round 2",
+          "refs": []
+        },
+        {
+          "sequence": 29,
+          "at": "2026-09-25T15:16:49.282Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 30,
+          "at": "2026-09-25T15:16:49.284Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 31,
+          "at": "2026-09-25T15:16:49.304Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 32,
+          "at": "2026-09-25T15:16:50.445Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 2 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 33,
+          "at": "2026-09-25T15:16:51.606Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-003 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 34,
+          "at": "2026-09-25T15:16:51.618Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 35,
+          "at": "2026-09-25T15:16:51.620Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 36,
+          "at": "2026-09-25T15:16:51.643Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 37,
+          "at": "2026-09-25T15:16:52.830Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-003 recorded for round 3",
+          "refs": []
+        },
+        {
+          "sequence": 38,
+          "at": "2026-09-25T15:16:52.834Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 39,
+          "at": "2026-09-25T15:16:52.835Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 40,
+          "at": "2026-09-25T15:16:52.841Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 41,
+          "at": "2026-09-25T15:16:53.972Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 3 closed: exhausted",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 42,
+          "at": "2026-09-25T15:16:55.163Z",
+          "transition": "nonfunctional-deviation-recorded",
+          "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
+          "refs": []
+        },
+        {
+          "sequence": 43,
+          "at": "2026-09-25T15:16:56.588Z",
+          "transition": "gate-committing",
+          "summary": "Gate ga-0002 (final) is committing before audit",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 44,
+          "at": "2026-09-25T15:16:58.569Z",
+          "transition": "gate-attempted",
+          "summary": "Gate ga-0002 (final): passed, next accept",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 45,
+          "at": "2026-09-25T15:16:58.785Z",
+          "transition": "candidate-bound-to-gate",
+          "summary": "Candidate cand-003 bound to gate ga-0002",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 46,
+          "at": "2026-09-25T15:16:59.908Z",
+          "transition": "session-finished",
+          "summary": "Session ses-0001 finished (run-ended)",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 47,
+          "at": "2026-09-25T15:16:59.913Z",
+          "transition": "job-completed",
+          "summary": "The run completed after 0 work items, with 1 plan deviation to review",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            },
+            {
+              "kind": "commit",
+              "id": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+            }
+          ]
+        },
+        {
+          "sequence": 48,
+          "at": "2026-09-25T15:16:59.968Z",
+          "transition": "check-findings-recorded",
+          "summary": "1 CheckFinding event was recorded (a person's command accept-nfr-1)",
+          "refs": []
+        },
+        {
+          "sequence": 49,
+          "at": "2026-09-25T15:16:59.980Z",
+          "transition": "check-findings-recorded",
+          "summary": "1 CheckFinding event was recorded (a person's command revoke-nfr-1)",
+          "refs": []
+        }
+      ],
+      "readiness": {
+        "runId": "20260925T151640Z-654d88",
+        "version": 49,
+        "readiness": {
+          "status": "unavailable",
+          "candidate": null,
+          "finalGate": null,
+          "checkFindings": [],
+          "reason": "ENOENT: no such file or directory, open '/tmp/ramify-agent-gEvaCB/collection-review/plans/review-notes/.harness/jobs/20260925T151640Z-654d88/analysis/catalog/17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336.json'",
+          "gateCommit": null
+        }
+      },
+      "findings": {
+        "protocol": "check-findings/1",
+        "runId": "20260925T151640Z-654d88",
+        "version": 49,
+        "coverage": {
+          "state": "unavailable",
+          "reason": "no-review-policy"
+        },
+        "query": {
+          "workItem": null,
+          "module": null,
+          "select": "all",
+          "order": "attention"
+        },
+        "total": 1,
+        "shown": 1,
+        "next": null,
+        "counts": {
+          "total": 1,
+          "open": 1,
+          "deferred": 0,
+          "closed": 0,
+          "fixed": 0,
+          "waived": 0,
+          "superseded": 0,
+          "unresolved": 0,
+          "awaitingUser": 0
+        },
+        "items": [
+          {
+            "id": "cf-0001",
+            "revision": 4,
+            "workItem": null,
+            "standing": "open",
+            "reason": "waiver-revoked",
+            "awaiting": "assessment",
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": null,
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 3,
+            "group": null,
+            "userCommands": [
+              "waive"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          }
+        ]
+      },
+      "details": {
+        "cf-0001": {
+          "protocol": "check-findings/1",
+          "runId": "20260925T151640Z-654d88",
+          "version": 49,
+          "summary": {
+            "id": "cf-0001",
+            "revision": 4,
+            "workItem": null,
+            "standing": "open",
+            "reason": "waiver-revoked",
+            "awaiting": "assessment",
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": null,
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 3,
+            "group": null,
+            "userCommands": [
+              "waive"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          },
+          "reports": {
+            "total": 1,
+            "items": [
+              {
+                "id": "cfr-0001",
+                "producer": "plan:deviation",
+                "attempt": "inv-0006",
+                "source": {
+                  "kind": "document",
+                  "id": "plans/review-notes/plan.md@sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                },
+                "observation": {
+                  "kind": "plan-deviation",
+                  "summary": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+                  "locations": [
+                    {
+                      "path": "plans/review-notes/plan.md",
+                      "startLine": 3,
+                      "endLine": 3
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "kind": "plan-deviation",
+                      "ref": "deviations/nfd-001.json"
+                    }
+                  ]
+                },
+                "judgment": {
+                  "by": {
+                    "kind": "agent",
+                    "role": "nonfunctional-coordinator",
+                    "invocation": "inv-0006"
+                  },
+                  "consequence": "The requirement nfr-001 remains Use a cached read.",
+                  "rationale": "Assessment nfa-003 did not establish satisfaction; evidence: Observed 87 milliseconds.",
+                  "uncertainty": "Load varies",
+                  "remedy": null,
+                  "risk": "high",
+                  "ground": "deviations/nfd-001.json"
+                },
+                "credibility": "agent-generated",
+                "modules": []
+              }
+            ]
+          },
+          "decisions": {
+            "total": 3,
+            "items": [
+              {
+                "id": "cfd-0001",
+                "considered": 1,
+                "by": {
+                  "kind": "harness",
+                  "reason": "a non-functional plan deviation is the person's to accept or reject"
+                },
+                "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "request-user-decision",
+                  "authority": "governing-record deviations/nfd-001.json",
+                  "conflicts": [
+                    {
+                      "text": "The service must answer within 50 milliseconds.",
+                      "document": "plans/review-notes/plan.md",
+                      "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                    }
+                  ],
+                  "options": [
+                    {
+                      "id": "accept",
+                      "summary": "Accept the deviation",
+                      "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                    },
+                    {
+                      "id": "reject",
+                      "summary": "Reject the deviation",
+                      "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "cfd-0002",
+                "considered": 2,
+                "by": {
+                  "kind": "user",
+                  "name": "dan"
+                },
+                "rationale": "dan accepted the plan deviation",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "waive",
+                  "authority": "user-decision accept-nfr-1",
+                  "acceptedRisk": "high",
+                  "uncertainty": "The person accepted the plan deviation as recorded"
+                }
+              },
+              {
+                "id": "cfd-0003",
+                "considered": 3,
+                "by": {
+                  "kind": "user",
+                  "name": "dan"
+                },
+                "rationale": "Reconsider the delay",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "revoke-waiver",
+                  "reason": "Reconsider the delay"
+                }
+              }
+            ]
+          },
+          "relations": [],
+          "attempts": [
+            {
+              "report": "cfr-0001",
+              "kind": "other",
+              "attempt": "inv-0006",
+              "request": null,
+              "iteration": null,
+              "gate": null,
+              "session": null,
+              "invocation": null,
+              "candidate": {
+                "base": null,
+                "commit": null,
+                "tree": null
+              }
+            }
+          ],
+          "repairs": []
+        }
+      }
+    },
+    "gate-failed": {
+      "run": {
+        "jobId": "20260925T151700Z-0b70a2",
+        "planId": "review-notes",
+        "agent": "scripted",
+        "version": 48,
+        "state": "failed",
+        "phase": "ended",
+        "stopRequested": false,
+        "startedAt": "2026-09-25T15:17:00.144Z",
+        "updatedAt": "2026-09-25T15:17:18.411Z",
+        "endedAt": "2026-09-25T15:17:18.405Z",
+        "failure": {
+          "reason": "repair-exhausted",
+          "message": "The final gate did not pass: failed (in-scope)",
+          "evidence": [
+            "gates/ga-0002/attempt.json"
+          ]
+        },
+        "current": null,
+        "waits": [],
+        "counts": {
+          "workItems": 0,
+          "completedWorkItems": 0,
+          "openRequirements": 0,
+          "invocations": 7,
+          "readinessAttempts": 1,
+          "gateAttempts": 2,
+          "scenarios": {
+            "pending": 0,
+            "bound": 0,
+            "declared": 0,
+            "implemented": 0
+          },
+          "degradedStarts": 0
+        },
+        "writer": {
+          "held": null,
+          "unsettled": null
+        },
+        "review": "not-reviewed",
+        "notices": [],
+        "decisionRequests": {
+          "open": 0,
+          "waiting": false,
+          "workItems": []
+        },
+        "planDeviations": {
+          "recorded": 1,
+          "toReview": 0
+        },
+        "environmentProblems": []
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "at": "2026-09-25T15:17:00.144Z",
+          "transition": "job-started",
+          "summary": "The run started",
+          "refs": []
+        },
+        {
+          "sequence": 2,
+          "at": "2026-09-25T15:17:00.144Z",
+          "transition": "document-manifest-committed",
+          "summary": "Captured 1 plan document",
+          "refs": []
+        },
+        {
+          "sequence": 3,
+          "at": "2026-09-25T15:17:00.376Z",
+          "transition": "session-opened",
+          "summary": "The initial-architect session ses-0001 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 4,
+          "at": "2026-09-25T15:17:00.378Z",
+          "transition": "invocation-started",
+          "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 5,
+          "at": "2026-09-25T15:17:00.407Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 6,
+          "at": "2026-09-25T15:17:00.441Z",
+          "transition": "analysis-accepted",
+          "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 7,
+          "at": "2026-09-25T15:17:00.668Z",
+          "transition": "gate-started",
+          "summary": "Gate ga-0001 (readiness) started",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 8,
+          "at": "2026-09-25T15:17:00.983Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 9,
+          "at": "2026-09-25T15:17:01.216Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 10,
+          "at": "2026-09-25T15:17:01.466Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 11,
+          "at": "2026-09-25T15:17:01.715Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 12,
+          "at": "2026-09-25T15:17:02.080Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 13,
+          "at": "2026-09-25T15:17:03.143Z",
+          "transition": "readiness-passed",
+          "summary": "Readiness passed at attempt 1",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 14,
+          "at": "2026-09-25T15:17:03.160Z",
+          "transition": "nonfunctional-phase-started",
+          "summary": "Non-functional assessment phase started with 3 rounds",
+          "refs": []
+        },
+        {
+          "sequence": 15,
+          "at": "2026-09-25T15:17:04.325Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-001 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 16,
+          "at": "2026-09-25T15:17:04.337Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 17,
+          "at": "2026-09-25T15:17:04.340Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 18,
+          "at": "2026-09-25T15:17:04.374Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 19,
+          "at": "2026-09-25T15:17:05.547Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-001 recorded for round 1",
+          "refs": []
+        },
+        {
+          "sequence": 20,
+          "at": "2026-09-25T15:17:05.560Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 21,
+          "at": "2026-09-25T15:17:05.563Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 22,
+          "at": "2026-09-25T15:17:05.585Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 23,
+          "at": "2026-09-25T15:17:06.717Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 1 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 24,
+          "at": "2026-09-25T15:17:07.837Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-002 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 25,
+          "at": "2026-09-25T15:17:07.848Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 26,
+          "at": "2026-09-25T15:17:07.850Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 27,
+          "at": "2026-09-25T15:17:07.872Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 28,
+          "at": "2026-09-25T15:17:09.025Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-002 recorded for round 2",
+          "refs": []
+        },
+        {
+          "sequence": 29,
+          "at": "2026-09-25T15:17:09.028Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 30,
+          "at": "2026-09-25T15:17:09.029Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 31,
+          "at": "2026-09-25T15:17:09.034Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 32,
+          "at": "2026-09-25T15:17:10.165Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 2 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 33,
+          "at": "2026-09-25T15:17:11.303Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-003 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 34,
+          "at": "2026-09-25T15:17:11.314Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 35,
+          "at": "2026-09-25T15:17:11.316Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 36,
+          "at": "2026-09-25T15:17:11.334Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 37,
+          "at": "2026-09-25T15:17:12.452Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-003 recorded for round 3",
+          "refs": []
+        },
+        {
+          "sequence": 38,
+          "at": "2026-09-25T15:17:12.463Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 39,
+          "at": "2026-09-25T15:17:12.466Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 40,
+          "at": "2026-09-25T15:17:12.485Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 41,
+          "at": "2026-09-25T15:17:13.590Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 3 closed: exhausted",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 42,
+          "at": "2026-09-25T15:17:14.722Z",
+          "transition": "nonfunctional-deviation-recorded",
+          "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
+          "refs": []
+        },
+        {
+          "sequence": 43,
+          "at": "2026-09-25T15:17:16.115Z",
+          "transition": "gate-committing",
+          "summary": "Gate ga-0002 (final) is committing before audit",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 44,
+          "at": "2026-09-25T15:17:18.192Z",
+          "transition": "gate-attempted",
+          "summary": "Gate ga-0002 (final): failed, next repair",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 45,
+          "at": "2026-09-25T15:17:18.403Z",
+          "transition": "candidate-bound-to-gate",
+          "summary": "Candidate cand-003 bound to gate ga-0002",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 46,
+          "at": "2026-09-25T15:17:18.404Z",
+          "transition": "session-finished",
+          "summary": "Session ses-0001 finished (run-ended)",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 47,
+          "at": "2026-09-25T15:17:18.405Z",
+          "transition": "job-failed",
+          "summary": "The run failed (repair-exhausted): The final gate did not pass: failed (in-scope)",
+          "refs": []
+        },
+        {
+          "sequence": 48,
+          "at": "2026-09-25T15:17:18.411Z",
+          "transition": "check-findings-recorded",
+          "summary": "1 CheckFinding event was recorded (a person's command accept-gate-failed-nfr)",
+          "refs": []
+        }
+      ],
+      "readiness": {
+        "runId": "20260925T151700Z-0b70a2",
+        "version": 48,
+        "readiness": {
+          "status": "gate-failed",
+          "candidate": null,
+          "finalGate": "ga-0002",
+          "checkFindings": [],
+          "reason": "The required final gate failed",
+          "gateCommit": null
+        }
+      },
+      "findings": {
+        "protocol": "check-findings/1",
+        "runId": "20260925T151700Z-0b70a2",
+        "version": 48,
+        "coverage": {
+          "state": "unavailable",
+          "reason": "no-review-policy"
+        },
+        "query": {
+          "workItem": null,
+          "module": null,
+          "select": "all",
+          "order": "attention"
+        },
+        "total": 1,
+        "shown": 1,
+        "next": null,
+        "counts": {
+          "total": 1,
+          "open": 0,
+          "deferred": 0,
+          "closed": 1,
+          "fixed": 0,
+          "waived": 1,
+          "superseded": 0,
+          "unresolved": 0,
+          "awaitingUser": 0
+        },
+        "items": [
+          {
+            "id": "cf-0001",
+            "revision": 3,
+            "workItem": null,
+            "standing": "closed",
+            "reason": "waived",
+            "awaiting": null,
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": {
+              "kind": "waived",
+              "decision": "cfd-0002",
+              "by": {
+                "kind": "user",
+                "name": "dan"
+              },
+              "reason": "dan accepted the plan deviation",
+              "acceptedRisk": "high",
+              "uncertainty": "The person accepted the plan deviation as recorded"
+            },
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 2,
+            "group": null,
+            "userCommands": [
+              "revoke"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "b9c6995e4b7945cd0d8c3051ffddbccda9c4dabb",
+                  "preparedAt": "2026-09-25T15:17:11.303Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          }
+        ]
+      },
+      "details": {
+        "cf-0001": {
+          "protocol": "check-findings/1",
+          "runId": "20260925T151700Z-0b70a2",
+          "version": 48,
+          "summary": {
+            "id": "cf-0001",
+            "revision": 3,
+            "workItem": null,
+            "standing": "closed",
+            "reason": "waived",
+            "awaiting": null,
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": {
+              "kind": "waived",
+              "decision": "cfd-0002",
+              "by": {
+                "kind": "user",
+                "name": "dan"
+              },
+              "reason": "dan accepted the plan deviation",
+              "acceptedRisk": "high",
+              "uncertainty": "The person accepted the plan deviation as recorded"
+            },
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 2,
+            "group": null,
+            "userCommands": [
+              "revoke"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "b9c6995e4b7945cd0d8c3051ffddbccda9c4dabb",
+                  "preparedAt": "2026-09-25T15:17:11.303Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": null
+            }
+          },
+          "reports": {
+            "total": 1,
+            "items": [
+              {
+                "id": "cfr-0001",
+                "producer": "plan:deviation",
+                "attempt": "inv-0006",
+                "source": {
+                  "kind": "document",
+                  "id": "plans/review-notes/plan.md@sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                },
+                "observation": {
+                  "kind": "plan-deviation",
+                  "summary": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+                  "locations": [
+                    {
+                      "path": "plans/review-notes/plan.md",
+                      "startLine": 3,
+                      "endLine": 3
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "kind": "plan-deviation",
+                      "ref": "deviations/nfd-001.json"
+                    }
+                  ]
+                },
+                "judgment": {
+                  "by": {
+                    "kind": "agent",
+                    "role": "nonfunctional-coordinator",
+                    "invocation": "inv-0006"
+                  },
+                  "consequence": "The requirement nfr-001 remains Use a cached read.",
+                  "rationale": "Assessment nfa-003 did not establish satisfaction; evidence: Observed 87 milliseconds.",
+                  "uncertainty": "Load varies",
+                  "remedy": null,
+                  "risk": "high",
+                  "ground": "deviations/nfd-001.json"
+                },
+                "credibility": "agent-generated",
+                "modules": []
+              }
+            ]
+          },
+          "decisions": {
+            "total": 2,
+            "items": [
+              {
+                "id": "cfd-0001",
+                "considered": 1,
+                "by": {
+                  "kind": "harness",
+                  "reason": "a non-functional plan deviation is the person's to accept or reject"
+                },
+                "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "request-user-decision",
+                  "authority": "governing-record deviations/nfd-001.json",
+                  "conflicts": [
+                    {
+                      "text": "The service must answer within 50 milliseconds.",
+                      "document": "plans/review-notes/plan.md",
+                      "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                    }
+                  ],
+                  "options": [
+                    {
+                      "id": "accept",
+                      "summary": "Accept the deviation",
+                      "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                    },
+                    {
+                      "id": "reject",
+                      "summary": "Reject the deviation",
+                      "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "cfd-0002",
+                "considered": 2,
+                "by": {
+                  "kind": "user",
+                  "name": "dan"
+                },
+                "rationale": "dan accepted the plan deviation",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "waive",
+                  "authority": "user-decision accept-gate-failed-nfr",
+                  "acceptedRisk": "high",
+                  "uncertainty": "The person accepted the plan deviation as recorded"
+                }
+              }
+            ]
+          },
+          "relations": [],
+          "attempts": [
+            {
+              "report": "cfr-0001",
+              "kind": "other",
+              "attempt": "inv-0006",
+              "request": null,
+              "iteration": null,
+              "gate": null,
+              "session": null,
+              "invocation": null,
+              "candidate": {
+                "base": null,
+                "commit": null,
+                "tree": null
+              }
+            }
+          ],
+          "repairs": []
+        }
+      }
+    },
+    "rejected": {
+      "run": {
+        "jobId": "20260925T151718Z-d28ead",
+        "planId": "review-notes",
+        "agent": "scripted",
+        "version": 48,
+        "state": "completed",
+        "phase": "ended",
+        "stopRequested": false,
+        "startedAt": "2026-09-25T15:17:18.566Z",
+        "updatedAt": "2026-09-25T15:17:37.987Z",
+        "endedAt": "2026-09-25T15:17:37.986Z",
+        "failure": null,
+        "current": null,
+        "waits": [],
+        "counts": {
+          "workItems": 0,
+          "completedWorkItems": 0,
+          "openRequirements": 0,
+          "invocations": 7,
+          "readinessAttempts": 1,
+          "gateAttempts": 2,
+          "scenarios": {
+            "pending": 0,
+            "bound": 0,
+            "declared": 0,
+            "implemented": 0
+          },
+          "degradedStarts": 0
+        },
+        "writer": {
+          "held": null,
+          "unsettled": null
+        },
+        "review": "not-reviewed",
+        "notices": [],
+        "decisionRequests": {
+          "open": 0,
+          "waiting": false,
+          "workItems": []
+        },
+        "planDeviations": {
+          "recorded": 1,
+          "toReview": 0
+        },
+        "environmentProblems": []
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "at": "2026-09-25T15:17:18.566Z",
+          "transition": "job-started",
+          "summary": "The run started",
+          "refs": []
+        },
+        {
+          "sequence": 2,
+          "at": "2026-09-25T15:17:18.566Z",
+          "transition": "document-manifest-committed",
+          "summary": "Captured 1 plan document",
+          "refs": []
+        },
+        {
+          "sequence": 3,
+          "at": "2026-09-25T15:17:18.795Z",
+          "transition": "session-opened",
+          "summary": "The initial-architect session ses-0001 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 4,
+          "at": "2026-09-25T15:17:18.798Z",
+          "transition": "invocation-started",
+          "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 5,
+          "at": "2026-09-25T15:17:18.824Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 6,
+          "at": "2026-09-25T15:17:18.868Z",
+          "transition": "analysis-accepted",
+          "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 7,
+          "at": "2026-09-25T15:17:19.082Z",
+          "transition": "gate-started",
+          "summary": "Gate ga-0001 (readiness) started",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 8,
+          "at": "2026-09-25T15:17:19.388Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 9,
+          "at": "2026-09-25T15:17:19.619Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 10,
+          "at": "2026-09-25T15:17:19.861Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 11,
+          "at": "2026-09-25T15:17:20.147Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 12,
+          "at": "2026-09-25T15:17:20.557Z",
+          "transition": "gate-command-started",
+          "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 13,
+          "at": "2026-09-25T15:17:21.571Z",
+          "transition": "readiness-passed",
+          "summary": "Readiness passed at attempt 1",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 14,
+          "at": "2026-09-25T15:17:21.579Z",
+          "transition": "nonfunctional-phase-started",
+          "summary": "Non-functional assessment phase started with 3 rounds",
+          "refs": []
+        },
+        {
+          "sequence": 15,
+          "at": "2026-09-25T15:17:22.717Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-001 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 16,
+          "at": "2026-09-25T15:17:22.720Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 17,
+          "at": "2026-09-25T15:17:22.721Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 18,
+          "at": "2026-09-25T15:17:22.728Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0002"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 19,
+          "at": "2026-09-25T15:17:23.873Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-001 recorded for round 1",
+          "refs": []
+        },
+        {
+          "sequence": 20,
+          "at": "2026-09-25T15:17:23.883Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 21,
+          "at": "2026-09-25T15:17:23.886Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 22,
+          "at": "2026-09-25T15:17:23.905Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 23,
+          "at": "2026-09-25T15:17:25.055Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 1 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0003"
+            }
+          ]
+        },
+        {
+          "sequence": 24,
+          "at": "2026-09-25T15:17:26.224Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-002 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 25,
+          "at": "2026-09-25T15:17:26.228Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 26,
+          "at": "2026-09-25T15:17:26.229Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 27,
+          "at": "2026-09-25T15:17:26.233Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0004"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0004"
+            }
+          ]
+        },
+        {
+          "sequence": 28,
+          "at": "2026-09-25T15:17:27.374Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-002 recorded for round 2",
+          "refs": []
+        },
+        {
+          "sequence": 29,
+          "at": "2026-09-25T15:17:27.385Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 30,
+          "at": "2026-09-25T15:17:27.387Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 31,
+          "at": "2026-09-25T15:17:27.407Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 32,
+          "at": "2026-09-25T15:17:28.517Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 2 closed: continue",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0005"
+            }
+          ]
+        },
+        {
+          "sequence": 33,
+          "at": "2026-09-25T15:17:29.673Z",
+          "transition": "candidate-prepared",
+          "summary": "Candidate cand-003 prepared",
+          "refs": []
+        },
+        {
+          "sequence": 34,
+          "at": "2026-09-25T15:17:29.684Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 35,
+          "at": "2026-09-25T15:17:29.686Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 36,
+          "at": "2026-09-25T15:17:29.702Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0006"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0006"
+            }
+          ]
+        },
+        {
+          "sequence": 37,
+          "at": "2026-09-25T15:17:30.872Z",
+          "transition": "nonfunctional-assessed",
+          "summary": "Non-functional assessment nfa-003 recorded for round 3",
+          "refs": []
+        },
+        {
+          "sequence": 38,
+          "at": "2026-09-25T15:17:30.874Z",
+          "transition": "session-opened",
+          "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 39,
+          "at": "2026-09-25T15:17:30.875Z",
+          "transition": "invocation-started",
+          "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 40,
+          "at": "2026-09-25T15:17:30.878Z",
+          "transition": "invocation-ended",
+          "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            },
+            {
+              "kind": "session",
+              "id": "ses-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 41,
+          "at": "2026-09-25T15:17:32.007Z",
+          "transition": "nonfunctional-round-closed",
+          "summary": "Non-functional round 3 closed: exhausted",
+          "refs": [
+            {
+              "kind": "invocation",
+              "id": "inv-0007"
+            }
+          ]
+        },
+        {
+          "sequence": 42,
+          "at": "2026-09-25T15:17:33.195Z",
+          "transition": "nonfunctional-deviation-recorded",
+          "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
+          "refs": []
+        },
+        {
+          "sequence": 43,
+          "at": "2026-09-25T15:17:34.589Z",
+          "transition": "gate-committing",
+          "summary": "Gate ga-0002 (final) is committing before audit",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 44,
+          "at": "2026-09-25T15:17:36.559Z",
+          "transition": "gate-attempted",
+          "summary": "Gate ga-0002 (final): passed, next accept",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 45,
+          "at": "2026-09-25T15:17:36.796Z",
+          "transition": "candidate-bound-to-gate",
+          "summary": "Candidate cand-003 bound to gate ga-0002",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            }
+          ]
+        },
+        {
+          "sequence": 46,
+          "at": "2026-09-25T15:17:37.984Z",
+          "transition": "session-finished",
+          "summary": "Session ses-0001 finished (run-ended)",
+          "refs": [
+            {
+              "kind": "session",
+              "id": "ses-0001"
+            }
+          ]
+        },
+        {
+          "sequence": 47,
+          "at": "2026-09-25T15:17:37.986Z",
+          "transition": "job-completed",
+          "summary": "The run completed after 0 work items, with 1 plan deviation to review",
+          "refs": [
+            {
+              "kind": "gate",
+              "id": "ga-0002"
+            },
+            {
+              "kind": "commit",
+              "id": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b"
+            }
+          ]
+        },
+        {
+          "sequence": 48,
+          "at": "2026-09-25T15:17:37.987Z",
+          "transition": "check-findings-recorded",
+          "summary": "1 CheckFinding event was recorded (a person's command reject-nfr-1)",
+          "refs": []
+        }
+      ],
+      "readiness": {
+        "runId": "20260925T151718Z-d28ead",
+        "version": 48,
+        "readiness": {
+          "status": "rejected",
+          "candidate": {
+            "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+            "head": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b",
+            "preparedAt": "2026-09-25T15:17:29.672Z"
+          },
+          "finalGate": "ga-0002",
+          "checkFindings": [
+            "cf-0001"
+          ],
+          "reason": "A plan deviation was rejected for this candidate",
+          "gateCommit": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b"
+        }
+      },
+      "findings": {
+        "protocol": "check-findings/1",
+        "runId": "20260925T151718Z-d28ead",
+        "version": 48,
+        "coverage": {
+          "state": "unavailable",
+          "reason": "no-review-policy"
+        },
+        "query": {
+          "workItem": null,
+          "module": null,
+          "select": "all",
+          "order": "attention"
+        },
+        "total": 1,
+        "shown": 1,
+        "next": null,
+        "counts": {
+          "total": 1,
+          "open": 1,
+          "deferred": 0,
+          "closed": 0,
+          "fixed": 0,
+          "waived": 0,
+          "superseded": 0,
+          "unresolved": 0,
+          "awaitingUser": 0
+        },
+        "items": [
+          {
+            "id": "cf-0001",
+            "revision": 3,
+            "workItem": null,
+            "standing": "open",
+            "reason": "user-decision-answered",
+            "awaiting": "assessment",
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": null,
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 2,
+            "group": null,
+            "userCommands": [
+              "waive"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b",
+                  "preparedAt": "2026-09-25T15:17:29.672Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": "Rework the response path before merge"
+            }
+          }
+        ]
+      },
+      "details": {
+        "cf-0001": {
+          "protocol": "check-findings/1",
+          "runId": "20260925T151718Z-d28ead",
+          "version": 48,
+          "summary": {
+            "id": "cf-0001",
+            "revision": 3,
+            "workItem": null,
+            "standing": "open",
+            "reason": "user-decision-answered",
+            "awaiting": "assessment",
+            "verification": "assessment",
+            "obligation": null,
+            "required": false,
+            "risk": "high",
+            "credibility": "agent-generated",
+            "modules": [],
+            "unresolved": null,
+            "latestReview": false,
+            "settlement": null,
+            "pendingUserDecision": null,
+            "materialChoice": null,
+            "repair": null,
+            "producers": [
+              "plan:deviation"
+            ],
+            "title": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+            "reports": 1,
+            "decisions": 2,
+            "group": null,
+            "userCommands": [
+              "waive"
+            ],
+            "planDeviation": {
+              "origin": {
+                "kind": "nonfunctional-assessment",
+                "nfr": "nfr-001",
+                "assessment": "nfa-003",
+                "candidate": {
+                  "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
+                  "head": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b",
+                  "preparedAt": "2026-09-25T15:17:29.672Z"
+                },
+                "coordinatorInvocation": "inv-0006"
+              },
+              "id": "nfd-001",
+              "passage": {
+                "document": "doc-001",
+                "sha256": "525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f",
+                "start": 16,
+                "end": 63,
+                "quote": "The service must answer within 50 milliseconds."
+              },
+              "sourcePath": "plans/review-notes/plan.md",
+              "evidence": [
+                "Observed 87 milliseconds"
+              ],
+              "proposedAlternative": "Use a cached read",
+              "uncertainty": "Load varies",
+              "followUp": "Rework the response path before merge"
+            }
+          },
+          "reports": {
+            "total": 1,
+            "items": [
+              {
+                "id": "cfr-0001",
+                "producer": "plan:deviation",
+                "attempt": "inv-0006",
+                "source": {
+                  "kind": "document",
+                  "id": "plans/review-notes/plan.md@sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                },
+                "observation": {
+                  "kind": "plan-deviation",
+                  "summary": "Non-functional deviation nfd-001 from nfr-001: The service must answer within 50 milliseconds.",
+                  "locations": [
+                    {
+                      "path": "plans/review-notes/plan.md",
+                      "startLine": 3,
+                      "endLine": 3
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "kind": "plan-deviation",
+                      "ref": "deviations/nfd-001.json"
+                    }
+                  ]
+                },
+                "judgment": {
+                  "by": {
+                    "kind": "agent",
+                    "role": "nonfunctional-coordinator",
+                    "invocation": "inv-0006"
+                  },
+                  "consequence": "The requirement nfr-001 remains Use a cached read.",
+                  "rationale": "Assessment nfa-003 did not establish satisfaction; evidence: Observed 87 milliseconds.",
+                  "uncertainty": "Load varies",
+                  "remedy": null,
+                  "risk": "high",
+                  "ground": "deviations/nfd-001.json"
+                },
+                "credibility": "agent-generated",
+                "modules": []
+              }
+            ]
+          },
+          "decisions": {
+            "total": 2,
+            "items": [
+              {
+                "id": "cfd-0001",
+                "considered": 1,
+                "by": {
+                  "kind": "harness",
+                  "reason": "a non-functional plan deviation is the person's to accept or reject"
+                },
+                "rationale": "The assessment of nfr-001 left this requirement unsatisfied or undetermined",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "request-user-decision",
+                  "authority": "governing-record deviations/nfd-001.json",
+                  "conflicts": [
+                    {
+                      "text": "The service must answer within 50 milliseconds.",
+                      "document": "plans/review-notes/plan.md",
+                      "revision": "sha256:525a2aa882bed1885823ba5d7f57f1f6d18a76cf5c5d00b8ddcb99cadb03f82f"
+                    }
+                  ],
+                  "options": [
+                    {
+                      "id": "accept",
+                      "summary": "Accept the deviation",
+                      "consequence": "It stands as recorded and closes as waived. The source plan is unchanged."
+                    },
+                    {
+                      "id": "reject",
+                      "summary": "Reject the deviation",
+                      "consequence": "Your note records the requirement a follow-up run must meet. Nothing is rerun automatically."
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "cfd-0002",
+                "considered": 2,
+                "by": {
+                  "kind": "user",
+                  "name": "dan"
+                },
+                "rationale": "Rework the response path before merge",
+                "risk": null,
+                "materialChoice": null,
+                "action": {
+                  "action": "answer-user-decision",
+                  "request": "cfd-0001",
+                  "option": "reject"
+                }
+              }
+            ]
+          },
+          "relations": [],
+          "attempts": [
+            {
+              "report": "cfr-0001",
+              "kind": "other",
+              "attempt": "inv-0006",
+              "request": null,
+              "iteration": null,
+              "gate": null,
+              "session": null,
+              "invocation": null,
+              "candidate": {
+                "base": null,
+                "commit": null,
+                "tree": null
+              }
+            }
+          ],
+          "repairs": []
+        }
+      }
+    }
+  }
+}
