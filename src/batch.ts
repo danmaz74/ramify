@@ -34,5 +34,5 @@ export async function runBatch(invocation: BatchInvocation, control: RunControl 
     && invocation.capabilities.every(id => report.capabilities.some(item => item.capability === id && item.available && item.executed));
   const exitCode = failed ? 2 : report.outcome.execution === 'invalid' ? 1 : !complete ? 2
     : report.outcome.check === 'failed' || report.diagnostics.length > 0 || report.summary.denied > 0 ? 1 : 0;
-  return { status: 'reported', report, exitCode };
+  return { status: 'reported', report: invocation.snapshot === false ? { ...report, snapshot: null } : report, exitCode };
 }

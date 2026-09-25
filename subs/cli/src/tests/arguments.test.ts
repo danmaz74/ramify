@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runCli } from '../run-cli.js';
-import { parseArguments } from '../arguments.js';
+import { help, parseArguments } from '../arguments.js';
 
 describe('lightweight CLI arguments', () => {
   for (const argv of [['--help'], ['check', '--help'], ['--version']]) it(`handles ${argv.join(' ')} without dispatch`, async () => {
@@ -97,6 +97,40 @@ describe('resident command grammar', () => {
     { argv: ['explore', '--help'] }, { argv: ['explore', 'file.ts'] },
   ])('rejects unsupported or ambiguous grammar $argv', ({ argv }) => {
     expect(() => parseArguments(argv)).toThrow();
+  });
+});
+
+describe('snapshot-free JSON grammar', () => {
+  it.each([
+    { argv: ['check', '--format', 'json', '--no-snapshot'], expected: { command: 'check', format: 'json', batch: false, snapshot: false } },
+    { argv: ['check', '--no-snapshot', '--batch', '--root', 'a project', '--format', 'json'],
+      expected: { command: 'check', format: 'json', root: 'a project', batch: true, snapshot: false } },
+  ])('selects a report without its snapshot for $argv', ({ argv, expected }) => {
+    expect(parseArguments(argv)).toEqual(expected);
+  });
+  it.each([
+    [['check', '--no-snapshot'], '--no-snapshot requires --format json'],
+    [['check', '--batch', '--no-snapshot'], '--no-snapshot requires --format json'],
+    [['check', '--format', 'json', '--no-snapshot', '--no-snapshot'], 'Duplicate option: --no-snapshot'],
+    [['check', '--changed', 'a.ts', '--format', 'json', '--no-snapshot'], '--no-snapshot cannot be combined with --changed'],
+    [['watch', '--format', 'json', '--no-snapshot'], 'Unsupported argument: --no-snapshot'],
+    [['measure', '--format', 'json', '--no-snapshot'], 'Unsupported argument: --no-snapshot'],
+  ])('rejects %j', (argv, message) => {
+    expect(() => parseArguments(argv)).toThrow(message);
+  });
+  it('reports a usage error as a ramify.cli/1 document with exit 2 before dispatch', async () => {
+    let calls = 0;
+    const stdout: string[] = [];
+    const exit = await runCli(['check', '--changed', 'a.ts', '--format', 'json', '--no-snapshot'], { cwd: '/project', version: '1',
+      connect: async () => { calls++; throw new Error('Unexpected daemon connection'); }, stdout: text => { stdout.push(text); },
+      stderr: text => { throw new Error(text); }, batch: async () => { calls++; throw new Error('Unexpected batch'); } });
+    expect([exit, calls, stdout.length]).toEqual([2, 0, 1]);
+    expect(JSON.parse(stdout[0])).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 2,
+      diagnostics: [{ code: 'invalid-invocation', message: '--no-snapshot cannot be combined with --changed' }] });
+  });
+  it('documents the flag in help', () => {
+    expect(help).toContain('[--format json [--no-snapshot]]');
+    expect(help).toContain('--no-snapshot requires --format json and cannot accompany --changed.');
   });
 });
 

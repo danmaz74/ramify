@@ -14,7 +14,7 @@ parameter is optional and only overrides something the command would otherwise
 find by itself.
 
 ```sh
-ramify check [--root <dir>] [--format json] [--batch]
+ramify check [--root <dir>] [--format json [--no-snapshot]] [--batch]
 ramify --help
 ramify --version
 ```
@@ -141,6 +141,17 @@ member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging go
 to stderr; nothing else is written to stdout in that mode. Locations are relative
 to the root regardless of the working directory. Ordering is deterministic.
 
+`--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
+that report. The report keeps `ramify.analysis/1` and sets `snapshot` to null; its
+summary, outcome, findings, warnings, analysis limits and exit code are those of
+the same check with the snapshot. A caller that reads only the verdict and its
+findings uses it: on the toolkit itself the snapshot is almost all of a
+25 MB report. It applies to complete checks in both modes; a batch session drops
+the snapshot before its result leaves the session, and a resident check drops it
+when printing. The flag requires `--format json` and cannot accompany `--changed`,
+whose `ramify.check/1` document has no snapshot; either misuse is an invalid
+invocation, exit 2.
+
 | Exit | Meaning |
 | --- | --- |
 | 0 | Checking completed. No definite violations, no invalid input. Warnings and analysis limits are allowed. |
@@ -213,6 +224,9 @@ reuse what it knows, so those hooks are slower than the same hooks elsewhere.
 
 - No per-invocation exclusions. Scope customization belongs to a future
   project configuration file.
+- `--no-snapshot` changes only the JSON report's size, never its verdict. A flag
+  that would have no effect in its combination is rejected rather than ignored,
+  as `--since` and `--deadline` are without `--changed`.
 - No type-checking, and no exit code influence from compiler diagnostics
   beyond the analysis limits they cause.
 - Root discovery from a subdirectory is part of Plan 1; `--root` is the

@@ -1,6 +1,6 @@
 import type { MaterializeViewId } from '../../../src/interfaces/service.js';
 
-export const help = `Usage: ramify check [--root <dir>] [--format json] [--batch]
+export const help = `Usage: ramify check [--root <dir>] [--format json [--no-snapshot]] [--batch]
                     [--changed <path>...] [--since <revision>] [--deadline <ms>]
        ramify watch [--root <dir>] [--format json]
        ramify materialize [--from <path>] [--all] [--root <dir>]
@@ -27,7 +27,12 @@ are discovered from the working directory; --root gives an explicit root.
                    --deadline bounds the wait (default 2000 ms; maximum
                    600000 ms) but does not delay that reply. --since marks
                    findings added since that revision.
+  --no-snapshot    Leave the snapshot of every evaluated import out of a
+                   complete check's JSON report. The report keeps its schema
+                   and sets "snapshot": null; its summary, outcome and findings
+                   are unchanged.
 --since and --deadline require --changed; --changed cannot accompany --batch.
+--no-snapshot requires --format json and cannot accompany --changed.
 Watch streams revisions until interrupted. Status and stop never start a daemon.
 
 materialize refreshes one module's or the whole project's generated .ramify
@@ -69,7 +74,9 @@ pending, cold, deadline, supersession, resource refusal or incompatible service,
 
 type Arguments = { readonly command: 'help' | 'version' }
   | { readonly command: 'check'; readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
-      readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number }
+      readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number;
+      /** Present only when `--no-snapshot` was given. */
+      readonly snapshot?: false }
   | { readonly command: 'watch'; readonly root?: string; readonly format: 'human' | 'json' }
   | { readonly command: 'daemon'; readonly action: 'status' | 'stop'; readonly format: 'human' | 'json' }
   | { readonly command: 'materialize'; readonly root?: string; readonly from?: string; readonly all: boolean;
@@ -90,10 +97,10 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'daemon' && action !== 'status' && action !== 'stop') throw new Error('Specify daemon status or daemon stop.');
   let root: string | undefined;
   let format: 'human' | 'json' = 'human';
-  let batch = false;
+  let batch = false, noSnapshot = false;
   let changed: string[] | undefined, since: string | undefined, deadlineMs: number | undefined;
   let from: string | undefined, all = false, views: MaterializeViewId[] | undefined;
-  const flags = command === 'check' ? ['--root', '--format', '--batch', '--changed', '--since', '--deadline']
+  const flags = command === 'check' ? ['--root', '--format', '--batch', '--no-snapshot', '--changed', '--since', '--deadline']
     : command === 'watch' || command === 'measure' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
     : command === 'explore' ? ['--root'] : ['--format'];
   const seen = new Set<string>();
@@ -113,6 +120,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
     if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
     seen.add(flag);
     if (flag === '--batch') { batch = true; continue; }
+    if (flag === '--no-snapshot') { noSnapshot = true; continue; }
     if (flag === '--all') { all = true; continue; }
     if (flag === '--changed') {
       changed = [];
@@ -149,8 +157,12 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'check') {
     if (changed && batch) throw new Error('--changed cannot be combined with --batch');
     if (!changed && (since !== undefined || deadlineMs !== undefined)) throw new Error('--since and --deadline require --changed');
+    // A changed check's ramify.check/1 document has no snapshot to leave out.
+    if (changed && noSnapshot) throw new Error('--no-snapshot cannot be combined with --changed');
+    if (noSnapshot && format !== 'json') throw new Error('--no-snapshot requires --format json');
     return { command, ...project, batch, ...(changed ? { changed } : {}),
-      ...(since === undefined ? {} : { since }), ...(deadlineMs === undefined ? {} : { deadlineMs }) };
+      ...(since === undefined ? {} : { since }), ...(deadlineMs === undefined ? {} : { deadlineMs }),
+      ...(noSnapshot ? { snapshot: false as const } : {}) };
   }
   if (command === 'watch') return { command, ...project };
   if (command === 'measure') return { command, ...project };

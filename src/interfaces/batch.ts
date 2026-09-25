@@ -4,6 +4,8 @@ export interface BatchInvocation {
   readonly cwd: string;
   readonly root?: string;
   readonly capabilities: readonly Capability[];
+  /** False returns the report with `snapshot: null`, so a batch child never transfers it. */
+  readonly snapshot?: false;
 }
 export type BatchResult =
   | { readonly status: 'reported'; readonly report: AnalysisReport; readonly exitCode: 0 | 1 | 2 }

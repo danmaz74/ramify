@@ -22,12 +22,17 @@ function checkedReport(report: AnalysisReport): AnalysisReport {
 }
 
 
-export function printReport(input: AnalysisReport, mode: string, format: 'human' | 'json', environment: CliEnvironment): CliExitCode {
-  const { report, json } = serializeReport(checkedReport(input));
+/** How a report is printed: human text, or JSON with or without its snapshot. */
+export interface ReportOutput { readonly format: 'human' | 'json'; readonly snapshot?: false }
+
+export function printReport(input: AnalysisReport, mode: string, output: ReportOutput, environment: CliEnvironment): CliExitCode {
+  const checked = checkedReport(input);
+  // Leaving the snapshot out changes no other member: the summary and outcome were derived before.
+  const { report, json } = serializeReport(output.snapshot === false && checked.snapshot !== null ? { ...checked, snapshot: null } : checked);
   const failed = report.outcome.execution === 'incomplete' || report.outcome.execution === 'unavailable'
     || report.stages.some(stage => stage.status === 'failed' || stage.status === 'unavailable');
   const code = failed ? 2 : report.outcome.execution === 'invalid' || report.outcome.check === 'failed'
     || report.diagnostics.length || report.summary.denied ? 1 : 0;
-  environment.stdout(format === 'json' ? json + '\n' : formatHuman(report, mode));
+  environment.stdout(output.format === 'json' ? json + '\n' : formatHuman(report, mode));
   return code;
 }

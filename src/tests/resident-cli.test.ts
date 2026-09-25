@@ -144,6 +144,10 @@ describe('changed-file CLI through the real resident service', () => {
       expect(report).not.toHaveProperty('mode');
       expect(report).not.toHaveProperty('findings');
       expect(report.diagnostics).toEqual(denied.findings.map(({ new: _new, ...finding }) => finding));
+      expect(report.snapshot).not.toBeNull();
+      const lean = await invokeResident(quick, root, ['check', '--format', 'json', '--no-snapshot']);
+      expect([lean.exitCode, lean.writes, lean.stderr, lean.batchCalls]).toEqual([1, 1, '', 0]);
+      expect(JSON.parse(lean.stdout)).toEqual({ ...report, runId: expect.any(String), snapshot: null });
 
       await put(root, 'module.ramify', originalDescription);
       const repaired = checkDocument(await invokeResident(quick, root, [...args, '--since', denied.revision.id]));

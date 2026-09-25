@@ -34,6 +34,11 @@ exhausted recovery; the fallback is visible on stdout in human mode and stderr
 in JSON mode. Explicit stop, incompatible peers and rejected requests retain
 their errors. Neither watch nor the client entry falls back.
 
+`--no-snapshot` prints a complete check's JSON report with `snapshot: null` and
+every other member unchanged. The batch operation receives it and drops the
+snapshot before returning; a resident report drops it when printed. It requires
+`--format json` and is rejected with `--changed`.
+
 `watch` subscribes to context events and fetches each reported revision by its
 exact id. JSON output is one `ramify.watch/1` object per line; an evicted report
 has an explicit `revision-evicted` line. A bounded queue coalesces replaceable

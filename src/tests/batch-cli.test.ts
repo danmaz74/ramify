@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { runBatch } from '../batch.js';
 import { runCli } from '../../subs/cli/src/run-cli.js';
 import type { AnalysisDiagnostic, AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
+import type { BatchInvocation } from '../interfaces/batch.js';
 import { fixture, invoke, put } from './fixture.js';
 
 describe('CLI with real batch sessions', () => {
@@ -38,6 +39,27 @@ describe('CLI with real batch sessions', () => {
     expect(human.stdout).toContain(`Root: ${root} (given)`);
     expect(human.stdout).toContain(`Configuration: ${root}/tsconfig.json`);
     expect(human.stdout).toContain('Completed scope: 2 owners, 2 source files');
+  }), 20_000);
+
+  it('leaves only the snapshot out of the JSON report with --no-snapshot, before the batch result is returned', async () => fixture(async root => {
+    await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue;\n");
+    const full = await invoke(root, ['check', '--batch', '--root', root, '--format', 'json']);
+    const invocations: BatchInvocation[] = [];
+    const returned: (AnalysisReport['snapshot'])[] = [];
+    const lean = await invoke(root, ['check', '--batch', '--root', root, '--format', 'json', '--no-snapshot'], async (invocation, control) => {
+      invocations.push(invocation);
+      const result = await runBatch(invocation, control);
+      if (result.status === 'reported') returned.push(result.report.snapshot);
+      return result;
+    });
+    expect([full.exitCode, lean.exitCode, lean.stderr, lean.writes]).toEqual([1, 1, '', 1]);
+    expect(invocations).toEqual([{ cwd: root, root, capabilities: expect.any(Array), snapshot: false }]);
+    expect(returned).toEqual([null]);
+    const expected = JSON.parse(full.stdout) as AnalysisReport, report = JSON.parse(lean.stdout) as AnalysisReport;
+    expect(expected.snapshot).not.toBeNull();
+    expect(report).toEqual({ ...expected, runId: report.runId, snapshot: null });
+    expect(report.summary.denied).toBe(1);
+    expect(Buffer.byteLength(lean.stdout)).toBeLessThan(Buffer.byteLength(full.stdout));
   }), 20_000);
 
   it('uses discovery and accepts batch without narrowing the whole-project scope', async () => fixture(async root => {

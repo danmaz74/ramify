@@ -7,15 +7,19 @@ import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
 import { changedCommand } from './changed-command.js';
 
 interface CheckArguments { readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
-  readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number }
+  readonly changed?: readonly string[]; readonly since?: string; readonly deadlineMs?: number;
+  /** False leaves the snapshot out of the JSON report. */
+  readonly snapshot?: false }
 
 export async function checkCommand(args: CheckArguments, environment: CliEnvironment, control: RunControl): Promise<CliExitCode> {
   if (args.changed) return changedCommand({ ...args, changed: args.changed }, environment, control);
+  const output = { format: args.format, ...(args.snapshot === false ? { snapshot: false as const } : {}) };
   async function batch(mode: string): Promise<CliExitCode> {
     const result = await environment.batch({ cwd: environment.cwd,
-      ...(args.root === undefined ? {} : { root: args.root }), capabilities }, control);
+      ...(args.root === undefined ? {} : { root: args.root }), capabilities,
+      ...(args.snapshot === false ? { snapshot: false } : {}) }, control);
     if (result.status === 'cancelled' || control.signal?.aborted) throw new Error('Interrupted');
-    const code = printReport(result.report, mode, args.format, environment);
+    const code = printReport(result.report, mode, output, environment);
     return result.exitCode === 2 ? 2 : result.exitCode === 1 && code === 0 ? 1 : code;
   }
   async function fallback(message: string): Promise<CliExitCode> {
@@ -44,7 +48,7 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         control.signal?.throwIfAborted();
         if (!opened.ok) throw serviceFailure(opened.error);
         if (opened.value.status === 'unresolved') return printReport(opened.value.report,
-          `resident (daemon ${connection.daemon.instance.pid}; no context)`, args.format, environment);
+          `resident (daemon ${connection.daemon.instance.pid}; no context)`, output, environment);
         // An open never answers with a reason reserved for a synchronized check; any
         // reason the failure codes do not name is a plain unavailable outcome.
         if (opened.value.status === 'unavailable') throw new CliFailure(
@@ -58,7 +62,7 @@ export async function checkCommand(args: CheckArguments, environment: CliEnviron
         if (value.status === 'reported' && value.report) {
           const revision = value.published ? `context ${token.context}; revision ${value.revision.sequence}; ${value.revision.checked.path}`
             : `context ${token.context}; unpublished`;
-          return printReport(value.report, `resident (daemon ${connection.daemon.instance.pid}; ${revision}; synchronized${value.freshness.reusedRevision ? '; revision reused' : ''})`, args.format, environment);
+          return printReport(value.report, `resident (daemon ${connection.daemon.instance.pid}; ${revision}; synchronized${value.freshness.reusedRevision ? '; revision reused' : ''})`, output, environment);
         }
         if (value.status === 'cancelled') throw new CliFailure('cancelled', 'Check was cancelled', value);
         if (value.status === 'unavailable' && ['expired-generation', 'unknown-context'].includes(value.reason) && !reopened) {
