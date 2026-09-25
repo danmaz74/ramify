@@ -46,8 +46,8 @@ test('a session on the scripted fake prints its stream, says nothing verified th
   const script = join(directory, 'script.json');
   await writeFile(script, JSON.stringify([
     { kind: 'message', text: 'Adding the note the prompt asks for.' },
-    { kind: 'tool', tool: 'write', input: { path: 'subs/workspace/subs/catalog/src/router.ts', content: 'export {};\n' } },
-    { kind: 'tool', tool: 'edit', input: { path: `${reviews}/src/session.ts`, edits: [{ oldText: ' * The review-session table.', newText: ' * The review-session table, one per application.' }] } },
+    { kind: 'tool', tool: 'write', input: { path: join(project, 'subs/workspace/subs/catalog/src/router.ts'), content: 'export {};\n' } },
+    { kind: 'tool', tool: 'edit', input: { path: 'session.ts', edits: [{ oldText: ' * The review-session table.', newText: ' * The review-session table, one per application.' }] } },
     { kind: 'submit', input: { kind: 'completion-proposed', summary: 'The table says there is one per application.', findings: [] } },
   ]));
 
@@ -62,7 +62,7 @@ test('a session on the scripted fake prints its stream, says nothing verified th
   expect(out).toContain('Say in the session table\'s comment that there is one per application.');
   expect(out).toContain('… Adding the note the prompt asks for.');
   expect(out).toContain('◆ write refused; the engineer is told:');
-  expect(out).toContain(`→ edit {"path":"${reviews}/src/session.ts"`);
+  expect(out).toContain('→ edit {"path":"session.ts"');
   expect(out).toContain('◆ Accepted; the engineer is told:');
   expect(out).toContain('Session ended: submitted');
   expect(out).toContain('Submission: completion-proposed. Rejected submissions: 0.');
