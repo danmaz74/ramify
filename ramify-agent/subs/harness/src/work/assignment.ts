@@ -12,6 +12,7 @@ import { assignedScenarioErrors, type DeclarationContext } from './declarations.
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
 import type { EngineerBounds } from '../run/policy.js';
+import type { ContextSelection } from '../context-selection/contracts.js';
 
 /*
  * The assignment a local architect submits, and the rules the schema cannot
@@ -108,6 +109,8 @@ export const assignmentBodySchema = z.object({
   approach: text,
   scope: scopeBodySchema,
   requirementRefs: z.array(planRefSchema),
+  /** Selected source IDs this iteration uses; the harness binds their passages separately. */
+  citedItems: z.array(text).optional(),
   externalCapabilities: z.array(z.object({
     capability: slugSchema,
     owner: modulePathSchema,
@@ -168,6 +171,8 @@ export interface AssignmentEvidence {
   readonly scenarios?: DeclarationContext | undefined;
   /** The policy's engineer bounds and their ceilings, which `bounds` is judged against. */
   readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
+  /** A verified selection for new runs; absent for legacy assignments. */
+  readonly selection?: ContextSelection | undefined;
 }
 
 /** The registry entry that authorizes creating `module`, or undefined when none does. */
@@ -187,6 +192,25 @@ export function creationAuthority(
  */
 export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvidence): SubmissionError[] {
   const errors: SubmissionError[] = [];
+  if (evidence.selection !== undefined) {
+    if (body.citedItems === undefined) errors.push({
+      path: 'assignment.citedItems', message: 'This assignment must explicitly cite selected source IDs, even when none applies',
+      expected: 'an explicit array of selected IDs',
+    });
+    const selected = new Set(evidence.selection.selected.map(entry => entry.item));
+    const cited = new Set<string>();
+    body.citedItems?.forEach((id, position) => {
+      if (!selected.has(id)) errors.push({
+        path: `assignment.citedItems.${position}`, message: `"${id}" was not selected for this work item`,
+        expected: 'an ID in the accepted context selection',
+      });
+      if (cited.has(id)) errors.push({
+        path: `assignment.citedItems.${position}`, message: `"${id}" is cited more than once`,
+        expected: 'each selected ID at most once',
+      });
+      cited.add(id);
+    });
+  }
   const index = evidence.index;
   const base = body.scope.base;
   const narrow = 'module' in base ? base : null;

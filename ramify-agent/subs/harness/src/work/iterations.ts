@@ -132,6 +132,8 @@ export const iterationAssignmentSchema = z.object({
   approach: text,
   scope: writeScopeSchema,
   requirementRefs: z.array(planRefSchema),
+  /** IDs cited from the work item's recorded selection; absent on legacy assignments. */
+  citedItems: z.array(text).optional(),
   externalCapabilities: z.array(z.object({
     capability: slugSchema,
     owner: modulePathSchema,

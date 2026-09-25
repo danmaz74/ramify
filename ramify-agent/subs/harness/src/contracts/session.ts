@@ -28,6 +28,8 @@ export interface ContractBriefing {
   readonly existingConsumers: readonly string[];
   /** Diagnostics of an attempt that did not pass, where this invocation is a repair. */
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
+  /** Exact assignment-cited source passages, assembled from the recorded selection. */
+  readonly sourceEvidence?: string | undefined;
 }
 
 /** The agreement in force, as a revising session receives it. */
@@ -58,6 +60,7 @@ export function contractMessage(briefing: ContractBriefing): string {
     '',
     assignment.goal,
     '',
+    ...(briefing.sourceEvidence === undefined ? [] : ['## Source evidence for this agreement', '', briefing.sourceEvidence, '']),
   ];
 
   if (revision !== undefined) {

@@ -14,6 +14,7 @@ import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
+import type { ContextSelection } from '../context-selection/contracts.js';
 
 /*
  * What a local architect submits at a coordination point. This iteration
@@ -154,6 +155,8 @@ export interface WorkEvidence {
   readonly integration?: IntegrationScope | undefined;
   /** The policy's engineer bounds and their ceilings, which an assignment's `bounds` is judged against. */
   readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
+  /** Verified source selection for this work item on a new captured run. */
+  readonly selection?: ContextSelection | undefined;
 }
 
 /** The same evidence, as the placement rules read it. */
@@ -217,6 +220,7 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
       ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
       ...(evidence.scenarios === undefined ? {} : { scenarios: evidence.scenarios }),
       ...(evidence.bounds === undefined ? {} : { bounds: evidence.bounds }),
+      ...(evidence.selection === undefined ? {} : { selection: evidence.selection }),
     }),
   ];
   return errors.length === 0 ? shape : { ok: false, errors };

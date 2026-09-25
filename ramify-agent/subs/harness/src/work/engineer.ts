@@ -529,6 +529,8 @@ export interface IterationBriefing {
   readonly handoff?: { readonly done: readonly string[]; readonly unfinished: readonly string[]; readonly returns: number } | undefined;
   /** The work item's scenarios; absent for a provider or follow-up work item, whose briefing says nothing of them. */
   readonly scenarios?: EngineerScenarios | undefined;
+  /** Exact assignment-cited source passages, assembled from the recorded selection. */
+  readonly sourceEvidence?: string | undefined;
 }
 
 /** The first user message of one engineer invocation. */
@@ -547,6 +549,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
     '',
     assignment.approach,
     '',
+    ...(briefing.sourceEvidence === undefined ? [] : ['## Source evidence for this assignment', '', briefing.sourceEvidence, '']),
     `Your starting module is \`${startingModule}\`. Your working directory is \`${briefing.workingDirectory ?? briefing.projectRoot}\`. Relative tool paths and shell commands start there.`,
     '',
     '## What you may write (project-relative paths)',
