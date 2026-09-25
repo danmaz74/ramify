@@ -11,8 +11,10 @@ export const contextSelectionSchema = z.object({
   orientationPoint: text.nullable(),
   selectorInvocation: text,
   degraded: z.boolean(),
+  /** Accepted catalog IDs or captured principle document IDs. */
   examined: z.array(text),
   selected: z.array(z.object({
+    /** A catalog ID, or a principle document ID with an exact passage below. */
     item: text,
     passage: passageReferenceSchema,
     reason: text,
