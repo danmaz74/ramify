@@ -29,6 +29,14 @@ branch `ramify-agent-run/20260925T085633Z-0c82a1` at commit
 20260925T085633Z-0c82a1` exited 0. It found 21 changed files, all inside a
 recorded write scope, none unaccounted for, and a clean Git status.
 
+The combined harness source also passed `npm run type-check`,
+`npm run check:self` (0 errors, 0 warnings, 285 nonblocking analysis limits),
+and the full harness suite: 133 test files and 1,041 tests passed; 2 files and
+7 tests were skipped. The first full-suite pass exposed an outdated transcript
+test expectation: two local architects in different module directories now
+have distinct system prompts. The assertion was corrected, its focused test
+passed, and the full suite passed on rerun.
+
 The reviews module's local architect and engineers received
 `subs/workspace/subs/reviews/src` as their working directory. Their first
 relative reads of `../README.md`, `../module.ramify`, local source and

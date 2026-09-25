@@ -197,7 +197,8 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
     expect(repair[note + 1]).toMatchObject({ type: 'started', invocation: 'inv-0010', start: 'continued' });
     expect(repair[note]).toMatchObject({ invocation: null, decision: { text: { stored: 'inline', text: 'Continuing iteration wi-002.i01.' } } });
 
-    // Engineer prompts name their module cwd, so two base modules render two prompts.
+    // Engineer and local-architect prompts name their module cwd, so two
+    // base modules render two prompts for each of those roles.
     const prompts = new Map<string, Set<string>>();
     for (const entry of [...transcripts.values()].flat()) {
       if (entry.type !== 'started' || entry.systemPrompt.stored !== 'blob') continue;
@@ -205,7 +206,8 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
     }
     expect(prompts.size).toBe(5);
     expect(prompts.get('engineer')?.size).toBe(2);
-    expect([...prompts].filter(([role]) => role !== 'engineer').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1, 1]);
+    expect(prompts.get('local-architect')?.size).toBe(2);
+    expect([...prompts].filter(([role]) => role !== 'engineer' && role !== 'local-architect').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1]);
     expect((await blobsIn(scenario.path(runLayout.blobs))).length).toBeGreaterThanOrEqual(prompts.size);
 
     // No record, event or observation quotes a body. An assistant's text is
