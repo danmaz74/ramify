@@ -46,8 +46,12 @@ class Observer implements ProjectObserver {
   #recordedId: { readonly inputs: readonly CapturedInput[]; readonly inventory: ProjectInventory; readonly id: string } | undefined;
   #work: Promise<unknown> = Promise.resolve();
   #disposed = false;
+  /** Rebuild options without the opening operation's signal; each rebuild passes its own. */
+  private readonly options: Omit<ProjectReadOptions, 'signal'>;
 
-  constructor(private readonly options: ProjectReadOptions, acquired: AcquiredProject) {
+  constructor(options: ProjectReadOptions, acquired: AcquiredProject) {
+    const { signal: _signal, ...retained } = options;
+    this.options = retained;
     this.#capture = acquired.capture;
     this.#inventory = acquired.inventory;
     this.#configuration = acquired.configuration;

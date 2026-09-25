@@ -623,7 +623,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         const stragglers = context.queue.filter(publishedCheck);
         for (const entry of [...entries, ...stragglers]) {
           if (entry.kind === 'apiView') {
-            completeApiView(entry, { ...unavailable('analysis-failed', run.report.diagnostics[0]?.message ?? 'The analysis could not be reported'), requestId: entry.request.requestId });
+            completeApiView(entry, { ...unavailable('analysis-failed', run.report.diagnostics[0]?.message || 'The analysis could not be reported'), requestId: entry.request.requestId });
             continue;
           }
           complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null, delta: null,

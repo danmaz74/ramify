@@ -24,8 +24,8 @@ import { auditFacts } from './session-audit.js';
 import { measureContextSize, resolveDeclaredMeasurementInputs } from './module-measurements.js';
 import type { SessionFacts } from './session-facts.js';
 import { FactLedger, deepFreeze, diagnosticSurface, draftPublication, draftReport, sortedPaths } from './session-facts.js';
-import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, parseRefused, recomputeAll, revise, wholeCheckedSet,
-  zeroTimings } from './session-revision.js';
+import { acquisitionDiagnostics, failureReport, invalidFacts, isCancellation, isStaleCancellation, parseRefused, recomputeAll, releaseObserver,
+  revise, wholeCheckedSet, zeroTimings } from './session-revision.js';
 import type { Computed, SessionState } from './session-revision.js';
 
 /** One published version: the facts a report projection needs. */
@@ -224,6 +224,7 @@ class Session implements RetainedSession {
       if (!state.observer) return timed(await this.#reopen(changes, started, signal));
       const result = await revise(state, changes, signal);
       if (result.status === 'cancelled') return { status: 'cancelled' };
+      if (result.status === 'released') return timed(await this.#reopen(changes, started, signal));
       if (result.status === 'reported') return timed(result);
       if (result.status === 'identical') {
         if (!republish || !state.facts) return timed({ status: 'revised', revision: this.#current!, identical: true, reacquired: false });
@@ -247,6 +248,10 @@ class Session implements RetainedSession {
       let changes: readonly SessionChange[];
       try { changes = await observer.reobserve(control.signal); }
       catch (error) {
+        if (isStaleCancellation(error, control.signal)) {
+          await releaseObserver(this.#state);
+          return this.#reopen([], performance.now(), control.signal);
+        }
         if (isCancellation(error, control.signal)) return this.#cancelledSweep(observer);
         this.#state.stale = true;
         return { status: 'reported', report: failureReport(this.#state, error, 'acquisition', this.#state.facts?.inventory) };
@@ -258,6 +263,7 @@ class Session implements RetainedSession {
       const started = performance.now();
       const result = await revise(this.#state, changes, control.signal);
       if (result.status === 'cancelled') return { status: 'cancelled' };
+      if (result.status === 'released') return this.#reopen(changes, started, control.signal);
       if (result.status === 'reported') return result;
       if (result.status === 'identical') return { status: 'revised', revision: this.#current!, identical: true, reacquired: false };
       return this.#complete(result, started, control.signal);

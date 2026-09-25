@@ -278,6 +278,33 @@ describe('project observer updates', () => {
     expect(await observer.readDescription('subs/child/absent.ramify')).toBeUndefined();
   });
 
+  it('keeps observing after the operation that opened it is aborted', async () => {
+    const opening = new AbortController();
+    const observer = await observe({ signal: opening.signal });
+    opening.abort();
+    await put(root, 'subs/child/src/child.ts', 'export const child = 2;\n');
+    expect(await observer.reobserve()).toEqual([{ path: join(root, 'subs/child/src/child.ts'), kind: 'changed' }]);
+    expect(local(await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'changed' }])).changed).toEqual(['subs/child/src/child.ts']);
+    // A rebuild without a signal of its own never inherits the opening operation's signal.
+    await put(root, 'subs/child/subs/grandchild/module.ramify', 'ramify 1\nmodule grandchild\n');
+    await put(root, 'subs/child/subs/grandchild/README.md', '# Grandchild\n\nGrandchild purpose.\n');
+    expect((await observer.apply([{ path: 'subs/child/subs/grandchild/module.ramify', kind: 'created' }])).kind).toBe('structural');
+  });
+
+  it('keeps observing after the operation that rebuilt it is aborted', async () => {
+    const observer = await observe();
+    const rebuilding = new AbortController();
+    await put(root, 'subs/child/subs/grandchild/module.ramify', 'ramify 1\nmodule grandchild\n');
+    await put(root, 'subs/child/subs/grandchild/README.md', '# Grandchild\n\nGrandchild purpose.\n');
+    const update = await observer.apply([{ path: 'subs/child/subs/grandchild/module.ramify', kind: 'created' }], rebuilding.signal);
+    expect(update.kind).toBe('structural');
+    rebuilding.abort();
+    await put(root, 'subs/child/src/child.ts', 'export const child = 2;\n');
+    expect(await observer.reobserve()).toEqual([{ path: join(root, 'subs/child/src/child.ts'), kind: 'changed' }]);
+    expect(local(await observer.apply([{ path: 'subs/child/src/child.ts', kind: 'changed' }])).changed).toEqual(['subs/child/src/child.ts']);
+    expect(await observer.readDescription('subs/child/subs/grandchild/module.ramify')).toBe('ramify 1\nmodule grandchild\n');
+  });
+
   it('refuses further work once disposed', async () => {
     const observer = await observe();
     await observer.dispose();

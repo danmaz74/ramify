@@ -109,6 +109,19 @@ describe('ContextManager.apiView: revision-bound projection', () => {
     } finally { await e.dispose(); }
   });
 
+  it('never answers a failed analysis with an empty message', async () => {
+    const e = sessionEnvironment();
+    try {
+      const opened = await e.open(); await flush();
+      const failed = capture(2, 'incomplete');
+      e.script.pending.push(() => ({ status: 'reported', report: { ...failed.report, diagnostics: [{ id: 'failure', category: 'execution',
+        code: 'internal-error', message: '', location: null, related: [], importer: null, original: null, accessId: null }] } }));
+      const result = await e.apiView(opened.token, { mode: 'synchronized', expect: [] });
+      expect(result).toEqual({ status: 'unavailable', reason: 'analysis-failed', message: 'The analysis could not be reported',
+        requestId: expect.any(String) });
+    } finally { await e.dispose(); }
+  });
+
   it('translates a session resource-limit outcome into a context resource-unavailable outcome', async () => {
     const e = sessionEnvironment();
     try {

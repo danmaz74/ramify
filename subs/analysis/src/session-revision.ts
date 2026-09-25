@@ -58,12 +58,27 @@ export type StepResult =
   | Computed
   | { readonly status: 'identical' }
   | { readonly status: 'reported'; readonly report: AnalysisReport }
-  | { readonly status: 'cancelled' };
+  | { readonly status: 'cancelled' }
+  /** The observer met a cancellation this step did not request and was released; the caller reopens the project. */
+  | { readonly status: 'released' };
 
 const cancelled = (): Error & { code: string } => Object.assign(new Error('Retained session operation was cancelled'), { code: 'cancelled' });
 export const isCancellation = (error: unknown, signal?: AbortSignal): boolean => signal?.aborted === true
   || (error !== null && typeof error === 'object' && 'code' in error && error.code === 'cancelled')
   || (error instanceof Error && error.name === 'AbortError');
+/**
+ * An acquisition cancellation the current operation did not request. It can
+ * only come from state an earlier, aborted operation left behind, so the
+ * session releases its observer instead of reporting the same failure again.
+ */
+export const isStaleCancellation = (error: unknown, signal?: AbortSignal): boolean => signal?.aborted !== true
+  && error instanceof Error && error.name === 'Cancelled';
+/** Release the observer and the compiler that reports to its sink; the session then reopens the project. */
+export async function releaseObserver(state: SessionState): Promise<void> {
+  const { observer, adapter } = state;
+  state.observer = null; state.adapter = null; state.adapterAreas = null; state.stale = true;
+  try { await adapter?.dispose(); } finally { await observer?.dispose(); }
+}
 const check = (signal?: AbortSignal): void => { if (signal?.aborted) throw cancelled(); };
 export const zeroTimings = (): PhaseTimings => ({ classify: 0, inventory: 0, compiler: 0, descriptions: 0, accesses: 0, link: 0, decide: 0, companions: 0 });
 const internal = (message: string): Error => Object.assign(new Error(message), { code: 'internal-error' });
@@ -761,6 +776,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     return { status: 'computed', facts: next, checked: { path, files: interpretedFiles, accesses: decided.decided, modelRebuilt: rebuild },
       changed, timings, positionRefreshed: decided.positionRefreshed };
   } catch (error) {
+    if (isStaleCancellation(error, signal)) { await releaseObserver(state); return { status: 'released' }; }
     // Once the observer or the compiler may have advanced past the published
     // revision, the next update recomputes everything from the disk. A
     // cancellation before that point leaves the session as published.
