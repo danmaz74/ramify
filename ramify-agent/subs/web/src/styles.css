@@ -704,6 +704,12 @@ button.link[aria-pressed='true'] { font-weight: 700; }
 .badge.risk-medium { background: #f7ecd4; color: var(--warn); }
 .badge.risk-low { background: #eceff2; color: var(--muted); }
 .badge.required { background: #dde8f6; color: var(--accent); }
+/* A plan deviation leads the list and reads as a departure from the plan, not as a signal about code. */
+.badge.plan-deviation { margin-left: 0; background: var(--ask); color: #fff; }
+.check-finding-deviation { border-left: 4px solid var(--ask); }
+.plan-deviation-body blockquote { margin: 0.2rem 0 0; padding-left: 0.6rem; border-left: 3px solid var(--line); white-space: pre-wrap; }
+.plan-deviation-body pre { margin: 0.2rem 0; padding: 0.3rem 0.5rem; background: #f4f5f7; overflow-x: auto; }
+.badge.run-state-deviated { background: #f6f1fc; color: var(--ask); }
 .standing { font-weight: 600; }
 .standing-closed { color: var(--good); }
 .unresolved { color: var(--warn); }

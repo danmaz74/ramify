@@ -4,7 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
-import { ModuleCheckFindings, WorkItemCheckFindings } from './check-findings.js';
+import { ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
@@ -83,7 +83,7 @@ export function RunPage({ client, planId, runId, interval }: {
         <p><a href={routeHref({ page: 'plan', planId })}>← The plan</a></p>
         <header className="page-header">
           <h1>Run <code>{runId}</code></h1>
-          {run && <span><RunState state={run.state} />{run.decisionRequests.waiting && <DecisionWaitBadge />}</span>}
+          {run && <span><RunState state={run.state} planDeviations={run.planDeviations} />{run.decisionRequests.waiting && <DecisionWaitBadge />}</span>}
         </header>
         {run && <DecisionBanner requests={run.decisionRequests} onOpen={openDecision} />}
         <p className={`connection-line connection-line-${error ? 'lost' : connection}`} aria-label="Connection to the harness">
@@ -149,7 +149,10 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
         </header>
         {stop.status === 'failed' && <p className="failure" role="alert">The stop was refused: {stop.message}</p>}
         <dl className="facts">
-          <div><dt>Run state</dt><dd><RunState state={run.state} />{run.stopRequested ? ' (a stop was requested)' : ''}</dd></div>
+          <div><dt>Run state</dt><dd><RunState state={run.state} planDeviations={run.planDeviations} />{run.stopRequested ? ' (a stop was requested)' : ''}</dd></div>
+          {run.planDeviations.recorded > 0 && (
+            <div><dt>Plan deviations</dt><dd>{run.planDeviations.recorded} recorded, {run.planDeviations.toReview} to review</dd></div>
+          )}
           <div><dt>Phase</dt><dd>{run.phase}</dd></div>
           <div><dt>Agent</dt><dd>{run.agent}</dd></div>
           <div><dt>Current</dt><dd>{run.current === null ? 'nothing open' : currentText(run.current)}</dd></div>
@@ -177,6 +180,7 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
         )}
       </section>
       <ReviewPanel client={client} run={run} onApproved={onApproved} />
+      {run.planDeviations.recorded > 0 && <PlanDeviations client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />}
       <ModuleCheckFindings client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />
       <section className="panel" aria-labelledby="events-heading">
         <h2 id="events-heading">Events</h2>

@@ -100,7 +100,7 @@ function run(jobId: string, state: RunSnapshot['state'], decisionRequests: RunDe
     jobId, planId: 'p', agent: 'scripted', version: 30, state, phase: state === 'running' ? 'working' : 'ended', stopRequested: false,
     startedAt: at, updatedAt: at, endedAt: state === 'running' ? null : at, failure: null, current: null, waits: [],
     counts: { workItems: 2, completedWorkItems: 1, openRequirements: 0, invocations: 5, readinessAttempts: 1, gateAttempts: 3, scenarios: { pending: 0, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
-    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests,
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests, planDeviations: { recorded: 0, toReview: 0 },
   });
 }
 

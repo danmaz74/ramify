@@ -6,7 +6,7 @@ import {
   type CheckFindingListResponse, type CheckFindingSummaryView, type ReviewCoverageView, type ReviewListResponse,
 } from '../../../harness/src/interfaces/protocol/check-findings.js';
 import { runSnapshotSchema } from '../../../harness/src/interfaces/protocol/runs.js';
-import { CheckFindingList, ModuleCheckFindings, WorkItemCheckFindings } from '../check-findings.js';
+import { CheckFindingList, ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from '../check-findings.js';
 import { ClientError } from '../client.js';
 import { checkFindingKey, StubClient } from './helpers/stub-client.js';
 
@@ -22,7 +22,7 @@ function snapshot() {
     jobId: runId, planId, agent: 'scripted', version, state: 'running', phase: 'working', stopRequested: false,
     startedAt: at, updatedAt: at, endedAt: null, failure: null, current: null, waits: [],
     counts: { workItems: 1, completedWorkItems: 0, openRequirements: 0, invocations: 3, readinessAttempts: 1, gateAttempts: 2, scenarios: { pending: 0, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
-    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] },
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] }, planDeviations: { recorded: 0, toReview: 0 },
   });
 }
 
@@ -34,7 +34,7 @@ function summary(id: string, extra: Partial<CheckFindingSummaryView> = {}): Chec
     id, revision: 1, workItem: 'wi-001', standing: 'open', reason: 'new', awaiting: 'assessment', verification: 'assessment',
     obligation: null, required: false, risk: 'medium', credibility: 'human-reviewed', modules: ['project/cart'], unresolved: null,
     latestReview: false, settlement: null, pendingUserDecision: null, materialChoice: null, repair: null, producers: ['review:code'],
-    title: `Signal ${id}`, reports: 1, decisions: 0, group: null, userCommands: ['waive'], ...extra,
+    title: `Signal ${id}`, reports: 1, decisions: 0, group: null, userCommands: ['waive'], planDeviation: null, ...extra,
   });
 }
 
@@ -289,4 +289,39 @@ test('the run\'s modules show their unsettled counts, which do not sum to the ru
   fireEvent.click(within(table).getByRole('button', { name: 'project/checkout' }));
   await screen.findByRole('listitem', { name: 'CheckFinding cf-0006' });
   expect(stub.calls).toContain(`getCheckFindings:${runId}:|project/checkout|reported`);
+});
+
+test('a plan deviation reads as a departure from the plan: its requirement as written, what the run does instead, and a reworded scenario before and after', async () => {
+  const deviation = summary('cf-0004', {
+    workItem: null, revision: 2, reason: 'awaiting-user-decision', awaiting: 'user-decision', risk: 'high', credibility: 'agent-generated',
+    producers: ['plan:deviation'], title: 'Plan deviation pd-001: tRPC only', userCommands: ['respond', 'waive'],
+    pendingUserDecision: {
+      request: 'cfd-0005', by: { kind: 'harness', reason: 'a plan deviation is the person\'s to accept or reject' }, rationale: 'The global architect departs from the plan',
+      conflicts: [{ text: 'Serve it over MCP too.', document: 'plans/review-notes/plan.md', revision: 'sha256:plan' }],
+      options: [{ id: 'accept', summary: 'Accept the deviation', consequence: 'It stands.' }, { id: 'reject', summary: 'Reject the deviation', consequence: 'A follow-up run meets it.' }],
+    },
+    planDeviation: {
+      id: 'pd-001', request: 'ur-001', workItems: ['wi-001'], plan: 'plans/review-notes/plan.md',
+      requirements: [{ startLine: 11, endLine: 12, text: 'Serve it over MCP too.' }],
+      instead: 'Serve it over tRPC only.', why: 'No module serves MCP.', rejected: [{ alternative: 'A new MCP module', reason: 'beyond the plan' }], loss: 'No MCP tool.',
+      scenarios: [{ scenario: 'sc-002', file: 'src/tests/features/p/e.feature', before: ['Scenario: over MCP'], after: ['Scenario: over tRPC'] }],
+      held: false, followUp: null,
+    },
+  });
+  const stub = client({ checkFindings: { [checkFindingKey({ select: 'all' })]: list([deviation, summary('cf-0001', { risk: 'high' })], 'all', { query: { workItem: null, module: null, select: 'all', order: 'attention' } }) } });
+  render(<PlanDeviations client={stub} planId={planId} runId={runId} version={version} />);
+  const card = await screen.findByRole('listitem', { name: 'CheckFinding cf-0004' });
+  // Only the deviation is listed here, labelled as one.
+  expect(screen.queryByRole('listitem', { name: 'CheckFinding cf-0001' })).toBeNull();
+  expect(within(card).getByText('Plan deviation')).toBeTruthy();
+  const body = within(card).getByRole('group', { name: 'Plan deviation pd-001' });
+  expect(within(body).getByRole('list', { name: 'Requirement as written' }).textContent).toMatch(/Serve it over MCP too\.plans\/review-notes\/plan\.md, lines 11–12/);
+  expect(body.textContent).toMatch(/Instead: Serve it over tRPC only\./);
+  expect(body.textContent).toMatch(/What you lose: No MCP tool\./);
+  const reworded = within(body).getByLabelText('Rewording of sc-002');
+  expect(reworded.textContent).toMatch(/BeforeScenario: over MCPAfterScenario: over tRPC/);
+  // It asks the person: accept or reject, with the note a rejection needs; or waive it.
+  const question = within(card).getByRole('group', { name: 'Decision requested' });
+  expect(within(question).getByRole('textbox', { name: /Note \(to reject: the requirement a follow-up run must meet\)/ })).toBeTruthy();
+  expect(within(card).getByRole('button', { name: 'Waive…' })).toBeTruthy();
 });
