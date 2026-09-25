@@ -1,9 +1,9 @@
 # audit
 
 Implements the harness's in-process adapter to `ramify-audit`, pinned at
-version 0.1.0. It hides the library, its registered-executor and evidence
-models, repository lease, isolated worktree, publication refs and Git
-environment from the rest of the harness. The harness owns gate policy and
+version 0.1.1 through its GitHub commit. It hides the library, its
+registered-executor and evidence models, repository lease, isolated worktree,
+publication refs and Git environment from the rest of the harness. The harness owns gate policy and
 durable run state; this child receives a verified check plan and an
 already-made commit, executes the audit, and returns the harness's own command
 records.
@@ -27,15 +27,14 @@ before it passed, the one that stopped it failed with its exit code or not
 verified with the preparation's own error code, and every later command not
 run. A preparation failure that names no setup command is the audit's own
 failure, recorded with its code and message. This needs the ramify-audit
-release whose `nodejs` preparation takes `setupCommands`, which follows the
-`0.1.0` the package manifest still names.
+0.1.1 `nodejs` preparation, which takes `setupCommands`.
 
 ramify-audit stops the whole process tree of a setup command that times out
 or is cancelled; the command's record carries how, in words, as `stopped`,
 and `outputIncomplete` where its output streams stayed open after it ended,
 both read from the preparation's `termination` and `outputIncomplete`, which
-releases after `0.1.0` record. A setup command that installs dependencies
-(`npm ci` and the like) where the worktree's `node_modules` is linked to the
+0.1.1 records. A setup command that installs dependencies (`npm ci` and the
+like) where the worktree's `node_modules` is linked to the
 project's is refused before it runs: its record is not verified with the
 runner error `setup-command-unsafe-with-linked-modules` and a message naming
 what the project must change, which the gate attributes to infrastructure.
@@ -69,9 +68,13 @@ the gate and every durable record.
 
 ## Dependency
 
-`ramify-audit` is unscoped and is installed from its private proxy registry,
-which is why this package's `.npmrc` names that registry. The dependency is
-exactly `0.1.0`; no other module imports it. The existing
+`ramify-audit` 0.1.1 is not yet published, so for now the dependency is
+pinned to its GitHub commit
+`github:danmaz74/ramify-audit#3ced97a67ade6b9ac1b01dd19570bf3f5e39d9b6`.
+npm builds it from source on install through the package's `prepare` script.
+Once 0.1.1 is published it returns to an exact version from the private proxy
+registry this package's `.npmrc` names, which still serves the other
+dependencies. No other module imports it. The existing
 `legacy-peer-deps=true` setting remains necessary for npm 10.9's Vitest peer
 set resolver and does not remove or replace any runtime or test dependency.
 
