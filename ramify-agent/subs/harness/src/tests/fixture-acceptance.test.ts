@@ -54,6 +54,7 @@ describe.runIf(enabled)('the fixture\'s scenario harness with its toolchain inst
 
   test('readiness passes all four acceptance steps', async () => {
     const result = await runReadiness(inPlaceCheckExecution, {
+      runId: 'run-readiness',
       attempt: 1,
       projectRoot: root,
       gateDirectory: `${root}/plans/.harness-readiness`,

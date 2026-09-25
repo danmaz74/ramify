@@ -126,7 +126,7 @@ describe('G8: one small work item completes in one iteration', () => {
 
     // One commit for the accepted iteration, with the harness's own message
     // and the audit evidence attached separately under the audit notes ref.
-    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
+    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent-run/${runId}`);
     const commits = log.split('').map(part => part.trim()).filter(Boolean);
     const accepted = commits.find(commit => commit.includes('Ramify-Iteration: wi-001.i01'));
     expect(accepted).toBeDefined();

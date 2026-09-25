@@ -2,7 +2,7 @@ import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
-import { gitCandidateSource, gitService, GitError, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
+import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -6092,11 +6092,13 @@ export class RunService {
 
       const attemptNumber = run.log.count('readiness-passed') + run.log.count('readiness-failed') + 1;
       const gateId = gateAttemptId(this.gateCount(run) + 1);
-      // Readiness runs on the branch the project is on. The run branch is
-      // created only once a clean repository has been established.
+      // Readiness runs on the branch the project is on. Its last step
+      // creates the run branch, once the repository is clean and the
+      // baseline passed; a branch git refuses fails readiness there.
       const head = await this.git.currentHead(this.projectRoot);
       await this.write(run, { type: 'gate-started', data: { gate: gateId, checkpoint: 'readiness' } });
       const result = await runReadiness(this.options.readinessExecution ?? inPlaceCheckExecution, {
+        runId: run.record.jobId,
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
         gateDirectory: run.path(runLayout.gateOutput(gateId)),
@@ -6110,7 +6112,6 @@ export class RunService {
       });
 
       if (result.attempt.verdict === 'passed' && result.gate !== null) {
-        await this.createBranch(run);
         await this.write(run, { type: 'readiness-passed', data: { attempt: attemptNumber, gate: gateId } }, [
           { path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate },
           { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: result.attempt },
@@ -6455,20 +6456,6 @@ export class RunService {
   /** The count of committed gate attempts: every readiness and every checkpoint. */
   private gateCount(run: Run): number {
     return run.log.count('readiness-passed') + run.log.all('readiness-failed').length + run.log.count('gate-attempted');
-  }
-
-  /**
-   * Creates and checks out `ramify-agent/run-<run-id>`, once readiness has
-   * established a clean repository. A run resumed after a crash finds its
-   * branch and stays on it; the branch is never reset.
-   */
-  private async createBranch(run: Run): Promise<void> {
-    try {
-      await this.git.createRunBranch(this.projectRoot, run.record.jobId);
-    } catch (error) {
-      if (!(error instanceof GitError)) throw error;
-      this.warn(`Run ${run.record.jobId}: the run branch could not be created: ${error.message}`);
-    }
   }
 
   /**

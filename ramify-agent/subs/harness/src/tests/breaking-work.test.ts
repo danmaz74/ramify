@@ -588,7 +588,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
     expect(breaking.map(attempt => attempt.commit)).toEqual(['revision-01', 'revision-02', 'revision-03']);
     expect(breaking.map(attempt => attempt.head)).toEqual([materialized, 'revision-01', 'revision-02']);
     expect(scripted.revisions()).toEqual([materialized, 'revision-01', 'revision-02', 'revision-03']);
-    expect(scripted.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(scripted.branch()).toBe(`ramify-agent-run/${runId}`);
     scripted.assertComplete();
   }, 600_000);
 });

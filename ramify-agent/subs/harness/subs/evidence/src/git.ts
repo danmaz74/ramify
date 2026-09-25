@@ -15,8 +15,29 @@ import type { CommandOutcome } from './run-command.js';
  * accepted-boundary accounting. It does not decide whether an audit passed.
  */
 
-/** Every branch the harness commits on is named for its run. */
-export const runBranchPrefix = 'ramify-agent/run-';
+/**
+ * Every branch the harness commits on is named for its run. The prefix is a
+ * directory of refs of its own: a repository with a branch of that one name
+ * could hold no run branch at all, and `ramify-agent-run` is no name a
+ * project's own branch is likely to have.
+ */
+export const runBranchPrefix = 'ramify-agent-run/';
+
+/**
+ * The prefix of run branches created before `ramify-agent-run/`. A run that
+ * recorded one is still resumed on it, and the harness still commits there.
+ */
+export const legacyRunBranchPrefix = 'ramify-agent/run-';
+
+/** The branch of one run: `ramify-agent-run/<run-id>`. */
+export function runBranchName(runId: string): string {
+  return `${runBranchPrefix}${runId}`;
+}
+
+/** Whether a branch is a run's own, by the current prefix or the earlier one. */
+export function isRunBranch(branch: string): boolean {
+  return branch.startsWith(runBranchPrefix) || branch.startsWith(legacyRunBranchPrefix);
+}
 
 /** The identity the harness commits under, so that no person's configuration is needed. */
 const harnessIdentity = { name: 'ramify-agent', email: 'ramify-agent@localhost' };
@@ -75,16 +96,23 @@ export async function isCleanRepository(root: string, signal?: AbortSignal): Pro
 }
 
 /**
- * The run's branch, `ramify-agent/run-<run-id>`, checked out. A run repeated
+ * The run's branch, `ramify-agent-run/<run-id>`, checked out. A run repeated
  * after a crash finds its branch and stays on it; the branch is never reset,
- * so the commits of the earlier attempt are kept.
+ * so the commits of the earlier attempt are kept. A run whose branch was
+ * created under the earlier prefix, `ramify-agent/run-<run-id>`, is found
+ * there. Git refusing the branch, as it refuses one beneath an existing
+ * branch's name, is a `GitError` that carries git's own message.
  */
 export async function createRunBranch(root: string, runId: string, signal?: AbortSignal): Promise<{ readonly branch: string; readonly created: boolean }> {
-  const branch = `${runBranchPrefix}${runId}`;
-  const existing = await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], signal);
-  const created = existing.exitCode !== 0;
-  await gitOk(root, created ? ['switch', '--create', branch] : ['switch', branch], signal);
-  return { branch, created };
+  for (const existing of [runBranchName(runId), `${legacyRunBranchPrefix}${runId}`]) {
+    const found = await git(root, ['rev-parse', '--verify', '--quiet', `refs/heads/${existing}`], signal);
+    if (found.exitCode !== 0) continue;
+    await gitOk(root, ['switch', existing], signal);
+    return { branch: existing, created: false };
+  }
+  const branch = runBranchName(runId);
+  await gitOk(root, ['switch', '--create', branch], signal);
+  return { branch, created: true };
 }
 
 /**
@@ -99,7 +127,7 @@ export async function createRunBranch(root: string, runId: string, signal?: Abor
 export async function commitAccepted(root: string, message: string, signal?: AbortSignal): Promise<string | null> {
   const head = await gitOk(root, ['rev-parse', '--abbrev-ref', 'HEAD'], signal);
   const branch = head.stdout.trim();
-  if (!branch.startsWith(runBranchPrefix)) {
+  if (!isRunBranch(branch)) {
     throw new GitError(`The harness commits only on a run branch; HEAD is ${branch === '' ? 'unnamed' : branch}`, {
       argv: ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
       outcome: { kind: 'completed', exitCode: 0 },

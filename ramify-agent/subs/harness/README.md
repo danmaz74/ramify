@@ -857,8 +857,13 @@ pi actually made and what the snapshot tools answered.
   `--dry-run` and fails on an `undefined` or `ambiguous` step, or, with the
   configuration's `readiness: run`, executes it between its `setup` and
   `teardown`. Both fail as `baseline-tests` fails, and the attempt records
-  them beside the other baseline steps, where they are verified. The run branch, `ramify-agent/run-<run-id>`, is created once a
-  clean repository has been established. Agents never commit, and the harness
+  them beside the other baseline steps, where they are verified. The last
+  step, `run-branch`, creates and checks out the run branch,
+  `ramify-agent-run/<run-id>`, once the repository is clean and the baseline
+  passed; a branch git refuses, such as one beneath an existing branch's
+  name, fails readiness there with git's own message, and nothing is
+  assigned. A run whose branch has the earlier prefix, `ramify-agent/run-`,
+  is still found and committed on. Agents never commit, and the harness
   never resets or reverts. `project-config` fails a run whose captured
   `ramify-agent.json` is missing or invalid, or names support code outside
   every module's test area (a module's `src/tests/`, a testing module's

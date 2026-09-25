@@ -67,7 +67,7 @@ export interface AnsweredGit extends Mocked<GitService> {
   assertAnswered(): void;
 }
 
-const runBranchPrefix = 'ramify-agent/run-';
+const runBranchPrefix = 'ramify-agent-run/';
 
 /** A scripted external Git for one scenario. */
 export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {

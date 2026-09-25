@@ -55,7 +55,7 @@ describe('run-to-Git integration', () => {
     await service.settled('review-notes', receipt.jobId);
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
-    const log = await git(root, 'log', '--format=%H %s', `ramify-agent/run-${receipt.jobId}`);
+    const log = await git(root, 'log', '--format=%H %s', `ramify-agent-run/${receipt.jobId}`);
     const commits = log.trim().split('\n');
     expect(commits).toHaveLength(2);
     expect(commits[0]).toContain('final verification of plan "review-notes"');
@@ -97,7 +97,7 @@ describe('run-to-Git integration', () => {
     const receipt = await crashed.service.execute(startRun('review-notes'));
     await until(() => commitMade, 60_000);
 
-    const branch = `ramify-agent/run-${receipt.jobId}`;
+    const branch = `ramify-agent-run/${receipt.jobId}`;
     const before = (await git(root, 'log', '--format=%H', branch)).trim().split('\n');
     expect(before).toHaveLength(2);
     const accepted = before[0]!;

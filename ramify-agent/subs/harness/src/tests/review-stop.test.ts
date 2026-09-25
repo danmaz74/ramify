@@ -111,7 +111,7 @@ describe('a run started with the review stop', () => {
     expect(events.find(event => event.type === 'analysis-approved')!.data).toMatchObject({
       reviewer: 'dana@example.com', note: 'The scenarios match the plan.', duringRun: false, command: { receipt: approved },
     });
-    expect(git.branch()).toBe(`ramify-agent/run-${receipt.jobId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${receipt.jobId}`);
   }, 120_000);
 
   test('a stop at awaiting-review ends the run stopped with no branch and no commit', async () => {

@@ -310,7 +310,7 @@ describe('a requirement whose fake is still injected is not verified', () => {
     // The verification that left the fake in place still committed what it
     // wrote: nothing is rewound, and the requirement closed over the commit
     // that followed it.
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04']);
     git.assertAnswered();
   }, 60_000);

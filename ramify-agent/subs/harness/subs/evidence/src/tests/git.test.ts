@@ -29,7 +29,7 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       expect(base).toMatch(/^[0-9a-f]{40}$/);
       expect(await git.isCleanRepository(root)).toBe(true);
       expect(await git.createRunBranch(root, 'run-identity'))
-        .toEqual({ branch: 'ramify-agent/run-run-identity', created: true });
+        .toEqual({ branch: 'ramify-agent-run/run-identity', created: true });
       expect(await git.commitAccepted(root, 'nothing changed')).toBeNull();
       expect(await git.currentHead(root)).toBe(base);
 
@@ -39,7 +39,7 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       await expect(git.commitAccepted(root, 'on main')).rejects.toBeInstanceOf(GitError);
       expect((await repository.git('log', '--format=%s')).trim()).toBe('first');
       expect(await git.createRunBranch(root, 'run-identity'))
-        .toEqual({ branch: 'ramify-agent/run-run-identity', created: false });
+        .toEqual({ branch: 'ramify-agent-run/run-identity', created: false });
 
       const hook = join(root, '.git', 'hooks', 'pre-commit');
       await writeFile(hook, '#!/usr/bin/env bash\necho "the project hook refuses" >&2\nexit 1\n');
@@ -65,8 +65,33 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       }
       await repository.git('switch', 'main');
       expect(await git.createRunBranch(root, 'run-identity'))
-        .toEqual({ branch: 'ramify-agent/run-run-identity', created: false });
+        .toEqual({ branch: 'ramify-agent-run/run-identity', created: false });
       expect(await git.currentHead(root)).toBe(second);
+    });
+  });
+
+  it('resumes a run on a branch of the earlier prefix, and commits there', async () => {
+    await withRepository(async repository => {
+      const root = repository.root;
+      await repository.git('switch', '--create', 'ramify-agent/run-run-earlier');
+      await repository.git('switch', 'main');
+      expect(await git.createRunBranch(root, 'run-earlier'))
+        .toEqual({ branch: 'ramify-agent/run-run-earlier', created: false });
+      await repository.write('src/one.ts', 'export const one = 1;\n');
+      expect(await git.commitAccepted(root, 'earlier run')).toMatch(/^[0-9a-f]{40}$/);
+    });
+  });
+
+  it('refuses a run branch git cannot create, with git\'s own message', async () => {
+    await withRepository(async repository => {
+      const root = repository.root;
+      // A branch named as the prefix's directory: no ref can live beneath it.
+      await repository.git('branch', 'ramify-agent-run');
+      const refused = await git.createRunBranch(root, 'run-collides').catch((error: unknown) => error);
+      expect(refused).toBeInstanceOf(GitError);
+      expect((refused as GitError).message).toContain('git switch --create ramify-agent-run/run-collides');
+      expect((refused as GitError).detail.output).toContain('cannot lock ref');
+      expect((await repository.git('rev-parse', '--abbrev-ref', 'HEAD')).trim()).toBe('main');
     });
   });
 

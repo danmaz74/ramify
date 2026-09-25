@@ -61,7 +61,7 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     async isCleanRepository(project) { check('isCleanRepository', project); return true; },
     async createRunBranch(project, runId) {
       check('createRunBranch', project);
-      branch = `ramify-agent/run-${runId}`;
+      branch = `ramify-agent-run/${runId}`;
       return { branch, created: true };
     },
     async commitAccepted(project, message) {
@@ -81,7 +81,7 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     async findCommitByTrailers(project, trailers) {
       check('findCommitByTrailers', project, () => {
         expect(trailers.map(trailer => trailer.key)).toEqual(['Ramify-Run', 'Ramify-Gate']);
-        expect(trailers[0]!.value).toBe(branch?.slice('ramify-agent/run-'.length));
+        expect(trailers[0]!.value).toBe(branch?.slice('ramify-agent-run/'.length));
         expect(trailers[1]!.value).toBe(`ga-${String(gates + 2).padStart(4, '0')}`);
       });
       return null; // This scenario has no recovered attempt.

@@ -238,6 +238,7 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
   async function readiness(fixture: { root: string; commit: string }) {
     const gateDirectory = await directory('ramify-agent-scenario-readiness-');
     const result = await runReadiness(inPlaceCheckExecution, {
+      runId: 'run-readiness',
       attempt: 1,
       projectRoot: fixture.root,
       gateDirectory,

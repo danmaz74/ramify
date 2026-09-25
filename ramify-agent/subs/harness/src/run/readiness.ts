@@ -6,7 +6,7 @@ import { allProjectChecks, checkpointPolicies, planScenarioCheck } from '../chec
 import { checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt, GateCommandRecord } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
-import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
+import { gitService, GitError, runBranchName, type GitService } from '../../subs/evidence/src/git.js';
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -42,6 +42,8 @@ interface StepResult {
 }
 
 export interface ReadinessRequest {
+  /** The run whose branch the last step creates. */
+  readonly runId: string;
   /** The count of committed readiness attempts, this one included. */
   readonly attempt: number;
   readonly projectRoot: string;
@@ -92,7 +94,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
 
   const blocked = steps.find(step => step.outcome !== 'passed');
   if (blocked !== undefined) {
-    for (const step of gateSteps) {
+    for (const step of [...gateSteps, 'run-branch'] as const) {
       steps.push({ step, outcome: 'not-verified', detail: `not reached: ${blocked.step} did not pass` });
     }
     return { attempt: attemptRecord(request, steps, nested, null), gate: null };
@@ -154,6 +156,15 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
 
   steps.push(acceptanceStep('baseline-acceptance', gate.commands[acceptanceIndex.quick], acceptance.modules));
   steps.push(acceptanceStep('acceptance-full', gate.commands[acceptanceIndex.full], acceptance.modules));
+
+  // The run branch is created last, once the repository is clean and the
+  // baseline passed, so a readiness that fails leaves the project on its own
+  // branch. A branch git refuses fails readiness here, with git's message,
+  // before any work: the first commit would otherwise fail far from the cause.
+  const failed = steps.find(step => step.outcome !== 'passed');
+  steps.push(failed === undefined
+    ? await runBranchStep(projectRoot, request.runId, request.signal, request.git ?? gitService)
+    : { step: 'run-branch', outcome: 'not-verified', detail: `not reached: ${failed.step} did not pass` });
 
   return { attempt: attemptRecord(request, steps, nested, gate), gate };
 }
@@ -382,6 +393,22 @@ export function nestedPackagesStep(
   }
   const note = added.length === 0 ? '' : `; ${added.join(', ')} appeared after the policy was captured and its tests are not in the gate`;
   return { step: 'nested-packages', outcome: 'passed', detail: `${summary}${uninstalled}${note}` };
+}
+
+/** The run branch created and checked out, or found where an earlier attempt of the run created it. */
+export async function runBranchStep(projectRoot: string, runId: string, signal: AbortSignal | undefined, git: GitService): Promise<StepResult> {
+  try {
+    const { branch, created } = await git.createRunBranch(projectRoot, runId, signal);
+    return { step: 'run-branch', outcome: 'passed', detail: `${branch} was ${created ? 'created and' : 'found and'} checked out` };
+  } catch (error) {
+    if (!(error instanceof GitError)) throw error;
+    const said = error.detail.output.trim();
+    return {
+      step: 'run-branch',
+      outcome: 'failed',
+      detail: `the run branch ${runBranchName(runId)} could not be created: ${error.message}${said === '' ? '' : `: ${said}`}`,
+    };
+  }
 }
 
 async function testDiscoveryStep(projectRoot: string): Promise<StepResult> {

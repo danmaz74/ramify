@@ -345,12 +345,14 @@ export type EntryAssignments = z.infer<typeof entryAssignmentsSchema>;
 /**
  * The steps readiness verifies. The attempt records the five the baseline
  * gate verifies, the two acceptance steps among them, after `ramify-daemon`,
- * where they run.
+ * where they run, and `run-branch`, the run branch created and checked out,
+ * last of all.
  */
 export const readinessSteps = [
   'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
   'baseline-acceptance', 'acceptance-full', 'nested-packages',
   'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+  'run-branch',
 ] as const;
 export const readinessStepSchema = z.enum(readinessSteps);
 export type ReadinessStep = z.infer<typeof readinessStepSchema>;

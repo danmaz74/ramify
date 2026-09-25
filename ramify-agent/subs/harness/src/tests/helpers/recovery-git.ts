@@ -174,7 +174,7 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
     },
     async createRunBranch(project, runId) {
       asked('createRunBranch', project);
-      const name = `ramify-agent/run-${runId}`;
+      const name = `ramify-agent-run/${runId}`;
       const created = branch === null;
       branch = name;
       return { branch: name, created };
@@ -191,7 +191,7 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
         expect(trailers.map(trailer => trailer.key)).toEqual([runTrailer, scenarios ? scenariosTrailer : gateTrailer]);
         expect(trailers[1]!.value).toMatch(scenarios ? /^materialized$/u : /^ga-\d{4}$/u);
         expect(branch, 'a recovery lookup was made before the run branch was created').not.toBeNull();
-        expect(trailers[0]!.value, 'the recovery lookup carried another run').toBe(branch!.slice('ramify-agent/run-'.length));
+        expect(trailers[0]!.value, 'the recovery lookup carried another run').toBe(branch!.slice('ramify-agent-run/'.length));
       });
       lastGate = scenarios ? scenariosCommitName : trailers[1]!.value;
       const stated = responses.recovered?.find(entry => entry.gate === lastGate);
@@ -218,7 +218,7 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
       const scenarios = message.includes(`\n${scenariosTrailer}: materialized\n`);
       check(() => {
         expect(branch, 'a commit was made before the run branch was created').not.toBeNull();
-        expect(message).toContain(`${runTrailer}: ${branch!.slice('ramify-agent/run-'.length)}`);
+        expect(message).toContain(`${runTrailer}: ${branch!.slice('ramify-agent-run/'.length)}`);
         if (scenarios) {
           expect(message.split('\n')[0]).toMatch(/^Scenarios of /u);
           expect(message).not.toContain(`${gateTrailer}:`);

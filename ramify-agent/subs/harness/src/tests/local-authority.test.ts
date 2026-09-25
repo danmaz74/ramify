@@ -163,7 +163,7 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
     // commit for each gate, and no other revision, because nothing else in
     // the tree changed. Every answer this scenario stated was used and
     // nothing else was asked of Git; only the gates' commits are looked up.
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(git.minted()).toEqual(['scenarios-of-revision-diff']);
     expect(git.lookups()).toHaveLength(git.messages().length - 1);
     git.assertAnswered();

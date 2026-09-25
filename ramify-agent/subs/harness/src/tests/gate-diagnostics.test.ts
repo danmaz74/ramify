@@ -185,7 +185,7 @@ describe('a module violation at the iteration gate, over a run', () => {
     const git = mockGit({
       currentHead: async () => head,
       isCleanRepository: async () => true,
-      createRunBranch: async (_root, runId) => ({ branch: `ramify-agent/run-${runId}`, created: true }),
+      createRunBranch: async (_root, runId) => ({ branch: `ramify-agent-run/${runId}`, created: true }),
       findCommitByTrailers: async () => null,
       // The feature files' commit is the boundary the engineer's change is asked against.
       changedPaths: async (_root, accepted) => accepted === 'scenarios' ? [source] : [],
