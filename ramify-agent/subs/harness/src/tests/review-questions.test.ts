@@ -4,7 +4,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptedAgent, ScriptStep } from '../../subs/agent/src/scripted.js';
 import { reviewLayout, type ReviewRequest } from '../reviews/records.js';
 import { snapshotToolNames } from '../reviews/snapshot.js';
-import { runLayout } from '../run/records.js';
+import { runLayout, runRecordSchema } from '../run/records.js';
+import { readCapturedDocuments } from '../run/document-inputs.js';
+import { resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
 import type { ScriptedCommit } from './helpers/candidates.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { completionProposed, submit, write } from './helpers/iterations.js';
@@ -135,9 +137,14 @@ describe('three questions over one candidate', () => {
     }
 
     // Scope binds the plan section its assignment cites, by the hash of its text.
-    const plan_ = await readFile(runPath(root, plan, runId, runLayout.capturedPlan), 'utf8');
-    const section = plan_.slice(plan_.indexOf('## Request'), plan_.indexOf('## Constraints')).trim();
-    expect(records[1]!.requirements).toEqual([{ ref: 'plan#request', hash: hash(section) }]);
+    const runRecord = runRecordSchema.parse(JSON.parse(await readFile(runPath(root, plan, runId, runLayout.record), 'utf8')));
+    const captured = await readCapturedDocuments(runPath(root, plan, runId, ''), runRecord.manifest);
+    const section = resolvePlanReference(captured.manifest, captured.bytes, { anchor: 'Request' });
+    expect(section.status).toBe('available');
+    if (section.status !== 'available') return;
+    expect(records[1]!.requirements[0]).toEqual({ ref: 'plan#request', hash: hash(section.text) });
+    expect(records[1]!.requirements[1]).toMatchObject({ ref: 'assignment-source:wi-001.i01', hash: expect.stringMatching(/^[0-9a-f]{64}$/u) });
+    expect(records[1]!.source).toMatchObject({ packageHash: expect.stringMatching(/^[0-9a-f]{64}$/u), deliveryHash: records[1]!.requirements[1]!.hash });
 
     // Scope forks the architect's point captured atomically with its assignment.
     const assigned = eventsOf(events, 'iteration-assigned');
@@ -176,8 +183,9 @@ describe('three questions over one candidate', () => {
     }
     // The second scope review started after the architect's later turn, and
     // sees the assignment point without it; the third assignment came after it.
-    expect(sessionOf('rq-0005').inherited).toEqual([]);
-    expect(sessionOf('rq-0008').inherited).toEqual(['LATER ARCHITECT TURN']);
+    expect(sessionOf('rq-0005').inherited).toHaveLength(1);
+    expect(sessionOf('rq-0005').inherited[0]).toContain('# Captured context for work item wi-001');
+    expect(sessionOf('rq-0008').inherited).toContain('LATER ARCHITECT TURN');
     // The scope reviewer is given the question's procedure and the plan's text either way.
     expect(sessionOf('rq-0005').spec.systemPrompt).toContain('Ask of the candidate as a whole: does it do what the assignment asked');
     expect(sessionOf('rq-0005').spec.prompt).toContain('A reviewer can attach one note of at most 500 characters');
@@ -266,7 +274,9 @@ describe('a missing or degraded fork starts fresh', () => {
       expect(await attemptRecord(root, runId, attempt)).toMatchObject({ requestedStart: 'fork', actualStart: 'fresh' });
     }
     // The invocation's end records the degradation: a fresh start is never measured as a fork.
-    const degraded = eventsOf(events, 'invocation-ended').filter(event => event.data.degraded !== undefined);
+    const reviewerInvocations = new Set(eventsOf(events, 'invocation-started')
+      .filter(event => event.data.role === 'reviewer').map(event => event.data.invocation));
+    const degraded = eventsOf(events, 'invocation-ended').filter(event => event.data.degraded !== undefined && reviewerInvocations.has(event.data.invocation));
     expect(degraded).toHaveLength(6);
     expect(degraded.every(event => event.data.degraded!.requested === 'fork' && event.data.degraded!.actual === 'fresh')).toBe(true);
     // The fresh scope reviewer still has the whole question: the assignment and the plan's text.

@@ -69,6 +69,10 @@ export const reviewRequestSchema = z.object({
   /** The candidate's tree, as Git names it. */
   tree: text,
   requirements: z.array(hashedRefSchema),
+  /** A source read that failed while the request was recorded is never an empty requirement set. */
+  inputsUnavailable: text.optional(),
+  /** The full recorded selection and the assignment-cited briefing hashes. */
+  source: z.object({ selection: text, packageHash: sha256Schema, deliveryHash: sha256Schema }).strict().optional(),
   guidance: z.array(hashedRefSchema),
   forkPoint: forkPointSchema,
 }).strict();

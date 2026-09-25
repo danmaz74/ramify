@@ -453,7 +453,7 @@ describe('a rejected submission in a run', () => {
     );
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
-    const local = agent!.sessions.find(session => session.spec.role === 'local-architect')!;
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
     expect(local.verdicts[0]).toMatchObject({ accepted: false });
     const answer = JSON.parse((local.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string }>; remainingAttempts: number };
     expect(answer.errors[0]!.path).toBe('outline');
@@ -462,7 +462,9 @@ describe('a rejected submission in a run', () => {
 
     // Nothing was written for the input that failed: one outline, at revision 1.
     expect(existsSync(runPath(root, 'review-notes', runId, workLayout.outline('wi-001', 2)))).toBe(false);
-    const observations = await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0002')), 'utf8');
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    const organizing = events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-1)!;
+    const observations = await readFile(runPath(root, 'review-notes', runId, runLayout.observations((organizing.data as { invocation: string }).invocation)), 'utf8');
     const rejections = observations.split('\n').filter(Boolean)
       .map(line => JSON.parse(line) as { type: string; data: { target?: string; errors?: unknown[] } })
       .filter(line => line.type === 'rejection');
@@ -478,15 +480,16 @@ describe('a rejected submission in a run', () => {
     expect(snapshot.state).toBe('failed');
     expect(snapshot.failure?.reason).toBe('invalid-submission');
 
-    const local = agent!.sessions.find(session => session.spec.role === 'local-architect')!;
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
     expect(local.verdicts).toHaveLength(3);
     const answer = JSON.parse((local.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string }> };
     expect(answer.errors[0]!.path).toBe('outline.stages');
     expect(local.verdicts.at(-1)).toMatchObject({ accepted: false, final: true });
 
-    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0002')), 'utf8')) as InvocationOutcome;
-    expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
     const events = await runEventsOnDisk(root, 'review-notes', runId);
+    const organizing = events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect').at(-1)!;
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome((organizing.data as { invocation: string }).invocation)), 'utf8')) as InvocationOutcome;
+    expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
     expect(events.some(event => event.type === 'outline-revised')).toBe(false);
     expect(events.some(event => event.type === 'gate-attempted')).toBe(false);
   }, 300_000);

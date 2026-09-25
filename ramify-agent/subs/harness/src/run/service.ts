@@ -71,6 +71,7 @@ import { readAcceptedEvidence } from '../analysis/evidence.js';
 import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
 import { contextSelectionSchema } from '../context-selection/contracts.js';
 import { readRecordedContextSelection } from '../context-selection/recorded.js';
+import { assignmentDelivery, makeAssignmentContext } from '../context-selection/delivery.js';
 import { contextSelectorJsonSchema, contextSelectorSubmissionSchema, contextSelectorToolName,
   orientationPacket, prepareContextSelection, workOrientationJsonSchema, workOrientationSubmissionSchema,
   workOrientationToolName, type ContextSelectorSubmission, type WorkOrientationSubmission } from '../context-selection/submissions.js';
@@ -915,11 +916,16 @@ export class RunService {
       const forkPoint: ForkPoint = pinned === undefined || pinned === null
         ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after the assignment' : 'The assignment recorded no pinned point of the local architect' }
         : { kind: 'session', session: pinned.session, ref: pinned.ref };
-      const requirements = await this.scopeRequirements(run, closed.assignment).catch(error => {
-        this.warn(`Run ${run.record.jobId}: the plan excerpts of ${closed.iteration} could not be read: ${message(error)}`);
-        return [] as CapturedInput[];
-      });
-      return { requirements: requirements.map(({ ref, hash }) => ({ ref, hash })), guidance: [], forkPoint };
+      try {
+        const requirements = await this.scopeRequirements(run, closed.assignment);
+        const assignment = iterationAssignmentSchema.parse(this.committedBody(run, closed.assignment));
+        const source = await this.assignmentSource(run, assignment);
+        return { requirements: requirements.map(({ ref, hash }) => ({ ref, hash })), guidance: [], forkPoint,
+          ...(source === null ? {} : { source: { selection: source.selection, packageHash: source.packageHash, deliveryHash: source.hash } }) };
+      } catch (error) {
+        return { requirements: [], guidance: [], forkPoint,
+          inputsUnavailable: `The scope review's captured inputs could not be read: ${message(error)}` };
+      }
     }
     try {
       const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: closed.commit, base: closed.base });
@@ -959,10 +965,43 @@ export class RunService {
         const ref = `${name}${reference.anchor === undefined ? `:${reference.lines?.[0]}-${reference.lines?.[1]}` : `#${headingAnchor(reference.anchor)}`}`;
         if (!inputs.some(input => input.ref === ref)) inputs.push({ ref, hash: sha256(resolved.text), text: resolved.text });
       }
+      const source = await this.assignmentSource(run, assignment);
+      if (source === null) throw new EvidenceUnavailableError(`No recorded source context for ${assignment.id}`);
+      inputs.push({ ref: `assignment-source:${assignment.id}`, hash: source.hash, text: source.text });
       return [...inputs, ...deviationInputs(this.deviationsOf(run))];
     }
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
     return [...planExcerpts(plan, assignment.requirementRefs), ...deviationInputs(this.deviationsOf(run))];
+  }
+
+  /** A new run's selection is read from its event-bound immutable files. */
+  private async selectedSource(run: Run, workItem: string) {
+    if (!run.record.manifest.documentManifest) return null;
+    const changes = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (changes.length > 0) throw new EvidenceUnavailableError(changes.join('; '));
+    const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
+    if (evidence.status === 'unavailable') throw new EvidenceUnavailableError(evidence.reason);
+    const event = run.log.all('context-selection-recorded').find(entry => entry.data.workItem === workItem);
+    if (!event) throw new EvidenceUnavailableError(`No context selection was recorded for ${workItem}`);
+    const recorded = await readRecordedContextSelection(run.directory, event, evidence.catalog, evidence.manifest, evidence.bytes);
+    if (recorded.status === 'unavailable') throw new EvidenceUnavailableError(recorded.reason);
+    return { event, recorded, evidence };
+  }
+
+  /** Rebuild the assignment-cited brief before every delivery or review read. */
+  private async assignmentSource(run: Run, assignment: IterationAssignment) {
+    const source = await this.selectedSource(run, assignment.workItem);
+    if (source === null) return null;
+    const context = this.committedBody(run, runLayout.assignmentContext(assignment.id));
+    const delivered = assignmentDelivery(context, {
+      assignment: assignment.id, workItem: assignment.workItem, selectionRef: source.event.data.selection,
+    }, source.recorded, source.evidence.catalog, source.evidence.manifest, source.evidence.bytes);
+    if (delivered.status === 'unavailable') throw new EvidenceUnavailableError(delivered.reasons.join('; '));
+    if (assignment.citedItems === undefined || JSON.stringify(assignment.citedItems) !== JSON.stringify(
+      (context as { citedItems?: unknown } | undefined)?.citedItems)) {
+      throw new EvidenceUnavailableError(`Assignment ${assignment.id} differs from its recorded source citations`);
+    }
+    return { ...delivered, selection: source.event.data.selection, packageHash: source.recorded.selection.packageHash };
   }
 
   /** A record body as the log committed it, never the materialized file. */
@@ -997,6 +1036,7 @@ export class RunService {
 
     const loaded = packages.get('reviewer');
     if (loaded?.reviewer === undefined) return await unavailable('No prompt package is loaded for the reviewer') === 'committed';
+    if (request.inputsUnavailable !== undefined) return await unavailable(request.inputsUnavailable) === 'committed';
     if (kind === 'design' && request.guidance.length === 0) {
       return await unavailable(request.forkPoint.kind === 'unavailable' ? request.forkPoint.reason : 'No design guidance was selected') === 'committed';
     }
@@ -1011,7 +1051,15 @@ export class RunService {
     try {
       // The question's inputs are read again and must be the bytes the
       // request bound; anything else is not the question it asked.
-      if (kind === 'scope') requirements = boundInputs(await this.scopeRequirements(run, request.assignment), request.requirements);
+      if (kind === 'scope') {
+        requirements = boundInputs(await this.scopeRequirements(run, request.assignment), request.requirements);
+        const assignment = iterationAssignmentSchema.parse(this.committedBody(run, request.assignment));
+        const source = await this.assignmentSource(run, assignment);
+        if (request.source === undefined ? source !== null : source === null ||
+          source.selection !== request.source.selection || source.packageHash !== request.source.packageHash || source.hash !== request.source.deliveryHash) {
+          throw new EvidenceUnavailableError('The review request source binding differs from the recorded assignment source');
+        }
+      }
       if (kind === 'design') {
         const texts = await Promise.all(request.guidance.map(entry => this.candidates.readBlob(this.projectRoot, request.key.candidate, entry.ref)));
         guidance = boundInputs(request.guidance.map((entry, index) => ({ ref: entry.ref, hash: sha256(texts[index]!), text: texts[index]! })), request.guidance);
@@ -3895,6 +3943,12 @@ export class RunService {
         }
       }
       if (contextPackage !== undefined) prompt = `${prompt}\n\n# Recorded context selection\n\n${contextPackage.text}`;
+      let selectedContext: Awaited<ReturnType<typeof this.selectedSource>>;
+      try { selectedContext = await this.selectedSource(run, item.id); }
+      catch (error) {
+        await this.fail(run, 'inputs-changed', `The source selection for ${item.id} cannot be used: ${message(error)}`);
+        return null;
+      }
       // A finding is delivered once: the next turn of this same architect
       // has it in its own history, and repeating it would read as a second
       // detection.
@@ -3949,6 +4003,7 @@ export class RunService {
           scenarios: this.declarationContext(run, item),
           ...(integration === undefined ? {} : { integration: integration.scope }),
           bounds: engineerBoundsOf(run.record.policy.limits),
+          ...(selectedContext === null ? {} : { selection: selectedContext.recorded.selection }),
         }),
         scope: {
           write: null,
@@ -5234,6 +5289,22 @@ export class RunService {
       }));
 
     const id = iterationId(item.id, number);
+    let selected: Awaited<ReturnType<typeof this.selectedSource>>;
+    try { selected = await this.selectedSource(run, item.id); }
+    catch (error) {
+      await this.fail(run, 'inputs-changed', `The assignment source for ${id} cannot be used: ${message(error)}`);
+      return null;
+    }
+    if (selected !== null && body.citedItems === undefined) {
+      await this.fail(run, 'invalid-submission', `The assignment ${id} omitted its source citations`);
+      return null;
+    }
+    const assignmentContext = selected === null ? null : makeAssignmentContext(
+      id, selected.event.data.selection, selected.recorded.selection, body.citedItems ?? []);
+    if (assignmentContext !== null && 'errors' in assignmentContext) {
+      await this.fail(run, 'invalid-submission', `The assignment ${id} has invalid source citations: ${assignmentContext.errors.join('; ')}`);
+      return null;
+    }
     const assignment = iterationAssignmentSchema.parse({
       schema: 'ramify-agent.iteration-assignment/1',
       id,
@@ -5245,6 +5316,7 @@ export class RunService {
       approach: body.approach,
       scope,
       requirementRefs: body.requirementRefs,
+      ...(body.citedItems === undefined ? {} : { citedItems: body.citedItems }),
       externalCapabilities: revised === undefined
         ? body.externalCapabilities
         : [{ capability: revised.capability.id, owner: revised.provider, role: 'request' }],
@@ -5286,6 +5358,7 @@ export class RunService {
         },
       }, [
       { path: iterationLayout.assignment(item.id, number), id, revision: 1, body: assignment },
+      ...(assignmentContext === null ? [] : [{ path: runLayout.assignmentContext(id), id, revision: 1, body: assignmentContext }]),
       ...localRecords,
     ]);
     await this.afterWrite(revised === undefined ? 'iteration-assigned' : 'contract-requested', run.record.jobId);
@@ -5452,6 +5525,12 @@ export class RunService {
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
       const briefedScenarios = await this.engineerScenarios(run, item);
+      let source: Awaited<ReturnType<typeof this.assignmentSource>>;
+      try { source = await this.assignmentSource(run, assignment); }
+      catch (error) {
+        await this.fail(run, 'inputs-changed', `The source evidence for ${assignment.id} cannot be delivered: ${message(error)}`);
+        return null;
+      }
       // The engineer's own test run is a diagnosis over the modules it was
       // given. Where the gate is the whole project, the tool still resolves
       // this iteration's own modules, with the suites its evidence requires.
@@ -5483,6 +5562,7 @@ export class RunService {
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
+          ...(source === null ? {} : { sourceEvidence: source.text }),
         }),
         start,
         session,
@@ -5897,6 +5977,28 @@ export class RunService {
 
     const subArtifacts = this.requiredArtifacts(committedRecords(run.log.ledger.replay()));
     const id = iterationId(item.id, number);
+    const parentNumber = Number.parseInt(request.requestedBy.slice(request.requestedBy.lastIndexOf('.i') + 2), 10);
+    const parentAssignment = iterationAssignmentSchema.safeParse(this.committedBody(run, iterationLayout.assignment(item.id, parentNumber)));
+    if (!parentAssignment.success || parentAssignment.data.id !== request.requestedBy) {
+      await this.fail(run, 'inputs-changed', `The requesting assignment ${request.requestedBy} cannot be read`);
+      return null;
+    }
+    let inherited: Awaited<ReturnType<typeof this.assignmentSource>>;
+    let selected: Awaited<ReturnType<typeof this.selectedSource>>;
+    try {
+      inherited = await this.assignmentSource(run, parentAssignment.data);
+      selected = inherited === null ? null : await this.selectedSource(run, item.id);
+    }
+    catch (error) {
+      await this.fail(run, 'inputs-changed', `The requesting assignment source for ${id} cannot be used: ${message(error)}`);
+      return null;
+    }
+    const assignmentContext = selected === null ? null : makeAssignmentContext(
+      id, selected.event.data.selection, selected.recorded.selection, parentAssignment.data.citedItems ?? []);
+    if (assignmentContext !== null && 'errors' in assignmentContext) {
+      await this.fail(run, 'inputs-changed', `The inherited source citations for ${id} are invalid: ${assignmentContext.errors.join('; ')}`);
+      return null;
+    }
     const assignment = iterationAssignmentSchema.parse({
       schema: 'ramify-agent.iteration-assignment/1',
       id,
@@ -5908,6 +6010,7 @@ export class RunService {
       approach: `${item.module} stated the need as behavior. Design the interface, write the conformance suite and the fake, integrate the fake at the seam where ${entry.owner}'s real export will act, exposed exactly as that export will be, and leave ${entry.owner} to implement the provider.`,
       scope,
       requirementRefs: [],
+      ...(parentAssignment.data.citedItems === undefined ? {} : { citedItems: [...parentAssignment.data.citedItems] }),
       externalCapabilities: [{ capability: entry.capability, owner: entry.owner, role: 'request' }],
       completionEvidence: `${item.module}'s own tests pass against the fake, and the fake passes the conformance suite.`,
       evidenceObligations: [],
@@ -5934,7 +6037,10 @@ export class RunService {
         requestedBy: request.requestedBy,
         revises: null,
       },
-    }, [{ path: iterationLayout.assignment(item.id, number), id, revision: 1, body: assignment }]);
+    }, [
+      { path: iterationLayout.assignment(item.id, number), id, revision: 1, body: assignment },
+      ...(assignmentContext === null ? [] : [{ path: runLayout.assignmentContext(id), id, revision: 1, body: assignmentContext }]),
+    ]);
     await this.afterWrite('contract-requested', run.record.jobId);
     if (this.ignoring(run)) return null;
 
@@ -6041,6 +6147,13 @@ export class RunService {
       });
       const index = await this.refreshIndex(run);
 
+      let source: Awaited<ReturnType<typeof this.assignmentSource>>;
+      try { source = await this.assignmentSource(run, assignment); }
+      catch (error) {
+        await this.fail(run, 'inputs-changed', `The source evidence for contract ${assignment.id} cannot be delivered: ${message(error)}`);
+        return null;
+      }
+
       const result = await this.runInvocation<ContractSubmission>(run, agent, {
         role: 'contract-engineer',
         work: { workItem: item.id, iteration: assignment.id },
@@ -6057,6 +6170,7 @@ export class RunService {
           provider: subject.provider,
           existingConsumers: this.consumersOf(run, subject.capability, item.module),
           ...(failedGate === undefined ? {} : { failedGate }),
+          ...(source === null ? {} : { sourceEvidence: source.text }),
         }),
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
         session,
@@ -8503,7 +8617,7 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  * outcome, which is written once the session has started.
  */
 /** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
-type ReviewInputs = Pick<ReviewRequest, 'requirements' | 'guidance' | 'forkPoint'>;
+type ReviewInputs = Pick<ReviewRequest, 'requirements' | 'guidance' | 'forkPoint'> & Partial<Pick<ReviewRequest, 'inputsUnavailable' | 'source'>>;
 
 /** What the harness binds to one concern of a valid submission. */
 interface ConcernBinding {

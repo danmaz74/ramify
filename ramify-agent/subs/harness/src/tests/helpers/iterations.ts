@@ -50,6 +50,7 @@ export function assign(
       goal: `Carry out the work in ${module}.`,
       approach: 'Change the source, then the tests that state it.',
       requirementRefs: [{ anchor: 'Request' }],
+      citedItems: [],
       externalCapabilities: [],
       completionEvidence: 'The tests this scope owns pass.',
       ...extra,

@@ -27,7 +27,7 @@ const sourceEvidence = '## nfr-001: non-functional-requirement\nSource: plans/sa
 
 describe('assignment source citations', () => {
   test('new selection requires an explicit array and only selected, unique IDs', () => {
-    const missing = validateLocalArchitect(assign('app/reviews'), evidence);
+    const missing = validateLocalArchitect(assign('app/reviews', { citedItems: undefined }), evidence);
     expect(missing.ok).toBe(false);
     if (!missing.ok) expect(missing.errors.map(error => error.path)).toContain('assignment.citedItems');
     expect(validateLocalArchitect(assign('app/reviews', { citedItems: [] }), evidence).ok).toBe(true);
@@ -35,15 +35,20 @@ describe('assignment source citations', () => {
     const invalid = validateLocalArchitect(assign('app/reviews', { citedItems: ['adv-001', 'nfr-001', 'nfr-001'] }), evidence);
     expect(invalid.ok).toBe(false);
     if (!invalid.ok) expect(invalid.errors.map(error => error.path)).toEqual(['assignment.citedItems.0', 'assignment.citedItems.2']);
-    expect(validateLocalArchitect(assign('app/reviews'), { index: null, registry: new Map() }).ok).toBe(true);
+    expect(validateLocalArchitect(assign('app/reviews', { citedItems: undefined }), { index: null, registry: new Map() }).ok).toBe(true);
   });
 
   test('engineer and contract briefs render the same evidence without rewriting approach', () => {
     const engineer = iterationMessage({ assignment, projectRoot: '/p', base: 'abc', sourceEvidence });
     const contract = contractMessage({ assignment, projectRoot: '/p', base: 'abc',
       consumer: { module: 'app/reviews', iteration: null }, provider: 'app/core', existingConsumers: [], sourceEvidence });
+    const continuedContract = contractMessage({ assignment, projectRoot: '/p', base: 'abc',
+      consumer: { module: 'app/reviews', iteration: null }, provider: 'app/core', existingConsumers: [], sourceEvidence,
+      failedGate: { id: 'ga-002', cause: 'in-scope', summary: ['The conformance test failed'] } });
     expect(engineer).toContain(sourceEvidence);
     expect(contract).toContain(sourceEvidence);
+    expect(continuedContract).toContain(sourceEvidence);
+    expect(continuedContract).toContain('The conformance test failed');
     expect(engineer).toContain('## Approach the architect asked for\n\nChange the handler.');
     expect(engineer).not.toContain(`## Approach the architect asked for\n\n${sourceEvidence}`);
   });

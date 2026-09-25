@@ -245,3 +245,66 @@ or selector phase still interrupts the ordinary run and is not claimed as a
 same-run resume. This iteration does not claim live assignment citation or
 engineer/contract delivery; those are iteration 5 consumers of the recorded
 selection.
+
+## Iteration 5 — assignment source delivery and review binding
+
+**Starting revision:** `4bf4ecb5` after iteration 4 and its context probe hardening.
+The preparatory pure delivery and briefing commits were `aba2be80` and
+`58cbddad`. The local architect now submits explicit selected evidence IDs
+for each new assignment. The harness validates that each ID was selected,
+records the assignment-specific citation and full selection package hash in
+`assignmentContext` in the same transaction as the assignment, and retains
+optional fields so earlier persisted assignments remain readable. An
+engineer-requested contract iteration inherits its requesting assignment's
+citation and package binding; it does not select again.
+
+Every fresh or continued engineer and contract briefing reconstructs its
+assignment-cited passage subset from the accepted catalog and captured bytes.
+The full work-item selection stays the authority; the derived delivery hash
+identifies the subset. The brief labels source path, revision, exact quote,
+classification, stated/inferred conditions and uncertainty without changing
+the architect's approach. A changed source, altered package, absent citation
+record or stale assignment is refused before the implementation invocation.
+The coordinator's complete catalog is unaffected by whether an assignment
+cites an NFR or advice.
+
+Scope review requests now bind the full selection hash and derived cited
+briefing hash along with exact plan-reference inputs. The plan-reference
+resolver reads the captured multi-document source; the former single-file
+parser remains only for earlier runs without a document manifest. If input
+capture fails at request creation, the request records `inputsUnavailable`
+and its attempt settles as not verified; it is never treated as a review of
+an empty requirement set. On attempt start, all input hashes are checked
+again. Old review requests remain readable with the optional fields absent.
+
+**Verification:** Ten focused Vitest files passed, 72 tests. The new harness
+witnesses show a completed run with one selected NFR, uncited advice retained
+in the catalog, an atomically recorded assignment context, and identical
+quoted NFR/classification/condition in fresh and continued engineer prompts
+(actual start modes `fresh`, `continue`). A contract-needed iteration inherits
+the cited ID and its fresh contract prompt carries the same quote. A separate
+harness run changes the captured plan after selection and refuses assignment
+before an engineer starts. The pure contract briefing test checks that a
+failed-gate continuation retains the source section; the live contract
+repair/session continuation was not exercised in this iteration.
+Existing local-architect and review suites were updated for the orientation
+session, exact multi-document reference, bound assignment-source input and
+recorded package inheritance. The exact aggregate command was:
+
+```sh
+npx vitest run src/tests/iteration-source-delivery.test.ts src/tests/assignment-source-evidence.test.ts src/tests/context-selection-delivery.test.ts src/tests/context-selection-runtime.test.ts src/tests/local-architect-submission.test.ts src/tests/review-questions.test.ts src/tests/review-attempts.test.ts src/tests/review-stop.test.ts src/tests/contract-scheduling.test.ts src/tests/iteration-gate.test.ts
+```
+
+`npm run build:web` passed. `npm run check:self` passed over 12 owners,
+514 source files and 41 resources with 0 errors, 0 warnings, 0 denied
+accesses and 298 analysis limits. `npm run type-check` passed after the
+concurrent iteration 8 CheckFinding UI branch restored its new union handling.
+The full post-edit suite and final browser audit remain the later plan gate.
+
+**Handoff to iteration 6:** The accepted catalog is complete independent of
+assignment citations. `assignmentSource` in the harness reads the event-bound
+selection, verifies accepted bytes and assignmentContext, and returns a
+separate derived delivery hash. The scope review request records both source
+hashes and explicit unavailability. Coordinator assessment must enumerate
+all NFR IDs from the accepted catalog, including those no assignment cited;
+assignment delivery does not discharge or assess one.

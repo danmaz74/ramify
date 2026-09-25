@@ -277,7 +277,7 @@ describe('approve-analysis in a run without the stop', () => {
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun(plan));
-    await until(() => agent!.sessions.length === 2);
+    await until(() => agent!.sessions.some(session => session.spec.submission.name === 'submit_work_item_result'));
     const before = service.getRun(plan, receipt.jobId)!;
     expect(before.phase).toBe('working');
 
@@ -286,7 +286,7 @@ describe('approve-analysis in a run without the stop', () => {
     expect(after).toMatchObject({ phase: 'working', state: 'running', review: { reviewer: 'lee@example.com', at: approved.acceptedAt, duringRun: true } });
     expect(after.version).toBe(before.version + 1);
     expect({ ...after, version: before.version, updatedAt: before.updatedAt, review: before.review }).toEqual(before);
-    expect(agent!.sessions).toHaveLength(2);
+    expect(agent!.sessions.some(session => session.spec.submission.name === 'submit_work_item_result')).toBe(true);
 
     // A second approval is refused with the first one's reviewer.
     await expect(service.execute(approveRun(plan, receipt.jobId, after.version, 'kim@example.com')))
