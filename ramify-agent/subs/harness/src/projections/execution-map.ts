@@ -403,10 +403,17 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
   const awaited = ended ? undefined : [...openInvocations.values()].at(-1);
   const running = ended ? undefined : [...activeStarts.values()].at(-1);
   const runningGate = running?.type === 'gate-started' || running?.type === 'gate-committing' ? running : undefined;
+  // The step a running gate is on: the last command of that gate that
+  // started after the gate did.
+  const command = runningGate === undefined ? undefined : [...view.events].reverse().find(event =>
+    event.type === 'gate-command-started' && event.data.gate === runningGate.data.gate && event.sequence > runningGate.sequence);
   const current: ExecutionCoreIndex['current'] = {
     awaitedSession: awaited === undefined ? null : key('session', awaited.session),
     runningGate: runningGate === undefined ? null : key('gate', runningGate.data.gate),
     source: runningGate !== undefined ? eventSource(view, runningGate.sequence) : awaited !== undefined ? eventSource(view, awaited.sequence) : null,
+    ...(command?.type === 'gate-command-started'
+      ? { gateCommand: { kind: command.data.kind, position: command.data.position, total: command.data.total, source: eventSource(view, command.sequence) } }
+      : {}),
   };
 
   const keys = new Set<string>();

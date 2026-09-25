@@ -6,9 +6,9 @@ import { gitCandidateSource, gitService, type CandidateSource, type GitService }
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
-import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
+import type { Checkpoint, GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
+import { inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
 import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import {
@@ -6109,6 +6109,7 @@ export class RunService {
         ramify: this.options.ramify,
         git: this.git,
         head,
+        started: this.commandStarted(run, gateId, 'readiness'),
       });
 
       if (result.attempt.verdict === 'passed' && result.gate !== null) {
@@ -6311,7 +6312,8 @@ export class RunService {
         const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
-        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit);
+        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit,
+          this.commandStarted(run, identity.id, prepared.checkpoint));
         if (attempt.audited !== null && attempt.audited !== sourceCommit) {
           throw new Error(`Gate ${attempt.id} audited ${attempt.audited}, expected ${sourceCommit}`);
         }
@@ -6456,6 +6458,22 @@ export class RunService {
       harness: captured.config.acceptance,
       modules: await scenarioModules(this.projectRoot, run.index),
       scenarios: records.map(record => ({ id: record.id, owner: record.owner, file: record.file, state: states.get(record.id) ?? 'pending' })),
+    };
+  }
+
+  /**
+   * What a gate's executor calls as each command starts: a
+   * `gate-command-started` line, written before the command runs. It is
+   * progress only, so a write that fails is a warning and never fails the
+   * gate.
+   */
+  private commandStarted(run: Run, gate: string, checkpoint: Checkpoint): GateCommandStarted {
+    return async command => {
+      try {
+        await this.write(run, { type: 'gate-command-started', data: { gate, checkpoint, ...command } });
+      } catch (error) {
+        this.warn(`Run ${run.record.jobId}: the start of command ${command.position} of gate ${gate} was not recorded: ${message(error)}`);
+      }
     };
   }
 

@@ -21,7 +21,7 @@ import {
 
 import { childEnvironment, outputTailBytes, runCommand } from '../../evidence/src/run-command.js';
 import type { CommandRun } from '../../evidence/src/run-command.js';
-import { checkOutputPath } from '../../../src/checks/execution.js';
+import { checkOutputPath, commandStart } from '../../../src/checks/execution.js';
 import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/checks/execution.js';
 import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
@@ -115,6 +115,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
             };
           }
           const [index, check] = planned;
+          await request.started?.(commandStart(checks, index));
           const outputFile = checkOutputPath(request.directory, index, check);
           const auditedProjectRoot = mapping.projectRootIn(registered.workingDirectory);
           if (check.scenarios !== undefined) {

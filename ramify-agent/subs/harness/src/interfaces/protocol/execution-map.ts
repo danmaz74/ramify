@@ -219,12 +219,29 @@ export const executionLinkSchema = z.object({
 }).strict();
 export type ExecutionLink = z.infer<typeof executionLinkSchema>;
 
-/** Exact activity references; null means there is no recorded active target. */
+/**
+ * The command a running gate started last, from its `gate-command-started`
+ * event: its kind and its place among the gate's commands, counted from one.
+ */
+export const executionGateCommandSchema = z.object({
+  kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+  position: z.int().positive(),
+  total: z.int().positive(),
+  source: executionSourceRefSchema,
+}).strict().refine(v => v.position <= v.total, 'A command lies within its gate');
+export type ExecutionGateCommand = z.infer<typeof executionGateCommandSchema>;
+
+/**
+ * Exact activity references; null means there is no recorded active target.
+ * `gateCommand` is present only for a running gate one of whose commands
+ * has started.
+ */
 export const executionCurrentActivitySchema = z.object({
   awaitedSession: executionElementKeySchema.nullable(),
   runningGate: executionElementKeySchema.nullable(),
   source: executionSourceRefSchema.nullable(),
-}).strict().refine(v => (v.awaitedSession !== null || v.runningGate !== null) === (v.source !== null))
+  gateCommand: executionGateCommandSchema.optional(),
+}).strict().refine(v => v.gateCommand === undefined || v.runningGate !== null, 'Only a running gate has a started command').refine(v => (v.awaitedSession !== null || v.runningGate !== null) === (v.source !== null))
   .refine(v => v.awaitedSession === null || v.awaitedSession.startsWith('session:'))
   .refine(v => v.runningGate === null || v.runningGate.startsWith('gate:'));
 

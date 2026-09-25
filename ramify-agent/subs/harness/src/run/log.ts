@@ -496,6 +496,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('gate-started', z.object({ gate: text, checkpoint: text }).strict()),
   event('gate-committing', z.object({ gate: text, checkpoint: text }).strict()),
   /**
+   * One command of a running gate started, readiness's included: its kind
+   * and its place among the gate's commands, counted from one, so a reader
+   * sees which step the gate is on. It records progress and decides
+   * nothing; a gate performed again after a crash announces its commands
+   * again.
+   */
+  event('gate-command-started', z.object({
+    gate: text,
+    checkpoint: text,
+    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    position: z.int().positive(),
+    total: z.int().positive(),
+  }).strict()),
+  /**
    * A gate finished and commits its one complete `GateAttempt`. A committing
    * gate of a work item also carries what its scenario check means for the
    * work item's CheckFindings: a repeated failure promoted, a witness that

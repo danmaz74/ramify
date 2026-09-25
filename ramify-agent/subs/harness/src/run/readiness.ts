@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
-import type { CheckExecutionPort } from '../checks/execution.js';
+import type { CheckExecutionPort, GateCommandStarted } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { allProjectChecks, checkpointPolicies, planScenarioCheck } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
@@ -60,6 +60,8 @@ export interface ReadinessRequest {
   /** The commit readiness ran on. */
   readonly head: string;
   readonly signal?: AbortSignal | undefined;
+  /** Called as each command of the baseline gate starts. */
+  readonly started?: GateCommandStarted | undefined;
 }
 
 /** What one readiness attempt established, with the gate that ran the baseline. */
@@ -118,6 +120,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
     head: request.head,
     checks,
     ...(request.signal === undefined ? {} : { signal: request.signal }),
+    ...(request.started === undefined ? {} : { started: request.started }),
   });
 
   // The baseline's three steps read the gate's own command records. The

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
-import type { Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
+import type { CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
 import { runScenarioCheck } from './scenario-check.js';
 import type { PlannedCheck } from './verify.js';
 
@@ -26,6 +26,27 @@ export interface CheckExecutionRequest {
   readonly context: CheckExecutionContext;
   /** Every gate execution is bounded, including time spent waiting for an audit lease. */
   readonly signal: AbortSignal;
+  /**
+   * Called as each command starts, before it runs, so that a reader can see
+   * which step a running gate is on. A command that never starts, because
+   * an earlier one was interrupted, is not announced.
+   */
+  readonly started?: GateCommandStarted | undefined;
+}
+
+/** One command of a gate as it starts: its kind and its place among the gate's commands, counted from one. */
+export interface GateCommandStart {
+  readonly kind: CheckCommandKind;
+  readonly position: number;
+  readonly total: number;
+}
+
+/** What an executor calls as each command starts. It settles before the command runs. */
+export type GateCommandStarted = (command: GateCommandStart) => Promise<void>;
+
+/** The announcement of one planned check, at its index among `checks`. */
+export function commandStart(checks: readonly PlannedCheck[], index: number): GateCommandStart {
+  return { kind: checks[index]!.kind, position: index + 1, total: checks.length };
 }
 
 /**
@@ -95,6 +116,7 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
         continue;
       }
 
+      await request.started?.(commandStart(checks, index));
       if (check.scenarios !== undefined) {
         const outcome = await runScenarioCheck({
           command: check.command,

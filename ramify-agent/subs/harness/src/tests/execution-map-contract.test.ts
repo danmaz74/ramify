@@ -45,6 +45,16 @@ describe('execution-map/1 contract', () => {
     expect(executionMapPageSchema.safeParse(settled).success).toBe(false);
   });
 
+  it('names the command a running gate is on, and only for a running gate', () => {
+    const source = runningGatePage.current.source!;
+    const onCommand = { ...runningGatePage, current: { ...runningGatePage.current, gateCommand: { kind: 'type-check' as const, position: 2, total: 4, source } } };
+    expect(executionMapPageSchema.parse(onCommand)).toEqual(onCommand);
+    const beyond = { ...onCommand, current: { ...onCommand.current, gateCommand: { ...onCommand.current.gateCommand, position: 5 } } };
+    expect(executionMapPageSchema.safeParse(beyond).error?.issues.map(issue => issue.message)).toContain('A command lies within its gate');
+    const idle = { ...onCommand, current: { ...onCommand.current, runningGate: null, awaitedSession: 'session:ses-engineer' } };
+    expect(executionMapPageSchema.safeParse(idle).error?.issues.map(issue => issue.message)).toContain('Only a running gate has a started command');
+  });
+
   it('requires compact gate subject and evidence, iteration scope, and session reach', () => {
     const gate = clone();
     const gateNode = gate.nodes.find(node => node.key === ids.failedGate)!;

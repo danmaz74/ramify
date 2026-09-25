@@ -4,7 +4,7 @@ import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { ramifyAttribution } from './diagnostics.js';
 import { checkOutputPath } from './execution.js';
 import { typeCheckAttribution } from './type-check-output.js';
-import type { CheckExecutionPort, CheckExecutionResult } from './execution.js';
+import type { CheckExecutionPort, CheckExecutionResult, GateCommandStarted } from './execution.js';
 import type {
   AcceptedCommit, CheckCommandKind, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
   GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference, ScenarioCheckSummary,
@@ -68,6 +68,8 @@ export interface GateRequest {
   /** `none-selected` when the checkpoint's scenario check had nothing to run, recorded on the attempt. */
   readonly scenarios?: 'none-selected' | undefined;
   readonly signal?: AbortSignal | undefined;
+  /** Called as each command starts; a gate run in place passes it to its executor. */
+  readonly started?: GateCommandStarted | undefined;
 }
 
 /** A verified gate whose commands may now be executed over a chosen revision. */
@@ -117,12 +119,17 @@ export async function prepareGate(checkpoint: Checkpoint, request: GateRequest):
   return { checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs };
 }
 
-/** Execute one already verified gate over `sourceCommit` and finish its immutable attempt. */
+/**
+ * Execute one already verified gate over `sourceCommit` and finish its
+ * immutable attempt. `started` is called as each command starts; a gate
+ * prepared again from its recorded operation is given it here.
+ */
 export async function executePreparedGate(
   execution: CheckExecutionPort,
   prepared: PreparedGate,
   sourceCommit: string,
   commit: string | null,
+  started: GateCommandStarted | undefined = prepared.request.started,
 ): Promise<GateAttempt> {
   const { request, checkpoint } = prepared;
   const bound = AbortSignal.timeout(prepared.timeoutMs);
@@ -142,6 +149,7 @@ export async function executePreparedGate(
         timeoutMs: prepared.timeoutMs,
       },
       signal,
+      ...(started === undefined ? {} : { started }),
     });
   return finishGate(prepared, executionResult, commit);
 }

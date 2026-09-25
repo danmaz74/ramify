@@ -168,7 +168,12 @@ hiding or measured complexity justifies it.
     audit executor runs each planned command
     through the harness's own command runner in a temporary worktree of the
     exact commit, then returns the published run, report and tree refs with
-    the harness command records.
+    the harness command records. Both executors announce each command as it
+    starts, and a run writes the announcement as `gate-command-started`, with
+    the gate, the command's kind and its place among the gate's commands
+    (`position` of `total`), readiness's gate included. It records progress
+    and decides nothing; the execution map's current activity names the
+    running gate's last started command as `gateCommand`.
   - `diagnostics.ts`: what a failing attempt says to the agent that receives
     it. Each command that did not pass is named with what it reported: a
     Ramify check's findings, worded by the one function that words a finding
