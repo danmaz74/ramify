@@ -1,0 +1,24 @@
+{
+  "revision": "577d0b5d71b3df7054ecb0dc91f6f684d2b4e976",
+  "dirtyAtStart": true,
+  "chromium": "/usr/bin/chromium",
+  "fixture": "RunQueries.analysis projection from analysis-plan-evidence.test.ts; actual PlanAndEntries component; local static Vite build",
+  "checks": [
+    "the fixture came from an accepted harness analysis projection",
+    "the fixture contains exact accepted NFR and advice passages",
+    "the real review component shows the original NFR quote and source path",
+    "the inferred condition remains labeled",
+    "unclear missing reference shows target, source path and exact excerpt",
+    "advice is separate from the NFR list",
+    "the advisory details reveal the original advice and incorporation judgment",
+    "explicit empty catalog is distinct from unavailable",
+    "unavailable evidence carries its reason",
+    "the narrow review remains inside the viewport",
+    "Chromium reports no page exceptions"
+  ],
+  "screenshots": [
+    "plan13-review-1440x900.png",
+    "plan13-review-480x800.png"
+  ],
+  "failure": null
+}
