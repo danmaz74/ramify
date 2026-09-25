@@ -88,7 +88,7 @@ files named in H13 to H16 below, copied from
 | H10 | The hook says nothing when a description error removes import findings | fixed, `345f30fc` |
 | H11 | Engineers never see warnings or analysis limits | fixed, `345f30fc` |
 | H12 | The scripted fake agent's analysis lacks the required scenario lists | fixed, `345f30fc` |
-| H13 | The audit worktree has no build | pending publish |
+| H13 | The audit worktree has no build | fixed (`ea8cd278`, audited `3d1f1a53`) |
 | H14 | An engineer failure ended the run | fixed, `f0d6ac6c`, `42e81ba6` |
 | H15 | The fake was more importable than the export it stands for | fixed, `a015ce0d` |
 | H16 | The global architect answered an environment problem as a placement | fixed, `b0a1f99a` |
@@ -454,11 +454,22 @@ infrastructure. Implemented in ramify-audit branch
 `feat/workspace-setup-commands` (`c56abf4`, `b587cb9`, version to become
 0.1.1: `nodejs` preparation with `packageDirectories` and `setupCommands`,
 error codes `setup-command-failed`, `setup-command-timed-out`,
-`dependency-link-failed`, evidence `workspacePreparation`), not yet
-published. Implemented in ramify-agent branch `fix/run-setup-commands`
-(`dbb6777d`: readiness step `baseline-setup`, gate command kind `setup`,
-reason `setup-failed`), not yet merged; it waits for the published
-ramify-audit. Pending publish.
+`dependency-link-failed`, evidence `workspacePreparation`; then `c08bcce`:
+a timeout kills the command's whole process tree and bounds the wait for
+its output, `source-revision-moved` is detected before each check, and an
+install-like command through a linked `node_modules` is refused; release
+commit `3ced97a`, version 0.1.1, pushed to GitHub). The registry publish
+needs a login this machine lacks, so ramify-agent takes the package from
+that GitHub commit for now. Implemented in ramify-agent branch
+`fix/run-setup-commands` (`dbb6777d`: readiness step `baseline-setup`, gate
+command kind `setup`, reason `setup-failed`; `0f611229`: gate command
+records carry `stopped` and `outputIncomplete`, readiness refuses an
+install-like setup command through a linked `node_modules`; `1430ee0d`: the
+GitHub pin), merged as `ea8cd278`. The audit passed on `3d1f1a53` (run
+`refs/audited/runs/2026-09-25T10-03-30Z-3d1f1a530`, 210 s, report commit
+`1279defe`). Open: a scenario's full-mode `setup`/`teardown` argv is not
+covered by the install guard, and a deterministic refusal at a gate is
+retried until its infrastructure bound. Fixed.
 
 ### H14. An engineer failure ended the run
 
@@ -769,7 +780,9 @@ the form `owner:file#binding`, such as `app/catalog/core:records.ts#findRecord`"
   seconds into the suite, and ramify-audit's command timeout then killed
   `npm` without its process tree, so the orphaned vitest held the audit for
   seventeen more minutes. Neither is a ramify-agent defect; the tree kill is
-  fixed in ramify-audit 0.1.1 with H13. H13 itself is audited when it merges.
+  fixed in ramify-audit 0.1.1 with H13. With H13 merged, the same request
+  first failed `patch-integrity` on `ea8cd278` (a blank line at the end of
+  `check-execution.ts`, every test passing) and then passed on `3d1f1a53`.
 
 ## Not reached
 
