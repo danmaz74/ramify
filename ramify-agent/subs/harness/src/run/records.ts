@@ -155,6 +155,8 @@ export const runPolicySchema = z.object({
     reconciliationRoundsPerWorkItem: z.int().positive().optional(),
     /** The least risk a correction after a work item's first reconciliation round may be planned for; absent before iteration 5. */
     laterRoundMinimumRisk: z.enum(['medium', 'high']).optional(),
+    /** The plan deviations a run records before the next one waits for the person; absent before plan deviations existed, which means five. */
+    maxPlanDeviations: z.int().nonnegative().optional(),
   }).strict(),
   /**
    * The context policy of each role. The reviewer's is absent from a run
@@ -496,10 +498,11 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
 /**
  * Why a suspended session is continued: its placement request was answered,
  * the iteration it assigned closed, its completion was refused while
- * evidence was owed, a gate failed after its result and it repairs, or the
- * reconciliation of its completion request chose a correction.
+ * evidence was owed, a gate failed after its result and it repairs, the
+ * reconciliation of its completion request chose a correction, or its
+ * unresolved request was answered with a plan deviation.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**
@@ -507,9 +510,10 @@ export type ContinueReason = z.infer<typeof continueReasonSchema>;
  * architect context; a scope review forks the local architect at the point
  * that produced the assignment; a design review forks the orientation that
  * read its guidance; a reconciliation forks the local architect at the
- * point after its completion request.
+ * point after its completion request; an unresolved request forks the
+ * architect context, as a placement request does.
  */
-export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']);
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);

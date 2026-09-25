@@ -228,6 +228,8 @@ export type RunNoticeKind = RunNotice['kind'];
  * The requests for a person's decision that the run's CheckFindings hold
  * open. A work item with one is held before its gate until a person
  * answers, with no time limit, and the run advances no further meanwhile.
+ * A plan deviation's request holds nothing, except one recorded past the
+ * run's limit, which holds the work item whose request it answered.
  * `waiting` says the run is held now: it is running, no stop was requested,
  * and a work item has an open request. A run with no CheckFinding, such as
  * one begun before CheckFindings existed, has none.
@@ -243,6 +245,19 @@ export const runDecisionRequestsSchema = z.object({
   }).strict()),
 }).strict();
 export type RunDecisionRequests = z.infer<typeof runDecisionRequestsSchema>;
+
+/**
+ * The plan deviations a run recorded: departures from a requirement of its
+ * plan that the global architect decided because the requirement could not
+ * be met as written. None holds a work item or a gate, so a run that
+ * recorded any completes "with N plan deviations to review", never plainly;
+ * `toReview` counts those still awaiting the person's decision.
+ */
+export const runPlanDeviationsSchema = z.object({
+  recorded: count,
+  toReview: count,
+}).strict();
+export type RunPlanDeviations = z.infer<typeof runPlanDeviationsSchema>;
 
 /**
  * A run as its log states it. Status lives in the log: every field here is
@@ -291,6 +306,7 @@ export const runSnapshotSchema = z.object({
   /** Module notices first, then cycles, each in the order the log established them. */
   notices: z.array(runNoticeSchema),
   decisionRequests: runDecisionRequestsSchema,
+  planDeviations: runPlanDeviationsSchema,
 }).strict();
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 

@@ -44,8 +44,10 @@ import { decompositionSchema } from './records.js';
  * independent entry work item and returns this item when they have
  * conformed.
  *
- * `unresolved` ends the run with the conflict and its evidence rather than
- * weakening the request.
+ * `unresolved` names the conflict and its evidence rather than weakening the
+ * request. The global architect answers it with a placement fix, a plan
+ * deviation the work item goes on under, or nothing possible, which ends
+ * the run.
  *
  * The fields the harness already knows are absent: the work item, the
  * revision, the invocation and the hypothesis revisions it delivered are the

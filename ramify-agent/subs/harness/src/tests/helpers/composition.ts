@@ -698,8 +698,8 @@ const failingNotes = {
 
 /**
  * A gate that fails in scope, three repair rounds that change nothing, the
- * iteration exhausted, and a local architect that reports the request
- * cannot be met.
+ * iteration exhausted, a local architect that reports the request cannot be
+ * met, and a global architect that finds nothing of the plan possible.
  */
 const repair: Scenario = {
   name: 'repair',
@@ -716,6 +716,9 @@ const repair: Scenario = {
       submit({ kind: 'unresolved', conflict: 'The limit the test states is not one this module can meet as asked.', evidence: [`${notesDirectory}/src/tests/notes.test.ts`] }),
     ],
     engineer: [submit(completionProposed('Nothing needed changing.'))],
+    // The global architect answers the unresolved request: no deviation
+    // leaves anything of the plan worth doing, so the run ends.
+    'global-fork': [submit({ kind: 'nothing-possible', reason: 'The plan asks for exactly the limit the module cannot meet.', evidence: [`${notesDirectory}/src/tests/notes.test.ts`] })],
   }),
   inputs: treeInputs,
 };

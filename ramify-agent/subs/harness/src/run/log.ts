@@ -557,9 +557,56 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('reconciliation-brief-appended', reconciliationBriefAppendedDataSchema),
   /** A basis that no longer held, at the assessment or before the work item's completion; a new round follows. */
   event('reconciliation-refused', reconciliationRefusedDataSchema),
+  /**
+   * Commits the `UnresolvedRequest` a local architect's `unresolved` answer
+   * makes. Like a placement request it licenses no agent by itself; the
+   * `view-refreshed` of its request licenses one fork of the global
+   * architect, which answers it.
+   */
+  event('unresolved-requested', z.object({
+    request: text,
+    workItem: text,
+    requester: modulePathSchema,
+    /** The local architect's invocation that answered `unresolved`. */
+    invocation: text,
+  }).strict()),
+  /**
+   * Commits one `PlanDeviation` the fork of an unresolved request decided,
+   * with the CheckFinding that asks the person to accept or reject it, as
+   * one line. `held` says the run waits for that decision before going on,
+   * because it recorded more deviations than its policy continues past.
+   */
+  event('plan-deviation-recorded', z.object({
+    request: text,
+    deviation: text,
+    workItem: text,
+    invocation: text,
+    checkFinding: text,
+    held: z.boolean(),
+    checkFindings: checkFindingEventsField,
+  }).strict()),
+  /**
+   * The intent of rendering the pending scenarios a plan deviation rewords
+   * into their feature files and committing them, with the revised scenario
+   * records. Its completion is `scenarios-reworded`.
+   */
+  event('scenarios-rewording', z.object({
+    deviation: text,
+    rewording: z.int().positive(),
+    scenarios: z.array(scenarioIdSchema).min(1),
+    files: z.array(text),
+  }).strict()),
+  /** The reworded feature files are in the tree, committed. */
+  event('scenarios-reworded', z.object({ deviation: text, commit: text }).strict()),
   event('stop-requested', z.object({ command: acceptedCommandSchema }).strict()),
   /** Requires a passing `final` gate on the current tree; an empty queue alone never satisfies it. */
-  event('job-completed', z.object({ gate: text, commit: z.string().nullable(), workItems: z.int().nonnegative() }).strict()),
+  event('job-completed', z.object({
+    gate: text,
+    commit: z.string().nullable(),
+    workItems: z.int().nonnegative(),
+    /** The plan deviations awaiting the person's review when it completed; absent before plan deviations existed. */
+    planDeviations: z.int().nonnegative().optional(),
+  }).strict()),
   event('job-failed', z.object({ reason: runFailureReasonSchema, message: z.string(), evidence: z.array(z.string()) }).strict()),
   /** `settled` says whether the writer was confirmed settled within the bound. */
   event('job-stopped', z.object({ settled: z.boolean() }).strict()),
@@ -571,15 +618,22 @@ export type RunEventOf<T extends RunEventType> = Extract<RunEvent, { type: T }>;
 
 /**
  * The event types that end a run. Nothing follows one, except that a person
- * may approve the analysis of a run that completed.
+ * may approve the analysis of a run that completed, and may accept or reject
+ * the plan deviations of a run that ended.
  */
 export const terminalRunEvents = ['job-completed', 'job-failed', 'job-stopped', 'job-interrupted'] as const satisfies readonly RunEventType[];
 
 const terminal = new Set<string>(terminalRunEvents);
 
-/** Whether an event of `type` may follow the run's terminal event. */
-function mayFollow(ended: RunEvent, type: RunEventType): boolean {
-  return ended.type === 'job-completed' && type === 'analysis-approved';
+/**
+ * Whether an event may follow the run's terminal event: an approval of a
+ * completed run's analysis, or a person's command recorded against its
+ * CheckFindings, which the service accepts after the end only for a plan
+ * deviation.
+ */
+function mayFollow(ended: RunEvent, input: Pick<RunEvent, 'type' | 'data'> | RunEventInput): boolean {
+  if (input.type === 'check-findings-recorded') return (input.data as RunEventOf<'check-findings-recorded'>['data']).cause.kind === 'user-command';
+  return ended.type === 'job-completed' && input.type === 'analysis-approved';
 }
 
 /** An event to append: its type and data. The log assigns the sequence and time. */
@@ -639,7 +693,7 @@ export class RunLog {
       if (current.sequence !== index + 1) throw new CorruptRunLogError(path, index + 1, `sequence ${current.sequence}, expected ${index + 1}`);
       if (current.jobId !== runId) throw new CorruptRunLogError(path, index + 1, `event of run ${current.jobId}`);
       const ended = terminalOf(events.slice(0, index));
-      if (ended && !mayFollow(ended, current.type)) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
+      if (ended && !mayFollow(ended, current)) throw new CorruptRunLogError(path, index + 1, `the run has ended; ${current.type} cannot follow ${ended.type}`);
     });
     const carriers = events.filter(current => carriedCheckFindings(current).length > 0);
     const replayed = replayCheckFindingEvents(carriers.flatMap(carriedCheckFindings));
@@ -717,7 +771,7 @@ export class RunLog {
    */
   carrier(input: RunEventInput, at: Date = new Date()): RunEvent {
     const ended = this.terminal;
-    if (ended && !mayFollow(ended, input.type)) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
+    if (ended && !mayFollow(ended, input)) throw new Error(`Run ${this.runId}: the run has ended; ${input.type} cannot follow ${ended.type}`);
     return runEvent(this.runId, this.nextSequence, input, at);
   }
 }

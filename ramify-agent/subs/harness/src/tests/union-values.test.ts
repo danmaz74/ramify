@@ -28,6 +28,7 @@ import {
   hypothesisStanceSchema, placementOutcomeSchema,
 } from '../architecture/records.js';
 import { forkSubmissionKinds, forkSubmissionSchema } from '../architecture/submission.js';
+import { deviationLayout, deviationSchemas } from '../deviations/records.js';
 import { localArchitectSubmissionSchema, localArchitectSubmissionKinds } from '../work/submission.js';
 import { engineerSubmissionSchema, engineerSubmissionKinds, unsuitableReasonSchema } from '../work/engineer.js';
 import { assignableKindSchema, assignmentBodySchema } from '../work/assignment.js';
@@ -105,15 +106,16 @@ describe('the run log', () => {
       'writer-acquired', 'writer-released',
       'gate-started', 'gate-committing', 'gate-attempted', 'check-findings-recorded',
       'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished',
-      'reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended', 'reconciliation-refused', 'stop-requested',
+      'reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended', 'reconciliation-refused',
+      'unresolved-requested', 'plan-deviation-recorded', 'scenarios-rewording', 'scenarios-reworded', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation']);
-    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded']);
+    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
@@ -689,10 +691,32 @@ describe('the records this iteration establishes', () => {
 
   test('every member of the fork submission this iteration offers', () => {
     const kinds = forkSubmissionSchema.options.map(option => option.shape.kind.value);
-    expect(kinds).toEqual(['decision', 'partial']);
+    expect(kinds).toEqual(['decision', 'partial', 'deviation', 'nothing-possible']);
     // The package offers exactly the members a run of this iteration
-    // produces, and both have one.
+    // produces, and each has one: a deviation and nothing possible answer an
+    // unresolved request only.
     expect([...forkSubmissionKinds]).toEqual(kinds);
+  });
+
+  test('an unresolved request and the plan deviation that answers it are written and read back', async () => {
+    const store = await ledger();
+    const request = await store.roundTrip(deviationLayout.request('ur-001'), {
+      schema: 'ramify-agent.unresolved-request/1', id: 'ur-001', workItem: 'wi-001', requester: 'shop/orders', invocation: 'inv-0004',
+      conflict: 'the plan asks for a surface no module has', evidence: ['plan.md lines 3-4'],
+    }, deviationSchemas.unresolvedRequest);
+    expect(request.id).toBe('ur-001');
+    for (const held of [false, true]) {
+      const read = await store.roundTrip(deviationLayout.deviation(held ? 'pd-002' : 'pd-001'), {
+        schema: 'ramify-agent.plan-deviation/1', id: held ? 'pd-002' : 'pd-001', request: 'ur-001', workItem: 'wi-001', invocation: 'inv-0005',
+        plan: { path: 'plans/p/plan.md', revision: `sha256:${'a'.repeat(64)}` },
+        requirements: [{ lines: [3, 4], text: '- Serve it over MCP.' }],
+        instead: 'tRPC only', why: 'no MCP surface', rejected: [{ alternative: 'a new module', reason: 'out of scope' }], loss: 'no MCP tool',
+        workItems: ['wi-001'], modules: ['shop/orders'],
+        scenarios: [{ scenario: 'sc-001', file: 'src/tests/features/p/e.feature', before: ['Scenario: a'], after: ['Scenario: b'] }],
+        checkFinding: 'cf-0001', held,
+      }, deviationSchemas.planDeviation);
+      expect(read.held).toBe(held);
+    }
   });
 
   test('the two events a contract revision writes carry every binding it scheduled', () => {
@@ -963,6 +987,10 @@ function sampleData(type: RunEvent['type']): unknown {
     'placement-requested': { request: 'pr-001', workItem: 'wi-001', requester: 'm', capability: 'c' },
     'view-refreshed': { request: 'pr-001', attempt: 1, view: { status: 'placeholder' }, unavailable: null },
     'fork-returned-partial': { request: 'pr-001', invocation: 'inv-0002', retry: 1 },
+    'unresolved-requested': { request: 'ur-001', workItem: 'wi-001', requester: 'm', invocation: 'inv-0002' },
+    'plan-deviation-recorded': { request: 'ur-001', deviation: 'pd-001', workItem: 'wi-001', invocation: 'inv-0003', checkFinding: 'cf-0001', held: false, checkFindings: [] },
+    'scenarios-rewording': { deviation: 'pd-001', rewording: 1, scenarios: ['sc-001'], files: ['src/tests/features/p/e.feature'] },
+    'scenarios-reworded': { deviation: 'pd-001', commit: 'c' },
     'decision-accepted': { request: 'pr-001', decision: 'gd-001', workItem: 'wi-001', invocation: 'inv-0002', registry: 0, hypotheses: 0 },
     'brief-appended': { decision: 'gd-001', generation: 1, session: 'ses-0001', ref: 's', outcome: 'appended' },
     'global-context-rebuilt': { generation: 2, reason: 'lost' },

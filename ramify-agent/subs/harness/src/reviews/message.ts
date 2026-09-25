@@ -54,8 +54,15 @@ export function reviewMessage(briefing: ReviewBriefing): string {
   if (kind === 'scope') {
     lines.push('## What the plan asks of it', '');
     const requirements = briefing.requirements ?? [];
-    if (requirements.length === 0) lines.push('The assignment cites no part of the plan; judge the candidate against the assignment\'s own goal.', '');
-    for (const requirement of requirements) lines.push(`### ${requirement.ref} (sha256 ${requirement.hash.slice(0, 12)})`, '', requirement.text, '');
+    const excerpts = requirements.filter(requirement => !requirement.ref.startsWith('deviation:'));
+    const deviations = requirements.filter(requirement => requirement.ref.startsWith('deviation:'));
+    if (excerpts.length === 0) lines.push('The assignment cites no part of the plan; judge the candidate against the assignment\'s own goal.', '');
+    for (const requirement of excerpts) lines.push(`### ${requirement.ref} (sha256 ${requirement.hash.slice(0, 12)})`, '', requirement.text, '');
+    if (deviations.length > 0) {
+      lines.push('## Plan deviations in force', '',
+        'Each amends the plan for this run; the plan file is unchanged. Where one names a requirement above, judge the candidate against that requirement as the deviation amends it, and raise no concern for what the deviation leaves out.', '');
+      for (const deviation of deviations) lines.push(`### ${deviation.ref} (sha256 ${deviation.hash.slice(0, 12)})`, '', deviation.text, '');
+    }
     lines.push(briefing.planDocument === undefined || briefing.planDocument === null
       ? 'The candidate holds no copy of the plan, so the plan itself cannot be a concern\'s ground here.'
       : `The candidate holds the plan as \`${briefing.planDocument}\`. To name it as a concern's ground, read it with \`snapshot_read\`.`, '');

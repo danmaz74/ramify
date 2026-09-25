@@ -300,11 +300,13 @@ describe('a work-item gate that does not pass', () => {
 });
 
 describe('a local architect that cannot meet the request', () => {
-  test('`unresolved` ends the run with the conflict and its evidence, and no gate runs', async () => {
+  test('`unresolved` the global architect finds nothing possible for ends the run with the conflict and its evidence, and no gate runs', async () => {
     const project = await target();
     const submitted = analysis([entry('reviewer-note', reviews)]);
     const { service } = await openRuns(project, {
-      script: script(submitted, () => unresolved('The note would outlive the run it belongs to.')),
+      script: script(submitted, spec => (spec.role === 'global-fork'
+        ? { kind: 'nothing-possible', reason: 'A note that outlives its run contradicts the plan.', evidence: ['README.md'] }
+        : unresolved('The note would outlive the run it belongs to.'))),
       unchangedCheckpoints: [scenariosCommit('review-notes')],
     });
     cleanups.push(() => service.close());

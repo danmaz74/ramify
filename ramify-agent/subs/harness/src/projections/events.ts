@@ -100,6 +100,20 @@ function describe(event: RunEvent): [string, Ref[]] {
       ];
     case 'fork-returned-partial':
       return [`The fork for ${event.data.request} returned partial findings (retry ${event.data.retry})`, [...ref('request', event.data.request), ...ref('invocation', event.data.invocation)]];
+    case 'unresolved-requested':
+      return [
+        `${event.data.workItem} reported that its request cannot be met as stated; the global architect answers ${event.data.request}`,
+        [...ref('request', event.data.request), ...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
+      ];
+    case 'plan-deviation-recorded':
+      return [
+        `Plan deviation ${event.data.deviation} was recorded for ${event.data.request}${event.data.held ? '; the run waits for your decision on it' : '; it awaits your review and holds nothing'}`,
+        [...ref('request', event.data.request), ...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
+      ];
+    case 'scenarios-rewording':
+      return [`Plan deviation ${event.data.deviation} rewords ${event.data.scenarios.join(', ')}`, event.data.scenarios.flatMap(scenario => ref('scenario', scenario))];
+    case 'scenarios-reworded':
+      return [`The scenarios plan deviation ${event.data.deviation} rewords were committed`, ref('commit', event.data.commit)];
     case 'decision-accepted':
       return [
         `Decision ${event.data.decision} was accepted for ${event.data.request}`,
@@ -253,7 +267,10 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':
-      return [`The run completed after ${counted(event.data.workItems, 'work item', 'work items')}`, [...ref('gate', event.data.gate), ...ref('commit', event.data.commit)]];
+      return [
+        `The run completed after ${counted(event.data.workItems, 'work item', 'work items')}${event.data.planDeviations === undefined ? '' : `, with ${counted(event.data.planDeviations, 'plan deviation', 'plan deviations')} to review`}`,
+        [...ref('gate', event.data.gate), ...ref('commit', event.data.commit)],
+      ];
     case 'job-failed':
       return [`The run failed (${event.data.reason}): ${event.data.message || 'no message'}`, []];
     case 'job-stopped':

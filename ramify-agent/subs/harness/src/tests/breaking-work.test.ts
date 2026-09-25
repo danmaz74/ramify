@@ -682,6 +682,7 @@ describe('the broad scope is a planned exception', () => {
           submit({ kind: 'unresolved', conflict: 'Stopping after the assignment this test is about.', evidence: [] }),
         ],
         engineer: [submit({ kind: 'partial', done: [], unfinished: ['everything'], findings: [] })],
+        'global-fork': [submit({ kind: 'nothing-possible', reason: 'The test stops here.', evidence: [] })],
       }),
     }).then(async opened => {
       cleanups.push(() => opened.service.close());
@@ -828,6 +829,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
         }, stagedOutline())),
         submit({ kind: 'unresolved', conflict: 'The iteration removed the runner\'s configuration rather than doing the work.', evidence: ['vitest.config.ts'] }),
       ],
+      'global-fork': [submit({ kind: 'nothing-possible', reason: 'The test stops here.', evidence: [] })],
       engineer: [
         submit(completionProposed('Removed the configuration that was in the way.'),
           write(`${dirC}/src/outcome.ts`, coreV1),

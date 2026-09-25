@@ -81,7 +81,12 @@ import {
   architectureLayout, architectureSchemas, globalDecisionId, localDecisionId, placementRequestSchema, requestId,
   type PlacementDecision, type PlacementRequest,
 } from '../architecture/records.js';
-import { forkMessage } from '../architecture/session.js';
+import { forkMessage, unresolvedForkMessage } from '../architecture/session.js';
+import {
+  defaultMaxPlanDeviations, deviationLayout, deviationText, planDeviationId, planDeviationSchema, planLines, unresolvedRequestId, unresolvedRequestSchema,
+  type DeviationBody, type PlanDeviation, type UnresolvedRequest,
+} from '../deviations/records.js';
+import { deviationCommands, isPlanDeviation, nextCheckFinding } from '../deviations/finding.js';
 import {
   forkJsonSchema, forkToolName, validateFork,
   type ForkSubmission, type PlacementEvidence, type PlacementRequestBody,
@@ -141,11 +146,11 @@ import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from './pol
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
-  incompleteScenarios, trackedScenarios, withdrawalMessage, withdrawnTrailerValue, withStates, writtenScenarios,
-  type FeatureRerendering,
+  incompleteScenarios, rewordedTrailerValue, rewordingMessage, scenarioNameOf, trackedScenarios, withdrawalMessage, withdrawnTrailerValue,
+  withStates, writtenScenarios, type FeatureRerendering,
 } from './feature-files.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
-import type { ScenarioRecord } from '../../subs/scenarios/src/records.js';
+import { scenarioRecordSchema, scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { scenariosToDeclare, type DeclarationContext } from '../work/declarations.js';
 import { dueIntegrations, integrationBriefing, integrationWorkItem, type IntegrationBriefing } from '../work/integration.js';
 import { entryScenariosOf, type EngineerScenarios } from '../work/scenario-briefing.js';
@@ -890,11 +895,17 @@ export class RunService {
     }
   }
 
-  /** The plan excerpts an iteration's assignment cites, from the captured plan. */
+  /**
+   * The plan excerpts an iteration's assignment cites, from the captured
+   * plan, and every plan deviation that amends the plan, each an input of
+   * its own: a scope review judges the candidate against the plan as its
+   * deviations amend it. A request binds the deviations recorded when it
+   * was made; a later one is not part of its question.
+   */
   private async scopeRequirements(run: Run, assignmentPath: string): Promise<CapturedInput[]> {
     const assignment = iterationAssignmentSchema.parse(this.committedBody(run, assignmentPath));
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
-    return planExcerpts(plan, assignment.requirementRefs);
+    return [...planExcerpts(plan, assignment.requirementRefs), ...deviationInputs(this.deviationsOf(run))];
   }
 
   /** A record body as the log committed it, never the materialized file. */
@@ -2137,6 +2148,13 @@ export class RunService {
         performed.push(`the withdrawal commit of ${event.data.scenarios.join(', ')}`);
         continue;
       }
+      if (event.type === 'scenarios-rewording') {
+        // The revised records are in the intent; the files are rendered from
+        // the ledger again, and the commit is found by its trailers.
+        await this.performRewording(run, event.data, [], true);
+        performed.push(`the rewording commit of ${event.data.scenarios.join(', ')}`);
+        continue;
+      }
       if (event.type === 'scenarios-materializing') {
         // The files are re-rendered from the ledger, and the commit is found
         // by its trailers where the interrupted attempt made it.
@@ -2612,7 +2630,9 @@ export class RunService {
    * the person saw, validates the person's authority, and commits the one
    * decision the child accepts on a `check-findings-recorded` line that holds
    * the accepted command. A refusal appends nothing. A work item waiting for
-   * the answer reads the state again.
+   * the answer reads the state again. After the run has ended, only a plan
+   * deviation accepts a command: the person reviews the run's deviations
+   * once it is over.
    */
   private async checkFindingCommand(command: CheckFindingUserCommand, contentHash: string): Promise<Receipt> {
     const { planId, jobId } = command.payload;
@@ -2621,8 +2641,14 @@ export class RunService {
     const at = this.now();
     let accepted: AcceptedCommand | undefined;
     const committed = await commitCheckFindingChange(run, ({ log, state }) => {
+      // A person's decision about a plan deviation outlasts the run; every
+      // other CheckFinding of an ended run accepts no command.
+      const entry = state.findings.get(command.payload.checkFinding);
+      if (log.terminal !== undefined && (entry === undefined || !isPlanDeviation(entry))) {
+        throw new CommandRejection('conflict', `The run has ended; its CheckFindings other than plan deviations accept no command. Run ${log.runId} has ended with ${log.terminal.type}`);
+      }
       this.commands.requireVersion(command, log.version);
-      const change = userCheckFindingChange(command, state.findings.get(command.payload.checkFinding));
+      const change = userCheckFindingChange(command, entry);
       if (!change.ok) throw new CommandRejection(change.code, change.message, undefined, change.evidence);
       const receipt = this.commands.accept(command, contentHash, jobId, log.nextSequence, at);
       accepted = receipt;
@@ -2630,7 +2656,7 @@ export class RunService {
         commands: [change.command],
         compose: decided => ({ event: { type: 'check-findings-recorded', data: { cause: { kind: 'user-command', command: receipt }, checkFindings: [...decided.events] } } }),
       };
-    }, at);
+    }, at, { afterEnd: true });
     if (committed.kind === 'refused') {
       const { refusal } = committed;
       if (refusal.reason === 'run-ended') throw new CommandRejection('conflict', `The run has ended; its CheckFindings accept no command. ${refusal.message}`);
@@ -3350,6 +3376,8 @@ export class RunService {
     let lastIterationGate: { id: string; cause: string | null; summary: readonly string[] } | undefined;
     /** A placement request of this work item that came back without a decision. */
     let unresolvedRequest: { id: string; findings: readonly string[]; gaps: readonly string[] } | undefined;
+    /** The plan deviation the global architect recorded for this work item's last unresolved request, delivered once. */
+    let deviationRecorded: PlanDeviation | undefined;
     /** A cycle one of this item's registrations closed, delivered once as a finding. */
     let cycleFinding: DependencyCycle | undefined;
     /** Providers of this item's requirements that reported they cannot conform. */
@@ -3434,6 +3462,10 @@ export class RunService {
           ...(revisionReports === undefined || revisionReports.length === 0 ? {} : { revisionsNeeded: revisionReports }),
         },
         ...(unresolvedRequest === undefined ? {} : { unresolvedRequest }),
+        // The plan as the run's deviations amend it: every one in force, and
+        // the one that just answered this architect's unresolved request.
+        deviations: this.deviationsOf(run),
+        ...(deviationRecorded === undefined ? {} : { deviationRecorded: deviationRecorded.id }),
         ...(returned === undefined ? {} : { reconciliation: this.reconciliationBriefing(run, returned, undelivered) }),
         ...(integration === undefined ? {} : { integration }),
         ...(scenarios.length === 0 ? {} : { scenarios }),
@@ -3455,6 +3487,7 @@ export class RunService {
       // detection.
       cycleFinding = undefined;
       blocked = undefined;
+      deviationRecorded = undefined;
       released = null;
       revisionReports = [];
       returned = undefined;
@@ -3471,9 +3504,10 @@ export class RunService {
         session,
         continuing,
         // The architect is continued after a placement request, an
-        // iteration and a refused or failed completion. A yield and an
-        // unresolved request end its use: a resumed work item starts afresh.
-        keep: (ended, value) => (ended === 'submitted' && value !== undefined && value.kind !== 'unresolved' && value.kind !== 'yield-for-providers'
+        // unresolved request the global architect answered, an iteration and
+        // a refused or failed completion. A yield ends its use: a resumed
+        // work item starts afresh.
+        keep: (ended, value) => (ended === 'submitted' && value !== undefined && value.kind !== 'yield-for-providers'
           ? kept
           : finished('not-kept')),
         toolName: localArchitectToolName,
@@ -3514,10 +3548,24 @@ export class RunService {
       }
 
       if (result.value.kind === 'unresolved') {
-        await this.fail(run, 'unresolvable-requirement',
-          `The local architect of ${item.id} reports the request cannot be met as stated: ${result.value.conflict}`,
-          [runLayout.submission(result.id), ...result.value.evidence]);
-        return null;
+        // The request cannot be met as stated. The global architect answers
+        // it: a placement fix, a plan deviation this work item goes on
+        // under, or nothing possible, which ends the run. What the work item
+        // declared and never passed is pending again first, as for a
+        // placement question.
+        if (!await this.withdrawScenarios(run, item, 'unresolved-requested')) return null;
+        const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
+          invocation: result.id, conflict: result.value.conflict, evidence: result.value.evidence,
+        });
+        if (resolution === null) return null;
+        unresolvedRequest = undefined;
+        if (resolution.kind === 'deviation') {
+          deviationRecorded = resolution.deviation;
+          continuing = 'deviation-recorded';
+        } else {
+          continuing = 'placement-answered';
+        }
+        continue;
       }
 
       if (result.value.kind === 'request-placement') {
@@ -3953,42 +4001,406 @@ export class RunService {
         continue;
       }
 
-      const decisionId = globalDecisionId(id);
-      const accepted = acceptDecision({
-        id: decisionId,
-        authority: 'global',
-        request: id,
-        workItem: item.id,
-        invocation: result.id,
-        body: result.value.decision,
-        registry: result.value.registry,
-        hypothesisRevisions: result.value.hypothesisRevisions,
-        brief: result.value.brief,
-        view,
-        committed: {
-          registry: new Map(current.registry.map(entry => [entry.capability, entry])),
-          hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
+      if (result.value.kind !== 'decision') {
+        await this.fail(run, 'internal', `The placement fork of ${id} answered ${result.value.kind}, which only an unresolved request accepts`, [runLayout.submission(result.id)]);
+        return null;
+      }
+      const decision = await this.acceptForkDecision(run, agent, item, id, result.id, result.value, view, current);
+      return decision === null ? null : { kind: 'decided', decision };
+    }
+  }
+
+  /**
+   * Accepts one fork's decision for a request: commits it with its registry
+   * and hypothesis revisions, appends its brief to the architect context
+   * and delivers it to the work item. Null once the run has ended.
+   */
+  private async acceptForkDecision(
+    run: Run,
+    agent: AgentPort,
+    item: WorkItem,
+    id: string,
+    invocation: string,
+    value: Extract<ForkSubmission, { kind: 'decision' }>,
+    view: ViewIdentity,
+    current: ReturnType<typeof committedRecords>,
+  ): Promise<PlacementDecision | null> {
+    const decisionId = globalDecisionId(id);
+    const accepted = acceptDecision({
+      id: decisionId,
+      authority: 'global',
+      request: id,
+      workItem: item.id,
+      invocation,
+      body: value.decision,
+      registry: value.registry,
+      hypothesisRevisions: value.hypothesisRevisions,
+      brief: value.brief,
+      view,
+      committed: {
+        registry: new Map(current.registry.map(entry => [entry.capability, entry])),
+        hypotheses: new Map(current.hypotheses.map(hypothesis => [hypothesis.id, hypothesis])),
+      },
+    });
+
+    await this.appendBrief(run, agent, accepted.decision, {
+      input: {
+        type: 'decision-accepted',
+        data: {
+          request: id,
+          decision: decisionId,
+          workItem: item.id,
+          invocation,
+          registry: accepted.registry.length,
+          hypotheses: accepted.hypotheses.length,
+        },
+      },
+      records: accepted.records,
+    });
+    if (this.ignoring(run)) return null;
+    if (!await this.deliverDecision(run, accepted.decision)) return null;
+    return accepted.decision;
+  }
+
+  /**
+   * A local architect's `unresolved` answer: its request cannot be met as
+   * stated. The harness records it as an unresolved request and forks the
+   * architect context with it, as for a placement request. The fork answers
+   * with a placement decision, delivered as a placement answer is; with a
+   * plan deviation, recorded with the CheckFinding that asks the person to
+   * accept or reject it, under which the work item goes on; or with nothing
+   * possible, which ends the run, as does a fork that cannot decide within
+   * its retries. Null once the run has ended.
+   */
+  private async resolveUnresolved(
+    run: Run,
+    agent: AgentPort,
+    packages: ReadonlyMap<string, LoadedPackage>,
+    baseline: MeasurementSnapshot,
+    item: WorkItem,
+    answer: { readonly invocation: string; readonly conflict: string; readonly evidence: readonly string[] },
+  ): Promise<UnresolvedResolution | null> {
+    const loaded = packages.get('global-fork');
+    if (loaded === undefined) {
+      await this.fail(run, 'internal', 'No prompt package is loaded for the global architect');
+      return null;
+    }
+    // Unresolved requests fork the architect context as placement requests
+    // do, and count against the same bound.
+    const forks = run.log.count('placement-requested') + run.log.count('unresolved-requested') + 1;
+    if (forks > run.record.policy.limits.maxPlacementRequests) {
+      await this.fail(run, 'limit-exceeded',
+        `The run has made ${forks - 1} placement and unresolved requests; the policy allows ${run.record.policy.limits.maxPlacementRequests}`);
+      return null;
+    }
+
+    const id = unresolvedRequestId(run.log.count('unresolved-requested') + 1);
+    const request = unresolvedRequestSchema.parse({
+      schema: 'ramify-agent.unresolved-request/1',
+      id,
+      workItem: item.id,
+      requester: item.module,
+      invocation: answer.invocation,
+      conflict: answer.conflict,
+      evidence: [...answer.evidence],
+    } satisfies UnresolvedRequest);
+    await this.write(run, {
+      type: 'unresolved-requested',
+      data: { request: id, workItem: item.id, requester: item.module, invocation: answer.invocation },
+    }, [{ path: deviationLayout.request(id), id, revision: 1, body: request }]);
+    if (this.ignoring(run)) return null;
+
+    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    const planFile = planPath(run.record.planId);
+    const unresolvable = (detail: string, evidence: readonly string[]) => this.fail(run, 'unresolvable-requirement',
+      `The local architect of ${item.id} reports the request cannot be met as stated (${answer.conflict}), and ${detail}`,
+      [deviationLayout.request(id), runLayout.submission(answer.invocation), ...answer.evidence, ...evidence]);
+    const systemPrompt = renderGlobalForkPrompt(loaded, this.projectRoot);
+    const bound = run.record.policy.limits.forkRetriesPerRequest;
+    const measured = baselineScope(
+      this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
+      baseline.supplementary.map(entry => entry.path),
+    );
+    let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined;
+    let revalidate: { was: string; now: string } | undefined;
+
+    for (;;) {
+      if (this.ignoring(run)) return null;
+      run.writer.requireSettled(`The architect view for ${id} cannot be refreshed`);
+
+      const attempt = run.log.all('view-refreshed').filter(event => event.data.request === id).length + 1;
+      const index = await this.refreshIndex(run);
+      const view = await this.viewIdentityOf(index);
+      const unavailable = index === null
+        ? 'the architect view could not be refreshed for this request, so what it does not show is not established'
+        : null;
+      await this.write(run, { type: 'view-refreshed', data: { request: id, attempt, view, unavailable } });
+      if (this.ignoring(run)) return null;
+
+      const current = committedRecords(run.log.ledger.replay());
+      const context = this.globalContextOf(run);
+      const decisions = [...current.decisions.values()];
+      const tracked = trackedScenarios(run.log.ledger.replay());
+      const result = await this.runInvocation<ForkSubmission>(run, agent, {
+        role: 'global-fork',
+        work: { workItem: item.id, request: id },
+        attempt,
+        loaded,
+        systemPrompt,
+        prompt: unresolvedForkMessage({
+          request,
+          workItem: { goal: item.goal, requirements: item.requirementRefs.map(ref => (ref.anchor !== undefined ? `“${ref.anchor}”` : `lines ${ref.lines![0]}–${ref.lines![1]}`)) },
+          plan: { path: planFile, text: plan },
+          deviations: this.deviationsOf(run),
+          deviationLimit: this.deviationLimit(run),
+          view,
+          ...(unavailable === null ? {} : { viewUnavailable: unavailable }),
+          registry: current.registry,
+          hypotheses: current.hypotheses,
+          decisions,
+          ...(context.ref === null
+            ? { orientation: orientation({ hypotheses: current.hypotheses, registry: current.registry, decisions }) }
+            : {}),
+          ...(partial === undefined ? {} : { partial }),
+          ...(revalidate === undefined ? {} : { revalidate }),
+        }),
+        start: context.ref === null ? { mode: 'fresh' } : { mode: 'fork', from: context.ref },
+        ...(context.point === null ? {} : {
+          fork: { from: context.point, reason: 'unresolved-request', generation: context.generation, briefs: [...context.appended] },
+        }),
+        ...(context.session === null && context.previous !== null
+          ? { replaces: { session: context.previous, reason: 'context-rebuilt' } }
+          : {}),
+        keep: ended => (context.session === null && ended === 'submitted' ? kept : finished('not-kept')),
+        toolName: forkToolName,
+        description: 'End this fork with its answer to the unresolved request: a placement decision, a plan deviation, nothing possible, or the findings and gaps of a fork that could not decide. The harness validates it; an invalid submission is returned with every error and its path.',
+        inputSchema: forkJsonSchema,
+        submissionSchema: 'ramify-agent.fork-submission/1',
+        validate: input => validateFork(input, placementEvidenceOf(current, index), {
+          kind: 'unresolved',
+          plan,
+          workItems: new Set(current.workItems.map(entry => entry.id)),
+          scenarios: new Map(tracked.records.map(record => [record.id, tracked.states.get(record.id) ?? 'pending'])),
+        }),
+        scope: {
+          write: null,
+          measurement: run.record.baseline && 'measurement' in run.record.baseline ? run.record.baseline.measurement : null,
+          size: scopeSize(baseline, measured),
         },
       });
 
-      await this.appendBrief(run, agent, accepted.decision, {
-        input: {
-          type: 'decision-accepted',
-          data: {
-            request: id,
-            decision: decisionId,
-            workItem: item.id,
-            invocation: result.id,
-            registry: accepted.registry.length,
-            hypotheses: accepted.hypotheses.length,
-          },
-        },
-        records: accepted.records,
-      });
       if (this.ignoring(run)) return null;
-      if (!await this.deliverDecision(run, accepted.decision)) return null;
-      return { kind: 'decided', decision: accepted.decision };
+      if (result.ended !== 'submitted' || result.value === undefined) {
+        await this.fail(
+          run,
+          result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
+          `The fork of unresolved request ${id} ended without a result (${result.ended})`,
+          [runLayout.outcome(result.id)],
+        );
+        return null;
+      }
+
+      const value = result.value;
+      if (value.kind === 'partial') {
+        const retry = run.log.all('fork-returned-partial').filter(event => event.data.request === id).length + 1;
+        await this.write(run, { type: 'fork-returned-partial', data: { request: id, invocation: result.id, retry } });
+        if (this.ignoring(run)) return null;
+        partial = { attempt, findings: [...value.findings], gaps: [...value.gaps] };
+        revalidate = undefined;
+        if (retry > bound) {
+          await unresolvable(`the global architect could not answer ${id} within ${bound} retr${bound === 1 ? 'y' : 'ies'}: ${[...value.findings, ...value.gaps].join('; ') || 'it named nothing'}`, [runLayout.submission(result.id)]);
+          return null;
+        }
+        continue;
+      }
+      if (value.kind === 'nothing-possible') {
+        await unresolvable(`the global architect found that no deviation leaves anything of the plan worth doing: ${value.reason}`, [runLayout.submission(result.id)]);
+        return null;
+      }
+      if (value.kind === 'deviation') {
+        return this.recordDeviation(run, item, id, result.id, value.deviation, { path: planFile, text: plan });
+      }
+
+      // A placement fix: the evidence must still be what the fork decided on.
+      const now = await this.viewIdentityOf(await this.refreshIndex(run));
+      if (!sameView(view, now)) {
+        const partials = run.log.all('fork-returned-partial').filter(event => event.data.request === id).length;
+        revalidate = { was: identityOf(view), now: identityOf(now) };
+        partial = undefined;
+        if (attempt - partials > bound) {
+          await unresolvable(`the architect view changed under every investigation of ${id}; it was ${revalidate.was} and is ${revalidate.now}`, []);
+          return null;
+        }
+        continue;
+      }
+      const decision = await this.acceptForkDecision(run, agent, item, id, result.id, value, view, current);
+      return decision === null ? null : { kind: 'decided', decision };
     }
+  }
+
+  /**
+   * Records the plan deviation a fork decided, with its CheckFinding, as one
+   * line: the requirements it departs from are quoted from the captured
+   * plan, which stays as written. The pending scenarios it rewords are
+   * rendered and committed. Past the run's limit, the run waits for the
+   * person to accept or reject it; a rejection there ends the run.
+   */
+  private async recordDeviation(
+    run: Run,
+    item: WorkItem,
+    request: string,
+    invocation: string,
+    body: DeviationBody,
+    plan: { readonly path: string; readonly text: string },
+  ): Promise<UnresolvedResolution | null> {
+    const recorded = run.log.count('plan-deviation-recorded');
+    const held = recorded >= this.deviationLimit(run);
+    const id = planDeviationId(recorded + 1);
+    const current = committedRecords(run.log.ledger.replay());
+    const workItems = [...new Set([item.id, ...body.workItems])];
+    const modules = [...new Set(workItems.flatMap(workItem => {
+      const module = current.workItems.find(entry => entry.id === workItem)?.module;
+      return module === undefined ? [] : [module];
+    }))];
+    const tracked = trackedScenarios(run.log.ledger.replay());
+    const scenarios = body.scenarios.map(entry => {
+      const record = tracked.records.find(candidate => candidate.id === entry.scenario);
+      if (record === undefined) throw new Error(`${entry.scenario} is no tracked scenario`);
+      return { scenario: entry.scenario, file: record.file, before: [...record.source], after: [...entry.source] };
+    });
+    let deviation: PlanDeviation | undefined;
+    const committed = await commitCheckFindingChange(run, ({ log, state }) => {
+      if (log.all('plan-deviation-recorded').some(event => event.data.request === request)) return { stale: `${request} is already answered with a deviation` };
+      const record = planDeviationSchema.parse({
+        schema: 'ramify-agent.plan-deviation/1',
+        id,
+        request,
+        workItem: item.id,
+        invocation,
+        plan: { path: plan.path, revision: `sha256:${sha256(plan.text)}` },
+        requirements: body.requirements.map(requirement => ({ lines: requirement.lines, text: planLines(plan.text, requirement.lines) })),
+        instead: body.instead,
+        why: body.why,
+        rejected: body.rejected.map(entry => ({ ...entry })),
+        loss: body.loss,
+        workItems,
+        modules,
+        scenarios,
+        checkFinding: nextCheckFinding(state),
+        held,
+      } satisfies PlanDeviation);
+      deviation = record;
+      return {
+        commands: deviationCommands(state, record),
+        compose: decided => ({
+          event: {
+            type: 'plan-deviation-recorded',
+            data: { request, deviation: id, workItem: item.id, invocation, checkFinding: record.checkFinding, held, checkFindings: [...decided.events] },
+          },
+          records: [{ path: deviationLayout.deviation(id), id, revision: 1, body: record }],
+        }),
+      };
+    }, this.now());
+    if (committed.kind === 'refused' && committed.refusal.reason === 'run-ended') return null;
+    if (committed.kind !== 'committed' || deviation === undefined) {
+      await this.fail(run, 'internal', `Plan deviation ${id} of ${request} could not be recorded: ${committed.kind === 'refused' ? committed.refusal.message : 'it was already recorded'}`);
+      return null;
+    }
+    run.notify();
+    if (scenarios.length > 0 && !await this.rewordScenarios(run, deviation)) return null;
+    if (held && !await this.awaitDeviationDecision(run, deviation)) return null;
+    return { kind: 'deviation', deviation };
+  }
+
+  /**
+   * Waits for the person's decision on a deviation the run recorded past its
+   * limit: the run goes no further meanwhile, with no time limit, and the
+   * run's decision requests say it waits. Their acceptance lets the work item
+   * go on; their rejection ends the run with their answer. A stop or the
+   * service closing ends the wait.
+   */
+  private async awaitDeviationDecision(run: Run, deviation: PlanDeviation): Promise<boolean> {
+    for (;;) {
+      if (this.ignoring(run)) return false;
+      // Registered before the state is read, so an answer in between still wakes it.
+      const changed = run.changed();
+      const entry = checkFindingStateOf(run.log.ledger).findings.get(deviation.checkFinding);
+      if (entry === undefined) {
+        await this.fail(run, 'internal', `Plan deviation ${deviation.id} names ${deviation.checkFinding}, which is no CheckFinding`);
+        return false;
+      }
+      if (entry.pendingUserDecision === null) {
+        if (entry.reason === 'waived') return true;
+        const answer = [...entry.decisions].reverse().find(decision => decision.decision.action === 'answer-user-decision');
+        await this.fail(run, 'unresolvable-requirement',
+          `The person rejected plan deviation ${deviation.id}, recorded past the run's limit of ${this.deviationLimit(run)}: ${answer?.rationale ?? 'no answer was recorded'}`,
+          [deviationLayout.deviation(deviation.id)]);
+        return false;
+      }
+      await changed;
+    }
+  }
+
+  /** Every plan deviation the run recorded, in order. */
+  private deviationsOf(run: Run): PlanDeviation[] {
+    return run.log.all('plan-deviation-recorded').flatMap(event => {
+      const parsed = planDeviationSchema.safeParse(this.committedBody(run, deviationLayout.deviation(event.data.deviation)));
+      return parsed.success ? [parsed.data] : [];
+    });
+  }
+
+  /** How many deviations the run records before the next one waits for the person. */
+  private deviationLimit(run: Run): number {
+    return run.record.policy.limits.maxPlanDeviations ?? defaultMaxPlanDeviations;
+  }
+
+  /**
+   * Renders the pending scenarios a deviation rewords into their feature
+   * files and commits them, as the ledger's external effect: the intent
+   * `scenarios-rewording` commits each revised scenario record, the effect
+   * renders the tracked files from the ledger and commits them, and
+   * `scenarios-reworded` is its completion. A recovery renders the same and
+   * finds the commit by its trailers.
+   */
+  private async rewordScenarios(run: Run, deviation: PlanDeviation): Promise<boolean> {
+    run.writer.requireSettled('The feature files cannot be written');
+    const tracked = trackedScenarios(run.log.ledger.replay());
+    const records = deviation.scenarios.map(entry => {
+      const record = tracked.records.find(candidate => candidate.id === entry.scenario)!;
+      return scenarioRecordSchema.parse({
+        ...record,
+        name: scenarioNameOf(entry.after) ?? record.name,
+        source: [...entry.after],
+        hash: scenarioSourceHash(entry.after),
+      } satisfies ScenarioRecord);
+    });
+    await this.performRewording(run, {
+      deviation: deviation.id,
+      rewording: run.log.count('scenarios-rewording') + 1,
+      scenarios: records.map(record => record.id),
+      files: [...new Set(records.map(record => record.file))].sort(),
+    }, records.map(record => ({ path: runLayout.scenario(record.id), id: record.id, revision: 2, body: record })), false);
+    return !this.ignoring(run);
+  }
+
+  private async performRewording(
+    run: Run,
+    data: RunEventOf<'scenarios-rewording'>['data'],
+    records: readonly CommitRecord[],
+    recovering: boolean,
+  ): Promise<{ commit: string }> {
+    return run.mutex.run(() => run.log.ledger.effect<{ commit: string }>({
+      key: `scenarios-reword:${data.rewording}`,
+      intent: { event: run.log.next({ type: 'scenarios-rewording', data }), records: [...records] },
+      perform: async () => {
+        const tracked = trackedScenarios(run.log.ledger.replay());
+        await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
+        const message = rewordingMessage({ runId: run.record.jobId, rewording: data.rewording, deviation: data.deviation, scenarios: data.scenarios, files: data.files });
+        const commit = await commitForScenarios(this.projectRoot, run.record.jobId, rewordedTrailerValue(data.rewording), message, recovering, this.git);
+        return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
+      },
+      complete: result => ({ event: run.log.next({ type: 'scenarios-reworded', data: { deviation: data.deviation, commit: result.commit } }), records: [] }),
+    }));
   }
 
   /**
@@ -6224,7 +6636,15 @@ export class RunService {
       return;
     }
     const workItems = run.log.count('work-item-completed');
-    await this.endRun(run, { type: 'job-completed', data: { gate: gateId, commit: attempt.audited, workItems } });
+    // A run that recorded plan deviations completes with them to review,
+    // never plainly: the count is of those still awaiting the person.
+    const deviations = run.log.all('plan-deviation-recorded').map(event => event.data.checkFinding);
+    const findings = checkFindingStateOf(run.log.ledger).findings;
+    const toReview = deviations.filter(id => findings.get(id)?.pendingUserDecision != null).length;
+    await this.endRun(run, {
+      type: 'job-completed',
+      data: { gate: gateId, commit: attempt.audited, workItems, ...(deviations.length === 0 ? {} : { planDeviations: toReview }) },
+    });
     await this.afterWrite('job-completed', run.record.jobId);
   }
 
@@ -6961,6 +7381,11 @@ function finalScenarioGaps(attempt: GateAttempt, required: readonly string[]): s
   return missing.length === 0 ? null : `${missing.join(', ')} did not pass in it`;
 }
 
+/** What one unresolved request resolved to: a placement fix, or a plan deviation the work item goes on under. */
+type UnresolvedResolution =
+  | { readonly kind: 'decided'; readonly decision: PlacementDecision }
+  | { readonly kind: 'deviation'; readonly deviation: PlanDeviation };
+
 /** What one placement request resolved to, for the local architect that made it. */
 type PlacementResolution =
   | { readonly kind: 'decided'; readonly decision: PlacementDecision }
@@ -7200,6 +7625,14 @@ function requestedStartOf(request: ReviewRequest): 'fresh' | 'fork' {
  * The inputs a request bound, as read again now: each must be there with
  * the hash the request recorded, or the question is not the one it asked.
  */
+/** Each plan deviation as a scope review's captured input: `deviation:pd-001`, with the hash of its text. */
+function deviationInputs(deviations: readonly PlanDeviation[]): CapturedInput[] {
+  return deviations.map(deviation => {
+    const text = deviationText(deviation);
+    return { ref: `deviation:${deviation.id}`, hash: sha256(text), text };
+  });
+}
+
 function boundInputs(read: readonly CapturedInput[], bound: ReadonlyArray<{ readonly ref: string; readonly hash: string }>): CapturedInput[] {
   return bound.map(entry => {
     const found = read.find(input => input.ref === entry.ref);

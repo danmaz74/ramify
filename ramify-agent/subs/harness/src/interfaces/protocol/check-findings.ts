@@ -18,7 +18,8 @@ import { commandIdSchema, jobVersionSchema } from './jobs.js';
  * The commands answer a pending user decision, waive a signal and revoke a
  * waiver. Each names the CheckFinding's revision it was decided against, so
  * it never applies silently to a later change. There is no command that
- * marks a CheckFinding resolved.
+ * marks a CheckFinding resolved. A plan deviation is the one CheckFinding
+ * that accepts them after its run has ended.
  */
 
 export const checkFindingProtocolVersion = 'check-findings/1';
@@ -150,6 +151,35 @@ export const checkFindingMaterialChoiceSchema = z.object({
 }).strict();
 export type CheckFindingMaterialChoice = z.infer<typeof checkFindingMaterialChoiceSchema>;
 
+/**
+ * A plan deviation, as its CheckFinding carries it: the requirements as the
+ * plan writes them, what the run does instead, why, the alternatives the
+ * global architect rejected and what the person loses. A reworded scenario
+ * shows its text before and after. The person accepts it by waiving it or
+ * answering `accept`, and rejects it by answering `reject` with the
+ * requirement a follow-up run must meet, which `followUp` then holds.
+ */
+export const planDeviationViewSchema = z.object({
+  id: text,
+  /** The unresolved request it answers. */
+  request: text,
+  /** The work item whose request it answers, then every other it changes. */
+  workItems: z.array(text).min(1),
+  /** The plan it departs from, which stays exactly as written. */
+  plan: text,
+  requirements: z.array(z.object({ startLine: z.int().positive(), endLine: z.int().positive(), text: z.string() }).strict()).min(1),
+  instead: text,
+  why: text,
+  rejected: z.array(z.object({ alternative: text, reason: text }).strict()),
+  loss: text,
+  scenarios: z.array(z.object({ scenario: text, file: text, before: z.array(z.string()), after: z.array(z.string()) }).strict()),
+  /** Whether the run waited for the person's decision on it, since it was recorded past the run's limit. */
+  held: z.boolean(),
+  /** The person's answer that rejected it, the requirement for a follow-up run; null unless rejected. */
+  followUp: z.string().nullable(),
+}).strict();
+export type PlanDeviationView = z.infer<typeof planDeviationViewSchema>;
+
 /** The commands a person may send about a CheckFinding now, as the harness would accept them. */
 export const userCheckFindingCommandKindSchema = z.enum(['respond', 'waive', 'revoke']);
 export type UserCheckFindingCommandKind = z.infer<typeof userCheckFindingCommandKindSchema>;
@@ -186,6 +216,8 @@ export const checkFindingSummarySchema = z.object({
   decisions: count,
   group: z.object({ canonical: checkFindingWireIdSchema, members: z.array(checkFindingWireIdSchema) }).strict().nullable(),
   userCommands: z.array(userCheckFindingCommandKindSchema),
+  /** The plan deviation this CheckFinding records; null for every other signal. Plan deviations come first in attention order. */
+  planDeviation: planDeviationViewSchema.nullable(),
 }).strict();
 export type CheckFindingSummaryView = z.infer<typeof checkFindingSummarySchema>;
 
@@ -267,7 +299,7 @@ export const checkFindingReportViewSchema = z.object({
   attempt: text,
   source: checkFindingSourceViewSchema,
   observation: z.object({
-    kind: z.enum(['check-failed', 'review-concern']),
+    kind: z.enum(['check-failed', 'review-concern', 'plan-deviation']),
     summary: text,
     locations: z.array(z.object({ path: text, startLine: z.int().positive().nullable(), endLine: z.int().positive().nullable() }).strict()),
     evidence: z.array(z.object({ kind: text, ref: text }).strict()),

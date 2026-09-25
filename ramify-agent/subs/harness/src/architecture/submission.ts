@@ -6,6 +6,7 @@ import { validateAgainst, type SubmissionError, type SubmissionValidation } from
 import { hypothesisChangeSchema, slugSchema, type Hypothesis, type RegistryEntry } from '../analysis/records.js';
 import { moduleProposalSchema, type ModuleProposal } from '../run/records.js';
 import { hypothesisStanceSchema, placementOutcomeSchema, type PlacementDecision } from './records.js';
+import { deviationBodySchema, type DeviationBody } from '../deviations/records.js';
 
 /*
  * What one fork of the global architect submits, what a local architect
@@ -20,6 +21,11 @@ import { hypothesisStanceSchema, placementOutcomeSchema, type PlacementDecision 
  * hypothesis revisions it makes, in one transition. `partial` records
  * findings and gaps: it is never appended to the parent context and is never
  * a decision.
+ *
+ * A fork of an unresolved request, which a local architect's `unresolved`
+ * answer makes, may also answer `deviation`, which records a plan deviation
+ * and lets the work item go on, or `nothing-possible`, which ends the run.
+ * A placement request is never answered with either.
  */
 
 const text = z.string().min(1);
@@ -140,11 +146,21 @@ export const forkSubmissionSchema = z.discriminatedUnion('kind', [
     findings: z.array(text),
     gaps: z.array(text),
   }).strict(),
+  z.object({
+    kind: z.literal('deviation'),
+    deviation: deviationBodySchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('nothing-possible'),
+    /** Why no deviation leaves anything of the plan worth doing. */
+    reason: text,
+    evidence: z.array(text),
+  }).strict(),
 ]);
 export type ForkSubmission = z.infer<typeof forkSubmissionSchema>;
 
 /** The members this iteration's package offers the role. */
-export const forkSubmissionKinds = ['decision', 'partial'] as const;
+export const forkSubmissionKinds = ['decision', 'partial', 'deviation', 'nothing-possible'] as const;
 
 /** The schema the agent's tool is given, taken from the same definition that validates. */
 export const forkJsonSchema = z.toJSONSchema(forkSubmissionSchema) as JsonSchema;
@@ -166,20 +182,99 @@ export interface PlacementEvidence {
 }
 
 /**
+ * What the fork answers. A placement request is answered with a decision or
+ * a partial return; an unresolved request may also be answered with a
+ * deviation, judged against the captured plan, the run's work items and its
+ * tracked scenarios, or with `nothing-possible`.
+ */
+export type ForkQuestion =
+  | { readonly kind: 'placement' }
+  | {
+    readonly kind: 'unresolved';
+    /** The captured plan, whose lines a deviation cites. */
+    readonly plan: string;
+    readonly workItems: ReadonlySet<string>;
+    /** Every tracked scenario with its state. */
+    readonly scenarios: ReadonlyMap<string, string>;
+  };
+
+/**
  * Validates one fork submission: the strict schema, then the rules the
  * schema cannot hold. Nothing changes on a failure, and every error names
  * its path.
  */
-export function validateFork(input: unknown, evidence: PlacementEvidence): SubmissionValidation<ForkSubmission> {
+export function validateFork(input: unknown, evidence: PlacementEvidence, question: ForkQuestion = { kind: 'placement' }): SubmissionValidation<ForkSubmission> {
   const shape = validateAgainst(forkSubmissionSchema, input);
   if (!shape.ok) return shape;
   if (shape.value.kind === 'partial') return shape;
+  if (shape.value.kind === 'deviation' || shape.value.kind === 'nothing-possible') {
+    if (question.kind === 'placement') {
+      return {
+        ok: false,
+        errors: [{
+          path: 'kind',
+          message: `A placement request is answered with a decision or a partial return; "${shape.value.kind}" answers only an unresolved request`,
+          expected: '"decision" or "partial"',
+        }],
+      };
+    }
+    if (shape.value.kind === 'nothing-possible') return shape;
+    const errors = deviationErrors(shape.value.deviation, question, 'deviation');
+    return errors.length === 0 ? shape : { ok: false, errors };
+  }
   const errors = [
     ...decisionErrors(shape.value.decision, shape.value.registry, evidence, 'decision'),
     ...registryErrors(shape.value.registry, evidence, 'registry'),
     ...hypothesisRevisionErrors(shape.value.hypothesisRevisions, evidence, 'hypothesisRevisions'),
   ];
   return errors.length === 0 ? shape : { ok: false, errors };
+}
+
+/** Every rule a deviation must satisfy beyond its schema: its plan lines exist, its work items and scenarios too. */
+function deviationErrors(body: DeviationBody, question: Extract<ForkQuestion, { kind: 'unresolved' }>, prefix: string): SubmissionError[] {
+  const errors: SubmissionError[] = [];
+  const length = question.plan.split('\n').length;
+  body.requirements.forEach((requirement, index) => {
+    const [from, to] = requirement.lines;
+    if (to < from || to > length) {
+      errors.push({
+        path: `${prefix}.requirements.${index}.lines`,
+        message: `[${from}, ${to}] is not a range of the captured plan, which has ${length} lines`,
+        expected: `1 ≤ from ≤ to ≤ ${length}`,
+      });
+    }
+  });
+  body.workItems.forEach((workItem, index) => {
+    if (question.workItems.has(workItem)) return;
+    errors.push({ path: `${prefix}.workItems.${index}`, message: `No work item "${workItem}" was committed by this run`, expected: 'a work item of this run' });
+  });
+  const seen = new Set<string>();
+  body.scenarios.forEach((scenario, index) => {
+    const state = question.scenarios.get(scenario.scenario);
+    const path = `${prefix}.scenarios.${index}`;
+    if (state === undefined) {
+      errors.push({ path: `${path}.scenario`, message: `No tracked scenario "${scenario.scenario}"`, expected: 'a tracked scenario of this run' });
+    } else if (state !== 'pending') {
+      errors.push({
+        path: `${path}.scenario`,
+        message: `${scenario.scenario} is ${state}; a deviation rewords only a pending scenario, since no gate may have verified the text it replaces`,
+        expected: 'a pending scenario',
+      });
+    }
+    if (seen.has(scenario.scenario)) {
+      errors.push({ path: `${path}.scenario`, message: `${scenario.scenario} is reworded twice; one entry states its new text`, expected: 'one entry per scenario' });
+    }
+    seen.add(scenario.scenario);
+    const first = scenario.source.find(line => line.trim() !== '');
+    if (first === undefined || !/^\s*Scenario( Outline)?:\s*\S/u.test(first)) {
+      errors.push({
+        path: `${path}.source.0`,
+        message: 'A scenario\'s source starts with its `Scenario:` line and a name, without tags',
+        expected: '"Scenario: <name>"',
+      });
+    }
+  });
+  return errors;
 }
 
 /** The same rules for a decision a local architect made within its own authority. */

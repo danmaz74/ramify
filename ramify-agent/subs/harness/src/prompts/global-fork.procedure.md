@@ -1,5 +1,5 @@
-<!-- ramify-agent global fork procedure, version 1. -->
-Do this, in order:
+<!-- ramify-agent global fork procedure, version 2. -->
+For a placement request, do this, in order:
 
 1. Read the request: the behavior it requires, what the local architect
    established, the candidates it suggests and what it could not resolve.
@@ -68,3 +68,65 @@ outcome to the local architect. It never asks the parent context to supply
 the choice you could not make.
 
 Do not invent a decision to avoid a partial return.
+
+## An unresolved request
+
+A local architect answered that its request cannot be met as stated. The
+message gives its conflict and evidence, the plan with its line numbers, and
+the deviations already recorded. Do this, in order:
+
+1. Read the conflict and verify its evidence. A conflict you cannot confirm is
+   not a reason to depart from the plan.
+2. Decide whether it is a placement question after all: the behavior belongs
+   to another owner, or exists already. Then answer `decision`, as for a
+   placement request. Nothing of the plan changes.
+3. Otherwise, find the smallest departure that makes the rest of the plan
+   achievable. **Keep as much of each requirement as the conflict allows;
+   drop no more than the conflict requires.** A requirement that fails in
+   one clause keeps its other clauses. Answer `deviation`.
+4. Answer `nothing-possible` only when no deviation leaves anything of the
+   plan worth doing. The run ends there.
+
+### `deviation`
+
+A plan deviation amends the plan for the rest of this run. The plan file is
+never changed; the deviation is recorded beside it, local architects receive
+it with the requirement it changes, and reviews judge the work against the
+plan as it amends it. The person reviews it afterwards and may reject it. It
+holds no work item and no gate, and the work item that asked goes on under
+it.
+
+- `deviation.requirements` are the requirements as written that you depart
+  from, as line ranges of the plan in the message. Cite exactly the lines
+  you change, not their section.
+- `deviation.instead` is what the run does instead: the part of each
+  requirement it still meets, and the replacement for the part it cannot.
+- `deviation.why` is why the requirement cannot be met as written, on the
+  evidence you verified.
+- `deviation.rejected` names each alternative you considered, such as
+  another owner, a staged break or a smaller departure, and why it does not
+  work. Name at least one.
+- `deviation.loss` is what the person loses compared with the plan as
+  written, stated so they can decide whether to accept it.
+- `deviation.workItems` names the other work items whose work it changes;
+  the one that asked is always included.
+- `deviation.scenarios` rewords a scenario the conflict makes impossible to
+  state: the scenario's ID and its new `Scenario:` block without tags. The
+  harness renders the feature file from it. Only a pending scenario can be
+  reworded; leave a scenario that is bound, declared or implemented as it is.
+
+A run records a bounded number of deviations. Past that number a deviation
+is still recorded, and the run waits for the person to accept or reject it
+before it goes on. Many deviations say the plan is wrong: prefer
+`nothing-possible` to a deviation that leaves the plan's purpose behind.
+
+### `nothing-possible`
+
+Say in `reason` why no deviation leaves anything of the plan worth doing,
+and list what you verified in `evidence`. Do not use it for a conflict a
+deviation could answer.
+
+### `partial`
+
+As for a placement request: what you established and what is missing. The
+harness retries within its bound; exhaustion ends the run.
