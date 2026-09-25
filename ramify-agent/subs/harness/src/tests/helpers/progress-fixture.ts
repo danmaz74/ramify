@@ -303,9 +303,12 @@ function assertFakeRamifyComplete(name: FixtureRun, root: string, ramify: FakeRa
   const expected = [
     `run measure --root ${root} --format json`,
     'run --version',
+    // The fake materializes no view, so each continued turn of a local
+    // architect asks for its unavailable API view again: four turns in core,
+    // two in ui.
     ...(name === 'placements' ? [
-      `materialize materialize --view architect --view api --from subs/workspace/subs/catalog/subs/core --root ${root}`,
-      `materialize materialize --view architect --view api --from subs/workspace/subs/catalog/subs/ui --root ${root}`,
+      ...Array.from({ length: 4 }, () => `materialize materialize --view architect --view api --from subs/workspace/subs/catalog/subs/core --root ${root}`),
+      ...Array.from({ length: 2 }, () => `materialize materialize --view architect --view api --from subs/workspace/subs/catalog/subs/ui --root ${root}`),
     ] : []),
   ];
   if (JSON.stringify(calls) !== JSON.stringify(expected)) {
