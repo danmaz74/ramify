@@ -46,3 +46,30 @@ disk-backed harness analysis projection, rendered by the web component in
 Chromium at desktop and mobile widths. The artifact records its own revision
 and dirty-state limits. It is a component-browser witness, not a live HTTP
 workflow or model run. The final implementation handoff records its rerun.
+
+## Real module-local tools
+
+[`real-module-local-witness.json`](real-module-local-witness.json) records two
+fresh `openai-codex/gpt-6-sol` sessions on clean implementation `a9a66dc1`.
+Both ran actual shell `pwd` under the chosen module's `src/`, read the seed and
+wrote their own file. The ordinary engineer's cross-module write was refused;
+the repair engineer's was allowed. Each refused all five protected/outside
+write probes. All seven recorded implementation hashes stayed unchanged.
+This is a pi/equipment boundary witness; the Ramify hook is explicitly
+unavailable and no full RunService or project-gate claim follows.
+
+## Composed functional trial and readiness
+
+[`functional-composition.json`](functional-composition.json) records the actual
+harness and ledger with scripted agent, Git and checks: two captured documents,
+two NFRs, one advisory item, one selected NFR and two assessed NFRs. Its
+candidate tree is declared fixture data. The model token count is unavailable.
+
+[`plan13-readiness-fixture.json`](plan13-readiness-fixture.json) contains actual
+run-query projections from the exhausted-run test, including its catalog,
+candidate, final gate and current user decisions. The browser results record
+its SHA-256, screenshot paths and individual assertions. They test production
+components with those projections, rather than a live HTTP workflow.
+
+The final [implementation report](../results.md#iteration-9--composed-acceptance-and-delivery)
+records command outcomes, acceptance mapping and limits for all boundaries.

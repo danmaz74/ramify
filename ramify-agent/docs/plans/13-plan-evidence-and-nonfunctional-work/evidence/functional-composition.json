@@ -1,0 +1,157 @@
+{
+  "trial": "functional-two-nfr-one-cited",
+  "boundary": "actual harness state machine with scripted agent, Git and checks; no process/model quality claim",
+  "run": {
+    "id": "20260925T152057Z-64a363",
+    "state": "job-completed",
+    "durationMs": 451,
+    "eventCount": 60,
+    "finalGate": {
+      "gate": "ga-0004",
+      "checkpoint": "final",
+      "verdict": "passed",
+      "next": "accept"
+    }
+  },
+  "source": {
+    "documents": [
+      {
+        "id": "doc-001",
+        "path": "plans/revision-diff/plan.md",
+        "sha256": "886623db253fc80c80852dfd51addfeec2c34ee0b013cafd988c7d610e30c4bd"
+      },
+      {
+        "id": "doc-002",
+        "path": "plans/revision-diff/audit.md",
+        "sha256": "2146244dbe6207bc82bd496ba1524f574cd4113fc8691873555749de98e3bcb2"
+      }
+    ],
+    "manifestHash": "b0fef45dd36a08a8714aa04a77b11df4d58f90f57c8e044287055917f3c78d02",
+    "catalogHash": "f3e3061b6179c289f9a12b301d19825a22f88f88978c8c1209638d807e03bbd5",
+    "selectionHash": "82f2ad60f92ba65b020a2307e9dbb18995d0cc7c89316f8bffd376c7434690f4",
+    "assignmentContextHash": "5395b4d31927bc95dcfe6c71525996526f68d3b420ac4cfaf767545c5623f0de",
+    "packageHash": "d75e2a027e864c32d706b9cf81c4e179e1700ac458cfefc69665a05c9e234db8",
+    "catalogCounts": {
+      "nfr": 2,
+      "advice": 1
+    },
+    "catalogItems": [
+      {
+        "id": "nfr-001",
+        "classification": "non-functional-requirement"
+      },
+      {
+        "id": "adv-001",
+        "classification": "advice"
+      },
+      {
+        "id": "nfr-002",
+        "classification": "non-functional-requirement"
+      }
+    ],
+    "selectedIds": [
+      "nfr-001"
+    ],
+    "citedIds": [
+      "nfr-001"
+    ],
+    "packageBytes": 982,
+    "citedQuoteBytes": 46,
+    "citedQuoteInPackage": true
+  },
+  "assessment": {
+    "id": "nfa-001",
+    "hash": "97004b2b593e53b19dd477da4a8faee873de46d6a380ca12c33b73d667b71aeb",
+    "candidateTree": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resultIds": [
+      {
+        "nfr": "nfr-001",
+        "result": "satisfied"
+      },
+      {
+        "nfr": "nfr-002",
+        "result": "satisfied"
+      }
+    ],
+    "rounds": [
+      {
+        "round": 1,
+        "record": "nfr-round-001",
+        "outcome": "satisfied"
+      }
+    ],
+    "denominator": 2,
+    "assessed": 2,
+    "adviceCount": 1
+  },
+  "humanReview": {
+    "reviewedNfrs": 0,
+    "denominator": 2,
+    "analysisApprovalEvents": 0,
+    "reason": "scripted unattended run received no person review of catalog semantics"
+  },
+  "execution": {
+    "modelTokens": null,
+    "modelTokensReason": "scripted agent has no model usage",
+    "treePreviews": 5,
+    "processSpawns": 0
+  },
+  "implementation": {
+    "head": "a9a66dc10e94c4db31c61818728eda3778b23272",
+    "dirty": false,
+    "identitySource": "runner-supplied environment, not verified by process-guarded test",
+    "filesStart": [
+      {
+        "path": "subs/harness/src/tests/plan13-composed-functional.test.ts",
+        "sha256": "def75bc2b543939cd8f7168df6d5fded1ed9274f98e9225fe045d085dd6ecaa4"
+      },
+      {
+        "path": "subs/harness/src/run/service.ts",
+        "sha256": "a8ec935d14620d80ab213442a0d458c4a07fca323d7551c0d04b6de8e34eab04"
+      },
+      {
+        "path": "subs/harness/src/run/nonfunctional-phase.ts",
+        "sha256": "57d3ca2e347e290d35f69e48505b131ffe8be30e5fc2a60fc1d61632efd35ca2"
+      },
+      {
+        "path": "subs/harness/src/nonfunctional/prompts.ts",
+        "sha256": "474fd0cce12d2013e61ce984ce2150590200d49fab910b54cf0f4fa2902f60c6"
+      },
+      {
+        "path": "subs/harness/src/nonfunctional/submissions.ts",
+        "sha256": "a9020833633443b932044cc900f8755b2650f827897fc49fc3982bb4e978900c"
+      },
+      {
+        "path": "subs/harness/subs/evidence/src/candidate-tree.ts",
+        "sha256": "b9b3ec58dd94972ee4285f64affc2bec5c6075c7f501f36e6db881ef3d7d551d"
+      }
+    ],
+    "filesEnd": [
+      {
+        "path": "subs/harness/src/tests/plan13-composed-functional.test.ts",
+        "sha256": "def75bc2b543939cd8f7168df6d5fded1ed9274f98e9225fe045d085dd6ecaa4"
+      },
+      {
+        "path": "subs/harness/src/run/service.ts",
+        "sha256": "a8ec935d14620d80ab213442a0d458c4a07fca323d7551c0d04b6de8e34eab04"
+      },
+      {
+        "path": "subs/harness/src/run/nonfunctional-phase.ts",
+        "sha256": "57d3ca2e347e290d35f69e48505b131ffe8be30e5fc2a60fc1d61632efd35ca2"
+      },
+      {
+        "path": "subs/harness/src/nonfunctional/prompts.ts",
+        "sha256": "474fd0cce12d2013e61ce984ce2150590200d49fab910b54cf0f4fa2902f60c6"
+      },
+      {
+        "path": "subs/harness/src/nonfunctional/submissions.ts",
+        "sha256": "a9020833633443b932044cc900f8755b2650f827897fc49fc3982bb4e978900c"
+      },
+      {
+        "path": "subs/harness/subs/evidence/src/candidate-tree.ts",
+        "sha256": "b9b3ec58dd94972ee4285f64affc2bec5c6075c7f501f36e6db881ef3d7d551d"
+      }
+    ],
+    "sourceStable": true
+  }
+}

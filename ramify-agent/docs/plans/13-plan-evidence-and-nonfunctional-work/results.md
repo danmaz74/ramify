@@ -474,3 +474,165 @@ contract-revision composition reproduces and verifies that correction without
 reselection. The five-file composition/recovery group passed 54 tests, the
 contract/gate/integration group passed 16, and the earlier recovery suite passed
 32. These focused results do not replace the final whole-suite audit.
+
+## Iteration 9 — composed acceptance and delivery
+
+Implemented in the isolated `feat/plan13-evidence-nonfunctional` worktree at
+`/tmp/ramify-plan13-evidence-nonfunctional`, coordinated through Sol subagents.
+The main checkout's HEAD, status and captured planning inputs were verified
+unchanged. The implementation adds only the two planned child owners:
+`plan-evidence` owns captured source identity and exact passages;
+`nonfunctional` owns pure assessment and round rules. Context selection stays
+in the harness, and the existing harness remains the only durable writer.
+The four scoped refactors are shared passage resolution, document-qualified
+scenario identity, explicit deviation origins and exact candidate preparation.
+No new scheduler, generic workflow layer or separate persistence service was
+introduced.
+
+### Composed trials and measured limits
+
+The functional trial uses a root plan plus a companion, two NFRs and one
+advisory item. Its engineer cites one NFR; the coordinator assesses both,
+including the uncited companion NFR. The ledger completes one round, binds
+its final passing gate to the assessed candidate and projects `ready`.
+[`functional-composition.json`](evidence/functional-composition.json) records
+captured document/catalog/selection/assignment hashes and candidate identity.
+The runner supplied implementation revision `a9a66dc1` and `dirty=false`; the
+process-guarded test does not independently verify Git status. All six recorded
+file hashes remained stable. Its agent, Git and checks are scripted, so the
+recorded all-`a` tree is fixture data.
+
+The NFR-only structural trial uses real Git. It starts with two unresolved
+NFRs, investigates the undetermined one, authorizes one repair targeting that
+NFR, edits two modules and reassesses both NFRs on the changed candidate. A
+protected plan write is refused. It closes one round after two assessments.
+The real ledger preserves investigation, assignment, repair, candidate,
+assessment and final-gate ordering. Check outcomes are supplied by the direct
+check adapter; this trial does not claim an actual project build.
+
+The exhausted trial uses real Git and three closed rounds/assessments for one
+NFR, followed by a passing gate and one pending deviation. Accepting that
+revision yields `ready`; revoking it returns to pending; rejection survives a
+fresh ledger rebuild. A failed project test gate stays failed after acceptance.
+Its browser fixture records the exact catalog, candidate, tree, gate and
+current decision. The reported 87 ms performance observation is scripted data,
+not a benchmark measurement.
+
+| Measurement | Value and denominator |
+| --- | --- |
+| Functional catalog | 2 NFRs, 1 advisory item, 2 captured documents |
+| Functional assessment coverage | 2 of 2 NFRs; advice excluded |
+| Functional human semantic review | 0 of 2 NFRs; unattended scripted run |
+| Functional selection | 1 of 2 NFRs cited; uncited NFR still assessed; no relevance-recall judgment |
+| Functional quoted package | 982 UTF-8 bytes; selected quote 46 bytes |
+| Functional run | 1 round, 1 assessment, 0 repair batches, 0 pending decisions |
+| Functional elapsed time | 451 ms for the scripted run, 60 ledger events; model tokens unavailable |
+| Structural trial | 2 of 2 NFRs assessed twice, 1 investigation, 1 repair batch, 1 closed round |
+| Exhausted trial | 1 of 1 NFR assessed in each of 3 rounds; 1 pending decision before user commands |
+| Live selector fixture | 3 of 3 supplied passages selected; 1 NFR, 1 advice, 1 principle; no observed omission in that fixture |
+| Live context package | 2,396 UTF-8 bytes; 1 of 1 requested exact quotes matched |
+| Live context model usage | 8,756 reported tokens across 5 usage records, including cache reads |
+| Live pre-work phases | 33,520 ms = 6,798 ms orientation + 26,722 ms selector; excludes harness setup |
+| Live ordinary engineer | 39,015 ms, 17,613 reported tokens, 10 tool starts/finishes, 1 shell process |
+| Live repair engineer | 20,768 ms, 17,236 reported tokens, 10 tool starts/finishes, 1 shell process |
+
+No matched baseline was run for model efficiency, and these fixtures do not
+establish general extraction quality, relevance recall or runtime performance.
+Unavailable model usage for scripted trials is not counted as zero.
+
+### Actual model, process and browser boundaries
+
+The committed [context witness](evidence/real-context-witness.json) executed
+actual `openai-codex/gpt-6-sol` fresh, fork and continued sessions. A keyed
+append returned `appended`, then `already-present`, and the continuation
+returned the exact requirement quote/classification. All six implementation
+hashes from clean revision `4bf4ecb5` were compared with the integrated source
+and still matched; [comparison](evidence/context-source-applicability.json).
+
+The [module-local witness](evidence/real-module-local-witness.json) ran on clean
+revision `a9a66dc1` with all seven recorded file hashes unchanged. Both actual
+`openai-codex/gpt-6-sol` sessions started fresh and submitted. Actual shell
+`pwd`, built-in read and write began under the chosen module's `src/`.
+The ordinary session's cross-module write was denied and absent; the repair
+session's was allowed and exact. Both denied writes to captured plan,
+principle, scenario, configuration and outside-project paths, whose original
+bytes stayed unchanged. The probe exercises pi and engineer equipment; its
+Ramify hook deliberately reports unavailable. It does not establish a full
+model-driven RunService or project gate.
+
+Browser results are actual Chromium renders of real disk-backed harness
+projections through the production web components. They are component-browser
+witnesses, not a live HTTP workflow. The analysis review covers desktop/mobile
+presentation, exact quote/classification, missing-reference notice and
+empty/unavailable distinctions. The readiness witness covers pending,
+accepted, rejected, failed-gate and unavailable-source states, with the actual
+CheckFinding history. Its persisted fixture SHA-256 binds the screenshots
+and assertions to the supplied projections.
+
+### Acceptance case map
+
+Paths below are relative to `subs/harness/`; browser artifacts are in this
+plan's `evidence/` directory. The earlier iteration sections describe the
+specific positive and negative controls.
+
+| Cases | Executed owner/consumer witnesses |
+| --- | --- |
+| PE01, PE04 | `subs/plan-evidence/src/tests/discovery.test.ts`: exact bytes/hash, linked documents/cycles, missing paths and project-principle boundaries |
+| PE02 | `src/tests/plan-evidence-required-runtime.test.ts`, `src/tests/analysis-plan-evidence.test.ts` and analysis browser: required rejection and unclear review notice |
+| PE03, PE16 | `subs/scenarios/src/tests/extraction.test.ts`, `subs/scenarios/src/tests/form.test.ts`: incorporation, document-qualified references and global scenario IDs |
+| PE05 | `subs/plan-evidence/src/tests/contracts.test.ts`, `src/tests/analysis-plan-evidence.test.ts` and browser: force, conditions and separate advice |
+| PE06 | `src/tests/plan13-composed-functional.test.ts`, `src/tests/acceptance-trial.test.ts`, `src/tests/scenario-states.test.ts`: existing functional state and full final gate |
+| PE07 | `src/tests/context-selection-runtime.test.ts` plus actual Sol fork/append/continue artifact: one selection and durable redelivery |
+| PE08 | `src/tests/context-selection-delivery.test.ts`, `src/tests/iteration-source-delivery.test.ts`: exact fresh, continued and contract briefs; stale inputs refused |
+| PE09 | `subs/nonfunctional/src/tests/rounds.test.ts`, `src/tests/nonfunctional-run.test.ts`, `src/tests/nonfunctional-repair.test.ts`: complete assessment and reassessment |
+| PE10 | `src/tests/nonfunctional-repair.test.ts` plus actual Sol module-local tool witness: cross-module repair authority and protected inputs |
+| PE11 | `subs/nonfunctional/src/tests/rounds.test.ts`, `src/tests/nonfunctional-deviation-runtime.test.ts`: three-round exhaustion and one source-bound finding |
+| PE12, PE13 | `src/tests/merge-readiness.test.ts`, `src/tests/nonfunctional-deviation-runtime.test.ts`, existing CheckFinding command tests and readiness browser: current decisions, pending/rejected standing and gate priority |
+| PE14 | `src/tests/plan-evidence-compatibility.test.ts` and merge-readiness tests: earlier records readable with unavailable NFR coverage |
+| PE15 | `src/tests/context-selection-runtime.test.ts`, `src/tests/nonfunctional-recovery.test.ts`, `src/tests/run-git.integration.test.ts`: keyed delivery, crash boundaries, exact final candidate and durable replay |
+| PE17 | `subs/plan-evidence/src/tests/contracts.test.ts`, `subs/plan-evidence/src/tests/references.test.ts`, assignment/analysis consumers and `src/tests/plan-evidence-review-unavailable.test.ts`: exact whitespace and explicit unavailable review input |
+| PE18 | `src/tests/nonfunctional-recovery.test.ts`, `src/tests/nonfunctional-run.test.ts`: real Git/audit, post-preparation tree identity, round-three late drift and exhausted-recovery readiness |
+| PE19 | `src/tests/nonfunctional-deviation.test.ts`, `src/tests/nonfunctional-deviation-runtime.test.ts`, `src/tests/plan-deviations.test.ts`: coordinator provenance and legacy decision behavior |
+
+### Regression audit and remaining boundaries
+
+The baseline audit passed at reviewed-input commit `4adc79f4`: 200 agent test
+files passed and 2 skipped; 1,667 tests passed and 7 skipped. The first
+integrated audit at `a9a66dc1` passed patch integrity, type checks, structural
+checks, web production build and the parent daemon case, but failed the agent
+suite: 43 files failed, 183 passed and 2 skipped; 90 tests failed, 1,685 passed
+and 18 skipped. Its immutable report is
+`refs/audited/runs/2026-09-25T15-25-39Z-a9a66dc10`, run
+`20e88d17-1d8a-4416-9388-8284f7d2ed2f`. The failure result is retained.
+
+The regression migrations declare the new candidate previews and audited-tree
+answers per scenario, update exact event/session expectations for orientation
+and selection, and bind custom scripted initial agents to captured evidence.
+Fixtures still reject unstated operations. The affected focused groups are
+rerun before the final audit. Final-commit audit completion is recorded in the
+handoff and in the revision-bound Git audit note; it is not inferred from
+focused tests or structural checks.
+
+The final request is `audit/plan13-plan-evidence.request.json`. From the
+worktree root:
+
+```sh
+ramify-agent/node_modules/.bin/ramify-audit audit \
+  --request ramify-agent/audit/plan13-plan-evidence.request.json --cwd . --json
+git notes --ref=audit show HEAD
+```
+
+The request covers patch integrity, all agent tests with four workers, all
+agent TypeScript scopes, the agent structural check, the parent daemon test
+and the web build. Live model and browser witnesses remain separate. Structural
+analysis currently reports 299 coverage limits, not complete static proof.
+A target module's API-view refresh exceeded available memory during discovery;
+no absence claim was based on that incomplete view.
+
+Semantic extraction and satisfaction are agent judgments; the harness verifies
+identity, complete IDs, finite transitions and gate evidence. Neither a single
+model probe nor a scripted satisfaction judgment establishes semantic quality.
+The repair write guard retains the existing shell limitation; revision/tree
+fences reject changed captured inputs or a changed final candidate. This work
+adds no OS sandbox or automatic merge. A merge consumer must honor readiness
+for the exact published candidate.

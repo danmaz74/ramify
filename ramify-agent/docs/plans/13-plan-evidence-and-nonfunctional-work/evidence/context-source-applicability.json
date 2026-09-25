@@ -1,0 +1,29 @@
+{
+  "head": "a9a66dc10e94c4db31c61818728eda3778b23272",
+  "checks": [
+    {
+      "path": "subs/harness/src/probes/plan13-context.probe.ts",
+      "matches": true
+    },
+    {
+      "path": "subs/harness/src/context-selection/submissions.ts",
+      "matches": true
+    },
+    {
+      "path": "subs/harness/src/context-selection/selection.ts",
+      "matches": true
+    },
+    {
+      "path": "subs/harness/src/context-selection/prompts.ts",
+      "matches": true
+    },
+    {
+      "path": "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+      "matches": true
+    },
+    {
+      "path": "package.json",
+      "matches": true
+    }
+  ]
+}

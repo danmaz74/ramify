@@ -617,7 +617,7 @@ export function PlanDeviations({ client, planId, runId, version, onOpenGate }: S
         const deviations = state.data.items.filter(summary => summary.planDeviation !== null);
         return deviations.length === 0 ? <p className="muted">No plan deviation.</p> : (
           <>
-            <p className="muted">Where a requirement could not be met as written, the global architect recorded what the run does instead. Accept each one, by waiving it or answering accept, or reject it with the requirement a follow-up run must meet.</p>
+            <p className="muted">Where a requirement could not be met as written, the run recorded a deviation for your review. Accept each one, by waiving it or answering accept, or reject it with the requirement a follow-up run must meet.</p>
             <ul className="cards check-finding-cards">{deviations.map(summary => (
               <CheckFindingCard key={summary.id} client={client} planId={planId} runId={runId} version={state.data.version} summary={summary} onOpenGate={onOpenGate} />
             ))}</ul>

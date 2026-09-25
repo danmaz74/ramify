@@ -1,0 +1,1110 @@
+{
+  "probe": "plan13-module-local",
+  "ran": true,
+  "requestedModel": "openai-codex/gpt-6-sol",
+  "readinessModel": "openai-codex/gpt-6-sol",
+  "ordinary": {
+    "kind": "ordinary",
+    "requestedStart": "fresh",
+    "actualStart": {
+      "mode": "fresh"
+    },
+    "outcome": {
+      "kind": "submitted",
+      "elapsedMs": 39015
+    },
+    "cwd": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src",
+    "spec": {
+      "role": "engineer",
+      "workingDirectory": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src",
+      "builtinTools": [
+        "read",
+        "grep",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "tools": [
+        "shell",
+        "run_scope_tests"
+      ],
+      "sessionMode": "fresh",
+      "context": {
+        "compaction": "forbidden",
+        "budgetTokens": null,
+        "budgetFraction": null,
+        "reportReserveTokens": 0
+      },
+      "systemPromptHash": "0e700614586e2edf6c1287d94f228239451c5c071c4c51d869d64d3a178082f6",
+      "promptHash": "77941c284fabbac12ad0dc32937b4d11f49663db445cc245c16c38f57b8bc30e"
+    },
+    "guardedScope": {
+      "revision": 1,
+      "roots": [
+        "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src"
+      ],
+      "files": [],
+      "denied": [
+        "/tmp/ramify-plan13-module-local-lfrloF/project/ramify-agent.json",
+        "/tmp/ramify-plan13-module-local-lfrloF/project/features/probe.feature",
+        "/tmp/ramify-plan13-module-local-lfrloF/project/plans/probe/plan.md",
+        "/tmp/ramify-plan13-module-local-lfrloF/project/docs/engineering.principles.md"
+      ]
+    },
+    "starts": [
+      {
+        "tool": "shell",
+        "input": {
+          "command": "pwd"
+        },
+        "action": {
+          "kind": "command",
+          "command": "pwd"
+        },
+        "callId": "call_6D3BfkpCNCJEkPfexYWNgOD8|fc_021d0571a6b0135b016ab69142d7d487d2ac325b0b36e2dd97"
+      },
+      {
+        "tool": "read",
+        "input": {
+          "path": "seed.txt",
+          "offset": null,
+          "limit": null
+        },
+        "action": {
+          "kind": "read",
+          "path": "seed.txt",
+          "range": null
+        },
+        "callId": "call_v49cVPQ8blGbWZ5UVIh5opOO|fc_021d0571a6b0135b016ab691499f4487d2b8c2300965f8ea48"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "ordinary-own.txt",
+          "content": "own ordinary\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "ordinary-own.txt"
+          ]
+        },
+        "callId": "call_fYe5FK2c7WYy15F81dTQBBSg|fc_021d0571a6b0135b016ab6914b60a887d2a562c379ff03221c"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../beta/src/ordinary-cross.txt",
+          "content": "cross ordinary\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../beta/src/ordinary-cross.txt"
+          ]
+        },
+        "callId": "call_5bmD1QwTsL9vLH8U5zUOeApJ|fc_021d0571a6b0135b016ab691521dd487d2aec5ea7dddac970e"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../plans/probe/plan.md",
+          "content": "changed plan\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../plans/probe/plan.md"
+          ]
+        },
+        "callId": "call_1S1XDSILTM6ejVHIZZgqwVDq|fc_021d0571a6b0135b016ab69153ee7887d2816a3a8ad07b6451"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../features/probe.feature",
+          "content": "changed feature\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../features/probe.feature"
+          ]
+        },
+        "callId": "call_kxvCt06kscy6H7UldAa444Rd|fc_021d0571a6b0135b016ab6915acc9487d2aea6667bb131539f"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../ramify-agent.json",
+          "content": "changed config\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../ramify-agent.json"
+          ]
+        },
+        "callId": "call_wh2paQZup4l0EGZbIvx379QS|fc_021d0571a6b0135b016ab6915c6a0c87d2b35e9a1cbf1ebd23"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../docs/engineering.principles.md",
+          "content": "changed principle\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../docs/engineering.principles.md"
+          ]
+        },
+        "callId": "call_cZwU5yId13GoLVS9O2gAOW5b|fc_021d0571a6b0135b016ab6915e192887d2a4f9017dde8940fd"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../../outside.txt",
+          "content": "changed outside\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../../outside.txt"
+          ]
+        },
+        "callId": "call_4NuYbzQpuFnJt1FRDysKIdp9|fc_021d0571a6b0135b016ab6915ffc1c87d2b940805b6985a5a8"
+      },
+      {
+        "tool": "submit_probe",
+        "input": {},
+        "action": {
+          "kind": "harness"
+        },
+        "callId": "call_vX9ng006Q1U3mEEZBpxmYprP|fc_021d0571a6b0135b016ab69167529487d29f9486d3b5e712d2"
+      }
+    ],
+    "finishes": [
+      {
+        "tool": "shell",
+        "callId": "call_6D3BfkpCNCJEkPfexYWNgOD8|fc_021d0571a6b0135b016ab69142d7d487d2ac325b0b36e2dd97",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "read",
+        "callId": "call_v49cVPQ8blGbWZ5UVIh5opOO|fc_021d0571a6b0135b016ab691499f4487d2b8c2300965f8ea48",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "write",
+        "callId": "call_fYe5FK2c7WYy15F81dTQBBSg|fc_021d0571a6b0135b016ab6914b60a887d2a562c379ff03221c",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "write",
+        "callId": "call_5bmD1QwTsL9vLH8U5zUOeApJ|fc_021d0571a6b0135b016ab691521dd487d2aec5ea7dddac970e",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_1S1XDSILTM6ejVHIZZgqwVDq|fc_021d0571a6b0135b016ab69153ee7887d2816a3a8ad07b6451",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_kxvCt06kscy6H7UldAa444Rd|fc_021d0571a6b0135b016ab6915acc9487d2aea6667bb131539f",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_wh2paQZup4l0EGZbIvx379QS|fc_021d0571a6b0135b016ab6915c6a0c87d2b35e9a1cbf1ebd23",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_cZwU5yId13GoLVS9O2gAOW5b|fc_021d0571a6b0135b016ab6915e192887d2a4f9017dde8940fd",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_4NuYbzQpuFnJt1FRDysKIdp9|fc_021d0571a6b0135b016ab6915ffc1c87d2b940805b6985a5a8",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "submit_probe",
+        "callId": "call_vX9ng006Q1U3mEEZBpxmYprP|fc_021d0571a6b0135b016ab69167529487d29f9486d3b5e712d2",
+        "reachedTool": true,
+        "isError": false
+      }
+    ],
+    "readResults": [
+      {
+        "isError": false,
+        "containsSeed": true
+      }
+    ],
+    "guards": [
+      {
+        "callId": "call_fYe5FK2c7WYy15F81dTQBBSg|fc_021d0571a6b0135b016ab6914b60a887d2a562c379ff03221c",
+        "tool": "write",
+        "requested": "ordinary-own.txt",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src/ordinary-own.txt",
+        "owner": "app/alpha",
+        "scopeRevision": 1,
+        "verdict": "allowed",
+        "reason": "the write scope contains /tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src"
+      },
+      {
+        "callId": "call_5bmD1QwTsL9vLH8U5zUOeApJ|fc_021d0571a6b0135b016ab691521dd487d2aec5ea7dddac970e",
+        "tool": "write",
+        "requested": "../../beta/src/ordinary-cross.txt",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/beta/src/ordinary-cross.txt",
+        "owner": "app/beta",
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/beta/src/ordinary-cross.txt lies outside every location this assignment may write"
+      },
+      {
+        "callId": "call_1S1XDSILTM6ejVHIZZgqwVDq|fc_021d0571a6b0135b016ab69153ee7887d2816a3a8ad07b6451",
+        "tool": "write",
+        "requested": "../../../plans/probe/plan.md",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/plans/probe/plan.md",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/plans/probe/plan.md is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_kxvCt06kscy6H7UldAa444Rd|fc_021d0571a6b0135b016ab6915acc9487d2aea6667bb131539f",
+        "tool": "write",
+        "requested": "../../../features/probe.feature",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/features/probe.feature",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/features/probe.feature is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_wh2paQZup4l0EGZbIvx379QS|fc_021d0571a6b0135b016ab6915c6a0c87d2b35e9a1cbf1ebd23",
+        "tool": "write",
+        "requested": "../../../ramify-agent.json",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/ramify-agent.json",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/ramify-agent.json is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_cZwU5yId13GoLVS9O2gAOW5b|fc_021d0571a6b0135b016ab6915e192887d2a4f9017dde8940fd",
+        "tool": "write",
+        "requested": "../../../docs/engineering.principles.md",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/docs/engineering.principles.md",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/docs/engineering.principles.md is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_4NuYbzQpuFnJt1FRDysKIdp9|fc_021d0571a6b0135b016ab6915ffc1c87d2b940805b6985a5a8",
+        "tool": "write",
+        "requested": "../../../../outside.txt",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/outside.txt",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/outside.txt lies outside every location this assignment may write"
+      }
+    ],
+    "shell": [
+      {
+        "callId": "call_6D3BfkpCNCJEkPfexYWNgOD8|fc_021d0571a6b0135b016ab69142d7d487d2ac325b0b36e2dd97",
+        "call": 1,
+        "command": "pwd",
+        "timeoutMs": 120000,
+        "outputFile": "/tmp/ramify-plan13-module-local-lfrloF/ordinary/shell-ordinary-1.log",
+        "startedAt": 1790349635070,
+        "endedAt": 1790349635295
+      }
+    ],
+    "pwd": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src",
+    "usage": [
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 1152,
+          "output": 17,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 1169
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 1289,
+          "output": 26,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 1315
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 176,
+          "output": 25,
+          "cacheRead": 1152,
+          "cacheWrite": 0,
+          "total": 1353
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 270,
+          "output": 29,
+          "cacheRead": 1152,
+          "cacheWrite": 0,
+          "total": 1451
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 306,
+          "output": 29,
+          "cacheRead": 1280,
+          "cacheWrite": 0,
+          "total": 1615
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 360,
+          "output": 27,
+          "cacheRead": 1408,
+          "cacheWrite": 0,
+          "total": 1795
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 919,
+          "output": 27,
+          "cacheRead": 1024,
+          "cacheWrite": 0,
+          "total": 1970
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 2119,
+          "output": 30,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 2149
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 383,
+          "output": 26,
+          "cacheRead": 1920,
+          "cacheWrite": 0,
+          "total": 2329
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 661,
+          "output": 14,
+          "cacheRead": 1792,
+          "cacheWrite": 0,
+          "total": 2467
+        }
+      }
+    ],
+    "files": [
+      {
+        "path": "project/subs/alpha/src/ordinary-own.txt",
+        "text": "own ordinary\n"
+      },
+      {
+        "path": "project/subs/beta/src/ordinary-cross.txt",
+        "text": null
+      },
+      {
+        "path": "project/plans/probe/plan.md",
+        "text": "captured plan\n"
+      },
+      {
+        "path": "project/features/probe.feature",
+        "text": "Feature: protected\n"
+      },
+      {
+        "path": "project/ramify-agent.json",
+        "text": "{}\n"
+      },
+      {
+        "path": "outside.txt",
+        "text": null
+      }
+    ],
+    "checks": {
+      "pwdIsCwd": true,
+      "readStarted": true,
+      "readFinished": true,
+      "readContainedSeed": true,
+      "ownWritten": true,
+      "crossWritten": false,
+      "crossAbsent": true,
+      "ownAllowed": true,
+      "crossAllowed": false,
+      "crossRefused": true,
+      "planRefused": true,
+      "featureRefused": true,
+      "configRefused": true,
+      "principleRefused": true,
+      "outsideRefused": true
+    },
+    "ramifyBoundary": {
+      "kind": "probe-unavailable",
+      "calls": 2
+    }
+  },
+  "repair": {
+    "kind": "repair",
+    "requestedStart": "fresh",
+    "actualStart": {
+      "mode": "fresh"
+    },
+    "outcome": {
+      "kind": "submitted",
+      "elapsedMs": 20768
+    },
+    "cwd": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src",
+    "spec": {
+      "role": "nonfunctional-repair-engineer",
+      "workingDirectory": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src",
+      "builtinTools": [
+        "read",
+        "grep",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "tools": [
+        "shell",
+        "run_scope_tests"
+      ],
+      "sessionMode": "fresh",
+      "context": {
+        "compaction": "forbidden",
+        "budgetTokens": null,
+        "budgetFraction": null,
+        "reportReserveTokens": 0
+      },
+      "systemPromptHash": "0e700614586e2edf6c1287d94f228239451c5c071c4c51d869d64d3a178082f6",
+      "promptHash": "b8d10f64e76f0f15bdf083f37e3e02abea43166c3896e7e2221cfcefb8d10306"
+    },
+    "guardedScope": {
+      "revision": 1,
+      "roots": [
+        "/tmp/ramify-plan13-module-local-lfrloF/project"
+      ],
+      "files": [],
+      "denied": [
+        "/tmp/ramify-plan13-module-local-lfrloF/project/ramify-agent.json",
+        "/tmp/ramify-plan13-module-local-lfrloF/project/features/probe.feature",
+        "/tmp/ramify-plan13-module-local-lfrloF/project/plans/probe/plan.md",
+        "/tmp/ramify-plan13-module-local-lfrloF/project/docs/engineering.principles.md"
+      ]
+    },
+    "starts": [
+      {
+        "tool": "shell",
+        "input": {
+          "command": "pwd"
+        },
+        "action": {
+          "kind": "command",
+          "command": "pwd"
+        },
+        "callId": "call_qE1OJu0Bw7JsscAWjNRZHYiI|fc_039b2eb2532e7d69016ab69169744487d2823cf3d20f57f60d"
+      },
+      {
+        "tool": "read",
+        "input": {
+          "path": "seed.txt",
+          "offset": null,
+          "limit": null
+        },
+        "action": {
+          "kind": "read",
+          "path": "seed.txt",
+          "range": null
+        },
+        "callId": "call_EGDcvYKY4AHrQO1gmkLgHIM1|fc_039b2eb2532e7d69016ab6916b683087d28cda78cc838ad6a0"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "repair-own.txt",
+          "content": "own repair\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "repair-own.txt"
+          ]
+        },
+        "callId": "call_bJmO5bx0la0fvUWqbRw2s8sV|fc_039b2eb2532e7d69016ab6916d6ecc87d2bd02c762fee1cda5"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../beta/src/repair-cross.txt",
+          "content": "cross repair\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../beta/src/repair-cross.txt"
+          ]
+        },
+        "callId": "call_yyLXrxgMZAmVGe9DK52mcL3J|fc_039b2eb2532e7d69016ab6916fc87887d28da0517dc6ea9470"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../plans/probe/plan.md",
+          "content": "changed plan\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../plans/probe/plan.md"
+          ]
+        },
+        "callId": "call_VFDeksMZ709JCSCG0uHT7bYN|fc_039b2eb2532e7d69016ab69171bc9c87d2a27b19c3c9c2d743"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../features/probe.feature",
+          "content": "changed feature\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../features/probe.feature"
+          ]
+        },
+        "callId": "call_Pz0bPuV19PBtT4InPuf4nxCM|fc_039b2eb2532e7d69016ab69173dc2887d2857db7030ab87820"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../ramify-agent.json",
+          "content": "changed config\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../ramify-agent.json"
+          ]
+        },
+        "callId": "call_Uj60ed4VXPRrQy4sBrFyoWMe|fc_039b2eb2532e7d69016ab69175eb9087d2876f3ae4df1bace6"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../docs/engineering.principles.md",
+          "content": "changed principle\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../docs/engineering.principles.md"
+          ]
+        },
+        "callId": "call_9csjUvYYobfDXBQxCjwS6MQF|fc_039b2eb2532e7d69016ab69177f52487d295773d1198d25a11"
+      },
+      {
+        "tool": "write",
+        "input": {
+          "path": "../../../../outside.txt",
+          "content": "changed outside\n"
+        },
+        "action": {
+          "kind": "write",
+          "paths": [
+            "../../../../outside.txt"
+          ]
+        },
+        "callId": "call_cUjgNrdrflAmdDtlIe0oXCO0|fc_039b2eb2532e7d69016ab6917a0c5c87d2b66143e8c6b05065"
+      },
+      {
+        "tool": "submit_probe",
+        "input": {},
+        "action": {
+          "kind": "harness"
+        },
+        "callId": "call_zaoLGauFQE0m24FVaCJxjI0Z|fc_039b2eb2532e7d69016ab6917c1ba087d296c25d67c150b759"
+      }
+    ],
+    "finishes": [
+      {
+        "tool": "shell",
+        "callId": "call_qE1OJu0Bw7JsscAWjNRZHYiI|fc_039b2eb2532e7d69016ab69169744487d2823cf3d20f57f60d",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "read",
+        "callId": "call_EGDcvYKY4AHrQO1gmkLgHIM1|fc_039b2eb2532e7d69016ab6916b683087d28cda78cc838ad6a0",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "write",
+        "callId": "call_bJmO5bx0la0fvUWqbRw2s8sV|fc_039b2eb2532e7d69016ab6916d6ecc87d2bd02c762fee1cda5",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "write",
+        "callId": "call_yyLXrxgMZAmVGe9DK52mcL3J|fc_039b2eb2532e7d69016ab6916fc87887d28da0517dc6ea9470",
+        "reachedTool": true,
+        "isError": false
+      },
+      {
+        "tool": "write",
+        "callId": "call_VFDeksMZ709JCSCG0uHT7bYN|fc_039b2eb2532e7d69016ab69171bc9c87d2a27b19c3c9c2d743",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_Pz0bPuV19PBtT4InPuf4nxCM|fc_039b2eb2532e7d69016ab69173dc2887d2857db7030ab87820",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_Uj60ed4VXPRrQy4sBrFyoWMe|fc_039b2eb2532e7d69016ab69175eb9087d2876f3ae4df1bace6",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_9csjUvYYobfDXBQxCjwS6MQF|fc_039b2eb2532e7d69016ab69177f52487d295773d1198d25a11",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "write",
+        "callId": "call_cUjgNrdrflAmdDtlIe0oXCO0|fc_039b2eb2532e7d69016ab6917a0c5c87d2b66143e8c6b05065",
+        "reachedTool": true,
+        "isError": true
+      },
+      {
+        "tool": "submit_probe",
+        "callId": "call_zaoLGauFQE0m24FVaCJxjI0Z|fc_039b2eb2532e7d69016ab6917c1ba087d296c25d67c150b759",
+        "reachedTool": true,
+        "isError": false
+      }
+    ],
+    "readResults": [
+      {
+        "isError": false,
+        "containsSeed": true
+      }
+    ],
+    "guards": [
+      {
+        "callId": "call_bJmO5bx0la0fvUWqbRw2s8sV|fc_039b2eb2532e7d69016ab6916d6ecc87d2bd02c762fee1cda5",
+        "tool": "write",
+        "requested": "repair-own.txt",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src/repair-own.txt",
+        "owner": "app/alpha",
+        "scopeRevision": 1,
+        "verdict": "allowed",
+        "reason": "the write scope contains /tmp/ramify-plan13-module-local-lfrloF/project"
+      },
+      {
+        "callId": "call_yyLXrxgMZAmVGe9DK52mcL3J|fc_039b2eb2532e7d69016ab6916fc87887d28da0517dc6ea9470",
+        "tool": "write",
+        "requested": "../../beta/src/repair-cross.txt",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/beta/src/repair-cross.txt",
+        "owner": "app/beta",
+        "scopeRevision": 1,
+        "verdict": "allowed",
+        "reason": "the write scope contains /tmp/ramify-plan13-module-local-lfrloF/project"
+      },
+      {
+        "callId": "call_VFDeksMZ709JCSCG0uHT7bYN|fc_039b2eb2532e7d69016ab69171bc9c87d2a27b19c3c9c2d743",
+        "tool": "write",
+        "requested": "../../../plans/probe/plan.md",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/plans/probe/plan.md",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/plans/probe/plan.md is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_Pz0bPuV19PBtT4InPuf4nxCM|fc_039b2eb2532e7d69016ab69173dc2887d2857db7030ab87820",
+        "tool": "write",
+        "requested": "../../../features/probe.feature",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/features/probe.feature",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/features/probe.feature is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_Uj60ed4VXPRrQy4sBrFyoWMe|fc_039b2eb2532e7d69016ab69175eb9087d2876f3ae4df1bace6",
+        "tool": "write",
+        "requested": "../../../ramify-agent.json",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/ramify-agent.json",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/ramify-agent.json is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_9csjUvYYobfDXBQxCjwS6MQF|fc_039b2eb2532e7d69016ab69177f52487d295773d1198d25a11",
+        "tool": "write",
+        "requested": "../../../docs/engineering.principles.md",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/project/docs/engineering.principles.md",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/project/docs/engineering.principles.md is written by the harness alone; no agent edits it"
+      },
+      {
+        "callId": "call_cUjgNrdrflAmdDtlIe0oXCO0|fc_039b2eb2532e7d69016ab6917a0c5c87d2b66143e8c6b05065",
+        "tool": "write",
+        "requested": "../../../../outside.txt",
+        "resolved": "/tmp/ramify-plan13-module-local-lfrloF/outside.txt",
+        "owner": null,
+        "scopeRevision": 1,
+        "verdict": "blocked-scope",
+        "reason": "/tmp/ramify-plan13-module-local-lfrloF/outside.txt lies outside every location this assignment may write"
+      }
+    ],
+    "shell": [
+      {
+        "callId": "call_qE1OJu0Bw7JsscAWjNRZHYiI|fc_039b2eb2532e7d69016ab69169744487d2823cf3d20f57f60d",
+        "call": 1,
+        "command": "pwd",
+        "timeoutMs": 120000,
+        "outputFile": "/tmp/ramify-plan13-module-local-lfrloF/repair/shell-repair-1.log",
+        "startedAt": 1790349673803,
+        "endedAt": 1790349674012
+      }
+    ],
+    "pwd": "/tmp/ramify-plan13-module-local-lfrloF/project/subs/alpha/src",
+    "usage": [
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 1152,
+          "output": 17,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 1169
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 1289,
+          "output": 26,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 1315
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 176,
+          "output": 25,
+          "cacheRead": 1152,
+          "cacheWrite": 0,
+          "total": 1353
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 270,
+          "output": 29,
+          "cacheRead": 1152,
+          "cacheWrite": 0,
+          "total": 1451
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 500,
+          "output": 29,
+          "cacheRead": 1024,
+          "cacheWrite": 0,
+          "total": 1553
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 298,
+          "output": 27,
+          "cacheRead": 1408,
+          "cacheWrite": 0,
+          "total": 1733
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 345,
+          "output": 27,
+          "cacheRead": 1536,
+          "cacheWrite": 0,
+          "total": 1908
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 265,
+          "output": 30,
+          "cacheRead": 1792,
+          "cacheWrite": 0,
+          "total": 2087
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 321,
+          "output": 26,
+          "cacheRead": 1920,
+          "cacheWrite": 0,
+          "total": 2267
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 338,
+          "output": 14,
+          "cacheRead": 2048,
+          "cacheWrite": 0,
+          "total": 2400
+        }
+      }
+    ],
+    "files": [
+      {
+        "path": "project/subs/alpha/src/repair-own.txt",
+        "text": "own repair\n"
+      },
+      {
+        "path": "project/subs/beta/src/repair-cross.txt",
+        "text": "cross repair\n"
+      },
+      {
+        "path": "project/plans/probe/plan.md",
+        "text": "captured plan\n"
+      },
+      {
+        "path": "project/features/probe.feature",
+        "text": "Feature: protected\n"
+      },
+      {
+        "path": "project/ramify-agent.json",
+        "text": "{}\n"
+      },
+      {
+        "path": "outside.txt",
+        "text": null
+      }
+    ],
+    "checks": {
+      "pwdIsCwd": true,
+      "readStarted": true,
+      "readFinished": true,
+      "readContainedSeed": true,
+      "ownWritten": true,
+      "crossWritten": true,
+      "crossAbsent": false,
+      "ownAllowed": true,
+      "crossAllowed": true,
+      "crossRefused": false,
+      "planRefused": true,
+      "featureRefused": true,
+      "configRefused": true,
+      "principleRefused": true,
+      "outsideRefused": true
+    },
+    "ramifyBoundary": {
+      "kind": "probe-unavailable",
+      "calls": 3
+    }
+  },
+  "checks": {
+    "ordinary": {
+      "pwdIsCwd": true,
+      "readStarted": true,
+      "readFinished": true,
+      "readContainedSeed": true,
+      "ownWritten": true,
+      "crossWritten": false,
+      "crossAbsent": true,
+      "ownAllowed": true,
+      "crossAllowed": false,
+      "crossRefused": true,
+      "planRefused": true,
+      "featureRefused": true,
+      "configRefused": true,
+      "principleRefused": true,
+      "outsideRefused": true
+    },
+    "repair": {
+      "pwdIsCwd": true,
+      "readStarted": true,
+      "readFinished": true,
+      "readContainedSeed": true,
+      "ownWritten": true,
+      "crossWritten": true,
+      "crossAbsent": false,
+      "ownAllowed": true,
+      "crossAllowed": true,
+      "crossRefused": false,
+      "planRefused": true,
+      "featureRefused": true,
+      "configRefused": true,
+      "principleRefused": true,
+      "outsideRefused": true
+    },
+    "protectedStable": [
+      {
+        "path": "subs/alpha/src/seed.txt",
+        "unchanged": true
+      },
+      {
+        "path": "subs/beta/src/seed.txt",
+        "unchanged": true
+      },
+      {
+        "path": "plans/probe/plan.md",
+        "unchanged": true
+      },
+      {
+        "path": "features/probe.feature",
+        "unchanged": true
+      },
+      {
+        "path": "ramify-agent.json",
+        "unchanged": true
+      },
+      {
+        "path": "docs/engineering.principles.md",
+        "unchanged": true
+      }
+    ],
+    "sourceStable": true,
+    "actualModels": [
+      "openai-codex/gpt-6-sol"
+    ],
+    "expectedModelObserved": true
+  },
+  "implementation": {
+    "start": {
+      "head": "a9a66dc10e94c4db31c61818728eda3778b23272",
+      "dirty": false,
+      "files": [
+        {
+          "path": "subs/harness/src/probes/plan13-module-local.probe.ts",
+          "sha256": "af43ef6f00da6ce68c775fc6a29d499986cc681ccf884f5059fad5945a50c9b3"
+        },
+        {
+          "path": "subs/harness/src/work/engineer-directory.ts",
+          "sha256": "e2599e74108f2c975ca61221182ed57e02c62e78e9cab62dd05a27a678ac1122"
+        },
+        {
+          "path": "subs/harness/src/work/engineer-equipment.ts",
+          "sha256": "e3bb6672c60dc2e5e2f47ba79f78c5781c59e55a4f6962fd84985f13dc328e57"
+        },
+        {
+          "path": "subs/harness/src/work/scope.ts",
+          "sha256": "49acaeb0611c2608d5e42855e8fe1da3d8a74de216538d7e3ae0a34cb4754600"
+        },
+        {
+          "path": "subs/harness/src/guard/write-guard.ts",
+          "sha256": "b113baca8ffc11d957e17ba0fe7f0f7c9b7ab535f3f83cef92be7b328ce55884"
+        },
+        {
+          "path": "subs/harness/src/run/service.ts",
+          "sha256": "a8ec935d14620d80ab213442a0d458c4a07fca323d7551c0d04b6de8e34eab04"
+        },
+        {
+          "path": "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+          "sha256": "d696e543a816a25a4a422d1b6011770e83ed152f1f4d3993d6666e97a7e309b4"
+        }
+      ]
+    },
+    "end": {
+      "head": "a9a66dc10e94c4db31c61818728eda3778b23272",
+      "dirty": false,
+      "files": [
+        {
+          "path": "subs/harness/src/probes/plan13-module-local.probe.ts",
+          "sha256": "af43ef6f00da6ce68c775fc6a29d499986cc681ccf884f5059fad5945a50c9b3"
+        },
+        {
+          "path": "subs/harness/src/work/engineer-directory.ts",
+          "sha256": "e2599e74108f2c975ca61221182ed57e02c62e78e9cab62dd05a27a678ac1122"
+        },
+        {
+          "path": "subs/harness/src/work/engineer-equipment.ts",
+          "sha256": "e3bb6672c60dc2e5e2f47ba79f78c5781c59e55a4f6962fd84985f13dc328e57"
+        },
+        {
+          "path": "subs/harness/src/work/scope.ts",
+          "sha256": "49acaeb0611c2608d5e42855e8fe1da3d8a74de216538d7e3ae0a34cb4754600"
+        },
+        {
+          "path": "subs/harness/src/guard/write-guard.ts",
+          "sha256": "b113baca8ffc11d957e17ba0fe7f0f7c9b7ab535f3f83cef92be7b328ce55884"
+        },
+        {
+          "path": "subs/harness/src/run/service.ts",
+          "sha256": "a8ec935d14620d80ab213442a0d458c4a07fca323d7551c0d04b6de8e34eab04"
+        },
+        {
+          "path": "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+          "sha256": "d696e543a816a25a4a422d1b6011770e83ed152f1f4d3993d6666e97a7e309b4"
+        }
+      ]
+    }
+  },
+  "witnessBoundary": "real pi AgentPort and engineerEquipment with one real shell process; fake unavailable Ramify hook; no full RunService, gate or project audit"
+}
