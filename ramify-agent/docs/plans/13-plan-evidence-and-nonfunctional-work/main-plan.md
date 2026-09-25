@@ -1,8 +1,8 @@
 # Plan 13: plan evidence, context selection and non-functional work
 
-**Date:** 2026-09-25. **Status:** implementation and focused verification through
-iteration 8; iteration 9 acceptance in progress in the isolated
-`feat/plan13-evidence-nonfunctional` worktree. See [implementation results](results.md).
+**Date:** 2026-09-25. **Status:** implemented through iteration 9 in the isolated
+`feat/plan13-evidence-nonfunctional` worktree. See [implementation results](results.md)
+and the revision-bound final audit published in the delivery commit's Git audit note.
 **Design starting source:** `d3cd73f1b14ff575dd16159242e2e52d7f6d0f34`.
 The [analysis](../../analysis/2026-09-25-plan-requirements-and-context-selection.md)
 provides the initial design. The decisions below supersede its broader catalog

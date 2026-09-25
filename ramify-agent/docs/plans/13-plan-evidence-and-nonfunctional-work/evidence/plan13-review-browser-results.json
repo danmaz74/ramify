@@ -1,6 +1,6 @@
 {
-  "revision": "223127c06c0904bbb506e640c6a627b004d7114e",
-  "dirtyAtStart": true,
+  "revision": "f15e023501af75fbe685a859541a6dada5f7b8df",
+  "dirtyAtStart": false,
   "chromium": "/usr/bin/chromium",
   "fixture": "RunQueries.analysis projection from analysis-plan-evidence.test.ts; actual PlanAndEntries component; local static Vite build",
   "checks": [

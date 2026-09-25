@@ -569,6 +569,24 @@ accepted, rejected, failed-gate and unavailable-source states, with the actual
 CheckFinding history. Its persisted fixture SHA-256 binds the screenshots
 and assertions to the supplied projections.
 
+The clean-source browser reruns passed with no page exceptions:
+readiness at `aeeaf383` passed 14/14 checks, and analysis review at `f15e0235`
+passed 11/11 checks. Both record `dirtyAtStart: false`. The readiness fixture
+SHA-256 is `c0d28e5e63f7ddd6a5b37b31f4adfd6f3a42e31197b3883547448d85b37c7d64`.
+Their later artifact/document commits do not change the exercised source.
+All recorded implementation hashes in the two model probes and the functional
+trial were compared again with the delivery source and still matched.
+
+The final focused regression sweep passed 56 tests in 10 session/scenario
+files (2 existing skips); the contract/authority group passed 44 in 13 files,
+and reconciliation passed 12. Event/protocol, context delivery, new unavailable
+review and exhausted-recovery cases also passed. All four TypeScript scopes
+passed. The unavailable-review case observes an actual unavailable request and
+no reviewer invocation; the exhausted-recovery case mutates source after three
+rounds and confirms `recovery-exhausted`, no completion and unavailable readiness.
+The repair case verifies reassessment and the final project gate occur after
+its last repair, with full/all scenario policy when scenarios are tracked.
+
 ### Acceptance case map
 
 Paths below are relative to `subs/harness/`; browser artifacts are in this
@@ -608,10 +626,11 @@ and 18 skipped. Its immutable report is
 The regression migrations declare the new candidate previews and audited-tree
 answers per scenario, update exact event/session expectations for orientation
 and selection, and bind custom scripted initial agents to captured evidence.
-Fixtures still reject unstated operations. The affected focused groups are
-rerun before the final audit. Final-commit audit completion is recorded in the
-handoff and in the revision-bound Git audit note; it is not inferred from
-focused tests or structural checks.
+Fixtures still reject unstated operations. The affected focused groups passed
+before the final audit. The final delivery commit is audited with the request
+below, and its immutable result, exact counts and retrieval command are
+published in that commit's Git audit note. That result is separate from the
+focused tests and structural checks recorded here.
 
 The final request is `audit/plan13-plan-evidence.request.json`. From the
 worktree root:
