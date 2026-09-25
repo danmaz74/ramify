@@ -5,7 +5,8 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { resolveContainedPath, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import type { ToolAction } from '../../subs/agent/src/interfaces/port.js';
 import { blockExplanation, decideWrite, type GuardedScope } from '../guard/write-guard.js';
-import { deniedFiles, guardedScopeOf, resolveWriteScope } from '../work/scope.js';
+import { deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, testPolicyOf } from '../work/scope.js';
+import type { WriteScope } from '../work/iterations.js';
 import { temporaryDirectory } from './helpers/fixture.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 
@@ -69,7 +70,7 @@ async function project() {
 
 async function scopeOf(root: string, index: ReturnType<typeof architectIndex>, options: {
   readonly includedChildren?: readonly string[];
-  readonly extra?: ReadonlyArray<{ path: string; purpose: 'contract' | 'conformance' | 'fake' | 'exposure-declaration' | 'consumer' }>;
+  readonly extra?: WriteScope['extra'];
   readonly bootstrap?: ReadonlyArray<{ directory: string }>;
 } = {}): Promise<GuardedScope> {
   const scope = await resolveWriteScope({
@@ -296,5 +297,53 @@ describe('the lifted containment check', () => {
     expect(fresh).toMatchObject({ ok: true, existed: false, resolved: join(root, 'subs/orders/src/a/b/c.ts') });
     // Resolving it created nothing.
     expect(existsSync(join(root, 'subs/orders/src/a'))).toBe(false);
+  });
+});
+
+describe('a path outside every module, assigned as outside-modules', () => {
+  test('a named file and a directory are writable, new files included, and the harness\'s own files stay refused', async () => {
+    const { root, index } = await project();
+    await mkdir(join(root, 'scripts', 'report'), { recursive: true });
+    await writeFile(join(root, 'scripts', 'report', 'report.ts'), 'export const report = 1;\n');
+    await writeFile(join(root, 'ramify-agent.json'), '{}\n');
+    const extra: WriteScope['extra'] = [
+      { path: 'scripts/report/report.ts', purpose: 'outside-modules', reason: 'The plan requires the report to print the block.' },
+      { path: 'tools/generated', purpose: 'outside-modules', kind: 'directory', reason: 'The plan requires a generator.' },
+    ];
+    const resolved = await resolveWriteScope({
+      projectRoot: root, index, view: { status: 'placeholder' }, revision: 4,
+      base: { module: 'shop/orders', includedChildren: [] }, extra, read: [], bootstrap: [], rationale: 'r',
+    });
+    const scope = guardedScopeOf(resolved, await deniedFiles(root, []));
+
+    for (const target of ['scripts/report/report.ts', 'tools/generated/new.ts', 'tools/generated/deeper/new.test.ts']) {
+      expect(`${target}: ${(await decideWrite(scope, root, writing(target))).verdict}`).toBe(`${target}: allowed`);
+    }
+    // Only what was named: a sibling of the named file is not in scope.
+    expect((await decideWrite(scope, root, writing('scripts/report/other.ts'))).verdict).toBe('blocked-scope');
+    const denied = await decideWrite(scope, root, writing('ramify-agent.json'));
+    expect(denied).toMatchObject({ verdict: 'blocked-scope', denied: true });
+
+    // The gate attributes findings against the same paths, so a file named
+    // outside modules is inside the write scope.
+    const paths = scopePaths(root, resolved);
+    expect(paths.files).toContain('scripts/report/report.ts');
+    expect(paths.roots).toContain('tools/generated');
+    // Its reason is recorded with the scope.
+    expect(resolved.extra[0]).toMatchObject({ purpose: 'outside-modules', reason: 'The plan requires the report to print the block.' });
+  });
+
+  test('the policy names the paths, so each attempt finds their tests anew', () => {
+    const extra: WriteScope['extra'] = [
+      { path: 'subs/contracts/src/interfaces/notes.ts', purpose: 'contract' },
+      { path: 'tools/generated', purpose: 'outside-modules', kind: 'directory', reason: 'r' },
+      { path: 'scripts/report.ts', purpose: 'outside-modules', reason: 'r' },
+    ];
+    const base = { module: 'shop/orders', includedChildren: [] };
+    expect(testPolicyOf('ordinary', base, [], extra)).toEqual({
+      policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [], outsideModules: ['scripts/report.ts', 'tools/generated'],
+    });
+    // Without such a path the policy is what it always was.
+    expect(testPolicyOf('ordinary', base, [], extra.slice(0, 1))).toEqual({ policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [] });
   });
 });

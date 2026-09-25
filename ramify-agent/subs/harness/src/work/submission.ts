@@ -143,6 +143,8 @@ export interface WorkEvidence {
   readonly contracts?: ReadonlySet<string> | undefined;
   /** The guarded paths of this project, which are the only ones an authorization can name. */
   readonly guardedPaths?: ReadonlySet<string> | undefined;
+  /** The files only the harness writes: its configuration for the project and the tracked feature files. */
+  readonly harnessOnly?: ReadonlySet<string> | undefined;
   /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
   readonly scenarios?: DeclarationContext | undefined;
   /** For an integration work item: the scope its engineer must be given. */
@@ -206,6 +208,7 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
       revising: outline !== undefined,
       ...(evidence.contracts === undefined ? {} : { contracts: evidence.contracts }),
       ...(evidence.guardedPaths === undefined ? {} : { guardedPaths: evidence.guardedPaths }),
+      ...(evidence.harnessOnly === undefined ? {} : { harnessOnly: evidence.harnessOnly }),
       ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
       ...(evidence.scenarios === undefined ? {} : { scenarios: evidence.scenarios }),
     }),

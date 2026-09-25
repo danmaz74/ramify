@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 import { isTestingModule, type ArchitectIndex, type ModuleEntry } from '../../subs/evidence/src/views.js';
 import type { TestSelection, TestSelectionPolicy } from './records.js';
 
@@ -40,17 +40,26 @@ export interface SelectionFailure {
 export interface SelectionResult {
   readonly selection: TestSelection;
   readonly failure: SelectionFailure | null;
+  /**
+   * The selected suites beneath the policy's `outside-modules` paths, which
+   * are also in `extraSuites`. The runner is given each on its own, so one
+   * it does not select cannot pass unnoticed beside the others.
+   */
+  readonly outside?: readonly string[] | undefined;
 }
 
 /**
  * The test files one policy selects from the current tree: each exact
  * owner's own test area, every descendant owner's for an included subtree,
- * the ordinary source of a testing module inside the selection, and the
- * suites a registered evidence obligation requires.
+ * the ordinary source of a testing module inside the selection, the test
+ * files beneath its `outside-modules` paths and the suites a registered
+ * evidence obligation requires.
  */
 export async function resolveTestSelection(request: SelectionRequest): Promise<SelectionResult> {
   const { policy } = request;
-  const empty: TestSelection = { ...policy, exactOwners: [...policy.exactOwners], subtrees: [...policy.subtrees], extraSuites: [...policy.extraSuites], resolved: [] };
+  const empty: TestSelection = {
+    policy: policy.policy, exactOwners: [...policy.exactOwners], subtrees: [...policy.subtrees], extraSuites: [...policy.extraSuites], resolved: [],
+  };
   if (policy.policy === 'all-project') return { selection: empty, failure: null };
 
   if (request.index === null) {
@@ -91,19 +100,41 @@ export async function resolveTestSelection(request: SelectionRequest): Promise<S
     for (const file of found) selected.add(file);
   }
 
-  for (const suite of policy.extraSuites) {
+  // A test file named as an `outside-modules` path is required like an
+  // obligation's suite; a directory contributes the test files it holds now.
+  const outside: string[] = [];
+  for (const path of policy.outsideModules ?? []) {
+    const entry = await stat(join(request.projectRoot, path)).catch(() => null);
+    if (entry?.isDirectory() === true) {
+      try {
+        outside.push(...await discover(request.projectRoot, path));
+      } catch (error) {
+        return { selection: empty, failure: { failed: 'discovery-error', detail: `${path} could not be read: ${message(error)}` } };
+      }
+    } else if (testFile.test(basename(path))) {
+      outside.push(toPosix(path));
+    }
+  }
+  const extraSuites = [...new Set([...policy.extraSuites, ...outside])];
+  const required: TestSelection = { ...empty, extraSuites };
+
+  for (const suite of extraSuites) {
     if (selected.has(suite)) continue;
     const exists = await stat(join(request.projectRoot, suite)).then(entry => entry.isFile(), () => false);
     if (!exists) {
       return {
-        selection: { ...empty, resolved: [...selected].sort() },
+        selection: { ...required, resolved: [...selected].sort() },
         failure: { failed: 'required-suite-missing', detail: `the required suite ${suite} is not in the tree` },
       };
     }
     selected.add(suite);
   }
 
-  return { selection: { ...empty, resolved: [...selected].sort() }, failure: null };
+  return {
+    selection: { ...required, resolved: [...selected].sort() },
+    failure: null,
+    ...(outside.length === 0 ? {} : { outside: [...new Set(outside)].sort() }),
+  };
 }
 
 /**

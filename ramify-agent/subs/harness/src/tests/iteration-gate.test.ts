@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
-import { iterationLayout, type IterationResult } from '../work/iterations.js';
+import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
@@ -471,3 +471,76 @@ function failingRefreshAfter(times: number) {
     },
   };
 }
+
+describe('a file outside every module, assigned as outside-modules', () => {
+  test('the engineer writes it through the guard, and the gate runs its test on a run of its own', async () => {
+    const root = await target({ limit: 500 });
+    const reason = 'The plan requires the report script to print the note limit.';
+    const report = 'scripts/notes-report.ts';
+    const reportTest = 'scripts/notes-report.test.ts';
+    const { service, runId, scripted } = await run(root, {
+      'initial-architect': [submit(analysis([entry('review-note', notes)]))],
+      'local-architect': [
+        submit(assign(notes, {
+          scope: {
+            base: { module: notes, includedChildren: [] },
+            extra: [
+              { path: report, purpose: 'outside-modules', reason },
+              { path: reportTest, purpose: 'outside-modules', kind: 'file', reason },
+              { path: 'scripts/report-fixtures', purpose: 'outside-modules', kind: 'directory', reason },
+            ],
+            read: [],
+            rationale: 'The report script lies in no module, and only it prints the report.',
+          },
+        }, outline())),
+        submit(requestCompletion()),
+      ],
+      engineer: [
+        submit(completionProposed('The report prints the limit, and its test says so.'),
+          write(report, 'export const reportLine = \'limit 500\';\n'),
+          write(reportTest, [
+            'import { test, expect } from \'vitest\';',
+            'import { reportLine } from \'./notes-report.ts\';',
+            '',
+            'test(\'the report prints the limit\', () => {',
+            '  expect(reportLine).toBe(\'limit 500\');',
+            '});',
+            '',
+          ].join('\n'))),
+      ],
+    }, {
+      commits: [
+        scenarios,
+        added('revision-01', report, reportTest),
+        unchanged,
+        unchanged,
+      ],
+    });
+
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    // The assignment records the location with its reason, and its policy
+    // names the path whose tests every attempt resolves anew.
+    const assignment = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.assignment('wi-001', 1)), 'utf8')) as IterationAssignment;
+    expect(assignment.scope.extra).toEqual([
+      { path: report, purpose: 'outside-modules', reason },
+      { path: reportTest, purpose: 'outside-modules', kind: 'file', reason },
+      { path: 'scripts/report-fixtures', purpose: 'outside-modules', kind: 'directory', reason },
+    ]);
+    expect(assignment.gate.tests.outsideModules).toEqual([reportTest, report, 'scripts/report-fixtures']);
+
+    // The guard let the engineer write both files.
+    expect(await readFile(`${root}/${report}`, 'utf8')).toContain('limit 500');
+
+    // The owner's tests run together and the outside suite on its own, so a
+    // runner that did not select it would fail that run rather than pass. A
+    // directory that holds no test yet adds none.
+    const [gate] = (await gates(root, runId)).filter(attempt => attempt.checkpoint === 'iteration');
+    expect(gate!.verdict).toBe('passed');
+    const tests = gate!.commands.filter(command => command.kind === 'tests');
+    expect(tests.map(command => command.selection!.resolved)).toEqual([[`${notesDirectory}/src/tests/notes.test.ts`], [reportTest]]);
+    expect(tests[1]!.selection!.extraSuites).toEqual([reportTest]);
+    expect(tests[1]!.command.argv.slice(-1)).toEqual([reportTest]);
+    expectNoProcesses();
+    scripted.assertComplete();
+  }, 120_000);
+});

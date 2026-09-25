@@ -41,6 +41,27 @@ function toPosix(path: string): string {
   return path.split(sep).join('/');
 }
 
+/**
+ * Whether a project-relative path lies in the own contents of the module at
+ * `dir`: its source area or one of its two declaration files. This is what
+ * Ramify assigns to a module; anything else beneath its directory, such as
+ * `subs/x/scripts/`, lies outside every module.
+ */
+export function inOwnContents(dir: string, path: string): boolean {
+  const target = toPosix(path);
+  return within(target, ownArea(dir)) || target === ownFile(dir, 'module.ramify') || target === ownFile(dir, 'README.md');
+}
+
+/** Whether any part of the own contents of the module at `dir` lies inside `directory`. */
+export function ownContentsWithin(dir: string, directory: string): boolean {
+  return [ownArea(dir), ownFile(dir, 'module.ramify'), ownFile(dir, 'README.md')].some(path => within(path, directory));
+}
+
+/** The `outside-modules` paths of a scope's extra locations, sorted. */
+export function outsideModulePaths(extra: WriteScope['extra']): string[] {
+  return [...new Set(extra.filter(entry => entry.purpose === 'outside-modules').map(entry => entry.path))].sort();
+}
+
 /** What a scope resolution was asked for, once the harness has validated it. */
 export interface ScopeCapture {
   readonly projectRoot: string;
@@ -172,12 +193,17 @@ export function testPolicyOf(
   kind: IterationKind,
   base: WriteScope['base'],
   evidenceObligations: ReadonlyArray<{ readonly suite: readonly string[] }>,
-): { policy: 'owned-by-scope' | 'all-project'; exactOwners: string[]; subtrees: string[]; extraSuites: string[] } {
+  extra: WriteScope['extra'] = [],
+): { policy: 'owned-by-scope' | 'all-project'; exactOwners: string[]; subtrees: string[]; extraSuites: string[]; outsideModules?: string[] } {
   const extraSuites = [...new Set(evidenceObligations.flatMap(obligation => [...obligation.suite]))].sort();
+  // The tests beneath an `outside-modules` path are no owner's, so the
+  // policy names the paths and each attempt finds the tests there anew.
+  const outside = outsideModulePaths(extra);
+  const outsideModules = outside.length === 0 ? {} : { outsideModules: outside };
   if (kind === 'breaking' || !('module' in base)) {
-    return { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites };
+    return { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites, ...outsideModules };
   }
-  return { policy: 'owned-by-scope', exactOwners: [base.module], subtrees: [...base.includedChildren], extraSuites };
+  return { policy: 'owned-by-scope', exactOwners: [base.module], subtrees: [...base.includedChildren], extraSuites, ...outsideModules };
 }
 
 /** What a run guards beyond the configuration and the contract artifacts. */
@@ -223,16 +249,19 @@ export async function captureGuardedFiles(
 
 /**
  * The probe an all-project checkpoint runs beside the project's own tests:
- * the modules of the assignment's base, as an ordinary owned selection. It
- * is what tells a failure inside the iteration's own scope from one outside
- * it, and it selects nothing more than the base names.
+ * the modules of the assignment's base, as an ordinary owned selection, and
+ * the tests beneath its `outside-modules` paths. It is what tells a failure
+ * inside the iteration's own scope from one outside it, and it selects
+ * nothing more than the scope names.
  */
-export function scopeProbePolicyOf(base: WriteScope['base']): {
-  policy: 'owned-by-scope'; exactOwners: string[]; subtrees: string[]; extraSuites: string[];
+export function scopeProbePolicyOf(base: WriteScope['base'], extra: WriteScope['extra'] = []): {
+  policy: 'owned-by-scope'; exactOwners: string[]; subtrees: string[]; extraSuites: string[]; outsideModules?: string[];
 } {
+  const outside = outsideModulePaths(extra);
+  const outsideModules = outside.length === 0 ? {} : { outsideModules: outside };
   return 'module' in base
-    ? { policy: 'owned-by-scope', exactOwners: [base.module], subtrees: [...base.includedChildren], extraSuites: [] }
-    : { policy: 'owned-by-scope', exactOwners: [...base.modules], subtrees: [], extraSuites: [] };
+    ? { policy: 'owned-by-scope', exactOwners: [base.module], subtrees: [...base.includedChildren], extraSuites: [], ...outsideModules }
+    : { policy: 'owned-by-scope', exactOwners: [...base.modules], subtrees: [], extraSuites: [], ...outsideModules };
 }
 
 /** Every module of the view that lies inside one directory, the directory's own owner included. */

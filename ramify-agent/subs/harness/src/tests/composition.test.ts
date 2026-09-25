@@ -297,6 +297,10 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  // A path outside every module, assigned as outside-modules and written through the guard.
+  { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['outside-modules'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
+  { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
+  { union: 'submission local-architect[assign].assignment.scope.extra[].kind', values: ['file', 'directory'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
   // Plan 12: CheckFindings committed through a driven run's own transition, and iteration reviews.
   { union: 'run log.type', values: ['check-findings-recorded'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
@@ -651,10 +655,6 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['consumer'],
     reason: 'The consumer is a contract scope\'s base, not an extra location (iteration 9), so no writer names it.',
-  },
-  {
-    union: 'record ramify-agent.iteration-assignment/1.scope.extra[].kind', values: ['file'],
-    reason: 'It is the default and is represented by the field\'s absence: an architect\'s extra location is recorded without a kind, and only a contract scope\'s directory writes one (iteration 9, deviation 3).',
   },
   {
     union: 'record ramify-agent.iteration-assignment/1.evidenceObligations[].against', values: ['fake'],

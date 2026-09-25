@@ -3490,6 +3490,7 @@ export class RunService {
           openRequirements: new Set(open.map(requirement => requirement.id)),
           contracts: this.contractsConsumedBy(run, current, item.id),
           guardedPaths: guarded,
+          harnessOnly,
           scenarios: this.declarationContext(run, item),
           ...(integration === undefined ? {} : { integration: integration.scope }),
         }),
@@ -4299,7 +4300,7 @@ export class RunService {
         : [{ capability: revised.capability.id, owner: revised.provider, role: 'request' }],
       completionEvidence: body.completionEvidence,
       evidenceObligations,
-      gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations) },
+      gate: { checkpoint: checkpointOf(body.kind), tests: testPolicyOf(body.kind, scope.base, evidenceObligations, scope.extra) },
       guarded: await captureGuardedFiles(this.projectRoot, artifacts.map(artifact => artifact.path), await this.guardedScenarioFiles(run)),
       authorizations,
       ...(revised === undefined ? {} : { revisesContract: refOf(revised.id, revised.revision, revised) }),
@@ -4497,7 +4498,7 @@ export class RunService {
       // given. Where the gate is the whole project, the tool still resolves
       // this iteration's own modules, with the suites its evidence requires.
       const probed = assignment.gate.tests.policy === 'all-project'
-        ? { ...scopeProbePolicyOf(assignment.scope.base), extraSuites: [...assignment.gate.tests.extraSuites] }
+        ? { ...scopeProbePolicyOf(assignment.scope.base, assignment.scope.extra), extraSuites: [...assignment.gate.tests.extraSuites] }
         : assignment.gate.tests;
       const tools = this.implementationTools(run, {
         scopeRevision: assignment.scope.revision,
@@ -5708,7 +5709,7 @@ export class RunService {
     return resolveTestSelection({
       projectRoot: this.projectRoot,
       index,
-      policy: scopeProbePolicyOf(assignment.scope.base),
+      policy: scopeProbePolicyOf(assignment.scope.base, assignment.scope.extra),
     });
   }
 

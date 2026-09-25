@@ -96,6 +96,9 @@ describe('the modules of a concern', () => {
     // A location no module's own contents hold falls back to the work item's module.
     expect(concernModules(index, at('subs/cart/docs/notes.md', 'docs/module.ramify'), 'shop/cart')).toEqual(['shop/cart']);
     expect(concernModules(index, at('subs/cart/docs/notes.md'), null)).toEqual([]);
+    // Beside a module's location, one outside every module, such as a file an
+    // outside-modules scope reached, still concerns the work item's module.
+    expect(concernModules(index, at('subs/cart/subs/pricing/src/price.ts', 'scripts/report.ts'), 'shop/cart')).toEqual(['shop/cart/pricing', 'shop/cart']);
     expect(concernModules(null, at('subs/cart/src/cart.ts'), 'shop/cart')).toEqual(['shop/cart']);
   });
 
