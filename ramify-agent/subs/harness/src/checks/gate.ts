@@ -209,6 +209,7 @@ async function notVerifiedRecords(
     await writeFile(outputFile, '');
     return {
       kind: check.kind,
+      ...(check.name === undefined ? {} : { name: check.name }),
       command: check.command,
       ...(check.selection === undefined ? {} : { selection: check.selection }),
       startedAt,
@@ -250,6 +251,7 @@ async function compareGuardedFiles(request: GateRequest): Promise<GateAttempt['g
 function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scenarios?: ScenarioCheckSummary): GateCommandRecord {
   const base = {
     kind: check.kind,
+    ...(check.name === undefined ? {} : { name: check.name }),
     command: check.command,
     ...(check.selection === undefined ? {} : { selection: check.selection }),
     startedAt: run.startedAt,
@@ -284,8 +286,14 @@ function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scen
   }
 }
 
+/**
+ * A command a failed setup kept from running proves nothing either way, and
+ * it is the setup command's own record that decides: a build that exited
+ * non-zero fails the attempt, and one that did not complete leaves it not
+ * verified.
+ */
 function verdictOf(commands: readonly GateCommandRecord[], harnessFinding: boolean): GateAttempt['verdict'] {
-  if (commands.some(command => command.outcome === 'not-verified')) return 'not-verified';
+  if (commands.some(command => command.outcome === 'not-verified' && command.notVerified !== 'setup-failed')) return 'not-verified';
   if (harnessFinding || commands.some(command => command.outcome === 'failed')) return 'failed';
   return 'passed';
 }
@@ -313,6 +321,12 @@ function causeOf(
   if (reasons.has('runner-error') || reasons.has('command-missing') || reasons.has('interrupted') || reasons.has('discovery-error')) return 'infrastructure';
   if (reasons.has('empty-selection') || reasons.has('required-suite-missing')) return 'unknown';
   if (verdict !== 'failed') return 'unknown';
+  // A setup command that ran and exited non-zero failed on the source it
+  // was given; nothing after it ran. The change since the last state that
+  // passed is the assignment's own, so the failure is in scope, the
+  // engineer's to repair, as any project-wide failure is when the probe of
+  // the assignment's own tests did not pass.
+  if (commands.some(command => command.kind === 'setup' && command.outcome === 'failed')) return 'in-scope';
   // A rule the harness verified is about what this iteration wrote, so it is
   // the engineer's to repair whatever else ran.
   if (ruleFailed) return 'in-scope';

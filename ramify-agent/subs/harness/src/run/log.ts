@@ -505,7 +505,9 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('gate-command-started', z.object({
     gate: text,
     checkpoint: text,
-    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    /** A setup command's declared name, such as `build`. */
+    name: text.optional(),
     position: z.int().positive(),
     total: z.int().positive(),
   }).strict()),
@@ -597,6 +599,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
     invocation: text,
     checkFinding: text,
     held: z.boolean(),
+    checkFindings: checkFindingEventsField,
+  }).strict()),
+  /**
+   * Commits one `EnvironmentProblem` the fork of an unresolved request
+   * reported, with the CheckFinding that asks the operator to resume the run
+   * or end it, as one line. The run holds the work item until the operator
+   * answers; nothing is placed and nothing of the plan changes.
+   */
+  event('environment-reported', z.object({
+    request: text,
+    problem: text,
+    workItem: text,
+    invocation: text,
+    checkFinding: text,
     checkFindings: checkFindingEventsField,
   }).strict()),
   /**

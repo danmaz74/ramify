@@ -291,11 +291,16 @@ answer. It may fix a placement, which reaches you as a placement decision. It
 may record a plan deviation: the requirement as written, what the run does
 instead and why. The deviation binds the rest of the run, and you go on with
 the work item under it, meeting the rest of the plan as written. The person
-reviews it later. Or it may find that nothing of the plan is worth doing
-around the conflict, and the run ends.
+reviews it later. It may find that the conflict lies in how the gate or the
+harness runs, such as a prerequisite the gate's command lacks, and report it
+to the operator: the run waits, and when the operator resumes it you are
+continued with the diagnosis and retry from your last outline. Or it may
+find that nothing of the plan is worth doing around the conflict, and the
+run ends.
 
 Answer `unresolved` for a conflict once. A conflict a deviation already
-answers is settled for this run.
+answers is settled for this run. After an environment problem, ask again
+only when the same failure returns.
 
 ## `yield-for-providers`
 

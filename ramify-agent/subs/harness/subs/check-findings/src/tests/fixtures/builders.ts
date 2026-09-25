@@ -235,6 +235,25 @@ export function deviation(options: { readonly key: string; readonly hash: number
   };
 }
 
+/**
+ * An environment problem as the harness records it: the run's, verified by
+ * assessment, judged by the global architect with the operator's remedy it
+ * suggests, credited as agent-generated, at high risk.
+ */
+export function environmentProblem(options: { readonly key: string; readonly hash: number }): CheckFindingReportInput {
+  return {
+    ...deviation(options),
+    producer: 'plan:environment',
+    source: { kind: 'artifact', id: `environment/${options.key}.json` },
+    observation: {
+      kind: 'environment-problem',
+      summary: `Environment problem ${options.key}: the gate's tests import dist/src, which nothing builds`,
+      evidence: [{ kind: 'environment-problem', ref: `environment/${options.key}.json`, hash: hashOf(options.hash + 3000) }],
+      locations: [],
+    },
+  };
+}
+
 /** The harness's request for the person's decision on a plan deviation: accept or reject. */
 export function deviationRequest(): CheckFindingDecisionInput {
   return decision({

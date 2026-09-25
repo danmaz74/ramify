@@ -5,7 +5,7 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
-import { deviationText, type PlanDeviation } from '../deviations/records.js';
+import { deviationText, type EnvironmentProblem, type PlanDeviation } from '../deviations/records.js';
 import type { IterationApiViews } from './engineer.js';
 import type { IntegrationBriefing } from './integration.js';
 import { architectScenarioSection, type BriefedScenario } from './scenario-briefing.js';
@@ -131,6 +131,11 @@ export interface WorkItemBriefing {
   readonly deviations?: readonly PlanDeviation[] | undefined;
   /** The deviation that just answered this architect's unresolved request. */
   readonly deviationRecorded?: string | undefined;
+  /**
+   * The environment problem that just answered this architect's unresolved
+   * request, after which the operator resumed the run, with their note.
+   */
+  readonly environmentResumed?: { readonly problem: EnvironmentProblem; readonly note: string } | undefined;
   /** The outline revisions already committed for this item, oldest first. */
   readonly outlines: readonly WorkItemOutline[];
   /** What this work item owes and is owed across a delegation. */
@@ -381,6 +386,8 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     lines.push('', 'Nothing was placed and nothing was registered. Decide what to do with the work item on the evidence you have, or answer `unresolved`.', '');
   }
 
+  if (briefing.environmentResumed !== undefined) lines.push(...environmentSection(briefing.environmentResumed));
+
   if (briefing.bounds !== undefined) {
     const { defaults, ceilings } = briefing.bounds;
     lines.push('## The bounds of an engineer', '');
@@ -478,6 +485,28 @@ function deviationSection(deviations: readonly PlanDeviation[], recorded: string
   lines.push('The plan file is unchanged. Each deviation below amends it for the rest of this run, and your work and its reviews are judged against the plan as amended.', '');
   for (const deviation of deviations) lines.push(deviationText(deviation), '');
   return lines;
+}
+
+/**
+ * The environment problem that answered this architect's unresolved
+ * request: it was reported to the operator, who resumed the run. The work
+ * item retries from its last outline.
+ */
+function environmentSection({ problem, note }: { readonly problem: EnvironmentProblem; readonly note: string }): string[] {
+  return [
+    '## The environment problem was reported, and the run resumed',
+    '',
+    `The global architect answered \`${problem.request}\` with environment problem \`${problem.id}\`: the conflict lies in how the gate or the harness runs, not in the plan or the architecture. Its diagnosis:`,
+    '',
+    ...problem.diagnosis.split('\n').map(line => `> ${line}`),
+    '',
+    `What it suggested to the operator: ${problem.suggestion}`,
+    '',
+    note.trim() === '' ? 'The operator resumed the run and left no note.' : `The operator resumed the run, with this note: ${note}`,
+    '',
+    'Nothing was placed, no deviation was recorded and the plan is unchanged. Retry from your last outline: assign the iteration again, or request completion again for a fresh gate attempt. If the same failure returns, answer `unresolved` again with the new evidence.',
+    '',
+  ];
 }
 
 /** What a reconciliation returns to the local architect: its correction, and its brief where the session lacks it. */

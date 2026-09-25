@@ -334,8 +334,8 @@ describe('the acceptance scenarios a client reads', () => {
 
   test('a gate\'s scenario command carries its compact summary; the others carry none', () => {
     const command = {
-      argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: '2026-09-23T08:00:00.000Z', elapsedMs: 5, exitCode: 1, outcome: 'failed',
-      notVerified: null, runnerError: null, selection: null, output: { path: 'gates/ga-0004/scenarios.log', bytes: 10, truncated: false, tail: 'failed' },
+      name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: '2026-09-23T08:00:00.000Z', elapsedMs: 5, exitCode: 1, outcome: 'failed',
+      notVerified: null, runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0004/scenarios.log', bytes: 10, truncated: false, tail: 'failed' },
     };
     const summary = {
       mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-003'] }, dryRun: false, excluded: 2,
@@ -354,6 +354,13 @@ describe('the acceptance scenarios a client reads', () => {
     const withBinding = { ...summary, scenarios: [{ ...summary.scenarios[0], binding: [] }] };
     expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'scenarios', ...command, scenarios: withBinding }] }).success).toBe(false);
     expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'scenarios', ...command, scenarios: { ...summary, mode: 'slow' } }] }).success).toBe(false);
+    // A setup command carries its declared name; a command a failed setup kept from running says so.
+    const setup = { ...gate, commands: [
+      { kind: 'setup', ...command, name: 'build', argv: ['npm', 'run', 'build'], exitCode: 2, scenarios: null },
+      { kind: 'tests', ...command, exitCode: null, outcome: 'not-verified', notVerified: 'setup-failed', scenarios: null },
+    ] };
+    expect(gateViewSchema.parse(setup)).toEqual(setup);
+    expect(gateViewSchema.safeParse({ ...gate, commands: [{ kind: 'setup', ...command, name: '', scenarios: null }] }).success).toBe(false);
   });
 
   test('a projected event may refer to a scenario', () => {

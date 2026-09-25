@@ -30,7 +30,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     writer: { held: 'inv-0006', unsettled: null },
     review: 'not-reviewed',
     decisionRequests: { open: 0, waiting: false, workItems: [] },
-    planDeviations: { recorded: 0, toReview: 0 },
+    planDeviations: { recorded: 0, toReview: 0 }, environmentProblems: [],
     notices: [
       {
         kind: 'module-created', at, sequence: 9, summary: 'Module created: shop/notes/drafts (subs/drafts/module.ramify) in wi-002.i01, commit abc. No placement decision proposed it.',
@@ -140,7 +140,11 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     gates: {
       'ga-0001': gateViewSchema.parse({
         id: 'ga-0001', checkpoint: 'readiness', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: baseCommit,
-        commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [], commands: [],
+        commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
+        commands: [{
+          kind: 'setup', name: 'build', argv: ['npm', 'run', 'build'], cwd: '/p', startedAt: at, elapsedMs: 7, exitCode: 0, outcome: 'passed', notVerified: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0001/01-setup.log', bytes: 6, truncated: false, tail: 'built\n' }, scenarios: null,
+        }],
       }),
       'ga-0002': gateViewSchema.parse({
         id: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, repairRound: 0, infrastructureAttempt: 0,
@@ -148,11 +152,11 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         evidence: { runRef: 'refs/audited/runs/failed', reportCommit: 'c'.repeat(40), treeRef: 'refs/audited/trees/failed' },
         verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
         commands: [{
-          kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
+          kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
         }, {
-          kind: 'scenarios', argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
+          kind: 'scenarios', name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
           scenarios: {
             mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-001'] }, dryRun: false, excluded: 3, runs: [{ module: 'shop/notes', exit: 1 }],
             scenarios: [{ id: 'sc-001', run: 'shop/notes', status: 'failed', file: 'subs/notes/src/tests/features/review-notes/review-note.feature', line: 4, failure: noteFailure, undefined: [] }],
@@ -167,8 +171,8 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         evidence: { runRef: 'refs/audited/runs/passed', reportCommit: 'd'.repeat(40), treeRef: 'refs/audited/trees/passed' },
         verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
-          kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
+          kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
         }],
       }),
     },
@@ -574,6 +578,25 @@ test('one iteration shows its failed and passed audits, attempt-local commit, ev
   expect(within(gate).getByText('Attempt commit').nextElementSibling?.textContent).toBe('none (this attempt made no commit)');
   expect(within(gate).getByText('Audited commit').nextElementSibling?.textContent).toBe('not audited');
   expect(within(gate).getByText('Audit evidence').nextElementSibling?.textContent).toBe('not published');
+  // The project's setup command, by its declared name.
+  expect(gate.querySelector('.command p')?.textContent).toBe('setup "build": passed, exit 0, 7 ms');
+  expect(within(gate).getByLabelText('Output tail of setup').textContent).toBe('built\n');
+});
+
+test('a setup command whose process tree ramify-audit stopped says how, and that its output may be incomplete', async () => {
+  const run = stubRun();
+  const readiness = run.gates!['ga-0001']!;
+  const stopped = 'its process tree was stopped after it timed out: 3 processes received SIGTERM, and SIGKILL after 2 s';
+  run.gates!['ga-0001'] = gateViewSchema.parse({
+    ...readiness, verdict: 'not-verified', cause: 'timeout', next: 'retry-infrastructure',
+    commands: [{ ...readiness.commands[0]!, exitCode: null, outcome: 'not-verified', notVerified: 'timeout', stopped, outputIncomplete: true }],
+  });
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'ga-0001' }));
+  const gate = await screen.findByLabelText('Gate ga-0001');
+  expect(gate.querySelector('.command p')?.textContent).toBe('setup "build": not-verified (timeout), exit none, 7 ms');
+  expect(within(gate).getByText('Its process tree was stopped after it timed out: 3 processes received SIGTERM, and SIGKILL after 2 s; its output may be incomplete.')).toBeTruthy();
 });
 
 test('an unavailable metric reads unavailable with its known subtotal, never zero; the guarding statement stays', async () => {
@@ -891,4 +914,47 @@ test('a work item row counts its iterations and gates in the singular for one an
   const rows = await within(screen.getByLabelText('Work items')).findAllByRole('listitem');
   expect(rows[0]!.textContent).toContain('send-button · 2 iterations · 4 gates');
   expect(rows[1]!.textContent).toContain('send-button · 1 iteration · 1 gate');
+});
+
+test('a run held on an environment problem shows its diagnosis and suggestion in the overview, with the answer form that resumes it', async () => {
+  const diagnosis = 'The work-item gate runs `npm test`, whose tests import `dist/src`; nothing builds it in the gate\'s worktree.';
+  const suggestion = 'Declare a build step in `ramify-agent.json`.';
+  const signal = {
+    id: 'cf-0001', revision: 2, workItem: null, standing: 'open', reason: 'awaiting-user-decision', awaiting: 'user-decision', verification: 'assessment',
+    obligation: null, required: false, risk: 'high', credibility: 'agent-generated', modules: ['collection-review/workspace/reviews'], unresolved: null,
+    latestReview: false, settlement: null, materialChoice: null, repair: null, producers: ['plan:environment'], title: `Environment problem ep-001 of wi-001: ${diagnosis}`,
+    reports: 1, decisions: 1, group: null, userCommands: ['respond'], planDeviation: null,
+    pendingUserDecision: { request: 'cfd-0001', by: { kind: 'harness', reason: 'an environment problem is the operator\'s to correct' }, rationale: diagnosis,
+      conflicts: [{ text: 'The work-item gate fails before any test runs.', document: 'requests/ur-001.json', revision: '1' }],
+      options: [{ id: 'resume', summary: 'Resume the run', consequence: 'wi-001 retries.' }, { id: 'end', summary: 'End the run', consequence: 'The run fails.' }] },
+  };
+  const coverage = { state: 'available', requested: 0, complete: 0, partial: 0, notVerified: 0, pending: 0 } as const;
+  const waiting = { open: 1, waiting: true, workItems: [{ workItem: 'wi-001', requests: [{ checkFinding: 'cf-0001', request: 'cfd-0001' }] }] };
+  const run: StubRun = {
+    ...stubRun({
+      current: null, writer: { held: null, unsettled: null }, decisionRequests: waiting,
+      environmentProblems: [{ problem: 'ep-001', request: 'ur-001', workItem: 'wi-001', checkFinding: 'cf-0001', diagnosis, suggestion, answer: 'waiting' }],
+    }),
+    checkFindings: { [checkFindingKey({ select: 'all' })]: checkFindingListResponseSchema.parse({
+      protocol: 'check-findings/1', runId, version: 12, coverage, query: { workItem: null, module: null, select: 'all', order: 'attention' },
+      total: 1, shown: 1, next: null, counts: { total: 1, open: 1, deferred: 0, closed: 0, fixed: 0, waived: 0, superseded: 0, unresolved: 0, awaitingUser: 1 }, items: [signal],
+    }) },
+  };
+  const client = clientWith(run);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+
+  expect(await screen.findByRole('status', { name: 'Waiting for your decision' })).toBeTruthy();
+  const panel = (await screen.findByRole('heading', { name: 'Environment problems' })).closest('section')!;
+  const problem = within(panel as HTMLElement).getByLabelText('Environment problem ep-001');
+  expect(problem.textContent).toContain('work item wi-001, request ur-001, CheckFinding cf-0001');
+  expect(problem.textContent).toContain(`Diagnosis: ${diagnosis}`);
+  expect(problem.textContent).toContain(`Suggestion: ${suggestion}`);
+  expect(problem.textContent).toContain('The run holds this work item until you answer');
+
+  const form = await within(panel as HTMLElement).findByRole('form', { name: 'Answer cfd-0001' });
+  fireEvent.click(within(form).getByRole('radio', { name: /Resume the run/ }));
+  fireEvent.change(within(form).getByRole('textbox', { name: 'Your name' }), { target: { value: 'dan' } });
+  fireEvent.click(within(form).getByRole('button', { name: 'Answer' }));
+  await waitFor(() => expect(client.commands.map(command => command.type)).toEqual(['respond-to-check-finding']));
+  expect(client.commands[0]).toMatchObject({ payload: { checkFinding: 'cf-0001', request: 'cfd-0001', option: 'resume', responder: 'dan' } });
 });

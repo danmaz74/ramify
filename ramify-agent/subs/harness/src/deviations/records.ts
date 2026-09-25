@@ -15,6 +15,11 @@ import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
  * rejected and what the person loses. The plan file is never changed; the
  * deviation is a durable record beside it, which binds the rest of the run.
  * Its CheckFinding asks the person to accept or reject it and holds nothing.
+ *
+ * An environment problem is the global architect's answer that the conflict
+ * lies in how the gate or the harness runs, not in the plan or the
+ * architecture. Nothing is placed and nothing of the plan changes: the run
+ * holds the work item for the operator, who resumes it or ends the run.
  */
 
 const text = z.string().min(1);
@@ -25,6 +30,12 @@ export const unresolvedRequestId = (count: number): string => `ur-${String(count
 
 /** `pd-003`, the count of committed plan deviations. */
 export const planDeviationId = (count: number): string => `pd-${String(count).padStart(3, '0')}`;
+
+/** `ep-003`, the count of committed environment problems. */
+export const environmentProblemId = (count: number): string => `ep-${String(count).padStart(3, '0')}`;
+
+/** The most characters of an environment problem's diagnosis and suggestion. */
+export const environmentLimits = { diagnosis: 2000, suggestion: 1000 } as const;
 
 /** The plan deviations a run records before the next one waits for the person, unless its policy says otherwise. */
 export const defaultMaxPlanDeviations = 5;
@@ -113,15 +124,51 @@ export const planDeviationSchema = z.object({
 }).strict();
 export type PlanDeviation = z.infer<typeof planDeviationSchema>;
 
+/**
+ * What the global architect submits as an environment problem: what is
+ * wrong with how the gate or the harness runs, with its evidence, and what
+ * the operator could do about it. Both are bounded.
+ */
+export const environmentBodySchema = z.object({
+  /** What is wrong, with evidence: the failing command and the missing prerequisite. */
+  diagnosis: text.max(environmentLimits.diagnosis),
+  /** What the operator could change, such as a build step declared in `ramify-agent.json`. */
+  suggestion: text.max(environmentLimits.suggestion),
+}).strict();
+export type EnvironmentBody = z.infer<typeof environmentBodySchema>;
+
+/**
+ * An environment problem as the run records it. The run holds its work item
+ * until the operator answers its CheckFinding: resuming returns the work
+ * item to its local architect with the diagnosis; ending fails the run.
+ */
+export const environmentProblemSchema = z.object({
+  schema: z.literal('ramify-agent.environment-problem/1'),
+  id: text,
+  /** The unresolved request it answers. */
+  request: text,
+  /** The work item whose local architect answered `unresolved`, which the run holds. */
+  workItem: text,
+  /** The global architect's fork that reported it. */
+  invocation: text,
+  diagnosis: text,
+  suggestion: text,
+  /** The CheckFinding that asks the operator to resume the run or end it. */
+  checkFinding: text,
+}).strict();
+export type EnvironmentProblem = z.infer<typeof environmentProblemSchema>;
+
 /** Where the records are materialized, relative to the run's directory. */
 export const deviationLayout = {
   request: (id: string): string => join('requests', `${id}.json`),
   deviation: (id: string): string => join('deviations', `${id}.json`),
+  environment: (id: string): string => join('environment', `${id}.json`),
 } as const;
 
 export const deviationSchemas = {
   unresolvedRequest: { schema: 'ramify-agent.unresolved-request/1', body: unresolvedRequestSchema },
   planDeviation: { schema: 'ramify-agent.plan-deviation/1', body: planDeviationSchema },
+  environmentProblem: { schema: 'ramify-agent.environment-problem/1', body: environmentProblemSchema },
 } as const;
 
 /** The text of a plan's lines `[from, to]`, as written. */

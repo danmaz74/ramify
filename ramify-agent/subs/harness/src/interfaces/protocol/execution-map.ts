@@ -225,7 +225,9 @@ export type ExecutionLink = z.infer<typeof executionLinkSchema>;
  * event: its kind and its place among the gate's commands, counted from one.
  */
 export const executionGateCommandSchema = z.object({
-  kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+  kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+  /** A setup command's declared name, such as `build`. */
+  name: text.optional(),
   position: z.int().positive(),
   total: z.int().positive(),
   source: executionSourceRefSchema,

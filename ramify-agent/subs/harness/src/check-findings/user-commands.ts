@@ -5,6 +5,7 @@ import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findi
 import type { ErrorCode } from '../interfaces/protocol/errors.js';
 import { withinModule } from '../reviews/reconciliation.js';
 import { isPlanDeviation, planDeviationOptions } from '../deviations/finding.js';
+import { environmentOptions, isEnvironmentProblem } from '../deviations/environment.js';
 
 /*
  * A person's CheckFinding commands (appendix §8), and the authority rules
@@ -23,6 +24,10 @@ import { isPlanDeviation, planDeviationOptions } from '../deviations/finding.js'
  * answer `accept`, accepts it and closes it as waived; their answer
  * `reject` keeps it open and records their note as the requirement a
  * follow-up run must meet, so a rejection without a note is refused.
+ *
+ * An environment problem awaits the operator's answer the same way. Their
+ * waiver, or their answer `resume`, closes it as waived and resumes the
+ * run; their answer `end` keeps it open and ends the run.
  */
 
 /** Where an actor stands for waiving and revoking: higher decides over lower. */
@@ -99,6 +104,20 @@ export function userCheckFindingChange(command: CheckFindingUserCommand, entry: 
         if (option === planDeviationOptions.reject && (note === undefined || note.trim() === '')) {
           return refuse('invalid-request', `Rejecting the plan deviation of ${checkFinding} states, in its note, the requirement a follow-up run must meet`, current);
         }
+      }
+      if (isEnvironmentProblem(entry) && option === environmentOptions.resume) {
+        // Resuming after an environment problem is the operator's waiver of
+        // it: the signal is understood, and the code stays as it is.
+        return dispose(checkFinding, expectedRevision, {
+          ...base,
+          rationale: note === undefined || note.trim() === '' ? `${responder} resumed the run` : note,
+          decision: {
+            action: 'waive',
+            authority: { kind: 'user-decision', ref: command.commandId },
+            acceptedRisk: entry.risk,
+            uncertainty: 'The operator resumed the run after the environment problem was reported',
+          },
+        });
       }
       return dispose(checkFinding, expectedRevision, {
         ...base,

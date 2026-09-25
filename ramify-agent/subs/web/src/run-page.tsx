@@ -4,7 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
-import { ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
+import { EnvironmentProblems, ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
@@ -22,7 +22,9 @@ import { SessionTimeline } from './session-timeline.js';
  * notices first: every module created or removed, every detected dependency
  * cycle, resolved or not, during the run and after it, and every degraded
  * start. A run that waits for the person's decision says so above every
- * area, and its banner opens each request's answer form. Stop and Approve
+ * area, and its banner opens each request's answer form. An environment
+ * problem the global architect reported shows its diagnosis and suggestion
+ * in the overview, with the answer form that resumes the run. Stop and Approve
  * are its commands; Start is on the Plan page. The
  * connection to the harness is shown apart from the run's state: losing it
  * changes nothing in the run.
@@ -180,6 +182,9 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
         )}
       </section>
       <ReviewPanel client={client} run={run} onApproved={onApproved} />
+      {run.environmentProblems.length > 0 && (
+        <EnvironmentProblems client={client} planId={run.planId} runId={run.jobId} version={run.version} problems={run.environmentProblems} onOpenGate={onOpenGate} />
+      )}
       {run.planDeviations.recorded > 0 && <PlanDeviations client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />}
       <ModuleCheckFindings client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />
       <section className="panel" aria-labelledby="events-heading">
@@ -598,10 +603,13 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
             )}
             {data.commands.map((command, index) => (
               <div key={index} className="command">
-                <p><strong>{command.kind}</strong>: {command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</p>
+                <p><strong>{command.kind}</strong>{command.name === null ? '' : ` "${command.name}"`}: {command.notVerified === 'setup-failed'
+                  ? 'not run, because a setup command before it did not pass'
+                  : <>{command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</>}</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
                 {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
+                {(command.stopped !== null || command.outputIncomplete) && <p className="muted">{stoppedText(command.stopped, command.outputIncomplete)}</p>}
                 {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>
               </div>
@@ -611,6 +619,13 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
       </Loading>
     </section>
   );
+}
+
+/** How ramify-audit stopped a command's process tree and whether its output may be incomplete, as one sentence. */
+function stoppedText(stopped: string | null, outputIncomplete: boolean): string {
+  const clauses = [...(stopped === null ? [] : [stopped]), ...(outputIncomplete ? ['its output may be incomplete'] : [])];
+  const sentence = clauses.join('; ');
+  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
 }
 
 // Progress

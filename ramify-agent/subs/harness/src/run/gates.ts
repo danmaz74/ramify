@@ -1,6 +1,9 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, type ResolvedTests, type ScenarioCheckInputs } from '../checks/checkpoint.js';
+import {
+  allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, setupChecks,
+  type ResolvedTests, type ScenarioCheckInputs, type SetupDeclaration,
+} from '../checks/checkpoint.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
 import type { PreparedGate } from '../checks/gate.js';
@@ -70,6 +73,13 @@ export interface CheckpointRequest {
    * by where its errors lie.
    */
   readonly typeCheckOutput?: TypeCheckOutput | undefined;
+  /**
+   * The project's setup commands from its captured `ramify-agent.json`,
+   * which run first, in order: the in-place runner runs them at the project
+   * root, and the audit forwards them to ramify-audit's preparation of the
+   * worktree.
+   */
+  readonly setup?: readonly SetupDeclaration[] | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
@@ -124,7 +134,10 @@ function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly
     ? allProjectChecks(request.policy.commands, policy, request.scopeProbe, scenarioCheck)
     : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
   const output = request.typeCheckOutput;
-  const checks = output === undefined ? planned : planned.map(check => (check.kind === 'type-check' ? { ...check, output } : check));
+  const checks = [
+    ...setupChecks(request.setup ?? [], request.projectRoot),
+    ...(output === undefined ? planned : planned.map(check => (check.kind === 'type-check' ? { ...check, output } : check))),
+  ];
   return {
     id: request.id,
     ...(request.runId === undefined ? {} : { runId: request.runId }),

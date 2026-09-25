@@ -1,0 +1,14 @@
+{
+  "schema": "ramify-agent.unresolved-request/1",
+  "id": "ur-001",
+  "workItem": "wi-003",
+  "requester": "ramify/analysis",
+  "invocation": "inv-0040",
+  "conflict": "The mandatory whole-project completion gate repeatedly fails its daemon IPC tests because its test environment lacks the production build at dist/src. The analysis provider cannot create that build within an honest analysis-module iteration, and changing daemon tests, discovery, or test discovery to bypass production build verification would weaken an unrelated guarantee. No further completion-gate retry addresses the repeated missing prerequisite.",
+  "evidence": [
+    "Both ga-0008 and ga-0009 report ENOENT lstat /tmp/ramify-run-sed2/dist/src from subs/daemon/src/discovery.ts runtimeFiles during subs/daemon/src/tests/ipc.test.ts; type-check, Ramify check, scenarios, and a separate tests run passed.",
+    "subs/daemon/src/tests/ipc-fixture.ts passes packageRoot: process.cwd() into selectEndpoint for public-client cases; subs/daemon/src/discovery.ts runtimePaths requires complete dist/src and dist/subs production artifacts before selecting the endpoint.",
+    "package.json defines build separately from test (build: tsx scripts/build-production.ts && npm run explorer:build; test: vitest run), so the project test entry itself does not produce dist/src. The gate's build setup and daemon module lie outside this analysis work item.",
+    "The final reconciliation also recorded medium-risk real-report findings left open under its no-further-correction floor; passing the synthetic conformance suite alone cannot be presented as proof those findings were repaired."
+  ]
+}

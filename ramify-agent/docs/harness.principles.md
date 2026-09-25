@@ -390,6 +390,10 @@ goal is reached; the work is partially complete, with its needs; a contract
 needs revision; the request cannot be satisfied as specified; the implementation
 map is wrong. The harness acts on nothing else.
 
+A request that cannot be satisfied because of how the gate or the harness runs
+is an environment problem: it is reported to the operator, never answered as a
+placement or a deviation.
+
 ### The Harness Stays Small; Ramify Stays Outside Its Control Loop
 
 The harness chooses agent scopes, orders seams and handles discoveries.

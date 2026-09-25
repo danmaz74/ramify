@@ -18,6 +18,7 @@ const ref = (kind: RunEventRefKind, id: string | null | undefined): Ref[] => (id
 
 /** Each kind of gate command, as a sentence names it. */
 const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], string> = {
+  setup: 'the setup command',
   tests: 'the tests',
   'type-check': 'the type check',
   'ramify-check': 'the Ramify check',
@@ -117,6 +118,11 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'plan-deviation-recorded':
       return [
         `Plan deviation ${event.data.deviation} was recorded for ${event.data.request}${event.data.held ? '; the run waits for your decision on it' : '; it awaits your review and holds nothing'}`,
+        [...ref('request', event.data.request), ...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
+      ];
+    case 'environment-reported':
+      return [
+        `The global architect answered ${event.data.request} with environment problem ${event.data.problem}: the run holds ${event.data.workItem} until you resume it or end the run`,
         [...ref('request', event.data.request), ...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
       ];
     case 'scenarios-rewording':
@@ -232,7 +238,7 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-command-started':
       return [
-        `Gate ${event.data.gate} (${event.data.checkpoint}): ${commandLabels[event.data.kind]} started, command ${event.data.position} of ${event.data.total}`,
+        `Gate ${event.data.gate} (${event.data.checkpoint}): ${commandLabels[event.data.kind]}${event.data.name === undefined ? '' : ` "${event.data.name}"`} started, command ${event.data.position} of ${event.data.total}`,
         ref('gate', event.data.gate),
       ];
     case 'gate-attempted': {

@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { ScenarioMode, ScenarioSelection } from '../../subs/scenarios/src/profiles.js';
 import type { ScenarioModule } from '../../subs/scenarios/src/records.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
@@ -150,6 +151,79 @@ export function scopedChecks(commands: ProjectCommands, tests: ResolvedTests, sc
     { kind: 'ramify-check', command: commands.ramifyCheck, attribution: 'project' },
     ...(scenarios === undefined ? [] : [scenarios]),
   ];
+}
+
+// The project's setup.
+
+/** How long one setup command may run where it declares no bound: ten minutes, as ramify-audit's own default. */
+export const defaultSetupTimeoutMs = 600_000;
+
+/** One setup command the project declares in its captured `ramify-agent.json`. */
+export interface SetupDeclaration {
+  readonly name?: string | undefined;
+  readonly command: readonly string[];
+  /** Relative to the project root, which it defaults to. */
+  readonly cwd?: string | undefined;
+  readonly timeoutMs?: number | undefined;
+  /** Added to the environment the harness builds for every command. */
+  readonly env?: Readonly<Record<string, string>> | undefined;
+}
+
+/**
+ * The project's setup commands as a gate's first checks, in the order the
+ * project declares them. Every check after them needs what they prepare,
+ * such as a build output the repository ignores, so an executor runs none
+ * of the others once one of them has not passed. A setup command is a
+ * command of the whole project.
+ */
+export function setupChecks(setup: readonly SetupDeclaration[], projectRoot: string): PlannedCheck[] {
+  return setup.map(entry => ({
+    kind: 'setup' as const,
+    ...(entry.name === undefined ? {} : { name: entry.name }),
+    command: checkCommand({
+      argv: [...entry.command],
+      cwd: entry.cwd === undefined || entry.cwd === '' || entry.cwd === '.' ? projectRoot : join(projectRoot, entry.cwd),
+      timeoutMs: entry.timeoutMs ?? defaultSetupTimeoutMs,
+      ...(entry.env === undefined ? {} : { envAdditions: { ...entry.env } }),
+    }),
+    attribution: 'project' as const,
+  }));
+}
+
+/**
+ * The runner errors ramify-audit answers for a command it refuses to run
+ * because it installs dependencies where `node_modules` is a link to the
+ * project's own: a setup command's, and a check command's.
+ */
+export const linkedModulesRefusals: ReadonlySet<string> = new Set(['setup-command-unsafe-with-linked-modules', 'unsafe-with-linked-modules']);
+
+const packageManagers = new Set(['npm', 'pnpm', 'yarn']);
+const installSubcommands = new Set(['ci', 'install', 'i', 'add', 'prune', 'dedupe', 'update', 'uninstall', 'rm']);
+/** Options whose value is a separate argument, so it is not taken for the subcommand. */
+const valueOptions = new Set(['--prefix', '-C', '--dir', '--cwd', '--workspace', '--filter', '-F']);
+
+/**
+ * The package-manager operation a command performs where it installs or
+ * removes dependencies (`npm ci`, `pnpm install`, a bare `yarn`), and null
+ * for any other command. It is ramify-audit's rule for what it refuses to
+ * run through a linked `node_modules`, read from the argv alone, never from
+ * a script the command runs.
+ */
+export function installOperation(argv: readonly string[]): string | null {
+  const [program, ...args] = argv;
+  if (program === undefined) return null;
+  const tool = (program.split(/[\\/]/u).at(-1) ?? program).replace(/\.(?:cmd|exe)$/iu, '');
+  if (!packageManagers.has(tool)) return null;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]!;
+    if (valueOptions.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('-')) continue;
+    return installSubcommands.has(arg) ? `${tool} ${arg}` : null;
+  }
+  return tool === 'yarn' ? tool : null;
 }
 
 // The scenario check.

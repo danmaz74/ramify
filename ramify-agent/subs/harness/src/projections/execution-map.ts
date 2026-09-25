@@ -413,7 +413,11 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     runningGate: runningGate === undefined ? null : key('gate', runningGate.data.gate),
     source: runningGate !== undefined ? eventSource(view, runningGate.sequence) : awaited !== undefined ? eventSource(view, awaited.sequence) : null,
     ...(command?.type === 'gate-command-started'
-      ? { gateCommand: { kind: command.data.kind, position: command.data.position, total: command.data.total, source: eventSource(view, command.sequence) } }
+      ? { gateCommand: {
+        kind: command.data.kind,
+        ...(command.data.name === undefined ? {} : { name: command.data.name }),
+        position: command.data.position, total: command.data.total, source: eventSource(view, command.sequence),
+      } }
       : {}),
   };
 

@@ -726,10 +726,14 @@ Autonomous decisions select how to fulfill the request. They do not authorize
 silently weakening its acceptance conditions. When a local architect finds a
 requirement cannot be met as stated, the global architect either fixes the
 placement, records a plan deviation that keeps as much of the requirement as
-the conflict allows, or finds nothing of the plan worth doing, which ends the
-run with the conflict. A deviation is never silent: it is a CheckFinding the
-user accepts or rejects, and a run that recorded one completes with it to
-review rather than claiming plain success. If the agents cannot find a viable
+the conflict allows, reports an environment problem, or finds nothing of the
+plan worth doing, which ends the run with the conflict. An environment
+problem is a conflict in how the gate or the harness runs, not in the plan or
+the architecture: the run holds the work item until the operator resumes the
+run, and the local architect then retries with the diagnosis. It is never
+answered as a placement or a deviation. A deviation is never silent: it is a
+CheckFinding the user accepts or rejects, and a run that recorded one
+completes with it to review rather than claiming plain success. If the agents cannot find a viable
 execution within the request and run limits otherwise, the run ends with an
 explanation of the unresolved conflict.
 

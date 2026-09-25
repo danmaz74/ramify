@@ -244,6 +244,7 @@ export function gateOf(view: RunView, id: string): GateView {
     })),
     commands: gate.commands.map(command => ({
       kind: command.kind,
+      name: command.name ?? null,
       argv: [...command.command.argv],
       cwd: command.command.cwd,
       startedAt: command.startedAt,
@@ -267,6 +268,8 @@ export function gateOf(view: RunView, id: string): GateView {
         truncated: command.output.truncated,
         tail: boundedTail(command.output.tail),
       },
+      stopped: command.stopped ?? null,
+      outputIncomplete: command.outputIncomplete === true,
       scenarios: command.scenarios === undefined ? null : scenarioCheckViewOf(command.scenarios),
     })),
   };

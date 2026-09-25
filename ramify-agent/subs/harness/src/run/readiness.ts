@@ -2,7 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import type { CheckExecutionPort, GateCommandStarted } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
-import { allProjectChecks, checkpointPolicies, planScenarioCheck } from '../checks/checkpoint.js';
+import { allProjectChecks, checkpointPolicies, installOperation, linkedModulesRefusals, planScenarioCheck, setupChecks } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt, GateCommandRecord } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
@@ -108,7 +108,22 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
   // left by an earlier run is kept out, so this is the project's own
   // regression acceptance. A step reached here has a valid configuration.
   const acceptance = await acceptanceChecks(request);
-  const checks = [...allProjectChecks(policy.commands, checkpointPolicies.readiness)];
+  // The project's setup commands run first, at the project root, as every
+  // gate runs them: a baseline that needs a build output is judged with it.
+  const declared = 'config' in request.projectConfig ? request.projectConfig.config.setup ?? [] : [];
+  const setup = setupChecks(declared, projectRoot);
+  // A setup command that installs where an audited worktree links the
+  // project's own node_modules would pass here, in place, and be refused by
+  // every audited gate after it: readiness refuses it first.
+  const refused = linkedInstalls(setup, projectRoot, linkedDirectories(policy, nested));
+  if (refused !== null) {
+    steps.push({ step: 'baseline-setup', outcome: 'failed', detail: refused });
+    for (const step of [...gateSteps.filter(step => step !== 'baseline-setup'), 'run-branch'] as const) {
+      steps.push({ step, outcome: 'not-verified', detail: 'not reached: baseline-setup did not pass' });
+    }
+    return { attempt: attemptRecord(request, steps, nested, null), gate: null };
+  }
+  const checks = [...setup, ...allProjectChecks(policy.commands, checkpointPolicies.readiness)];
   const acceptanceIndex = { quick: -1, full: -1 };
   if (acceptance.quick !== null) acceptanceIndex.quick = checks.push(acceptance.quick) - 1;
   if (acceptance.full !== null) acceptanceIndex.full = checks.push(acceptance.full) - 1;
@@ -122,6 +137,8 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
     ...(request.signal === undefined ? {} : { signal: request.signal }),
     ...(request.started === undefined ? {} : { started: request.started }),
   });
+
+  steps.push(setupStep(gate.commands.slice(0, setup.length)));
 
   // The baseline's three steps read the gate's own command records. The
   // nested packages' tests run inside the same attempt, beside the project's.
@@ -178,7 +195,81 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
  * vocabulary, and are recorded here, where they are verified: a step not
  * reached must never stand before the step that stopped the attempt.
  */
-const gateSteps: readonly ReadinessStep[] = ['baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full'];
+const gateSteps: readonly ReadinessStep[] = ['baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full'];
+
+/** How much of a failed setup command's output its step quotes: a build's errors are the reason readiness failed. */
+const setupTailCharacters = 2_000;
+
+/**
+ * The project's setup commands, which ran before every other command of the
+ * baseline gate: passed with nothing to run where the project declares
+ * none, and otherwise as the first of them that did not pass, with the end
+ * of what it printed.
+ */
+function setupStep(records: readonly GateCommandRecord[]): StepResult {
+  const step = 'baseline-setup';
+  if (records.length === 0) return { step, outcome: 'passed', detail: 'the project declares no setup command' };
+  const failed = records.find(record => record.outcome !== 'passed');
+  if (failed !== undefined) {
+    return { step, outcome: failed.outcome, detail: describeCommand(setupLabel(failed), failed, setupTailCharacters) };
+  }
+  return {
+    step,
+    outcome: 'passed',
+    detail: `${records.length} setup command${records.length === 1 ? '' : 's'} passed: ${records.map(record => `${setupLabel(record)}, \`${record.command.argv.join(' ')}\` in ${record.elapsedMs} ms`).join('; ')}`,
+  };
+}
+
+/**
+ * The project directories whose `node_modules` an audited gate links into
+ * its worktree: the project root, and each nested package whose tests a
+ * gate runs or that the project has installed.
+ */
+function linkedDirectories(
+  policy: RunPolicy,
+  nested: ReadonlyArray<{ readonly directory: string; readonly installed: boolean }>,
+): string[] {
+  const linked = new Set<string>(['']);
+  for (const entry of policy.commands.nestedPackages) if (entry.tests !== null) linked.add(entry.directory);
+  for (const entry of nested) if (entry.installed) linked.add(entry.directory);
+  return [...linked];
+}
+
+/** How many directory levels below its working directory ramify-audit looks for a linked `node_modules`. */
+const linkedModulesDepth = 4;
+
+/**
+ * Why a declared setup command would be refused in every audited gate, or
+ * null where none would: ramify-audit does not run a command that installs
+ * dependencies where its working directory, or one up to four levels below
+ * it, has a `node_modules` linked to the project's own, since the package
+ * manager would follow the link and change or empty that installation.
+ */
+function linkedInstalls(setup: readonly PlannedCheck[], projectRoot: string, linked: readonly string[]): string | null {
+  for (const check of setup) {
+    const operation = installOperation(check.command.argv);
+    if (operation === null) continue;
+    const cwd = relative(projectRoot, check.command.cwd).split(sep).join('/');
+    const below = linked.filter(directory => {
+      if (directory === cwd) return true;
+      if (cwd !== '' && !directory.startsWith(`${cwd}/`)) return false;
+      const rest = cwd === '' ? directory : directory.slice(cwd.length + 1);
+      return rest.split('/').length <= linkedModulesDepth;
+    });
+    if (below.length === 0) continue;
+    const label = check.name === undefined ? 'the setup command' : `the setup command "${check.name}"`;
+    const links = below.map(directory => `\`${directory === '' ? '' : `${directory}/`}node_modules\``).join(', ');
+    return `${label}: \`${check.command.argv.join(' ')}\` runs \`${operation}\` in ${cwd === '' ? 'the project root' : `\`${cwd}\``}, `
+      + `where every audited gate links the project's own ${links}; ramify-audit refuses to run it there, since the package manager `
+      + 'would follow the link and change or empty the project\'s installation. The project\'s `setup` in ramify-agent.json must not '
+      + 'install dependencies: the audited worktree already has the project\'s installed ones.';
+  }
+  return null;
+}
+
+function setupLabel(record: GateCommandRecord): string {
+  return record.name === undefined ? 'the setup command' : `the setup command "${record.name}"`;
+}
 
 /** Readiness's two scenario checks, or null for each when no module has feature files. */
 async function acceptanceChecks(request: ReadinessRequest): Promise<{ quick: PlannedCheck | null; full: PlannedCheck | null; modules: number }> {
@@ -214,14 +305,21 @@ function acceptanceStep(step: 'baseline-acceptance' | 'acceptance-full', record:
   };
 }
 
-function describeCommand(label: string, record: GateAttempt['commands'][number]): string {
+function describeCommand(label: string, record: GateAttempt['commands'][number], tailCharacters = 400): string {
+  if (record.notVerified === 'setup-failed') {
+    return `${label}: \`${record.command.argv.join(' ')}\` did not run, because a setup command before it did not pass`;
+  }
   const outcome = record.outcome === 'passed'
     ? `passed in ${record.elapsedMs} ms`
     : record.outcome === 'failed'
       ? `exited with ${record.exitCode}`
       : `not verified (${record.notVerified ?? 'unknown'})`;
   const tail = record.output.tail.trim();
-  return `${label}: \`${record.command.argv.join(' ')}\` ${outcome}${tail === '' ? '' : `; ${tail.slice(-400)}`}`;
+  const stopped = [
+    ...(record.stopped === undefined ? [] : [record.stopped]),
+    ...(record.outputIncomplete === true ? ['its output may be incomplete'] : []),
+  ];
+  return `${label}: \`${record.command.argv.join(' ')}\` ${outcome}${stopped.length === 0 ? '' : `; ${stopped.join('; ')}`}${tail === '' ? '' : `; ${tail.slice(-tailCharacters)}`}`;
 }
 
 function attemptRecord(
@@ -495,6 +593,9 @@ export function recoveryFor(attempt: ReadinessAttempt, gate: GateAttempt | null,
 
   const reasons = new Set(gate.commands.flatMap(command => (command.notVerified === undefined ? [] : [command.notVerified])));
   if (reasons.has('command-missing')) return null;
+  // An install ramify-audit refused is refused again on every rerun: it is
+  // the project's configuration to change, and no preparation repairs it.
+  if (gate.commands.some(command => command.runnerError !== null && linkedModulesRefusals.has(command.runnerError.kind))) return null;
   if (reasons.has('timeout')) return { cause: 'timeout', action: 'rerun-command', directories: [] };
   if (reasons.has('runner-error') || reasons.has('interrupted')) return { cause: 'infrastructure', action: 'rerun-command', directories: [] };
   // A baseline the project itself fails is evidence about the project, and no

@@ -114,8 +114,8 @@ export interface PromptPackageOptions {
 
 /** The versions of the packages this iteration ships. */
 export const initialArchitectPackage = 'initial-architect/2';
-export const globalForkPackage = 'global-fork/2';
-export const localArchitectPackage = 'local-architect/5';
+export const globalForkPackage = 'global-fork/3';
+export const localArchitectPackage = 'local-architect/6';
 export const engineerPackage = 'engineer/3';
 export const contractEngineerPackage = 'contract-engineer/2';
 export const reviewerPackage = 'reviewer/3';
