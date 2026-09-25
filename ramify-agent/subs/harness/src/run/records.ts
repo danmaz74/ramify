@@ -10,6 +10,11 @@ import { planScenarioExtractionSchema } from '../../subs/scenarios/src/extractio
 import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
 import { scenarioModeSchema, scenarioSelectionSchema } from '../../subs/scenarios/src/profiles.js';
 import { scenarioRunResultSchema, untrackedScenarioCountsSchema } from '../../subs/scenarios/src/messages.js';
+import { documentManifestSchema, catalogSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { assessmentSchema, roundSchema } from '../../subs/nonfunctional/src/interfaces/contracts.js';
+import { incorporationSchema } from '../analysis/evidence-contracts.js';
+import { contextSelectionSchema, assignmentContextSchema } from '../context-selection/contracts.js';
+import { preparedCandidateSchema, nonfunctionalDeviationSchema } from './nonfunctional-records.js';
 
 /*
  * The durable records of one implementation run, and where each of them is
@@ -172,6 +177,8 @@ export const runPolicySchema = z.object({
     maxCommandTimeoutMs: z.int().positive().optional(),
     maxInvocationIdleMs: z.int().positive().optional(),
     maxInvocationAbsoluteMs: z.int().positive().optional(),
+    /** Absent on earlier runs, whose non-functional coverage is unavailable. */
+    nonfunctionalRoundsPerPlan: z.int().positive().max(3).optional(),
   }).strict(),
   /**
    * The context policy of each role. The reviewer's is absent from a run
@@ -187,6 +194,10 @@ export const runPolicySchema = z.object({
     reviewer: contextPolicySchema.optional(),
     /** Absent from a run captured before failure analysis existed, which analyzes nothing. */
     'failure-analyst': contextPolicySchema.optional(),
+    /** Absent before Plan 13. */
+    'context-selector': contextPolicySchema.optional(),
+    'nonfunctional-coordinator': contextPolicySchema.optional(),
+    'nonfunctional-repair-engineer': contextPolicySchema.optional(),
   }).strict() satisfies z.ZodType<Partial<Record<Role, z.infer<typeof contextPolicySchema>>>>,
   /** A transcript body larger than `inlineBodyBytes` is stored in the content store, not in its entry. */
   transcript: z.object({ inlineBodyBytes: z.int().positive() }).strict(),
@@ -391,6 +402,8 @@ export type PromptPackageManifest = z.infer<typeof promptPackageManifestSchema>;
 
 /** A heading anchor or line range of the captured plan. */
 export const planRefSchema = z.object({
+  /** Absent on old runs: resolve against the captured root plan. */
+  document: z.string().regex(/^doc-\d{3,}$/).optional(),
   anchor: text.optional(),
   lines: z.tuple([z.int().nonnegative(), z.int().nonnegative()]).optional(),
 }).strict();
@@ -921,6 +934,16 @@ export function runDirectory(projectRoot: string, planId: string, runId: string)
 export const runLayout = {
   record: 'job.json',
   capturedPlan: join('input', 'plan.md'),
+  documentManifest: join('input', 'documents.json'),
+  documentBytes: (id: string): string => join('input', 'documents', `${id}.bin`),
+  catalog: join('analysis', 'nonfunctional-catalog.json'),
+  incorporation: join('analysis', 'incorporation.json'),
+  selection: (workItem: string): string => join('work', workItem, 'context-selection.json'),
+  assignmentContext: (assignment: string): string => join('assignments', `${assignment}-context.json`),
+  candidate: (id: string): string => join('nonfunctional', 'candidates', `${id}.json`),
+  assessment: (id: string): string => join('nonfunctional', 'assessments', `${id}.json`),
+  nonfunctionalRound: (number: number): string => join('nonfunctional', 'rounds', `${number}.json`),
+  nonfunctionalDeviation: (id: string): string => join('deviations', `${id}.json`),
   events: 'events.jsonl',
   promptManifest: join('prompts', 'manifest.json'),
   entries: join('analysis', 'entries.json'),
@@ -956,6 +979,15 @@ export const runLayout = {
 /** The schema literal of each record kind, for a reader that answers unsupported version. */
 export const runSchemas = {
   run: { schema: jobSchemaVersion, body: runRecordSchema },
+  documents: { schema: 'ramify-agent.document-manifest/1', body: documentManifestSchema },
+  catalog: { schema: 'ramify-agent.nonfunctional-catalog/1', body: catalogSchema },
+  incorporation: { schema: 'ramify-agent.document-incorporation/1', body: incorporationSchema },
+  selection: { schema: 'ramify-agent.context-selection/1', body: contextSelectionSchema },
+  assignmentContext: { schema: 'ramify-agent.assignment-context/1', body: assignmentContextSchema },
+  preparedCandidate: { schema: 'ramify-agent.prepared-candidate/1', body: preparedCandidateSchema },
+  assessment: { schema: 'ramify-agent.nonfunctional-assessment/1', body: assessmentSchema },
+  nonfunctionalRound: { schema: 'ramify-agent.nonfunctional-round/1', body: roundSchema },
+  nonfunctionalDeviation: { schema: 'ramify-agent.nonfunctional-deviation/1', body: nonfunctionalDeviationSchema },
   promptManifest: { schema: 'ramify-agent.prompt-manifest/1', body: promptPackageManifestSchema },
   entries: { schema: 'ramify-agent.entry-assignments/1', body: entryAssignmentsSchema },
   scenario: { schema: 'ramify-agent.scenario/1', body: scenarioRecordSchema },

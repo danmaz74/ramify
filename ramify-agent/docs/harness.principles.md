@@ -297,7 +297,9 @@ scenario's state.
 
 A scenario that passes against a fake is bound, not done, as a delegation is.
 A plan is finished when every scenario passes in full mode at the final
-gate.
+gate. A completed automated run may still await a person's decision on a
+non-functional plan deviation. Merge readiness requires that decision on the
+exact assessed candidate; it never changes the final gate's result.
 
 ### Trust Follows Provenance
 

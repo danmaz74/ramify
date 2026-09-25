@@ -69,6 +69,22 @@ source path and revision, that establishes what the plan said.
 identified by its source path and revision, that establishes what the
 principle said.
 
+## Non-functional requirement
+
+A **non-functional requirement** is a source-grounded plan or principle
+obligation about a quality or constraint of the solution, assessed against a
+specific candidate.
+
+## Advisory item
+
+An **advisory item** is a source-grounded suggestion that can inform an
+architect's choice without creating a satisfaction gate.
+
+## Merge readiness
+
+**Merge readiness** is the revision-bound standing derived from a completed
+run's final gate, non-functional assessment and user deviation decisions.
+
 ## Capability
 
 A **capability** is a named unit of decomposition that agents use while

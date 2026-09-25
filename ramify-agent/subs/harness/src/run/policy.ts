@@ -17,7 +17,7 @@ import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig
  */
 
 /** The version this policy is recorded under. `run-policy/2` runs, without reviews, stay readable. */
-export const runPolicyVersion = 'run-policy/3';
+export const runPolicyVersion = 'run-policy/4';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {
@@ -47,6 +47,7 @@ export const defaultLimits: RunPolicy['limits'] = {
   maxCommandTimeoutMs: 1_800_000,
   maxInvocationIdleMs: 1_800_000,
   maxInvocationAbsoluteMs: 10_800_000,
+  nonfunctionalRoundsPerPlan: 3,
 };
 
 /**
@@ -112,6 +113,9 @@ export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context
   // A failure analyst reads one failed session's evidence and submits a
   // short account; it is never compacted either.
   'failure-analyst': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
+  'context-selector': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
+  'nonfunctional-coordinator': { compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 },
+  'nonfunctional-repair-engineer': { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
 };
 
 /**

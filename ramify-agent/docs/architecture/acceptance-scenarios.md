@@ -92,6 +92,9 @@ and `unresolved` run states do not exist there yet.
   included, is `implemented`, carries no pending tag, matches its recorded
   text, and passes in full mode at the final gate, beside the project's
   tests, its type check and a complete Ramify check.
+  Completion can await user review of non-functional plan deviations before
+  that exact candidate is merge-ready. A CheckFinding decision cannot make a
+  failed scenario or required gate pass.
 
 ## Terms
 

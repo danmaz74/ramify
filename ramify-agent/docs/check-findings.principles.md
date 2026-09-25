@@ -119,6 +119,8 @@ only when an issue must be followed through a repair, a reassessment or a
 decision, never for every diagnostic, failure or reviewer note. Add a state,
 role or workflow only when it serves a different decision. Simplicity must not
 hide uncertainty or merge a passing judgment with a passing required check.
+An accepted non-functional deviation changes review standing for its assessed
+candidate, not the verdict of a required gate or scenario.
 
 An objective signal keeps its identity through the producer's stable key. Two
 subjective signals are the same issue when the assessing architect judges

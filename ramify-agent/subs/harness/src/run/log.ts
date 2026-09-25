@@ -141,7 +141,26 @@ export const runEventSchema = z.discriminatedUnion('type', [
     workItems: z.int().nonnegative(),
     scenarios: z.int().nonnegative(),
     warnings: z.array(scenarioWarningSchema),
+    /** Present when the same transaction also commits catalog and incorporation. */
+    catalog: z.object({ nfr: z.int().nonnegative(), advice: z.int().nonnegative() }).strict().optional(),
   }).strict()),
+  /** The manifest is committed only after every immutable document byte file is durable. */
+  event('document-manifest-committed', z.object({ manifest: text, hash: z.string().regex(/^[0-9a-f]{64}$/), documents: z.int().positive() }).strict()),
+  event('work-orientation-recorded', z.object({ workItem: text, invocation: text, packetHash: z.string().regex(/^[0-9a-f]{64}$/), point: text.nullable() }).strict()),
+  /** A work item's one read-only selection and exact continuation package. */
+  event('context-selection-recorded', z.object({ workItem: text, selection: text, packageHash: z.string().regex(/^[0-9a-f]{64}$/) }).strict()),
+  event('context-package-appended', z.object({
+    workItem: text, selection: text, session: sessionIdSchema.nullable(), appendKey: text,
+    ref: text.nullable(), outcome: z.enum(['appended', 'already-present', 'session-lost', 'failed', 'no-session']), reason: z.string().nullable(),
+  }).strict()),
+  /** The resulting tree is recorded only after all source-mutating preparation. */
+  event('candidate-prepared', z.object({ candidate: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),
+  event('nonfunctional-assessed', z.object({ assessment: text, candidate: text, round: z.int().positive(), phase: z.enum(['initial', 'after-repair']) }).strict()),
+  event('nonfunctional-investigated', z.object({ round: z.int().positive(), invocation: text, assessment: text }).strict()),
+  event('nonfunctional-repair-committed', z.object({ round: z.int().positive(), invocation: text, assignment: text }).strict()),
+  event('nonfunctional-round-closed', z.object({ round: z.int().positive(), record: text, outcome: z.enum(['satisfied', 'continue', 'exhausted', 'unavailable']) }).strict()),
+  event('nonfunctional-deviation-recorded', z.object({ deviation: text, nfr: text, assessment: text, checkFinding: text }).strict()),
+  event('candidate-bound-to-gate', z.object({ candidate: text, assessment: text, gate: text, commit: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),
   /**
    * The run was started with its review stop: after the analysis is
    * accepted it waits, holding the project, for `analysis-approved` or a

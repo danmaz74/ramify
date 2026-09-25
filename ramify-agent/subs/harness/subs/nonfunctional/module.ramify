@@ -1,0 +1,5 @@
+ramify 1
+module nonfunctional
+
+// Pure assessment and candidate rules. The parent owns all effects.
+expose-src * from "interfaces/contracts.ts" to parent

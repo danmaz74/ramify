@@ -284,6 +284,28 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`The brief of ${event.data.reconciliation} reached the local architect's session (${event.data.outcome}${event.data.reason === null ? '' : `: ${event.data.reason}`})`, ref('session', event.data.session)];
     case 'reconciliation-refused':
       return [`${event.data.reconciliation === null ? `${event.data.workItem}'s completion` : `Reconciliation ${event.data.reconciliation}`} was refused at its ${event.data.stage}: ${event.data.reason}`, ref('work-item', event.data.workItem)];
+    case 'document-manifest-committed':
+      return [`Captured ${counted(event.data.documents, 'plan document', 'plan documents')}`, []];
+    case 'work-orientation-recorded':
+      return [`Orientation recorded for ${event.data.workItem}`, ref('work-item', event.data.workItem)];
+    case 'context-selection-recorded':
+      return [`Context selected for ${event.data.workItem}`, ref('work-item', event.data.workItem)];
+    case 'context-package-appended':
+      return [`Context package delivery for ${event.data.workItem}: ${event.data.outcome}`, ref('session', event.data.session)];
+    case 'candidate-prepared':
+      return [`Candidate ${event.data.candidate} prepared`, []];
+    case 'nonfunctional-assessed':
+      return [`Non-functional assessment ${event.data.assessment} recorded for round ${event.data.round}`, []];
+    case 'nonfunctional-investigated':
+      return [`Non-functional round ${event.data.round} investigated`, ref('invocation', event.data.invocation)];
+    case 'nonfunctional-repair-committed':
+      return [`Non-functional round ${event.data.round} repaired`, ref('invocation', event.data.invocation)];
+    case 'nonfunctional-round-closed':
+      return [`Non-functional round ${event.data.round} closed: ${event.data.outcome}`, []];
+    case 'nonfunctional-deviation-recorded':
+      return [`Non-functional deviation ${event.data.deviation} recorded for ${event.data.nfr}`, []];
+    case 'candidate-bound-to-gate':
+      return [`Candidate ${event.data.candidate} bound to gate ${event.data.gate}`, ref('gate', event.data.gate)];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':
