@@ -51,9 +51,9 @@ expose-src * from "interfaces/protocol/sessions.ts" tagged [browser] to parent
 // verifies that publication does not disturb repository cleanliness. The git
 // behavior and process execution remain owned by evidence; harness relays the
 // narrow contracts the audit adapter implements rather than duplicating them.
-expose-src CheckExecutionPort, CheckExecutionRequest, CheckExecutionContext, CheckExecutionResult, CheckHarnessGuardedChange, checkOutputPath from "checks/execution.ts" to descendants
+expose-src CheckExecutionPort, CheckExecutionRequest, CheckExecutionContext, CheckExecutionResult, CheckHarnessGuardedChange, checkOutputPath, GateCommandStart, GateCommandStarted, commandStart from "checks/execution.ts" to descendants
 expose-src PlannedCheck from "checks/verify.ts" to descendants
-expose-src Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy, TestSelection, CheckCommand, CheckCommandKind, NotVerified, checkCommandEnvironment from "checks/records.ts" to descendants
+expose-src Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, TestSelectionPolicy, TestSelection, CheckCommand, CheckCommandKind, NotVerified, TypeCheckOutput, checkCommandEnvironment from "checks/records.ts" to descendants
 expose-src ScenarioCheckSummary, ScenarioCheckRun, ScenarioCheckResult from "checks/records.ts" to descendants
 
 // The scenario check's runs, which both the in-place runner and the audit's
