@@ -41,6 +41,14 @@ interface ReportedCheck extends HookCheck {
   readonly repeated: readonly HookFinding[];
   /** Findings that stood before this check and that it no longer reports. */
   readonly cleared: readonly HookFinding[];
+  /**
+   * Where the check ran without evaluating imports: its execution, and the
+   * findings that wait on an evaluation and stand although it did not report
+   * them. Null where imports were evaluated or the check did not run.
+   */
+  readonly unevaluated: { readonly execution: string; readonly standing: readonly HookFinding[] } | null;
+  /** The warnings and analysis limits on the written files that this invocation had not been told of. */
+  readonly notices: readonly HookNotice[];
 }
 
 /** A coverage gap the hook check itself observed. */
@@ -64,7 +72,10 @@ export interface HookOutcome {
 
 /** One finding of a check, as much of it as the engineer is told. */
 export interface HookFinding {
+  /** Ramify's own `id` for the finding, or the entry itself where it carries none. */
   readonly identity: string;
+  /** Ramify's category, such as `import` or `description`, where the entry states one. */
+  readonly category: string | null;
   readonly code: string;
   readonly message: string;
   /** The project-relative file the finding is located in, where it names one. */
@@ -77,14 +88,42 @@ export interface HookFinding {
 }
 
 /**
+ * A warning or an analysis limit Ramify reported on a written file. Neither
+ * fails a check: a warning names source no module owns, and an analysis
+ * limit names an import Ramify could not decide.
+ */
+export interface HookNotice {
+  readonly identity: string;
+  readonly kind: 'warning' | 'analysis-limit';
+  readonly code: string;
+  readonly message: string;
+  readonly file: string;
+  readonly line: number | null;
+}
+
+/**
+ * The categories of finding that only an evaluation of the imports reports:
+ * a denied import, a missing export and an exposure without its companion.
+ * A finding with no category is counted among them, so that a check that
+ * evaluated nothing never clears it.
+ */
+const evaluatedCategories = new Set(['import', 'missing-export', 'exposure']);
+
+function awaitsEvaluation(finding: HookFinding): boolean {
+  return finding.category === null || evaluatedCategories.has(finding.category);
+}
+
+/**
  * The findings one invocation has been told about, and which of them still
  * stand. A finding reported again by a later check of the same invocation is
  * not newly introduced, so the engineer is not told about it twice. A
- * finding stands until a check that covered its file no longer reports it.
+ * finding stands until a check that covered its file and evaluated imports
+ * no longer reports it.
  */
 export class FindingsSeen {
   private readonly seen = new Set<string>();
   private readonly standing = new Map<string, readonly HookFinding[]>();
+  private readonly told = new Set<string>();
 
   /** The findings not seen before, adding them all to what has been seen. */
   admit(findings: readonly HookFinding[]): HookFinding[] {
@@ -100,9 +139,12 @@ export class FindingsSeen {
   /**
    * Records what one check that ran found. A changed check answers for the
    * files it covered, so their standing findings are replaced; a complete
-   * check answers for the whole project.
+   * check answers for the whole project. A check that did not evaluate
+   * imports answers for none of the findings only that evaluation reports:
+   * they stand as they were.
    */
-  settle(covered: readonly string[] | 'all', findings: readonly HookFinding[]): void {
+  settle(covered: readonly string[] | 'all', findings: readonly HookFinding[], importsEvaluated = true): void {
+    const kept = importsEvaluated ? [] : this.open().filter(awaitsEvaluation);
     if (covered === 'all') this.standing.clear();
     else for (const file of covered) this.standing.delete(file);
     const byFile = new Map<string, HookFinding[]>();
@@ -111,6 +153,22 @@ export class FindingsSeen {
       byFile.set(file, [...(byFile.get(file) ?? []), finding]);
     }
     for (const [file, found] of byFile) this.standing.set(file, found);
+    for (const finding of kept) {
+      const file = finding.file ?? '';
+      const standing = this.standing.get(file) ?? [];
+      if (!standing.some(other => other.identity === finding.identity)) this.standing.set(file, [...standing, finding]);
+    }
+  }
+
+  /** The notices this invocation has not been told of, adding them to what it has. */
+  tell(notices: readonly HookNotice[]): HookNotice[] {
+    const untold: HookNotice[] = [];
+    for (const notice of notices) {
+      if (this.told.has(notice.identity)) continue;
+      this.told.add(notice.identity);
+      untold.push(notice);
+    }
+    return untold;
   }
 
   /** Every finding no later check has cleared. */
@@ -137,6 +195,18 @@ export interface HookCheckOptions {
   readonly logFile: (check: number) => string;
   /** The number of checks this invocation has already run. */
   readonly ran: number;
+  /**
+   * The project-relative paths the assignment names as extra scope with
+   * purpose `outside-modules`. A file beneath one lies outside every module
+   * by assignment, so Ramify's warning that it does is not relayed.
+   */
+  readonly outsideModules?: readonly string[] | undefined;
+  /**
+   * Whether the warnings and analysis limits on the written files are
+   * relayed. A check whose text reaches no one, such as the one at
+   * `completion-proposed`, passes false, so that they are not taken as told.
+   */
+  readonly relayNotices?: boolean | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
@@ -168,6 +238,10 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
   const paths = options.paths === null ? null : relativePaths(options.projectRoot, options.paths);
   const configuration = paths === null ? [] : paths.filter(isGuardedConfiguration);
 
+  // What the mutation wrote, which the warnings and analysis limits relayed
+  // must concern; where it is unknown, none is relayed.
+  const written = { files: options.relayNotices === false ? [] : paths ?? [], outsideModules: options.outsideModules ?? [] };
+
   let completeNeeded = false;
   if (paths === null || paths.length === 0) {
     completeNeeded = true;
@@ -177,7 +251,7 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
     });
     checks.push({
       paths: [], mode: 'changed', outcome: 'not-checked',
-      reason: 'the changed set could not be established', newFindings: 0, log: null, added: [], repeated: [], cleared: [],
+      reason: 'the changed set could not be established', newFindings: 0, log: null, ...nothingReported,
     });
   } else if (configuration.length > 0) {
     completeNeeded = true;
@@ -188,16 +262,14 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
       reason: `a changed check covers no named configuration file (${configuration.join(', ')})`,
       newFindings: 0,
       log: null,
-      added: [],
-      repeated: [],
-      cleared: [],
+      ...nothingReported,
     });
   } else {
     ran += 1;
     const log = options.logFile(ran);
     const result = await options.ramify.checkChanged(paths, options.projectRoot, options.hookTimeoutMs, options.signal);
     await record(log, result);
-    checks.push(reported({ paths, mode: 'changed', outcome: outcomeOf(result), reason: result.reason, log }, result, paths, options.seen));
+    checks.push(reported({ paths, mode: 'changed', outcome: outcomeOf(result), reason: result.reason, log }, result, paths, options.seen, written));
   }
 
   if (completeNeeded) {
@@ -205,15 +277,18 @@ export async function runHookCheck(options: HookCheckOptions): Promise<HookOutco
     const log = options.logFile(ran);
     const result = await options.ramify.checkComplete(options.projectRoot, options.signal);
     await record(log, result);
-    checks.push(reported({ paths: paths ?? [], mode: 'complete', outcome: outcomeOf(result), reason: result.reason, log }, result, 'all', options.seen));
+    checks.push(reported({ paths: paths ?? [], mode: 'complete', outcome: outcomeOf(result), reason: result.reason, log }, result, 'all', options.seen, written));
   }
 
   return {
-    checks: checks.map(({ added: _added, repeated: _repeated, cleared: _cleared, ...check }) => check),
+    checks: checks.map(({ added: _added, repeated: _repeated, cleared: _cleared, unevaluated: _unevaluated, notices: _notices, ...check }) => check),
     gaps,
     text: describe(checks),
   };
 }
+
+/** What a check that was not run reported: nothing. */
+const nothingReported = { added: [], repeated: [], cleared: [], unevaluated: null, notices: [] } as const;
 
 /** A check that ran: what it found, what was new, and what still stands. */
 function reported(
@@ -221,18 +296,67 @@ function reported(
   result: RamifyCheckResult,
   covered: readonly string[] | 'all',
   seen: FindingsSeen,
+  written: { readonly files: readonly string[]; readonly outsideModules: readonly string[] },
 ): ReportedCheck {
   const found = findingsOf(result.report);
+  const ran = check.outcome !== 'not-checked';
+  const execution = ran ? executionOf(result.report) : null;
+  const evaluated = execution === null || execution === 'completed';
   const before = seen.open();
   // A check that did not check answers for nothing: what stood still stands.
-  if (check.outcome !== 'not-checked') seen.settle(covered, found);
-  const stands = new Set(seen.open().map(finding => finding.identity));
+  if (ran) seen.settle(covered, found, evaluated);
+  const standingNow = seen.open();
+  const stands = new Set(standingNow.map(finding => finding.identity));
+  const earlier = new Set(before.map(finding => finding.identity));
+  // Ramify's id includes the finding's offsets, so an edit above a violation
+  // gives the same violation a new id. A finding that went and one that came
+  // with the same code, message, file and import are that one violation,
+  // moved: it is neither cleared nor newly introduced.
+  const gone = before.filter(finding => !stands.has(finding.identity));
+  const moved: HookFinding[] = [];
+  for (const finding of found) {
+    if (earlier.has(finding.identity)) continue;
+    const at = gone.findIndex(other => sameViolation(other, finding));
+    if (at === -1) continue;
+    gone.splice(at, 1);
+    moved.push(finding);
+  }
+  seen.admit(moved);
   const added = seen.admit(found);
   const repeated = found.filter(finding => !added.includes(finding));
   // What this check cleared: a finding it covered and no longer reports. It
   // was reported to the engineer when it arose, so its going is news too.
-  const cleared = before.filter(finding => !stands.has(finding.identity));
-  return { ...check, newFindings: added.length, added, repeated, cleared };
+  const cleared = gone;
+  const reportedNow = new Set(found.map(finding => finding.identity));
+  const unevaluated = evaluated ? null : {
+    execution: execution!,
+    standing: standingNow.filter(finding => awaitsEvaluation(finding) && !reportedNow.has(finding.identity)),
+  };
+  // A module whose description is invalid owns no source, so Ramify warns
+  // that its files lie outside every module; that warning is the
+  // description error's, which the engineer is told of as a finding.
+  const notices = ran ? seen.tell(noticesOf(result.report, written.files, evaluated ? written.outsideModules : null)) : [];
+  return { ...check, newFindings: added.length, added, repeated, cleared, unevaluated, notices };
+}
+
+/** Whether two findings are one violation, wherever in its file it now lies. */
+function sameViolation(a: HookFinding, b: HookFinding): boolean {
+  return a.code === b.code && a.message === b.message && a.file === b.file && a.importer === b.importer
+    && a.original?.owner === b.original?.owner && a.original?.file === b.original?.file && a.original?.binding === b.original?.binding;
+}
+
+/**
+ * The execution a report states, or null where it states none. A
+ * `ramify.check/1` document states it at `execution`, and a
+ * `ramify.analysis/1` report at `outcome.execution`. Only `completed`
+ * evaluated imports: an invalid module description, layout or tag registry
+ * makes it `invalid`, and Ramify then decides no import.
+ */
+function executionOf(report: unknown): string | null {
+  if (typeof report !== 'object' || report === null) return null;
+  const document = report as Record<string, unknown>;
+  const outcome = typeof document['outcome'] === 'object' && document['outcome'] !== null ? document['outcome'] as Record<string, unknown> : {};
+  return stringOf(document['execution']) ?? stringOf(outcome['execution']);
 }
 
 /** Exit 0 is checked with nothing to report, 1 is findings, and anything else is not checked. */
@@ -256,6 +380,7 @@ export function findingsOf(report: unknown): HookFinding[] {
     const line = numberOf(location['line']) ?? numberOf(fields['line']);
     return {
       identity: identities[index]!,
+      category: stringOf(fields['category']),
       code: stringOf(fields['code']) ?? 'finding',
       message: stringOf(fields['message']) ?? stringOf(fields['detail']) ?? (typeof entry === 'string' ? entry : JSON.stringify(entry)),
       file,
@@ -286,20 +411,72 @@ function numberOf(value: unknown): number | null {
 }
 
 /**
- * The identity of each finding the check reported. `ramify.check/1` calls
- * them `findings` and `ramify.analysis/1` calls them `diagnostics`; both are
- * read, and an entry whose shape this does not know is identified by itself
- * rather than dropped.
+ * The identity of each finding the check reported: Ramify's own `id`, which
+ * both `ramify.check/1` `findings` and `ramify.analysis/1` `diagnostics`
+ * carry, and which differs for two files that import the same symbol. Both
+ * shapes are read. An entry with no `id` is outside either contract; it is
+ * identified by itself, without the changed check's `new` flag, rather than
+ * dropped.
  */
 export function findingIdentities(report: unknown): string[] {
   return entriesOf(report).map(entry => {
     if (typeof entry !== 'object' || entry === null) return JSON.stringify(entry);
-    const fields = entry as Record<string, unknown>;
-    const named = ['code', 'rule', 'severity', 'file', 'path', 'line', 'message', 'detail']
-      .filter(field => fields[field] !== undefined)
-      .map(field => `${field}=${String(fields[field])}`);
-    return named.length === 0 ? JSON.stringify(entry) : named.join('\u001f');
+    const { new: _new, ...fields } = entry as Record<string, unknown>;
+    return stringOf(fields['id']) ?? JSON.stringify(fields);
   });
+}
+
+/**
+ * The warnings and analysis limits a report states on the written files.
+ * Ramify reports them apart from its findings, in `warnings` and
+ * `coverage`, and fails no check on them. A warning that a file lies outside
+ * every module's source is left out for a file beneath one of the
+ * assignment's `outside-modules` paths, which lies there by assignment, and
+ * left out entirely where `outsideModules` is null.
+ */
+export function noticesOf(report: unknown, written: readonly string[], outsideModules: readonly string[] | null): HookNotice[] {
+  if (typeof report !== 'object' || report === null || written.length === 0) return [];
+  const document = report as Record<string, unknown>;
+  const files = new Set(written);
+  const notices: HookNotice[] = [];
+  for (const entry of Array.isArray(document['warnings']) ? document['warnings'] as unknown[] : []) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const fields = entry as Record<string, unknown>;
+    const code = stringOf(fields['code']) ?? 'warning';
+    const named = Array.isArray(fields['files']) ? (fields['files'] as unknown[]).flatMap(file => stringOf(file) ?? []) : [];
+    for (const file of named) {
+      if (!files.has(file)) continue;
+      if (code === 'outside-module-source') {
+        if (outsideModules === null || outsideModules.some(path => isBeneath(file, path))) continue;
+        notices.push({
+          identity: `warning:${code}:${file}`, kind: 'warning', code, file, line: null,
+          message: 'the compiler selects this file, but it lies outside every module\'s source, so no module owns it and Ramify decides no import of it',
+        });
+      } else {
+        notices.push({ identity: `warning:${code}:${file}`, kind: 'warning', code, file, line: null, message: stringOf(fields['message']) ?? code });
+      }
+    }
+  }
+  for (const entry of Array.isArray(document['coverage']) ? document['coverage'] as unknown[] : []) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const fields = entry as Record<string, unknown>;
+    const location = typeof fields['location'] === 'object' && fields['location'] !== null ? fields['location'] as Record<string, unknown> : {};
+    const file = stringOf(location['file']);
+    if (file === null || !files.has(file)) continue;
+    const code = stringOf(fields['code']) ?? 'analysis-limit';
+    notices.push({
+      identity: stringOf(fields['id']) ?? `limit:${code}:${file}:${String(location['start'])}`,
+      kind: 'analysis-limit', code, file, line: numberOf(location['line']),
+      message: stringOf(fields['message']) ?? code,
+    });
+  }
+  return notices;
+}
+
+/** Whether a project-relative file is the path itself or lies beneath it. */
+function isBeneath(file: string, path: string): boolean {
+  const base = path.replace(/^\.\//, '').replace(/\/+$/, '');
+  return file === base || file.startsWith(`${base}/`);
 }
 
 /**
@@ -334,6 +511,10 @@ function describe(checks: readonly ReportedCheck[]): string | null {
     if (added.length === 0) lines.push(`Fix ${standing.length === 1 ? 'it' : 'them'}, or submit \`contract-needed\` or \`unsuitable\`. \`completion-proposed\` is refused while ${standing.length === 1 ? 'it stands' : 'they stand'}.`);
   }
   if (cleared.length > 0) lines.push(clearedLine(cleared));
+  const unevaluated = checks.flatMap(check => check.unevaluated === null ? [] : [check.unevaluated]);
+  if (unevaluated.length > 0) lines.push(...unevaluatedLines(unevaluated));
+  const notices = checks.flatMap(check => check.notices);
+  if (notices.length > 0) lines.push(...noticeLines(notices));
   if (unchecked.length > 0) {
     lines.push('Ramify hook check:');
     for (const check of unchecked) {
@@ -356,6 +537,41 @@ function clearedLine(cleared: readonly HookFinding[]): string {
   return cleared.length === 1
     ? `Cleared: the Ramify module violation reported earlier (${at}) no longer stands.`
     : `Cleared: the ${cleared.length} Ramify module violations reported earlier (${at}) no longer stand.`;
+}
+
+/**
+ * What a check that did not evaluate imports tells: that it verified no
+ * import, and that the findings only that evaluation reports stand until a
+ * check that evaluates imports no longer reports them. Ramify lists them as
+ * removed, which is not their being fixed.
+ */
+function unevaluatedLines(unevaluated: readonly NonNullable<ReportedCheck['unevaluated']>[]): string[] {
+  const executions = [...new Set(unevaluated.map(check => check.execution))].map(execution => `\`${execution}\``).join(' or ');
+  const why = unevaluated.some(check => check.execution === 'invalid')
+    ? ' An invalid module description, layout or tag registry stops the analysis before any import is decided.'
+    : '';
+  const lines = [`Imports were not evaluated: the check's execution was ${executions}, so Ramify decided no import and this check is not a pass for any.${why}`];
+  const standing = unique(unevaluated.at(-1)!.standing);
+  if (standing.length > 0) {
+    lines.push(standing.length === 1
+      ? `The finding reported earlier (${where(standing[0]!)}) is not cleared: it stands until a check that evaluates imports no longer reports it.`
+      : `The ${standing.length} findings reported earlier (${standing.map(where).join(', ')}) are not cleared: they stand until a check that evaluates imports no longer reports them.`);
+  }
+  return lines;
+}
+
+/** The warnings and analysis limits on the files just written, labelled as not blocking. */
+function noticeLines(notices: readonly HookNotice[]): string[] {
+  const files = new Set(notices.map(notice => notice.file)).size;
+  const lines = [`Not blocking: Ramify reports ${notices.length === 1 ? 'this' : 'these'} for the ${files === 1 ? 'file' : 'files'} you just wrote, and fails no check on ${notices.length === 1 ? 'it' : 'them'}.`];
+  for (const notice of notices) {
+    const at = notice.line === null ? notice.file : `${notice.file}:${notice.line}`;
+    lines.push(`- ${at}: ${notice.message} [${notice.kind === 'warning' ? 'warning' : 'analysis limit'} ${notice.code}]`);
+  }
+  if (notices.some(notice => notice.kind === 'analysis-limit')) {
+    lines.push('An analysis limit is an import Ramify could not decide: it is neither allowed nor denied.');
+  }
+  return lines;
 }
 
 function unique(findings: readonly HookFinding[]): HookFinding[] {

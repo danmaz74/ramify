@@ -8,9 +8,12 @@ import { describePlan, initialAnalysisJsonSchema, initialAnalysisToolName, valid
 import { extensionIsANewForecast } from '../analysis/records.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { loadPromptPackages } from '../prompts/packages.js';
-import { copyFixture } from './helpers/fixture.js';
+import { copyFixture, fixtureRoot } from './helpers/fixture.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { architectScenario } from './helpers/analysis.js';
+import { demonstrationScript } from '../http/server.js';
+import { extractPlanScenarios } from '../../subs/scenarios/src/extraction.js';
+import { join } from 'node:path';
 
 /*
  * Everything the initial architect tells the harness is validated JSON: the
@@ -375,6 +378,38 @@ describe('a rejected submission in a run', () => {
     expect(rejections[0]!.data).toMatchObject({ target: initialAnalysisToolName, attempt: 1 });
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     void agent;
+  }, 180_000);
+});
+
+describe('the scripted fake\'s demonstration, which `serve --agent fake` runs', () => {
+  const plan = 'review-notes';
+
+  test('every submission it makes passes the real submission validator', async () => {
+    const text = await readFile(join(fixtureRoot, 'plans', plan, 'plan.md'), 'utf8');
+    const planScenarios = extractPlanScenarios(text).scenarios;
+    const submissions = demonstrationScript().flatMap(step => (step.kind === 'submit' ? [step.input] : []));
+
+    expect(submissions.length).toBeGreaterThan(0);
+    for (const input of submissions) {
+      expect(validateInitialAnalysis(input, { index: null, plan: describePlan(text), planScenarios })).toEqual({ ok: true, value: input });
+    }
+  });
+
+  test('gets a run past its analysis to the end', async () => {
+    const fixture = await copyFixture();
+    cleanups.push(fixture.remove);
+    await installTestRunner(fixture.root);
+    const { service } = await openRuns(fixture.root, {
+      script: demonstrationScript(),
+      unchangedCheckpoints: [`final verification of plan "${plan}"`],
+    });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun(plan));
+    await service.settled(plan, receipt.jobId);
+
+    const events = await runEventsOnDisk(fixture.root, plan, receipt.jobId);
+    expect(events.some(event => event.type === 'analysis-accepted')).toBe(true);
+    expect(onlyRun(service, plan).state).toBe('completed');
   }, 180_000);
 });
 

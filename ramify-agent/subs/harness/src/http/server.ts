@@ -5,6 +5,7 @@ import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
 import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
 import { createPiAgent, piReadiness } from '../../subs/agent/subs/pi/src/pi-agent.js';
 import { privateRamify, type RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
+import type { InitialAnalysisSubmission } from '../analysis/submission.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
@@ -104,18 +105,24 @@ export class ProjectRootError extends Error {
   }
 }
 
-/** The scripted fake's turns: an analysis with no entry capability, and nothing else. */
-function demonstrationScript(): ScriptStep[] {
+/**
+ * The scripted fake's turns: an analysis with no entry capability, and
+ * nothing else. It is typed as the submission it is, so a change to the
+ * analysis schema fails to compile here. A plan with a `gherkin` block of
+ * its own is beyond it: every plan scenario must appear in the analysis,
+ * and this one names none.
+ */
+export function demonstrationScript(): ScriptStep[] {
+  const analysis: InitialAnalysisSubmission = {
+    entries: [],
+    hypotheses: [],
+    coverageLimits: ['The scripted fake analyses nothing: this run exercises the lifecycle, readiness and the final gate only.'],
+    scenarios: [],
+    integrationScenarios: [],
+  };
   return [
     { kind: 'message', text: 'The scripted fake reads nothing and assigns no entry capability.' },
-    {
-      kind: 'submit',
-      input: {
-        entries: [],
-        hypotheses: [],
-        coverageLimits: ['The scripted fake analyses nothing: this run exercises the lifecycle, readiness and the final gate only.'],
-      },
-    },
+    { kind: 'submit', input: analysis },
   ];
 }
 
