@@ -2,7 +2,7 @@ import { access, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { delimiter, isAbsolute, join } from 'node:path';
 import { checkCommandEnvironment } from './records.js';
-import type { CheckCommand, CheckCommandKind, NotVerified, TestSelection } from './records.js';
+import type { CheckCommand, CheckCommandKind, NotVerified, TestSelection, TypeCheckOutput } from './records.js';
 import type { ScenarioCheckPlan } from './scenario-check.js';
 
 /*
@@ -30,9 +30,17 @@ export interface PlannedCheck {
    * assignment's own selection; `project` is everything else the checkpoint
    * runs. A project command that fails while every in-scope command passed
    * is a failure outside the last assignment, which the attempt's cause
-   * says. It is decided by which files ran, never by what they printed.
+   * says. It is decided by which files ran, and not by what they printed,
+   * except where a command's own report or declared `output` names where
+   * each failure lies.
    */
   readonly attribution?: 'in-scope' | 'project' | undefined;
+  /**
+   * For a `type-check` check: the format of what it prints, as the project
+   * declared it. Where it is declared, a failure is attributed from the
+   * locations of its errors.
+   */
+  readonly output?: TypeCheckOutput | undefined;
   /**
    * For a `scenarios` check: its runs, setup and teardown. The command is
    * then the mode's configured command, which each run extends with its

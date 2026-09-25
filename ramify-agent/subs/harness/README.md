@@ -154,8 +154,16 @@ hiding or measured complexity justifies it.
     every module violation a failure outside the assignment. A failed Ramify
     check returns to the local architect whatever scope its findings lie in:
     what a module may import is the architect's to arrange with the owner,
-    and an engineer given the same brief again cannot widen it. No test
-    output is parsed for any of this. The attempt is returned, not written:
+    and an engineer given the same brief again cannot widen it. A type check
+    whose output format the project declares in `ramify-agent.json`
+    (`"typeCheck": { "output": "tsc" }`) is attributed the same way: every
+    error `tsc` names inside the write scope makes the failure in scope, the
+    engineer's to repair, and any error outside it makes it
+    `outside-assignment`. Output that is truncated, holds a line the reader
+    cannot read, or names no error keeps the attribution by which commands
+    failed, as does a type check without the declaration. No test output is
+    parsed for any of this, nor any output whose format the project did not
+    declare. The attempt is returned, not written:
     the harness commits it with the event that closes the checkpoint. The
     audit executor runs each planned command
     through the harness's own command runner in a temporary worktree of the
@@ -217,6 +225,8 @@ hiding or measured complexity justifies it.
     `job.json` beside the policy, with the reason where it is missing or
     invalid; and what readiness asks of a valid one: the modules' test areas
     its support code must match, and whether each mode's commands resolve.
+    Its optional `typeCheck.output` declares the format the type check
+    prints, which committing gates read error locations from.
   - `readiness.ts`: the readiness steps, their bounded recovery and the
     discovery of the project's test files. A failure a preparation can
     repair consumes one recovery; one it cannot consumes none.

@@ -124,20 +124,38 @@ export type NotVerified =
   | 'interrupted' | 'discovery-error' | 'required-suite-missing';
 
 /**
+ * A format of the type checker's output the project declares in
+ * `ramify-agent.json`, which the gate may read error locations from. `tsc`
+ * is the compiler's own, in either its plain or its pretty form.
+ */
+export type TypeCheckOutput = 'tsc';
+
+/** What an attribution's locations were read from: a Ramify report, the type check's errors, or both. */
+export type GateAttributionBasis = 'ramify-findings' | 'type-check-errors' | 'ramify-findings-and-type-check-errors';
+
+/**
  * What the cause was read from, beyond the runner error, the timeout and the
  * exit codes. A Ramify check prints a structured report that names each
- * finding's own file, so a failure of it is attributed to where the findings
- * lie: `inScope` and `outside` are those locations against the write scope of
- * the assignment the attempt followed. No test output is parsed for this, and
- * an attempt with no such report records no attribution.
+ * finding's own file, and a type check whose output format the project
+ * declared names each error's file, so a failure of either is attributed to
+ * where its findings or errors lie: `inScope` and `outside` are those
+ * locations against the write scope of the assignment the attempt followed.
+ * No test output is parsed for this, nor the output of a command whose
+ * format the project did not declare, and an attempt with neither records
+ * no attribution.
  */
 export interface GateAttribution {
-  readonly basis: 'ramify-findings';
+  readonly basis: GateAttributionBasis;
   readonly inScope: string[];
   readonly outside: string[];
 }
 
-/** What a verdict is attributed to. It derives from the runner error, the timeout, the exit codes and a Ramify report's own locations, never from output text. */
+/**
+ * What a verdict is attributed to. It derives from the runner error, the
+ * timeout, the exit codes, a Ramify report's own locations and those of a
+ * type check's errors in a format the project declared; never from any
+ * other output text.
+ */
 export type GateCause =
   | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
   | 'outside-assignment' | 'guarded-change' | 'unknown';
@@ -256,7 +274,7 @@ export interface GateAttempt {
   readonly scenarios?: 'none-selected';
   readonly verdict: 'passed' | 'failed' | 'not-verified';
   readonly cause: GateCause | null;
-  /** What the cause was read from, where a report of its own named the files. */
+  /** What the cause was read from, where a report or declared output of its own named the files. */
   readonly attribution?: GateAttribution;
   readonly next: GateNext;
 }

@@ -6238,7 +6238,13 @@ export class RunService {
     goal?: string,
   ): Promise<GateAttempt> {
     const scenarios = await this.scenarioInputs(run);
-    const prepared = await prepareCheckpoint(scenarios === undefined ? request : { ...request, scenarios });
+    const captured = run.record.projectConfig;
+    const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
+    const prepared = await prepareCheckpoint({
+      ...request,
+      ...(scenarios === undefined ? {} : { scenarios }),
+      ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
+    });
     if ('schema' in prepared) {
       await this.write(run, {
         type: 'gate-attempted',

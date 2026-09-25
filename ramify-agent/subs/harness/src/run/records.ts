@@ -218,14 +218,24 @@ export type AcceptanceMode = z.infer<typeof acceptanceModeSchema>;
 /** Whether readiness loads full mode with `--dry-run` or executes it. */
 export const fullModeReadinessSchema = z.enum(['dry-run', 'run']);
 
+/** The formats of a type checker's output the gate reads error locations from. */
+export const typeCheckOutputSchema = z.enum(['tsc']);
+
 /**
  * `ramify-agent.json`, the target project's configuration for the harness:
  * only what the harness cannot derive. In v1 that is the scenario harness,
  * the support code Cucumber imports before any step file and the command of
- * each execution mode.
+ * each execution mode, and, optionally, the format of what the type check
+ * prints.
  */
 export const projectConfigSchema = z.object({
   schema: z.literal(projectConfigVersion),
+  /**
+   * The project's type check. `output` declares the format it prints, from
+   * which a failed type check is attributed by the locations of its errors;
+   * without it, by which commands failed.
+   */
+  typeCheck: z.object({ output: typeCheckOutputSchema.optional() }).strict().optional(),
   acceptance: z.object({
     /** Project-relative files or globs, imported in order before any step file. */
     support: z.array(text),
@@ -694,6 +704,8 @@ const plannedCheckSchema = z.object({
     detail: z.string(),
   }).strict().optional(),
   attribution: z.enum(['in-scope', 'project']).optional(),
+  /** A type check's declared output format. */
+  output: typeCheckOutputSchema.optional(),
   scenarios: scenarioCheckPlanSchema.optional(),
 }).strict();
 
@@ -748,11 +760,12 @@ export const gateAttemptSchema = z.object({
   verdict: z.enum(['passed', 'failed', 'not-verified']),
   cause: z.enum(['in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']).nullable(),
   /**
-   * Where a failed Ramify check's own findings lie, against the write scope
-   * the attempt followed. Absent for an attempt with no such report.
+   * Where a failed Ramify check's own findings and a failed type check's
+   * errors lie, against the write scope the attempt followed. Absent for an
+   * attempt with neither.
    */
   attribution: z.object({
-    basis: z.literal('ramify-findings'),
+    basis: z.enum(['ramify-findings', 'type-check-errors', 'ramify-findings-and-type-check-errors']),
     inScope: z.array(z.string()),
     outside: z.array(z.string()),
   }).strict().optional(),

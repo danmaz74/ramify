@@ -4,7 +4,7 @@ import { allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, 
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
 import type { PreparedGate } from '../checks/gate.js';
-import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference } from '../checks/records.js';
+import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference, TypeCheckOutput } from '../checks/records.js';
 import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { RunPolicy } from './records.js';
 
@@ -64,6 +64,12 @@ export interface CheckpointRequest {
    * planned. A gate without them, such as a standalone session's, has none.
    */
   readonly scenarios?: ScenarioCheckInputs | undefined;
+  /**
+   * The format the project declared for what its type check prints, from
+   * its captured `ramify-agent.json`. A failed type check is then attributed
+   * by where its errors lie.
+   */
+  readonly typeCheckOutput?: TypeCheckOutput | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
@@ -114,9 +120,11 @@ function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly
     ...(request.tests === undefined ? {} : { scope: request.tests.selection }),
   });
   const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
-  const checks = request.tests === undefined
+  const planned = request.tests === undefined
     ? allProjectChecks(request.policy.commands, policy, request.scopeProbe, scenarioCheck)
     : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
+  const output = request.typeCheckOutput;
+  const checks = output === undefined ? planned : planned.map(check => (check.kind === 'type-check' ? { ...check, output } : check));
   return {
     id: request.id,
     ...(request.runId === undefined ? {} : { runId: request.runId }),
