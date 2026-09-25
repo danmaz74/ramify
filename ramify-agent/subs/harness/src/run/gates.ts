@@ -1,3 +1,5 @@
+import { stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, type ResolvedTests, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
@@ -77,10 +79,32 @@ export async function runCheckpoint(execution: CheckExecutionPort, request: Chec
 
 /** Verify a committing checkpoint before its commit effect is allowed to begin. */
 export async function prepareCheckpoint(request: CheckpointRequest): Promise<PreparedGate | GateAttempt> {
-  return prepareGate(request.checkpoint, gateRequest(request));
+  return prepareGate(request.checkpoint, gateRequest(request, await linkedDependencies(request)));
 }
 
-function gateRequest(request: CheckpointRequest) {
+/**
+ * The nested packages whose installed dependencies an isolated runner links:
+ * every one whose tests a gate runs, which readiness required installed, and
+ * any other the project has installed. One without its tests and without
+ * `node_modules` is left out, as readiness left it uninstalled.
+ */
+async function linkedDependencies(request: CheckpointRequest): Promise<string[]> {
+  const linked: string[] = [];
+  for (const nested of request.policy.commands.nestedPackages) {
+    if (nested.tests !== null || await isDirectory(join(request.projectRoot, nested.directory, 'node_modules'))) linked.push(nested.directory);
+  }
+  return linked;
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly string[]) {
   const policy = checkpointPolicies[request.checkpoint];
   if (policy.selection !== 'all-project' && request.tests === undefined) {
     throw new Error(`The ${request.checkpoint} checkpoint requires an ${policy.selection} selection, and none was resolved`);
@@ -105,7 +129,7 @@ function gateRequest(request: CheckpointRequest) {
       exactOwners: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.exactOwners ?? [])] : [],
       subtrees: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.subtrees ?? [])] : [],
     },
-    dependencyDirectories: request.policy.commands.nestedPackages.map(nested => nested.directory),
+    dependencyDirectories: [...dependencyDirectories],
     ...(request.subject === undefined ? {} : { subject: request.subject }),
     ...(request.proposedBy === undefined ? {} : { proposedBy: request.proposedBy }),
     ...(request.repairRound === undefined ? {} : { repairRound: request.repairRound }),

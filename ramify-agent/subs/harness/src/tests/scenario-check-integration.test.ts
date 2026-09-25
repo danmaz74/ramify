@@ -300,6 +300,6 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
     expect(step('acceptance-full').outcome).toBe('failed');
     expect(step('acceptance-full').detail).toContain('did not pass');
     expect(failingStep(result.attempt)?.step).toBe('acceptance-full');
-    expect(recoveryFor(result.attempt, result.gate)).toBeNull();
+    expect(recoveryFor(result.attempt, result.gate, testPolicy(fixture.root))).toBeNull();
   }, 60_000);
 });

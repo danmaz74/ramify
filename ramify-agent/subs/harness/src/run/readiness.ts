@@ -352,23 +352,36 @@ async function acceptanceRunnerStep(projectRoot: string, captured: CapturedProje
   };
 }
 
-function nestedPackagesStep(
+/**
+ * The nested packages whose tests the gate runs: those the policy captured
+ * with a `test` script. Only these must be installed; the gate runs nothing
+ * in any other, so a missing `node_modules` there is noted and never fails.
+ */
+export function gatedNestedPackages(policy: RunPolicy): Set<string> {
+  return new Set(policy.commands.nestedPackages.filter(entry => entry.tests !== null).map(entry => entry.directory));
+}
+
+/** The nested packages step: every package whose tests the gate runs is installed. */
+export function nestedPackagesStep(
   nested: ReadonlyArray<{ directory: string; installed: boolean; testScript: string | null }>,
   policy: RunPolicy,
 ): StepResult {
-  const missing = nested.filter(entry => !entry.installed);
+  const gated = gatedNestedPackages(policy);
+  const missing = nested.filter(entry => !entry.installed && gated.has(entry.directory));
+  const ungated = nested.filter(entry => !entry.installed && !gated.has(entry.directory)).map(entry => entry.directory);
   const captured = new Set(policy.commands.nestedPackages.map(entry => entry.directory));
   const added = nested.filter(entry => !captured.has(entry.directory)).map(entry => entry.directory);
   const summary = nested.length === 0 ? 'no independent nested package' : `${nested.length} independent nested package${nested.length === 1 ? '' : 's'}: ${nested.map(entry => `${entry.directory} (${entry.testScript === null ? 'no test script' : `test: ${entry.testScript}`})`).join(', ')}`;
+  const uninstalled = ungated.length === 0 ? '' : `; node_modules is missing in ${ungated.join(', ')}, whose tests the gate does not run, so ${ungated.length === 1 ? 'it need' : 'they need'} not be installed`;
   if (missing.length > 0) {
     return {
       step: 'nested-packages',
       outcome: 'failed',
-      detail: `${summary}; node_modules is missing in ${missing.map(entry => entry.directory).join(', ')}`,
+      detail: `${summary}; node_modules is missing in ${missing.map(entry => entry.directory).join(', ')}, whose tests the gate runs${uninstalled}`,
     };
   }
   const note = added.length === 0 ? '' : `; ${added.join(', ')} appeared after the policy was captured and its tests are not in the gate`;
-  return { step: 'nested-packages', outcome: 'passed', detail: `${summary}${note}` };
+  return { step: 'nested-packages', outcome: 'passed', detail: `${summary}${uninstalled}${note}` };
 }
 
 async function testDiscoveryStep(projectRoot: string): Promise<StepResult> {
@@ -437,11 +450,14 @@ export interface RecoveryPlan {
  * answers the same, and neither is a code-repair assignment either. Only a
  * recoverable failure consumes a recovery attempt.
  */
-export function recoveryFor(attempt: ReadinessAttempt, gate: GateAttempt | null): RecoveryPlan | null {
+export function recoveryFor(attempt: ReadinessAttempt, gate: GateAttempt | null, policy: RunPolicy): RecoveryPlan | null {
   const failing = failingStep(attempt);
   if (failing === undefined) return null;
   if (failing.step === 'nested-packages') {
-    const missing = attempt.nested.filter(entry => !entry.installed).map(entry => entry.directory);
+    // Only a package whose tests the gate runs fails the step, so only those
+    // are installed again; any other is left as the project has it.
+    const gated = gatedNestedPackages(policy);
+    const missing = attempt.nested.filter(entry => !entry.installed && gated.has(entry.directory)).map(entry => entry.directory);
     return missing.length === 0 ? null : { cause: 'infrastructure', action: 'reinstall-nested', directories: missing };
   }
   if (failing.step === 'ramify-daemon') return { cause: 'daemon-unavailable', action: 'restart-daemon', directories: [] };

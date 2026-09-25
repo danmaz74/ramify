@@ -847,8 +847,9 @@ pi actually made and what the snapshot tools answered.
   original cause preserved.
 - **Readiness.** The project root, a clean git repository, the compiler
   configuration, the test runner, the project's configuration, its scenario
-  harness, the independent nested packages, test discovery, the Ramify
-  command line, and then the project's own baseline:
+  harness, the independent nested packages whose tests the gate runs
+  installed (one without a test script is noted and need not be), test
+  discovery, the Ramify command line, and then the project's own baseline:
   its tests, its type check, a complete Ramify check and two scenario
   checks, as one gate attempt through the in-place runner.
   `baseline-acceptance` runs every module with feature files in quick mode

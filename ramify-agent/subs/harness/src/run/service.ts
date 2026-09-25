@@ -6120,7 +6120,7 @@ export class RunService {
       }
 
       const step = failingStep(result.attempt);
-      const plan = recoveryFor(result.attempt, result.gate);
+      const plan = recoveryFor(result.attempt, result.gate, run.record.policy);
       const spent = run.log.all('readiness-failed').filter(event => event.data.recovery !== null).length;
       const recoverable = plan !== null && spent < bound;
 
