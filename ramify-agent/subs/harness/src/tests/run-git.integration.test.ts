@@ -112,13 +112,12 @@ describe('run-to-Git integration', () => {
     // This witness intentionally uses the real dead-process helper and the
     // production Git default on both service instances.
     await crashLock(root);
-    const reopened = await openRuns(root, { git: gitService });
+    const reopened = await openRuns(root, { git: gitService, script: [] });
     cleanups.unshift(() => reopened.service.close());
 
-    expect(reopened.recovery.effects).toEqual([
-      `review-notes/${receipt.jobId}: the commit and audit of gate ga-0002`,
-    ]);
-    expect(onlyRun(reopened.service, 'review-notes').state).toBe('interrupted');
+    expect(reopened.recovery.effects).toContain(`review-notes/${receipt.jobId}: resumed the non-functional phase`);
+    await reopened.service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(reopened.service, 'review-notes').state).toBe('completed');
 
     const after = (await git(root, 'log', '--format=%H', branch)).trim().split('\n');
     expect(after).toEqual(before);

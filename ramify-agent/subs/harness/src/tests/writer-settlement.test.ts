@@ -1,3 +1,4 @@
+import { declaringScenarios } from './helpers/declarations.js';
 import { spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -138,7 +139,7 @@ describe('the harness confirms settlement itself', () => {
 describe('a run whose invocation is not confirmed settled', () => {
   /** The scripted fake, with sessions that never confirm they are idle. */
   function unsettling(script: Script): AgentPort {
-    const scripted = createScriptedAgent(script);
+    const scripted = createScriptedAgent(declaringScenarios(script));
     return {
       name: scripted.name,
       support: scripted.support,
@@ -175,7 +176,7 @@ describe('a run whose invocation is not confirmed settled', () => {
     // The analysis was accepted; readiness never ran, so the run has no gate.
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'session-finished', 'job-failed',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'session-finished', 'job-failed',
     ]);
     const outcome = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome.settled.confirmed).toBe(false);

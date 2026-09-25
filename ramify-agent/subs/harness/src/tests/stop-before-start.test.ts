@@ -54,7 +54,7 @@ describe('a stop between the invocation and its session', () => {
 
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'stop-requested', 'invocation-ended', 'job-stopped',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'stop-requested', 'invocation-ended', 'job-stopped',
     ]);
     // The run was ending when the invocation ended, so its session ended with it.
     expect(events.find(event => event.type === 'invocation-ended')!.data).toMatchObject({ kept: false, finished: 'run-ended' });
@@ -92,6 +92,6 @@ describe('a stop between the invocation and its session', () => {
 
     expect(agent!.sessions).toHaveLength(0);
     const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
-    expect(events.map(event => event.type)).toEqual(['job-started', 'stop-requested', 'job-stopped']);
+    expect(events.map(event => event.type)).toEqual(['job-started', 'document-manifest-committed', 'stop-requested', 'job-stopped']);
   }, 180_000);
 });

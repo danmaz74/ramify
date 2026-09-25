@@ -1,3 +1,4 @@
+import { finalCandidate } from './helpers/final-candidate.js';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -229,9 +230,10 @@ describe('the project-config and acceptance-runner readiness steps', () => {
   async function run(root: string, passes: boolean) {
     const git = scriptedGit(root, {
       head: 'project-config-base',
+      previews: passes ? finalCandidate(root, 'project-config-base').previews : [],
       checkpoints: passes ? [{ subject: 'final verification of plan "review-notes"', commit: null, changes: [] }] : [],
     });
-    const { service } = await openRunsWithoutProcesses(root, git, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service } = await openRunsWithoutProcesses(root, git, { candidates: finalCandidate(root, 'project-config-base').candidates, script: [{ kind: 'submit', input: emptyAnalysis() }] });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);

@@ -1,3 +1,4 @@
+import { finalCandidate } from './helpers/final-candidate.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -25,7 +26,7 @@ afterEach(async () => {
 });
 
 function observationGit(root: string) {
-  return scriptedGit(root, { head: 'observation-base', checkpoints: [
+  return scriptedGit(root, { previews: finalCandidate(root, 'observation-base').previews, head: 'observation-base', checkpoints: [
     { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
   ] });
 }
@@ -95,7 +96,8 @@ describe('what a run observes', () => {
     await installTestRunner(fixture.root);
 
     const git = observationGit(fixture.root);
-    const { service } = await openRunsWithoutProcesses(fixture.root, git, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    const { service } = await openRunsWithoutProcesses(fixture.root, git, {
+      candidates: finalCandidate(fixture.root, 'observation-base').candidates, script: [{ kind: 'submit', input: emptyAnalysis() }] });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
@@ -115,6 +117,7 @@ describe('what a run observes', () => {
 
     const git = observationGit(fixture.root);
     const { service } = await openRunsWithoutProcesses(fixture.root, git, {
+      candidates: finalCandidate(fixture.root, 'observation-base').candidates,
       script: [
         { kind: 'message', text: 'orienting', usage: { input: 10, output: 2, cacheRead: 1, cacheWrite: 0, total: 13 } },
         { kind: 'context', tokens: 1000, window: 200_000 },

@@ -1,3 +1,4 @@
+import { coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import { afterEach, expect, test, vi } from 'vitest';
 import { readFile, writeFile } from 'node:fs/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -99,11 +100,12 @@ test('a selected NFR and advice retain their exact captured passages through the
       { item: 'nfr-001', passage: passages[0], reason: 'Service timing applies to this work item.', conditions: ['for the service'], uncertainty: '' },
       { item: 'adv-001', passage: passages[1], reason: 'The plan suggests an optional storage choice.', conditions: [], uncertainty: 'Tentative suggestion.' },
     ], unavailable: [] });
+    if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [{ nfr: 'nfr-001', result: 'satisfied', inspectedScope: ['src/'], evidence: ['Fixture timeout inspected'], uncertainty: '' }] });
     if (spec.role === 'local-architect') return submit({ ...requestCompletion(), scenarios: ['sc-001'] });
     return [];
   }));
   const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
-    unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'], });
+    previewCount: 5, unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001', 'final verification of plan "revision-diff"'], });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('revision-diff'));
   await opened.service.settled('revision-diff', receipt.jobId);

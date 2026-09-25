@@ -417,7 +417,7 @@ describe('the scripted fake\'s demonstration, which `serve --agent fake` runs', 
 describe('the prompt package', () => {
   test('offers exactly the submission members this iteration produces', async () => {
     const { manifest } = await loadPromptPackages();
-    expect(Object.keys(manifest.packages).sort()).toEqual(['contract-engineer', 'engineer', 'failure-analyst', 'global-fork', 'initial-architect', 'local-architect', 'reviewer']);
+    expect(Object.keys(manifest.packages).sort()).toEqual(['context-selector', 'contract-engineer', 'engineer', 'failure-analyst', 'global-fork', 'initial-architect', 'local-architect', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer', 'reviewer']);
     const initial = manifest.packages['initial-architect']!;
     expect(initial.package).toBe('initial-architect/2');
     expect(initial.submissionKinds).toEqual(['initial-analysis']);
@@ -427,9 +427,9 @@ describe('the prompt package', () => {
     // Each role is offered exactly the members a run of this iteration
     // produces, and no other.
     const local = manifest.packages['local-architect']!;
-    expect(local.package).toBe('local-architect/6');
+    expect(local.package).toBe('local-architect/7');
     // The reconciliation fork's submission is the package's second.
-    expect(local.submissionKinds).toEqual(['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved', 'reconciliation']);
+    expect(local.submissionKinds).toEqual(['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved', 'reconciliation', 'work-orientation']);
 
     const fork = manifest.packages['global-fork']!;
     expect(fork.package).toBe('global-fork/3');

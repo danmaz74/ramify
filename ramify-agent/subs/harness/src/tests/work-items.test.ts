@@ -1,3 +1,4 @@
+import { localArchitectToolName } from '../work/submission.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -93,15 +94,20 @@ describe('a run whose work items need no change', () => {
 
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
       // Each completion request declares its entry's scenario, and the
       // work item's gate implements it.
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
+      'work-orientation-recorded', 'session-opened', 'invocation-started', 'invocation-ended', 'context-selection-recorded',
+      'context-package-append-requested', 'context-package-appended', 'invocation-started', 'context-package-prompt-bound', 'invocation-ended',
       'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
+      'work-orientation-recorded', 'session-opened', 'invocation-started', 'invocation-ended', 'context-selection-recorded',
+      'context-package-append-requested', 'context-package-appended', 'invocation-started', 'context-package-prompt-bound', 'invocation-ended',
       'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
-      'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
+      'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
+      'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-completed',
     ]);
 
     // One event holds every record of the analysis phase.
@@ -300,9 +306,9 @@ describe('a work-item gate that does not pass', () => {
 
     // The local architect is one continuing session: every turn after the
     // first continues the point the last one reached.
-    const local = agent!.sessions.filter(session => session.spec.role === 'local-architect');
+    const local = agent!.sessions.filter(session => session.spec.submission.name === localArchitectToolName);
     expect(local).toHaveLength(4);
-    expect(local[0]!.start.mode).toBe('fresh');
+    expect(local[0]!.start.mode).toBe('continue'); // Continues the recorded orientation after selection.
     for (const session of local.slice(1)) expect(session.start).toEqual({ mode: 'continue' });
     // Each turn after the first is told what the gate found.
     expect(local[1]!.spec.prompt).toContain('The gate did not pass');
@@ -335,7 +341,7 @@ describe('a local architect that cannot meet the request', () => {
     expect(events.filter(event => event.type === 'gate-attempted')).toHaveLength(0);
     expect(events.some(event => event.type === 'work-item-completed')).toBe(false);
     // The submission is stored verbatim before anything is derived from it.
-    const stored = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.submission('inv-0002')), 'utf8')) as Record<string, unknown>;
+    const stored = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.submission('inv-0004')), 'utf8')) as Record<string, unknown>;
     expect(stored).toMatchObject({ schema: 'ramify-agent.local-architect-submission/1', kind: 'unresolved' });
   }, 300_000);
 });

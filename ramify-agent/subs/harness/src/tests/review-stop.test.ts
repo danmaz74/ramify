@@ -1,3 +1,4 @@
+import { finalCandidate } from './helpers/final-candidate.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -98,7 +99,7 @@ describe('a run started with the review stop', () => {
     await writeFile(join(root, 'plans', plan, 'companion.md'), 'First version\n');
     let changed = false;
     const { service } = await openRuns(root, {
-      script: [{ kind: 'submit', input: emptyAnalysis() }], unchangedCheckpoints: [finalVerification],
+      script: [{ kind: 'submit', input: emptyAnalysis() }], previewCount: 3, unchangedCheckpoints: [finalVerification],
       checkScript: async invocation => {
         if (!changed && invocation.context.checkpoint === 'final') {
           changed = true;
@@ -178,7 +179,8 @@ describe('a run started with the review stop', () => {
     const events = await runEventsOnDisk(root, plan, receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
-      'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
+      'gate-started', 'readiness-passed', 'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
+      'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-completed',
     ]);
     expect(events.find(event => event.type === 'analysis-approved')!.data).toMatchObject({
       reviewer: 'dana@example.com', note: 'The scenarios match the plan.', duringRun: false, command: { receipt: approved },
@@ -449,7 +451,7 @@ describe('over HTTP', () => {
       agent: createScriptedAgent(withPlan13Fixture(script)),
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
-        git: unchangedGit(root, [finalVerification]), readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution(),
+        git: unchangedGit(root, [finalVerification], 4), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution(),
       },
     });
   }

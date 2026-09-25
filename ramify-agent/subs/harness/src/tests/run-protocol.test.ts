@@ -1,3 +1,5 @@
+import { finalCandidate } from './helpers/final-candidate.js';
+import { declaringScenarios } from './helpers/declarations.js';
 import type { GitCheckpoint } from './helpers/scripted-git.js';
 import { protocolPorts } from './helpers/protocol-ports.js';
 import { openUnchangedRuns, unchangedGit, assertUnchangedGit, type UnchangedRunsOptions } from './helpers/unchanged-run.js';
@@ -128,7 +130,8 @@ async function serve(
     runs: {
       inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
-      ...(ports ?? { git: unchangedGit(root, unchangedCheckpoints), readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution() }),
+      ...(ports ?? { git: unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0),
+        candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution() }),
     },
   });
 }
@@ -314,7 +317,7 @@ describe('commands over HTTP', () => {
   test('an identical retry returns its receipt; a conflicting reuse and a stale version are refused', async () => {
     const root = await commandTarget();
     const server = await serve(root, {
-      agent: createScriptedAgent([{ kind: 'submit', input: emptyAnalysis() }]),
+      agent: createScriptedAgent(declaringScenarios([{ kind: 'submit', input: emptyAnalysis() }])),
       runs: { inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined },
     }, ['final verification of plan "review-notes"']);
     cleanups.push(() => server.close());
@@ -355,7 +358,7 @@ describe('commands over HTTP', () => {
     const root = await commandTarget();
     const server = await serve(
       root,
-      { agent: createScriptedAgent([{ kind: 'submit', input: emptyAnalysis() }]) },
+      { agent: createScriptedAgent(declaringScenarios([{ kind: 'submit', input: emptyAnalysis() }])) },
       ['final verification of plan "review-notes"'],
     );
     cleanups.push(() => server.close());

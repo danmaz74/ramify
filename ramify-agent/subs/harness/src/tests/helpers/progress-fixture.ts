@@ -1,3 +1,4 @@
+import { finalCandidate } from './final-candidate.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { analysis, entry, hypothesis, requestCompletion, unresolved } from './analysis.js';
@@ -265,7 +266,9 @@ export async function progressFixture(): Promise<ProgressFixture> {
     const runs = {} as Record<FixtureRun, { planId: string; runId: string; state: string }>;
     for (const name of Object.keys(scripts) as FixtureRun[]) {
       const planId = fixturePlans[name];
+      const final = name === 'proposed' ? null : finalCandidate(fixture.root, name === 'placements' ? 'scenarios-of-revision-diff' : `progress-fixture-${name}`);
       const git = scriptedGit(fixture.root, {
+        previews: final?.previews ?? [],
         head: `progress-fixture-${name}`,
         checkpoints: checkpoints[name].map(step => (typeof step === 'string' ? { subject: step, commit: null, changes: [] } : step)),
       });
@@ -273,7 +276,7 @@ export async function progressFixture(): Promise<ProgressFixture> {
       const opened = await openRuns(fixture.root, {
         script: scripts[name](),
         inputs: treeInputs(),
-        git,
+        git, ...(final ? { candidates: final.candidates } : {}),
         ramify,
         readinessExecution: directReadinessExecution(),
         checkExecution: createPassingCheckExecution(),

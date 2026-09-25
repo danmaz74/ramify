@@ -1,3 +1,4 @@
+import { localArchitectToolName } from '../work/submission.js';
 import type { AddressInfo } from 'node:net';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -155,7 +156,7 @@ describe('an unresolved request answered with an environment problem', () => {
     expect(onlyRun(opened.service, plan).state).toBe('completed');
 
     // The local architect that asked was continued with the briefing, and retried from its outline.
-    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = agent.sessions.filter(session => session.spec.submission.name === localArchitectToolName);
     expect(architects).toHaveLength(3);
     expect(architects[1]!.start.mode).toBe('continue');
     const briefed = architects[1]!.spec.prompt;

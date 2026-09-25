@@ -1,3 +1,4 @@
+import { declaringScenarios } from './helpers/declarations.js';
 import { scenariosCommit, type GitCheckpoint } from './helpers/scripted-git.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -147,10 +148,10 @@ describe('the bounds on the whole run', () => {
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
       let current = new Date('2026-09-22T12:00:00.000Z');
-    const scripted = createScriptedAgent(byRole({
+    const scripted = createScriptedAgent(declaringScenarios(byRole({
       'initial-architect': [submit(analysis([entry('reviewer-note', reviews)]))],
       'local-architect': [submit(requestCompletion())],
-    }));
+    })));
     const timed: AgentPort = {
       name: scripted.name,
       support: scripted.support,

@@ -88,6 +88,7 @@ describe('the run log', () => {
     const types = runEventSchema.options.map(option => option.shape.type.value);
     expect(types).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
+      'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
       'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
       'scenarios-materializing', 'scenarios-materialized',
@@ -114,8 +115,8 @@ describe('the run log', () => {
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed']);
-    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected']);
+    expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
@@ -858,7 +859,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
   });
 
   test('every failure reason and every phase is named', () => {
@@ -1004,6 +1005,7 @@ describe('the run protocol a client reads', () => {
 
 /** The smallest data each event type's schema accepts, for the projection's exhaustiveness. */
 function sampleData(type: RunEvent['type']): unknown {
+  const hash64 = 'a'.repeat(64);
   const r = { id: 'x', revision: 1, hash: 'a'.repeat(64) };
   const command = { commandId: 'c', contentHash: 'h', receipt: { commandId: 'c', jobId: 'j', sequence: 1, acceptedAt: '2026-09-20T10:15:00.000Z' } };
   const samples: Partial<Record<RunEvent['type'], unknown>> = {
@@ -1012,6 +1014,21 @@ function sampleData(type: RunEvent['type']): unknown {
     'invocation-ended': { invocation: 'inv-0001', ended: 'submitted', submission: null, session: 'ses-0001', kept: false, finished: 'work-closed' },
     'session-finished': { session: 'ses-0001', reason: 'run-ended' },
     'analysis-accepted': { invocation: 'inv-0001', entries: 0, hypotheses: 0, registry: 0, workItems: 0 },
+    'document-manifest-committed': { manifest: 'input/documents.json', hash: hash64, documents: 1 },
+    'work-orientation-recorded': { workItem: 'wi-001', invocation: 'inv-0002', packetHash: hash64, point: 'p' },
+    'context-selection-recorded': { workItem: 'wi-001', selection: 'sel-001', packageHash: hash64 },
+    'context-package-append-requested': { workItem: 'wi-001', selection: 'sel-001', session: 'ses-0002', appendKey: 'selection' },
+    'context-package-appended': { workItem: 'wi-001', selection: 'sel-001', session: 'ses-0002', appendKey: 'selection', ref: 'r', outcome: 'appended', reason: null },
+    'context-package-prompt-bound': { workItem: 'wi-001', selection: 'sel-001', packageHash: hash64, invocation: 'inv-0004', session: 'ses-0002' },
+    'candidate-prepared': { candidate: 'cand-001', tree: 'a'.repeat(40) },
+    'nonfunctional-phase-started': { catalogHash: hash64, maxRounds: 3 },
+    'nonfunctional-assessed': { assessment: 'nfa-001', candidate: 'cand-001', round: 1, phase: 'initial' },
+    'nonfunctional-investigated': { round: 1, invocation: 'inv-0005', assessment: 'nfa-001', nfrs: ['nfr-001'] },
+    'nonfunctional-repair-assigned': { round: 1, assignment: 'repair-001', assessment: 'nfa-001', candidate: 'cand-001', nfrs: ['nfr-001'], startingModule: 'm' },
+    'nonfunctional-repair-committed': { round: 1, invocation: 'inv-0006', assignment: 'repair-001' },
+    'nonfunctional-round-closed': { round: 1, record: 'round-001', outcome: 'exhausted' },
+    'nonfunctional-deviation-recorded': { deviation: 'pd-001', nfr: 'nfr-001', assessment: 'nfa-001', checkFinding: 'cf-0001', checkFindings: [] },
+    'candidate-bound-to-gate': { candidate: 'cand-001', assessment: 'nfa-001', gate: 'ga-0004', commit: 'c', tree: 'a'.repeat(40) },
     'review-requested': {},
     'analysis-approved': { command, reviewer: 'r', note: null, duringRun: false },
     'readiness-passed': { attempt: 1, gate: 'ga-0001' },

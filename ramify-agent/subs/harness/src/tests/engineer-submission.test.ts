@@ -1,3 +1,4 @@
+import { finalCandidate } from './helpers/final-candidate.js';
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
@@ -248,7 +249,7 @@ describe('a rejected submission in a run', () => {
 
     // Nothing was derived from the input that failed, and the rejection is
     // an observation with its errors.
-    const observations = await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0003')), 'utf8');
+    const observations = await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0005')), 'utf8');
     const rejections = observations.split('\n').filter(Boolean)
       .map(line => JSON.parse(line) as { type: string; data: { target?: string } })
       .filter(line => line.type === 'rejection');
@@ -271,7 +272,7 @@ describe('a rejected submission in a run', () => {
     expect(engineer.verdicts).toHaveLength(3);
     expect(engineer.verdicts.at(-1)).toMatchObject({ accepted: false, final: true });
 
-    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0005')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
     // Nothing the iteration would have done happened: no gate, no commit.
     const events = await runEventsOnDisk(root, 'review-notes', runId);
@@ -279,7 +280,7 @@ describe('a rejected submission in a run', () => {
     const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
     expect(result).toMatchObject({ outcome: 'partial', commit: null });
     // The digest names the rejections and the last one's reason.
-    expect(result.failure?.digest).toMatchObject({ invocation: 'inv-0003', ended: 'invalid-submission', rejected: { count: 3, target: engineerToolName } });
+    expect(result.failure?.digest).toMatchObject({ invocation: 'inv-0005', ended: 'invalid-submission', rejected: { count: 3, target: engineerToolName } });
     expect(result.failure?.digest.cause).toBe(`3 of its inputs were rejected, the last to \`${engineerToolName}\`, and the bound on rejected inputs ended it.`);
     expect(result.failure?.digest.rejected?.reasons.join(' ')).toContain('summary');
   }, 300_000);
@@ -309,12 +310,12 @@ describe('a rejected submission in a run', () => {
       expect(body.errors[0]!.message).toContain('suite');
     }
 
-    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0003')), 'utf8'))
+    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0005')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { target?: string } });
     expect(observations.filter(line => line.type === 'rejection' && line.data.target === scopeTestsToolName)).toHaveLength(3);
     // No test run was recorded for a call that never ran.
     expect(observations.some(line => line.type === 'scope-tests')).toBe(false);
-    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0005')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('invalid-submission');
     const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
     expect(result.outcome).toBe('partial');
@@ -339,7 +340,7 @@ describe('a rejected submission in a run', () => {
     expect(answer.text).toContain('Scenarios: passed; quick mode, selected by identity: sc-001.');
     expect(answer.text).toMatch(/- `sc-001` ".+" passed, at `.+\.feature:\d+`, with no step bound\./);
 
-    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0003')), 'utf8'))
+    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0005')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { resolved?: string[]; outcome?: string; scenarios?: unknown } });
     const ran = observations.filter(line => line.type === 'scope-tests');
     expect(ran).toHaveLength(1);
@@ -347,7 +348,7 @@ describe('a rejected submission in a run', () => {
     expect(ran[0]!.data.outcome).toBe('passed');
     expect(ran[0]!.data.scenarios).toEqual({ selected: ['sc-001'], passed: ['sc-001'], failures: 0 });
     // Its profile and stream are the invocation's, outside the worktree.
-    expect(existsSync(runPath(root, 'review-notes', runId, join(runLayout.scopeScenarios('inv-0003', 1), 'scenarios.log')))).toBe(true);
+    expect(existsSync(runPath(root, 'review-notes', runId, join(runLayout.scopeScenarios('inv-0005', 1), 'scenarios.log')))).toBe(true);
     expect(existsSync(join(root, notesDirectory, 'src', 'notes.ts'))).toBe(true);
   }, 300_000);
 });
@@ -371,7 +372,7 @@ describe('a Ramify module violation in a run', () => {
 
     const marker = '/* NOT-EXPOSED-IMPORT */';
     const file = `${notesDirectory}/src/notes.ts`;
-    const git = scriptedGit(root, { head: 'base', checkpoints: [
+    const git = scriptedGit(root, { previews: finalCandidate(root, 'fixed-source').previews, head: 'base', checkpoints: [
       scenariosCommit('review-notes'),
       { subject: 'wi-001.i01', commit: 'fixed-source', changes: [{ status: 'M', path: file }] },
       { subject: 'wi-001', commit: null, changes: [] },
@@ -394,7 +395,7 @@ describe('a Ramify module violation in a run', () => {
       .mockResolvedValueOnce(answer([finding])).mockResolvedValueOnce(answer([finding]))
       .mockResolvedValue(answer([]));
     const { service, agent } = await openRunsWithGit(root, {
-      inputs: treeInputs(), git, ramify, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: finalCandidate(root, 'fixed-source').candidates, ramify, readinessExecution: directReadinessExecution(),
       // The engineer's writes are what Git reports once the feature files are committed.
       afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({

@@ -1,3 +1,4 @@
+import { finalCandidate } from './helpers/final-candidate.js';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -276,13 +277,14 @@ describe('over a real run', () => {
       [entry('reviewer-note', reviews), entry('note-in-panel', root)],
       [hypothesis('note-storage', { involvedModules: [reviews] })],
     );
-    const git = scriptedGit(fixture.root, { head: 'progress-base', checkpoints: [
+    const git = scriptedGit(fixture.root, { previews: finalCandidate(fixture.root, 'scenarios-of-review-notes').previews, head: 'progress-base', checkpoints: [
       scenariosCommit('review-notes'),
       { subject: 'wi-001', commit: null, changes: [] },
       { subject: 'wi-002', commit: null, changes: [] },
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
     ] });
     const { service } = await openRunsWithoutProcesses(fixture.root, git, {
+      candidates: finalCandidate(fixture.root, 'scenarios-of-review-notes').candidates,
       script: (spec: SessionSpec) => [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }],
     });
     cleanups.push(() => service.close());

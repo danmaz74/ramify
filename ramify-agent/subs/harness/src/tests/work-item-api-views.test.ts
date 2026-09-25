@@ -1,3 +1,5 @@
+import { localArchitectToolName } from '../work/submission.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -56,8 +58,8 @@ class RecoveringRamify extends FakeRamifyCli {
 /** Records the first message of every session a role starts or continues. */
 function recording(script: Script, prompts: Map<string, string[]>, directories: string[] = []): Script {
   return spec => {
-    prompts.set(spec.role, [...(prompts.get(spec.role) ?? []), spec.prompt]);
-    if (spec.role === 'local-architect') directories.push(spec.scope.workingDirectory);
+    if (spec.role !== 'local-architect' || spec.submission.name === localArchitectToolName) prompts.set(spec.role, [...(prompts.get(spec.role) ?? []), spec.prompt]);
+    if (spec.submission.name === localArchitectToolName) directories.push(spec.scope.workingDirectory);
     return typeof script === 'function' ? script(spec) : script;
   };
 }
@@ -72,7 +74,7 @@ describe('the API view of a local architect\'s continued turns', () => {
     const ramify = new RecoveringRamify();
     const prompts = new Map<string, string[]>();
     const directories: string[] = [];
-    const scripted = gateGit(fixture.root, { head: base, commits: [scenarios,
+    const scripted = gateGit(fixture.root, { previews: finalCandidate(fixture.root, 'revision-01').previews, head: base, commits: [scenarios,
       { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] }, unchanged] });
     const opened = await openRuns(fixture.root, {
       script: recording(byRole({
@@ -85,7 +87,7 @@ describe('the API view of a local architect\'s continued turns', () => {
       }), prompts, directories),
       inputs: treeInputs(),
       ramify,
-      git: scripted.git,
+      git: scripted.git, candidates: finalCandidate(fixture.root, 'revision-01').candidates,
       readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());
@@ -103,7 +105,7 @@ describe('the API view of a local architect\'s continued turns', () => {
     expect(first).toContain(`- Onboarding (\`${join(fixture.root, notesDirectory, 'README.md')}\`)`);
     expect(first).toContain(`- The architect view is at \`${fixture.root}/.ramify-architect/\``);
     expect(first).toContain(`- Working directory: \`${moduleSource}\``);
-    const activity = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0002')), 'utf8'))
+    const activity = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0004')), 'utf8'))
       .trim().split('\n').map(line => JSON.parse(line) as { type: string; data: { activity?: { kind: string; path?: string } } });
     expect(activity).toContainEqual(expect.objectContaining({ type: 'activity', data: { activity: expect.objectContaining({ kind: 'read', path: `${notesDirectory}/src/notes.ts` }) } }));
     // The architect's first turn, the engineer's briefing and the architect's second turn each materialized it.

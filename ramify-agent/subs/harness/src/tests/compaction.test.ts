@@ -75,7 +75,7 @@ describe('compaction during a run', () => {
 
     // The local architect: the same record, with the size the implementation
     // could not report left null rather than filled in.
-    const local = await observations(fixture.root, receipt.jobId, 'inv-0002');
+    const local = await observations(fixture.root, receipt.jobId, 'inv-0004');
     const localCompaction = local.filter(line => line.type === 'compaction');
     expect(localCompaction).toHaveLength(1);
     expect(localCompaction[0]!.data).toEqual({ trigger: 'overflow', succeeded: true, before: 140_000, after: null });
