@@ -609,6 +609,7 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
                 {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
+                {(command.stopped !== null || command.outputIncomplete) && <p className="muted">{stoppedText(command.stopped, command.outputIncomplete)}</p>}
                 {command.scenarios && <ScenarioCheckSummaryView summary={command.scenarios} />}
                 <pre className="tail" aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre>
               </div>
@@ -618,6 +619,13 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
       </Loading>
     </section>
   );
+}
+
+/** How ramify-audit stopped a command's process tree and whether its output may be incomplete, as one sentence. */
+function stoppedText(stopped: string | null, outputIncomplete: boolean): string {
+  const clauses = [...(stopped === null ? [] : [stopped]), ...(outputIncomplete ? ['its output may be incomplete'] : [])];
+  const sentence = clauses.join('; ');
+  return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
 }
 
 // Progress

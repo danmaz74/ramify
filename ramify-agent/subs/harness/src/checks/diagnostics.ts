@@ -92,7 +92,7 @@ export async function gateDiagnostics(
     const outcome = command.outcome === 'not-verified'
       ? `not verified (${command.notVerified ?? 'unknown'})`
       : command.outcome;
-    const exit = command.exitCode === null ? '' : `, exit ${command.exitCode}`;
+    const exit = `${command.exitCode === null ? '' : `, exit ${command.exitCode}`}${stoppedNote(command)}`;
     if (command.kind === 'setup') {
       summary.push(...setupLines(command, outcome, exit));
       if (command === blocking && skipped.length > 0) {
@@ -144,6 +144,19 @@ export async function gateDiagnostics(
   }
   if (findings.length > 0 && audience === 'local-architect') summary.push(architectRemedy(findings));
   return { id: gate.id, cause: gate.cause, summary };
+}
+
+/**
+ * How ramify-audit stopped a command's process tree and whether what it
+ * printed may be incomplete, as a clause; empty for a command it did not
+ * stop and whose output is complete.
+ */
+function stoppedNote(command: GateCommandRecord): string {
+  const notes = [
+    ...(command.stopped === undefined ? [] : [command.stopped]),
+    ...(command.outputIncomplete === true ? ['its output may be incomplete'] : []),
+  ];
+  return notes.length === 0 ? '' : `; ${notes.join('; ')}`;
 }
 
 /** A setup command as a briefing names it: its declared name where it has one, and its argv. */

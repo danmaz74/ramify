@@ -7,6 +7,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { setupChecks } from '../checks/checkpoint.js';
 import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
+import { gateDiagnostics } from '../checks/diagnostics.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import type { GateAttempt, TestSelection } from '../checks/records.js';
@@ -526,6 +527,34 @@ describe('the project\'s setup commands in the audited worktree', () => {
     ]);
     expect(attempt.commands[0]!.name).toBeUndefined();
     expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'timeout', 'retry-infrastructure']);
+    // ramify-audit stopped the command's whole process tree, and the record and its briefing say how.
+    expect(attempt.commands[0]!.stopped).toMatch(/^its process tree was stopped after it timed out: \d+ process(es)? received SIGTERM/u);
+    const briefing = (await gateDiagnostics(attempt, 'engineer')).summary.join('\n');
+    expect(briefing).toContain(`not verified (timeout); ${attempt.commands[0]!.stopped!}`);
+  });
+
+  it('a setup command that installs through the linked node_modules is refused before it runs, and is infrastructure with what the project must change', async () => {
+    const fixture = await builtProject();
+    await writeFile(join(fixture.projectRoot, 'node_modules', 'kept.txt'), 'the project\'s own installation');
+    const checks: PlannedCheck[] = [
+      ...setupChecks([{ name: 'install', command: ['npm', 'ci'] }], fixture.projectRoot),
+      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")'), attribution: 'project' },
+    ];
+
+    const { attempt } = await auditGate(fixture, checks, 'ga-setup-linked-install');
+
+    const [setup, tests] = attempt.commands;
+    expect(setup).toMatchObject({
+      kind: 'setup', name: 'install', outcome: 'not-verified', notVerified: 'runner-error', exitCode: null,
+      runnerError: { kind: 'setup-command-unsafe-with-linked-modules' },
+    });
+    expect(setup!.runnerError!.message).toContain('`npm ci` changes node_modules');
+    expect(setup!.runnerError!.message).toContain('so a setup command must not install them: remove it from `setup` in ramify-agent.json.');
+    // What the record shows as its output is why it was refused.
+    expect(setup!.output.tail).toBe(setup!.runnerError!.message);
+    expect(tests).toMatchObject({ outcome: 'not-verified', notVerified: 'setup-failed' });
+    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
+    expect(await readFile(join(fixture.projectRoot, 'node_modules', 'kept.txt'), 'utf8')).toBe('the project\'s own installation');
   });
 
   it('a setup command that cannot start is infrastructure, with the preparation\'s own error', async () => {
@@ -546,5 +575,34 @@ describe('the project\'s setup commands in the audited worktree', () => {
     });
     expect(attempt.commands[1]).toMatchObject({ outcome: 'not-verified', notVerified: 'setup-failed' });
     expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
+  });
+});
+
+describe('an audited worktree whose HEAD moves during the audit', () => {
+  it('fails every command as infrastructure, with where the audit found the move', async () => {
+    const fixture = await repository({ '.gitignore': 'node_modules/\n', 'package.json': '{}\n' });
+    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
+    const move = checkCommand({
+      argv: ['git', '-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--allow-empty', '--no-gpg-sign', '-q', '-m', 'moved'],
+      cwd: fixture.projectRoot,
+      timeoutMs: 30_000,
+    });
+    const checks: PlannedCheck[] = [
+      { kind: 'tests', command: move, attribution: 'project' },
+      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("types")'), attribution: 'project' },
+    ];
+
+    const { attempt } = await auditGate(fixture, checks, 'ga-revision-moved');
+
+    expect(attempt.commands.map(record => [record.kind, record.outcome, record.notVerified ?? null, record.runnerError?.kind ?? null])).toEqual([
+      ['tests', 'not-verified', 'runner-error', 'source-revision-moved'],
+      ['type-check', 'not-verified', 'runner-error', 'source-revision-moved'],
+    ]);
+    const message = attempt.commands[0]!.runnerError!.message;
+    expect(message).toMatch(new RegExp(`The audited HEAD moved from ${fixture.commit} to [0-9a-f]{40} \\(stage before-check, check check-02-type-check, workspace isolated-worktree\\); checks completed before it: check-01-tests\\.$`, 'u'));
+    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
+    expect(attempt.evidence).toBeNull();
+    // The project's own branch did not move.
+    expect(git(fixture.repositoryRoot, ['rev-parse', 'HEAD'])).toBe(fixture.commit);
   });
 });

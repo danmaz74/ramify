@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import {
 import { runLayout, type InfrastructureRecovery, type ReadinessAttempt } from '../run/records.js';
 import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { gitService } from '../../subs/evidence/src/git.js';
+import { checkOutputPath, notRun, type CheckExecutionPort } from '../checks/execution.js';
 
 /*
  * Execution readiness, and the recoveries it is allowed. Missing
@@ -296,6 +298,65 @@ describe('the project\'s declared setup', () => {
       expect(steps.find(step => step.step === name)).toMatchObject({ outcome: 'not-verified' });
       expect(steps.find(step => step.step === name)!.detail).toContain('did not run, because a setup command before it did not pass');
     }
+  }, 180_000);
+
+  test('a setup command that installs where an audited gate links node_modules fails readiness before any command runs, with no recovery', async () => {
+    const { root, policy } = await builtTarget([
+      { name: 'install', command: ['npm', '--no-audit', 'ci'] },
+      { name: 'build', command: [process.execPath, '-e', build] },
+    ]);
+
+    const { snapshot, failures, attempts, recoveries, events } = await readinessOf(root, { policy });
+
+    expect(snapshot.state).toBe('failed');
+    expect(snapshot.failure?.reason).toBe('readiness-failed');
+    expect(failures).toEqual([expect.objectContaining({ step: 'baseline-setup', recovery: null, final: true })]);
+    expect(recoveries).toHaveLength(0);
+    const steps = attempts[0]!.steps;
+    const setup = steps.find(step => step.step === 'baseline-setup')!;
+    expect(setup.outcome).toBe('failed');
+    expect(setup.gate).toBeUndefined();
+    expect(setup.detail).toBe('the setup command "install": `npm --no-audit ci` runs `npm ci` in the project root, where every audited gate'
+      + ' links the project\'s own `node_modules`; ramify-audit refuses to run it there, since the package manager would follow the link'
+      + ' and change or empty the project\'s installation. The project\'s `setup` in ramify-agent.json must not install dependencies:'
+      + ' the audited worktree already has the project\'s installed ones.');
+    for (const name of ['baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'run-branch'] as const) {
+      expect(steps.find(step => step.step === name)).toMatchObject({ outcome: 'not-verified', detail: 'not reached: baseline-setup did not pass' });
+    }
+    // Nothing ran: not the install, not the build.
+    expect(events.some(event => event.type === 'gate-command-started')).toBe(false);
+    expect(existsSync(join(root, 'dist'))).toBe(false);
+  }, 180_000);
+
+  test('an install ramify-audit refused through a linked node_modules fails readiness with its message, and no recovery reruns it', async () => {
+    const { root, policy } = await builtTarget([{ name: 'build', command: [process.execPath, '-e', build] }]);
+    const refusal = '`npm ci` changes node_modules, and node_modules -> /p/node_modules is a symbolic link.';
+    // An execution that answers the setup command as ramify-audit's preparation refuses it.
+    const refusing: CheckExecutionPort = {
+      async run(checks, request) {
+        const startedAt = new Date().toISOString();
+        const commands = await Promise.all(checks.map(async (check, index) => {
+          const outputFile = checkOutputPath(request.directory, index, check);
+          await writeFile(outputFile, index === 0 ? refusal : '');
+          if (index > 0) return notRun(check, outputFile, startedAt, 'setup-failed');
+          return request.classify(check, {
+            outcome: { kind: 'runner-error', error: { kind: 'setup-command-unsafe-with-linked-modules', message: refusal } },
+            startedAt, elapsedMs: 0, stdout: refusal, stderr: '',
+            output: { path: outputFile, bytes: Buffer.byteLength(refusal), truncated: false, tail: refusal },
+          }, outputFile);
+        }));
+        return { commands, audited: null, evidence: null };
+      },
+    };
+
+    const { snapshot, failures, attempts, recoveries } = await readinessOf(root, { policy, readinessExecution: refusing });
+
+    expect(snapshot.state).toBe('failed');
+    expect(failures).toEqual([expect.objectContaining({ step: 'baseline-setup', recovery: null, final: true })]);
+    expect(recoveries).toHaveLength(0);
+    const setup = attempts[0]!.steps.find(step => step.step === 'baseline-setup')!;
+    expect(setup).toMatchObject({ outcome: 'not-verified' });
+    expect(setup.detail).toContain(refusal);
   }, 180_000);
 });
 

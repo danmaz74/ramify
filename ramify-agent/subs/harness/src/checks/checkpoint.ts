@@ -190,6 +190,42 @@ export function setupChecks(setup: readonly SetupDeclaration[], projectRoot: str
   }));
 }
 
+/**
+ * The runner errors ramify-audit answers for a command it refuses to run
+ * because it installs dependencies where `node_modules` is a link to the
+ * project's own: a setup command's, and a check command's.
+ */
+export const linkedModulesRefusals: ReadonlySet<string> = new Set(['setup-command-unsafe-with-linked-modules', 'unsafe-with-linked-modules']);
+
+const packageManagers = new Set(['npm', 'pnpm', 'yarn']);
+const installSubcommands = new Set(['ci', 'install', 'i', 'add', 'prune', 'dedupe', 'update', 'uninstall', 'rm']);
+/** Options whose value is a separate argument, so it is not taken for the subcommand. */
+const valueOptions = new Set(['--prefix', '-C', '--dir', '--cwd', '--workspace', '--filter', '-F']);
+
+/**
+ * The package-manager operation a command performs where it installs or
+ * removes dependencies (`npm ci`, `pnpm install`, a bare `yarn`), and null
+ * for any other command. It is ramify-audit's rule for what it refuses to
+ * run through a linked `node_modules`, read from the argv alone, never from
+ * a script the command runs.
+ */
+export function installOperation(argv: readonly string[]): string | null {
+  const [program, ...args] = argv;
+  if (program === undefined) return null;
+  const tool = (program.split(/[\\/]/u).at(-1) ?? program).replace(/\.(?:cmd|exe)$/iu, '');
+  if (!packageManagers.has(tool)) return null;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]!;
+    if (valueOptions.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('-')) continue;
+    return installSubcommands.has(arg) ? `${tool} ${arg}` : null;
+  }
+  return tool === 'yarn' ? tool : null;
+}
+
 // The scenario check.
 
 /** One execution mode of the project's scenario harness, as the captured configuration names it. */

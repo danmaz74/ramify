@@ -256,7 +256,10 @@ hiding or measured complexity justifies it.
     repair consumes one recovery; one it cannot consumes none. The baseline
     gate runs the project's setup commands first, which `baseline-setup`
     records: a setup command that exits non-zero fails readiness with the
-    end of its output and no recovery.
+    end of its output and no recovery. So does one that installs
+    dependencies where an audited gate links the project's `node_modules`,
+    before any command runs, since ramify-audit would refuse it at every
+    audited gate.
   - `gates.ts`: a checkpoint of a run and the commit that follows a pass,
     with the message the harness writes mechanically from records.
   - `inputs.ts`: the evidence seam. A run's lifecycle, its log and its

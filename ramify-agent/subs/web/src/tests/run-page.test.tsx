@@ -143,7 +143,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
           kind: 'setup', name: 'build', argv: ['npm', 'run', 'build'], cwd: '/p', startedAt: at, elapsedMs: 7, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0001/01-setup.log', bytes: 6, truncated: false, tail: 'built\n' }, scenarios: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0001/01-setup.log', bytes: 6, truncated: false, tail: 'built\n' }, scenarios: null,
         }],
       }),
       'ga-0002': gateViewSchema.parse({
@@ -153,10 +153,10 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
         commands: [{
           kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
         }, {
           kind: 'scenarios', name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
           scenarios: {
             mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-001'] }, dryRun: false, excluded: 3, runs: [{ module: 'shop/notes', exit: 1 }],
             scenarios: [{ id: 'sc-001', run: 'shop/notes', status: 'failed', file: 'subs/notes/src/tests/features/review-notes/review-note.feature', line: 4, failure: noteFailure, undefined: [] }],
@@ -172,7 +172,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
           kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
-          runnerError: null, selection: null, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
+          runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
         }],
       }),
     },
@@ -581,6 +581,22 @@ test('one iteration shows its failed and passed audits, attempt-local commit, ev
   // The project's setup command, by its declared name.
   expect(gate.querySelector('.command p')?.textContent).toBe('setup "build": passed, exit 0, 7 ms');
   expect(within(gate).getByLabelText('Output tail of setup').textContent).toBe('built\n');
+});
+
+test('a setup command whose process tree ramify-audit stopped says how, and that its output may be incomplete', async () => {
+  const run = stubRun();
+  const readiness = run.gates!['ga-0001']!;
+  const stopped = 'its process tree was stopped after it timed out: 3 processes received SIGTERM, and SIGKILL after 2 s';
+  run.gates!['ga-0001'] = gateViewSchema.parse({
+    ...readiness, verdict: 'not-verified', cause: 'timeout', next: 'retry-infrastructure',
+    commands: [{ ...readiness.commands[0]!, exitCode: null, outcome: 'not-verified', notVerified: 'timeout', stopped, outputIncomplete: true }],
+  });
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'ga-0001' }));
+  const gate = await screen.findByLabelText('Gate ga-0001');
+  expect(gate.querySelector('.command p')?.textContent).toBe('setup "build": not-verified (timeout), exit none, 7 ms');
+  expect(within(gate).getByText('Its process tree was stopped after it timed out: 3 processes received SIGTERM, and SIGKILL after 2 s; its output may be incomplete.')).toBeTruthy();
 });
 
 test('an unavailable metric reads unavailable with its known subtotal, never zero; the guarding statement stays', async () => {

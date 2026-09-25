@@ -830,6 +830,10 @@ export const gateAttemptSchema = z.object({
     notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed']).optional(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     output: z.object({ path: z.string(), bytes: z.int().nonnegative(), truncated: z.boolean(), tail: z.string() }).strict(),
+    /** How ramify-audit stopped the command's process tree, in words; absent where it did not stop it. */
+    stopped: text.optional(),
+    /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
+    outputIncomplete: z.literal(true).optional(),
     /** A `scenarios` command's summary of its message streams. */
     scenarios: scenarioCheckSummarySchema.optional(),
   }).strict()),

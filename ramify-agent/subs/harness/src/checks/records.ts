@@ -201,6 +201,14 @@ export interface GateCommandRecord {
   readonly runnerError: { readonly kind: string; readonly message: string } | null;
   /** The complete output is a file beside the attempt; `tail` has a fixed bound. */
   readonly output: { readonly path: string; readonly bytes: number; readonly truncated: boolean; readonly tail: string };
+  /**
+   * How ramify-audit stopped the command's process tree, in words, where it
+   * stopped it: a setup command that timed out or was cancelled in an
+   * audited worktree. Absent for every command it did not stop.
+   */
+  readonly stopped?: string;
+  /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
+  readonly outputIncomplete?: true;
   /** For a `scenarios` command: what its message streams said. Its outcome is read from this, not from the exit codes alone. */
   readonly scenarios?: ScenarioCheckSummary;
 }

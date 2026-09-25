@@ -30,6 +30,20 @@ failure, recorded with its code and message. This needs the ramify-audit
 release whose `nodejs` preparation takes `setupCommands`, which follows the
 `0.1.0` the package manifest still names.
 
+ramify-audit stops the whole process tree of a setup command that times out
+or is cancelled; the command's record carries how, in words, as `stopped`,
+and `outputIncomplete` where its output streams stayed open after it ended,
+both read from the preparation's `termination` and `outputIncomplete`, which
+releases after `0.1.0` record. A setup command that installs dependencies
+(`npm ci` and the like) where the worktree's `node_modules` is linked to the
+project's is refused before it runs: its record is not verified with the
+runner error `setup-command-unsafe-with-linked-modules` and a message naming
+what the project must change, which the gate attributes to infrastructure.
+Readiness refuses such a command first. An audit whose worktree HEAD moved
+during it fails with `source-revision-moved`, which is infrastructure too;
+the message says where the audit found the move and which checks had
+completed.
+
 A setup command's environment is ramify-audit's: the inherited one without
 `NODE_OPTIONS`, plus the command's declared `env`. It is not the allowlist
 the harness builds for the commands it spawns itself.

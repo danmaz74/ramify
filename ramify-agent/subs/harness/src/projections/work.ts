@@ -268,6 +268,8 @@ export function gateOf(view: RunView, id: string): GateView {
         truncated: command.output.truncated,
         tail: boundedTail(command.output.tail),
       },
+      stopped: command.stopped ?? null,
+      outputIncomplete: command.outputIncomplete === true,
       scenarios: command.scenarios === undefined ? null : scenarioCheckViewOf(command.scenarios),
     })),
   };

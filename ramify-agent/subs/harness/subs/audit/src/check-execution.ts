@@ -254,7 +254,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         if (failed !== null) return executionFailure(failed);
         return executionFailure(await infrastructureRecords(checks, request, {
           kind: result.error.code,
-          message: setup.restore(result.error.message),
+          message: auditFailureMessage(result.error, setup.restore),
         }));
       }
       const prepared = await preparedSetupRecords(checks, request, result, setup);
@@ -701,6 +701,9 @@ interface PreparedCommand {
   readonly outputFile: string | null;
   readonly outputTruncated: boolean;
   readonly outputTail: string | null;
+  /** How the preparation stopped the command's process tree, in words, where it stopped it. */
+  readonly stopped: string | null;
+  readonly outputIncomplete: boolean;
 }
 
 function preparedCommandOf(value: unknown): PreparedCommand | null {
@@ -715,7 +718,62 @@ function preparedCommandOf(value: unknown): PreparedCommand | null {
     outputFile: typeof entry['outputFile'] === 'string' ? entry['outputFile'] : null,
     outputTruncated: entry['outputTruncated'] === true,
     outputTail: typeof entry['outputTail'] === 'string' ? entry['outputTail'] : null,
+    stopped: stoppedOf(entry['termination']),
+    outputIncomplete: entry['outputIncomplete'] === true,
   };
+}
+
+/**
+ * The words for how ramify-audit stopped a command's process tree, from the
+ * `termination` it records where it stopped one (ramify-audit 0.1.1 and
+ * later): what stopped it, how many processes, and whether any outlived
+ * SIGTERM. Null where it recorded none.
+ */
+function stoppedOf(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const termination = value as Record<string, unknown>;
+  const why = termination['reason'] === 'timeout' ? 'after it timed out'
+    : termination['reason'] === 'cancelled' ? 'when the audit was cancelled'
+      : termination['reason'] === 'leader-signalled' ? 'after a signal ramify-audit did not send stopped the command'
+        : null;
+  if (why === null) return null;
+  const count = typeof termination['processCount'] === 'number' ? termination['processCount'] : null;
+  const what = termination['scope'] === 'process-group' ? 'its process group'
+    : termination['scope'] === 'pid' ? 'the command\'s own process'
+      : count === null ? 'its processes' : `${count} process${count === 1 ? '' : 'es'}`;
+  const graceMs = typeof termination['graceMs'] === 'number' ? termination['graceMs'] : null;
+  const signals = termination['sigkillRequired'] === true || termination['finalSignal'] === 'SIGKILL'
+    ? `SIGTERM, and SIGKILL${graceMs === null ? '' : ` after ${graceMs / 1000} s`}`
+    : 'SIGTERM';
+  const survivors = Array.isArray(termination['survivingPids'])
+    ? termination['survivingPids'].filter((pid): pid is number => typeof pid === 'number')
+    : [];
+  const left = survivors.length === 0 ? '' : `; still present after SIGKILL: ${survivors.join(', ')}`;
+  return `its process tree was stopped ${why}: ${what} received ${signals}${left}`;
+}
+
+/**
+ * What an audit that failed outside any setup command says: ramify-audit's
+ * message with the worktree's paths restored, and, where the audited
+ * worktree's HEAD moved during the audit, where it found that.
+ */
+function auditFailureMessage(
+  error: { readonly code: string; readonly message: string; readonly details?: unknown },
+  restore: (text: string) => string,
+): string {
+  const message = restore(error.message);
+  if (error.code !== 'source-revision-moved') return message;
+  const details = typeof error.details === 'object' && error.details !== null ? error.details as Record<string, unknown> : {};
+  const expected = typeof details['expectedRevision'] === 'string' ? details['expectedRevision'] : 'unknown';
+  const actual = typeof details['actualRevision'] === 'string' ? details['actualRevision'] : 'unknown';
+  const stage = typeof details['stage'] === 'string' ? details['stage'] : 'unknown';
+  const mode = typeof details['workspaceMode'] === 'string' ? details['workspaceMode'] : 'unknown';
+  const check = typeof details['checkId'] === 'string' ? `, check ${details['checkId']}` : '';
+  const completed = Array.isArray(details['completedCheckIds'])
+    ? details['completedCheckIds'].filter((id): id is string => typeof id === 'string')
+    : [];
+  return `${message} The audited HEAD moved from ${expected} to ${actual} (stage ${stage}${check}, workspace ${mode});`
+    + ` checks completed before it: ${completed.length === 0 ? 'none' : completed.join(', ')}.`;
 }
 
 function preparedCommandsOf(value: unknown): PreparedCommand[] {
@@ -779,7 +837,12 @@ async function failedSetupRecords(
       continue;
     }
     if (position === failed.index) {
-      records.push(await setupRecord(check, index, failed, request, setup, failedOutcome(error, failed, check, setup)));
+      const outcome = failedOutcome(error, failed, check, setup);
+      // A refused command printed nothing: its output is why it was refused.
+      const entry = outcome.kind === 'runner-error' && failed.status === 'refused'
+        ? { ...failed, outputFile: null, outputTail: outcome.error.message }
+        : failed;
+      records.push(await setupRecord(check, index, entry, request, setup, outcome));
       continue;
     }
     const outputFile = checkOutputPath(request.directory, index, check);
@@ -798,6 +861,19 @@ function failedOutcome(
 ): CommandOutcome {
   if (failed.status === 'failed' && failed.exitCode !== null) return { kind: 'completed', exitCode: failed.exitCode };
   if (failed.status === 'timed-out') return { kind: 'timed-out', timeoutMs: check.command.timeoutMs };
+  if (error.code === 'setup-command-unsafe-with-linked-modules') {
+    // The same setup passed readiness, which refuses an install ramify-audit
+    // would refuse, so this is not the source's failure: it stays
+    // infrastructure, and the message says what the project must change.
+    return {
+      kind: 'runner-error',
+      error: {
+        kind: error.code,
+        message: `${setup.restore(error.message)} ramify-audit links the project's installed dependencies into the audited worktree, `
+          + 'so a setup command must not install them: remove it from `setup` in ramify-agent.json.',
+      },
+    };
+  }
   return { kind: 'runner-error', error: { kind: error.code, message: setup.restore(error.message) } };
 }
 
@@ -833,7 +909,12 @@ async function setupRecord(
     stdout: text,
     stderr: '',
   };
-  return request.classify(check, run, outputFile);
+  const record = request.classify(check, run, outputFile);
+  return {
+    ...record,
+    ...(entry.stopped === null ? {} : { stopped: entry.stopped }),
+    ...(entry.outputIncomplete ? { outputIncomplete: true } : {}),
+  };
 }
 
 async function interruptedRecords(

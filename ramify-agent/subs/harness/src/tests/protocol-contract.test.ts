@@ -335,7 +335,7 @@ describe('the acceptance scenarios a client reads', () => {
   test('a gate\'s scenario command carries its compact summary; the others carry none', () => {
     const command = {
       name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: '2026-09-23T08:00:00.000Z', elapsedMs: 5, exitCode: 1, outcome: 'failed',
-      notVerified: null, runnerError: null, selection: null, output: { path: 'gates/ga-0004/scenarios.log', bytes: 10, truncated: false, tail: 'failed' },
+      notVerified: null, runnerError: null, selection: null, stopped: null, outputIncomplete: false, output: { path: 'gates/ga-0004/scenarios.log', bytes: 10, truncated: false, tail: 'failed' },
     };
     const summary = {
       mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-003'] }, dryRun: false, excluded: 2,

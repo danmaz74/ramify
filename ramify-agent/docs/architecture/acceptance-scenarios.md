@@ -267,6 +267,19 @@ A work-item or final gate follows its own next step. One that timed out,
 could not start or was stopped is infrastructure, and takes the bounded
 retry. At readiness, a setup command that exits non-zero fails readiness
 with the end of its output and no recovery; one that timed out is rerun.
+ramify-audit stops the whole process tree of a setup command that timed out
+or was cancelled, and the command's record and briefing say how, and that
+its output may be incomplete where its output streams stayed open.
+
+A setup command must not install dependencies: the audited worktree already
+links the project's installed ones, and a package manager would follow the
+link and change or empty the project's own installation. ramify-audit
+refuses an installing command (`npm ci`, `pnpm install`, a bare `yarn` and
+the like) where its working directory, or one up to four levels below it,
+has a linked `node_modules`, so readiness refuses one first, at
+`baseline-setup`, before any command runs and with no recovery, saying what
+to remove from `setup`. Should a committing gate meet the refusal all the
+same, it is infrastructure, with ramify-audit's message.
 
 The `collection-review` fixture needs the configuration file, a full mode and
 the two scripts; its quick mode is the in-process `createTestSystem` its one

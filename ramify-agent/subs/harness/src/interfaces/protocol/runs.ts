@@ -1061,6 +1061,10 @@ export const gateViewSchema = z.object({
       truncated: z.boolean(),
       tail: z.string().refine(tail => tailBytes(tail) <= runQueryLimits.outputTailBytes, 'An output tail is at most 8 KiB'),
     }).strict(),
+    /** How ramify-audit stopped the command's process tree, in words; null where it did not stop it. */
+    stopped: text.nullable(),
+    /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
+    outputIncomplete: z.boolean(),
     /** A `scenarios` command's summary; null for every other kind, and for one that recorded none. */
     scenarios: scenarioCheckViewSchema.nullable(),
   }).strict()),
