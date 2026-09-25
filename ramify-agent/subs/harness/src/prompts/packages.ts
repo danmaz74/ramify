@@ -373,8 +373,8 @@ export function renderGlobalForkPrompt(loaded: LoadedPackage, projectRoot: strin
 }
 
 /** The rendered system prompt of a local architect. It is never stored either. */
-export function renderLocalArchitectPrompt(loaded: LoadedPackage, projectRoot: string): string {
-  return render(loaded, projectRoot, localArchitectToolName);
+export function renderLocalArchitectPrompt(loaded: LoadedPackage, projectRoot: string, workingDirectory: string = projectRoot): string {
+  return render(loaded, projectRoot, localArchitectToolName, { workingDirectory });
 }
 
 /** The rendered system prompt of a local architect's reconciliation fork. It is never stored either. */

@@ -97,16 +97,21 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     const analysed = analysis([entry('review-note', notes, 'The module holds a reviewer\'s note.', {
       parent: reviews, directory: notesDirectory, purpose: 'Holds a reviewer\'s note for one review run.', tags: [],
     })]);
+    const architectScopes: Array<{ directory: string; prompt: string }> = [];
+    const script = byRole({
+      'initial-architect': [submit(analysed)],
+      'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
+      engineer: [submit(
+        completionProposed('Created the notes module with its first behavior and the test that states it.'),
+        ...moduleWrites,
+      )],
+    });
 
     const opened = await openRuns(root, {
-      script: byRole({
-        'initial-architect': [submit(analysed)],
-        'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-        engineer: [submit(
-          completionProposed('Created the notes module with its first behavior and the test that states it.'),
-          ...moduleWrites,
-        )],
-      }),
+      script: spec => {
+        if (spec.role === 'local-architect') architectScopes.push({ directory: spec.scope.workingDirectory, prompt: spec.prompt });
+        return typeof script === 'function' ? script(spec) : script;
+      },
       ramify: daemon.ramify,
       inputs: viewedInputs(daemon.ramify, message => unavailable.push(message)),
       git: scripted.git,
@@ -118,6 +123,10 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     const runId = receipt.jobId;
 
     expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
+    expect(architectScopes.map(scope => scope.directory)).toEqual([root, root]);
+    expect(architectScopes[0]!.prompt).toContain('This session remains at the project root even if an engineer creates the module.');
+    expect(architectScopes[0]!.prompt).toContain(`- Assigned module declaration: \`${join(root, notesDirectory, 'module.ramify')}\` (read it if present).`);
+    expect(architectScopes[0]!.prompt).toContain(`- Onboarding: \`${join(root, notesDirectory, 'README.md')}\` gives none:`);
     // Every refresh answered, so nothing below rests on evidence the
     // harness could not obtain.
     expect(unavailable).toEqual([]);

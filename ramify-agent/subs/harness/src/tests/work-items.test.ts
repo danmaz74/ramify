@@ -3,6 +3,7 @@ import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { analysisLayout } from '../analysis/records.js';
@@ -10,6 +11,7 @@ import { workLayout } from '../work/records.js';
 import { runLayout } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, hypothesis, requestCompletion, unresolved } from './helpers/analysis.js';
+import { treeInputs } from './helpers/iterations.js';
 import {
   installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun, testPolicy,
 } from './helpers/runs.js';
@@ -67,8 +69,13 @@ describe('a run whose work items need no change', () => {
         hypothesis('note-rendering', { change: 'create', suggestedOwner: root, anticipatedConsumers: ['note-in-panel'] })],
       ['the view reports no dependency facts for this fixture'],
     );
+    const architectDirectories: string[] = [];
     const { service } = await openRuns(project, {
-      script: script(submitted, () => requestCompletion()),
+      script: script(submitted, spec => {
+        if (spec.role === 'local-architect') architectDirectories.push(spec.scope.workingDirectory);
+        return requestCompletion();
+      }),
+      inputs: treeInputs(),
       unchangedCheckpoints: twoWorkItemCheckpoints,
     });
     cleanups.push(() => service.close());
@@ -79,6 +86,10 @@ describe('a run whose work items need no change', () => {
     expect(run.state).toBe('completed');
     expect(run.counts.workItems).toBe(2);
     expect(run.counts.completedWorkItems).toBe(2);
+    expect(architectDirectories).toEqual([
+      join(project, 'subs/workspace/subs/reviews/src'),
+      join(project, 'src'),
+    ]);
 
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([

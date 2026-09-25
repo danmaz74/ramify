@@ -2922,7 +2922,7 @@ export class RunService {
     });
     const context = contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({
-      projectRoot: this.projectRoot, workingDirectory: request.workingDirectory, observations, judge, excursions, context, transcript,
+      projectRoot: this.projectRoot, workingDirectory: request.workingDirectory ?? this.projectRoot, observations, judge, excursions, context, transcript,
     });
     // Every port event is activity; `touch` is what the idle bound resets.
     // A command the equipment runs for the session holds it instead. An
@@ -3400,9 +3400,20 @@ export class RunService {
     }
 
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
-    const onboarding = await onboardingOf(this.projectRoot, directoryOf(run.index, item.module));
+    const initialRecords = committedRecords(run.log.ledger.replay());
+    const moduleEntry = run.index === null ? undefined : findModule(run.index, item.module);
+    const proposal = initialRecords.registry.find(entry => entry.owner === item.module)?.proposed;
+    const onboarding = moduleEntry !== undefined || proposal !== undefined
+      ? await onboardingOf(this.projectRoot, moduleEntry?.dir ?? proposal!.directory)
+      : { path: '(module directory unavailable)', purpose: null, missing: 'the assigned module is absent from the architect view and no proposal gives its directory' };
     let views = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, item.module);
-    const systemPrompt = renderLocalArchitectPrompt(loaded, this.projectRoot);
+    const moduleDirectory = moduleEntry?.dir;
+    const moduleSource = moduleDirectory === undefined ? null : join(this.projectRoot, moduleDirectory, 'src');
+    // A continued session keeps the same cwd even if an engineer creates the module later.
+    const workingDirectory = moduleSource !== null && (await stat(moduleSource).catch(() => null))?.isDirectory()
+      ? moduleSource
+      : this.projectRoot;
+    const systemPrompt = renderLocalArchitectPrompt(loaded, this.projectRoot, workingDirectory);
     const scope = baselineScope(item.module, baseline.supplementary.map(entry => entry.path));
     const integration = await this.integrationOfItem(run, item);
 
@@ -3537,6 +3548,9 @@ export class RunService {
         }),
         bounds: engineerBoundsOf(run.record.policy.limits),
         runDirectory: run.directory,
+        projectRoot: this.projectRoot,
+        workingDirectory,
+        ...(moduleEntry !== undefined || proposal !== undefined ? { moduleDirectory: moduleEntry?.dir ?? proposal!.directory } : {}),
       });
       // A finding is delivered once: the next turn of this same architect
       // has it in its own history, and repeating it would read as a second
@@ -3556,6 +3570,7 @@ export class RunService {
         loaded,
         systemPrompt,
         prompt,
+        workingDirectory,
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
         session,
         continuing,

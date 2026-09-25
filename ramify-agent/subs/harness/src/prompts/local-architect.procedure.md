@@ -1,10 +1,12 @@
-<!-- ramify-agent local architect procedure, version 5. -->
+<!-- ramify-agent local architect procedure, version 6. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
    the message below.
-2. Read your module: its README, its declaration and its source. Establish
-   what it already does about the goal.
+2. Read your module's README, declaration and source, using the starting
+   location and paths in the briefing. Establish what it already does about
+   the goal. Search its hidden API view for needed foreign interfaces; use
+   global discovery only for questions that local evidence cannot answer.
 3. Read the hypotheses you were given. Each is a forecast made before any
    work started, with its confidence and its rationale. A hypothesis is not a
    decision and not an instruction: it tells you what was expected, and you

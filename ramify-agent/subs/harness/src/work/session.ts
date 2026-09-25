@@ -108,6 +108,10 @@ export async function iterationApiViews(
 export interface WorkItemBriefing {
   readonly item: WorkItem;
   readonly plan: string;
+  /** Runtime location for resolving paths in this reader's briefing. Durable paths stay project-relative. */
+  readonly projectRoot?: string | undefined;
+  readonly workingDirectory?: string | undefined;
+  readonly moduleDirectory?: string | undefined;
   readonly onboarding: Onboarding;
   readonly views: ApiViewResult;
   readonly hypotheses: readonly Hypothesis[];
@@ -220,6 +224,7 @@ export interface DelegationBriefing {
 /** The first user message of one local architect invocation. */
 export function workItemMessage(briefing: WorkItemBriefing): string {
   const { item } = briefing;
+  const rooted = (path: string): string => briefing.projectRoot === undefined ? path : join(briefing.projectRoot, path);
   const lines: string[] = [
     `# Work item ${item.id} — ${item.module}`,
     '',
@@ -240,21 +245,34 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     '## Your module',
     '',
     `- Declared name: \`${item.module}\`.`,
-    briefing.onboarding.purpose === null
-      ? `- Onboarding: \`${briefing.onboarding.path}\` gives none: ${briefing.onboarding.missing}. No other module's prose stands in for it.`
-      : `- Onboarding (\`${briefing.onboarding.path}\`): ${briefing.onboarding.purpose}`,
+    ...(briefing.workingDirectory === undefined ? [] : [
+      `- Working directory: \`${briefing.workingDirectory}\`.`,
+      briefing.workingDirectory === briefing.projectRoot
+        ? '- The assigned module source directory was absent when this session began. This session remains at the project root even if an engineer creates the module. Do not create it from this reader session.'
+        : '- This is the assigned module\'s source directory.',
+      ...(briefing.workingDirectory === briefing.projectRoot && briefing.moduleDirectory !== undefined ? [
+        `- Assigned module declaration: \`${rooted(join(briefing.moduleDirectory, 'module.ramify'))}\` (read it if present).`,
+        `- Assigned module source: \`${rooted(join(briefing.moduleDirectory, 'src'))}/\` (read it if present).`,
+      ] : []),
+      '- Any project-relative path in this briefing resolves from the project root; structured submissions keep their project-relative paths.',
+    ]),
+    briefing.onboarding.path === '(module directory unavailable)'
+      ? `- Onboarding unavailable: ${briefing.onboarding.missing}. No other module's prose stands in for it.`
+      : briefing.onboarding.purpose === null
+        ? `- Onboarding: \`${rooted(briefing.onboarding.path)}\` gives none: ${briefing.onboarding.missing}. No other module's prose stands in for it.`
+        : `- Onboarding (\`${rooted(briefing.onboarding.path)}\`): ${briefing.onboarding.purpose}`,
   ];
 
   if (briefing.views.evidence === null) {
     lines.push(`- API view: none was materialized, because ${briefing.views.unavailable}. Absence of a view is not a refusal; say so in your outline if it matters.`);
   } else {
     for (const view of briefing.views.evidence.views) {
-      lines.push(`- API view (${view.area}): \`${view.path}/\`, revision \`${view.revision}\`; ${view.coverage === null
+      lines.push(`- API view (${view.area}): \`${rooted(view.path)}/\`, revision \`${view.revision}\`; ${view.coverage === null
         ? 'coverage complete, so absence means unavailable'
         : `coverage limits: ${view.coverage}, so absence is not proof of unavailability`}.`);
     }
   }
-  lines.push(`- The architect view is at \`${architectViewDirectory}/\`.`, '');
+  lines.push(`- The architect view is at \`${rooted(architectViewDirectory)}/\`.`, '');
 
   lines.push('## Hypotheses you received', '');
   if (briefing.hypotheses.length === 0) {
