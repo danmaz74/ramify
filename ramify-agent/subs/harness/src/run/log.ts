@@ -600,6 +600,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
     checkFindings: checkFindingEventsField,
   }).strict()),
   /**
+   * Commits one `EnvironmentProblem` the fork of an unresolved request
+   * reported, with the CheckFinding that asks the operator to resume the run
+   * or end it, as one line. The run holds the work item until the operator
+   * answers; nothing is placed and nothing of the plan changes.
+   */
+  event('environment-reported', z.object({
+    request: text,
+    problem: text,
+    workItem: text,
+    invocation: text,
+    checkFinding: text,
+    checkFindings: checkFindingEventsField,
+  }).strict()),
+  /**
    * The intent of rendering the pending scenarios a plan deviation rewords
    * into their feature files and committing them, with the revised scenario
    * records. Its completion is `scenarios-reworded`.

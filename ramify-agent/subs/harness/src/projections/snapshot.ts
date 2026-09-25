@@ -1,5 +1,6 @@
 import { replayCheckFindingState } from '../check-findings/state.js';
-import type { RunDecisionRequests, RunNotice, RunPlanDeviations, RunSnapshot } from '../interfaces/protocol/runs.js';
+import type { RunDecisionRequests, RunEnvironmentProblem, RunNotice, RunPlanDeviations, RunSnapshot } from '../interfaces/protocol/runs.js';
+import { environmentProblemSchema } from '../deviations/records.js';
 import { runSnapshot } from '../run/snapshot.js';
 import type { CommittedLine, RunView } from './inputs.js';
 
@@ -21,6 +22,10 @@ import type { CommittedLine, RunView } from './inputs.js';
  * limit; the snapshot counts the run's deviations and those still awaiting
  * the person, so a completed run reads "completed with N plan deviations
  * to review".
+ *
+ * An environment problem holds the work item whose request it answered
+ * until the operator resumes the run or ends it; the snapshot states each
+ * one with the global architect's diagnosis and suggestion.
  */
 
 /** A run's public snapshot, from its view. */
@@ -62,7 +67,37 @@ export function snapshotOf(view: RunView): RunSnapshot {
     notices: orderedNotices(internal.notices.map(notice => withDecisionStatement(notice))),
     decisionRequests: decisionRequestsOf(view.entries, internal.state === 'running' && !internal.stopRequested),
     planDeviations: planDeviationsOf(view.entries),
+    environmentProblems: environmentProblemsOf(view.entries),
   };
+}
+
+/**
+ * Every environment problem the log recorded, with how the operator
+ * answered its CheckFinding: a waiver resumed the run, and any other answer
+ * ended it.
+ */
+export function environmentProblemsOf(entries: readonly CommittedLine[]): RunEnvironmentProblem[] {
+  const reported = entries.flatMap(entry => entry.transaction.event.type === 'environment-reported'
+    ? entry.transaction.records.flatMap(record => {
+      const parsed = environmentProblemSchema.safeParse(record.body);
+      return parsed.success ? [parsed.data] : [];
+    })
+    : []);
+  if (reported.length === 0) return [];
+  const state = replayCheckFindingState(entries);
+  return reported.map(problem => {
+    const entry = state.findings.get(problem.checkFinding);
+    const answer = entry === undefined || entry.pendingUserDecision !== null ? 'waiting' : entry.reason === 'waived' ? 'resumed' : 'ended';
+    return {
+      problem: problem.id,
+      request: problem.request,
+      workItem: problem.workItem,
+      checkFinding: problem.checkFinding,
+      diagnosis: problem.diagnosis,
+      suggestion: problem.suggestion,
+      answer,
+    };
+  });
 }
 
 /**
@@ -95,8 +130,15 @@ function recordedDeviations(entries: readonly CommittedLine[]): Array<{ readonly
  */
 export function decisionRequestsOf(entries: readonly CommittedLine[], live: boolean): RunDecisionRequests {
   const state = replayCheckFindingState(entries);
-  // A plan deviation is the run's; one recorded past the limit holds the work item that asked.
-  const held = new Map(recordedDeviations(entries).filter(entry => entry.held).map(entry => [entry.checkFinding, entry.workItem]));
+  // A plan deviation is the run's; one recorded past the limit holds the work
+  // item that asked, and an environment problem always does.
+  const held = new Map([
+    ...recordedDeviations(entries).filter(entry => entry.held).map(entry => [entry.checkFinding, entry.workItem] as const),
+    ...entries.flatMap(entry => {
+      const event = entry.transaction.event;
+      return event.type === 'environment-reported' ? [[event.data.checkFinding, event.data.workItem] as const] : [];
+    }),
+  ]);
   let open = 0;
   const workItems = new Map<string, Array<{ checkFinding: string; request: string }>>();
   // The state holds CheckFindings in the order they were created, which is their IDs' order.

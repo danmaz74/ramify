@@ -1,4 +1,4 @@
-<!-- ramify-agent global fork procedure, version 2. -->
+<!-- ramify-agent global fork procedure, version 3. -->
 For a placement request, do this, in order:
 
 1. Read the request: the behavior it requires, what the local architect
@@ -84,15 +84,35 @@ the deviations already recorded. Do this, in order:
 
 1. Read the conflict and verify its evidence. A conflict you cannot confirm is
    not a reason to depart from the plan.
-2. Decide whether it is a placement question after all: the behavior belongs
+2. Decide whether the conflict lies in how the gate or the harness runs: its
+   environment, setup or configuration, such as a prerequisite the gate's
+   command expects and nothing provides. Then answer `environment`. Nothing
+   of the plan changes.
+3. Decide whether it is a placement question after all: the behavior belongs
    to another owner, or exists already. Then answer `decision`, as for a
    placement request. Nothing of the plan changes.
-3. Otherwise, find the smallest departure that makes the rest of the plan
+4. Otherwise, find the smallest departure that makes the rest of the plan
    achievable. **Keep as much of each requirement as the conflict allows;
    drop no more than the conflict requires.** A requirement that fails in
    one clause keeps its other clauses. Answer `deviation`.
-4. Answer `nothing-possible` only when no deviation leaves anything of the
+5. Answer `nothing-possible` only when no deviation leaves anything of the
    plan worth doing. The run ends there.
+
+The remedy decides between them. A remedy an engineer can carry out in a
+write scope, a code or declaration change within modules or extra scope with
+a purpose, is a placement or a deviation. A remedy outside every write
+scope, such as building, installing, configuring the gate or changing the
+harness, is `environment`. **An environment problem is never dressed as a
+placement or a deviation**: a constraint no engineer can meet, such as "run
+the production build before the tests", leaves the work item failing the
+same gate.
+
+### `decision`, for an unresolved request
+
+As for a placement request. Its `decision.constraints` name only what a local
+architect can assign: code and declaration changes within modules, and extra
+scope with its purpose. Give at most 10, each one statement of at most 400
+characters.
 
 ### `deviation`
 
@@ -126,6 +146,22 @@ A run records a bounded number of deviations. Past that number a deviation
 is still recorded, and the run waits for the person to accept or reject it
 before it goes on. Many deviations say the plan is wrong: prefer
 `nothing-possible` to a deviation that leaves the plan's purpose behind.
+
+### `environment`
+
+The conflict lies in how the gate or the harness runs, not in the plan or the
+architecture. The run holds the work item for the operator: nothing is
+placed, no deviation is recorded and the plan file is untouched. When the
+operator resumes the run, the work item's local architect retries from its
+last outline with your diagnosis; if the same failure returns, it may ask
+again.
+
+- `diagnosis` is what is wrong, with its evidence: the failing command, what
+  it reported and the prerequisite it lacks. At most 2000 characters.
+- `suggestion` is what the operator could change, such as a build step
+  declared in `ramify-agent.json`. At most 1000 characters.
+
+Do not answer `environment` for a failure the work itself causes.
 
 ### `nothing-possible`
 

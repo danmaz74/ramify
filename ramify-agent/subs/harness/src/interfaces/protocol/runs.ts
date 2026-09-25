@@ -232,7 +232,9 @@ export type RunNoticeKind = RunNotice['kind'];
  * open. A work item with one is held before its gate until a person
  * answers, with no time limit, and the run advances no further meanwhile.
  * A plan deviation's request holds nothing, except one recorded past the
- * run's limit, which holds the work item whose request it answered.
+ * run's limit, which holds the work item whose request it answered. An
+ * environment problem's request holds the work item whose request it
+ * answered.
  * `waiting` says the run is held now: it is running, no stop was requested,
  * and a work item has an open request. A run with no CheckFinding, such as
  * one begun before CheckFindings existed, has none.
@@ -261,6 +263,25 @@ export const runPlanDeviationsSchema = z.object({
   toReview: count,
 }).strict();
 export type RunPlanDeviations = z.infer<typeof runPlanDeviationsSchema>;
+
+/**
+ * An environment problem the global architect reported for an unresolved
+ * request: the conflict lies in how the gate or the harness runs, not in
+ * the plan or the architecture. The run holds the work item until the
+ * operator answers its CheckFinding: `waiting` until then, then `resumed`,
+ * which returns the work item to its local architect, or `ended`, which
+ * ends the run.
+ */
+export const runEnvironmentProblemSchema = z.object({
+  problem: text,
+  request: text,
+  workItem: text,
+  checkFinding: text,
+  diagnosis: text,
+  suggestion: text,
+  answer: z.enum(['waiting', 'resumed', 'ended']),
+}).strict();
+export type RunEnvironmentProblem = z.infer<typeof runEnvironmentProblemSchema>;
 
 /**
  * A run as its log states it. Status lives in the log: every field here is
@@ -310,6 +331,8 @@ export const runSnapshotSchema = z.object({
   notices: z.array(runNoticeSchema),
   decisionRequests: runDecisionRequestsSchema,
   planDeviations: runPlanDeviationsSchema,
+  /** Every environment problem the run reported, in the order the log recorded them. */
+  environmentProblems: z.array(runEnvironmentProblemSchema),
 }).strict();
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 

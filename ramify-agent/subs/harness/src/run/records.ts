@@ -547,10 +547,12 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
  * Why a suspended session is continued: its placement request was answered,
  * the iteration it assigned closed, its completion was refused while
  * evidence was owed, a gate failed after its result and it repairs, the
- * reconciliation of its completion request chose a correction, or its
- * unresolved request was answered with a plan deviation.
+ * reconciliation of its completion request chose a correction, its
+ * unresolved request was answered with a plan deviation, or the operator
+ * resumed the run after its unresolved request was answered with an
+ * environment problem.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**

@@ -100,6 +100,7 @@ const supported: Readonly<Record<string, string>> = Object.fromEntries([
   'ramify-agent.consumer-requirement/1', 'ramify-agent.gate-attempt/3', 'ramify-agent.gate-audit-outcome/1', 'ramify-agent.entry-assignments/1',
   'ramify-agent.readiness-attempt/1', 'ramify-agent.infrastructure-recovery/1', 'ramify-agent.measurement-snapshot/1',
   'ramify-agent.line-events/1', 'ramify-agent.scenario/1', 'ramify-agent.unresolved-request/1', 'ramify-agent.plan-deviation/1',
+  'ramify-agent.environment-problem/1',
 ].map(schema => [familyOf(schema), schema]));
 
 function familyOf(schema: string): string {

@@ -362,8 +362,9 @@ hiding or measured complexity justifies it.
     `request-placement`, which asks the global architect where a capability
     belongs; `request-completion`, which commits an outline and asks for the
     work item's gate; `yield-for-providers`, which names the open
-    requirements this work item waits for; and `unresolved`, which ends the
-    run with a conflict rather than weakening the request.
+    requirements this work item waits for; and `unresolved`, which states a
+    conflict rather than weakening the request, for the global architect to
+    answer.
   - `assignment.ts`: the assignment body an architect submits and the rules
     the schema cannot hold: the module is one the refreshed view has or one
     an accepted proposal creates, an included child is a direct child and
@@ -852,6 +853,22 @@ pi actually made and what the snapshot tools answered.
   revisions are never combined. A fork that cannot decide returns findings
   and gaps, which consume one retry of `forkRetriesPerRequest` and are never
   appended; exhaustion returns an unresolved outcome to the local architect.
+- **An unresolved request.** A local architect's `unresolved` answer is
+  recorded as an `UnresolvedRequest` and forks the architect context like a
+  placement request. The fork answers with a placement `decision`, whose
+  constraints name only what a local architect can assign; a `deviation`,
+  recorded beside the plan, which the work item goes on under; `environment`,
+  when the conflict lies in how the gate or the harness runs; or
+  `nothing-possible`, which fails the run. An `environment` answer carries a
+  bounded diagnosis and a suggestion for the operator. `environment-reported`
+  commits the `EnvironmentProblem` and its CheckFinding, and the run holds the
+  work item until the operator answers: `resume`, or a waiver, returns the
+  work item to its continued local architect with the diagnosis and the
+  operator's note, to retry from its last outline; `end` fails the run. Nothing
+  is placed, no deviation is recorded and the plan file is untouched. The run
+  snapshot's `environmentProblems` states each one with its work item,
+  request, diagnosis, suggestion and answer. A later `unresolved` answer
+  answered with `environment` holds the run again.
 - **A decision and its brief.** `decision-accepted` commits the decision, the
   registry entries it creates or revises and the hypothesis revisions it
   makes, in one transition, and it is the intent of the parent append. The
@@ -911,8 +928,9 @@ pi actually made and what the snapshot tools answered.
   allowed and recorded. `request-completion` commits an outline and runs the
   `work-item` gate; requesting completion with no iteration is a legitimate
   outcome, because a goal existing behavior already satisfies is verified
-  reuse and the gate is what verifies it. `unresolved` ends the run with the
-  conflict and its evidence rather than weakening the request. A failing gate
+  reuse and the gate is what verifies it. `unresolved` states the conflict
+  and its evidence rather than weakening the request, and a fork of the
+  global architect answers it. A failing gate
   returns to the same architect, which may revise its outline; exhaustion of
   `repairRoundsPerWorkItemGate` fails the run with `repair-exhausted` and the
   original cause preserved.

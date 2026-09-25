@@ -6,7 +6,7 @@ import { validateAgainst, type SubmissionError, type SubmissionValidation } from
 import { hypothesisChangeSchema, slugSchema, type Hypothesis, type RegistryEntry } from '../analysis/records.js';
 import { moduleProposalSchema, type ModuleProposal } from '../run/records.js';
 import { hypothesisStanceSchema, placementOutcomeSchema, type PlacementDecision } from './records.js';
-import { deviationBodySchema, type DeviationBody } from '../deviations/records.js';
+import { deviationBodySchema, environmentBodySchema, type DeviationBody } from '../deviations/records.js';
 
 /*
  * What one fork of the global architect submits, what a local architect
@@ -24,8 +24,10 @@ import { deviationBodySchema, type DeviationBody } from '../deviations/records.j
  *
  * A fork of an unresolved request, which a local architect's `unresolved`
  * answer makes, may also answer `deviation`, which records a plan deviation
- * and lets the work item go on, or `nothing-possible`, which ends the run.
- * A placement request is never answered with either.
+ * and lets the work item go on; `environment`, which reports that the
+ * conflict lies in how the gate or the harness runs and holds the run for
+ * the operator; or `nothing-possible`, which ends the run. A placement
+ * request is never answered with any of the three.
  */
 
 const text = z.string().min(1);
@@ -156,11 +158,25 @@ export const forkSubmissionSchema = z.discriminatedUnion('kind', [
     reason: text,
     evidence: z.array(text),
   }).strict(),
+  /**
+   * The conflict lies in how the gate or the harness runs: its environment,
+   * setup or configuration, not the plan or the architecture. The run holds
+   * for the operator; nothing is placed and nothing of the plan changes.
+   */
+  environmentBodySchema.extend({ kind: z.literal('environment') }).strict(),
 ]);
 export type ForkSubmission = z.infer<typeof forkSubmissionSchema>;
 
 /** The members this iteration's package offers the role. */
-export const forkSubmissionKinds = ['decision', 'partial', 'deviation', 'nothing-possible'] as const;
+export const forkSubmissionKinds = ['decision', 'partial', 'deviation', 'nothing-possible', 'environment'] as const;
+
+/**
+ * The shape of a constraint a placement decision gives in answer to an
+ * unresolved request: one short statement per entry, of something a local
+ * architect can assign. What it names is the fork's judgment; only its
+ * shape is verified.
+ */
+export const unresolvedConstraintLimits = { entries: 10, characters: 400 } as const;
 
 /** The schema the agent's tool is given, taken from the same definition that validates. */
 export const forkJsonSchema = z.toJSONSchema(forkSubmissionSchema) as JsonSchema;
@@ -185,7 +201,7 @@ export interface PlacementEvidence {
  * What the fork answers. A placement request is answered with a decision or
  * a partial return; an unresolved request may also be answered with a
  * deviation, judged against the captured plan, the run's work items and its
- * tracked scenarios, or with `nothing-possible`.
+ * tracked scenarios, with `environment` or with `nothing-possible`.
  */
 export type ForkQuestion =
   | { readonly kind: 'placement' }
@@ -207,7 +223,7 @@ export function validateFork(input: unknown, evidence: PlacementEvidence, questi
   const shape = validateAgainst(forkSubmissionSchema, input);
   if (!shape.ok) return shape;
   if (shape.value.kind === 'partial') return shape;
-  if (shape.value.kind === 'deviation' || shape.value.kind === 'nothing-possible') {
+  if (shape.value.kind === 'deviation' || shape.value.kind === 'nothing-possible' || shape.value.kind === 'environment') {
     if (question.kind === 'placement') {
       return {
         ok: false,
@@ -218,7 +234,7 @@ export function validateFork(input: unknown, evidence: PlacementEvidence, questi
         }],
       };
     }
-    if (shape.value.kind === 'nothing-possible') return shape;
+    if (shape.value.kind !== 'deviation') return shape;
     const errors = deviationErrors(shape.value.deviation, question, 'deviation');
     return errors.length === 0 ? shape : { ok: false, errors };
   }
@@ -226,8 +242,36 @@ export function validateFork(input: unknown, evidence: PlacementEvidence, questi
     ...decisionErrors(shape.value.decision, shape.value.registry, evidence, 'decision'),
     ...registryErrors(shape.value.registry, evidence, 'registry'),
     ...hypothesisRevisionErrors(shape.value.hypothesisRevisions, evidence, 'hypothesisRevisions'),
+    ...(question.kind === 'unresolved' ? unresolvedConstraintErrors(shape.value.decision.constraints, 'decision.constraints') : []),
   ];
   return errors.length === 0 ? shape : { ok: false, errors };
+}
+
+/**
+ * The shape of the constraints a placement answer to an unresolved request
+ * gives: a few short statements, each one something to assign. A remedy no
+ * engineer can carry out in a write scope is an `environment` answer, which
+ * the fork's procedure says; nothing here judges the text.
+ */
+function unresolvedConstraintErrors(constraints: readonly string[], prefix: string): SubmissionError[] {
+  const { entries, characters } = unresolvedConstraintLimits;
+  const errors: SubmissionError[] = [];
+  if (constraints.length > entries) {
+    errors.push({
+      path: prefix,
+      message: `A placement answer to an unresolved request gives at most ${entries} constraints, each one thing a local architect can assign; it gives ${constraints.length}`,
+      expected: `at most ${entries} entries`,
+    });
+  }
+  constraints.forEach((constraint, index) => {
+    if (constraint.length <= characters) return;
+    errors.push({
+      path: `${prefix}.${index}`,
+      message: `A constraint of a placement answer to an unresolved request states one change a local architect can assign in at most ${characters} characters; this one has ${constraint.length}`,
+      expected: `at most ${characters} characters`,
+    });
+  });
+  return errors;
 }
 
 /** Every rule a deviation must satisfy beyond its schema: its plan lines exist, its work items and scenarios too. */

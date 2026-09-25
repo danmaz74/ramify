@@ -30,7 +30,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     writer: { held: 'inv-0006', unsettled: null },
     review: 'not-reviewed',
     decisionRequests: { open: 0, waiting: false, workItems: [] },
-    planDeviations: { recorded: 0, toReview: 0 },
+    planDeviations: { recorded: 0, toReview: 0 }, environmentProblems: [],
     notices: [
       {
         kind: 'module-created', at, sequence: 9, summary: 'Module created: shop/notes/drafts (subs/drafts/module.ramify) in wi-002.i01, commit abc. No placement decision proposed it.',
@@ -891,4 +891,47 @@ test('a work item row counts its iterations and gates in the singular for one an
   const rows = await within(screen.getByLabelText('Work items')).findAllByRole('listitem');
   expect(rows[0]!.textContent).toContain('send-button · 2 iterations · 4 gates');
   expect(rows[1]!.textContent).toContain('send-button · 1 iteration · 1 gate');
+});
+
+test('a run held on an environment problem shows its diagnosis and suggestion in the overview, with the answer form that resumes it', async () => {
+  const diagnosis = 'The work-item gate runs `npm test`, whose tests import `dist/src`; nothing builds it in the gate\'s worktree.';
+  const suggestion = 'Declare a build step in `ramify-agent.json`.';
+  const signal = {
+    id: 'cf-0001', revision: 2, workItem: null, standing: 'open', reason: 'awaiting-user-decision', awaiting: 'user-decision', verification: 'assessment',
+    obligation: null, required: false, risk: 'high', credibility: 'agent-generated', modules: ['collection-review/workspace/reviews'], unresolved: null,
+    latestReview: false, settlement: null, materialChoice: null, repair: null, producers: ['plan:environment'], title: `Environment problem ep-001 of wi-001: ${diagnosis}`,
+    reports: 1, decisions: 1, group: null, userCommands: ['respond'], planDeviation: null,
+    pendingUserDecision: { request: 'cfd-0001', by: { kind: 'harness', reason: 'an environment problem is the operator\'s to correct' }, rationale: diagnosis,
+      conflicts: [{ text: 'The work-item gate fails before any test runs.', document: 'requests/ur-001.json', revision: '1' }],
+      options: [{ id: 'resume', summary: 'Resume the run', consequence: 'wi-001 retries.' }, { id: 'end', summary: 'End the run', consequence: 'The run fails.' }] },
+  };
+  const coverage = { state: 'available', requested: 0, complete: 0, partial: 0, notVerified: 0, pending: 0 } as const;
+  const waiting = { open: 1, waiting: true, workItems: [{ workItem: 'wi-001', requests: [{ checkFinding: 'cf-0001', request: 'cfd-0001' }] }] };
+  const run: StubRun = {
+    ...stubRun({
+      current: null, writer: { held: null, unsettled: null }, decisionRequests: waiting,
+      environmentProblems: [{ problem: 'ep-001', request: 'ur-001', workItem: 'wi-001', checkFinding: 'cf-0001', diagnosis, suggestion, answer: 'waiting' }],
+    }),
+    checkFindings: { [checkFindingKey({ select: 'all' })]: checkFindingListResponseSchema.parse({
+      protocol: 'check-findings/1', runId, version: 12, coverage, query: { workItem: null, module: null, select: 'all', order: 'attention' },
+      total: 1, shown: 1, next: null, counts: { total: 1, open: 1, deferred: 0, closed: 0, fixed: 0, waived: 0, superseded: 0, unresolved: 0, awaitingUser: 1 }, items: [signal],
+    }) },
+  };
+  const client = clientWith(run);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+
+  expect(await screen.findByRole('status', { name: 'Waiting for your decision' })).toBeTruthy();
+  const panel = (await screen.findByRole('heading', { name: 'Environment problems' })).closest('section')!;
+  const problem = within(panel as HTMLElement).getByLabelText('Environment problem ep-001');
+  expect(problem.textContent).toContain('work item wi-001, request ur-001, CheckFinding cf-0001');
+  expect(problem.textContent).toContain(`Diagnosis: ${diagnosis}`);
+  expect(problem.textContent).toContain(`Suggestion: ${suggestion}`);
+  expect(problem.textContent).toContain('The run holds this work item until you answer');
+
+  const form = await within(panel as HTMLElement).findByRole('form', { name: 'Answer cfd-0001' });
+  fireEvent.click(within(form).getByRole('radio', { name: /Resume the run/ }));
+  fireEvent.change(within(form).getByRole('textbox', { name: 'Your name' }), { target: { value: 'dan' } });
+  fireEvent.click(within(form).getByRole('button', { name: 'Answer' }));
+  await waitFor(() => expect(client.commands.map(command => command.type)).toEqual(['respond-to-check-finding']));
+  expect(client.commands[0]).toMatchObject({ payload: { checkFinding: 'cf-0001', request: 'cfd-0001', option: 'resume', responder: 'dan' } });
 });

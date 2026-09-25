@@ -22,7 +22,7 @@ function snapshot() {
     jobId: runId, planId, agent: 'scripted', version, state: 'running', phase: 'working', stopRequested: false,
     startedAt: at, updatedAt: at, endedAt: null, failure: null, current: null, waits: [],
     counts: { workItems: 1, completedWorkItems: 0, openRequirements: 0, invocations: 3, readinessAttempts: 1, gateAttempts: 2, scenarios: { pending: 0, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
-    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] }, planDeviations: { recorded: 0, toReview: 0 },
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] }, planDeviations: { recorded: 0, toReview: 0 }, environmentProblems: [],
   });
 }
 
