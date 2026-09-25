@@ -29,6 +29,8 @@ export const limit = `${notesDirectory}/src/limit.ts`;
 export const escape = `${notesDirectory}/src/escape`;
 export const base = 'revision-00';
 export const materialized = 'scenarios-00';
+/** Exact Git tree identity of the third, final reviewed candidate. */
+export const finalReviewTree = 'c'.repeat(40);
 /** A commit boundary where Git reports the tree unchanged. */
 export const unchanged: GateCommit = { commit: null };
 /** What Git answers the three iteration gates. */
@@ -57,7 +59,7 @@ export function candidates(): Record<string, ScriptedCommit> {
       files: { ...common, [store]: 'export export const store = new Map(); // v1\n' } },
     'revision-02': { tree: 'tree-02', base: 'revision-01', changes: [{ status: 'A', path: limit }],
       files: { ...common, [store]: 'export export const store = new Map(); // v1\n', [limit]: 'export export const limit = (text: string) => text.length <= 50;\n' } },
-    'revision-03': { tree: 'tree-03', base: 'revision-02', changes: [{ status: 'M', path: store }, { status: 'A', path: `${notesDirectory}/src/index.ts` }],
+    'revision-03': { tree: finalReviewTree, base: 'revision-02', changes: [{ status: 'M', path: store }, { status: 'A', path: `${notesDirectory}/src/index.ts` }],
       files: { ...common, [store]: 'export export const store = new Map(); // v3\n', [limit]: 'export export const limit = (text: string) => text.length <= 50;\n', [`${notesDirectory}/src/index.ts`]: 'export * from \'./store.js\';\n' } },
   };
 }
@@ -103,6 +105,8 @@ export interface ReviewRun {
   readonly reconcilers?: Readonly<Record<string, readonly ScriptStep[]>>;
   /** What Git answers at each commit boundary after the scenarios' commit, in place of the three revisions and two unchanged trees. */
   readonly gates?: readonly GateCommit[];
+  /** Exact number of final candidate tree previews this scenario reaches. */
+  readonly previewCount?: number;
   /** Run limits beside the test policy's, such as the reconciliation rounds. */
   readonly limits?: Partial<RunPolicy['limits']>;
   /**
@@ -154,14 +158,24 @@ export function reviewScript(scenario: Pick<ReviewRun, 'reviewers' | 'engineer' 
 
 /** Drives one work item of three iterations with the reviewers each request's prompt selects, to the run's end. */
 export async function reviewRun(root: string, cleanups: Array<() => Promise<void>>, scenario: ReviewRun) {
+  const gates = scenario.gates ?? [...revisionGates, unchanged, unchanged];
+  const scripted = scenario.commits ?? candidates();
+  const beforeFinal = gates.slice(0, -1).reduce((head, gate) => gate.commit ?? head, materialized);
+  const afterFinal = gates.at(-1)?.commit ?? beforeFinal;
+  const tree = scripted[beforeFinal]?.tree;
+  const previewCount = scenario.previewCount ?? 4;
+  if (previewCount > 0 && (tree === undefined || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(tree))) {
+    throw new Error(`Review run must state a valid final candidate tree for ${beforeFinal}`);
+  }
   const git = gateGit(root, {
     head: base,
     commits: [
       scenariosCommit(plan, materialized, base),
-      ...(scenario.gates ?? [...revisionGates, unchanged, unchanged]),
+      ...gates,
     ],
+    previews: Array.from({ length: previewCount }, (_, index) => ({ repositoryRoot: root,
+      head: index === previewCount - 1 && previewCount >= 4 ? afterFinal : beforeFinal, tree: tree! })),
   });
-  const scripted = scenario.commits ?? candidates();
   const source = scriptedCandidates(root, scripted);
   scenario.candidates?.(source);
   const script = reviewScript(scenario);

@@ -12,6 +12,7 @@ import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToo
 import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
 import { failureAnalysisJsonSchema, failureAnalysisToolName } from '../work/failure.js';
 import { contextSelectorJsonSchema, contextSelectorToolName, workOrientationJsonSchema, workOrientationToolName } from '../context-selection/submissions.js';
+import { coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 import { shellMaxTimeoutMs } from '../tools/shell.js';
 
@@ -51,6 +52,8 @@ const failureAnalysisProcedureFile = fileURLToPath(new URL('./failure-analysis.p
 const workOrientationProcedureFile = fileURLToPath(new URL('../context-selection/orientation.procedure.md', import.meta.url));
 const selectorSystemFile = fileURLToPath(new URL('../context-selection/selector.system.md', import.meta.url));
 const selectorProcedureFile = fileURLToPath(new URL('../context-selection/selector.procedure.md', import.meta.url));
+const nonfunctionalCoordinatorSystemFile = fileURLToPath(new URL('../nonfunctional/coordinator.system.md', import.meta.url));
+const nonfunctionalAssessmentProcedureFile = fileURLToPath(new URL('../nonfunctional/assessment.procedure.md', import.meta.url));
 
 /** The contract skill the harness supplies with a contract iteration. */
 const contractSkillFile = fileURLToPath(new URL('./contract.skill.md', import.meta.url));
@@ -126,6 +129,7 @@ export const engineerPackage = 'engineer/3';
 export const contractEngineerPackage = 'contract-engineer/2';
 export const reviewerPackage = 'reviewer/3';
 export const failureAnalystPackage = 'failure-analyst/1';
+export const nonfunctionalCoordinatorPackage = 'nonfunctional-coordinator/1';
 
 /**
  * Loads every package a run offers. A role with no package yet has no entry:
@@ -144,6 +148,7 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['contract-engineer', await loadContractEngineer(options)],
     ['reviewer', await loadReviewer(options)],
     ['failure-analyst', await loadFailureAnalyst(options)],
+    ['nonfunctional-coordinator', await loadNonfunctionalCoordinator(options)],
   ]);
   const manifest = promptPackageManifestSchema.parse({
     schema: 'ramify-agent.prompt-manifest/1',
@@ -155,6 +160,12 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     }])),
   });
   return { manifest, packages };
+}
+
+function loadNonfunctionalCoordinator(options: PromptPackageOptions): Promise<LoadedPackage> {
+  return loadPackage({ role: 'nonfunctional-coordinator', name: nonfunctionalCoordinatorPackage,
+    systemFile: nonfunctionalCoordinatorSystemFile, procedureFile: nonfunctionalAssessmentProcedureFile,
+    schema: coordinatorAssessmentJsonSchema, submissionKinds: ['assessment'], options });
 }
 
 function loadInitialArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
@@ -429,6 +440,10 @@ export function renderContractPrompt(loaded: LoadedPackage, projectRoot: string,
 /** The rendered system prompt of a failure analyst, over the evidence in its working directory. It is never stored either. */
 export function renderFailureAnalystPrompt(loaded: LoadedPackage, workingDirectory: string): string {
   return render(loaded, workingDirectory, failureAnalysisToolName, { workingDirectory });
+}
+
+export function renderNonfunctionalCoordinatorPrompt(loaded: LoadedPackage, projectRoot: string): string {
+  return render(loaded, projectRoot, coordinatorAssessmentToolName);
 }
 
 function render(loaded: LoadedPackage, projectRoot: string, submissionTool: string, extra: Readonly<Record<string, string>> = {}): string {

@@ -308,3 +308,52 @@ separate derived delivery hash. The scope review request records both source
 hashes and explicit unavailability. Coordinator assessment must enumerate
 all NFR IDs from the accepted catalog, including those no assignment cited;
 assignment delivery does not discharge or assess one.
+
+## Iteration 6 — candidate-bound non-functional assessment
+
+**Starting revision:** `0e7cd044` after iteration 5. The harness now enters
+non-functional assessment after ordinary work and review settlement, including
+the zero-entry path. It re-renders scenarios after writer settlement and uses
+an isolated Git index to record the exact eventual whole-repository tree as a
+prepared candidate. The accepted catalog is read from immutable, hash-checked
+evidence. A nonempty catalog starts a read-only coordinator with the complete
+NFR set; validation requires exactly one result per fixed NFR ID and checks a
+fresh tree preview after the invocation. An empty catalog commits an explicit
+`results: []` assessment with the truthful `harness:empty-catalog` provenance.
+
+Each candidate, assessment and satisfied round is co-committed with its event.
+The replay helper authenticates event-to-record IDs, full candidate fields,
+coverage, transition order and closed outcomes, preserving valid incomplete
+prefixes separately from malformed ones. Before the final gate, inside its
+commit effect, and after audit, the harness compares the live tree with the
+assessed tree. It reads the audited commit tree, records
+`candidate-bound-to-gate` only for an exact match, and refuses completion if
+source changes during final verification. The existing gate verdict remains
+authoritative. This iteration records unresolved assessments but ends those
+runs not verified; iteration 7 supplies investigations, repair and bounded
+reassessment rather than treating an unresolved result as satisfied.
+
+**Verification:** The aggregate focused command passed 8 files and 39 tests:
+
+```sh
+npx vitest run subs/harness/subs/evidence/src/tests/candidate-tree.test.ts subs/harness/src/tests/helpers/preview-git.test.ts subs/harness/src/tests/nonfunctional-phase.test.ts subs/harness/src/tests/nonfunctional-submissions.test.ts subs/harness/src/tests/nonfunctional-run.test.ts subs/harness/src/tests/plan13-composed-functional.test.ts subs/harness/src/tests/run.test.ts subs/harness/src/tests/review-lifecycle.test.ts
+```
+
+The real-Git witness covers an empty catalog and exact audited commit tree;
+another mutates source during the final gate and confirms completion is
+refused. A scripted composition covers two NFRs when only one was selected
+for functional work and confirms the coordinator assesses both. The Git
+provider witness covers untracked files, deletions, nested working directories
+and preservation of the user's index. `npm run type-check`,
+`npm run build:web` and `npm run check:self` passed; self-check reported
+12 owners, 518 source files, 42 resources, 0 errors, 0 warnings and 299
+analysis limits. The full post-edit suite and audit remain the later plan gate.
+
+**Handoff to iteration 7:** The current unresolved-result terminal path is an
+interim refusal, not exhaustion of three permitted rounds. Recovery still
+interrupts runs rather than continuing this phase. Iteration 7 must add
+durable phase and repair-assignment markers, same-run phase continuation,
+sequential investigation, project-wide guarded repair from a module `src/`
+working directory, complete reassessment after repair, and bounded deviation
+creation. It must also protect every captured source document in engineer
+guards and retain final tree revalidation after slow audit.

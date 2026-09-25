@@ -68,6 +68,12 @@ import { planPath, readPlan } from '../plans/discover.js';
 import { discoverDocuments } from '../../subs/plan-evidence/src/discovery.js';
 import { assignCatalog, verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { readAcceptedEvidence } from '../analysis/evidence.js';
+import { assessmentSchema, roundSchema, type Assessment, type Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
+import { replayNonfunctionalPhase } from './nonfunctional-phase.js';
+import { preparedCandidateSchema } from './nonfunctional-records.js';
+import { bindCoordinatorAssessment, coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName,
+  type CoordinatorAssessmentSubmission } from '../nonfunctional/submissions.js';
+import { coordinatorAssessmentPrompt } from '../nonfunctional/prompts.js';
 import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
 import { contextSelectionSchema } from '../context-selection/contracts.js';
 import { readRecordedContextSelection } from '../context-selection/recorded.js';
@@ -80,7 +86,7 @@ import { documentChanges, readCapturedDocuments } from './document-inputs.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
-  renderContextSelectorPrompt, renderWorkOrientationPrompt,
+  renderContextSelectorPrompt, renderWorkOrientationPrompt, renderNonfunctionalCoordinatorPrompt,
   type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
@@ -2879,7 +2885,111 @@ export class RunService {
     await this.settleReviews(run);
     if (this.ignoring(run)) return;
 
-    await this.finalGate(run);
+    const nonfunctional = await this.assessNonfunctional(run, agent, packages);
+    if (nonfunctional === null || this.ignoring(run)) return;
+    await this.finalGate(run, nonfunctional);
+  }
+
+  /** Prepare the actual eventual commit tree after all source-mutating rendering. */
+  private async prepareNonfunctionalCandidate(run: Run): Promise<{ id: string; candidate: Candidate } | null> {
+    run.writer.requireSettled('A non-functional candidate cannot be prepared');
+    const changed = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (changed.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed before assessment: ${changed.join('; ')}`, [runLayout.documentManifest]);
+      return null;
+    }
+    await this.rerenderScenarios(run);
+    const preview = await this.git.previewCandidateTree(this.projectRoot);
+    const id = `cand-${String(run.log.count('candidate-prepared') + 1).padStart(3, '0')}`;
+    const candidate = { tree: preview.tree, head: preview.head, preparedAt: this.now().toISOString() };
+    const body = preparedCandidateSchema.parse({
+      schema: 'ramify-agent.prepared-candidate/1', candidate,
+      scenarioRenderingHash: sha256(canonicalJson(this.expectedFeatures(run))), writerSettled: true,
+    });
+    await this.write(run, { type: 'candidate-prepared', data: { candidate: id, tree: candidate.tree } }, [
+      { path: runLayout.candidate(id), id, revision: 1, body },
+    ]);
+    return { id, candidate };
+  }
+
+  /** One complete fixed-catalog assessment. The round loop follows in iteration 7. */
+  private async assessNonfunctional(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
+  ): Promise<{ candidateId: string; assessment: Assessment } | null> {
+    const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
+    if (evidence.status === 'unavailable') {
+      await this.fail(run, 'analysis-invalid', `The fixed non-functional catalog is unavailable: ${evidence.reason}`);
+      return null;
+    }
+    const prepared = await this.prepareNonfunctionalCandidate(run);
+    if (prepared === null || this.ignoring(run)) return null;
+    const nfrIds = evidence.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+    const id = `nfa-${String(run.log.count('nonfunctional-assessed') + 1).padStart(3, '0')}`;
+    let assessment: Assessment;
+    if (nfrIds.length === 0) {
+      // An empty fixed catalog still needs explicit candidate-bound coverage.
+      assessment = assessmentSchema.parse({ schema: 'ramify-agent.nonfunctional-assessment/1', id,
+        candidate: prepared.candidate, round: 1, phase: 'initial', coordinatorInvocation: 'harness:empty-catalog', results: [] });
+    } else {
+      const loaded = packages.get('nonfunctional-coordinator');
+      if (loaded === undefined) {
+        await this.fail(run, 'internal', 'No prompt package is loaded for the non-functional coordinator');
+        return null;
+      }
+      const result = await this.runInvocation<CoordinatorAssessmentSubmission>(run, agent, {
+        role: 'nonfunctional-coordinator', work: {},
+        attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
+        loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot),
+        prompt: coordinatorAssessmentPrompt(evidence.catalog, prepared.candidate, 1, 'initial'),
+        start: { mode: 'fresh' }, toolName: coordinatorAssessmentToolName,
+        description: 'Submit one evidence-grounded result for every fixed non-functional requirement.',
+        inputSchema: coordinatorAssessmentJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-assessment-submission/1',
+        validate: input => {
+          const checked = bindCoordinatorAssessment(input, { catalog: evidence.catalog, candidate: prepared.candidate,
+            observedTree: prepared.candidate.tree, id, round: 1, phase: 'initial', coordinatorInvocation: 'pending' });
+          return checked.ok
+            ? { ok: true, value: { kind: 'assessment' as const, results: checked.value.results } }
+            : checked;
+        },
+        keep: () => finished('work-closed'), scope: { write: null, measurement: null, size: null },
+        equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
+      });
+      if (result.ended !== 'submitted' || result.value === undefined) {
+        await this.fail(run, 'agent-failed', `The non-functional coordinator ended ${result.ended} without a complete assessment`);
+        return null;
+      }
+      const late = await this.git.previewCandidateTree(this.projectRoot);
+      const bound = bindCoordinatorAssessment(result.value, { catalog: evidence.catalog, candidate: prepared.candidate,
+        observedTree: late.tree, id, round: 1, phase: 'initial', coordinatorInvocation: result.id });
+      if (!bound.ok) {
+        await this.fail(run, 'inputs-changed', `The non-functional assessment could not bind to the prepared tree: ${bound.errors.map(error => error.message).join('; ')}`);
+        return null;
+      }
+      assessment = bound.value;
+    }
+    const changed = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (changed.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed during assessment: ${changed.join('; ')}`, [runLayout.documentManifest]);
+      return null;
+    }
+    await this.write(run, { type: 'nonfunctional-assessed', data: { assessment: id, candidate: prepared.id, round: 1, phase: 'initial' } }, [
+      { path: runLayout.assessment(id), id, revision: 1, body: assessment },
+    ]);
+    const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, run.record.policy.limits.nonfunctionalRoundsPerPlan ?? 3);
+    if (!replay.ok) {
+      await this.fail(run, 'internal', `Committed non-functional evidence cannot be replayed: ${replay.reason}`);
+      return null;
+    }
+    if (assessment.results.some(item => item.result !== 'satisfied')) {
+      await this.fail(run, 'recovery-exhausted', 'The first assessment has unresolved non-functional requirements; repair rounds are not yet available', [runLayout.assessment(id)]);
+      return null;
+    }
+    const round = roundSchema.parse({ schema: 'ramify-agent.nonfunctional-round/1', number: 1,
+      initial: id, investigation: null, repair: null, reassessment: null, outcome: 'satisfied' });
+    await this.write(run, { type: 'nonfunctional-round-closed', data: { round: 1, record: 'nfr-round-001', outcome: 'satisfied' } }, [
+      { path: runLayout.nonfunctionalRound(1), id: 'nfr-round-001', revision: 1, body: round },
+    ]);
+    return { candidateId: prepared.id, assessment };
   }
 
   // Invocations
@@ -7554,7 +7664,7 @@ export class RunService {
    * check, on the current tree. `job-completed` requires a passing attempt;
    * an empty work queue alone never satisfies it.
    */
-  private async finalGate(run: Run): Promise<void> {
+  private async finalGate(run: Run, binding: { candidateId: string; assessment: Assessment }): Promise<void> {
     run.writer.requireSettled('The final gate cannot run');
     const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (sourceChanges.length > 0) {
@@ -7588,6 +7698,11 @@ export class RunService {
     }
     // Every tracked scenario, integration scenarios included.
     const required = tracked.records;
+    const beforeGate = await this.git.previewCandidateTree(this.projectRoot);
+    if (beforeGate.tree !== binding.assessment.candidate.tree) {
+      await this.fail(run, 'inputs-changed', 'The source tree changed after non-functional assessment', [runLayout.assessment(binding.assessment.id)]);
+      return;
+    }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const head = await this.git.currentHead(this.projectRoot);
     const attempt = await this.committingCheckpoint(run, {
@@ -7599,7 +7714,25 @@ export class RunService {
       head,
       policy: run.record.policy,
       proposedBy: null,
-    });
+    }, undefined, undefined, undefined, binding);
+
+    if (attempt.audited !== null && attempt.evidence !== null) {
+      const auditedTree = await this.candidates.commitTree(this.projectRoot, attempt.audited);
+      if (auditedTree !== binding.assessment.candidate.tree) {
+        await this.fail(run, 'inputs-changed', `Final gate audited tree ${auditedTree}, not assessed tree ${binding.assessment.candidate.tree}`,
+          [runLayout.assessment(binding.assessment.id), runLayout.gate(gateId)]);
+        return;
+      }
+      await this.write(run, { type: 'candidate-bound-to-gate', data: {
+        candidate: binding.candidateId, assessment: binding.assessment.id, gate: gateId,
+        commit: attempt.audited, tree: auditedTree,
+      } });
+    }
+    if (attempt.verdict === 'passed' && (attempt.audited === null || attempt.evidence === null
+      || run.log.all('candidate-bound-to-gate').at(-1)?.data.gate !== gateId)) {
+      await this.fail(run, 'recovery-exhausted', 'The final gate passed without durable candidate-bound audit evidence', [runLayout.gate(gateId)]);
+      return;
+    }
 
     if (attempt.verdict !== 'passed') {
       await this.fail(run, attempt.verdict === 'not-verified' ? 'recovery-exhausted' : 'repair-exhausted',
@@ -7622,6 +7755,11 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed during final verification: ${lateSourceChanges.join('; ')}`, [runLayout.documentManifest, runLayout.gate(gateId)]);
       return;
     }
+    const afterGate = await this.git.previewCandidateTree(this.projectRoot);
+    if (afterGate.tree !== binding.assessment.candidate.tree) {
+      await this.fail(run, 'inputs-changed', 'The source tree changed during final verification', [runLayout.assessment(binding.assessment.id), runLayout.gate(gateId)]);
+      return;
+    }
     const workItems = run.log.count('work-item-completed');
     // A run that recorded plan deviations completes with them to review,
     // never plainly: the count is of those still awaiting the person.
@@ -7642,6 +7780,7 @@ export class RunService {
     summary?: string,
     modules?: readonly ModuleNotice[],
     goal?: string,
+    binding?: { candidateId: string; assessment: Assessment },
   ): Promise<GateAttempt> {
     const scenarios = await this.scenarioInputs(run);
     const captured = run.record.projectConfig;
@@ -7661,7 +7800,7 @@ export class RunService {
       await this.afterWrite('gate-committed', run.record.jobId);
       return prepared;
     }
-    return this.commitGate(run, prepared, summary, modules, goal);
+    return this.commitGate(run, prepared, summary, modules, goal, undefined, binding);
   }
 
   /**
@@ -7686,6 +7825,7 @@ export class RunService {
     modules?: readonly ModuleNotice[],
     goal?: string,
     recordedMessage?: string,
+    binding?: { candidateId: string; assessment: Assessment },
   ): Promise<GateAttempt> {
     const identity = prepared.request;
     // A reader, a reviewer or a failure analyst, contributed nothing to the
@@ -7718,7 +7858,12 @@ export class RunService {
         // The feature files go into the gate's commit as the states now
         // render them; the guarded comparison before this effect judged the
         // tree against the rendering the assignment captured.
-        await this.rerenderScenarios(run);
+        const rendering = await this.rerenderScenarios(run);
+        if (binding !== undefined) {
+          if (rendering.written.length > 0) throw new Error('Final gate rendering changed the assessed candidate');
+          const current = await this.git.previewCandidateTree(this.projectRoot);
+          if (current.tree !== binding.assessment.candidate.tree) throw new Error('Final gate source changed after assessment');
+        }
         const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;

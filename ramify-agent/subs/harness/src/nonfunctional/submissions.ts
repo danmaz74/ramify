@@ -15,6 +15,7 @@ export const coordinatorAssessmentSubmissionSchema = z.object({
 }).strict();
 export type CoordinatorAssessmentSubmission = z.infer<typeof coordinatorAssessmentSubmissionSchema>;
 export const coordinatorAssessmentJsonSchema = z.toJSONSchema(coordinatorAssessmentSubmissionSchema);
+export const coordinatorAssessmentToolName = 'submit_nonfunctional_assessment';
 
 export interface AssessmentBinding {
   readonly catalog: Catalog;

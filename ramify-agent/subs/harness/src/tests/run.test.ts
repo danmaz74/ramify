@@ -57,14 +57,19 @@ describe('an implementation run with no entry capabilities', () => {
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started',
+      'document-manifest-committed',
       'session-opened',
       'invocation-started',
       'invocation-ended',
       'analysis-accepted',
       'gate-started',
       'readiness-passed',
+      'candidate-prepared',
+      'nonfunctional-assessed',
+      'nonfunctional-round-closed',
       'gate-committing',
       'gate-attempted',
+      'candidate-bound-to-gate',
       'session-finished',
       'job-completed',
     ]);
@@ -144,7 +149,7 @@ describe('an implementation run with no entry capabilities', () => {
     expect(snapshot.failure?.message).toContain(refusal);
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-failed', 'session-finished', 'job-failed',
     ]);
     expect(events.find(event => event.type === 'readiness-failed')?.data).toMatchObject({ step: 'run-branch', recovery: null, final: true });
@@ -161,6 +166,7 @@ describe('an implementation run with no entry capabilities', () => {
         ? { outcome: { kind: 'completed', exitCode: 1 } }
         : {},
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
+      previewCount: 3,
     });
     cleanups.push(() => service.close());
 
@@ -174,8 +180,9 @@ describe('an implementation run with no entry capabilities', () => {
 
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-failed',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'gate-started', 'readiness-passed', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
+      'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-failed',
     ]);
     // The unchanged tree needs no new commit, but its current revision was
     // audited and the failing attempt records that identity and evidence.
