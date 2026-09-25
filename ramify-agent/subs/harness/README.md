@@ -252,7 +252,26 @@ hiding or measured complexity justifies it.
     not fresh records its point and its reason, and each end a start the
     executor could not honor. Each invocation writes its session's
     transcript beside its observations: its start before the session
-    starts, and its end and point after the log's.
+    starts, and its end and point after the log's. An engineer or contract
+    session that ends `failed`, by a bound, a provider error or an adapter
+    fault, ends its iteration and not the run: the iteration closes
+    `partial` with the failure, its interruption and its invocation as a
+    finding, what the session wrote stays uncommitted in the tree, and the
+    local architect's next turn reads it. The work item's
+    `maxIterationsPerWorkItem` bounds an engineer that keeps failing. A
+    writer release that could not be confirmed still ends the run
+    `agent-failed`, since no writer and no gate may follow it. Every other
+    role's failed invocation still ends the run, except a reviewer's, which
+    its review retries, and a reconciliation fork's, which refuses its
+    assessment.
+  - `port-events.ts`: what one session's port events leave in its
+    observations and transcript, and the policy's two bounds on one
+    session: no port event for `invocationIdleMs`, and
+    `invocationAbsoluteMs` in all. A command the implementation equipment
+    runs for the session, a `shell` call or a scoped test run, is the
+    harness's work and not the session's silence: it holds the idle bound
+    for the command's own timeout plus a margin of one minute. Its release
+    starts the idle bound afresh, and the absolute bound is unchanged.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
     guard saw; comparing it with the write scope fills `outsideScope`, and

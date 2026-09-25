@@ -470,6 +470,8 @@ interface InvocationResult<T> {
   readonly kept: boolean;
   /** The bound or fault that interrupted it, where one did. */
   readonly interruption?: InvocationOutcome['interruption'];
+  /** What ended a failed invocation, as its outcome records it. */
+  readonly error?: string | undefined;
   /** The mode the executor actually started the session in; absent where none started. */
   readonly actual?: 'fresh' | 'continue' | 'fork' | undefined;
 }
@@ -2896,18 +2898,19 @@ export class RunService {
     });
     const context = contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context, transcript });
+    // Every port event is activity; `touch` is what the idle bound resets.
+    // A command the equipment runs for the session holds it instead.
+    const bounds = new InvocationBounds(request.absoluteMs === undefined
+      ? run.record.policy.limits
+      : { ...run.record.policy.limits, invocationAbsoluteMs: Math.min(run.record.policy.limits.invocationAbsoluteMs, request.absoluteMs) });
     const equipment: Equipment = request.equip?.({
       invocation: id,
       observations,
       callId: tool => recorder.callId(tool),
       reminders: () => excursions.takeReminders(),
       transcript,
+      hold: timeoutMs => bounds.hold(timeoutMs),
     }) ?? {};
-
-    // Every port event is activity; `touch` is what the idle bound resets.
-    const bounds = new InvocationBounds(request.absoluteMs === undefined
-      ? run.record.policy.limits
-      : { ...run.record.policy.limits, invocationAbsoluteMs: Math.min(run.record.policy.limits.invocationAbsoluteMs, request.absoluteMs) });
     let budget: InvocationOutcome['budget'] | undefined;
 
     const spec: SessionSpec = {
@@ -2944,13 +2947,17 @@ export class RunService {
       agentSession = agent.startSession(spec);
     } catch (error) {
       const keptAs = keeping('failed', undefined);
+      const failure = `The agent session could not start: ${message(error)}`;
       await this.endInvocation(run, id, session, keptAs, {
         ...stoppedOutcome(),
         ended: 'failed',
         interruption: 'adapter-fault',
-        error: `The agent session could not start: ${message(error)}`,
+        error: failure,
       }, undefined, transcript);
-      return { id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept, interruption: 'adapter-fault' };
+      return {
+        id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept,
+        interruption: 'adapter-fault', error: failure,
+      };
     }
     const live = run.live.get(id);
     if (live !== undefined) live.session = agentSession;
@@ -3001,14 +3008,14 @@ export class RunService {
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
     const keptAs = keeping(ended, ended === 'submitted' ? value : undefined);
+    const error = interruption === 'idle-timeout'
+      ? `No port event for ${limits.invocationIdleMs} ms`
+      : interruption === 'absolute-timeout'
+        ? `The invocation ran for ${limits.invocationAbsoluteMs} ms, its absolute bound`
+        : outcome.kind === 'failed' ? outcome.error : undefined;
     await this.endInvocation(run, id, session, keptAs, {
       ended,
-      ...(interruption === undefined ? {} : {
-        interruption,
-        error: interruption === 'idle-timeout'
-          ? `No port event for ${limits.invocationIdleMs} ms`
-          : `The invocation ran for ${limits.invocationAbsoluteMs} ms, its absolute bound`,
-      }),
+      ...(interruption === undefined ? {} : { interruption, error }),
       // What the implementation answered, not what was asked for: a fork it
       // could not take is a fresh session, and the comparison of fork cost
       // must not be corrupted by one that silently became fresh.
@@ -3037,6 +3044,7 @@ export class RunService {
       session,
       kept: keptAs.kept,
       ...(interruption === undefined ? {} : { interruption }),
+      ...(ended === 'failed' && error !== undefined ? { error } : {}),
       actual: agentSession.start.mode,
     };
   }
@@ -5014,6 +5022,17 @@ export class RunService {
         continue;
       }
 
+      // An engineer whose session failed, whether a bound, the provider or
+      // the adapter ended it, leaves its iteration without a result and not
+      // the run: the iteration closes partial, what the session wrote stays
+      // uncommitted in the tree as a partial report's does, and the local
+      // architect decides what comes next. The work item's iteration bound
+      // counts it like any other. A writer not confirmed settled blocks every
+      // later writer and gate, so that failure still ends the run here.
+      if (result.ended === 'failed' && !run.writer.isUnsettled) {
+        findings.push(`${failedWithoutResult('engineer', assignment.id, result)}; nothing of it was committed, and what it wrote stays uncommitted in the tree`);
+        return close('partial');
+      }
       if (result.ended !== 'submitted' || result.value === undefined) {
         await this.fail(
           run,
@@ -5510,6 +5529,18 @@ export class RunService {
       // agreement, whatever it wrote.
       if (result.ended === 'context-budget-reached') {
         findings.push('the contract session reached its context budget before it established the agreement; nothing was registered');
+        const closed = await this.closeIteration(run, item, subject.number, assignment, {
+          outcome: 'partial', invocations, findings, gate: null, commit: null,
+        });
+        return this.ignoring(run) ? null : { findings, result: closed };
+      }
+
+      // A failed contract session is closed as a threshold return is: it
+      // established no agreement, and its local architect decides what
+      // comes next. An unsettled writer still ends the run, as for the
+      // engineer.
+      if (result.ended === 'failed' && !run.writer.isUnsettled) {
+        findings.push(`${failedWithoutResult('contract engineer', assignment.id, result)}; nothing was registered`);
         const closed = await this.closeIteration(run, item, subject.number, assignment, {
           outcome: 'partial', invocations, findings, gate: null, commit: null,
         });
@@ -7682,6 +7713,16 @@ function requestedSession<T>(request: InvocationRequest<T>): Invocation['session
     return { requested: 'fork', actual: 'fork', ref: request.start.from, from: request.start.from };
   }
   return { requested: 'fresh', actual: 'fresh', ref: '' };
+}
+
+/**
+ * Why one implementation session ended without a result, as its local
+ * architect reads it: the bound or fault that ended it, and what its outcome
+ * records.
+ */
+function failedWithoutResult(role: string, iteration: string, result: InvocationResult<unknown>): string {
+  const cause = [result.interruption ?? result.ended, result.error].filter(part => part !== undefined && part !== '').join(': ');
+  return `the ${role} of ${iteration} ended without a result (${cause}; invocation ${result.id})`;
 }
 
 function analysisFailure(ended: InvocationOutcome['ended'], kind: string): string {

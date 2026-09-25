@@ -159,11 +159,24 @@ export interface InvocationLimits {
 }
 
 /**
+ * What a held command's own timeout is extended by before the idle bound
+ * may fire: the time its tool still needs after the command ends, such as
+ * the hook check after a shell call, and the command's own kill.
+ */
+export const commandHoldMarginMs = 60_000;
+
+/**
  * The policy's two bounds on one session: no port event for
  * `invocationIdleMs`, and `invocationAbsoluteMs` in all. Either asks the
  * session to stop and records the bound as its interruption. A session that
  * does not stop is waited for no longer than `writerSettleMs`; settlement is
  * what then says whether it is gone.
+ *
+ * A command the harness runs for the session is the harness's work, not the
+ * session's silence: while one is held, the idle bound cannot fire before the
+ * command's own timeout and the margin have passed. The command's timeout
+ * already bounds it, and the absolute bound is unchanged. Its release starts
+ * the idle bound afresh.
  */
 export class InvocationBounds {
   private armed = false;
@@ -171,19 +184,42 @@ export class InvocationBounds {
   private expired: () => void = () => undefined;
   private session: AgentSession | undefined;
   private reached: 'idle-timeout' | 'absolute-timeout' | undefined;
+  /** The time each held command may run until, with the margin. */
+  private readonly holds = new Set<{ readonly until: number }>();
 
-  constructor(private readonly limits: InvocationLimits) {}
+  constructor(private readonly limits: InvocationLimits, private readonly marginMs = commandHoldMarginMs) {}
 
   /** The bound that ended the session, if one did. */
   get interruption(): 'idle-timeout' | 'absolute-timeout' | undefined {
     return this.reached;
   }
 
-  /** Every port event is activity: it resets the idle bound while the session is awaited. */
+  /**
+   * Every port event is activity: it resets the idle bound while the session
+   * is awaited. The bound fires no earlier than the last held command's
+   * timeout and margin.
+   */
   touch(): void {
     if (!this.armed) return;
     clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.expire('idle-timeout'), this.limits.invocationIdleMs);
+    const now = Date.now();
+    const held = Math.max(0, ...[...this.holds].map(hold => hold.until - now));
+    this.idleTimer = setTimeout(() => this.expire('idle-timeout'), Math.max(this.limits.invocationIdleMs, held));
+  }
+
+  /**
+   * Holds the idle bound for one command the harness runs for the session,
+   * for that command's own timeout and the margin. The returned release is
+   * called once the command has ended; the idle bound then starts afresh.
+   */
+  hold(timeoutMs: number): () => void {
+    const entry = { until: Date.now() + timeoutMs + this.marginMs };
+    this.holds.add(entry);
+    this.touch();
+    return () => {
+      if (!this.holds.delete(entry)) return;
+      this.touch();
+    };
   }
 
   /** The session's outcome, or `stopped` once a bound was reached and the settle wait ran out. */

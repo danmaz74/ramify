@@ -382,6 +382,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     callId: tool => recorder.callId(tool),
     reminders: () => excursions.takeReminders(),
     transcript,
+    hold: timeoutMs => bounds.hold(timeoutMs),
   });
   const { guard, afterMutation } = equipment;
 
