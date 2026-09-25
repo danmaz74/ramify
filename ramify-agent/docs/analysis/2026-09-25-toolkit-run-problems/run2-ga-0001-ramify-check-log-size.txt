@@ -1,0 +1,1 @@
+16777216 bytes  /tmp/ramify-run-self-explaining-denials/plans/self-explaining-denials/.harness/jobs/20260924T213823Z-c0f512/gates/ga-0001/04-ramify-check.log

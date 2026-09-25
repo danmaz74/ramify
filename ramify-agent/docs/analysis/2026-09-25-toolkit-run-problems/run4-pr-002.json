@@ -1,0 +1,77 @@
+{
+  "schema": "ramify-agent.placement-request/1",
+  "id": "pr-002",
+  "workItem": "wi-001",
+  "requester": "ramify/cli",
+  "forCapability": "render-explained-import-denials",
+  "question": "How should root-owned scripts/reference-harness/report.ts and its gate.test.ts be scoped for reference block parity? The harness rejected both explicit extra consumer paths as lying under no module of the refreshed architect view, despite gd-001 placing root reference rendering in ramify.",
+  "requiredBehavior": "The request requires the reference harness report script to display the same completed block as CLI full/changed, preserving its existing summaries. The CLI renderer can be exposed to its parent, but the root script and test must be writable by an engineer under a valid module scope without weakening test discovery.",
+  "findings": [
+    {
+      "text": "The script currently maps diagnostics to only a header in checkerSummary, while the CLI's shared findingBlock now builds complete blocks. The root test lives beside the script.",
+      "citations": [
+        {
+          "module": "ramify",
+          "file": "scripts/reference-harness/report.ts",
+          "symbol": "checkerSummary"
+        },
+        {
+          "module": "ramify",
+          "file": "scripts/reference-harness/gate.test.ts",
+          "symbol": "checkerSummary"
+        },
+        {
+          "module": "ramify/cli",
+          "file": "subs/cli/src/format.ts",
+          "symbol": "findingBlock"
+        }
+      ]
+    },
+    {
+      "text": "An assignment with base ramify/cli and exact extra consumer paths scripts/reference-harness/report.ts and scripts/reference-harness/gate.test.ts was rejected at submission: each path 'lies under no module of the refreshed view'. The accepted global placement explicitly called the reference script root-owned integration rendering; extra scope nevertheless cannot address it.",
+      "citations": [
+        {
+          "module": "ramify",
+          "file": "scripts/reference-harness/report.ts",
+          "note": "Root script currently outside validated module scope."
+        }
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "owner": "ramify",
+      "note": "gd-001 considers script root-owned but module-scoping validator does not consider its path part of ramify; need valid mapped ownership or a root entry work item."
+    },
+    {
+      "capability": "render-explained-import-denials",
+      "owner": "ramify/cli",
+      "note": "Can expose a reusable block formatter from CLI, but cannot write the root script under its own module or accepted extra paths."
+    }
+  ],
+  "unresolved": [
+    "A valid module scope for the root script and test, or a separate root-owned work item/authorized module proposal to render them without violating ownership.",
+    "Whether the CLI should export its existing formatter to parent for this consumer, pending a valid script scope."
+  ],
+  "hypotheses": [
+    {
+      "ref": {
+        "id": "create-reference-block-rendering",
+        "revision": 2,
+        "hash": "c0b4cc8d38c70cc9d7285ca894bd614167267bcab889e26debe7dfd4fa4c401f"
+      },
+      "stance": "departs",
+      "evidence": "Ownership by ramify is conceptually supported by script location, but the assignment validator reports root scripts are outside every module in the refreshed view; the forecast did not account for this scoping boundary."
+    },
+    {
+      "ref": {
+        "id": "create-evidence-rich-diagnostics",
+        "revision": 2,
+        "hash": "c62082c6470b78ca37ea4d65badc28e457dbb2cf28638c06b8cd235a1a0fca2c"
+      },
+      "stance": "supports",
+      "evidence": "The analysis diagnostic payload remains provider-owned and CLI can display it; root should only render, not compose evidence."
+    }
+  ],
+  "localDecisions": []
+}

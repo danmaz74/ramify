@@ -1,0 +1,15 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-001.i07",
+  "outcome": "accepted",
+  "invocations": [
+    "inv-0020"
+  ],
+  "gate": "ga-0006",
+  "commit": "b2b0dadf9518fe4e721d3a3f2e3230a3022350f4",
+  "findings": [
+    "All nine scenarios pass in quick mode; CLI scope tests and the analysis conformance test pass."
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

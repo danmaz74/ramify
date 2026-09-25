@@ -1,0 +1,20 @@
+#15 placement-requested: {"request":"pr-001","workItem":"wi-001","requester":"ramify/cli","capability":"render-explained-import-denials"}
+#20 decision-accepted: {"request":"pr-001","decision":"gd-001","workItem":"wi-001","invocation":"inv-0003","registry":1,"hypotheses":2}
+#33 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i01","outcome":"partial","gate":null,"commit":null,"notices":[]}
+#41 gate-attempted: {"gate":"ga-0002","checkpoint":"contract","verdict":"passed","next":"accept"}
+#42 contract-registered: {"contract":"ct-001","revision":1,"mode":"fake-backed","iteration":"wi-001.i02","obligation":"ob-ct-001","requirements":["rq-001"],"providerWorkItem":"wi-003"}
+#43 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i02","outcome":"accepted","gate":"ga-0002","commit":"e820861063a211b38060a81d1a57f25e95a111d1","notices":[]}
+#57 gate-attempted: {"gate":"ga-0003","checkpoint":"iteration","verdict":"failed","next":"return-to-local-architect"}
+#58 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i03","outcome":"unsuitable","gate":null,"commit":null,"notices":[]}
+#70 gate-attempted: {"gate":"ga-0004","checkpoint":"iteration","verdict":"passed","next":"accept"}
+#73 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i04","outcome":"accepted","gate":"ga-0004","commit":"46ee9e6f4e28dbdec77784ead1d15009bd28f50a","notices":[]}
+#105 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i05","outcome":"partial","gate":null,"commit":null,"notices":[]}
+#123 gate-attempted: {"gate":"ga-0005","checkpoint":"iteration","verdict":"failed","next":"return-to-local-architect"}
+#124 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i06","outcome":"unsuitable","gate":null,"commit":null,"notices":[]}
+#136 gate-attempted: {"gate":"ga-0006","checkpoint":"iteration","verdict":"passed","next":"accept"}
+#146 iteration-closed: {"workItem":"wi-001","iteration":"wi-001.i07","outcome":"accepted","gate":"ga-0006","commit":"b2b0dadf9518fe4e721d3a3f2e3230a3022350f4","notices":[]}
+#159 placement-requested: {"request":"pr-002","workItem":"wi-001","requester":"ramify/cli","capability":"render-explained-import-denials"}
+#177 fork-returned-partial: {"request":"pr-002","invocation":"inv-0024","retry":1}
+#182 fork-returned-partial: {"request":"pr-002","invocation":"inv-0027","retry":2}
+#187 fork-returned-partial: {"request":"pr-002","invocation":"inv-0028","retry":3}
+#193 job-failed: {"reason":"unresolvable-requirement","message":"The local architect of wi-001 reports the request cannot be met as stated: The required reference harness rendering cannot be implemented under any permitted assignment scope: scripts/reference-harness/report.ts and its test are outside every architect-view module, and explicit extra consumer paths were rejected. A CLI formatter or provider implementation alone cannot change the actually invoked report script. No supported write authorization for unmapped integration files was established; closing or yielding as if the full request were achievable would omit a stated constraint.","evidence":["invocations/inv-0029/submission.json","plans/self-explaining-denials/plan.md Constraints requires scripts/reference-harness/report.ts to print the same block and the reference harness to pass.","scripts/reference-harness/report.ts checkerSummary currently prints each diagnostic's header only; package.json invokes that unmapped script directly, and its test/configuration also reside under scripts/reference-harness.","Assignment with base ramify/cli and extras scripts/reference-harness/report.ts and scripts/reference-harness/gate.test.ts was rejected because each path lies under no module of the refreshed view.","Global placement request pr-002 found root ramify maps only src and src/tests, and explicitly could not establish any valid writable scope or supported exception for the existing reference script and test.","All nine CLI scenarios ha

@@ -1,0 +1,82 @@
+{
+ "schema": "ramify-agent.gate-attempt/3",
+ "id": "ga-0003",
+ "checkpoint": "iteration",
+ "subject": {
+  "workItem": "wi-001",
+  "iteration": "wi-001.i03"
+ },
+ "proposedBy": "inv-0008",
+ "repairRound": 0,
+ "infrastructureAttempt": 0,
+ "head": "e820861063a211b38060a81d1a57f25e95a111d1",
+ "commit": "471ec3ac3ecdcdfb63d1490578057bfa04cace93",
+ "audited": "471ec3ac3ecdcdfb63d1490578057bfa04cace93",
+ "evidence": {
+  "runRef": "refs/audited/runs/2026-09-24T22-21-03Z-471ec3ac3",
+  "reportCommit": "5967511d74d999bc248d0124c1a3471fa7351644",
+  "treeRef": "refs/audited/by-tree/d650a21b047ef19a191ad9cf6a517154a416b692"
+ },
+ "guardedChanges": [],
+ "commands": [
+  {
+   "kind": "tests",
+   "argv": [
+    "/tmp/ramify-run-sed/node_modules/.bin/vitest",
+    "run",
+    "subs/cli/src/tests/arguments.test.ts",
+    "subs/cli/src/tests/capabilities.test.ts",
+    "subs/cli/src/tests/changed-command.test.ts",
+    "subs/cli/src/tests/errors.test.ts",
+    "subs/cli/src/tests/explained-diagnostics.test.ts",
+    "subs/cli/src/tests/explore-command.test.ts",
+    "subs/cli/src/tests/materialize-command.test.ts",
+    "subs/cli/src/tests/measure-command.test.ts"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 20815
+  },
+  {
+   "kind": "type-check",
+   "argv": [
+    "npm",
+    "run",
+    "type-check"
+   ],
+   "outcome": "failed",
+   "exitCode": 1,
+   "elapsedMs": 1557
+  },
+  {
+   "kind": "ramify-check",
+   "argv": [
+    "/ramify/ramify-agent/node_modules/.bin/ramify",
+    "check",
+    "--batch",
+    "--root",
+    "/tmp/ramify-run-sed",
+    "--format",
+    "json"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 12209
+  },
+  {
+   "kind": "scenarios",
+   "argv": [
+    "npm",
+    "run",
+    "acceptance:quick",
+    "--"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 1007
+  }
+ ],
+ "verdict": "failed",
+ "cause": "outside-assignment",
+ "next": "return-to-local-architect"
+}

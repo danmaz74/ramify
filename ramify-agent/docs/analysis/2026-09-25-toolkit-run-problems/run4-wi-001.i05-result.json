@@ -1,0 +1,17 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-001.i05",
+  "outcome": "partial",
+  "invocations": [
+    "inv-0014"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "Fake-backed evidence and the sc-007 limitation are recorded in the CLI README. No provider, analysis, feature or contract files were changed.",
+    "unfinished: sc-007 fails because the ct-001 fake renders the original declaration's tagEvidence for a required-symbol-tag denial; an honest browser-tagged importer with an untagged component yields 'assigned at: none' instead of the importer tag's assignment. The fake/provider or real captured evidence needs follow-up outside CLI scope before this scenario can pass non-vacuously.",
+    "unfinished: Completion gate and declaration of all seven new scenarios remain pending."
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

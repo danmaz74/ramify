@@ -1,0 +1,95 @@
+{
+ "schema": "ramify-agent.gate-attempt/3",
+ "id": "ga-0005",
+ "checkpoint": "iteration",
+ "subject": {
+  "workItem": "wi-001",
+  "iteration": "wi-001.i06"
+ },
+ "proposedBy": "inv-0018",
+ "repairRound": 0,
+ "infrastructureAttempt": 0,
+ "head": "46ee9e6f4e28dbdec77784ead1d15009bd28f50a",
+ "commit": "291a5384ea4151bb68070ddc6894d8135b135d13",
+ "audited": "291a5384ea4151bb68070ddc6894d8135b135d13",
+ "evidence": {
+  "runRef": "refs/audited/runs/2026-09-24T22-37-17Z-291a5384e",
+  "reportCommit": "9cab41ba441535698b3b2c55642fc98a40f6858a",
+  "treeRef": "refs/audited/by-tree/0228cb2854cb58934c2dfa3577748d90443d8221"
+ },
+ "guardedChanges": [
+  {
+   "path": "subs/analysis/src/fakes/explained-import-diagnostics.fake.ts",
+   "before": "a9911a5bea23fa4ea60a8e7075509465a2d84d5e9648d20bc2932a67eae0fc74",
+   "after": "77f0e3ff9725dbc0f1bd2037b7bf20357fca44112eb74673f013811e992a443f",
+   "authorizedBy": null
+  },
+  {
+   "path": "subs/analysis/src/tests/explained-import-diagnostics.conformance.test.ts",
+   "before": "35e3f4f9732a46ec3a541ceb4732a52ace60ff698af5566eccae27f09292278d",
+   "after": "35cd6e5747bc391ac8e9e0a6517a78eb651e66cedc4552f6f5573a2698141519",
+   "authorizedBy": null
+  }
+ ],
+ "commands": [
+  {
+   "kind": "tests",
+   "argv": [
+    "/tmp/ramify-run-sed/node_modules/.bin/vitest",
+    "run",
+    "subs/cli/src/tests/arguments.test.ts",
+    "subs/cli/src/tests/capabilities.test.ts",
+    "subs/cli/src/tests/changed-command.test.ts",
+    "subs/cli/src/tests/errors.test.ts",
+    "subs/cli/src/tests/explained-diagnostics.test.ts",
+    "subs/cli/src/tests/explore-command.test.ts",
+    "subs/cli/src/tests/materialize-command.test.ts",
+    "subs/cli/src/tests/measure-command.test.ts"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 20899
+  },
+  {
+   "kind": "type-check",
+   "argv": [
+    "npm",
+    "run",
+    "type-check"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 3761
+  },
+  {
+   "kind": "ramify-check",
+   "argv": [
+    "/ramify/ramify-agent/node_modules/.bin/ramify",
+    "check",
+    "--batch",
+    "--root",
+    "/tmp/ramify-run-sed",
+    "--format",
+    "json"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 12215
+  },
+  {
+   "kind": "scenarios",
+   "argv": [
+    "npm",
+    "run",
+    "acceptance:quick",
+    "--"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 1110
+  }
+ ],
+ "verdict": "failed",
+ "cause": "guarded-change",
+ "next": "return-to-local-architect"
+}

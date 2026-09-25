@@ -1,0 +1,6 @@
+
+> ramify.ts@0.0.0 type-check
+> tsc --noEmit && tsc -p tsconfig.portable.json && tsc -p tsconfig.scripts.json && tsc -p scripts/reference-harness/tsconfig.json
+
+subs/cli/src/tests/explained-diagnostics.test.ts(56,52): error TS2352: Conversion of type '{ stdout: (value: string) => number; }' to type 'CliEnvironment' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ stdout: (value: string) => number; }' is missing the following properties from type 'CliEnvironment': cwd, version, stderr, batch, connect

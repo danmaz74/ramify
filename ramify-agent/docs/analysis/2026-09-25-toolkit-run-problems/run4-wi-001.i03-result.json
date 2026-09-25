@@ -1,0 +1,17 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-001.i03",
+  "outcome": "unsuitable",
+  "invocations": [
+    "inv-0008"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "The ct-001 fake clips detail lines to 300 characters; fixtures use short received names so the remaining-count suffix remains visible.",
+    "Other pending scenarios remain unbound by this iteration.",
+    "the gate returned to the local architect: outside-assignment at gate ga-0003"
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

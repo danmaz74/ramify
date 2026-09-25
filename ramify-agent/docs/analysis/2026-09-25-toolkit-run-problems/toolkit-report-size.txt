@@ -1,0 +1,25 @@
+section bytes count
+total 25368538
+schemaVersion 19
+runId 38
+inputId 74
+request 1195
+scope 1341
+registry 390
+capabilities 1132 14
+stages 598 8
+outcome 64
+snapshot 25363333
+diagnostics 2 0
+warnings 2 0
+coverage 2 0
+summary 179
+snapshot.inventory 533469
+snapshot.areas 3344 30
+snapshot.inputs 860017 5201
+snapshot.catalog 1665289
+snapshot.linked 1829137
+snapshot.model 1606395
+snapshot.accesses 6730717 6583
+snapshot.results 12134879 6583
+summary {"complete":true,"owners":15,"sourceFiles":440,"resources":17,"originals":1368,"accesses":6583,"allowed":4570,"denied":0,"errors":0,"warnings":0,"coverageNotes":0,"external":2013}

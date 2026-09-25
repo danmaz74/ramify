@@ -1,0 +1,66 @@
+{
+ "schema": "ramify-agent.gate-attempt/3",
+ "id": "ga-0001",
+ "checkpoint": "readiness",
+ "subject": {},
+ "proposedBy": null,
+ "repairRound": 0,
+ "infrastructureAttempt": 0,
+ "head": "e64f90157459f82a807b15395b91636505c5fd6e",
+ "commit": null,
+ "audited": null,
+ "evidence": null,
+ "guardedChanges": [],
+ "commands": [
+  {
+   "kind": "tests",
+   "argv": [
+    "npm",
+    "test"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 162964
+  },
+  {
+   "kind": "tests",
+   "argv": [
+    "npm",
+    "test"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 1569
+  },
+  {
+   "kind": "type-check",
+   "argv": [
+    "npm",
+    "run",
+    "type-check"
+   ],
+   "outcome": "passed",
+   "exitCode": 0,
+   "elapsedMs": 3669
+  },
+  {
+   "kind": "ramify-check",
+   "argv": [
+    "/ramify/ramify-agent/node_modules/.bin/ramify",
+    "check",
+    "--batch",
+    "--root",
+    "/tmp/ramify-run-self-explaining-denials",
+    "--format",
+    "json"
+   ],
+   "outcome": "not-verified",
+   "exitCode": null,
+   "elapsedMs": 11527,
+   "notVerified": "runner-error"
+  }
+ ],
+ "verdict": "not-verified",
+ "cause": "infrastructure",
+ "next": "retry-infrastructure"
+}

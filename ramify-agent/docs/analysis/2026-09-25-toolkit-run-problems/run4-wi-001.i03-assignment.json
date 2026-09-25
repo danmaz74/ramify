@@ -1,0 +1,146 @@
+{
+  "schema": "ramify-agent.iteration-assignment/1",
+  "id": "wi-001.i03",
+  "workItem": "wi-001",
+  "outline": {
+    "id": "wi-001",
+    "revision": 2,
+    "hash": "38297f2ab3a85e1895b550dd7b2a2a84fa4e7a48c8e92df4e7ebca48e2372b98"
+  },
+  "stage": 0,
+  "kind": "ordinary",
+  "goal": "Implement and test one common human diagnostic block for full and changed CLI checks using the ct-001 fake-backed diagnostic payload, including warning and JSON parity.",
+  "approach": "Use the existing registered fake adapter subs/cli/src/explained-diagnostics.ts, contract interface and conformance suite; do not invent another provider or put domain reasoning in CLI. Extract a shared block formatter for header/message/Importer/Original/details/related roles/proposal with the fixed proposal label, called by both formatHuman and formatChangedHuman; format warnings once with pluralization and file list. Preserve the full output metadata, changed-check new marker, JSON fields and exit codes. For fake-backed fixtures, apply the fake at the report/delta boundary only where required for current tests, marking a clear replacement point for verification rather than leaving the fake on production after provider conformance. Update local CLI-created diagnostics with empty details/null proposal/related roles. Bind sc-009 and sc-010 via quick-mode steps against deterministic fake-backed reports and document what is fake versus real. Do not change contract or package/runner files.",
+  "scope": {
+    "revision": 3,
+    "base": {
+      "module": "ramify/cli",
+      "includedChildren": []
+    },
+    "extra": [],
+    "read": [
+      "ramify/analysis",
+      "ramify/daemon/contexts",
+      "ramify"
+    ],
+    "bootstrap": [],
+    "rationale": "All implementation and step definitions belong in CLI; provider contract, fake and conformance files already exist, with no need for cross-module writes in this iteration.",
+    "resolved": {
+      "roots": [
+        "/tmp/ramify-run-sed/subs/cli/src"
+      ],
+      "files": [
+        "/tmp/ramify-run-sed/subs/cli/module.ramify",
+        "/tmp/ramify-run-sed/subs/cli/README.md"
+      ],
+      "view": {
+        "status": "materialized",
+        "revision": "rev/1:b92cfb89-3c5f-4d5a-88a0-95edeba55428:1",
+        "input": "input/1:3b42a78b70dc7b5a9e5cc6d819cb07c204a903403819cc7d2a860ddc4bc57de6",
+        "coverageLimits": [
+          "cut: 376",
+          "detailsUnavailable: 1",
+          "dynamicTitles: 21"
+        ]
+      }
+    }
+  },
+  "requirementRefs": [
+    {
+      "anchor": "plans/self-explaining-denials/plan.md#request",
+      "lines": [
+        39,
+        86
+      ]
+    },
+    {
+      "anchor": "plans/self-explaining-denials/plan.md#constraints",
+      "lines": [
+        90,
+        135
+      ]
+    },
+    {
+      "anchor": "plans/self-explaining-denials/plan.md#acceptance",
+      "lines": [
+        137,
+        152
+      ]
+    }
+  ],
+  "externalCapabilities": [
+    {
+      "capability": "compose-explained-import-diagnostics",
+      "owner": "ramify/analysis",
+      "role": "use"
+    }
+  ],
+  "completionEvidence": "Both human forms render the identical ordered diagnostic block from the same composed finding; full/changed warnings are byte-identical including plurality and file names; CLI-produced non-import findings have empty details, null proposal and roles; JSON preserves the completed diagnostics under the same schema identities; fake-backed quick scenarios sc-009 and sc-010 pass and exit code semantics are unchanged.",
+  "evidenceObligations": [],
+  "gate": {
+    "checkpoint": "iteration",
+    "tests": {
+      "policy": "owned-by-scope",
+      "exactOwners": [
+        "ramify/cli"
+      ],
+      "subtrees": [],
+      "extraSuites": []
+    }
+  },
+  "guarded": [
+    {
+      "path": "package.json",
+      "hash": "debfbd100d36cdc10f3a0d0f372b6f6b0e4b7b1ee916c4334073835f3e4febba"
+    },
+    {
+      "path": "ramify-agent.json",
+      "hash": "6bba0cdaf897006528dabb15cd91df740d8f963235644b8b0c549ffcd85e5a08"
+    },
+    {
+      "path": "src/tests/support/hooks.ts",
+      "hash": "d14ae73314149093ef2cfba0a99a73573e6132e0c05e52bd2a96e1cdee8125f1"
+    },
+    {
+      "path": "src/tests/support/world.ts",
+      "hash": "9e66bf181eff4f9eb4cbefb1e1754d40c62690578570776c9ce1f135115b8ff3"
+    },
+    {
+      "path": "subs/analysis/src/fakes/explained-import-diagnostics.fake.ts",
+      "hash": "a9911a5bea23fa4ea60a8e7075509465a2d84d5e9648d20bc2932a67eae0fc74"
+    },
+    {
+      "path": "subs/analysis/src/interfaces/analysis.ts",
+      "hash": "f30b242867b6800dd8242defb603beb741f82e9e1fadec477a5d3d254e13db09"
+    },
+    {
+      "path": "subs/analysis/src/interfaces/explained-import-diagnostics.ts",
+      "hash": "92e61b8c8ab209e24c5957a4790127a455ee30a1585e93a0aefcba993a5736c0"
+    },
+    {
+      "path": "subs/analysis/src/tests/explained-import-diagnostics.conformance.test.ts",
+      "hash": "35e3f4f9732a46ec3a541ceb4732a52ace60ff698af5566eccae27f09292278d"
+    },
+    {
+      "path": "subs/cli/src/tests/features/self-explaining-denials/explain-unchecked-hook-reply.feature",
+      "hash": "f945048d6c342221eecdf598f00d0886ca21599a882f209ffd2221bc03ce483b"
+    },
+    {
+      "path": "subs/cli/src/tests/features/self-explaining-denials/render-explained-import-denials.feature",
+      "hash": "91a309d2d9c23da81a224a8af556b40a2ed83156bbb3503a0dcfd1f1112ddd9c"
+    },
+    {
+      "path": "tsconfig.json",
+      "hash": "9c7bc48e280b04fd40ec464d1924686c811ec73bf49a1cc3618a55c3ccfca6dc"
+    },
+    {
+      "path": "vitest.config.ts",
+      "hash": "323aa1d9cce60b76d533e927d34c0f68982514364bccdf523c0bea45a3f01a12"
+    }
+  ],
+  "authorizations": [],
+  "scenarios": [
+    "sc-009",
+    "sc-010"
+  ]
+}

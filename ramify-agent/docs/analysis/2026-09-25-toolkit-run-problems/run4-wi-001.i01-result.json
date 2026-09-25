@@ -1,0 +1,15 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-001.i01",
+  "outcome": "partial",
+  "invocations": [
+    "inv-0005"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "the behavior needed for \"compose-explained-import-diagnostics\" is owned outside this scope: CLI rendering requires analysis-owned explanatory diagnostic payloads before it can implement the shared block or assert provider conformance. Request the compose-explained-import-diagnostics agreement, including bounded evidence, single-change proposals, related-location roles and neutral defaults for all other findings."
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

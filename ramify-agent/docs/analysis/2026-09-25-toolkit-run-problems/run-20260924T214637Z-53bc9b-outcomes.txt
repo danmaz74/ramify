@@ -1,0 +1,2 @@
+#7 readiness-passed: {"attempt":1,"gate":"ga-0001"}
+#10 job-failed: {"reason":"internal","message":"The harness commits only on a run branch; HEAD is run/self-explaining-denials","evidence":[]}

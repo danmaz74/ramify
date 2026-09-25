@@ -1,0 +1,18 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-001.i06",
+  "outcome": "unsuitable",
+  "invocations": [
+    "inv-0018"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "Exact tag-token locations are available when the captured inventory contains a valid parsed importing description. Without it, the fake reports that the assignment location is not established rather than inventing one; if exact locations must be guaranteed without parsed descriptions, ct-001 needs an agreement revision.",
+    "the gate returned to the local architect: guarded-change at gate ga-0005",
+    "no record authorizes the change to the guarded file \"subs/analysis/src/fakes/explained-import-diagnostics.fake.ts\"",
+    "no record authorizes the change to the guarded file \"subs/analysis/src/tests/explained-import-diagnostics.conformance.test.ts\""
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

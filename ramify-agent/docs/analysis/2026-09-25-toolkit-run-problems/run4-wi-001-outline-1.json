@@ -1,0 +1,61 @@
+{
+  "schema": "ramify-agent.work-item-outline/1",
+  "workItem": "wi-001",
+  "revision": 1,
+  "invocation": "inv-0004",
+  "changes": "CLI has two divergent human renderers: full prints importer/original/unlabelled locations, changed prints only the header; warnings differ. The CLI receives already-created AnalysisDiagnostic and cannot compute declaration evidence. Global decision gd-001 assigns shared evidence-rich diagnostic construction to ramify/analysis; root owns the separate reference script. No existing steps bind these nine scenarios. API materialization failed after four attempts (analysis-failed), not a refusal: use existing documented imports and verify any new shared symbol against exposure declarations rather than assuming access. Make compatible additions only; retain decisions, JSON identities and exit codes.",
+  "decomposition": {
+    "kind": "staged",
+    "rationale": "First establish analysis-owned payload agreement and a CLI shared renderer against its fake, then replace the fake with real analysis and exercise planted check fixtures, then align the root reference harness if not already covered. The provider boundary must be verified before completion."
+  },
+  "reuse": [
+    {
+      "capability": "compose-explained-import-diagnostics",
+      "owner": "ramify/analysis",
+      "role": "Requested provider of immutable details/proposal/role-bearing related locations, including empty fields for other codes; both CLI outputs relay these without reconstructing policy."
+    }
+  ],
+  "breakingChanges": [],
+  "stages": [
+    {
+      "title": "Shared CLI rendering and provider agreement",
+      "approach": "non-breaking",
+      "dependsOn": [],
+      "note": "Request analysis-owned diagnostic payload; implement a single formatter for both human check forms, warnings and tests including fake-backed block parity and JSON preservation."
+    },
+    {
+      "title": "Verify provider and bind real check scenarios",
+      "approach": "non-breaking",
+      "dependsOn": [
+        0
+      ],
+      "note": "Once analysis conforms, remove fake, run full and hook on real fixtures and bind all outstanding scenarios; verify retained deltas, byte stability, size limits, structured output and unchanged exit decisions."
+    },
+    {
+      "title": "Reference harness parity",
+      "approach": "non-breaking",
+      "dependsOn": [
+        1
+      ],
+      "note": "Root-owned scripts/reference-harness/report.ts prints the completed block, preferably by consuming a permitted CLI-exposed formatter; check harness and self-check without widening checking semantics."
+    }
+  ],
+  "hypothesesSeen": [
+    {
+      "id": "create-evidence-rich-diagnostics",
+      "revision": 2,
+      "hash": "c62082c6470b78ca37ea4d65badc28e457dbb2cf28638c06b8cd235a1a0fca2c"
+    },
+    {
+      "id": "reuse-unavailable-explanation",
+      "revision": 1,
+      "hash": "cb8fceb9462e18df2fe18b9a113ebf31fbd2dba034dd81a2cb88ac49f397b4f2"
+    },
+    {
+      "id": "create-reference-block-rendering",
+      "revision": 2,
+      "hash": "c0b4cc8d38c70cc9d7285ca894bd614167267bcab889e26debe7dfd4fa4c401f"
+    }
+  ],
+  "revisionReason": ""
+}

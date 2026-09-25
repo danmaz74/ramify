@@ -1,0 +1,12 @@
+{
+  "schema": "ramify-agent.local-architect-submission/1",
+  "kind": "unresolved",
+  "conflict": "The required reference harness rendering cannot be implemented under any permitted assignment scope: scripts/reference-harness/report.ts and its test are outside every architect-view module, and explicit extra consumer paths were rejected. A CLI formatter or provider implementation alone cannot change the actually invoked report script. No supported write authorization for unmapped integration files was established; closing or yielding as if the full request were achievable would omit a stated constraint.",
+  "evidence": [
+    "plans/self-explaining-denials/plan.md Constraints requires scripts/reference-harness/report.ts to print the same block and the reference harness to pass.",
+    "scripts/reference-harness/report.ts checkerSummary currently prints each diagnostic's header only; package.json invokes that unmapped script directly, and its test/configuration also reside under scripts/reference-harness.",
+    "Assignment with base ramify/cli and extras scripts/reference-harness/report.ts and scripts/reference-harness/gate.test.ts was rejected because each path lies under no module of the refreshed view.",
+    "Global placement request pr-002 found root ramify maps only src and src/tests, and explicitly could not establish any valid writable scope or supported exception for the existing reference script and test.",
+    "All nine CLI scenarios have passed against the ct-001 fake, but rq-001 is still open; neither their bound status nor future provider conformance supplies authority to edit the unmapped reference harness."
+  ]
+}

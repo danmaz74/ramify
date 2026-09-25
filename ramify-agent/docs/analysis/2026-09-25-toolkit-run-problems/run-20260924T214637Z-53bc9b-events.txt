@@ -1,0 +1,10 @@
+1 2026-09-24T21:46:39.624Z job-started
+2 2026-09-24T21:46:39.633Z session-opened
+3 2026-09-24T21:46:39.634Z invocation-started
+4 2026-09-24T21:50:25.253Z invocation-ended
+5 2026-09-24T21:50:25.331Z analysis-accepted
+6 2026-09-24T21:50:25.560Z gate-started
+7 2026-09-24T21:53:33.984Z readiness-passed
+8 2026-09-24T21:53:33.990Z scenarios-materializing
+9 2026-09-24T21:53:34.207Z session-finished
+10 2026-09-24T21:53:34.207Z job-failed
