@@ -82,7 +82,8 @@ This is that fixture and not this package's test framework, which is Vitest.
 `ramify-agent.json` beside `package.json` declares the package's scenario
 harness to ramify-agent: the support code Cucumber imports before any step
 file, `integration-tests`' World and hooks, and the command of each execution
-mode. The mode is fixed for one run of the runner by `TEST_MODE` and never
+mode. It also declares that the type check prints `tsc`'s output, so a gate
+attributes a failed type check by where its errors lie. The mode is fixed for one run of the runner by `TEST_MODE` and never
 written into a scenario. `acceptance:quick` drives the configured system in
 process, through `createTestSystem`, as every other test does.
 `acceptance:full` reaches the same system through the real listener on a

@@ -60,6 +60,7 @@ describe('the ramify-agent.project/1 schema', () => {
     ]);
     expect(parsed.config.acceptance.modes.quick).toEqual({ command: ['npm', 'run', 'acceptance:quick', '--'] });
     expect(parsed.config.acceptance.modes.full.readiness).toBe('dry-run');
+    expect(parsed.config.typeCheck).toEqual({ output: 'tsc' });
 
     const defaulted = parseProjectConfig(JSON.stringify(valid()));
     expect('config' in defaulted && defaulted.config.acceptance.modes.full.readiness).toBe('dry-run');
@@ -201,6 +202,7 @@ describe('the project-config and acceptance-runner readiness steps', () => {
       hash: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown,
       config: {
         schema: 'ramify-agent.project/1',
+        typeCheck: { output: 'tsc' },
         acceptance: {
           support: ['subs/integration-tests/src/support/world.ts', 'subs/integration-tests/src/support/hooks.ts'],
           modes: {

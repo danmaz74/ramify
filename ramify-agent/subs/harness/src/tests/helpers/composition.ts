@@ -23,6 +23,7 @@ import { decision as decisionBody, forkDecision, forkPartial, localDecision, reg
 import { commandResult } from './command-result.js';
 import { scriptedScenarioRun } from './project-config.js';
 import { directReadinessExecution } from './external-tools.js';
+import { announcingCheckExecution, createPassingCheckExecution } from './direct-check-execution.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
 import {
   staleCrashLock, freeze, installTestRunner, openRuns, shapeOnlyInputs, startRun, stopRun, testPolicy,
@@ -938,7 +939,9 @@ export async function runToEnd(scenario: Scenario, watch?: (service: RunService,
   const opened = await openRuns(target.root, {
     agent,
     git,
-    readinessExecution: directReadinessExecution(),
+    // Every gate announces its commands, as the real executors do.
+    readinessExecution: announcingCheckExecution(directReadinessExecution()),
+    checkExecution: announcingCheckExecution(createPassingCheckExecution()),
     commandExecution: commands,
     inputs: scenario.inputs(),
     ...(scenario.policy === undefined ? {} : { policy: scenario.policy }),
@@ -1000,7 +1003,9 @@ export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const opened = await openRuns(target.root, {
     agent,
     git,
-    readinessExecution: directReadinessExecution(),
+    // Every gate announces its commands, as the real executors do.
+    readinessExecution: announcingCheckExecution(directReadinessExecution()),
+    checkExecution: announcingCheckExecution(createPassingCheckExecution()),
     commandExecution: commands,
     inputs: scenario.inputs(),
     // A stop waits for the invocation the driver has open before it writes

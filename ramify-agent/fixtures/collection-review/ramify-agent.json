@@ -1,5 +1,6 @@
 {
   "schema": "ramify-agent.project/1",
+  "typeCheck": { "output": "tsc" },
   "acceptance": {
     "support": [
       "subs/integration-tests/src/support/world.ts",

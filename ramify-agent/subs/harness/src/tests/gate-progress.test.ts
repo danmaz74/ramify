@@ -2,13 +2,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { commandStart, inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStart } from '../checks/execution.js';
+import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import { projectEvent } from '../projections/events.js';
 import type { RunEvent } from '../run/log.js';
 import { copyFixture } from './helpers/fixture.js';
-import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
+import { announcingCheckExecution, createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { assertUnchangedGit, openUnchangedRuns } from './helpers/unchanged-run.js';
@@ -54,16 +54,6 @@ describe('the in-place executor', () => {
   }, 60_000);
 });
 
-/** An executor that announces every command before its delegate answers them. */
-function announcing(port: CheckExecutionPort): CheckExecutionPort {
-  return {
-    async run(checks, request) {
-      for (const index of checks.keys()) await request.started?.(commandStart(checks, index));
-      return port.run(checks, request);
-    },
-  };
-}
-
 describe('a run', () => {
   test('records the start of each command of readiness and of a committing gate', async () => {
     const fixture = await copyFixture();
@@ -72,8 +62,8 @@ describe('a run', () => {
     const { service } = await openUnchangedRuns(fixture.root, {
       script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: ['final verification of plan "review-notes"'],
-      readinessExecution: announcing(directReadinessExecution()),
-      checkExecution: announcing(createPassingCheckExecution()),
+      readinessExecution: announcingCheckExecution(directReadinessExecution()),
+      checkExecution: announcingCheckExecution(createPassingCheckExecution()),
     });
     cleanups.push(() => service.close());
 

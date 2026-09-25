@@ -517,6 +517,11 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   // query projects the state from scenario-declared, whose bound value
   // scenario-states produces.
   { union: 'query scenarios.scenarios[].state', values: ['bound'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'every state, the entry\'s work item, an integration scenario without its work item yet, and no gate that did not run it' },
+  // Where a failed gate's cause was read from: a Ramify report in a driven
+  // run, a declared tsc output and both together at a gate of their own.
+  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings'], file: 'subs/harness/src/tests/gate-diagnostics.test.ts', test: 'the iteration returns to the local architect, whose briefing carries the finding itself' },
+  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'every error in the engineer\'s own write scope is in scope, and the engineer repairs it' },
+  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings-and-type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'beside a failed Ramify check, both attribute the cause, and the local architect answers the module violation' },
   { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
 ];
 
@@ -646,6 +651,10 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   {
     union: 'record ramify-agent.gate-attempt/3.commands[].kind', values: ['conformance'],
     reason: 'A conformance suite runs inside the project\'s own tests command, selected through extraSuites (iteration 9); no gate records a command of kind conformance.',
+  },
+  {
+    union: 'run log[gate-command-started].data.kind', values: ['conformance'],
+    reason: 'A gate announces the commands it plans, and no gate plans a command of kind conformance: a conformance suite runs inside the project\'s own tests command, selected through extraSuites (iteration 9).',
   },
   {
     union: 'record ramify-agent.gate-attempt/3.commands[].selection.policy', values: ['all-project'],

@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { GateEvidence, ScenarioCheckSummary } from '../../checks/records.js';
-import { checkOutputPath, inPlaceCheckExecution, type CheckExecutionContext, type CheckExecutionPort } from '../../checks/execution.js';
+import { checkOutputPath, commandStart, inPlaceCheckExecution, type CheckExecutionContext, type CheckExecutionPort } from '../../checks/execution.js';
 import type { PlannedCheck } from '../../checks/verify.js';
 import { outputTailBytes, type CommandOutcome, type CommandRun } from '../../../subs/evidence/src/run-command.js';
 import { scenarioRunName } from '../../../subs/scenarios/src/profiles.js';
@@ -82,6 +82,20 @@ export function createDirectCheckExecution(options: DirectCheckExecutionOptions)
  */
 export function createMappedCheckExecution(options: MappedCheckExecutionOptions): CheckExecutionPort {
   return directCheckExecution(options.script, options.evidence, true).port;
+}
+
+/**
+ * The same executor, announcing each command before it answers them, as the
+ * in-place and the audit executors announce each command as it starts. A
+ * run given it records a `gate-command-started` line for every command.
+ */
+export function announcingCheckExecution(port: CheckExecutionPort): CheckExecutionPort {
+  return {
+    async run(checks, request) {
+      for (const index of checks.keys()) await request.started?.(commandStart(checks, index));
+      return port.run(checks, request);
+    },
+  };
 }
 
 /**
