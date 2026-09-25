@@ -39,7 +39,7 @@ describe('the Ramify check forms', () => {
 
     expect(result).toMatchObject({ form: 'complete', exitCode: 0, outcome: 'checked', reason: null });
     expect((result.report as { outcome: { check: string } }).outcome.check).toBe('passed');
-    expect(await argv()).toEqual(['check', '--batch', '--root', directory.path, '--format', 'json']);
+    expect(await argv()).toEqual(['check', '--batch', '--root', directory.path, '--format', 'json', '--no-snapshot']);
   });
 
   it('reads exit 1 as findings', async () => {

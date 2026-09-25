@@ -238,8 +238,12 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
         cwd: projectRoot,
         timeoutMs: commandTimeouts.scopedTests,
       }),
+      /**
+       * The complete check. The harness reads its verdict and findings, never
+       * the snapshot of every evaluated import, so the report leaves it out.
+       */
       ramifyCheck: checkCommand({
-        argv: [ramify, 'check', '--batch', '--root', projectRoot, '--format', 'json'],
+        argv: [ramify, 'check', '--batch', '--root', projectRoot, '--format', 'json', '--no-snapshot'],
         cwd: projectRoot,
         envAdditions: ramifySettings,
         timeoutMs: commandTimeouts.ramifyCheck,

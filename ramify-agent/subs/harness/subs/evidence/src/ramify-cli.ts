@@ -103,13 +103,15 @@ export class RamifyCli {
   }
 
   /**
-   * The complete check, `ramify check --batch --format json`: an independent
-   * session that trusts no retained daemon state, with no deadline. This is
-   * the form a gate runs, and the form that gives a configuration edit its
-   * verdict.
+   * The complete check, `ramify check --batch --format json --no-snapshot`:
+   * an independent session that trusts no retained daemon state, with no
+   * deadline. This is the form a gate runs, and the form that gives a
+   * configuration edit its verdict. The harness reads the verdict and the
+   * findings, never the snapshot of every evaluated import, so the report
+   * leaves it out.
    */
   async checkComplete(projectRoot: string, signal?: AbortSignal): Promise<RamifyCheckResult> {
-    const args = ['check', '--batch', '--root', projectRoot, '--format', 'json'];
+    const args = ['check', '--batch', '--root', projectRoot, '--format', 'json', '--no-snapshot'];
     return answer('complete', args, await this.run(args, projectRoot, signal));
   }
 

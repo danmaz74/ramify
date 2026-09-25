@@ -32,7 +32,7 @@ describe('the captured commands', () => {
     expect(policy.transcript).toEqual({ inlineBodyBytes: 8192 });
     expect(policy.commands.typeCheck.argv).toEqual(['npm', 'run', 'type-check']);
     expect(policy.commands.allTests.argv).toEqual(['npm', 'test']);
-    expect(policy.commands.ramifyCheck.argv).toEqual([ramifyExecutable, 'check', '--batch', '--root', '/project', '--format', 'json']);
+    expect(policy.commands.ramifyCheck.argv).toEqual([ramifyExecutable, 'check', '--batch', '--root', '/project', '--format', 'json', '--no-snapshot']);
     expect(policy.commands.ramifyChanged.argv).toEqual([ramifyExecutable, 'check', '--changed', '--format', 'json', '--deadline', '5000']);
     expect(policy.commands.hookTimeoutMs).toBe(commandTimeouts.hook);
     expect(policy.commands.typeCheck.timeoutMs).toBe(300_000);

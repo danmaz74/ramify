@@ -135,7 +135,7 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
       return exitsAfter(options.testsFailFrom.run, projectRoot, options.testsFailFrom.counter);
     }
     if (name === 'ramifyCheck' && options.realRamifyCheck === true) {
-      return { ...base.commands.ramifyCheck, argv: [ramifyExecutable, 'check', '--batch', '--root', projectRoot, '--format', 'json'] };
+      return { ...base.commands.ramifyCheck, argv: [ramifyExecutable, 'check', '--batch', '--root', projectRoot, '--format', 'json', '--no-snapshot'] };
     }
     return exits(options.failing === name ? 1 : 0, projectRoot);
   };

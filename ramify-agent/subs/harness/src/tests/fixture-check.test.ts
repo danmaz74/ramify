@@ -14,7 +14,7 @@ import { realRamify } from './helpers/runs.js';
  * subject is the fixture.
  *
  * It copies a fresh fixture, runs the complete check a gate runs -- `ramify
- * check --batch --root <copy> --format json`, through the installed command
+ * check --batch --root <copy> --format json --no-snapshot`, through the installed command
  * line and a daemon of its own -- and requires the check to pass with no
  * error. On failure it names every finding's code and location, so a drift is
  * diagnosable from the failure message alone.
