@@ -48,5 +48,9 @@ export class AcquisitionError extends Error {
     super(message);
   }
 }
-export class Cancelled extends Error {}
+/** An acquisition its operation's signal stopped. Session code recognises it by name. */
+export class Cancelled extends Error {
+  override readonly name = 'Cancelled';
+  constructor() { super('Acquisition was cancelled'); }
+}
 export const missing = (error: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '');

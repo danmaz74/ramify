@@ -47,9 +47,13 @@ export class Capture {
   #root: string;
   #version = 0;
   #inputs: readonly CapturedInput[] | undefined;
-  constructor(root: string, readonly limits: AcquisitionLimits, readonly deadline: number, readonly signal?: AbortSignal) {
+  #signal: AbortSignal | undefined;
+  constructor(root: string, readonly limits: AcquisitionLimits, readonly deadline: number, signal?: AbortSignal) {
     this.#root = root;
+    this.#signal = signal;
   }
+  /** The acquiring operation's signal, until the acquisition finishes. */
+  get signal(): AbortSignal | undefined { return this.#signal; }
   get root(): string { return this.#root; }
   /** Labels are relative to the root, so every recorded input is relabelled. */
   set root(root: string) {
@@ -80,11 +84,16 @@ export class Capture {
     return entry.sha256 ??= hash(entry.bytes ?? JSON.stringify([entry.signature, entry.link, entry.entries, entry.exactName]));
   }
   check(): void {
-    if (this.signal?.aborted) throw new Cancelled();
+    if (this.#signal?.aborted) throw new Cancelled();
     if (this.#disposed) throw new AcquisitionError('read-failure', this.root, 'Input view is disposed');
     if (!this.#acquired && performance.now() >= this.deadline) throw new AcquisitionError('resource-limit', this.root, 'Acquisition deadline exceeded');
   }
-  finishAcquisition(): void { this.#acquired = true; }
+  /**
+   * A retained capture outlives the operation that acquired it. It releases
+   * that operation's signal, so a later abort of the finished operation never
+   * cancels another; each later operation checks its own signal.
+   */
+  finishAcquisition(): void { this.#acquired = true; this.#signal = undefined; }
   /** The observer keeps acquisition reads separate from compiler callbacks. */
   retainAcquisition(): void { this.#acquisition = new Map(this.observations().map(entry => [entry.path, entry])); }
   async reported<T>(operation: () => Promise<T>): Promise<T> {

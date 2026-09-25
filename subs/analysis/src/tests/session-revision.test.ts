@@ -700,6 +700,52 @@ describe('cancelled sweeps and revisions', () => {
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }
   }), timeout);
+
+  // An acquisition cancellation that the current operation did not request can
+  // only come from state an earlier, aborted operation left behind.
+  const staleCancellation = (): Error => Object.assign(new Error('Acquisition was cancelled'), { name: 'Cancelled' });
+
+  it('reopens the project when reobservation meets a cancellation the sweep did not request', () => fixture(async (root, inputs) => {
+    const { handle, state, revision } = await opened(inputs);
+    try {
+      const { observer, reobserve } = instrumentObserver(state);
+      const compiler = instrumentCompiler(state);
+      reobserve.mockRejectedValueOnce(staleCancellation());
+      await replace(root, paths.description, parentExposure, '');
+      const result = await handle.sweep({ signal: new AbortController().signal });
+      expect(result.status).toBe('revised');
+      if (result.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(result)}`);
+      expect(result.revision.sequence).toBe(revision.sequence + 1);
+      expect(result.revision.checked.path).toBe('broad');
+      expect(findings(result.revision)).toEqual([['not-visible', paths.rootMain]]);
+      // The released observer and the compiler reporting to its sink were disposed and replaced.
+      expect(compiler.dispose).toHaveBeenCalledTimes(1);
+      await expect(observer.reobserve()).rejects.toThrow('disposed');
+      expect(state.observer).not.toBeNull();
+      expect(await handle.sweep()).toEqual({ status: 'unchanged' });
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('reopens the project when an update meets a cancellation it did not request', () => fixture(async (root, inputs) => {
+    const { handle, state } = await opened(inputs);
+    try {
+      const { observer, apply } = instrumentObserver(state);
+      apply.mockRejectedValueOnce(staleCancellation());
+      await replace(root, paths.description, parentExposure, '');
+      const reopened = await revised(handle, [paths.description]);
+      expect(reopened.checked.path).toBe('broad');
+      expect(reopened.changed).toEqual([paths.description]);
+      expect(findings(reopened)).toEqual([['not-visible', paths.rootMain]]);
+      expect(apply).toHaveBeenCalledTimes(1);
+      await expect(observer.apply([])).rejects.toThrow('disposed');
+      await put(root, paths.description, fixtureFiles[paths.description]!);
+      expect((await revised(handle, [paths.description])).checked.path).toBe('description');
+      await audited(handle);
+      await equalToBatch(handle, inputs);
+    } finally { await handle.dispose(); }
+  }), timeout);
 });
 
 describe('timing fields outside the revision total', () => {

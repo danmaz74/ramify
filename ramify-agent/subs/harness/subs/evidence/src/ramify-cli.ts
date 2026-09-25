@@ -84,13 +84,15 @@ export class RamifyCli {
    */
   async materialize(projectRoot: string, apiFrom?: string, signal?: AbortSignal): Promise<MaterializeResult> {
     const args = ['materialize', '--view', 'architect', ...(apiFrom === undefined ? [] : ['--view', 'api', '--from', apiFrom === '' ? '.' : apiFrom]), '--root', projectRoot];
-    // A request against a tree that has just changed can be superseded by a
-    // newer revision of the daemon's own analysis, and answers that it
-    // materialized nothing. It is transient and it is the CLI's to resolve,
-    // so the invocation is repeated a bounded number of times, waiting
-    // longer each time for the analysis that superseded it to finish, before
-    // the harness reports that the view could not be materialized. Nothing
-    // of the output is read to decide it.
+    // Any failure is repeated a bounded number of times, waiting longer each
+    // time, before the harness reports that the view could not be
+    // materialized with the last failure's own output. A request against a
+    // tree that has just changed can be superseded by a newer revision of the
+    // daemon's own analysis, which settles within these pauses. A failure the
+    // daemon repeats until its next file event (an analysis-failed answer
+    // once did) outlasts them, so a caller that briefs several turns
+    // materializes again for a later one rather than repeating this result.
+    // Nothing of the output is read to decide a retry.
     let last = '';
     for (let attempt = 1; attempt <= materializeAttempts; attempt += 1) {
       const result = await this.run(args, projectRoot, signal);

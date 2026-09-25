@@ -158,6 +158,7 @@ export interface ProjectObserver {
   readonly inputs: readonly CapturedInput[];
   readonly inputId: string;
   readonly sink: ObservationSink;
+  /** An aborted signal rejects `apply` and `reobserve` with an error named `Cancelled`, or with the signal's reason. */
   apply(changes: readonly ObservedChange[], signal?: AbortSignal): Promise<InventoryUpdate>;
   /** Release compiler-reported observations before a compiler update that reports them again. */
   retire(retirement: ObservationRetirement): Promise<void>;
