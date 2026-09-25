@@ -3,7 +3,7 @@ import type {
   CheckFindingActorView, CheckFindingDecisionView, CheckFindingDetail, CheckFindingListResponse, CheckFindingSettlement,
   CheckFindingSummaryView, PendingUserDecision, PlanDeviationView, ReviewCoverageView, ReviewRequestView, UnresolvedReasonView,
 } from '../../harness/src/interfaces/protocol/check-findings.js';
-import type { RunCommandInput } from '../../harness/src/interfaces/protocol/runs.js';
+import type { RunCommandInput, RunEnvironmentProblem } from '../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, newCommandId, type ProtocolClient } from './client.js';
 import { useDecisionFocus } from './decision-waits.js';
 import { chapterHref } from './routes.js';
@@ -612,6 +612,52 @@ export function PlanDeviations({ client, planId, runId, version, onOpenGate }: S
           </>
         );
       })()}
+    </section>
+  );
+}
+
+// The run's environment problems.
+
+/** What the operator's answer to an environment problem did, in words. */
+const environmentAnswerText: Readonly<Record<RunEnvironmentProblem['answer'], string>> = {
+  waiting: 'The run holds this work item until you answer: resume it once the environment is corrected, or end the run.',
+  resumed: 'You resumed the run; the work item returned to its local architect with this diagnosis.',
+  ended: 'You ended the run.',
+};
+
+/**
+ * Every environment problem the global architect reported: the conflict
+ * lies in how the gate or the harness runs, not in the plan or the
+ * architecture. Each shows its work item, request, diagnosis and suggestion,
+ * and one still waiting shows its CheckFinding's answer form.
+ */
+export function EnvironmentProblems({ client, planId, runId, version, problems, onOpenGate }: Scope & {
+  readonly problems: readonly RunEnvironmentProblem[];
+  readonly onOpenGate?: (gate: string) => void;
+}) {
+  const waiting = new Set(problems.filter(problem => problem.answer === 'waiting').map(problem => problem.checkFinding));
+  const state = useRunQuery(`environment-problems:${runId}`, version, () => client.getCheckFindings(planId, runId, { select: 'all', order: 'attention' }));
+  return (
+    <section className="panel" aria-labelledby="environment-problems-heading">
+      <h2 id="environment-problems-heading">Environment problems</h2>
+      <ul className="cards">
+        {problems.map(problem => (
+          <li key={problem.problem} className={`card environment-problem environment-problem-${problem.answer}`} aria-label={`Environment problem ${problem.problem}`}>
+            <p><strong>{problem.problem}</strong>: work item {problem.workItem}, request {problem.request}, CheckFinding <code>{problem.checkFinding}</code>.</p>
+            <p><strong>Diagnosis:</strong> {problem.diagnosis}</p>
+            <p><strong>Suggestion:</strong> {problem.suggestion}</p>
+            <p className="muted">{environmentAnswerText[problem.answer]}</p>
+          </li>
+        ))}
+      </ul>
+      {waiting.size > 0 && state.status === 'failed' && <p className="failure" role="alert">Could not load the answer forms: {state.error.message}</p>}
+      {waiting.size > 0 && state.status === 'ready' && (
+        <ul className="cards check-finding-cards">
+          {state.data.items.filter(summary => waiting.has(summary.id) && summary.pendingUserDecision !== null).map(summary => (
+            <CheckFindingCard key={summary.id} client={client} planId={planId} runId={runId} version={state.data.version} summary={summary} onOpenGate={onOpenGate} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

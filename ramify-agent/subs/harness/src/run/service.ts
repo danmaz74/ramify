@@ -83,10 +83,12 @@ import {
 } from '../architecture/records.js';
 import { forkMessage, unresolvedForkMessage } from '../architecture/session.js';
 import {
-  defaultMaxPlanDeviations, deviationLayout, deviationText, planDeviationId, planDeviationSchema, planLines, unresolvedRequestId, unresolvedRequestSchema,
-  type DeviationBody, type PlanDeviation, type UnresolvedRequest,
+  defaultMaxPlanDeviations, deviationLayout, deviationText, environmentProblemId, environmentProblemSchema,
+  planDeviationId, planDeviationSchema, planLines, unresolvedRequestId, unresolvedRequestSchema,
+  type DeviationBody, type EnvironmentBody, type EnvironmentProblem, type PlanDeviation, type UnresolvedRequest,
 } from '../deviations/records.js';
 import { deviationCommands, isPlanDeviation, nextCheckFinding } from '../deviations/finding.js';
+import { environmentCommands, environmentOptions } from '../deviations/environment.js';
 import {
   forkJsonSchema, forkToolName, validateFork,
   type ForkSubmission, type PlacementEvidence, type PlacementRequestBody,
@@ -3423,6 +3425,8 @@ export class RunService {
     let unresolvedRequest: { id: string; findings: readonly string[]; gaps: readonly string[] } | undefined;
     /** The plan deviation the global architect recorded for this work item's last unresolved request, delivered once. */
     let deviationRecorded: PlanDeviation | undefined;
+    /** The environment problem the global architect reported for that request, after which the operator resumed the run, delivered once. */
+    let environmentResumed: { problem: EnvironmentProblem; note: string } | undefined;
     /** A cycle one of this item's registrations closed, delivered once as a finding. */
     let cycleFinding: DependencyCycle | undefined;
     /** Providers of this item's requirements that reported they cannot conform. */
@@ -3514,6 +3518,7 @@ export class RunService {
         // the one that just answered this architect's unresolved request.
         deviations: this.deviationsOf(run),
         ...(deviationRecorded === undefined ? {} : { deviationRecorded: deviationRecorded.id }),
+        ...(environmentResumed === undefined ? {} : { environmentResumed }),
         ...(returned === undefined ? {} : { reconciliation: this.reconciliationBriefing(run, returned, undelivered) }),
         ...(integration === undefined ? {} : { integration }),
         ...(scenarios.length === 0 ? {} : { scenarios }),
@@ -3541,6 +3546,7 @@ export class RunService {
       cycleFinding = undefined;
       blocked = undefined;
       deviationRecorded = undefined;
+      environmentResumed = undefined;
       released = null;
       revisionReports = [];
       returned = undefined;
@@ -3605,9 +3611,10 @@ export class RunService {
       if (result.value.kind === 'unresolved') {
         // The request cannot be met as stated. The global architect answers
         // it: a placement fix, a plan deviation this work item goes on
-        // under, or nothing possible, which ends the run. What the work item
-        // declared and never passed is pending again first, as for a
-        // placement question.
+        // under, an environment problem the run holds for until the
+        // operator resumes it, or nothing possible, which ends the run. What
+        // the work item declared and never passed is pending again first,
+        // as for a placement question.
         if (!await this.withdrawScenarios(run, item, 'unresolved-requested')) return null;
         const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
           invocation: result.id, conflict: result.value.conflict, evidence: result.value.evidence,
@@ -3617,6 +3624,9 @@ export class RunService {
         if (resolution.kind === 'deviation') {
           deviationRecorded = resolution.deviation;
           continuing = 'deviation-recorded';
+        } else if (resolution.kind === 'environment') {
+          environmentResumed = { problem: resolution.problem, note: resolution.note };
+          continuing = 'environment-resumed';
         } else {
           continuing = 'placement-answered';
         }
@@ -4129,9 +4139,10 @@ export class RunService {
    * architect context with it, as for a placement request. The fork answers
    * with a placement decision, delivered as a placement answer is; with a
    * plan deviation, recorded with the CheckFinding that asks the person to
-   * accept or reject it, under which the work item goes on; or with nothing
-   * possible, which ends the run, as does a fork that cannot decide within
-   * its retries. Null once the run has ended.
+   * accept or reject it, under which the work item goes on; with an
+   * environment problem, which holds the work item until the operator
+   * resumes the run; or with nothing possible, which ends the run, as does a
+   * fork that cannot decide within its retries. Null once the run has ended.
    */
   private async resolveUnresolved(
     run: Run,
@@ -4214,6 +4225,7 @@ export class RunService {
           plan: { path: planFile, text: plan },
           deviations: this.deviationsOf(run),
           deviationLimit: this.deviationLimit(run),
+          environmentProblems: this.environmentProblemsOf(run),
           view,
           ...(unavailable === null ? {} : { viewUnavailable: unavailable }),
           registry: current.registry,
@@ -4234,7 +4246,7 @@ export class RunService {
           : {}),
         keep: ended => (context.session === null && ended === 'submitted' ? kept : finished('not-kept')),
         toolName: forkToolName,
-        description: 'End this fork with its answer to the unresolved request: a placement decision, a plan deviation, nothing possible, or the findings and gaps of a fork that could not decide. The harness validates it; an invalid submission is returned with every error and its path.',
+        description: 'End this fork with its answer to the unresolved request: a placement decision, a plan deviation, an environment problem, nothing possible, or the findings and gaps of a fork that could not decide. The harness validates it; an invalid submission is returned with every error and its path.',
         inputSchema: forkJsonSchema,
         submissionSchema: 'ramify-agent.fork-submission/1',
         validate: input => validateFork(input, placementEvidenceOf(current, index), {
@@ -4280,6 +4292,9 @@ export class RunService {
       }
       if (value.kind === 'deviation') {
         return this.recordDeviation(run, item, id, result.id, value.deviation, { path: planFile, text: plan });
+      }
+      if (value.kind === 'environment') {
+        return this.reportEnvironment(run, item, request, result.id, value);
       }
 
       // A placement fix: the evidence must still be what the fork decided on.
@@ -4374,6 +4389,87 @@ export class RunService {
   }
 
   /**
+   * Records the environment problem a fork reported, with its CheckFinding,
+   * as one line, and holds the work item until the operator answers it:
+   * nothing is placed, no deviation is recorded and the plan file is
+   * untouched. Their resumption returns the work item to its local
+   * architect with the diagnosis; their answer `end` ends the run.
+   */
+  private async reportEnvironment(
+    run: Run,
+    item: WorkItem,
+    request: UnresolvedRequest,
+    invocation: string,
+    body: EnvironmentBody,
+  ): Promise<UnresolvedResolution | null> {
+    const id = environmentProblemId(run.log.count('environment-reported') + 1);
+    let problem: EnvironmentProblem | undefined;
+    const committed = await commitCheckFindingChange(run, ({ log, state }) => {
+      if (log.all('environment-reported').some(event => event.data.request === request.id)) return { stale: `${request.id} is already answered with an environment problem` };
+      const record = environmentProblemSchema.parse({
+        schema: 'ramify-agent.environment-problem/1',
+        id,
+        request: request.id,
+        workItem: item.id,
+        invocation,
+        diagnosis: body.diagnosis,
+        suggestion: body.suggestion,
+        checkFinding: nextCheckFinding(state),
+      } satisfies EnvironmentProblem);
+      problem = record;
+      return {
+        commands: environmentCommands(state, record, request, item.module),
+        compose: decided => ({
+          event: {
+            type: 'environment-reported',
+            data: { request: request.id, problem: id, workItem: item.id, invocation, checkFinding: record.checkFinding, checkFindings: [...decided.events] },
+          },
+          records: [{ path: deviationLayout.environment(id), id, revision: 1, body: record }],
+        }),
+      };
+    }, this.now());
+    if (committed.kind === 'refused' && committed.refusal.reason === 'run-ended') return null;
+    if (committed.kind !== 'committed' || problem === undefined) {
+      await this.fail(run, 'internal', `Environment problem ${id} of ${request.id} could not be recorded: ${committed.kind === 'refused' ? committed.refusal.message : 'it was already recorded'}`);
+      return null;
+    }
+    run.notify();
+    const note = await this.awaitEnvironmentAnswer(run, problem);
+    return note === null ? null : { kind: 'environment', problem, note };
+  }
+
+  /**
+   * Waits for the operator's answer to an environment problem: the run goes
+   * no further meanwhile, with no time limit, and the run's decision
+   * requests say it waits. Their resumption answers with their note, or the
+   * empty string for none; their answer `end` ends the run with the
+   * diagnosis and their note. A stop or the service closing ends the wait.
+   */
+  private async awaitEnvironmentAnswer(run: Run, problem: EnvironmentProblem): Promise<string | null> {
+    for (;;) {
+      if (this.ignoring(run)) return null;
+      // Registered before the state is read, so an answer in between still wakes it.
+      const changed = run.changed();
+      const entry = checkFindingStateOf(run.log.ledger).findings.get(problem.checkFinding);
+      if (entry === undefined) {
+        await this.fail(run, 'internal', `Environment problem ${problem.id} names ${problem.checkFinding}, which is no CheckFinding`);
+        return null;
+      }
+      if (entry.pendingUserDecision === null) {
+        const settled = entry.decisions.find(decision => decision.id === entry.settledBy);
+        if (entry.reason === 'waived') return settled === undefined || settled.actor.kind !== 'user' ? '' : settled.rationale;
+        const answer = [...entry.decisions].reverse().find(decision => decision.decision.action === 'answer-user-decision');
+        const option = answer?.decision.action === 'answer-user-decision' ? answer.decision.option : null;
+        await this.fail(run, 'unresolvable-requirement',
+          `The operator ended the run on environment problem ${problem.id} of ${problem.workItem}${option === environmentOptions.end ? '' : ` (answer ${option ?? 'none'})`}: ${answer?.rationale ?? 'no answer was recorded'}. The global architect's diagnosis: ${problem.diagnosis}`,
+          [deviationLayout.environment(problem.id), deviationLayout.request(problem.request)]);
+        return null;
+      }
+      await changed;
+    }
+  }
+
+  /**
    * Waits for the person's decision on a deviation the run recorded past its
    * limit: the run goes no further meanwhile, with no time limit, and the
    * run's decision requests say it waits. Their acceptance lets the work item
@@ -4407,6 +4503,21 @@ export class RunService {
     return run.log.all('plan-deviation-recorded').flatMap(event => {
       const parsed = planDeviationSchema.safeParse(this.committedBody(run, deviationLayout.deviation(event.data.deviation)));
       return parsed.success ? [parsed.data] : [];
+    });
+  }
+
+  /**
+   * Every environment problem the run recorded, in order, with the
+   * operator's note where they resumed the run for it, else null.
+   */
+  private environmentProblemsOf(run: Run): Array<{ problem: EnvironmentProblem; resumed: string | null }> {
+    const findings = checkFindingStateOf(run.log.ledger).findings;
+    return run.log.all('environment-reported').flatMap(event => {
+      const parsed = environmentProblemSchema.safeParse(this.committedBody(run, deviationLayout.environment(event.data.problem)));
+      if (!parsed.success) return [];
+      const entry = findings.get(parsed.data.checkFinding);
+      const settled = entry?.reason === 'waived' ? entry.decisions.find(decision => decision.id === entry.settledBy) : undefined;
+      return [{ problem: parsed.data, resumed: settled === undefined ? null : settled.rationale }];
     });
   }
 
@@ -7778,10 +7889,15 @@ function finalScenarioGaps(attempt: GateAttempt, required: readonly string[]): s
   return missing.length === 0 ? null : `${missing.join(', ')} did not pass in it`;
 }
 
-/** What one unresolved request resolved to: a placement fix, or a plan deviation the work item goes on under. */
+/**
+ * What one unresolved request resolved to: a placement fix, a plan deviation
+ * the work item goes on under, or an environment problem the operator
+ * answered by resuming the run, with their note.
+ */
 type UnresolvedResolution =
   | { readonly kind: 'decided'; readonly decision: PlacementDecision }
-  | { readonly kind: 'deviation'; readonly deviation: PlanDeviation };
+  | { readonly kind: 'deviation'; readonly deviation: PlanDeviation }
+  | { readonly kind: 'environment'; readonly problem: EnvironmentProblem; readonly note: string };
 
 /** What one placement request resolved to, for the local architect that made it. */
 type PlacementResolution =

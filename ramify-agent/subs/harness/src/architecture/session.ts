@@ -2,7 +2,7 @@ import { architectViewDirectory } from '../../subs/evidence/src/views.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import type { PlacementDecision, PlacementRequest } from './records.js';
-import { deviationText, type PlanDeviation, type UnresolvedRequest } from '../deviations/records.js';
+import { deviationText, type EnvironmentProblem, type PlanDeviation, type UnresolvedRequest } from '../deviations/records.js';
 
 /*
  * What one fork of the architect context is given: the focused request, the
@@ -93,6 +93,8 @@ export interface UnresolvedForkBriefing extends Omit<ForkBriefing, 'request'> {
   readonly deviations: readonly PlanDeviation[];
   /** How many deviations the run records before the next one waits for the person. */
   readonly deviationLimit: number;
+  /** Every environment problem already reported in this run, with the operator's note where they resumed it. */
+  readonly environmentProblems?: ReadonlyArray<{ readonly problem: EnvironmentProblem; readonly resumed: string | null }> | undefined;
 }
 
 /** The first user message of one fork of an unresolved request. */
@@ -133,8 +135,15 @@ export function unresolvedForkMessage(briefing: UnresolvedForkBriefing): string 
   lines.push('', briefing.deviations.length >= briefing.deviationLimit
     ? `This run has recorded ${briefing.deviations.length} deviations, its limit. A further one is recorded, and the run then waits for the person to accept or reject it before it goes on.`
     : `This run records at most ${briefing.deviationLimit} deviations before the next one waits for the person; ${briefing.deviations.length} are recorded.`);
+  const reported = briefing.environmentProblems ?? [];
+  if (reported.length > 0) {
+    lines.push('', '## Environment problems already reported', '');
+    for (const { problem, resumed } of reported) {
+      lines.push(`- \`${problem.id}\`, for ${problem.request} of ${problem.workItem}: ${problem.diagnosis.replace(/\s+/gu, ' ')} ${resumed === null ? 'The operator has not resumed the run for it.' : `The operator resumed the run${resumed.trim() === '' ? '.' : `, noting: ${resumed.replace(/\s+/gu, ' ')}`}`}`);
+    }
+  }
   lines.push(...evidenceSections(briefing));
-  lines.push('', 'Investigate and answer: a placement decision, a plan deviation that keeps as much of the plan as the conflict allows, or that nothing is possible. The parent context does not reassess your answer.');
+  lines.push('', 'Investigate and answer: a placement decision, a plan deviation that keeps as much of the plan as the conflict allows, an environment problem for the operator, or that nothing is possible. The parent context does not reassess your answer.');
   return lines.join('\n');
 }
 

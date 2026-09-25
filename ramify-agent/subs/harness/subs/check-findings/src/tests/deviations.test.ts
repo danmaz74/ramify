@@ -3,7 +3,7 @@ import type { CheckFindingCommand, CheckFindingState } from '../interfaces/check
 import { decideCheckFindingChange } from '../decide.js';
 import { selectCheckFindings } from '../queries.js';
 import {
-  commit, commitAll, concern, decision, deviation, deviationRequest, dispose, report, workItem,
+  commit, commitAll, concern, decision, deviation, deviationRequest, dispose, environmentProblem, report, workItem,
 } from './fixtures/builders.js';
 
 /*
@@ -70,6 +70,38 @@ describe('plan deviations', () => {
     const state = commitAll([
       report(concern({ attempt: 'rq-0001.a01', key: 'c1', summary: 'A high concern', hash: 1, risk: 'high', credibility: 'human-reviewed', ground: { ref: 'plan', hash: `sha256:${'1'.repeat(64)}` } })),
       report(deviation({ key: 'pd-001', hash: 2 })),
+    ]);
+    const selected = selectCheckFindings(state, { kind: 'list', select: 'all', order: 'attention' });
+    if (!selected.ok || selected.view.kind !== 'list') throw new Error('no list');
+    expect(selected.view.items.map(item => item.id)).toEqual(['cf-0002', 'cf-0001']);
+  });
+});
+
+describe('environment problems', () => {
+  /** One reported environment problem, awaiting the operator's answer. */
+  function reported(): CheckFindingState {
+    return commitAll([report(environmentProblem({ key: 'ep-001', hash: 1 })), dispose('cf-0001', 1, deviationRequest())]);
+  }
+
+  it('is the run\'s, judged, verified by assessment and agent-generated', () => {
+    const valid = environmentProblem({ key: 'ep-001', hash: 1 });
+    expect(refusal(commitAll([]), report(valid))).toBeNull();
+    expect(refusal(commitAll([]), report({ ...valid, owner: workItem('wi-001') }))).toBe('invalid-report');
+    expect(refusal(commitAll([]), report({ ...valid, judgment: null }))).toBe('invalid-report');
+    expect(refusal(commitAll([]), report({ ...valid, credibility: 'ungrounded' }))).toBe('invalid-report');
+  });
+
+  it('the operator\'s waiver settles its request, and no one else\'s does', () => {
+    const state = reported();
+    expect(refusal(state, dispose('cf-0001', 2, { ...waive, actor: { kind: 'agent', role: 'global-architect', invocation: 'inv-1' } }))).toBe('awaiting-user-decision');
+    const resumed = commit(state, dispose('cf-0001', 2, waive));
+    expect(resumed.findings.get('cf-0001')).toMatchObject({ standing: 'closed', reason: 'waived', pendingUserDecision: null });
+  });
+
+  it('comes before an ordinary signal in the attention order', () => {
+    const state = commitAll([
+      report(concern({ attempt: 'rq-0001.a01', key: 'c1', summary: 'A high concern', hash: 1, risk: 'high', credibility: 'human-reviewed', ground: { ref: 'plan', hash: `sha256:${'1'.repeat(64)}` } })),
+      report(environmentProblem({ key: 'ep-001', hash: 2 })),
     ]);
     const selected = selectCheckFindings(state, { kind: 'list', select: 'all', order: 'attention' });
     if (!selected.ok || selected.view.kind !== 'list') throw new Error('no list');

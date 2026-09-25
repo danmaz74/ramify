@@ -57,9 +57,9 @@ function decideReport(state: CheckFindingState, report: CheckFindingReportInput)
   if (report.observation.kind === 'review-concern' && (report.judgment === null || report.verification.kind !== 'assessment')) {
     return reject('invalid-report', 'a review concern carries its judgment and is verified by assessment');
   }
-  if (report.observation.kind === 'plan-deviation'
+  if ((report.observation.kind === 'plan-deviation' || report.observation.kind === 'environment-problem')
     && (report.judgment === null || report.verification.kind !== 'assessment' || report.credibility !== 'agent-generated' || report.owner.kind !== 'run')) {
-    return reject('invalid-report', 'a plan deviation is the run\'s, carries the architect\'s judgment, is verified by assessment and is agent-generated');
+    return reject('invalid-report', `a ${report.observation.kind === 'plan-deviation' ? 'plan deviation' : 'environment problem'} is the run's, carries the architect's judgment, is verified by assessment and is agent-generated`);
   }
   if (report.observation.kind === 'check-failed' && report.verification.kind !== 'check') {
     return reject('invalid-report', 'a failed check is verified by a check of its obligation');
@@ -139,17 +139,19 @@ function decideDisposal(state: CheckFindingState, id: CheckFindingId, expectedRe
 }
 
 /**
- * A person's waiver of a plan deviation that awaits their decision: it is
- * the answer the request asks for, accepting the deviation, so it settles
- * the request with it. No one else settles a request by waiving.
+ * A person's waiver of a plan deviation or an environment problem that
+ * awaits their decision: it is the answer the request asks for, accepting
+ * the deviation or resuming the run, so it settles the request with it. No
+ * one else settles a request by waiving.
  */
 function acceptsDeviation(entry: CheckFindingEntry, input: CheckFindingDecisionInput): boolean {
-  return input.decision.action === 'waive' && input.actor.kind === 'user' && isPlanDeviation(entry);
+  return input.decision.action === 'waive' && input.actor.kind === 'user' && awaitsThePerson(entry);
 }
 
-/** Whether a CheckFinding records a departure from the plan. */
-function isPlanDeviation(entry: Pick<CheckFindingEntry, 'reports'>): boolean {
-  return entry.reports[0]?.observation.kind === 'plan-deviation';
+/** Whether a CheckFinding records a departure from the plan or an environment problem: the run's, for the person to answer. */
+function awaitsThePerson(entry: Pick<CheckFindingEntry, 'reports'>): boolean {
+  const kind = entry.reports[0]?.observation.kind;
+  return kind === 'plan-deviation' || kind === 'environment-problem';
 }
 
 /** Why this action does not fit the CheckFinding, its evidence or its authority, or null. */

@@ -45,8 +45,9 @@ export type CheckFindingRelationId = z.infer<typeof checkFindingRelationIdSchema
 
 /**
  * What produced a report: `review:code`, `review:scope`, `review:design`,
- * `check:scenario`, or `plan:deviation` for a departure from the plan the
- * global architect recorded. The trusted integration names it; a reporting
+ * `check:scenario`, `plan:deviation` for a departure from the plan the
+ * global architect recorded, or `plan:environment` for an environment
+ * problem it reported. The trusted integration names it; a reporting
  * agent never does.
  */
 export const checkFindingProducerSchema = z.string().regex(/^(review|check|plan):[a-z][a-z0-9-]*$/);
@@ -171,9 +172,12 @@ export type CheckFindingReportCredibility = z.infer<typeof checkFindingReportCre
  * asserted, or a plan deviation: the run does something other than a
  * requirement of its plan states, because the requirement cannot be met as
  * written. A plan deviation is the person's to accept or reject; it holds
- * no work item and no gate.
+ * no work item and no gate. An environment problem is the global
+ * architect's report that a conflict lies in how the gate or the harness
+ * runs, not in the plan or the architecture; the person resumes the run
+ * or ends it.
  */
-export const checkFindingObservationKindSchema = z.enum(['check-failed', 'review-concern', 'plan-deviation']);
+export const checkFindingObservationKindSchema = z.enum(['check-failed', 'review-concern', 'plan-deviation', 'environment-problem']);
 export type CheckFindingObservationKind = z.infer<typeof checkFindingObservationKindSchema>;
 
 export const checkFindingObservationSchema = z.object({

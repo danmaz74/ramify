@@ -80,7 +80,7 @@ describe('the fork submission schema', () => {
   test('is a union discriminated on kind, and has no field for an ID the harness knows', () => {
     const union = (forkJsonSchema as { anyOf?: unknown[]; oneOf?: unknown[] });
     const members = (union.anyOf ?? union.oneOf) as Array<{ properties?: Record<string, unknown> }>;
-    expect(members).toHaveLength(4);
+    expect(members).toHaveLength(5);
     const text = JSON.stringify(forkJsonSchema);
     for (const assigned of ['"id"', '"authority"', '"invocation"', '"schema"', '"revision"', '"origin"', '"previousOwner"', '"view"', '"hash"']) {
       expect(text).not.toContain(assigned);

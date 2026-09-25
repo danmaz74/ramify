@@ -383,6 +383,18 @@ possible after the run ends. Past the run's limit of deviations, five by
 default, a further one holds the work item that asked until the user
 decides, and a rejection there fails the run.
 
+### Environment problems
+
+The global architect may also answer an unresolved request with an
+environment problem: the conflict lies in how the gate or the harness runs,
+not in the plan or the architecture. Its CheckFinding is the run's, high
+risk and agent-generated, with the diagnosis as its rationale and the
+operator's suggested change as its remedy. It awaits the operator from the
+start and holds the work item that asked. The operator resumes the run by
+answering `resume` or waiving it, which closes it as waived and returns the
+work item to its local architect with the diagnosis; answering `end` fails
+the run. Nothing is placed and no deviation is recorded.
+
 ## Application flow
 
 ```mermaid
