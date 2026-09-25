@@ -403,7 +403,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
     // The first commit is the feature files', which no gate made.
     expect(git.commits()[0]!.id).toBe(materialized);
     const scripted = git.commits().slice(1).map(commit => commit.id);
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(committing.map(attempt => attempt.commit)).toEqual(scripted);
     expect(committing.map(attempt => attempt.audited)).toEqual(scripted);
     expect(committing.map(attempt => attempt.head)).toEqual([materialized, ...scripted.slice(0, -1)]);

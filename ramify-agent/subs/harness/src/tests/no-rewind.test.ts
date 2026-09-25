@@ -366,7 +366,7 @@ describe('adding work leaves every completed piece completed', () => {
     // The first iteration's failed attempt and repaired attempt were each
     // committed, and the second iteration added its own beside them: three
     // revisions, none of them replacing another.
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     const committed = git.messages();
     expect(committed.filter(message => message.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
     expect(committed.filter(message => message.includes('Ramify-Iteration: wi-001.i02'))).toHaveLength(1);

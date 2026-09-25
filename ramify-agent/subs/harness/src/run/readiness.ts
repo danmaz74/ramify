@@ -1,12 +1,12 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
-import type { CheckExecutionPort } from '../checks/execution.js';
+import type { CheckExecutionPort, GateCommandStarted } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { allProjectChecks, checkpointPolicies, planScenarioCheck } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt, GateCommandRecord } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
-import { gitService, GitError, type GitService } from '../../subs/evidence/src/git.js';
+import { gitService, GitError, runBranchName, type GitService } from '../../subs/evidence/src/git.js';
 import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
@@ -42,6 +42,8 @@ interface StepResult {
 }
 
 export interface ReadinessRequest {
+  /** The run whose branch the last step creates. */
+  readonly runId: string;
   /** The count of committed readiness attempts, this one included. */
   readonly attempt: number;
   readonly projectRoot: string;
@@ -58,6 +60,8 @@ export interface ReadinessRequest {
   /** The commit readiness ran on. */
   readonly head: string;
   readonly signal?: AbortSignal | undefined;
+  /** Called as each command of the baseline gate starts. */
+  readonly started?: GateCommandStarted | undefined;
 }
 
 /** What one readiness attempt established, with the gate that ran the baseline. */
@@ -92,7 +96,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
 
   const blocked = steps.find(step => step.outcome !== 'passed');
   if (blocked !== undefined) {
-    for (const step of gateSteps) {
+    for (const step of [...gateSteps, 'run-branch'] as const) {
       steps.push({ step, outcome: 'not-verified', detail: `not reached: ${blocked.step} did not pass` });
     }
     return { attempt: attemptRecord(request, steps, nested, null), gate: null };
@@ -116,6 +120,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
     head: request.head,
     checks,
     ...(request.signal === undefined ? {} : { signal: request.signal }),
+    ...(request.started === undefined ? {} : { started: request.started }),
   });
 
   // The baseline's three steps read the gate's own command records. The
@@ -154,6 +159,15 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
 
   steps.push(acceptanceStep('baseline-acceptance', gate.commands[acceptanceIndex.quick], acceptance.modules));
   steps.push(acceptanceStep('acceptance-full', gate.commands[acceptanceIndex.full], acceptance.modules));
+
+  // The run branch is created last, once the repository is clean and the
+  // baseline passed, so a readiness that fails leaves the project on its own
+  // branch. A branch git refuses fails readiness here, with git's message,
+  // before any work: the first commit would otherwise fail far from the cause.
+  const failed = steps.find(step => step.outcome !== 'passed');
+  steps.push(failed === undefined
+    ? await runBranchStep(projectRoot, request.runId, request.signal, request.git ?? gitService)
+    : { step: 'run-branch', outcome: 'not-verified', detail: `not reached: ${failed.step} did not pass` });
 
   return { attempt: attemptRecord(request, steps, nested, gate), gate };
 }
@@ -352,23 +366,52 @@ async function acceptanceRunnerStep(projectRoot: string, captured: CapturedProje
   };
 }
 
-function nestedPackagesStep(
+/**
+ * The nested packages whose tests the gate runs: those the policy captured
+ * with a `test` script. Only these must be installed; the gate runs nothing
+ * in any other, so a missing `node_modules` there is noted and never fails.
+ */
+export function gatedNestedPackages(policy: RunPolicy): Set<string> {
+  return new Set(policy.commands.nestedPackages.filter(entry => entry.tests !== null).map(entry => entry.directory));
+}
+
+/** The nested packages step: every package whose tests the gate runs is installed. */
+export function nestedPackagesStep(
   nested: ReadonlyArray<{ directory: string; installed: boolean; testScript: string | null }>,
   policy: RunPolicy,
 ): StepResult {
-  const missing = nested.filter(entry => !entry.installed);
+  const gated = gatedNestedPackages(policy);
+  const missing = nested.filter(entry => !entry.installed && gated.has(entry.directory));
+  const ungated = nested.filter(entry => !entry.installed && !gated.has(entry.directory)).map(entry => entry.directory);
   const captured = new Set(policy.commands.nestedPackages.map(entry => entry.directory));
   const added = nested.filter(entry => !captured.has(entry.directory)).map(entry => entry.directory);
   const summary = nested.length === 0 ? 'no independent nested package' : `${nested.length} independent nested package${nested.length === 1 ? '' : 's'}: ${nested.map(entry => `${entry.directory} (${entry.testScript === null ? 'no test script' : `test: ${entry.testScript}`})`).join(', ')}`;
+  const uninstalled = ungated.length === 0 ? '' : `; node_modules is missing in ${ungated.join(', ')}, whose tests the gate does not run, so ${ungated.length === 1 ? 'it need' : 'they need'} not be installed`;
   if (missing.length > 0) {
     return {
       step: 'nested-packages',
       outcome: 'failed',
-      detail: `${summary}; node_modules is missing in ${missing.map(entry => entry.directory).join(', ')}`,
+      detail: `${summary}; node_modules is missing in ${missing.map(entry => entry.directory).join(', ')}, whose tests the gate runs${uninstalled}`,
     };
   }
   const note = added.length === 0 ? '' : `; ${added.join(', ')} appeared after the policy was captured and its tests are not in the gate`;
-  return { step: 'nested-packages', outcome: 'passed', detail: `${summary}${note}` };
+  return { step: 'nested-packages', outcome: 'passed', detail: `${summary}${uninstalled}${note}` };
+}
+
+/** The run branch created and checked out, or found where an earlier attempt of the run created it. */
+export async function runBranchStep(projectRoot: string, runId: string, signal: AbortSignal | undefined, git: GitService): Promise<StepResult> {
+  try {
+    const { branch, created } = await git.createRunBranch(projectRoot, runId, signal);
+    return { step: 'run-branch', outcome: 'passed', detail: `${branch} was ${created ? 'created and' : 'found and'} checked out` };
+  } catch (error) {
+    if (!(error instanceof GitError)) throw error;
+    const said = error.detail.output.trim();
+    return {
+      step: 'run-branch',
+      outcome: 'failed',
+      detail: `the run branch ${runBranchName(runId)} could not be created: ${error.message}${said === '' ? '' : `: ${said}`}`,
+    };
+  }
 }
 
 async function testDiscoveryStep(projectRoot: string): Promise<StepResult> {
@@ -437,11 +480,14 @@ export interface RecoveryPlan {
  * answers the same, and neither is a code-repair assignment either. Only a
  * recoverable failure consumes a recovery attempt.
  */
-export function recoveryFor(attempt: ReadinessAttempt, gate: GateAttempt | null): RecoveryPlan | null {
+export function recoveryFor(attempt: ReadinessAttempt, gate: GateAttempt | null, policy: RunPolicy): RecoveryPlan | null {
   const failing = failingStep(attempt);
   if (failing === undefined) return null;
   if (failing.step === 'nested-packages') {
-    const missing = attempt.nested.filter(entry => !entry.installed).map(entry => entry.directory);
+    // Only a package whose tests the gate runs fails the step, so only those
+    // are installed again; any other is left as the project has it.
+    const gated = gatedNestedPackages(policy);
+    const missing = attempt.nested.filter(entry => !entry.installed && gated.has(entry.directory)).map(entry => entry.directory);
     return missing.length === 0 ? null : { cause: 'infrastructure', action: 'reinstall-nested', directories: missing };
   }
   if (failing.step === 'ramify-daemon') return { cause: 'daemon-unavailable', action: 'restart-daemon', directories: [] };

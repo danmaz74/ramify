@@ -167,7 +167,7 @@ async function retain(directory: string, project: string, plan: string, runId: s
   await cp(runPath(project, plan, runId), join(directory, 'run'), { recursive: true });
   await writeFile(join(directory, 'verification.txt'), verification);
   await writeFile(join(directory, 'verification.json'), `${JSON.stringify(report, null, 2)}\n`);
-  await writeFile(join(directory, 'branch.txt'), await git(project, 'log', '--format=%H %s%n%b', `ramify-agent/run-${runId}`));
+  await writeFile(join(directory, 'branch.txt'), await git(project, 'log', '--format=%H %s%n%b', `ramify-agent-run/${runId}`));
   const gates = [];
   for (const id of (await readdir(runPath(project, plan, runId, 'gates'))).sort()) {
     const attempt = JSON.parse(await readFile(runPath(project, plan, runId, runLayout.gate(id)), 'utf8')) as GateAttempt;

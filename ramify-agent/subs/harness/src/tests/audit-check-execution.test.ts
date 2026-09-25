@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-import { inPlaceCheckExecution } from '../checks/execution.js';
+import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import type { GateAttempt, TestSelection } from '../checks/records.js';
@@ -93,6 +93,7 @@ async function auditGate(
     readonly guarded?: readonly { readonly path: string; readonly hash: string }[];
     readonly signal?: AbortSignal;
     readonly workspaceOwnership?: AuditWorkspaceOwnershipRecorder;
+    readonly announced?: GateCommandStart[];
   } = {},
 ): Promise<{ readonly attempt: GateAttempt; readonly workspaces: IntendedAuditWorkspace[]; readonly outputDirectory: string }> {
   const outputDirectory = await temporaryDirectory('ramify-agent-audit-output-');
@@ -123,6 +124,7 @@ async function auditGate(
     ...(options.rules === undefined ? {} : { rules: options.rules }),
     ...(options.guarded === undefined ? {} : { guarded: options.guarded }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.announced === undefined ? {} : { started: async (command: GateCommandStart) => { options.announced!.push(command); } }),
   });
   return { attempt, workspaces, outputDirectory };
 }
@@ -222,10 +224,18 @@ describe('audit-backed gate execution', () => {
       },
     ];
 
+    const announced: GateCommandStart[] = [];
     const { attempt } = await auditGate(fixture, checks, 'ga-duplicates', {
       checkpoint: 'breaking-iteration',
       selectionPolicy: 'all-project',
+      announced,
     });
+    // Each command is announced as the audit starts it, with its place.
+    expect(announced).toEqual([
+      { kind: 'tests', position: 1, total: 3 },
+      { kind: 'type-check', position: 2, total: 3 },
+      { kind: 'tests', position: 3, total: 3 },
+    ]);
     const note = git(fixture.repositoryRoot, ['notes', '--ref=audit', 'show', fixture.commit]);
     const runRef = note.match(/^Audited-Reports-Ref: (.+)$/mu)?.[1];
     expect(runRef).toBeDefined();

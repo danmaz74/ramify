@@ -774,7 +774,7 @@ Every agent finishes only through its submission tool
 
 ### 1.23 Commits
 
-- **Kinds** (all on the run branch `ramify-agent/run-<run-id>`):
+- **Kinds** (all on the run branch `ramify-agent-run/<run-id>`):
   - The source commit the run started from: `job.json.manifest.source`.
   - The materialization commit.
   - A withdrawal commit.

@@ -126,6 +126,21 @@ describe('execution map causal projection', () => {
     expect(ended.current.runningGate).toBeNull();
   });
 
+  it('names the command a running gate started last, and nothing once the gate ended', () => {
+    const started = { type: 'gate-started', data: { gate: 'ga-readiness', checkpoint: 'readiness' } } as const;
+    const command = (position: number, kind: 'tests' | 'type-check') =>
+      ({ type: 'gate-command-started', data: { gate: 'ga-readiness', checkpoint: 'readiness', kind, position, total: 4 } }) as const;
+    const waiting = projected([started]);
+    expect(waiting.current.gateCommand).toBeUndefined();
+    const running = projected([started, command(1, 'tests'), command(2, 'type-check')]);
+    expect(running.current.runningGate).toBe('gate:ga-readiness');
+    expect(running.current.gateCommand).toMatchObject({ kind: 'type-check', position: 2, total: 4 });
+    expect(running.current.gateCommand?.source.sequence).toBe(running.runVersion);
+    const ended = projected([started, command(1, 'tests'),
+      { type: 'readiness-failed', data: { attempt: 1, gate: 'ga-readiness', step: 'baseline-tests', detail: 'failure', recovery: null, final: true } }]);
+    expect(ended.current).toEqual({ awaitedSession: null, runningGate: null, source: null });
+  });
+
   it('keeps failed and repaired attempts as separate cards with a typed repair edge', () => {
     const gate = (id: string, repairRound: number, verdict: 'failed' | 'passed') => gateAttemptSchema.parse({
       schema: 'ramify-agent.gate-attempt/3', id, checkpoint: 'iteration',

@@ -35,4 +35,4 @@ expose-src commitNameStatus, diffNameStatus, worktreeLineChanges, changedEntries
 expose-src CandidateSource, gitCandidateSource, TreeEntry, TreeMatch, commitTree, treeEntries, readBlob, grepTree, diffPatch from "git.ts" to parent
 
 // Consumers inject this boundary; real Git integration tests live with the adapter.
-expose-src GitService, gitService, currentHead from "git.ts" to parent
+expose-src GitService, gitService, currentHead, runBranchName from "git.ts" to parent

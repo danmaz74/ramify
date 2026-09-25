@@ -132,14 +132,14 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(closed?.type === 'iteration-closed' && closed.data.notices).toEqual([]);
 
     // Each changed attempt made one commit before its audit: fail, then pass.
-    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent/run-${runId}`);
+    const log = await git(root, 'log', '--format=%H%x1f%B%x1e', `ramify-agent-run/${runId}`);
     const commits = log.split('').map(part => part.trim()).filter(Boolean);
     expect(commits.filter(commit => commit.includes('Ramify-Iteration: wi-001.i01'))).toHaveLength(2);
     expect(commits.some(commit => commit.includes(`Ramify-Gate: ${failed.id}`))).toBe(true);
     expect(await git(root, 'notes', '--ref=audit', 'show', failed.audited!)).toContain('Audited-Overall: fail');
     expect(await git(root, 'notes', '--ref=audit', 'show', repaired.audited!)).toContain('Audited-Overall: pass');
     const branchAudit = await runCommand({
-      argv: [process.execPath, auditCli, 'check-branch', `ramify-agent/run-${runId}`, '--cwd', root, '--json'],
+      argv: [process.execPath, auditCli, 'check-branch', `ramify-agent-run/${runId}`, '--cwd', root, '--json'],
       cwd: root,
       env: childEnvironment({ GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }),
       timeoutMs: 30_000,

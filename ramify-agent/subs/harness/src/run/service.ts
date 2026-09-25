@@ -2,13 +2,13 @@ import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
-import { gitCandidateSource, gitService, GitError, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
+import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
 import { coverageLimitsOf, findModule, readArchitectMeta, type ArchitectIndex } from '../../subs/evidence/src/views.js';
-import type { GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
+import type { Checkpoint, GateAttempt, GateRuleRecord, TestSelectionPolicy } from '../checks/records.js';
 import { acceptedCommit } from '../checks/accepted.js';
-import { inPlaceCheckExecution, type CheckExecutionPort } from '../checks/execution.js';
+import { inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStarted } from '../checks/execution.js';
 import { executePreparedGate, type PreparedGate } from '../checks/gate.js';
 import { resolveTestSelection } from '../checks/selection.js';
 import {
@@ -6093,11 +6093,13 @@ export class RunService {
 
       const attemptNumber = run.log.count('readiness-passed') + run.log.count('readiness-failed') + 1;
       const gateId = gateAttemptId(this.gateCount(run) + 1);
-      // Readiness runs on the branch the project is on. The run branch is
-      // created only once a clean repository has been established.
+      // Readiness runs on the branch the project is on. Its last step
+      // creates the run branch, once the repository is clean and the
+      // baseline passed; a branch git refuses fails readiness there.
       const head = await this.git.currentHead(this.projectRoot);
       await this.write(run, { type: 'gate-started', data: { gate: gateId, checkpoint: 'readiness' } });
       const result = await runReadiness(this.options.readinessExecution ?? inPlaceCheckExecution, {
+        runId: run.record.jobId,
         attempt: attemptNumber,
         projectRoot: this.projectRoot,
         gateDirectory: run.path(runLayout.gateOutput(gateId)),
@@ -6108,10 +6110,10 @@ export class RunService {
         ramify: this.options.ramify,
         git: this.git,
         head,
+        started: this.commandStarted(run, gateId, 'readiness'),
       });
 
       if (result.attempt.verdict === 'passed' && result.gate !== null) {
-        await this.createBranch(run);
         await this.write(run, { type: 'readiness-passed', data: { attempt: attemptNumber, gate: gateId } }, [
           { path: runLayout.gate(gateId), id: gateId, revision: 1, body: result.gate },
           { path: runLayout.readiness(attemptNumber), id: String(attemptNumber), revision: 1, body: result.attempt },
@@ -6121,7 +6123,7 @@ export class RunService {
       }
 
       const step = failingStep(result.attempt);
-      const plan = recoveryFor(result.attempt, result.gate);
+      const plan = recoveryFor(result.attempt, result.gate, run.record.policy);
       const spent = run.log.all('readiness-failed').filter(event => event.data.recovery !== null).length;
       const recoverable = plan !== null && spent < bound;
 
@@ -6238,7 +6240,13 @@ export class RunService {
     goal?: string,
   ): Promise<GateAttempt> {
     const scenarios = await this.scenarioInputs(run);
-    const prepared = await prepareCheckpoint(scenarios === undefined ? request : { ...request, scenarios });
+    const captured = run.record.projectConfig;
+    const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
+    const prepared = await prepareCheckpoint({
+      ...request,
+      ...(scenarios === undefined ? {} : { scenarios }),
+      ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
+    });
     if ('schema' in prepared) {
       await this.write(run, {
         type: 'gate-attempted',
@@ -6305,7 +6313,8 @@ export class RunService {
         const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
-        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit);
+        const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit,
+          this.commandStarted(run, identity.id, prepared.checkpoint));
         if (attempt.audited !== null && attempt.audited !== sourceCommit) {
           throw new Error(`Gate ${attempt.id} audited ${attempt.audited}, expected ${sourceCommit}`);
         }
@@ -6453,23 +6462,25 @@ export class RunService {
     };
   }
 
+  /**
+   * What a gate's executor calls as each command starts: a
+   * `gate-command-started` line, written before the command runs. It is
+   * progress only, so a write that fails is a warning and never fails the
+   * gate.
+   */
+  private commandStarted(run: Run, gate: string, checkpoint: Checkpoint): GateCommandStarted {
+    return async command => {
+      try {
+        await this.write(run, { type: 'gate-command-started', data: { gate, checkpoint, ...command } });
+      } catch (error) {
+        this.warn(`Run ${run.record.jobId}: the start of command ${command.position} of gate ${gate} was not recorded: ${message(error)}`);
+      }
+    };
+  }
+
   /** The count of committed gate attempts: every readiness and every checkpoint. */
   private gateCount(run: Run): number {
     return run.log.count('readiness-passed') + run.log.all('readiness-failed').length + run.log.count('gate-attempted');
-  }
-
-  /**
-   * Creates and checks out `ramify-agent/run-<run-id>`, once readiness has
-   * established a clean repository. A run resumed after a crash finds its
-   * branch and stays on it; the branch is never reset.
-   */
-  private async createBranch(run: Run): Promise<void> {
-    try {
-      await this.git.createRunBranch(this.projectRoot, run.record.jobId);
-    } catch (error) {
-      if (!(error instanceof GitError)) throw error;
-      this.warn(`Run ${run.record.jobId}: the run branch could not be created: ${error.message}`);
-    }
   }
 
   /**

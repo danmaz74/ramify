@@ -273,7 +273,7 @@ describe('P4: an ordinary provider engineer reports inability to conform through
     // The revision was committed as a change of its own, after the agreement
     // it revises: the run made four commits on its own branch, and the gates
     // that followed them without a write of their own changed nothing.
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04']);
     expect(git.subjects().slice(1, 3).map(subject => subject.split(':')[0])).toEqual(['wi-001.i02', 'wi-001.i03']);
     // Each commit was made over the revision the one before it was accepted

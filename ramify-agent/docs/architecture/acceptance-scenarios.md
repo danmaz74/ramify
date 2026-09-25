@@ -184,6 +184,7 @@ project's scenarios, and the file holds only what the harness cannot derive.
 | `acceptance.modes.<mode>.command` | The argv that starts `cucumber-js` in that mode, with the mode's environment and loader, such as `TEST_MODE` and `--import tsx`, and passes the arguments the harness appends through to it. Both `quick` and `full` are required. |
 | `acceptance.modes.<mode>.setup`, `teardown` | Optional. Run once per gate attempt before the mode's first run and after its last, so a server or a database started for full mode serves every module's run. Without them, each run starts what its hooks start. |
 | `acceptance.modes.full.readiness` | `dry-run`, the default, or `run`: whether readiness executes full mode or only loads it. See [readiness](#4-readiness). |
+| `typeCheck.output` | Optional. The format the type check prints; `tsc` is the only one. Where it is declared, a failed type check at a gate is attributed by where its errors lie: every error inside the assignment's write scope makes the failure the engineer's to repair, and any error outside makes it `outside-assignment`. Without it, or where the output is truncated, holds a line the gate cannot read or names no error, a failed type check is attributed by which commands failed. |
 
 What the harness derives without configuration:
 
@@ -211,7 +212,22 @@ captured into `job.json` beside the run policy, and guarded like
 `package.json`: an agent's change to it is a guarded change. The file is
 designed to hold later settings, such as the test and type-check commands the
 policy hardcodes today; v1 moves nothing into it that this design does not
-need.
+need. A project whose type check is `tsc` may declare so:
+
+```json
+{
+  "schema": "ramify-agent.project/1",
+  "typeCheck": { "output": "tsc" },
+  "acceptance": { "...": "as above" }
+}
+```
+
+The gate then reads `tsc`'s error lines, in its plain form
+`path(line,col): error TSnnnn: message` or its pretty form
+`path:line:col - error TSnnnn: message`, and passes over blank and indented
+lines, the pretty form's code excerpt and summary, npm's `> ` banner and its
+`npm error`, `npm ERR!` and `npm warn` lines. Each path is read relative to
+the command's working directory.
 
 The `collection-review` fixture needs the configuration file, a full mode and
 the two scripts; its quick mode is the in-process `createTestSystem` its one

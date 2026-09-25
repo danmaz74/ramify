@@ -16,6 +16,15 @@ import { snapshotOf } from './snapshot.js';
 type Ref = { kind: RunEventRefKind; id: string };
 const ref = (kind: RunEventRefKind, id: string | null | undefined): Ref[] => (id === null || id === undefined ? [] : [{ kind, id }]);
 
+/** Each kind of gate command, as a sentence names it. */
+const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], string> = {
+  tests: 'the tests',
+  'type-check': 'the type check',
+  'ramify-check': 'the Ramify check',
+  conformance: 'the conformance check',
+  scenarios: 'the scenario check',
+};
+
 /** One event, as a client reads it. Every internal event type has a projection here. */
 export function projectEvent(event: RunEvent): ProjectedRunEvent {
   const [summary, refs] = describe(event);
@@ -207,6 +216,11 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) started`, ref('gate', event.data.gate)];
     case 'gate-committing':
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
+    case 'gate-command-started':
+      return [
+        `Gate ${event.data.gate} (${event.data.checkpoint}): ${commandLabels[event.data.kind]} started, command ${event.data.position} of ${event.data.total}`,
+        ref('gate', event.data.gate),
+      ];
     case 'gate-attempted': {
       const carried = event.data.checkFindings?.length ?? 0;
       const refused = event.data.scenarioFindings?.refused;

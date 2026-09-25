@@ -181,7 +181,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
     },
     async createRunBranch(project, runId) {
       expect(project).toBe(root);
-      branch = `ramify-agent/run-${runId}`;
+      branch = `ramify-agent-run/${runId}`;
       record('createRunBranch', branch);
       return { branch, created: true };
     },
@@ -191,7 +191,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
       lookups.push(asked);
       // The identity a repeat is asked for: this run, and one gate of it.
       expect(asked.map(trailer => trailer.key)).toEqual(['Ramify-Run', 'Ramify-Gate']);
-      if (branch !== null) expect(asked[0]!.value).toBe(branch.slice('ramify-agent/run-'.length));
+      if (branch !== null) expect(asked[0]!.value).toBe(branch.slice('ramify-agent-run/'.length));
       expect(asked[1]!.value).toMatch(/^ga-\d{4}$/u);
       gate = asked[1]!.value;
       const entry = pending();
@@ -213,7 +213,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
       messages.push(message);
       // The message the harness wrote carries the identity the lookup just
       // asked for, so a commit and its recovery name the same attempt.
-      if (branch !== null) expect(message).toContain(`Ramify-Run: ${branch.slice('ramify-agent/run-'.length)}`);
+      if (branch !== null) expect(message).toContain(`Ramify-Run: ${branch.slice('ramify-agent-run/'.length)}`);
       // A scenario commit of the harness's own is made without a lookup and names no gate.
       if (message.includes('\nRamify-Scenarios: ')) gate = null;
       if (gate !== null) expect(message).toContain(`Ramify-Gate: ${gate}`);

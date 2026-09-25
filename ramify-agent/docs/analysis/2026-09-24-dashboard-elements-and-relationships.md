@@ -460,7 +460,7 @@ One engineer assignment within a work item, with a write scope.
 
 #### Commit
 
-A commit the harness writes on the run branch `ramify-agent/run-<run-id>`: the
+A commit the harness writes on the run branch `ramify-agent-run/<run-id>`: the
 scenario materialization, withdrawals, and one per passing committing gate.
 
 - **Identity**: its sha. **P** (as references)

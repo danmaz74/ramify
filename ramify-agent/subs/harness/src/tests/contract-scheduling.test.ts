@@ -182,7 +182,7 @@ describe('P5: a shared obligation runs its provider once and each consumer verif
 
     // The run committed on its own branch, once for each gate, and recorded
     // the revisions Git reported for the five that changed the tree.
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03', 'revision-04', 'revision-05']);
     git.assertAnswered();
   }, 60_000);

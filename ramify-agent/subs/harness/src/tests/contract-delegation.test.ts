@@ -382,7 +382,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
 
     // The run committed on its own branch: the agreement, the real provider
     // and the verification, in that order, each over the one before it.
-    expect(git.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01', 'revision-02', 'revision-03']);
     git.assertAnswered();
   }, 60_000);

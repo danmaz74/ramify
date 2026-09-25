@@ -183,7 +183,7 @@ describe('G8: a work item revised across several iterations keeps every obligati
     expect(attempts.map(attempt => attempt.audited)).toEqual(['revision-01', 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
     expect(attempts.map(attempt => attempt.head)).toEqual([materialized, 'revision-01', 'revision-01', 'revision-01', 'revision-01']);
     expect(scripted.revisions()).toEqual([materialized, 'revision-01']);
-    expect(scripted.branch()).toBe(`ramify-agent/run-${runId}`);
+    expect(scripted.branch()).toBe(`ramify-agent-run/${runId}`);
     expect(scripted.messages).toHaveLength(6);
     expect(scripted.messages[1]).toContain('Ramify-Iteration: wi-001.i01');
     expect(scripted.messages[1]).toContain('Added the note store.');

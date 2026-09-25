@@ -247,7 +247,7 @@ describe('the structural steps', () => {
     expect(snapshot.state).toBe('failed');
     expect(failures[0]).toMatchObject({ step: 'git-clean', recovery: null, final: true });
     expect(failures[0]!.detail).toContain('uncommitted changes');
-    expect((await git(root, 'branch', '--list', 'ramify-agent/run-*')).trim()).toBe('');
+    expect((await git(root, 'branch', '--list', 'ramify-agent-run/*')).trim()).toBe('');
   }, 180_000);
 
   test('a directory that is no git repository is refused with the same step', async () => {

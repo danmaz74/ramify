@@ -1,8 +1,10 @@
+import { stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { allProjectChecks, checkpointPolicies, planScenarioCheck, scopedChecks, type ResolvedTests, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { executePreparedGate, prepareGate } from '../checks/gate.js';
 import type { PreparedGate } from '../checks/gate.js';
-import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference } from '../checks/records.js';
+import type { Checkpoint, GateAttempt, GateRuleRecord, RecordReference, TypeCheckOutput } from '../checks/records.js';
 import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import type { RunPolicy } from './records.js';
 
@@ -62,6 +64,12 @@ export interface CheckpointRequest {
    * planned. A gate without them, such as a standalone session's, has none.
    */
   readonly scenarios?: ScenarioCheckInputs | undefined;
+  /**
+   * The format the project declared for what its type check prints, from
+   * its captured `ramify-agent.json`. A failed type check is then attributed
+   * by where its errors lie.
+   */
+  readonly typeCheckOutput?: TypeCheckOutput | undefined;
   readonly signal?: AbortSignal | undefined;
 }
 
@@ -77,10 +85,32 @@ export async function runCheckpoint(execution: CheckExecutionPort, request: Chec
 
 /** Verify a committing checkpoint before its commit effect is allowed to begin. */
 export async function prepareCheckpoint(request: CheckpointRequest): Promise<PreparedGate | GateAttempt> {
-  return prepareGate(request.checkpoint, gateRequest(request));
+  return prepareGate(request.checkpoint, gateRequest(request, await linkedDependencies(request)));
 }
 
-function gateRequest(request: CheckpointRequest) {
+/**
+ * The nested packages whose installed dependencies an isolated runner links:
+ * every one whose tests a gate runs, which readiness required installed, and
+ * any other the project has installed. One without its tests and without
+ * `node_modules` is left out, as readiness left it uninstalled.
+ */
+async function linkedDependencies(request: CheckpointRequest): Promise<string[]> {
+  const linked: string[] = [];
+  for (const nested of request.policy.commands.nestedPackages) {
+    if (nested.tests !== null || await isDirectory(join(request.projectRoot, nested.directory, 'node_modules'))) linked.push(nested.directory);
+  }
+  return linked;
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly string[]) {
   const policy = checkpointPolicies[request.checkpoint];
   if (policy.selection !== 'all-project' && request.tests === undefined) {
     throw new Error(`The ${request.checkpoint} checkpoint requires an ${policy.selection} selection, and none was resolved`);
@@ -90,9 +120,11 @@ function gateRequest(request: CheckpointRequest) {
     ...(request.tests === undefined ? {} : { scope: request.tests.selection }),
   });
   const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
-  const checks = request.tests === undefined
+  const planned = request.tests === undefined
     ? allProjectChecks(request.policy.commands, policy, request.scopeProbe, scenarioCheck)
     : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
+  const output = request.typeCheckOutput;
+  const checks = output === undefined ? planned : planned.map(check => (check.kind === 'type-check' ? { ...check, output } : check));
   return {
     id: request.id,
     ...(request.runId === undefined ? {} : { runId: request.runId }),
@@ -105,7 +137,7 @@ function gateRequest(request: CheckpointRequest) {
       exactOwners: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.exactOwners ?? [])] : [],
       subtrees: policy.selection === 'owned-by-scope' ? [...(request.tests?.selection.subtrees ?? [])] : [],
     },
-    dependencyDirectories: request.policy.commands.nestedPackages.map(nested => nested.directory),
+    dependencyDirectories: [...dependencyDirectories],
     ...(request.subject === undefined ? {} : { subject: request.subject }),
     ...(request.proposedBy === undefined ? {} : { proposedBy: request.proposedBy }),
     ...(request.repairRound === undefined ? {} : { repairRound: request.repairRound }),

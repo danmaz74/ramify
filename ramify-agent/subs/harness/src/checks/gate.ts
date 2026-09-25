@@ -3,9 +3,10 @@ import { guardedFilesHash } from '../../subs/evidence/src/guarded-files.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { ramifyAttribution } from './diagnostics.js';
 import { checkOutputPath } from './execution.js';
-import type { CheckExecutionPort, CheckExecutionResult } from './execution.js';
+import { typeCheckAttribution } from './type-check-output.js';
+import type { CheckExecutionPort, CheckExecutionResult, GateCommandStarted } from './execution.js';
 import type {
-  AcceptedCommit, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
+  AcceptedCommit, CheckCommandKind, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
   GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference, ScenarioCheckSummary,
 } from './records.js';
 import { gateAttemptSchema } from './records.js';
@@ -67,6 +68,8 @@ export interface GateRequest {
   /** `none-selected` when the checkpoint's scenario check had nothing to run, recorded on the attempt. */
   readonly scenarios?: 'none-selected' | undefined;
   readonly signal?: AbortSignal | undefined;
+  /** Called as each command starts; a gate run in place passes it to its executor. */
+  readonly started?: GateCommandStarted | undefined;
 }
 
 /** A verified gate whose commands may now be executed over a chosen revision. */
@@ -116,12 +119,17 @@ export async function prepareGate(checkpoint: Checkpoint, request: GateRequest):
   return { checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs };
 }
 
-/** Execute one already verified gate over `sourceCommit` and finish its immutable attempt. */
+/**
+ * Execute one already verified gate over `sourceCommit` and finish its
+ * immutable attempt. `started` is called as each command starts; a gate
+ * prepared again from its recorded operation is given it here.
+ */
 export async function executePreparedGate(
   execution: CheckExecutionPort,
   prepared: PreparedGate,
   sourceCommit: string,
   commit: string | null,
+  started: GateCommandStarted | undefined = prepared.request.started,
 ): Promise<GateAttempt> {
   const { request, checkpoint } = prepared;
   const bound = AbortSignal.timeout(prepared.timeoutMs);
@@ -141,6 +149,7 @@ export async function executePreparedGate(
         timeoutMs: prepared.timeoutMs,
       },
       signal,
+      ...(started === undefined ? {} : { started }),
     });
   return finishGate(prepared, executionResult, commit);
 }
@@ -153,10 +162,16 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
   }
 
   const verdict = verdictOf(commands, unauthorized || ruleFailed);
-  // A failed Ramify check reported where each of its findings lies, so the
-  // cause is attributed from that report and not only from which commands
-  // failed. Nothing of a test's output is read.
-  const attribution = await ramifyAttribution(commands, request.writeScope ?? null);
+  // A failed Ramify check reported where each of its findings lies, and a
+  // failed type check whose output format the project declared named the
+  // file of each error, so the cause is attributed from those locations and
+  // not only from which commands failed. Nothing of a test's output is read,
+  // nor any output whose format the project did not declare.
+  const writeScope = request.writeScope ?? null;
+  const attribution = mergeAttributions(
+    await ramifyAttribution(commands, writeScope),
+    await typeCheckAttribution(commands, request.checks, writeScope, request.projectRoot),
+  );
   const cause = causeOf(decisive, commands, request.checks, verdict, unauthorized, ruleFailed, attribution);
   return {
     schema: gateAttemptSchema,
@@ -301,42 +316,63 @@ function causeOf(
   // A rule the harness verified is about what this iteration wrote, so it is
   // the engineer's to repair whatever else ran.
   if (ruleFailed) return 'in-scope';
-  // A failed Ramify check named the file of every finding. Where any of them
+  // A failed Ramify check named the file of every finding, and a failed type
+  // check in a declared format the file of every error. Where any of them
   // lies outside the assignment's own write scope the failure is not that
   // assignment's, whatever the tests of that scope did; where all of them
-  // lie inside it, the failure is in scope even though it is the local
-  // architect that answers a module violation.
+  // lie inside it, the failure is in scope, the engineer's to repair, even
+  // though it is the local architect that answers a module violation.
   if (attribution !== null) {
-    // The Ramify check is a command of the whole project, so leaving it in
-    // the scope comparison would call every module violation a failure
-    // outside the assignment. Its own report already said where it lies.
-    return attribution.outside.length > 0 || outsideAssignment(commands, checks, true) ? 'outside-assignment' : 'in-scope';
+    // Both are commands of the whole project, so leaving them in the scope
+    // comparison would call every module violation and every type error a
+    // failure outside the assignment. Their own output already said where
+    // each lies.
+    return attribution.outside.length > 0 || outsideAssignment(commands, checks, attributedKinds(attribution)) ? 'outside-assignment' : 'in-scope';
   }
   return outsideAssignment(commands, checks) ? 'outside-assignment' : 'in-scope';
+}
+
+/** The one attribution of an attempt, from the Ramify report's locations and the type check's. */
+function mergeAttributions(ramify: GateAttribution | null, typeCheck: GateAttribution | null): GateAttribution | null {
+  if (ramify === null || typeCheck === null) return ramify ?? typeCheck;
+  return {
+    basis: 'ramify-findings-and-type-check-errors',
+    inScope: [...ramify.inScope, ...typeCheck.inScope],
+    outside: [...ramify.outside, ...typeCheck.outside],
+  };
+}
+
+/** The command kinds whose own output located their failures. */
+function attributedKinds(attribution: GateAttribution): ReadonlySet<CheckCommandKind> {
+  switch (attribution.basis) {
+    case 'ramify-findings': return new Set(['ramify-check']);
+    case 'type-check-errors': return new Set(['type-check']);
+    case 'ramify-findings-and-type-check-errors': return new Set(['ramify-check', 'type-check']);
+  }
 }
 
 /**
  * Whether this failure lies outside the last assignment's own scope: every
  * command of that scope passed, and what failed is a command of the whole
- * project. It is read from which files ran and how each command exited, never
- * from what any of them printed. Without a probe of the assignment's own
- * selection there is nothing to attribute, so the failure stays in scope.
+ * project. It is read from which files ran and how each command exited.
+ * Without a probe of the assignment's own selection there is nothing to
+ * attribute, so the failure stays in scope.
  *
- * With `exceptRamify`, a failed Ramify check is left out of the comparison:
- * it runs over the whole project, but its own report named the file of every
- * finding, and that is what attributes it.
+ * The kinds in `except` are left out of the comparison: a Ramify check and
+ * a type check run over the whole project, but where their own output named
+ * the file of every finding or error, that is what attributes them.
  */
 function outsideAssignment(
   commands: readonly GateCommandRecord[],
   checks: readonly PlannedCheck[],
-  exceptRamify = false,
+  except: ReadonlySet<CheckCommandKind> = new Set(),
 ): boolean {
   let probed = false;
   let failedOutside = false;
   for (const [index, check] of checks.entries()) {
     const record = commands[index];
     if (record === undefined || check.attribution === undefined) continue;
-    if (exceptRamify && check.kind === 'ramify-check') continue;
+    if (except.has(check.kind)) continue;
     if (check.attribution === 'in-scope') {
       if (record.outcome !== 'passed') return false;
       probed = true;

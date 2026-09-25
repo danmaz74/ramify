@@ -154,13 +154,26 @@ hiding or measured complexity justifies it.
     every module violation a failure outside the assignment. A failed Ramify
     check returns to the local architect whatever scope its findings lie in:
     what a module may import is the architect's to arrange with the owner,
-    and an engineer given the same brief again cannot widen it. No test
-    output is parsed for any of this. The attempt is returned, not written:
+    and an engineer given the same brief again cannot widen it. A type check
+    whose output format the project declares in `ramify-agent.json`
+    (`"typeCheck": { "output": "tsc" }`) is attributed the same way: every
+    error `tsc` names inside the write scope makes the failure in scope, the
+    engineer's to repair, and any error outside it makes it
+    `outside-assignment`. Output that is truncated, holds a line the reader
+    cannot read, or names no error keeps the attribution by which commands
+    failed, as does a type check without the declaration. No test output is
+    parsed for any of this, nor any output whose format the project did not
+    declare. The attempt is returned, not written:
     the harness commits it with the event that closes the checkpoint. The
     audit executor runs each planned command
     through the harness's own command runner in a temporary worktree of the
     exact commit, then returns the published run, report and tree refs with
-    the harness command records.
+    the harness command records. Both executors announce each command as it
+    starts, and a run writes the announcement as `gate-command-started`, with
+    the gate, the command's kind and its place among the gate's commands
+    (`position` of `total`), readiness's gate included. It records progress
+    and decides nothing; the execution map's current activity names the
+    running gate's last started command as `gateCommand`.
   - `diagnostics.ts`: what a failing attempt says to the agent that receives
     it. Each command that did not pass is named with what it reported: a
     Ramify check's findings, worded by the one function that words a finding
@@ -217,6 +230,8 @@ hiding or measured complexity justifies it.
     `job.json` beside the policy, with the reason where it is missing or
     invalid; and what readiness asks of a valid one: the modules' test areas
     its support code must match, and whether each mode's commands resolve.
+    Its optional `typeCheck.output` declares the format the type check
+    prints, which committing gates read error locations from.
   - `readiness.ts`: the readiness steps, their bounded recovery and the
     discovery of the project's test files. A failure a preparation can
     repair consumes one recovery; one it cannot consumes none.
@@ -847,8 +862,9 @@ pi actually made and what the snapshot tools answered.
   original cause preserved.
 - **Readiness.** The project root, a clean git repository, the compiler
   configuration, the test runner, the project's configuration, its scenario
-  harness, the independent nested packages, test discovery, the Ramify
-  command line, and then the project's own baseline:
+  harness, the independent nested packages whose tests the gate runs
+  installed (one without a test script is noted and need not be), test
+  discovery, the Ramify command line, and then the project's own baseline:
   its tests, its type check, a complete Ramify check and two scenario
   checks, as one gate attempt through the in-place runner.
   `baseline-acceptance` runs every module with feature files in quick mode
@@ -856,8 +872,13 @@ pi actually made and what the snapshot tools answered.
   `--dry-run` and fails on an `undefined` or `ambiguous` step, or, with the
   configuration's `readiness: run`, executes it between its `setup` and
   `teardown`. Both fail as `baseline-tests` fails, and the attempt records
-  them beside the other baseline steps, where they are verified. The run branch, `ramify-agent/run-<run-id>`, is created once a
-  clean repository has been established. Agents never commit, and the harness
+  them beside the other baseline steps, where they are verified. The last
+  step, `run-branch`, creates and checks out the run branch,
+  `ramify-agent-run/<run-id>`, once the repository is clean and the baseline
+  passed; a branch git refuses, such as one beneath an existing branch's
+  name, fails readiness there with git's own message, and nothing is
+  assigned. A run whose branch has the earlier prefix, `ramify-agent/run-`,
+  is still found and committed on. Agents never commit, and the harness
   never resets or reverts. `project-config` fails a run whose captured
   `ramify-agent.json` is missing or invalid, or names support code outside
   every module's test area (a module's `src/tests/`, a testing module's

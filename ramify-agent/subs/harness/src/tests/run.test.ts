@@ -1,12 +1,13 @@
-import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
-import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { openUnchangedRuns as openRuns, assertUnchangedGit, unchangedGit } from './helpers/unchanged-run.js';
+import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { GitError } from '../../subs/evidence/src/git.js';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
 import {
-  emptyAnalysis, installTestRunner, onlyRun,
+  emptyAnalysis, installTestRunner, onlyRun, openRuns as openRunsWithGit,
   runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
 
@@ -93,7 +94,7 @@ describe('an implementation run with no entry capabilities', () => {
     expect(attempt.steps.map(step => step.step)).toEqual([
       'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
       'nested-packages', 'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
-      'baseline-acceptance', 'acceptance-full',
+      'baseline-acceptance', 'acceptance-full', 'run-branch',
     ]);
   }, 120_000);
 
@@ -109,13 +110,45 @@ describe('an implementation run with no entry capabilities', () => {
     await service.settled('review-notes', receipt.jobId);
 
     expect(git.operations()['createRunBranch']).toBe(1);
-    expect(git.branch()).toBe(`ramify-agent/run-${receipt.jobId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${receipt.jobId}`);
     // Nothing changed, so the passing gate made no commit, and the tree is
     // clean although the run wrote its whole log into it.
     expect(git.operations()['commitAccepted']).toBe(1);
     expect(git.commits()).toEqual([]);
     const ignore = await readFile(runPath(root, 'review-notes', receipt.jobId, '..', '..', '.gitignore'), 'utf8');
     expect(ignore.trim().endsWith('*')).toBe(true);
+  }, 120_000);
+
+  test('a run branch git refuses fails readiness at run-branch, with git\'s own message, before any work', async () => {
+    const { root } = await target();
+    const scripted = unchangedGit(root);
+    const refusal = 'fatal: cannot lock ref \'refs/heads/ramify-agent-run/x\': \'refs/heads/ramify-agent-run\' exists';
+    const git = {
+      ...scripted,
+      async createRunBranch(): Promise<never> {
+        throw new GitError('`git switch --create ramify-agent-run/x` exited with 128', {
+          argv: ['git', 'switch', '--create', 'ramify-agent-run/x'], outcome: { kind: 'completed', exitCode: 128 }, output: refusal,
+        });
+      },
+    };
+    const { service } = await openRunsWithGit(root, { git, readinessExecution: directReadinessExecution(), script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    cleanups.push(() => service.close());
+
+    const receipt = await service.execute(startRun('review-notes'));
+    await service.settled('review-notes', receipt.jobId);
+
+    const snapshot = onlyRun(service, 'review-notes');
+    expect(snapshot.state).toBe('failed');
+    expect(snapshot.failure?.reason).toBe('readiness-failed');
+    expect(snapshot.failure?.message).toContain('Readiness failed at run-branch');
+    expect(snapshot.failure?.message).toContain(refusal);
+    const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
+    expect(events.map(event => event.type)).toEqual([
+      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'gate-started', 'readiness-failed', 'session-finished', 'job-failed',
+    ]);
+    expect(events.find(event => event.type === 'readiness-failed')?.data).toMatchObject({ step: 'run-branch', recovery: null, final: true });
+    expect(scripted.operations()['commitAccepted']).toBeUndefined();
   }, 120_000);
 
   test('a final gate that does not pass fails the run, with the attempt as evidence', async () => {

@@ -109,7 +109,7 @@ describe('materializing the feature files', () => {
     // The commit: the run branch's first, over the project root, with the
     // subject, the files and the run's trailer, and no gate's. The live
     // attempt looks nothing up, since its intent was just appended.
-    expect(git.branch()).toBe(`ramify-agent/run-${receipt.jobId}`);
+    expect(git.branch()).toBe(`ramify-agent-run/${receipt.jobId}`);
     expect(commitAccepted).toHaveBeenCalledTimes(4);
     const [committedRoot, message] = commitAccepted.mock.calls[0]!;
     expect(committedRoot).toBe(project);
