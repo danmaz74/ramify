@@ -298,10 +298,14 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Recorded context package bound to ${event.data.workItem}'s invocation`, [...ref('session', event.data.session), ...ref('invocation', event.data.invocation)]];
     case 'candidate-prepared':
       return [`Candidate ${event.data.candidate} prepared`, []];
+    case 'nonfunctional-phase-started':
+      return [`Non-functional assessment phase started with ${event.data.maxRounds} round${event.data.maxRounds === 1 ? '' : 's'}`, []];
     case 'nonfunctional-assessed':
       return [`Non-functional assessment ${event.data.assessment} recorded for round ${event.data.round}`, []];
     case 'nonfunctional-investigated':
-      return [`Non-functional round ${event.data.round} investigated`, ref('invocation', event.data.invocation)];
+      return [`Non-functional round ${event.data.round} investigated${event.data.nfrs ? ` for ${event.data.nfrs.join(', ')}` : ''}`, ref('invocation', event.data.invocation)];
+    case 'nonfunctional-repair-assigned':
+      return [`Non-functional repair ${event.data.assignment} assigned in ${event.data.startingModule} for ${event.data.nfrs.join(', ')}`, []];
     case 'nonfunctional-repair-committed':
       return [`Non-functional round ${event.data.round} repaired`, ref('invocation', event.data.invocation)];
     case 'nonfunctional-round-closed':

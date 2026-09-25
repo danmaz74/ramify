@@ -159,7 +159,9 @@ export type CheckFindingMaterialChoice = z.infer<typeof checkFindingMaterialChoi
  * answering `accept`, and rejects it by answering `reject` with the
  * requirement a follow-up run must meet, which `followUp` then holds.
  */
-export const planDeviationViewSchema = z.object({
+const workItemDeviationViewSchema = z.object({
+  /** Projected from legacy records; absent only in older wire snapshots. */
+  origin: z.object({ kind: z.literal('work-item-conflict'), request: text, workItem: text, architectInvocation: text }).strict().optional(),
   id: text,
   /** The unresolved request it answers. */
   request: text,
@@ -178,6 +180,19 @@ export const planDeviationViewSchema = z.object({
   /** The person's answer that rejected it, the requirement for a follow-up run; null unless rejected. */
   followUp: z.string().nullable(),
 }).strict();
+const nonfunctionalDeviationViewSchema = z.object({
+  origin: z.object({ kind: z.literal('nonfunctional-assessment'), nfr: text, assessment: text,
+    candidate: z.object({ tree: text, head: text.nullable(), preparedAt: text }).strict(),
+    coordinatorInvocation: text }).strict(),
+  id: text,
+  passage: z.object({ document: text, sha256: text, start: z.int().nonnegative(), end: z.int().positive(), quote: text }).strict(),
+  sourcePath: text.nullable(),
+  evidence: z.array(text),
+  proposedAlternative: z.string(),
+  uncertainty: z.string(),
+  followUp: z.string().nullable(),
+}).strict();
+export const planDeviationViewSchema = z.union([workItemDeviationViewSchema, nonfunctionalDeviationViewSchema]);
 export type PlanDeviationView = z.infer<typeof planDeviationViewSchema>;
 
 /** The commands a person may send about a CheckFinding now, as the harness would accept them. */

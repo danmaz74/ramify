@@ -240,6 +240,24 @@ test('the overview shows notices first: the module created, then every cycle, re
   expect(notices[1]!.textContent).toContain('resolved');
 });
 
+test('overview presents the harness verdict with its exact candidate tree and audited gate commit', async () => {
+  const run = stubRun();
+  run.mergeReadiness = { runId, version: run.snapshot.version, readiness: {
+    status: 'pending-review', reason: 'A plan deviation awaits user review',
+    candidate: { tree: baseCommit, head: null, preparedAt: at }, finalGate: 'ga-0009',
+    gateCommit: failedCommit, checkFindings: ['cf-0001'],
+  } };
+  const client = clientWith(run);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  const panel = await screen.findByRole('heading', { name: 'Merge readiness' });
+  const body = panel.closest('section')!;
+  await within(body).findByText(/Completed, pending user review/);
+  expect(body.textContent).toContain(baseCommit);
+  expect(body.textContent).toContain(`ga-0009 at commit ${failedCommit}`);
+  expect(body.textContent).toContain('cf-0001');
+  expect(client.calls).toContain(`getMergeReadiness:${runId}:${run.snapshot.version}`);
+});
+
 test('a run with a degraded start notices it with its count and a link to its chapter; a run without one asks for no sessions', async () => {
   const counts = { ...snapshot().counts, degradedStarts: 1 };
   const client = clientWith(stubRun({ counts, notices: [] }));

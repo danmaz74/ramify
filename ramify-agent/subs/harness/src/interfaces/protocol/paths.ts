@@ -39,6 +39,8 @@ export const protocolPaths = {
   run,
   runEvents: (planId: string, runId: string, after: number): string => `${run(planId, runId)}/events?after=${after}`,
   runAnalysis: (planId: string, runId: string): string => `${run(planId, runId)}/analysis`,
+  runMergeReadiness: (planId: string, runId: string, version: number): string =>
+    withQuery(`${run(planId, runId)}/merge-readiness`, { version }),
   runDecisions: (planId: string, runId: string): string => `${run(planId, runId)}/decisions`,
   runWorkItems: (planId: string, runId: string): string => `${run(planId, runId)}/work-items`,
   runWorkItem: (planId: string, runId: string, workItem: string): string => `${run(planId, runId)}/work-items/${encodeURIComponent(workItem)}`,

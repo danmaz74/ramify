@@ -91,6 +91,7 @@ expose-sub runPlanDeviationsSchema, RunPlanDeviations from harness to descendant
 expose-sub runEnvironmentProblemSchema, RunEnvironmentProblem from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
 expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
+expose-sub mergeReadinessResponseSchema, MergeReadinessResponse from harness to descendants
 expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants
 expose-sub ProjectedRunEvent, runEventPageSchema, RunEventPage, entryViewSchema from harness to descendants
 expose-sub EntryView, hypothesisStandingSchema, HypothesisStanding from harness to descendants

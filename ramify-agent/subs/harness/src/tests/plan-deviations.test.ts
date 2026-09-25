@@ -139,7 +139,8 @@ describe('an unresolved request answered with a plan deviation', () => {
     expect(forks[0]!.spec.prompt).toContain('  11  - Serve it through both protocol surfaces');
 
     // The local architect that asked was continued with the deviation and the requirement it changes; the next work item received it too.
-    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect'
+      && session.spec.submission.name === 'submit_work_item_result');
     expect(architects).toHaveLength(3);
     expect(architects[1]!.start.mode).toBe('continue');
     const continued = architects[1]!.spec.prompt;
@@ -259,12 +260,13 @@ describe('a deviation that rewords a pending scenario', () => {
     expect(file).not.toContain('Scenario: A person uses compare-panel');
 
     // The next work item's architect was briefed with the reworded scenario.
-    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect'
+      && session.spec.submission.name === 'submit_work_item_result');
     expect(architects[2]!.spec.prompt).toContain('Scenario: A person compares revisions over tRPC');
 
     // The CheckFinding shows the old text and the new.
     const deviation = checkFindingListResponseSchema.parse(await get(origin, protocolPaths.runCheckFindings(plan, runId, { select: 'all' }))).items[0]!.planDeviation;
-    expect(deviation?.scenarios).toEqual([{
+    expect(deviation && 'scenarios' in deviation ? deviation.scenarios : null).toEqual([{
       scenario: 'sc-002', file: record.file, after: reworded,
       before: ['Scenario: A person uses compare-panel', '  Given the project as the plan finds it', '  When the person uses compare-panel', '  Then the outcome compare-panel promises is shown'],
     }]);
@@ -308,7 +310,9 @@ describe('a scope review under a plan deviation', () => {
     expect(requests).toEqual(['rq-0001', 'rq-0002', 'rq-0003']);
     for (const id of requests) {
       const record = JSON.parse(await readFile(runPath(root, reviewPlan, run.runId, reviewLayout.request(id)), 'utf8')) as ReviewRequest;
-      expect(record.requirements.map(requirement => requirement.ref)).toEqual(['plan#request', 'deviation:pd-001']);
+      expect(record.requirements.map(requirement => requirement.ref)).toEqual([
+        'plan#request', `assignment-source:${record.key.iteration}`, 'deviation:pd-001',
+      ]);
     }
     const reviewer = run.agent!.sessions.find(session => session.spec.role === 'reviewer' && session.spec.prompt.includes('rq-0001'))!;
     expect(reviewer.spec.prompt).toContain('## Plan deviations in force');
@@ -346,7 +350,8 @@ describe('an unresolved request answered otherwise', () => {
     // A plain completion: no plan deviation was recorded.
     expect(events.at(-1)).toMatchObject({ type: 'job-completed' });
     expect(events.at(-1)!.data).not.toHaveProperty('planDeviations');
-    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect'
+      && session.spec.submission.name === 'submit_work_item_result');
     expect(architects[1]!.start.mode).toBe('continue');
     expect(architects[1]!.spec.prompt).toContain('`gd-ur-001` (global, request ur-001)');
     const origin = await serve(opened.service, project);

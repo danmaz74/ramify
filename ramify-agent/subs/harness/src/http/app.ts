@@ -19,7 +19,7 @@ import {
 } from '../interfaces/protocol/queries.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
-  metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  mergeReadinessResponseSchema, metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runCommandSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
 } from '../interfaces/protocol/runs.js';
 import {
@@ -136,6 +136,11 @@ export function createApp(options: AppOptions): express.Express {
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/analysis`, async (request: RunRequest, response) => {
     send(response, analysisResponseSchema, await projected(() => queries.analysis(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/merge-readiness`, async (request: RunRequest, response) => {
+    const version = requiredCounter(request.query['version'], 'version');
+    send(response, mergeReadinessResponseSchema, await projected(() => queries.mergeReadiness(request.params.planId, request.params.runId, version)));
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/decisions`, async (request: RunRequest, response) => {

@@ -168,6 +168,7 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
           <div><dt>Started</dt><dd>{run.startedAt}</dd></div>
           <div><dt>Ended</dt><dd>{run.endedAt ?? 'not ended'}</dd></div>
         </dl>
+        <MergeReadinessPanel client={client} planId={run.planId} runId={run.jobId} version={run.version} />
         {run.waits.length > 0 && (
           <>
             <h3>Waits</h3>
@@ -200,6 +201,38 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
     </div>
   );
 }
+
+function MergeReadinessPanel({ client, planId, runId, version }: AreaProps) {
+  const state = useRunQuery(`merge-readiness:${runId}`, version,
+    () => client.getMergeReadiness(planId, runId, version!));
+  return (
+    <section className="panel" aria-labelledby="merge-readiness-heading">
+      <h3 id="merge-readiness-heading">Merge readiness</h3>
+      {state.status === 'loading' && <p>Reading committed evidence…</p>}
+      {state.status === 'failed' && <p className="failure" role="alert">Could not read merge readiness: {state.error.message}</p>}
+      {state.status === 'ready' && state.data.version !== version && <p>Refreshing for run version {version}…</p>}
+      {state.status === 'ready' && state.data.version === version && (
+        <>
+          <p><strong>{mergeReadinessLabel[state.data.readiness.status]}</strong>: {state.data.readiness.reason}</p>
+          {state.data.readiness.candidate && <p>Candidate tree <code>{state.data.readiness.candidate.tree}</code></p>}
+          {state.data.readiness.finalGate && <p>Final gate <code>{state.data.readiness.finalGate}</code>
+            {state.data.readiness.gateCommit && <> at commit <code>{state.data.readiness.gateCommit}</code></>}</p>}
+          {state.data.readiness.checkFindings.length > 0 &&
+            <p>Deviation findings: {state.data.readiness.checkFindings.map((id, index) =>
+              <span key={id}>{index > 0 ? ', ' : ''}<code>{id}</code></span>)}</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
+const mergeReadinessLabel = {
+  ready: 'Ready to merge',
+  'pending-review': 'Completed, pending user review',
+  rejected: 'Deviation rejected',
+  'gate-failed': 'Final gate failed',
+  unavailable: 'Readiness unavailable',
+} as const;
 
 function currentText(current: NonNullable<RunSnapshot['current']>): string {
   const parts = [

@@ -18,7 +18,10 @@ import { reviewCoverage, reviewStateOf } from '../reviews/state.js';
 import { terminalRunEvents, type RunEvent } from '../run/log.js';
 import { ProjectionError, type RunView } from './inputs.js';
 import { planDeviationSchema, type PlanDeviation } from '../deviations/records.js';
-import { planDeviationOptions } from '../deviations/finding.js';
+import { currentDeviationDecision } from '../deviations/readiness-decision.js';
+import { nonfunctionalDeviationSchema } from '../run/nonfunctional-records.js';
+
+type DeviationRecord = PlanDeviation | ReturnType<typeof nonfunctionalDeviationSchema.parse>;
 
 /*
  * The CheckFinding protocol's projections (appendix §8), pure over one
@@ -56,7 +59,7 @@ interface Basis {
   /** Every review request as the log derives it, in the order recorded. */
   readonly requests: ReturnType<typeof reviewStateOf>;
   /** Every plan deviation the log committed, by the CheckFinding that records it. */
-  readonly deviations: ReadonlyMap<string, PlanDeviation>;
+  readonly deviations: ReadonlyMap<string, DeviationRecord>;
 }
 
 interface ReviewRecords {
@@ -92,13 +95,24 @@ function basisOf(view: RunView): Basis {
   };
 }
 
-function deviationsOf(view: RunView): Map<string, PlanDeviation> {
-  const deviations = new Map<string, PlanDeviation>();
+function deviationsOf(view: RunView): Map<string, DeviationRecord> {
+  const deviations = new Map<string, DeviationRecord>();
   for (const line of view.entries) {
     for (const record of line.transaction.records) {
-      if ((record.body as { schema?: unknown } | null)?.schema !== 'ramify-agent.plan-deviation/1') continue;
-      const parsed = planDeviationSchema.safeParse(record.body);
-      if (parsed.success) deviations.set(parsed.data.checkFinding, parsed.data);
+      const schema = (record.body as { schema?: unknown } | null)?.schema;
+      if (schema === 'ramify-agent.plan-deviation/1') {
+        const parsed = planDeviationSchema.safeParse(record.body);
+        if (parsed.success) deviations.set(parsed.data.checkFinding, parsed.data);
+      } else if (schema === 'ramify-agent.nonfunctional-deviation/1'
+        && line.transaction.event.type === 'nonfunctional-deviation-recorded') {
+        const parsed = nonfunctionalDeviationSchema.safeParse(record.body);
+        if (parsed.success && parsed.data.id === line.transaction.event.data.deviation
+          && parsed.data.origin.nfr === line.transaction.event.data.nfr
+          && parsed.data.origin.assessment === line.transaction.event.data.assessment
+          && parsed.data.checkFinding === line.transaction.event.data.checkFinding) {
+          deviations.set(parsed.data.checkFinding, parsed.data);
+        }
+      }
     }
   }
   return deviations;
@@ -358,11 +372,24 @@ function summaryView(basis: Basis, summary: CheckFindingSummary): CheckFindingSu
 function deviationView(basis: Basis, entry: CheckFindingEntry): PlanDeviationView | null {
   const deviation = basis.deviations.get(entry.id);
   if (deviation === undefined) return null;
-  const rejection = [...entry.decisions].reverse().find(decision =>
-    decision.decision.action === 'answer-user-decision' && decision.decision.option === planDeviationOptions.reject);
-  const rejected = rejection !== undefined && entry.reason !== 'waived' ? rejection.rationale : null;
+  const current = currentDeviationDecision(entry);
+  const rejected = current?.standing === 'rejected' ? current.followUp : null;
+  if ('origin' in deviation) return {
+    id: deviation.id,
+    origin: deviation.origin,
+    passage: { ...deviation.passage },
+    sourcePath: entry.reports[0]?.source.kind === 'document'
+      && entry.reports[0].source.id.endsWith(`@sha256:${deviation.passage.sha256}`)
+      ? entry.reports[0].source.id.slice(0, -`@sha256:${deviation.passage.sha256}`.length) : null,
+    evidence: [...deviation.evidence],
+    proposedAlternative: deviation.proposedAlternative,
+    uncertainty: deviation.uncertainty,
+    followUp: rejected,
+  };
   return {
     id: deviation.id,
+    origin: { kind: 'work-item-conflict', request: deviation.request, workItem: deviation.workItem,
+      architectInvocation: deviation.invocation },
     request: deviation.request,
     workItems: [...deviation.workItems],
     plan: deviation.plan.path,

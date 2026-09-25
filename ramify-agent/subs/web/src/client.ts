@@ -19,10 +19,10 @@ import {
 } from '../../harness/src/interfaces/protocol/queries.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema,
-  metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
+  mergeReadinessResponseSchema, metricsResponseSchema, moduleCapabilityComparisonResponseSchema, runEventPageSchema, runListResponseSchema, runResponseSchema,
   scenarioListResponseSchema, workItemListResponseSchema, workItemResponseSchema,
   type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateView,
-  type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
+  type MergeReadinessResponse, type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunCommandInput, type RunEventPage, type RunListResponse, type RunSnapshot,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import {
@@ -84,6 +84,7 @@ export interface ProtocolClient {
   getExecutionCapability(planId: string, runId: string, capability: string, version: number): Promise<ExecutionCapabilityDetail>;
   getExecutionScenario(planId: string, runId: string, scenario: string, version: number): Promise<ExecutionScenarioDetail>;
   getGate(planId: string, runId: string, gate: string): Promise<GateView>;
+  getMergeReadiness(planId: string, runId: string, version: number): Promise<MergeReadinessResponse>;
   /** A page of the run's CheckFindings, of one work item or module, with its review coverage. */
   getCheckFindings(planId: string, runId: string, query: CheckFindingPathQuery): Promise<CheckFindingListResponse>;
   /** One CheckFinding with its history and what it links to. */
@@ -206,6 +207,7 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getExecutionScenario: (planId, runId, scenario, version) => get(
       protocolPaths.runExecutionScenario(planId, runId, scenario, version), executionScenarioDetailSchema),
     getGate: async (planId, runId, gate) => (await get(protocolPaths.runGate(planId, runId, gate), gateResponseSchema)).gate,
+    getMergeReadiness: (planId, runId, version) => get(protocolPaths.runMergeReadiness(planId, runId, version), mergeReadinessResponseSchema),
     getCheckFindings: (planId, runId, query) => get(protocolPaths.runCheckFindings(planId, runId, query), checkFindingListResponseSchema),
     getCheckFinding: (planId, runId, checkFinding) => get(protocolPaths.runCheckFinding(planId, runId, checkFinding), checkFindingDetailSchema),
     getCheckFindingModules: (planId, runId) => get(protocolPaths.runCheckFindingModules(planId, runId), checkFindingModuleCountsSchema),

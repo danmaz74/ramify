@@ -325,3 +325,29 @@ test('a plan deviation reads as a departure from the plan: its requirement as wr
   expect(within(question).getByRole('textbox', { name: /Note \(to reject: the requirement a follow-up run must meet\)/ })).toBeTruthy();
   expect(within(card).getByRole('button', { name: 'Waive…' })).toBeTruthy();
 });
+
+test('a non-functional deviation shows the exact captured requirement and assessment without inventing a work item', async () => {
+  const deviation = summary('cf-0007', {
+    workItem: null, producers: ['plan:deviation'], title: 'Non-functional deviation nfr-001',
+    planDeviation: {
+      id: 'nfd-001', origin: { kind: 'nonfunctional-assessment', nfr: 'nfr-001', assessment: 'nfa-001',
+        candidate: { tree: 'a'.repeat(40), head: null, preparedAt: at }, coordinatorInvocation: 'inv-0012' },
+      passage: { document: 'doc-001', sha256: 'b'.repeat(64), start: 10, end: 53,
+        quote: 'The service must answer within 50 milliseconds.' },
+      sourcePath: 'plans/review-notes/constraints.md',
+      evidence: ['Measured 87 milliseconds'], proposedAlternative: 'Use a cached read',
+      uncertainty: 'The production load is unknown', followUp: null,
+    },
+  });
+  const stub = client({ checkFindings: { [checkFindingKey({ select: 'all' })]: list([deviation], 'all',
+    { query: { workItem: null, module: null, select: 'all', order: 'attention' } }) } });
+  render(<PlanDeviations client={stub} planId={planId} runId={runId} version={version} />);
+  const card = await screen.findByRole('listitem', { name: 'CheckFinding cf-0007' });
+  const body = within(card).getByRole('group', { name: 'Non-functional deviation nfd-001' });
+  expect(body.textContent).toContain('The service must answer within 50 milliseconds.');
+  expect(body.textContent).toContain('doc-001');
+  expect(body.textContent).toContain('plans/review-notes/constraints.md');
+  expect(body.textContent).toContain('Measured 87 milliseconds');
+  expect(body.textContent).toContain('The production load is unknown');
+  expect(body.textContent).not.toContain('wi-');
+});

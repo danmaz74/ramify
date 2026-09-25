@@ -1,6 +1,6 @@
 import {
   runAgentSchema, runQueryLimits,
-  type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateResponse,
+  type AnalysisResponse, type CapabilityListResponse, type DecisionListResponse, type GateResponse, type MergeReadinessResponse,
   type MetricsResponse, type ModuleCapabilityComparisonResponse, type RunEventPage, type RunListResponse, type RunResponse,
   type ScenarioListResponse, type WorkItemListResponse, type WorkItemResponse,
 } from '../interfaces/protocol/runs.js';
@@ -10,6 +10,8 @@ import { runLayout } from '../run/records.js';
 import { runSnapshot } from '../run/snapshot.js';
 import type { CheckFindingDetail, CheckFindingListResponse, CheckFindingModuleCounts, ReviewListResponse } from '../interfaces/protocol/check-findings.js';
 import { analysisOf, decisionsOf } from './analysis.js';
+import { readAcceptedEvidence } from '../analysis/evidence.js';
+import { mergeReadinessOf } from './merge-readiness.js';
 import {
   checkFindingDetailOf, checkFindingListOf, checkFindingModulesOf, reviewListOf, runVersionOf, type CheckFindingListQuery,
 } from './check-findings.js';
@@ -91,6 +93,22 @@ export class RunQueries {
 
   async analysis(planId: string, runId: string): Promise<AnalysisResponse> {
     return analysisOf(await this.view(planId, runId));
+  }
+
+  /** A versioned verdict from one committed view, with no writable effect. */
+  async mergeReadiness(planId: string, runId: string, version: number): Promise<MergeReadinessResponse> {
+    const view = await this.versioned(planId, runId, version);
+    const evidence = await readAcceptedEvidence(view.directory, view.record, view.events);
+    const currentVersion = this.source.committed(planId, runId)?.entries.at(-1)?.sequence ?? 0;
+    if (currentVersion !== version) {
+      throw new ProjectionError('stale-version', `Run ${runId} moved while merge readiness was read`, [], currentVersion);
+    }
+    const readiness = mergeReadinessOf(view, evidence);
+    const binding = [...view.events].reverse().find(event => event.type === 'candidate-bound-to-gate'
+      && event.data.gate === readiness.finalGate);
+    return { runId, version, readiness: { ...readiness,
+      gateCommit: binding?.type === 'candidate-bound-to-gate' && readiness.candidate?.tree === binding.data.tree
+        ? binding.data.commit : null } };
   }
 
   async decisions(planId: string, runId: string): Promise<DecisionListResponse> {

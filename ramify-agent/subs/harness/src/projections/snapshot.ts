@@ -114,11 +114,12 @@ export function planDeviationsOf(entries: readonly CommittedLine[]): RunPlanDevi
   };
 }
 
-/** Every `plan-deviation-recorded` of the log: its CheckFinding, its work item and whether it holds the run. */
-function recordedDeviations(entries: readonly CommittedLine[]): Array<{ readonly checkFinding: string; readonly workItem: string; readonly held: boolean }> {
-  return entries.flatMap(entry => {
+/** Both deviation origins, with an actual work item only for a local conflict. */
+function recordedDeviations(entries: readonly CommittedLine[]): Array<{ readonly checkFinding: string; readonly workItem: string | null; readonly held: boolean }> {
+  return entries.flatMap<{ readonly checkFinding: string; readonly workItem: string | null; readonly held: boolean }>(entry => {
     const event = entry.transaction.event;
-    return event.type === 'plan-deviation-recorded' ? [{ checkFinding: event.data.checkFinding, workItem: event.data.workItem, held: event.data.held }] : [];
+    return event.type === 'plan-deviation-recorded' ? [{ checkFinding: event.data.checkFinding, workItem: event.data.workItem, held: event.data.held }]
+      : event.type === 'nonfunctional-deviation-recorded' ? [{ checkFinding: event.data.checkFinding, workItem: null, held: false }] : [];
   });
 }
 
@@ -133,7 +134,8 @@ export function decisionRequestsOf(entries: readonly CommittedLine[], live: bool
   // A plan deviation is the run's; one recorded past the limit holds the work
   // item that asked, and an environment problem always does.
   const held = new Map([
-    ...recordedDeviations(entries).filter(entry => entry.held).map(entry => [entry.checkFinding, entry.workItem] as const),
+    ...recordedDeviations(entries).filter((entry): entry is { checkFinding: string; workItem: string; held: boolean } => entry.held && entry.workItem !== null)
+      .map(entry => [entry.checkFinding, entry.workItem] as const),
     ...entries.flatMap(entry => {
       const event = entry.transaction.event;
       return event.type === 'environment-reported' ? [[event.data.checkFinding, event.data.workItem] as const] : [];

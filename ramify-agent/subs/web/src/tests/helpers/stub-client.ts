@@ -8,7 +8,7 @@ import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.j
 import type { PlanDocument, PlanEntry } from '../../../../harness/src/interfaces/protocol/queries.js';
 import type {
   AnalysisResponse, CapabilityListResponse, DecisionListResponse, GateView, MetricsResponse, ModuleCapabilityComparisonResponse, ProjectedRunEvent,
-  RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, ScenarioListResponse, WorkItemListResponse, WorkItemResponse,
+  MergeReadinessResponse, RunCommandInput, RunEventPage, RunListResponse, RunSnapshot, ScenarioListResponse, WorkItemListResponse, WorkItemResponse,
 } from '../../../../harness/src/interfaces/protocol/runs.js';
 import type {
   RunSessionResponse, RunSessionsResponse, SessionBodyResponse, SessionCursor, SessionListResponse, SessionRef, SessionTranscriptResponse,
@@ -36,6 +36,7 @@ export interface StubRun {
   executionCapabilities?: Record<string, ExecutionCapabilityDetail>;
   executionScenarios?: Record<string, ExecutionScenarioDetail>;
   metrics?: MetricsResponse;
+  mergeReadiness?: MergeReadinessResponse;
   /** CheckFinding lists by `<workItem>|<module>|<select>`, the absent filters empty and the select defaulting to attention. */
   checkFindings?: Record<string, CheckFindingListResponse>;
   checkFindingDetails?: Record<string, CheckFindingDetail>;
@@ -133,6 +134,12 @@ export class StubClient implements ProtocolClient {
   }
 
   async getAnalysis(_planId: string, runId: string) { this.calls.push(`getAnalysis:${runId}`); return this.answer(runId, run => run.analysis, 'analysis'); }
+  async getMergeReadiness(_planId: string, runId: string, version: number): Promise<MergeReadinessResponse> {
+    this.calls.push(`getMergeReadiness:${runId}:${version}`);
+    const run = this.run(runId);
+    return run.mergeReadiness ?? { runId, version, readiness: { status: 'unavailable', candidate: null,
+      finalGate: null, gateCommit: null, checkFindings: [], reason: 'No committed non-functional assessment is available' } };
+  }
   async getDecisions(_planId: string, runId: string) { this.calls.push(`getDecisions:${runId}`); return this.answer(runId, run => run.decisions, 'decisions'); }
   async getWorkItems(_planId: string, runId: string) { this.calls.push(`getWorkItems:${runId}`); return this.answer(runId, run => run.workItems, 'work items'); }
   async getWorkItem(_planId: string, runId: string, workItem: string) { this.calls.push(`getWorkItem:${runId}:${workItem}`); return this.answer(runId, run => run.workItem?.[workItem], `work item ${workItem}`); }

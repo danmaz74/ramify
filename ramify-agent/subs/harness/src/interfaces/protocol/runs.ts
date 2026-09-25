@@ -363,6 +363,21 @@ export type RunListResponse = z.infer<typeof runListResponseSchema>;
 export const runResponseSchema = z.object({ run: runSnapshotSchema }).strict();
 export type RunResponse = z.infer<typeof runResponseSchema>;
 
+/** Read-only, revision-bound merge advice; it never changes run completion. */
+export const mergeReadinessResponseSchema = z.object({
+  runId: runIdSchema,
+  version: jobVersionSchema,
+  readiness: z.object({
+    status: z.enum(['ready', 'pending-review', 'rejected', 'gate-failed', 'unavailable']),
+    candidate: z.object({ tree: text, head: text.nullable(), preparedAt: text }).strict().nullable(),
+    finalGate: text.nullable(),
+    gateCommit: text.nullable(),
+    checkFindings: z.array(text),
+    reason: text,
+  }).strict(),
+}).strict();
+export type MergeReadinessResponse = z.infer<typeof mergeReadinessResponseSchema>;
+
 /** What a projected event refers to. */
 export const runEventRefKindSchema = z.enum([
   'work-item', 'iteration', 'invocation', 'gate', 'decision', 'request',

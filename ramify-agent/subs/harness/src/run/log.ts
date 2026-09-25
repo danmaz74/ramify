@@ -165,11 +165,21 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }).strict()),
   /** The resulting tree is recorded only after all source-mutating preparation. */
   event('candidate-prepared', z.object({ candidate: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),
+  /** Freezes the accepted catalog and captured round bound before the first candidate preview. */
+  event('nonfunctional-phase-started', z.object({ catalogHash: z.string().regex(/^[0-9a-f]{64}$/), maxRounds: z.int().positive().max(3) }).strict()),
   event('nonfunctional-assessed', z.object({ assessment: text, candidate: text, round: z.int().positive(), phase: z.enum(['initial', 'after-repair']) }).strict()),
-  event('nonfunctional-investigated', z.object({ round: z.int().positive(), invocation: text, assessment: text }).strict()),
+  event('nonfunctional-investigated', z.object({ round: z.int().positive(), invocation: text, assessment: text,
+    nfrs: z.array(text).optional(),
+  }).strict()),
+  /** Assignment authority is committed before the sequential repair child starts. */
+  event('nonfunctional-repair-assigned', z.object({ round: z.int().positive(), assignment: text, assessment: text,
+    candidate: text, nfrs: z.array(text), startingModule: text,
+  }).strict()),
   event('nonfunctional-repair-committed', z.object({ round: z.int().positive(), invocation: text, assignment: text }).strict()),
   event('nonfunctional-round-closed', z.object({ round: z.int().positive(), record: text, outcome: z.enum(['satisfied', 'continue', 'exhausted', 'unavailable']) }).strict()),
-  event('nonfunctional-deviation-recorded', z.object({ deviation: text, nfr: text, assessment: text, checkFinding: text }).strict()),
+  event('nonfunctional-deviation-recorded', z.object({ deviation: text, nfr: text, assessment: text, checkFinding: text,
+    checkFindings: checkFindingEventsField,
+  }).strict()),
   event('candidate-bound-to-gate', z.object({ candidate: text, assessment: text, gate: text, commit: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),
   /**
    * The run was started with its review stop: after the analysis is
