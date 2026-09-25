@@ -73,3 +73,33 @@ export function requestPlacement(extra: Partial<PlacementRequestBody> = {}): Loc
 export function localDecision(body: Partial<DecisionBody>, registry: readonly RegistryChange[] = []): LocalDecisionBody {
   return { decision: decision(body), registry: [...registry] };
 }
+
+/** A local architect reporting that its request cannot be met as stated. */
+export function unresolved(
+  conflict = 'The comparison cannot be served as an MCP tool: the project has no MCP surface to serve it from.',
+  evidence: readonly string[] = ['plans/revision-diff/plan.md, lines 11–12, ask for an MCP tool `catalog.compare`.'],
+): LocalArchitectSubmission {
+  return { kind: 'unresolved', conflict, evidence: [...evidence] };
+}
+
+/** The global architect's answer to an unresolved request: a plan deviation, keeping what the conflict allows. */
+export function forkDeviation(extra: Partial<Extract<ForkSubmission, { kind: 'deviation' }>['deviation']> = {}): ForkSubmission {
+  return {
+    kind: 'deviation',
+    deviation: {
+      requirements: [{ lines: [11, 12] }],
+      instead: 'Serve the comparison through the tRPC query `catalog.compare` only; the MCP tool is not built.',
+      why: 'No module of the project serves MCP, and adding a protocol surface is beyond this plan.',
+      rejected: [{ alternative: 'Create an MCP module under the workspace', reason: 'It would be a new protocol surface no requirement of the plan describes.' }],
+      loss: 'An MCP client cannot compare revisions.',
+      workItems: [],
+      scenarios: [],
+      ...extra,
+    },
+  };
+}
+
+/** The global architect finding that no deviation leaves anything of the plan worth doing. */
+export function forkNothingPossible(reason = 'Every requirement of the plan rests on the missing surface.'): ForkSubmission {
+  return { kind: 'nothing-possible', reason, evidence: ['plans/revision-diff/plan.md, lines 9–14'] };
+}

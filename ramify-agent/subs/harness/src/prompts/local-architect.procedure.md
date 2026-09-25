@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 3. -->
+<!-- ramify-agent local architect procedure, version 4. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -249,9 +249,22 @@ you request completion again. A reconciliation never passes a gate for you.
 
 ## `unresolved`
 
-The request cannot be met as stated, and no outline would be honest about it.
-Name the conflict and the evidence for it. The run ends there. Do not weaken
-the request to make it satisfiable.
+The request cannot be met as stated, and no outline would be honest about it:
+it contradicts itself or the project's rules, it lacks information, it breaks
+something no stage can carry, the evidence it asks for cannot be had, or the
+harness offers no way to do it. Name the conflict and the evidence for it. Do
+not weaken the request to make it satisfiable; that is not yours to decide.
+
+The global architect decides what follows, and you are continued with its
+answer. It may fix a placement, which reaches you as a placement decision. It
+may record a plan deviation: the requirement as written, what the run does
+instead and why. The deviation binds the rest of the run, and you go on with
+the work item under it, meeting the rest of the plan as written. The person
+reviews it later. Or it may find that nothing of the plan is worth doing
+around the conflict, and the run ends.
+
+Answer `unresolved` for a conflict once. A conflict a deviation already
+answers is settled for this run.
 
 ## `yield-for-providers`
 

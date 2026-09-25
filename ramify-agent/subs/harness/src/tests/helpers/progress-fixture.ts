@@ -195,6 +195,7 @@ function proposedScript() {
       [hypothesis('badge-tones', { change: 'create', suggestedOwner: sharedUi, dependsOn: ['badge-legend'] })],
     ))],
     'local-architect': [submit(unresolved('The archive would need the badge history, which the plan says is never stored.'))],
+    'global-fork': [submit({ kind: 'nothing-possible', reason: 'Every requirement of the archive rests on the history the plan never stores.', evidence: [] })],
   });
 }
 

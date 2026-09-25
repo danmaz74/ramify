@@ -19,8 +19,9 @@ import { entryAssignmentsSchema } from './records.js';
  * should say. A re-rendering computes every tracked file's expected content,
  * writes the files that differ and reports whether a commit is needed. It
  * is the one way a feature file changes: the materialization after the run
- * branch exists, the recovery of a crash, and later every state change that
- * alters a pending tag.
+ * branch exists, the recovery of a crash, every state change that alters a
+ * pending tag, and a plan deviation that rewords a pending scenario, which
+ * revises its record.
  */
 
 /** The trailer that identifies a run's scenario commits beside its `Ramify-Run`. */
@@ -75,7 +76,13 @@ function replayScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios
   for (const line of lines) {
     for (const record of line.transaction.records) {
       const schema = (record.body as { schema?: unknown } | null)?.schema;
-      if (schema === 'ramify-agent.scenario/1') records.push(scenarioRecordSchema.parse(record.body));
+      if (schema === 'ramify-agent.scenario/1') {
+        // A plan deviation's rewording revises a record in place: the latest wins.
+        const scenario = scenarioRecordSchema.parse(record.body);
+        const at = records.findIndex(held => held.id === scenario.id);
+        if (at < 0) records.push(scenario);
+        else records[at] = scenario;
+      }
       if (schema === 'ramify-agent.entry-assignments/1') {
         entries = entryAssignmentsSchema.parse(record.body).entries.map(entry => ({ capability: entry.capability, description: entry.description }));
       }
@@ -87,7 +94,7 @@ function replayScenarios(lines: readonly ScenarioLedgerLine[]): TrackedScenarios
       if (applied.ok) states = applied.states;
     }
     // The points where the harness renders the files into the tree.
-    if (event.type === 'scenarios-materializing' || event.type === 'gate-committing') written = states;
+    if (event.type === 'scenarios-materializing' || event.type === 'gate-committing' || event.type === 'scenarios-rewording') written = states;
     if (event.type === 'scenarios-withdrawing') {
       const withdrawn = new Map(states);
       for (const id of event.data?.scenarios ?? []) withdrawn.set(id, 'pending');
@@ -272,4 +279,42 @@ export function withStates(tracked: TrackedScenarios, states: ReadonlyMap<string
   const next = new Map(tracked.states);
   for (const [id, state] of states) next.set(id, state);
   return { ...tracked, states: next };
+}
+
+/** The trailer value of a run's nth rewording commit. */
+export function rewordedTrailerValue(rewording: number): string {
+  return `reworded-${rewording}`;
+}
+
+/** A scenario's name, from the `Scenario:` line its source starts with; null where it has none. */
+export function scenarioNameOf(source: readonly string[]): string | null {
+  const first = source.find(line => line.trim() !== '');
+  const match = first === undefined ? null : /^\s*Scenario(?: Outline)?:\s*(.*?)\s*$/u.exec(first);
+  return match === null ? null : match[1]!;
+}
+
+/**
+ * The message of a rewording commit, "Reword sc-003", written mechanically
+ * from the intent: the plan deviation that rewords the pending scenarios,
+ * and their files.
+ */
+export function rewordingMessage(parts: {
+  readonly runId: string;
+  readonly rewording: number;
+  readonly deviation: string;
+  readonly scenarios: readonly string[];
+  readonly files: readonly string[];
+}): string {
+  return [
+    `Reword ${parts.scenarios.join(', ')}`,
+    '',
+    `Plan deviation ${parts.deviation} rewords ${parts.scenarios.length === 1 ? 'this pending scenario' : 'these pending scenarios'}. The plan file is`,
+    'unchanged; the deviation beside it is the record of the new wording.',
+    '',
+    ...parts.files.map(file => `  ${file}`),
+    '',
+    `${runTrailer}: ${parts.runId}`,
+    `${scenariosTrailer}: ${rewordedTrailerValue(parts.rewording)}`,
+    '',
+  ].join('\n');
 }

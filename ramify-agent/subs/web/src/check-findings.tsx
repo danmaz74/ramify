@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type {
   CheckFindingActorView, CheckFindingDecisionView, CheckFindingDetail, CheckFindingListResponse, CheckFindingSettlement,
-  CheckFindingSummaryView, PendingUserDecision, ReviewCoverageView, ReviewRequestView, UnresolvedReasonView,
+  CheckFindingSummaryView, PendingUserDecision, PlanDeviationView, ReviewCoverageView, ReviewRequestView, UnresolvedReasonView,
 } from '../../harness/src/interfaces/protocol/check-findings.js';
 import type { RunCommandInput } from '../../harness/src/interfaces/protocol/runs.js';
 import { ClientError, newCommandId, type ProtocolClient } from './client.js';
@@ -239,10 +239,12 @@ function CheckFindingCard({ client, planId, runId, version, summary, onOpenGate 
   const [history, setHistory] = useState(false);
   const scope = { client, planId, runId, version, summary };
   return (
-    <li className={`card check-finding check-finding-${summary.standing}`} aria-label={`CheckFinding ${summary.id}`}>
+    <li className={`card check-finding check-finding-${summary.standing}${summary.planDeviation ? ' check-finding-deviation' : ''}`} aria-label={`CheckFinding ${summary.id}`}>
       <p className="check-finding-title">
+        {summary.planDeviation && <span className="badge plan-deviation">Plan deviation</span>}{' '}
         <strong>{summary.title}</strong> <code>{summary.id}</code> <span className="muted">revision {summary.revision}</span>
       </p>
+      {summary.planDeviation && <DeviationBody deviation={summary.planDeviation} />}
       <p className="check-finding-signal">
         <RiskBadge risk={summary.risk} />
         <span className="badge credibility">{credibilityLabels[summary.credibility]}</span>
@@ -271,6 +273,52 @@ function CheckFindingCard({ client, planId, runId, version, summary, onOpenGate 
       <button type="button" className="link" aria-expanded={history} onClick={() => setHistory(value => !value)}>{history ? 'Hide history' : 'History'}</button>
       {history && <History client={client} planId={planId} runId={runId} version={version} checkFinding={summary.id} onOpenGate={onOpenGate} />}
     </li>
+  );
+}
+
+/**
+ * A plan deviation: the requirement as the plan writes it, what the run does
+ * instead, why, the alternatives rejected and what is lost, with each
+ * reworded scenario before and after. Accepting it is a waiver or the answer
+ * `accept`; rejecting it is the answer `reject`, whose note is the
+ * requirement a follow-up run must meet.
+ */
+function DeviationBody({ deviation }: { readonly deviation: PlanDeviationView }) {
+  return (
+    <div className="plan-deviation-body" role="group" aria-label={`Plan deviation ${deviation.id}`}>
+      <p className="muted">
+        The run departs from its plan here, and holds nothing for it{deviation.held ? ', except that it was recorded past the run\'s limit and the run waited for your decision' : ''}.
+        {' '}It answers {deviation.request} of {deviation.workItems.join(', ')}. The plan file is unchanged.
+      </p>
+      <p><strong>The requirement as written</strong></p>
+      <ul className="conflicts" aria-label="Requirement as written">
+        {deviation.requirements.map(requirement => (
+          <li key={`${requirement.startLine}-${requirement.endLine}`}>
+            <blockquote>{requirement.text}</blockquote>
+            <span className="muted"><code>{deviation.plan}</code>, lines {requirement.startLine}–{requirement.endLine}</span>
+          </li>
+        ))}
+      </ul>
+      <p><strong>Instead:</strong> {deviation.instead}</p>
+      <p><strong>Why:</strong> {deviation.why}</p>
+      <p><strong>What you lose:</strong> {deviation.loss}</p>
+      {deviation.rejected.length > 0 && (
+        <>
+          <p><strong>Alternatives rejected</strong></p>
+          <ul>{deviation.rejected.map(entry => <li key={entry.alternative}>{entry.alternative}: <span className="muted">{entry.reason}</span></li>)}</ul>
+        </>
+      )}
+      {deviation.scenarios.map(scenario => (
+        <div key={scenario.scenario} className="reworded-scenario" aria-label={`Rewording of ${scenario.scenario}`}>
+          <p><strong>{scenario.scenario} reworded</strong> in <code>{scenario.file}</code></p>
+          <p className="muted">Before</p>
+          <pre>{scenario.before.join('\n')}</pre>
+          <p className="muted">After</p>
+          <pre>{scenario.after.join('\n')}</pre>
+        </div>
+      ))}
+      {deviation.followUp !== null && <p className="follow-up"><strong>Rejected.</strong> The requirement for a follow-up run: {deviation.followUp}</p>}
+    </div>
   );
 }
 
@@ -402,7 +450,7 @@ function DecisionRequest({ client, planId, runId, version, summary, request }: C
               </label>
             ))}
             <label><span>Your name</span><input type="text" name="responder" value={responder} maxLength={200} required onChange={event => setResponder(event.target.value)} /></label>
-            <label><span>Note (optional)</span><textarea name="note" value={note} maxLength={4000} rows={2} onChange={event => setNote(event.target.value)} /></label>
+            <label><span>{summary.planDeviation ? 'Note (to reject: the requirement a follow-up run must meet)' : 'Note (optional)'}</span><textarea name="note" value={note} maxLength={4000} rows={2} onChange={event => setNote(event.target.value)} /></label>
             <button type="submit" disabled={option === '' || responder.trim() === ''}>{status.kind === 'sending' ? 'Answering…' : status.kind === 'sent' ? 'Answered' : 'Answer'}</button>
           </fieldset>
         </form>
@@ -537,6 +585,35 @@ function decisionText(decision: CheckFindingDecisionView): string {
     case 'reopen': return `reopened (${action.cause})`;
     case 'revise-obligation': return `revised the obligation from ${action.from} to ${action.to}`;
   }
+}
+
+// The run's plan deviations.
+
+/**
+ * Every plan deviation of the run, whatever module it concerns, for the
+ * person to accept or reject. They lead the run's attention order, so the
+ * first page holds them.
+ */
+export function PlanDeviations({ client, planId, runId, version, onOpenGate }: Scope & { readonly onOpenGate?: (gate: string) => void }) {
+  const state = useRunQuery(`plan-deviations:${runId}`, version, () => client.getCheckFindings(planId, runId, { select: 'all', order: 'attention' }));
+  return (
+    <section className="panel" aria-labelledby="plan-deviations-heading">
+      <h2 id="plan-deviations-heading">Plan deviations</h2>
+      {state.status === 'loading' && <p className="muted">Loading the plan deviations…</p>}
+      {state.status === 'failed' && <p className="failure" role="alert">Could not load the plan deviations: {state.error.message}</p>}
+      {state.status === 'ready' && (() => {
+        const deviations = state.data.items.filter(summary => summary.planDeviation !== null);
+        return deviations.length === 0 ? <p className="muted">No plan deviation.</p> : (
+          <>
+            <p className="muted">Where a requirement could not be met as written, the global architect recorded what the run does instead. Accept each one, by waiving it or answering accept, or reject it with the requirement a follow-up run must meet.</p>
+            <ul className="cards check-finding-cards">{deviations.map(summary => (
+              <CheckFindingCard key={summary.id} client={client} planId={planId} runId={runId} version={state.data.version} summary={summary} onOpenGate={onOpenGate} />
+            ))}</ul>
+          </>
+        );
+      })()}
+    </section>
+  );
 }
 
 // The run's CheckFindings by module.

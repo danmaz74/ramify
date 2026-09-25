@@ -2,6 +2,7 @@ import { architectViewDirectory } from '../../subs/evidence/src/views.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import type { PlacementDecision, PlacementRequest } from './records.js';
+import { deviationText, type PlanDeviation, type UnresolvedRequest } from '../deviations/records.js';
 
 /*
  * What one fork of the architect context is given: the focused request, the
@@ -76,6 +77,70 @@ export function forkMessage(briefing: ForkBriefing): string {
     lines.push('', `Its own local decisions this request rests on: ${request.localDecisions.map(id => `\`${id}\``).join(', ')}.`);
   }
 
+  lines.push(...evidenceSections(briefing));
+  lines.push('', 'Investigate and decide. The parent context does not reassess your choice.');
+  return lines.join('\n');
+}
+
+/** What one fork of an unresolved request is given, beside the evidence a placement fork has. */
+export interface UnresolvedForkBriefing extends Omit<ForkBriefing, 'request'> {
+  readonly request: UnresolvedRequest;
+  /** The work item's goal and the plan lines it was entered for. */
+  readonly workItem: { readonly goal: string; readonly requirements: readonly string[] };
+  /** The captured plan, which a deviation cites by line. */
+  readonly plan: { readonly path: string; readonly text: string };
+  /** Every plan deviation already recorded in this run. */
+  readonly deviations: readonly PlanDeviation[];
+  /** How many deviations the run records before the next one waits for the person. */
+  readonly deviationLimit: number;
+}
+
+/** The first user message of one fork of an unresolved request. */
+export function unresolvedForkMessage(briefing: UnresolvedForkBriefing): string {
+  const { request } = briefing;
+  const lines: string[] = [];
+  if (briefing.orientation !== undefined) lines.push(briefing.orientation, '');
+  lines.push(
+    `# Unresolved request ${request.id}`,
+    '',
+    `The local architect of \`${request.requester}\`, working ${request.workItem}, answered that its request cannot be met as stated:`,
+    '',
+    ...request.conflict.split('\n').map(line => `> ${line}`),
+    '',
+    '## Its evidence',
+    '',
+    ...(request.evidence.length === 0 ? ['It names none.'] : request.evidence.map(entry => `- ${entry}`)),
+    '',
+    `## What ${request.workItem} asks`,
+    '',
+    `Goal: ${briefing.workItem.goal}`,
+    '',
+    ...(briefing.workItem.requirements.length === 0 ? ['Its plan references: none.'] : [`Its plan references: ${briefing.workItem.requirements.join('; ')}.`]),
+    '',
+    `## The plan, \`${briefing.plan.path}\`, as this run captured it`,
+    '',
+    'Each line carries its number. A deviation cites the lines it departs from by these numbers.',
+    '',
+    '```text',
+    ...briefing.plan.text.split('\n').map((line, index) => `${String(index + 1).padStart(4, ' ')}  ${line}`),
+    '```',
+    '',
+    '## Plan deviations already recorded',
+    '',
+  );
+  if (briefing.deviations.length === 0) lines.push('None.');
+  else for (const deviation of briefing.deviations) lines.push(deviationText(deviation), '');
+  lines.push('', briefing.deviations.length >= briefing.deviationLimit
+    ? `This run has recorded ${briefing.deviations.length} deviations, its limit. A further one is recorded, and the run then waits for the person to accept or reject it before it goes on.`
+    : `This run records at most ${briefing.deviationLimit} deviations before the next one waits for the person; ${briefing.deviations.length} are recorded.`);
+  lines.push(...evidenceSections(briefing));
+  lines.push('', 'Investigate and answer: a placement decision, a plan deviation that keeps as much of the plan as the conflict allows, or that nothing is possible. The parent context does not reassess your answer.');
+  return lines.join('\n');
+}
+
+/** The evidence a fork decides against, and what an earlier fork of its request left: shared by both questions. */
+function evidenceSections(briefing: Omit<ForkBriefing, 'request' | 'orientation'>): string[] {
+  const lines: string[] = [];
   lines.push('', '## The evidence you decide against', '');
   lines.push(briefing.view.status === 'materialized'
     ? `- The architect view at \`${architectViewDirectory}/\` was refreshed for this request: revision \`${briefing.view.revision}\`, input \`${briefing.view.input}\`. Coverage limits: ${briefing.view.coverageLimits.length === 0 ? 'none' : briefing.view.coverageLimits.join('; ')}.`
@@ -118,6 +183,5 @@ export function forkMessage(briefing: ForkBriefing): string {
     lines.push(`The view was \`${briefing.revalidate.was}\` when this request started and is \`${briefing.revalidate.now}\` now. Revalidate what the earlier investigation rested on and repeat what it affected. Two revisions are never combined.`);
   }
 
-  lines.push('', 'Investigate and decide. The parent context does not reassess your choice.');
-  return lines.join('\n');
+  return lines;
 }

@@ -214,4 +214,26 @@ describe('the scope question\'s message', () => {
     expect(message(`plans/${plan}/plan.md`)).toContain(`The candidate holds the plan as \`plans/${plan}/plan.md\`. To name it as a concern's ground, read it with \`snapshot_read\`.`);
     expect(message(null)).toContain('The candidate holds no copy of the plan');
   });
+
+  test('lists every plan deviation in force apart from the excerpts, to be judged as the plan amended', async () => {
+    const source = scriptedCandidates('/project', { c1: { tree: 't1', base: 'c0', changes: [], files: {} } });
+    const snapshot = await openCandidateSnapshot(source, '/project', { commit: 'c1', base: 'c0' });
+    const request: ReviewRequest = {
+      schema: 'ramify-agent.review-request/1', id: 'rq-0002', key: { iteration: 'wi-001.i01', candidate: 'c1', kind: 'scope', policy: 'review-policy/1' },
+      workItem: 'wi-001', assignment: 'a.json', base: 'c0', gate: 'ga-0001', tree: 't1', requirements: [], guidance: [], forkPoint: { kind: 'none' },
+    };
+    const message = reviewMessage({
+      request, snapshot, assignment: null, checkFindings: [], planDocument: null,
+      requirements: [
+        { ref: 'plan#request', hash: 'a'.repeat(64), text: '## Request\n- Serve it over tRPC and MCP.' },
+        { ref: 'deviation:pd-001', hash: 'b'.repeat(64), text: 'Plan deviation pd-001 ... What the run does instead: tRPC only.' },
+      ],
+    });
+    const [excerpts, deviations] = message.split('## Plan deviations in force');
+    expect(excerpts).toContain('### plan#request');
+    expect(excerpts).not.toContain('deviation:pd-001');
+    expect(deviations).toContain('judge the candidate against that requirement as the deviation amends it');
+    expect(deviations).toContain('### deviation:pd-001 (sha256 bbbbbbbbbbbb)');
+    expect(deviations).toContain('What the run does instead: tRPC only.');
+  });
 });

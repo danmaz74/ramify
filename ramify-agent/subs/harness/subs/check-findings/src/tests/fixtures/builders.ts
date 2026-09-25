@@ -198,3 +198,52 @@ export function commit(state: CheckFindingState, command: CheckFindingCommand, l
 export function commitAll(commands: readonly CheckFindingCommand[], log?: CheckFindingEvent[]): CheckFindingState {
   return commands.reduce((state, command) => commit(state, command, log), emptyCheckFindingState());
 }
+
+/**
+ * A plan deviation as the harness records it: the run's, verified by
+ * assessment, judged by the global architect and credited as agent-generated,
+ * at high risk, located at the plan lines it departs from.
+ */
+export function deviation(options: { readonly key: string; readonly hash: number; readonly modules?: readonly string[] }): CheckFindingReportInput {
+  return {
+    producer: 'plan:deviation',
+    attempt: 'inv-0030',
+    reportKey: options.key,
+    contentHash: hashOf(options.hash),
+    owner: { kind: 'run' },
+    source: { kind: 'document', id: 'plans/p/plan.md' },
+    issueKey: null,
+    verification: assessment,
+    observation: {
+      kind: 'plan-deviation',
+      summary: `Plan deviation ${options.key}: the report script keeps its summary line`,
+      evidence: [{ kind: 'plan-deviation', ref: `deviations/${options.key}.json`, hash: hashOf(options.hash + 3000) }],
+      locations: [{ path: 'plans/p/plan.md', startLine: 40, endLine: 42 }],
+    },
+    judgment: {
+      actor: { kind: 'agent', role: 'global-architect', invocation: 'inv-0030' },
+      consequence: 'The reference report does not print the block',
+      rationale: 'The script lies outside every module',
+      uncertainty: 'none recorded',
+      remedy: null,
+      risk: 'high',
+      ground: ground(`deviations/${options.key}.json`, options.hash + 3000),
+    },
+    suggests: null,
+    credibility: 'agent-generated',
+    modules: [...(options.modules ?? ['project/cli'])],
+  };
+}
+
+/** The harness's request for the person's decision on a plan deviation: accept or reject. */
+export function deviationRequest(): CheckFindingDecisionInput {
+  return decision({
+    action: 'request-user-decision',
+    authority: { kind: 'governing-record', ref: 'deviations/pd-001.json' },
+    conflicts: [{ text: 'The report script prints the same block.', document: 'plans/p/plan.md', revision: hashOf(77) }],
+    options: [
+      { id: 'accept', summary: 'Accept the deviation', consequence: 'It stands.' },
+      { id: 'reject', summary: 'Reject it', consequence: 'A follow-up run meets the requirement.' },
+    ],
+  }, { actor: { kind: 'harness', reason: 'a plan deviation is the person\'s to accept or reject' }, source: { kind: 'document', id: 'plans/p/plan.md' } });
+}

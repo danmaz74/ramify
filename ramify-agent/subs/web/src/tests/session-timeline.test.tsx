@@ -31,7 +31,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     jobId: runId, planId, agent: 'scripted', version: 16, state: 'running', phase: 'working', stopRequested: false,
     startedAt: at(0), updatedAt: at(16), endedAt: null, failure: null, current: null, waits: [],
     counts: { workItems: 1, completedWorkItems: 0, openRequirements: 0, invocations: 6, readinessAttempts: 1, gateAttempts: 0, scenarios: { pending: 0, bound: 0, declared: 0, implemented: 0 }, degradedStarts: 0 },
-    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] },
+    writer: { held: null, unsettled: null }, review: 'not-reviewed', notices: [], decisionRequests: { open: 0, waiting: false, workItems: [] }, planDeviations: { recorded: 0, toReview: 0 },
     ...extra,
   });
 }

@@ -52,6 +52,7 @@ expose-sub CheckFindingActorView, checkFindingSourceViewSchema, checkFindingWitn
 expose-sub checkFindingSettlementSchema, CheckFindingSettlement, checkFindingConflictViewSchema from harness to descendants
 expose-sub checkFindingOptionViewSchema, pendingUserDecisionSchema, PendingUserDecision from harness to descendants
 expose-sub checkFindingMaterialChoiceSchema, CheckFindingMaterialChoice, userCheckFindingCommandKindSchema from harness to descendants
+expose-sub planDeviationViewSchema, PlanDeviationView from harness to descendants
 expose-sub UserCheckFindingCommandKind, checkFindingSummarySchema, CheckFindingSummaryView from harness to descendants
 expose-sub checkFindingCountsSchema, CheckFindingCountsView, checkFindingSelectSchema from harness to descendants
 expose-sub CheckFindingSelect, checkFindingOrderSchema, checkFindingListResponseSchema from harness to descendants
@@ -86,6 +87,7 @@ expose-sub runReviewSchema, RunReview from harness to descendants
 expose-sub runPhaseSchema, RunPhase, runQueryLimits, measurementPolicySchema from harness to descendants
 expose-sub kpiPolicySchema, lineagePolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
 expose-sub runDecisionRequestsSchema, RunDecisionRequests from harness to descendants
+expose-sub runPlanDeviationsSchema, RunPlanDeviations from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
 expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
 expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants

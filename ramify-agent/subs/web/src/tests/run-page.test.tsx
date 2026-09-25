@@ -30,6 +30,7 @@ function snapshot(extra: Partial<RunSnapshot> = {}): RunSnapshot {
     writer: { held: 'inv-0006', unsettled: null },
     review: 'not-reviewed',
     decisionRequests: { open: 0, waiting: false, workItems: [] },
+    planDeviations: { recorded: 0, toReview: 0 },
     notices: [
       {
         kind: 'module-created', at, sequence: 9, summary: 'Module created: shop/notes/drafts (subs/drafts/module.ramify) in wi-002.i01, commit abc. No placement decision proposed it.',
@@ -269,6 +270,17 @@ test('after the run ends the notices stay, and an empty list says that nothing w
   render(<RunPage client={none} planId="review-notes" runId={runId} interval={60_000} />);
   expect(await screen.findByText('No module was created or removed, and no dependency cycle was detected.')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+});
+
+test('a run that recorded plan deviations reads completed with those to review, never plainly completed, and lists them', async () => {
+  const deviated = clientWith(stubRun({ state: 'completed', phase: 'ended', endedAt: at, current: null, writer: { held: null, unsettled: null }, planDeviations: { recorded: 2, toReview: 1 } }));
+  render(<RunPage client={deviated} planId="review-notes" runId={runId} interval={60_000} />);
+  await screen.findByLabelText('Overview');
+  expect(screen.getAllByText('completed with 1 plan deviation to review').length).toBe(2);
+  expect(screen.queryByText('completed')).toBeNull();
+  expect(screen.getByText('2 recorded, 1 to review')).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Plan deviations' })).toBeTruthy();
+  expect(deviated.calls).toContain(`getCheckFindings:${runId}:||all`);
 });
 
 test('Stop sends stop-job with the run\'s version; the only fields on the page are the approval\'s', async () => {
@@ -737,7 +749,7 @@ test('a work item\'s CheckFindings sit in its history, and the overview shows th
     id: 'cf-0001', revision: 2, workItem: 'wi-001', standing: 'open', reason: 'awaiting-user-decision', awaiting: 'user-decision', verification: 'assessment',
     obligation: null, required: false, risk: 'medium', credibility: 'human-reviewed', modules: ['collection-review/workspace/reviews'], unresolved: null,
     latestReview: false, settlement: null, materialChoice: null, repair: null, producers: ['review:scope'], title: 'The API conflicts with the plan',
-    reports: 1, decisions: 1, group: null, userCommands: ['respond'],
+    reports: 1, decisions: 1, group: null, userCommands: ['respond'], planDeviation: null,
     pendingUserDecision: { request: 'cfd-0001', by: { kind: 'agent', role: 'local-architect', invocation: 'inv-0020' }, rationale: 'A strong conflict',
       conflicts: [{ text: 'The API returns a list.', document: 'plans/review-notes/plan.md', revision: 'sha256:plan' }],
       options: [{ id: 'keep', summary: 'Keep', consequence: 'Unmet' }, { id: 'list', summary: 'List', consequence: 'Callers change' }] },
@@ -775,7 +787,7 @@ test('a run that waits for the person\'s decision says so above every area and m
     id: 'cf-0001', revision: 2, workItem: 'wi-001', standing: 'open', reason: 'awaiting-user-decision', awaiting: 'user-decision', verification: 'assessment',
     obligation: null, required: false, risk: 'high', credibility: 'human-reviewed', modules: ['collection-review/workspace/reviews'], unresolved: null,
     latestReview: false, settlement: null, materialChoice: null, repair: null, producers: ['review:scope'], title: 'The API conflicts with the plan',
-    reports: 1, decisions: 1, group: null, userCommands: ['respond'],
+    reports: 1, decisions: 1, group: null, userCommands: ['respond'], planDeviation: null,
     pendingUserDecision: { request: 'cfd-0001', by: { kind: 'agent', role: 'local-architect', invocation: 'inv-0020' }, rationale: 'A strong conflict',
       conflicts: [{ text: 'The API returns a list.', document: 'plans/review-notes/plan.md', revision: 'sha256:plan' }],
       options: [{ id: 'keep', summary: 'Keep', consequence: 'Unmet' }, { id: 'list', summary: 'List', consequence: 'Callers change' }] },

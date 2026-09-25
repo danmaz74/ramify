@@ -42,6 +42,7 @@ export const defaultLimits: RunPolicy['limits'] = {
   runAbsoluteMs: 28_800_000,
   reconciliationRoundsPerWorkItem: 3,
   laterRoundMinimumRisk: 'medium',
+  maxPlanDeviations: 5,
 };
 
 /**

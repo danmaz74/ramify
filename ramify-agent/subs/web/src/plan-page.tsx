@@ -79,7 +79,7 @@ function Runs({ client, planId, navigate }: { readonly client: ProtocolClient; r
           {list.runs.map(run => (
             <li key={run.jobId}>
               <a href={routeHref({ page: 'run', planId, runId: run.jobId })}><code>{run.jobId}</code></a>
-              <RunState state={run.state} />
+              <RunState state={run.state} planDeviations={run.planDeviations} />
               {run.decisionRequests.waiting && (
                 <DecisionWaitBadge title={`Held until you answer: ${workItemsText(run.decisionRequests.workItems.map(item => item.workItem))}`} />
               )}

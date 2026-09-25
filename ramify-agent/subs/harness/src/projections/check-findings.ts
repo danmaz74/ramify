@@ -10,13 +10,15 @@ import {
   type CheckFindingActorView, type CheckFindingAttemptLink, type CheckFindingCountsView, type CheckFindingDecisionView,
   type CheckFindingDetail, type CheckFindingListResponse, type CheckFindingModuleCounts, type CheckFindingRepairLink,
   type CheckFindingReportView, type CheckFindingSelect, type CheckFindingSettlement, type CheckFindingSummaryView,
-  type PendingUserDecision, type ReviewCoverageView, type ReviewListResponse, type ReviewRequestView,
+  type PendingUserDecision, type PlanDeviationView, type ReviewCoverageView, type ReviewListResponse, type ReviewRequestView,
   type UnresolvedReasonView, type UserCheckFindingCommandKind,
 } from '../interfaces/protocol/check-findings.js';
 import { reviewAttemptSchema, reviewRequestSchema, type ReviewAttempt, type ReviewRequest } from '../reviews/records.js';
 import { reviewCoverage, reviewStateOf } from '../reviews/state.js';
 import { terminalRunEvents, type RunEvent } from '../run/log.js';
 import { ProjectionError, type RunView } from './inputs.js';
+import { planDeviationSchema, type PlanDeviation } from '../deviations/records.js';
+import { planDeviationOptions } from '../deviations/finding.js';
 
 /*
  * The CheckFinding protocol's projections (appendix §8), pure over one
@@ -53,6 +55,8 @@ interface Basis {
   readonly reviews: ReviewRecords;
   /** Every review request as the log derives it, in the order recorded. */
   readonly requests: ReturnType<typeof reviewStateOf>;
+  /** Every plan deviation the log committed, by the CheckFinding that records it. */
+  readonly deviations: ReadonlyMap<string, PlanDeviation>;
 }
 
 interface ReviewRecords {
@@ -84,7 +88,20 @@ function basisOf(view: RunView): Basis {
     completed,
     reviews: reviewRecordsOf(view),
     requests: reviewStateOf(view.events),
+    deviations: deviationsOf(view),
   };
+}
+
+function deviationsOf(view: RunView): Map<string, PlanDeviation> {
+  const deviations = new Map<string, PlanDeviation>();
+  for (const line of view.entries) {
+    for (const record of line.transaction.records) {
+      if ((record.body as { schema?: unknown } | null)?.schema !== 'ramify-agent.plan-deviation/1') continue;
+      const parsed = planDeviationSchema.safeParse(record.body);
+      if (parsed.success) deviations.set(parsed.data.checkFinding, parsed.data);
+    }
+  }
+  return deviations;
 }
 
 function reviewRecordsOf(view: RunView): ReviewRecords {
@@ -333,6 +350,30 @@ function summaryView(basis: Basis, summary: CheckFindingSummary): CheckFindingSu
     decisions: summary.decisions,
     group: summary.group === null ? null : { canonical: summary.group.canonical, members: [...summary.group.members] },
     userCommands: userCommandsOf(basis, summary, required, settlement),
+    planDeviation: deviationView(basis, entry),
+  };
+}
+
+/** The plan deviation a CheckFinding records, with the person's rejection where they answered one. */
+function deviationView(basis: Basis, entry: CheckFindingEntry): PlanDeviationView | null {
+  const deviation = basis.deviations.get(entry.id);
+  if (deviation === undefined) return null;
+  const rejection = [...entry.decisions].reverse().find(decision =>
+    decision.decision.action === 'answer-user-decision' && decision.decision.option === planDeviationOptions.reject);
+  const rejected = rejection !== undefined && entry.reason !== 'waived' ? rejection.rationale : null;
+  return {
+    id: deviation.id,
+    request: deviation.request,
+    workItems: [...deviation.workItems],
+    plan: deviation.plan.path,
+    requirements: deviation.requirements.map(requirement => ({ startLine: requirement.lines[0], endLine: requirement.lines[1], text: requirement.text })),
+    instead: deviation.instead,
+    why: deviation.why,
+    rejected: deviation.rejected.map(entry => ({ ...entry })),
+    loss: deviation.loss,
+    scenarios: deviation.scenarios.map(scenario => ({ scenario: scenario.scenario, file: scenario.file, before: [...scenario.before], after: [...scenario.after] })),
+    held: deviation.held,
+    followUp: rejected,
   };
 }
 
@@ -401,13 +442,15 @@ function settlementOf(entry: CheckFindingEntry): CheckFindingSettlement | null {
 
 /**
  * The commands a user may send now, as the command path would accept them:
- * none once the run has ended; an answer to a pending request; a waiver of
+ * none once the run has ended, except about a plan deviation, whose pending
+ * request a waiver answers too; an answer to a pending request; a waiver of
  * an open or deferred signal that is no required check and awaits no
  * answer; a revocation of a waiver, whoever made it.
  */
 function userCommandsOf(basis: Basis, summary: CheckFindingSummary, required: boolean, settlement: CheckFindingSettlement | null): UserCheckFindingCommandKind[] {
-  if (basis.ended) return [];
-  if (summary.pendingUserDecision !== null) return ['respond'];
+  const deviation = basis.deviations.has(summary.id);
+  if (basis.ended && !deviation) return [];
+  if (summary.pendingUserDecision !== null) return deviation ? ['respond', 'waive'] : ['respond'];
   if (summary.reason === 'waived' && settlement?.kind === 'waived') return ['revoke'];
   if (!required && (summary.standing === 'open' || summary.standing === 'deferred')) return ['waive'];
   return [];

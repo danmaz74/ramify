@@ -5,6 +5,7 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
+import { deviationText, type PlanDeviation } from '../deviations/records.js';
 import type { IterationApiViews } from './engineer.js';
 import type { IntegrationBriefing } from './integration.js';
 import { architectScenarioSection, type BriefedScenario } from './scenario-briefing.js';
@@ -116,6 +117,13 @@ export interface WorkItemBriefing {
     readonly findings: readonly string[];
     readonly gaps: readonly string[];
   } | undefined;
+  /**
+   * Every plan deviation the run recorded. Each amends the plan for the rest
+   * of the run: the requirement it names is met as the deviation says.
+   */
+  readonly deviations?: readonly PlanDeviation[] | undefined;
+  /** The deviation that just answered this architect's unresolved request. */
+  readonly deviationRecorded?: string | undefined;
   /** The outline revisions already committed for this item, oldest first. */
   readonly outlines: readonly WorkItemOutline[];
   /** What this work item owes and is owed across a delegation. */
@@ -215,6 +223,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     '',
     'Tests that state the acceptance are part of the work.',
     '',
+    ...deviationSection(briefing.deviations ?? [], briefing.deviationRecorded),
     ...(briefing.integration === undefined ? [] : integrationSection(briefing.integration)),
     ...architectScenarioSection(briefing.scenarios ?? []),
     '## Your module',
@@ -377,6 +386,24 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
 
   lines.push('Read your module, decide, and submit.');
   return lines.join('\n');
+}
+
+/**
+ * The plan deviations in force, each with the requirement it changes, and
+ * the one that answered this architect's unresolved request.
+ */
+function deviationSection(deviations: readonly PlanDeviation[], recorded: string | undefined): string[] {
+  if (deviations.length === 0) return [];
+  const lines: string[] = [];
+  const answered = deviations.find(deviation => deviation.id === recorded);
+  if (answered !== undefined) {
+    lines.push('## Your unresolved request was answered with a plan deviation', '');
+    lines.push(`The global architect answered \`${answered.request}\` with plan deviation \`${answered.id}\`, below. Go on with the work item under it: meet the rest of the plan as written and this requirement as the deviation states it. Do not answer \`unresolved\` again for the same conflict; the person reviews the deviation.`, '');
+  }
+  lines.push('## Plan deviations in force', '');
+  lines.push('The plan file is unchanged. Each deviation below amends it for the rest of this run, and your work and its reviews are judged against the plan as amended.', '');
+  for (const deviation of deviations) lines.push(deviationText(deviation), '');
+  return lines;
 }
 
 /** What a reconciliation returns to the local architect: its correction, and its brief where the session lacks it. */

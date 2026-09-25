@@ -358,6 +358,31 @@ Required checks remain governed by their own policy even if a related CheckFindi
 is deferred or waived. The simplest initial rule permits deferral and waiving
 only when they do not evade a required obligation or reserved approval.
 
+### Plan deviations
+
+A plan deviation is the one CheckFinding that holds nothing. When a local
+architect answers that its request cannot be met as stated, the global
+architect answers the unresolved request: a placement decision, a plan
+deviation, or that nothing of the plan remains worth doing, which fails the
+run. A deviation records the requirement as written at its plan lines, what
+the run does instead, why, the alternatives rejected and what the person
+loses. The plan file is never changed; the deviation is a durable record
+beside it that binds the rest of the run. Local architects receive it with
+the requirement it changes, and scope reviews judge the work against the plan
+as it amends it. A deviation may reword a pending scenario, and the harness
+renders that scenario's feature file from it.
+
+Its CheckFinding is the run's, high risk and agent-generated, located at the
+plan lines, and it awaits the user's decision from the start. Unlike every
+other open CheckFinding it holds neither its work item's completion nor the
+final gate: the work item that asked goes on under it, and a run that
+recorded any completes with them to review, never plainly. The user accepts
+a deviation by waiving it or answering `accept`, and rejects it by answering
+`reject` with the requirement a follow-up run must meet; both remain
+possible after the run ends. Past the run's limit of deviations, five by
+default, a further one holds the work item that asked until the user
+decides, and a rejection there fails the run.
+
 ## Application flow
 
 ```mermaid

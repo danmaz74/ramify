@@ -1,5 +1,5 @@
 import { replayCheckFindingState } from '../check-findings/state.js';
-import type { RunDecisionRequests, RunNotice, RunSnapshot } from '../interfaces/protocol/runs.js';
+import type { RunDecisionRequests, RunNotice, RunPlanDeviations, RunSnapshot } from '../interfaces/protocol/runs.js';
 import { runSnapshot } from '../run/snapshot.js';
 import type { CommittedLine, RunView } from './inputs.js';
 
@@ -16,6 +16,11 @@ import type { CommittedLine, RunView } from './inputs.js';
  * until a person answers, with no time limit. The snapshot says so, read
  * from the CheckFinding state the log replays, so every page that shows a
  * run can show that it waits for a person rather than looking slow.
+ *
+ * A plan deviation holds nothing, unless the run recorded it past its
+ * limit; the snapshot counts the run's deviations and those still awaiting
+ * the person, so a completed run reads "completed with N plan deviations
+ * to review".
  */
 
 /** A run's public snapshot, from its view. */
@@ -56,7 +61,30 @@ export function snapshotOf(view: RunView): RunSnapshot {
     review: internal.review === 'not-reviewed' ? 'not-reviewed' : { ...internal.review },
     notices: orderedNotices(internal.notices.map(notice => withDecisionStatement(notice))),
     decisionRequests: decisionRequestsOf(view.entries, internal.state === 'running' && !internal.stopRequested),
+    planDeviations: planDeviationsOf(view.entries),
   };
+}
+
+/**
+ * The plan deviations the run recorded, and those whose CheckFinding still
+ * awaits the person's decision.
+ */
+export function planDeviationsOf(entries: readonly CommittedLine[]): RunPlanDeviations {
+  const recorded = recordedDeviations(entries);
+  if (recorded.length === 0) return { recorded: 0, toReview: 0 };
+  const state = replayCheckFindingState(entries);
+  return {
+    recorded: recorded.length,
+    toReview: recorded.filter(entry => state.findings.get(entry.checkFinding)?.pendingUserDecision != null).length,
+  };
+}
+
+/** Every `plan-deviation-recorded` of the log: its CheckFinding, its work item and whether it holds the run. */
+function recordedDeviations(entries: readonly CommittedLine[]): Array<{ readonly checkFinding: string; readonly workItem: string; readonly held: boolean }> {
+  return entries.flatMap(entry => {
+    const event = entry.transaction.event;
+    return event.type === 'plan-deviation-recorded' ? [{ checkFinding: event.data.checkFinding, workItem: event.data.workItem, held: event.data.held }] : [];
+  });
 }
 
 /**
@@ -67,16 +95,19 @@ export function snapshotOf(view: RunView): RunSnapshot {
  */
 export function decisionRequestsOf(entries: readonly CommittedLine[], live: boolean): RunDecisionRequests {
   const state = replayCheckFindingState(entries);
+  // A plan deviation is the run's; one recorded past the limit holds the work item that asked.
+  const held = new Map(recordedDeviations(entries).filter(entry => entry.held).map(entry => [entry.checkFinding, entry.workItem]));
   let open = 0;
   const workItems = new Map<string, Array<{ checkFinding: string; request: string }>>();
   // The state holds CheckFindings in the order they were created, which is their IDs' order.
   for (const [id, entry] of state.findings) {
     if (entry.pendingUserDecision === null) continue;
     open += 1;
-    if (entry.owner.kind !== 'work-item') continue;
-    const requests = workItems.get(entry.owner.workItem) ?? [];
+    const holder = entry.owner.kind === 'work-item' ? entry.owner.workItem : held.get(id);
+    if (holder === undefined) continue;
+    const requests = workItems.get(holder) ?? [];
     requests.push({ checkFinding: id, request: entry.pendingUserDecision });
-    workItems.set(entry.owner.workItem, requests);
+    workItems.set(holder, requests);
   }
   return {
     open,

@@ -57,6 +57,10 @@ function decideReport(state: CheckFindingState, report: CheckFindingReportInput)
   if (report.observation.kind === 'review-concern' && (report.judgment === null || report.verification.kind !== 'assessment')) {
     return reject('invalid-report', 'a review concern carries its judgment and is verified by assessment');
   }
+  if (report.observation.kind === 'plan-deviation'
+    && (report.judgment === null || report.verification.kind !== 'assessment' || report.credibility !== 'agent-generated' || report.owner.kind !== 'run')) {
+    return reject('invalid-report', 'a plan deviation is the run\'s, carries the architect\'s judgment, is verified by assessment and is agent-generated');
+  }
   if (report.observation.kind === 'check-failed' && report.verification.kind !== 'check') {
     return reject('invalid-report', 'a failed check is verified by a check of its obligation');
   }
@@ -125,13 +129,27 @@ function decideDisposal(state: CheckFindingState, id: CheckFindingId, expectedRe
   if (entry === undefined) return reject('unknown-check-finding', `${id} is no CheckFinding`);
   if (entry.revision !== expectedRevision) return reject('stale-revision', `the decision considered ${id} at revision ${expectedRevision}, but it is at ${entry.revision}`);
   const action = input.decision;
-  if (entry.pendingUserDecision !== null && action.action !== 'answer-user-decision') {
+  if (entry.pendingUserDecision !== null && action.action !== 'answer-user-decision' && !acceptsDeviation(entry, input)) {
     return reject('awaiting-user-decision', `${id} awaits the user's answer to ${entry.pendingUserDecision}`);
   }
   const refusal = refusalOf(entry, input);
   if (refusal !== null) return refusal;
   const decision: CheckFindingDecision = { ...input, id: decisionId(state.counters.decisions + 1), considered: entry.revision };
   return accepted([{ type: 'check-finding-decided', data: { version: checkFindingEventVersion, checkFinding: id, revision: entry.revision + 1, decision } }], [id]);
+}
+
+/**
+ * A person's waiver of a plan deviation that awaits their decision: it is
+ * the answer the request asks for, accepting the deviation, so it settles
+ * the request with it. No one else settles a request by waiving.
+ */
+function acceptsDeviation(entry: CheckFindingEntry, input: CheckFindingDecisionInput): boolean {
+  return input.decision.action === 'waive' && input.actor.kind === 'user' && isPlanDeviation(entry);
+}
+
+/** Whether a CheckFinding records a departure from the plan. */
+function isPlanDeviation(entry: Pick<CheckFindingEntry, 'reports'>): boolean {
+  return entry.reports[0]?.observation.kind === 'plan-deviation';
 }
 
 /** Why this action does not fit the CheckFinding, its evidence or its authority, or null. */

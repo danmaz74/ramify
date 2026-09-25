@@ -4,6 +4,7 @@ import type {
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import type { ErrorCode } from '../interfaces/protocol/errors.js';
 import { withinModule } from '../reviews/reconciliation.js';
+import { isPlanDeviation, planDeviationOptions } from '../deviations/finding.js';
 
 /*
  * A person's CheckFinding commands (appendix §8), and the authority rules
@@ -17,6 +18,11 @@ import { withinModule } from '../reviews/reconciliation.js';
  * rank at least the waiver's actor's: user, then global architect, then
  * local architect, then the harness. A required check is waived by no one:
  * the child refuses it whoever asks.
+ *
+ * A plan deviation awaits the person's decision. Their waiver, or their
+ * answer `accept`, accepts it and closes it as waived; their answer
+ * `reject` keeps it open and records their note as the requirement a
+ * follow-up run must meet, so a rejection without a note is refused.
  */
 
 /** Where an actor stands for waiving and revoking: higher decides over lower. */
@@ -74,6 +80,25 @@ export function userCheckFindingChange(command: CheckFindingUserCommand, entry: 
       const { request, option, note } = command.payload;
       if (entry.pendingUserDecision !== request) {
         return refuse('conflict', `${request} is not the pending decision request of ${checkFinding}${entry.pendingUserDecision === null ? ', which awaits none' : `, which awaits ${entry.pendingUserDecision}`}`, current);
+      }
+      if (isPlanDeviation(entry)) {
+        // Accepting a plan deviation is the person's waiver of it; rejecting
+        // it records their answer as the requirement for a follow-up run.
+        if (option === planDeviationOptions.accept) {
+          return dispose(checkFinding, expectedRevision, {
+            ...base,
+            rationale: note === undefined || note.trim() === '' ? `${responder} accepted the plan deviation` : note,
+            decision: {
+              action: 'waive',
+              authority: { kind: 'user-decision', ref: command.commandId },
+              acceptedRisk: entry.risk,
+              uncertainty: 'The person accepted the plan deviation as recorded',
+            },
+          });
+        }
+        if (option === planDeviationOptions.reject && (note === undefined || note.trim() === '')) {
+          return refuse('invalid-request', `Rejecting the plan deviation of ${checkFinding} states, in its note, the requirement a follow-up run must meet`, current);
+        }
       }
       return dispose(checkFinding, expectedRevision, {
         ...base,

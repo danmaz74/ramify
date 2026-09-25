@@ -1,10 +1,12 @@
-<!-- ramify-agent scope review procedure, version 2. -->
+<!-- ramify-agent scope review procedure, version 3. -->
 Do this, in order:
 
 1. Read the iteration's goal and approach and the parts of the plan the
-   message below quotes. They are the intent this candidate is judged
-   against; if this session holds an earlier conversation, what it said
-   after the assignment is not part of that intent.
+   message below quotes, with the plan deviations it lists. They are the
+   intent this candidate is judged against: a requirement a deviation
+   amends is judged as the deviation states it. If this session holds an
+   earlier conversation, what it said after the assignment is not part of
+   that intent.
 2. List the changed paths with `snapshot_diff`, and read each patch.
 3. Ask of the candidate as a whole: does it do what the assignment asked,
    no less and no more? Name a promised case it leaves out, a behavior it

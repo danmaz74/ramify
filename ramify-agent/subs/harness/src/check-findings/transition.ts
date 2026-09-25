@@ -88,6 +88,15 @@ export type CheckFindingRefusal =
   /** The transaction would not fit one ledger line. */
   | { readonly reason: 'too-large'; readonly message: string };
 
+/**
+ * `afterEnd` lets a transition follow the run's terminal event: a person's
+ * decision about a plan deviation, which outlasts the run. The log accepts
+ * only a person's command there.
+ */
+export interface CheckFindingTransitionOptions {
+  readonly afterEnd?: boolean | undefined;
+}
+
 /** What deciding a transition under a held mutex returned. */
 export type CheckFindingTransaction =
   | { readonly kind: 'transaction'; readonly transaction: Transaction<RunEvent>; readonly decided: CheckFindingDecided }
@@ -106,9 +115,9 @@ export type CheckFindingCommit =
  * that same hold, as `commitCheckFindingChange` does; a ledger effect whose
  * completion carries CheckFinding events calls this from its `complete`.
  */
-export function decideCheckFindingTransaction(log: RunLog, build: CheckFindingBuild, at?: Date): CheckFindingTransaction {
+export function decideCheckFindingTransaction(log: RunLog, build: CheckFindingBuild, at?: Date, options: CheckFindingTransitionOptions = {}): CheckFindingTransaction {
   const ended = log.terminal;
-  if (ended !== undefined) return refused({ reason: 'run-ended', message: `Run ${log.runId} has ended with ${ended.type}; it accepts no CheckFinding change` });
+  if (ended !== undefined && options.afterEnd !== true) return refused({ reason: 'run-ended', message: `Run ${log.runId} has ended with ${ended.type}; it accepts no CheckFinding change` });
 
   let state = checkFindingStateOf(log.ledger);
   const plan = build({ log, state });
@@ -157,9 +166,9 @@ export function decideCheckFindingTransaction(log: RunLog, build: CheckFindingBu
  * one ledger line: the carrier event, its records and the CheckFinding
  * record copies, or nothing.
  */
-export function commitCheckFindingChange(target: CheckFindingTarget, build: CheckFindingBuild, at?: Date): Promise<CheckFindingCommit> {
+export function commitCheckFindingChange(target: CheckFindingTarget, build: CheckFindingBuild, at?: Date, options: CheckFindingTransitionOptions = {}): Promise<CheckFindingCommit> {
   return target.mutex.run(async () => {
-    const decided = decideCheckFindingTransaction(target.log, build, at);
+    const decided = decideCheckFindingTransaction(target.log, build, at, options);
     if (decided.kind !== 'transaction') return decided;
     try {
       await target.log.ledger.append(decided.transaction);

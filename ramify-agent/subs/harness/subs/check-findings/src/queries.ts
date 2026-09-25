@@ -16,7 +16,7 @@ import { credibilityRank, riskRank } from './signals.js';
  * harness found due. This module never evaluates a revisit condition or a
  * run phase; the caller supplies the due IDs. The attention order puts what
  * is worth most attention first: the highest risk, then the most credible
- * signal, then the most recent report.
+ * signal, then the most recent report, after every plan deviation.
  */
 
 /** Selects a bounded list or one CheckFinding's detail. */
@@ -105,12 +105,21 @@ function byId(a: CheckFindingEntry, b: CheckFindingEntry): number {
   return compareIds(a.id, b.id);
 }
 
-/** Highest risk first, then the most credible, then the most recent report, then ID. */
+/**
+ * Plan deviations first, since each is a departure from the plan that only
+ * a person accepts; then the highest risk, then the most credible, then the
+ * most recent report, then ID.
+ */
 function byAttention(a: CheckFindingEntry, b: CheckFindingEntry): number {
-  return riskRank(a.risk) - riskRank(b.risk)
+  return deviationRank(a) - deviationRank(b)
+    || riskRank(a.risk) - riskRank(b.risk)
     || credibilityRank(a.credibility) - credibilityRank(b.credibility)
     || latestReport(b) - latestReport(a)
     || compareIds(a.id, b.id);
+}
+
+function deviationRank(entry: CheckFindingEntry): number {
+  return entry.reports[0]?.observation.kind === 'plan-deviation' ? 0 : 1;
 }
 
 function latestReport(entry: CheckFindingEntry): number {

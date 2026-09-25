@@ -14,6 +14,7 @@ import { contractSchemas } from '../contracts/records.js';
 import { architectureSchemas } from '../architecture/records.js';
 import { reviewSchemas } from '../reviews/records.js';
 import { reconciliationSchemas } from '../reviews/reconciliation.js';
+import { deviationSchemas } from '../deviations/records.js';
 import { initialAnalysisSubmissionSchema } from '../analysis/submission.js';
 import { localArchitectSubmissionSchema } from '../work/submission.js';
 import { engineerSubmissionSchema, scopeTestsInputSchema } from '../work/engineer.js';
@@ -199,7 +200,7 @@ describe('no query appends an event', () => {
 
 /** Every schema a durable record, a log line, a submission, a harness tool or a projection is written against. */
 function unionRoots(): Record<string, unknown> {
-  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas, ...reviewSchemas, ...reconciliationSchemas };
+  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas, ...reviewSchemas, ...reconciliationSchemas, ...deviationSchemas };
   return {
     'run log': runEventSchema,
     'observation log': observationSchema,
@@ -238,7 +239,7 @@ const submissionSchemas: Readonly<Record<string, unknown>> = {
 /** What the composed runs wrote, walked value by value against the schemas that describe it. */
 async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
   const observed = new Map<unknown, Set<string>>();
-  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas, ...reviewSchemas, ...reconciliationSchemas };
+  const registries = { ...runSchemas, ...analysisSchemas, ...workSchemas, ...iterationSchemas, ...contractSchemas, ...architectureSchemas, ...reviewSchemas, ...reconciliationSchemas, ...deviationSchemas };
   const bySchema = new Map<string, unknown>(Object.values(registries).map(entry => [entry.schema, entry.body]));
   for (const run of finished.values()) {
     const directory = runDirectory(run.root, run.runId);
@@ -304,6 +305,12 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   // Plan 12: CheckFindings committed through a driven run's own transition, and iteration reviews.
   { union: 'run log.type', values: ['check-findings-recorded'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['producer'], file: 'subs/harness/src/tests/check-findings-run.test.ts', test: 'concurrent deliveries of one report are one issue, gates keep their verdicts, and a terminal run accepts none' },
+  // H7: an unresolved request the global architect answers with a plan deviation, which may reword a pending scenario.
+  { union: 'run log.type', values: ['plan-deviation-recorded'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['deviation-recorded'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.observation.kind', values: ['plan-deviation'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
+  { union: 'submission fork.kind', values: ['deviation'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
+  { union: 'run log.type', values: ['scenarios-rewording', 'scenarios-reworded'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the harness renders the feature file from it, commits it, and the finding shows the old and the new text' },
   // Plan 12 iteration 7: a person's CheckFinding commands.
   { union: 'command.type', values: ['respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-command'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
