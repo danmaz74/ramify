@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { catalogSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import type { Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
-import { coordinatorActionPrompt, coordinatorAssessmentPrompt, repairPrompt } from './prompts.js';
+import { coordinatorActionPrompt, coordinatorAssessmentPrompt, repairPrompt } from '../nonfunctional/prompts.js';
 import {
   bindCoordinatorAssessment, validateCoordinatorAction, validateCoordinatorInvestigation,
   nonfunctionalRepairSubmissionSchema, type ActionContext,
-} from './submissions.js';
+} from '../nonfunctional/submissions.js';
 
 const candidate: Candidate = { tree: 'a'.repeat(40), head: 'b'.repeat(40), preparedAt: '2026-09-25T00:00:00.000Z' };
 const passage = { document: 'doc-001', sha256: 'c'.repeat(64), start: 0, end: 19, quote: 'Latency stays low.\n' };
