@@ -1,0 +1,235 @@
+{
+  "probe": "plan13-context",
+  "ran": true,
+  "requestedModel": "openai-codex/gpt-6-sol",
+  "readinessModel": "openai-codex/gpt-6-sol",
+  "actualModels": [
+    "openai-codex/gpt-6-sol"
+  ],
+  "source": {
+    "commit": "6d64a52e8a693fc2fbb87cff9751c27eb1f45c60",
+    "manifestHash": "2e2d2e61a0b8167b553620d61573ba003a80f443d70ba4cee4515daec4d9ff74",
+    "documents": [
+      {
+        "id": "doc-001",
+        "path": "plans/probe/plan.md",
+        "sha256": "d76e50e96276c1fd606bf23ef16f43642ee2acb7f630a91bfa6b936341544e0c",
+        "revision": {
+          "commit": "6d64a52e8a693fc2fbb87cff9751c27eb1f45c60",
+          "dirty": false
+        }
+      },
+      {
+        "id": "doc-002",
+        "path": "docs/engineering.principles.md",
+        "sha256": "545e40bfb44d355f2247567dfb26686451cb3684be07744f05ba5264e9bda9a4",
+        "revision": {
+          "commit": "6d64a52e8a693fc2fbb87cff9751c27eb1f45c60",
+          "dirty": false
+        }
+      }
+    ],
+    "passageHashes": {
+      "nfr": "314c9967f0bf675393ca8509725a34010367919abecf04a2592eca0535cbbb97",
+      "advice": "3afcae5f294a1c5aaf1c320cd215e35482573d7d5b554e140f7f32adcea982a3",
+      "principle": "be6890b409dc4f56c8099d8e2e7e7dbd30d33b3121a5c442455e1ccd36f66ade"
+    }
+  },
+  "contextBytes": {
+    "briefing": 234,
+    "parentPrompt": 457,
+    "orientationPacket": 1094,
+    "selectorPrompt": 3479,
+    "package": 2396,
+    "continuationPrompt": 160
+  },
+  "parent": {
+    "requested": "fresh",
+    "actual": {
+      "mode": "fresh"
+    },
+    "kind": "submitted",
+    "elapsedMs": 6798,
+    "usage": [
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 272,
+          "output": 169,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 441
+        }
+      }
+    ],
+    "orientationHash": "23946dfa3f24bb3cdee016fec08204f3f1635a8e94e3094031587a77fd6aa27d"
+  },
+  "selector": {
+    "requested": "fork",
+    "actual": {
+      "mode": "fork"
+    },
+    "kind": "submitted",
+    "elapsedMs": 26722,
+    "usage": [
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 1766,
+          "output": 48,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 1814
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 171,
+          "output": 543,
+          "cacheRead": 1664,
+          "cacheWrite": 0,
+          "total": 2378
+        }
+      },
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 747,
+          "output": 567,
+          "cacheRead": 1664,
+          "cacheWrite": 0,
+          "total": 2978
+        }
+      }
+    ],
+    "rejectedSubmissions": 1,
+    "selectionHash": "5ff6dcc0e3bf8b77d0efa0ee427e29732a32d132c3289f592016512fcdf1214b",
+    "selected": [
+      {
+        "item": "nfr-001",
+        "document": "doc-001",
+        "start": 19,
+        "end": 57,
+        "sha256": "d76e50e96276c1fd606bf23ef16f43642ee2acb7f630a91bfa6b936341544e0c"
+      },
+      {
+        "item": "adv-001",
+        "document": "doc-001",
+        "start": 66,
+        "end": 87,
+        "sha256": "d76e50e96276c1fd606bf23ef16f43642ee2acb7f630a91bfa6b936341544e0c"
+      },
+      {
+        "item": "doc-002",
+        "document": "doc-002",
+        "start": 25,
+        "end": 66,
+        "sha256": "545e40bfb44d355f2247567dfb26686451cb3684be07744f05ba5264e9bda9a4"
+      }
+    ]
+  },
+  "append": {
+    "key": "probe:wi-001:5ff6dcc0e3bf8b77d0efa0ee427e29732a32d132c3289f592016512fcdf1214b",
+    "first": "appended",
+    "repeated": "already-present"
+  },
+  "continuedParent": {
+    "requested": "continue",
+    "actual": {
+      "mode": "continue"
+    },
+    "kind": "submitted",
+    "elapsedMs": 2249,
+    "usage": [
+      {
+        "model": "openai-codex/gpt-6-sol",
+        "tokens": {
+          "input": 1109,
+          "output": 36,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 1145
+        }
+      }
+    ],
+    "submitted": {
+      "quote": "Keep audit lookup below 100 ms at p95.",
+      "classification": "non-functional-requirement"
+    },
+    "quoteMatches": true
+  },
+  "checks": {
+    "actualFork": true,
+    "degradedMatchesActual": true,
+    "actualContinuation": true,
+    "selectedAll": true,
+    "packageValidated": true,
+    "appendIdempotent": true,
+    "quoteMatches": true
+  },
+  "implementation": {
+    "start": {
+      "head": "4bf4ecb590e5417437a1df1acd99e2676ef34032",
+      "dirty": false,
+      "files": [
+        {
+          "file": "subs/harness/src/probes/plan13-context.probe.ts",
+          "sha256": "69fc3f51663733bc06b5f6505091d7442360dac48082f39508cb143766b53408"
+        },
+        {
+          "file": "subs/harness/src/context-selection/submissions.ts",
+          "sha256": "8cf411a1a90339ffc5cf408e9968e8c22e0a317c4d1503ce9476e6af39cf31e1"
+        },
+        {
+          "file": "subs/harness/src/context-selection/selection.ts",
+          "sha256": "7188815d0ea4ea9c5a3b49e7916b7e5db9d98e06ba32a7b86006012db2013a5f"
+        },
+        {
+          "file": "subs/harness/src/context-selection/prompts.ts",
+          "sha256": "32f9af9c5306c7fba5058ad2d58a7d4ef1362aa021bcbdb658203b553a401c63"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+          "sha256": "d696e543a816a25a4a422d1b6011770e83ed152f1f4d3993d6666e97a7e309b4"
+        },
+        {
+          "file": "package.json",
+          "sha256": "d4a8440d7771db9b301410277c23332b4835ff7969784e05a01acab1edcfd326"
+        }
+      ]
+    },
+    "end": {
+      "head": "4bf4ecb590e5417437a1df1acd99e2676ef34032",
+      "dirty": false,
+      "files": [
+        {
+          "file": "subs/harness/src/probes/plan13-context.probe.ts",
+          "sha256": "69fc3f51663733bc06b5f6505091d7442360dac48082f39508cb143766b53408"
+        },
+        {
+          "file": "subs/harness/src/context-selection/submissions.ts",
+          "sha256": "8cf411a1a90339ffc5cf408e9968e8c22e0a317c4d1503ce9476e6af39cf31e1"
+        },
+        {
+          "file": "subs/harness/src/context-selection/selection.ts",
+          "sha256": "7188815d0ea4ea9c5a3b49e7916b7e5db9d98e06ba32a7b86006012db2013a5f"
+        },
+        {
+          "file": "subs/harness/src/context-selection/prompts.ts",
+          "sha256": "32f9af9c5306c7fba5058ad2d58a7d4ef1362aa021bcbdb658203b553a401c63"
+        },
+        {
+          "file": "subs/harness/subs/agent/subs/pi/src/pi-agent.ts",
+          "sha256": "d696e543a816a25a4a422d1b6011770e83ed152f1f4d3993d6666e97a7e309b4"
+        },
+        {
+          "file": "package.json",
+          "sha256": "d4a8440d7771db9b301410277c23332b4835ff7969784e05a01acab1edcfd326"
+        }
+      ]
+    },
+    "sourceStable": true
+  },
+  "witnessBoundary": "actual pi AgentPort sessions and context-selection helpers; not full RunService orchestration"
+}
