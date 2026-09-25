@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { lstat, mkdir, realpath, symlink, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import {
@@ -9,19 +9,22 @@ import {
   createAuditService,
   createInProcessRegisteredExecutorBridge,
   createNodeExecutionLeaseProcessLookup,
+  createNodeProcessExecutor,
   createNodeRepositoryExecutionLease,
   resolveRepositoryExecutionLeaseIdentity,
   type AuditCheckSummary,
   type AuditRequest,
+  type AuditResult,
   type CheckDefinition,
   type GitExecutorPort,
+  type JsonObject,
+  type ProcessExecutorPort,
   type RegisteredExecutorResult,
-  type WorkspacePreparationPort,
 } from 'ramify-audit';
 
 import { childEnvironment, outputTailBytes, runCommand } from '../../evidence/src/run-command.js';
-import type { CommandRun } from '../../evidence/src/run-command.js';
-import { checkOutputPath, commandStart } from '../../../src/checks/execution.js';
+import type { CommandOutcome, CommandRun } from '../../evidence/src/run-command.js';
+import { checkOutputPath, commandStart, notRun } from '../../../src/checks/execution.js';
 import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/checks/execution.js';
 import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
@@ -29,7 +32,13 @@ import { runScenarioCheck } from '../../../src/checks/scenario-check.js';
 import type { PlannedCheck } from '../../../src/checks/verify.js';
 
 const executorId = 'ramify-agent.gate-check';
-const preparationId = 'ramify-agent.dependencies';
+/**
+ * ramify-audit's built-in preparation: it links each package directory's
+ * installed dependencies into the worktree and then runs the project's
+ * setup commands there, in order. The harness registers no preparation of
+ * its own.
+ */
+const preparationId = 'nodejs';
 const harnessCheckId = 'harness-rules';
 const gitTimeoutMs = 60_000;
 
@@ -102,12 +111,21 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         }));
       }
 
+      // The project's setup commands lead the plan. They are not checks of
+      // the audit: its preparation runs them in the worktree before any check.
+      const setupCount = leadingSetup(checks);
+      if (checks.slice(setupCount).some(check => check.kind === 'setup')) {
+        return executionFailure(await infrastructureRecords(checks, request, {
+          kind: 'audit-plan',
+          message: 'A setup command must come before every other command of an audited gate',
+        }));
+      }
       const records = new Map<string, GateCommandRecord>();
       const definitions = checkDefinitions(checks);
       const bridge = createInProcessRegisteredExecutorBridge({
         [executorId]: async (registered, signal) => {
           if (registered.checkId === harnessCheckId) return harnessSummary(request);
-          const planned = plannedCheck(definitions, checks, registered.checkId);
+          const planned = plannedCheck(checks, registered.checkId);
           if (planned === null) {
             return {
               status: 'failed',
@@ -161,7 +179,22 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         },
       });
 
-      const preparation = workspacePreparation(mapping, request);
+      // Each setup command is announced as the preparation starts its
+      // process: the audit runs no process of its own for a registered check,
+      // so every process it starts is the next setup command.
+      const setupStarts: string[] = [];
+      const processes = createNodeProcessExecutor();
+      const processExecutor: ProcessExecutorPort = {
+        async execute(input, signal) {
+          const index = setupStarts.length;
+          if (index < setupCount) {
+            setupStarts.push(new Date().toISOString());
+            await request.started?.(commandStart(checks, index));
+          }
+          return processes.execute(input, signal);
+        },
+      };
+      const auditStartedAt = new Date().toISOString();
       const recordedWorkspace: { current: IntendedAuditWorkspace | null } = { current: null };
       const git = recordingGit({
         base: baseGit,
@@ -191,22 +224,44 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         },
         validateOwnership: baseLease.validateOwnership.bind(baseLease),
       };
-      const service = createAuditService({ git, registeredExecutors: bridge, workspacePreparation: preparation, executionLease });
+      const service = createAuditService({ git, processExecutor, registeredExecutors: bridge, executionLease });
       const bound = AbortSignal.timeout(request.context.timeoutMs);
       const signal = AbortSignal.any([request.signal, bound]);
-      const result = await service.run(auditRequest(definitions, request, mapping, runId), signal);
+      let preparation: AuditRequest['workspacePreparation'];
+      try {
+        preparation = workspacePreparationOf({
+          projectRoot: mapping.projectRoot,
+          projectPrefix: mapping.projectPrefix,
+          dependencyDirectories: request.context.dependencyDirectories,
+          directory: request.directory,
+          setup: checks.slice(0, setupCount),
+        });
+      } catch (error) {
+        return executionFailure(await infrastructureRecords(checks, request, { kind: 'audit-plan', message: errorMessage(error) }));
+      }
+      const result = await service.run(auditRequest(definitions, request, mapping, runId, preparation), signal);
       if (recordedWorkspace.current !== null) await options.workspaceOwnership.recordWorkspaceCleaned(recordedWorkspace.current);
+      // After workspace intent is recorded, library results may name the
+      // isolated worktree even though its finally block has removed it.
+      // Restore that exact prefix; before worktree selection there is no
+      // temporary path to restore, so repositoryRoot is a safe no-op.
+      const worktreePath = recordedWorkspace.current?.worktreePath ?? mapping.repositoryRoot;
+      const setup = { count: setupCount, starts: setupStarts, auditStartedAt, restore: (text: string) => mapping.restoreText(text, worktreePath) };
 
       if (result.status === 'cancelled') return executionFailure(await interruptedRecords(checks, request, result.reason));
       if (result.status === 'failed') {
-        // After workspace intent is recorded, library failures may name the
-        // isolated worktree even though its finally block has removed it.
-        // Restore that exact prefix; before worktree selection there is no
-        // temporary path to restore, so repositoryRoot is a safe no-op.
-        const failurePath = recordedWorkspace.current?.worktreePath ?? mapping.repositoryRoot;
+        const failed = await failedSetupRecords(checks, request, result.error, setup);
+        if (failed !== null) return executionFailure(failed);
         return executionFailure(await infrastructureRecords(checks, request, {
           kind: result.error.code,
-          message: mapping.restoreText(result.error.message, failurePath),
+          message: setup.restore(result.error.message),
+        }));
+      }
+      const prepared = await preparedSetupRecords(checks, request, result, setup);
+      if ('missing' in prepared) {
+        return executionFailure(await infrastructureRecords(checks, request, {
+          kind: 'audit-result',
+          message: `The completed audit recorded no setup command at position ${prepared.missing.join(', ')}; the installed ramify-audit may not run setup commands`,
         }));
       }
       const missing = definitions
@@ -218,11 +273,11 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           message: `The completed audit returned no harness command record for ${missing.join(', ')}`,
         }));
       }
-      const commands = definitions.flatMap(definition => {
+      const commands = [...prepared.records, ...definitions.flatMap(definition => {
         if (definition.id === harnessCheckId) return [];
         const record = records.get(definition.id);
         return record === undefined ? [] : [record];
-      });
+      })];
       return {
         commands,
         audited: result.summary.sourceCommit,
@@ -239,6 +294,8 @@ function executionFailure(commands: readonly GateCommandRecord[]) {
 
 interface PathMapping {
   readonly repositoryRoot: string;
+  /** The project root, its real path. */
+  readonly projectRoot: string;
   readonly projectPrefix: string;
   projectRootIn(worktreeRoot: string): string;
   rebaseProjectPath(value: string, auditedProjectRoot: string): string;
@@ -258,6 +315,7 @@ async function resolvePathMapping(projectRoot: string, git: GitExecutorPort, sig
   return {
     repositoryRoot: repository,
     projectPrefix: projectPrefix.split(sep).join('/'),
+    projectRoot: project,
     projectRootIn,
     rebaseProjectPath(value, auditedProjectRoot) {
       const suffix = containedSuffix(project, value);
@@ -302,8 +360,15 @@ function replacePath(value: string, from: string, to: string): string {
   return answer;
 }
 
+/** How many setup checks lead the plan. */
+function leadingSetup(checks: readonly PlannedCheck[]): number {
+  const index = checks.findIndex(check => check.kind !== 'setup');
+  return index < 0 ? checks.length : index;
+}
+
+/** The audit's checks: every planned check but the setup commands, which its preparation runs, and the harness's rules. */
 function checkDefinitions(checks: readonly PlannedCheck[]): CheckDefinition[] {
-  const planned = checks.map((check, index): CheckDefinition => ({
+  const planned = checks.flatMap((check, index): CheckDefinition[] => check.kind === 'setup' ? [] : [{
     id: checkId(index, check),
     name: `${check.kind} ${index + 1}`,
     description: `Harness-planned ${check.kind} check at position ${index + 1}`,
@@ -312,7 +377,7 @@ function checkDefinitions(checks: readonly PlannedCheck[]): CheckDefinition[] {
     executor: { kind: 'registered', executorId },
     onFailure: 'record',
     metadata: { kind: check.kind, position: index + 1 },
-  }));
+  }]);
   planned.push({
     id: harnessCheckId,
     name: 'Harness rules',
@@ -329,14 +394,63 @@ function checkId(index: number, check: PlannedCheck): string {
   return `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
 }
 
-function plannedCheck(
-  definitions: readonly CheckDefinition[],
-  checks: readonly PlannedCheck[],
-  id: string,
-): readonly [number, PlannedCheck] | null {
-  const index = definitions.findIndex(definition => definition.id === id);
+function plannedCheck(checks: readonly PlannedCheck[], id: string): readonly [number, PlannedCheck] | null {
+  const index = checks.findIndex((check, position) => check.kind !== 'setup' && checkId(position, check) === id);
   const check = checks[index];
   return index < 0 || check === undefined ? null : [index, check];
+}
+
+/**
+ * The workspace preparation an audit request names: ramify-audit's
+ * built-in `nodejs` preparation, which links the installed dependencies of
+ * the project root and of each nested package into the worktree, then runs
+ * the project's setup commands there in order, each command's output
+ * captured beside the attempt. It never runs a build the project did not
+ * declare.
+ */
+export function workspacePreparationOf(input: {
+  /** The project root, its real path; each setup command's directory lies inside it. */
+  readonly projectRoot: string;
+  /** The project's directory relative to the repository root, `''` for the root. */
+  readonly projectPrefix: string;
+  readonly dependencyDirectories: readonly string[];
+  /** The attempt's directory, outside the worktree. */
+  readonly directory: string;
+  /** The gate's leading setup checks. */
+  readonly setup: readonly PlannedCheck[];
+}): { preparationId: string; options: JsonObject } {
+  return {
+    preparationId,
+    options: {
+      projectPrefix: input.projectPrefix,
+      packageDirectories: [...new Set(['', ...input.dependencyDirectories])],
+      build: false,
+      setupCommands: input.setup.map(check => setupCommandOf(check, input.projectRoot)),
+      outputDirectory: resolve(input.directory, 'setup-output'),
+    },
+  };
+}
+
+/**
+ * One setup command as ramify-audit's preparation takes it. Its working
+ * directory is relative to the project, and its environment is the
+ * project's declared additions: the preparation adds them to the one it
+ * inherits.
+ */
+function setupCommandOf(check: PlannedCheck, projectRoot: string): JsonObject {
+  const [cmd, ...args] = check.command.argv;
+  if (cmd === undefined) throw new Error('A setup command names no executable');
+  const suffix = containedSuffix(projectRoot, check.command.cwd);
+  if (suffix === null) throw new Error(`Setup working directory ${check.command.cwd} is outside project ${projectRoot}`);
+  const cwd = suffix.split(sep).join('/');
+  return {
+    ...(check.name === undefined ? {} : { name: check.name }),
+    cmd,
+    args,
+    timeoutMs: check.command.timeoutMs,
+    ...(cwd === '' ? {} : { cwd }),
+    ...(Object.keys(check.command.envAdditions).length === 0 ? {} : { env: { ...check.command.envAdditions } }),
+  };
 }
 
 function auditRequest(
@@ -344,6 +458,7 @@ function auditRequest(
   request: CheckExecutionRequest,
   mapping: PathMapping,
   runId: string,
+  workspacePreparation: AuditRequest['workspacePreparation'],
 ): AuditRequest {
   const selection = request.context.selection;
   const owners = selection.policy === 'owned-by-scope'
@@ -367,7 +482,7 @@ function auditRequest(
       ...(owners.length === 0 ? {} : { owners }),
     },
     workspaceMode: 'isolated-worktree',
-    workspacePreparation: { preparationId, options: { projectPrefix: mapping.projectPrefix } },
+    ...(workspacePreparation === undefined ? {} : { workspacePreparation }),
     registeredExecutorIds: [executorId],
     metadata: { runId, attemptId: request.context.attemptId },
   };
@@ -390,58 +505,6 @@ function harnessSummary(request: CheckExecutionRequest): RegisteredExecutorResul
       },
     },
   };
-}
-
-function workspacePreparation(mapping: PathMapping, execution: CheckExecutionRequest): WorkspacePreparationPort {
-  return {
-    async prepare(request, signal) {
-      try {
-        if (signal.aborted) return { status: 'cancelled', reason: signalReason(signal) };
-        if (request.preparationId !== preparationId) {
-          return { status: 'failed', error: { code: 'unknown-preparation', message: `Unknown preparation ${request.preparationId}` } };
-        }
-        const auditedProjectRoot = mapping.projectRootIn(request.workingDirectory);
-        const directories = ['', ...execution.context.dependencyDirectories];
-        for (const directory of directories) {
-          if (signal.aborted) return { status: 'cancelled', reason: signalReason(signal) };
-          const normalized = validateRelativeDirectory(directory);
-          const source = join(execution.context.projectRoot, normalized, 'node_modules');
-          const target = join(auditedProjectRoot, normalized, 'node_modules');
-          await requireDirectory(source);
-          await refuseExisting(target);
-          await mkdir(dirname(target), { recursive: true });
-          await symlink(source, target, 'dir');
-        }
-        return { status: 'completed', payload: { projectPrefix: mapping.projectPrefix, links: directories.length } };
-      } catch (error) {
-        return { status: 'failed', error: { code: 'dependency-link-failed', message: errorMessage(error) } };
-      }
-    },
-  };
-}
-
-function validateRelativeDirectory(directory: string): string {
-  if (directory === '') return '';
-  const normalized = directory.split('/').join(sep);
-  if (isAbsolute(normalized) || normalized === '..' || normalized.startsWith(`..${sep}`)) {
-    throw new Error(`Nested package path must stay within the project: ${directory}`);
-  }
-  return normalized;
-}
-
-async function requireDirectory(path: string): Promise<void> {
-  const entry = await lstat(path).catch(() => null);
-  if (entry === null || (!entry.isDirectory() && !entry.isSymbolicLink())) {
-    throw new Error(`Installed dependencies are unavailable at ${path}`);
-  }
-}
-
-async function refuseExisting(path: string): Promise<void> {
-  const entry = await lstat(path).catch(error => {
-    if (isErrno(error, 'ENOENT')) return null;
-    throw error;
-  });
-  if (entry !== null) throw new Error(`Audit dependency target already exists at ${path}`);
 }
 
 function gitWithHarnessEnvironment(): GitExecutorPort {
@@ -619,6 +682,160 @@ function auditSummary(record: GateCommandRecord, run: CommandRun): AuditCheckSum
   };
 }
 
+// The project's setup commands, as the preparation recorded them.
+
+/** What the harness needs of the setup commands' run: how many, when each started, and the worktree's paths restored. */
+interface SetupRun {
+  readonly count: number;
+  readonly starts: readonly string[];
+  readonly auditStartedAt: string;
+  readonly restore: (text: string) => string;
+}
+
+/** One command's record as ramify-audit's preparation writes it, read without trusting its shape. */
+interface PreparedCommand {
+  readonly index: number;
+  readonly status: string;
+  readonly exitCode: number | null;
+  readonly durationMs: number;
+  readonly outputFile: string | null;
+  readonly outputTruncated: boolean;
+  readonly outputTail: string | null;
+}
+
+function preparedCommandOf(value: unknown): PreparedCommand | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const entry = value as Record<string, unknown>;
+  if (typeof entry['index'] !== 'number' || typeof entry['status'] !== 'string') return null;
+  return {
+    index: entry['index'],
+    status: entry['status'],
+    exitCode: typeof entry['exitCode'] === 'number' ? entry['exitCode'] : null,
+    durationMs: typeof entry['durationMs'] === 'number' && entry['durationMs'] >= 0 ? Math.round(entry['durationMs']) : 0,
+    outputFile: typeof entry['outputFile'] === 'string' ? entry['outputFile'] : null,
+    outputTruncated: entry['outputTruncated'] === true,
+    outputTail: typeof entry['outputTail'] === 'string' ? entry['outputTail'] : null,
+  };
+}
+
+function preparedCommandsOf(value: unknown): PreparedCommand[] {
+  return Array.isArray(value) ? value.flatMap(entry => preparedCommandOf(entry) ?? []) : [];
+}
+
+/**
+ * The setup commands' records of a completed audit, from the preparation's
+ * evidence in its summary: each one passed, or the audit would not have
+ * run a check. A declared command the evidence does not record is named,
+ * which an installed ramify-audit that does not run setup commands answers.
+ */
+async function preparedSetupRecords(
+  checks: readonly PlannedCheck[],
+  request: CheckExecutionRequest,
+  result: Extract<AuditResult, { status: 'completed' }>,
+  setup: SetupRun,
+): Promise<{ readonly records: GateCommandRecord[] } | { readonly missing: number[] }> {
+  if (setup.count === 0) return { records: [] };
+  const evidence = (result.summary as { workspacePreparation?: { payload?: { setupCommands?: unknown } } }).workspacePreparation;
+  const prepared = preparedCommandsOf(evidence?.payload?.setupCommands);
+  const records: GateCommandRecord[] = [];
+  const missing: number[] = [];
+  for (const [index, check] of checks.slice(0, setup.count).entries()) {
+    const entry = prepared.find(candidate => candidate.index === index + 1);
+    if (entry === undefined || entry.status !== 'passed') {
+      missing.push(index + 1);
+      continue;
+    }
+    records.push(await setupRecord(check, index, entry, request, setup, { kind: 'completed', exitCode: entry.exitCode ?? 0 }));
+  }
+  return missing.length > 0 ? { missing } : { records };
+}
+
+/**
+ * The records of an audit whose preparation stopped at a setup command:
+ * each setup command before it passed, the one that stopped it as the
+ * preparation recorded it, and every later command not run because of it.
+ * A command that ran and exited non-zero is a failed command, which the
+ * gate attributes as it attributes any failure; one that timed out, was
+ * terminated or could not start is not verified. Null where the failure
+ * named no setup command, which is the audit's own failure.
+ */
+async function failedSetupRecords(
+  checks: readonly PlannedCheck[],
+  request: CheckExecutionRequest,
+  error: { readonly code: string; readonly message: string; readonly details?: unknown },
+  setup: SetupRun,
+): Promise<GateCommandRecord[] | null> {
+  const details = typeof error.details === 'object' && error.details !== null ? error.details as Record<string, unknown> : {};
+  const failed = preparedCommandOf(details['failedCommand']);
+  if (details['preparationId'] !== preparationId || failed === null || failed.index < 1 || failed.index > setup.count) return null;
+  const passed = preparedCommandsOf(details['setupCommands']);
+  const records: GateCommandRecord[] = [];
+  for (const [index, check] of checks.entries()) {
+    const position = index + 1;
+    if (index < setup.count && position < failed.index) {
+      const entry = passed.find(candidate => candidate.index === position && candidate.status === 'passed');
+      if (entry === undefined) return null;
+      records.push(await setupRecord(check, index, entry, request, setup, { kind: 'completed', exitCode: entry.exitCode ?? 0 }));
+      continue;
+    }
+    if (position === failed.index) {
+      records.push(await setupRecord(check, index, failed, request, setup, failedOutcome(error, failed, check, setup)));
+      continue;
+    }
+    const outputFile = checkOutputPath(request.directory, index, check);
+    await writeFile(outputFile, '');
+    records.push(notRun(check, outputFile, setup.starts[failed.index - 1] ?? setup.auditStartedAt, 'setup-failed'));
+  }
+  return records;
+}
+
+/** How the failed setup command ended: its exit code where it ran to one, and otherwise the preparation's error. */
+function failedOutcome(
+  error: { readonly code: string; readonly message: string },
+  failed: PreparedCommand,
+  check: PlannedCheck,
+  setup: SetupRun,
+): CommandOutcome {
+  if (failed.status === 'failed' && failed.exitCode !== null) return { kind: 'completed', exitCode: failed.exitCode };
+  if (failed.status === 'timed-out') return { kind: 'timed-out', timeoutMs: check.command.timeoutMs };
+  return { kind: 'runner-error', error: { kind: error.code, message: setup.restore(error.message) } };
+}
+
+/**
+ * One setup command's record, classified by the gate's own policy. Its
+ * output is the preparation's captured file for it, beside the attempt,
+ * with the worktree's paths restored, and it is written where the harness
+ * keeps each command's output.
+ */
+async function setupRecord(
+  check: PlannedCheck,
+  index: number,
+  entry: PreparedCommand,
+  request: CheckExecutionRequest,
+  setup: SetupRun,
+  outcome: CommandOutcome,
+): Promise<GateCommandRecord> {
+  const captured = entry.outputFile === null ? null : await readFile(entry.outputFile, 'utf8').catch(() => null);
+  const text = setup.restore(captured ?? entry.outputTail ?? '');
+  const outputFile = checkOutputPath(request.directory, index, check);
+  const bytes = Buffer.from(text, 'utf8');
+  await writeFile(outputFile, bytes);
+  const run: CommandRun = {
+    outcome,
+    startedAt: setup.starts[index] ?? setup.auditStartedAt,
+    elapsedMs: entry.durationMs,
+    output: {
+      path: outputFile,
+      bytes: bytes.byteLength,
+      truncated: entry.outputTruncated,
+      tail: bytes.subarray(Math.max(0, bytes.byteLength - outputTailBytes)).toString('utf8'),
+    },
+    stdout: text,
+    stderr: '',
+  };
+  return request.classify(check, run, outputFile);
+}
+
 async function interruptedRecords(
   checks: readonly PlannedCheck[],
   request: CheckExecutionRequest,
@@ -674,6 +891,3 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isErrno(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}

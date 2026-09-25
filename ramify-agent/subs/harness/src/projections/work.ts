@@ -237,6 +237,7 @@ export function gateOf(view: RunView, id: string): GateView {
     rules: (gate.rules ?? []).map(rule => ({ rule: rule.rule, outcome: rule.outcome, violations: rule.violations.map(violation => ({ ...violation })) })),
     commands: gate.commands.map(command => ({
       kind: command.kind,
+      name: command.name ?? null,
       argv: [...command.command.argv],
       cwd: command.command.cwd,
       startedAt: command.startedAt,

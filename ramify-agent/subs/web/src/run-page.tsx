@@ -597,7 +597,9 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
             )}
             {data.commands.map((command, index) => (
               <div key={index} className="command">
-                <p><strong>{command.kind}</strong>: {command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</p>
+                <p><strong>{command.kind}</strong>{command.name === null ? '' : ` "${command.name}"`}: {command.notVerified === 'setup-failed'
+                  ? 'not run, because a setup command before it did not pass'
+                  : <>{command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</>}</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
                 {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>

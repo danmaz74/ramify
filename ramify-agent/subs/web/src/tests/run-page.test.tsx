@@ -140,7 +140,11 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
     gates: {
       'ga-0001': gateViewSchema.parse({
         id: 'ga-0001', checkpoint: 'readiness', subject: {}, repairRound: 0, infrastructureAttempt: 0, head: baseCommit,
-        commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [], commands: [],
+        commit: null, audited: null, evidence: null, verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
+        commands: [{
+          kind: 'setup', name: 'build', argv: ['npm', 'run', 'build'], cwd: '/p', startedAt: at, elapsedMs: 7, exitCode: 0, outcome: 'passed', notVerified: null,
+          runnerError: null, selection: null, output: { path: 'gates/ga-0001/01-setup.log', bytes: 6, truncated: false, tail: 'built\n' }, scenarios: null,
+        }],
       }),
       'ga-0002': gateViewSchema.parse({
         id: 'ga-0002', checkpoint: 'iteration', subject: { workItem: 'wi-002', iteration: 'wi-002.i01' }, repairRound: 0, infrastructureAttempt: 0,
@@ -148,10 +152,10 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         evidence: { runRef: 'refs/audited/runs/failed', reportCommit: 'c'.repeat(40), treeRef: 'refs/audited/trees/failed' },
         verdict: 'failed', cause: 'in-scope', next: 'repair', guardedChanges: [], rules: [],
         commands: [{
-          kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
+          kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
           runnerError: null, selection: null, output: { path: 'gates/ga-0002/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\none failed\n' }, scenarios: null,
         }, {
-          kind: 'scenarios', argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
+          kind: 'scenarios', name: null, argv: ['npm', 'run', 'acceptance'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 1, outcome: 'failed', notVerified: null,
           runnerError: null, selection: null, output: { path: 'gates/ga-0002/scenarios.log', bytes: 30, truncated: false, tail: 'sc-001 failed\n' },
           scenarios: {
             mode: 'quick', selection: { kind: 'identity', scenarios: ['sc-001'] }, dryRun: false, excluded: 3, runs: [{ module: 'shop/notes', exit: 1 }],
@@ -167,7 +171,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
         evidence: { runRef: 'refs/audited/runs/passed', reportCommit: 'd'.repeat(40), treeRef: 'refs/audited/trees/passed' },
         verdict: 'passed', cause: null, next: 'accept', guardedChanges: [], rules: [],
         commands: [{
-          kind: 'tests', argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
+          kind: 'tests', name: null, argv: ['npm', 'test'], cwd: '/p', startedAt: at, elapsedMs: 5, exitCode: 0, outcome: 'passed', notVerified: null,
           runnerError: null, selection: null, output: { path: 'gates/ga-0003/tests.log', bytes: 20000, truncated: false, tail: 'xxxx\nall passed\n' }, scenarios: null,
         }],
       }),
@@ -533,6 +537,9 @@ test('one iteration shows its failed and passed audits, attempt-local commit, ev
   expect(within(gate).getByText('Attempt commit').nextElementSibling?.textContent).toBe('none (this attempt made no commit)');
   expect(within(gate).getByText('Audited commit').nextElementSibling?.textContent).toBe('not audited');
   expect(within(gate).getByText('Audit evidence').nextElementSibling?.textContent).toBe('not published');
+  // The project's setup command, by its declared name.
+  expect(gate.querySelector('.command p')?.textContent).toBe('setup "build": passed, exit 0, 7 ms');
+  expect(within(gate).getByLabelText('Output tail of setup').textContent).toBe('built\n');
 });
 
 test('an unavailable metric reads unavailable with its known subtotal, never zero; the guarding statement stays', async () => {

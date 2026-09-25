@@ -124,7 +124,9 @@ hiding or measured complexity justifies it.
     hardcoded; no submission carries it and no agent chooses it. An
     `all-project` checkpoint that follows an assignment also runs that
     assignment's own selection beside the project's tests, which is what
-    tells a failure inside the last scope from one outside it.
+    tells a failure inside the last scope from one outside it. The
+    project's setup commands, which `ramify-agent.json` declares in `setup`,
+    lead every checkpoint's plan as commands of kind `setup`.
   - `selection.ts`: resolving a policy against the tree as it stands. Each
     exact owner's own test area, every descendant owner's for an included
     subtree, the ordinary source of a testing module inside the selection,
@@ -137,7 +139,14 @@ hiding or measured complexity justifies it.
     executor's command records and answers one attempt. Committing checkpoints
     use the audit executor in `subs/audit`; readiness and the standalone
     session's optional gate use the in-place executor because they do not
-    commit. The guarded set is the configuration, the
+    commit. Both run the project's setup commands before any other command,
+    the in-place executor at the project root and the audit through
+    ramify-audit's preparation of the worktree, and once one has not passed
+    no later command runs: each is recorded as not verified, `setup-failed`,
+    and the setup command's own record decides the attempt. One that exited
+    non-zero fails it `in-scope`, the engineer's to repair after readiness
+    passed; one that timed out, could not start or was stopped is
+    infrastructure. The guarded set is the configuration, the
     manifests, `ramify-agent.json`, the support files it names, the contract
     artifacts in force and every tracked feature file at the hash of its
     expected rendering; a change no record the
@@ -182,7 +191,10 @@ hiding or measured complexity justifies it.
     instead: each tracked scenario that did not pass with its name, file and
     line, its failing step, its bounded message and the steps no definition
     matched; each one that passed with the definition that bound each step
-    as `uri:line`; and the check's other failure lines. The local architect
+    as `uri:line`; and the check's other failure lines. A setup command that
+    did not pass is named with its declared name, its argv, its exit code,
+    where its complete output is and the end of what it printed, followed by
+    one line naming the commands it kept from running. The local architect
     also receives what a module violation leaves it to decide.
 - `run/`: implementation runs. A run is a job, and the only durable authority
   of one is its `events.jsonl`: one flushed line is one transition, carrying
@@ -231,10 +243,17 @@ hiding or measured complexity justifies it.
     invalid; and what readiness asks of a valid one: the modules' test areas
     its support code must match, and whether each mode's commands resolve.
     Its optional `typeCheck.output` declares the format the type check
-    prints, which committing gates read error locations from.
+    prints, which committing gates read error locations from. Its optional
+    `setup` declares the project's setup commands, such as its build, each
+    `{ name?, command, cwd?, timeoutMs?, env? }` with `cwd` inside the
+    project and a positive bound, ten minutes by default; every gate runs
+    them first.
   - `readiness.ts`: the readiness steps, their bounded recovery and the
     discovery of the project's test files. A failure a preparation can
-    repair consumes one recovery; one it cannot consumes none.
+    repair consumes one recovery; one it cannot consumes none. The baseline
+    gate runs the project's setup commands first, which `baseline-setup`
+    records: a setup command that exits non-zero fails readiness with the
+    end of its output and no recovery.
   - `gates.ts`: a checkpoint of a run and the commit that follows a pass,
     with the message the harness writes mechanically from records.
   - `inputs.ts`: the evidence seam. A run's lifecycle, its log and its

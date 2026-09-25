@@ -14,6 +14,26 @@ receives the intended temporary directory and worktree path, repository and
 process identities, source commit, run and attempt. Plan 7 iteration 4 owns
 the concrete durable record and cleanup lifecycle.
 
+Every request names ramify-audit's built-in `nodejs` workspace preparation;
+the harness registers none of its own. It links the installed dependencies
+of the project root and of each nested package whose tests a gate runs into
+the worktree, then runs the project's setup commands there in order, never a
+build the project did not declare, each command's output captured under the
+attempt's `setup-output/`. The gate's leading `setup` checks are forwarded as
+those commands rather than run as audit checks, and each is announced as the
+preparation starts its process. Their records come from the preparation's
+evidence, or, when it stopped at one, from its failure details: the commands
+before it passed, the one that stopped it failed with its exit code or not
+verified with the preparation's own error code, and every later command not
+run. A preparation failure that names no setup command is the audit's own
+failure, recorded with its code and message. This needs the ramify-audit
+release whose `nodejs` preparation takes `setupCommands`, which follows the
+`0.1.0` the package manifest still names.
+
+A setup command's environment is ramify-audit's: the inherited one without
+`NODE_OPTIONS`, plus the command's declared `env`. It is not the allowlist
+the harness builds for the commands it spawns itself.
+
 A `scenarios` check runs through the harness's `runScenarioCheck`, as the
 in-place runner runs it, with the audit's path mapping: the runs start in the
 worktree, the configured commands' paths are rebased into it, the profiles

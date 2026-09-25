@@ -88,12 +88,17 @@ function verdictText(node: GateNode): string {
 /** The command a running gate started last, as the map's current activity states it. */
 type ExecutionGateCommand = NonNullable<ExecutionMapSnapshot['current']['gateCommand']>;
 const commandWords: Record<ExecutionGateCommand['kind'], string> = {
-  tests: 'Tests', 'type-check': 'Type check', 'ramify-check': 'Ramify check', conformance: 'Conformance', scenarios: 'Scenarios',
+  setup: 'Setup', tests: 'Tests', 'type-check': 'Type check', 'ramify-check': 'Ramify check', conformance: 'Conformance', scenarios: 'Scenarios',
 };
+
+/** A command's words: a setup command the project named `build` is the build. */
+function commandText(command: { readonly kind: ExecutionGateCommand['kind']; readonly name?: string | null | undefined }): string {
+  return command.kind === 'setup' && command.name?.trim().toLowerCase() === 'build' ? 'Build' : commandWords[command.kind];
+}
 
 /** The command a running gate is on, and its place among the gate's commands: "Type check (2 of 4)". */
 function gateStep(command: ExecutionGateCommand): string {
-  return `${commandWords[command.kind]} (${command.position} of ${command.total})`;
+  return `${commandText(command)} (${command.position} of ${command.total})`;
 }
 
 function elapsedText(ms: number): string {

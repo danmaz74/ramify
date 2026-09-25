@@ -185,8 +185,9 @@ describe('the three causes a readiness failure can have', () => {
     expect(attempts).toHaveLength(1);
     // Nothing ran: the attempt could not run what the checkpoint requires.
     const attempt = attempts[0]!;
+    // The project declares no setup command, which is nothing to fail.
     expect(attempt.steps.filter(step => step.step.startsWith('baseline-') || step.step === 'acceptance-full').map(step => step.outcome))
-      .toEqual(['not-verified', 'not-verified', 'not-verified', 'not-verified', 'not-verified']);
+      .toEqual(['passed', 'not-verified', 'not-verified', 'not-verified', 'not-verified', 'not-verified']);
     expect(attempt.steps.find(step => step.step === 'baseline-type-check')!.detail).toContain('command-missing');
   }, 180_000);
 
@@ -237,6 +238,67 @@ describe('the three causes a readiness failure can have', () => {
   }, 180_000);
 });
 
+describe('the project\'s declared setup', () => {
+  /** The fixture's configuration with a setup command, and a test command that needs what it builds. */
+  async function builtTarget(setup: readonly unknown[]): Promise<{ root: string; policy: (projectRoot: string) => ReturnType<typeof testPolicy> }> {
+    const root = await target();
+    const config = JSON.parse(await readFile(join(root, 'ramify-agent.json'), 'utf8')) as Record<string, unknown>;
+    await writeFile(join(root, 'ramify-agent.json'), `${JSON.stringify({ ...config, setup }, null, 2)}\n`);
+    await initRepository(root);
+    return {
+      root,
+      policy: projectRoot => {
+        const base = testPolicy(projectRoot);
+        // The project's tests read the build output, which the repository ignores.
+        const program = 'process.exit(require("fs").existsSync("dist/built.txt") ? 0 : 1)';
+        return { ...base, commands: { ...base.commands, allTests: { ...base.commands.allTests, argv: [process.execPath, '-e', program] } } };
+      },
+    };
+  }
+
+  const build = 'const fs = require("fs"); fs.mkdirSync("dist", { recursive: true }); fs.writeFileSync("dist/built.txt", "built"); console.log("built dist/built.txt")';
+
+  test('runs first, at the project root, so the baseline reads what it built, and is announced and recorded as a gate command', async () => {
+    const { root, policy } = await builtTarget([{ name: 'build', command: [process.execPath, '-e', build] }]);
+
+    const { snapshot, attempts, events, receipt } = await readinessOf(root, { policy });
+
+    expect(snapshot.state).toBe('completed');
+    const attempt = attempts[0]!;
+    expect(attempt.verdict).toBe('passed');
+    const step = attempt.steps.find(entry => entry.step === 'baseline-setup')!;
+    expect(step.outcome).toBe('passed');
+    expect(step.detail).toMatch(/^1 setup command passed: the setup command "build", `.+` in \d+ ms$/u);
+    expect(step.gate).toBeDefined();
+    const gate = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(step.gate!)), 'utf8')) as { commands: Array<{ kind: string; name?: string; outcome: string; command: { cwd: string } }> };
+    expect(gate.commands[0]).toMatchObject({ kind: 'setup', name: 'build', outcome: 'passed', command: { cwd: root } });
+    const started = events.flatMap(event => (event.type === 'gate-command-started' && event.data.checkpoint === 'readiness' ? [event.data] : []));
+    expect(started[0]).toMatchObject({ kind: 'setup', name: 'build', position: 1 });
+    expect(started[1]).toMatchObject({ kind: 'tests', position: 2 });
+  }, 180_000);
+
+  test('a setup command that exits non-zero fails readiness at its own step with what it printed, and nothing after it runs', async () => {
+    const failing = 'console.error("src/a.ts(1,1): error TS2304: Cannot find name \'x\'."); process.exit(2)';
+    const { root, policy } = await builtTarget([{ name: 'build', command: [process.execPath, '-e', failing] }]);
+
+    const { snapshot, failures, attempts, recoveries } = await readinessOf(root, { policy });
+
+    expect(snapshot.state).toBe('failed');
+    expect(snapshot.failure?.reason).toBe('readiness-failed');
+    expect(snapshot.failure?.message).toContain('error TS2304');
+    expect(failures).toEqual([expect.objectContaining({ step: 'baseline-setup', recovery: null, final: true })]);
+    expect(recoveries).toHaveLength(0);
+    const steps = attempts[0]!.steps;
+    expect(steps.find(step => step.step === 'baseline-setup')).toMatchObject({ outcome: 'failed' });
+    expect(steps.find(step => step.step === 'baseline-setup')!.detail).toMatch(/^the setup command "build": `.+` exited with 2; src\/a\.ts\(1,1\): error TS2304/u);
+    // The baseline did not run: each of its steps says why, never that it selected nothing.
+    for (const name of ['baseline-tests', 'baseline-type-check', 'baseline-ramify-check'] as const) {
+      expect(steps.find(step => step.step === name)).toMatchObject({ outcome: 'not-verified' });
+      expect(steps.find(step => step.step === name)!.detail).toContain('did not run, because a setup command before it did not pass');
+    }
+  }, 180_000);
+});
+
 describe('the structural steps', () => {
   test('a dirty working tree is refused with the step git-clean, and no branch is created', async () => {
     const root = await target();
@@ -284,7 +346,8 @@ describe('the structural steps', () => {
     expect(attempt.steps.find(step => step.step === 'test-discovery')!.detail).toMatch(/^\d+ test files discovered/);
     expect(attempt.steps.find(step => step.step === 'ramify-daemon')!.detail).toContain('answers');
     expect(attempt.steps.filter(step => step.gate !== undefined).map(step => step.step)).toEqual([
-      'baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full',
+      'baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full',
     ]);
+    expect(attempt.steps.find(step => step.step === 'baseline-setup')).toMatchObject({ outcome: 'passed', detail: 'the project declares no setup command' });
   }, 180_000);
 });

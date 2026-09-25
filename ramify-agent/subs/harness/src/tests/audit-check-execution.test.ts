@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+import { existsSync } from 'node:fs';
+import { setupChecks } from '../checks/checkpoint.js';
 import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
@@ -398,18 +400,151 @@ describe('audit-backed gate execution', () => {
     const output = await readFile(record.output.path, 'utf8');
 
     expect(workspaces).toHaveLength(1);
+    // ramify-audit's own preparation refused the link, and says so with its
+    // own code and message.
     expect(record).toMatchObject({
       outcome: 'not-verified',
       notVerified: 'runner-error',
       runnerError: {
-        kind: 'audit-failed',
-        message: expect.stringContaining(join(fixture.repositoryRoot, 'node_modules')),
+        kind: 'dependency-link-failed',
+        message: `Audit dependency target already exists at ${join(fixture.repositoryRoot, 'node_modules')}`,
       },
     });
+    expect(attempt.cause).toBe('infrastructure');
+    expect(attempt.next).toBe('retry-infrastructure');
     expect(record.runnerError?.message).not.toContain('ramify-audit-worktree-');
     expect(record.output.tail).toContain(join(fixture.repositoryRoot, 'node_modules'));
     expect(record.output.tail).not.toContain('ramify-audit-worktree-');
     expect(output).toContain(join(fixture.repositoryRoot, 'node_modules'));
     expect(output).not.toContain('ramify-audit-worktree-');
+  });
+});
+
+describe('the project\'s setup commands in the audited worktree', () => {
+  /** A project whose check reads the build output its declared setup writes; the repository ignores that output. */
+  async function builtProject() {
+    const fixture = await repository({
+      '.gitignore': 'dist/\nnode_modules/\n',
+      'package.json': JSON.stringify({ scripts: { build: 'node scripts/build.mjs' } }),
+      'scripts/build.mjs': [
+        'import { mkdirSync, writeFileSync } from "node:fs";',
+        'mkdirSync("dist", { recursive: true });',
+        'writeFileSync("dist/out.txt", `built for ${process.env.BUILD_LABEL}`);',
+        'console.log(`wrote ${process.cwd()}/dist/out.txt`);',
+      ].join('\n'),
+      'scripts/check.mjs': 'import { readFileSync } from "node:fs";\nconsole.log(readFileSync("dist/out.txt", "utf8"));\n',
+    });
+    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
+    return fixture;
+  }
+
+  it('builds in the worktree before any check, so a check reads the ignored output, and publishes what the build printed', async () => {
+    const fixture = await builtProject();
+    const checks: PlannedCheck[] = [
+      ...setupChecks([{ name: 'build', command: ['node', 'scripts/build.mjs'], env: { BUILD_LABEL: 'audited' }, timeoutMs: 60_000 }], fixture.projectRoot),
+      { kind: 'tests', command: checkCommand({ argv: ['node', 'scripts/check.mjs'], cwd: fixture.projectRoot, timeoutMs: 30_000 }), attribution: 'project' },
+    ];
+    const announced: GateCommandStart[] = [];
+
+    const { attempt, workspaces, outputDirectory } = await auditGate(fixture, checks, 'ga-setup-built', { announced });
+
+    expect(attempt.verdict).toBe('passed');
+    expect(attempt.evidence).not.toBeNull();
+    expect(announced).toEqual([
+      { kind: 'setup', name: 'build', position: 1, total: 2 },
+      { kind: 'tests', position: 2, total: 2 },
+    ]);
+    const [setup, tests] = attempt.commands;
+    expect(setup).toMatchObject({ kind: 'setup', name: 'build', outcome: 'passed', exitCode: 0, command: { argv: ['node', 'scripts/build.mjs'], cwd: fixture.projectRoot } });
+    expect(setup!.command.envAdditions).toEqual({ BUILD_LABEL: 'audited' });
+    // What the build printed names the project, not the removed worktree.
+    expect(setup!.output.path).toBe(join(outputDirectory, '01-setup.log'));
+    expect(setup!.output.tail).toContain(`wrote ${fixture.projectRoot}/dist/out.txt`);
+    expect(setup!.output.tail).not.toContain(workspaces[0]?.worktreePath ?? 'missing-worktree');
+    expect(await readFile(join(outputDirectory, 'setup-output', 'setup-01.txt'), 'utf8')).toContain('status: passed');
+    expect(tests).toMatchObject({ kind: 'tests', outcome: 'passed' });
+    expect(tests!.output.tail).toContain('built for audited');
+    // The build ran in the worktree, never in the project.
+    expect(existsSync(join(fixture.projectRoot, 'dist'))).toBe(false);
+
+    const note = git(fixture.repositoryRoot, ['notes', '--ref=audit', 'show', fixture.commit]);
+    const runRef = note.match(/^Audited-Reports-Ref: (.+)$/mu)?.[1];
+    const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${runRef}:reports/audit/summary.json`])) as {
+      checks: Record<string, unknown>;
+      workspacePreparation: { preparationId: string; payload: { linkedPackageDirectories: string[]; setupCommands: Array<Record<string, unknown>> } };
+    };
+    expect(Object.keys(summary.checks)).toEqual(['check-02-tests', 'harness-rules']);
+    expect(summary.workspacePreparation.preparationId).toBe('nodejs');
+    expect(summary.workspacePreparation.payload.linkedPackageDirectories).toEqual(['']);
+    expect(summary.workspacePreparation.payload.setupCommands).toEqual([expect.objectContaining({
+      index: 1, name: 'build', command: ['node', 'scripts/build.mjs'], status: 'passed', exitCode: 0,
+      outputPath: 'reports/audit/workspace-preparation/setup-01.txt',
+    })]);
+    expect(git(fixture.repositoryRoot, ['show', `${runRef}:reports/audit/workspace-preparation/setup-01.txt`])).toContain('wrote ');
+  });
+
+  it('a setup command that exits non-zero fails the gate in scope with what it printed, and no check runs after it', async () => {
+    const fixture = await builtProject();
+    const marker = join(fixture.projectRoot, 'check-ran');
+    const checks: PlannedCheck[] = [
+      ...setupChecks([{ name: 'build', command: ['node', '-e', 'console.error("src/a.ts(1,1): error TS2304: Cannot find name x."); process.exit(2)'] }], fixture.projectRoot),
+      { kind: 'tests', command: command(fixture.projectRoot, `require("fs").writeFileSync(${JSON.stringify(marker)}, "ran")`), attribution: 'project' },
+      { kind: 'type-check', command: command(fixture.projectRoot, 'console.log("types")'), attribution: 'project' },
+    ];
+
+    const { attempt, outputDirectory } = await auditGate(fixture, checks, 'ga-setup-failed');
+    const inPlace = await inPlaceGate(fixture, checks, 'ga-setup-failed-place');
+
+    for (const gate of [attempt, inPlace]) {
+      expect(gate.commands.map(record => [record.kind, record.outcome, record.notVerified ?? null, record.exitCode])).toEqual([
+        ['setup', 'failed', null, 2],
+        ['tests', 'not-verified', 'setup-failed', null],
+        ['type-check', 'not-verified', 'setup-failed', null],
+      ]);
+      expect(gate.commands[0]!.output.tail).toContain('error TS2304: Cannot find name x.');
+      expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'in-scope', 'repair']);
+    }
+    expect(attempt.evidence).toBeNull();
+    expect(attempt.audited).toBeNull();
+    expect(attempt.commands[0]!.output.path).toBe(join(outputDirectory, '01-setup.log'));
+    expect(await readFile(attempt.commands[0]!.output.path, 'utf8')).toContain('exit: 2');
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it('a setup command that does not finish in time is infrastructure, not a failure of the source', async () => {
+    const fixture = await builtProject();
+    const checks: PlannedCheck[] = [
+      ...setupChecks([{ command: ['node', '-e', 'setTimeout(() => {}, 60000)'], timeoutMs: 500 }], fixture.projectRoot),
+      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")'), attribution: 'project' },
+    ];
+
+    const { attempt } = await auditGate(fixture, checks, 'ga-setup-timeout');
+
+    expect(attempt.commands.map(record => [record.kind, record.outcome, record.notVerified ?? null])).toEqual([
+      ['setup', 'not-verified', 'timeout'],
+      ['tests', 'not-verified', 'setup-failed'],
+    ]);
+    expect(attempt.commands[0]!.name).toBeUndefined();
+    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'timeout', 'retry-infrastructure']);
+  });
+
+  it('a setup command that cannot start is infrastructure, with the preparation\'s own error', async () => {
+    const fixture = await builtProject();
+    // The directory exists where the gate verified the plan, and not in the
+    // worktree of the commit, which holds only tracked files.
+    await mkdir(join(fixture.projectRoot, 'dist', 'local'), { recursive: true });
+    const checks: PlannedCheck[] = [
+      ...setupChecks([{ name: 'build', command: ['node', 'scripts/build.mjs'], cwd: 'dist/local' }], fixture.projectRoot),
+      { kind: 'tests', command: command(fixture.projectRoot, 'console.log("unreached")'), attribution: 'project' },
+    ];
+
+    const { attempt } = await auditGate(fixture, checks, 'ga-setup-spawn');
+
+    expect(attempt.commands[0]).toMatchObject({
+      kind: 'setup', outcome: 'not-verified', notVerified: 'runner-error',
+      runnerError: { kind: 'setup-command-spawn-failed', message: expect.stringContaining('its working directory does not exist') },
+    });
+    expect(attempt.commands[1]).toMatchObject({ outcome: 'not-verified', notVerified: 'setup-failed' });
+    expect([attempt.verdict, attempt.cause, attempt.next]).toEqual(['not-verified', 'infrastructure', 'retry-infrastructure']);
   });
 });

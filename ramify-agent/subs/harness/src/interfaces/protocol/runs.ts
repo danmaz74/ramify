@@ -961,14 +961,16 @@ export const gateViewSchema = z.object({
     violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
   }).strict()),
   commands: z.array(z.object({
-    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    /** A setup command's declared name, such as `build`; null for every other command and an unnamed one. */
+    name: text.nullable(),
     argv: z.array(z.string()),
     cwd: text,
     startedAt: z.string(),
     elapsedMs: count,
     exitCode: z.int().nullable(),
     outcome: gateVerdictSchema,
-    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing']).nullable(),
+    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed']).nullable(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     selection: z.object({
       policy: z.enum(['owned-by-scope', 'all-project']),

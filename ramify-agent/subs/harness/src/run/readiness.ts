@@ -2,7 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import type { CheckExecutionPort, GateCommandStarted } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
-import { allProjectChecks, checkpointPolicies, planScenarioCheck } from '../checks/checkpoint.js';
+import { allProjectChecks, checkpointPolicies, planScenarioCheck, setupChecks } from '../checks/checkpoint.js';
 import { checkCommandEnvironment } from '../checks/records.js';
 import type { GateAttempt, GateCommandRecord } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
@@ -108,7 +108,11 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
   // left by an earlier run is kept out, so this is the project's own
   // regression acceptance. A step reached here has a valid configuration.
   const acceptance = await acceptanceChecks(request);
-  const checks = [...allProjectChecks(policy.commands, checkpointPolicies.readiness)];
+  // The project's setup commands run first, at the project root, as every
+  // gate runs them: a baseline that needs a build output is judged with it.
+  const declared = 'config' in request.projectConfig ? request.projectConfig.config.setup ?? [] : [];
+  const setup = setupChecks(declared, projectRoot);
+  const checks = [...setup, ...allProjectChecks(policy.commands, checkpointPolicies.readiness)];
   const acceptanceIndex = { quick: -1, full: -1 };
   if (acceptance.quick !== null) acceptanceIndex.quick = checks.push(acceptance.quick) - 1;
   if (acceptance.full !== null) acceptanceIndex.full = checks.push(acceptance.full) - 1;
@@ -122,6 +126,8 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
     ...(request.signal === undefined ? {} : { signal: request.signal }),
     ...(request.started === undefined ? {} : { started: request.started }),
   });
+
+  steps.push(setupStep(gate.commands.slice(0, setup.length)));
 
   // The baseline's three steps read the gate's own command records. The
   // nested packages' tests run inside the same attempt, beside the project's.
@@ -178,7 +184,34 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
  * vocabulary, and are recorded here, where they are verified: a step not
  * reached must never stand before the step that stopped the attempt.
  */
-const gateSteps: readonly ReadinessStep[] = ['baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full'];
+const gateSteps: readonly ReadinessStep[] = ['baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check', 'baseline-acceptance', 'acceptance-full'];
+
+/** How much of a failed setup command's output its step quotes: a build's errors are the reason readiness failed. */
+const setupTailCharacters = 2_000;
+
+/**
+ * The project's setup commands, which ran before every other command of the
+ * baseline gate: passed with nothing to run where the project declares
+ * none, and otherwise as the first of them that did not pass, with the end
+ * of what it printed.
+ */
+function setupStep(records: readonly GateCommandRecord[]): StepResult {
+  const step = 'baseline-setup';
+  if (records.length === 0) return { step, outcome: 'passed', detail: 'the project declares no setup command' };
+  const failed = records.find(record => record.outcome !== 'passed');
+  if (failed !== undefined) {
+    return { step, outcome: failed.outcome, detail: describeCommand(setupLabel(failed), failed, setupTailCharacters) };
+  }
+  return {
+    step,
+    outcome: 'passed',
+    detail: `${records.length} setup command${records.length === 1 ? '' : 's'} passed: ${records.map(record => `${setupLabel(record)}, \`${record.command.argv.join(' ')}\` in ${record.elapsedMs} ms`).join('; ')}`,
+  };
+}
+
+function setupLabel(record: GateCommandRecord): string {
+  return record.name === undefined ? 'the setup command' : `the setup command "${record.name}"`;
+}
 
 /** Readiness's two scenario checks, or null for each when no module has feature files. */
 async function acceptanceChecks(request: ReadinessRequest): Promise<{ quick: PlannedCheck | null; full: PlannedCheck | null; modules: number }> {
@@ -214,14 +247,17 @@ function acceptanceStep(step: 'baseline-acceptance' | 'acceptance-full', record:
   };
 }
 
-function describeCommand(label: string, record: GateAttempt['commands'][number]): string {
+function describeCommand(label: string, record: GateAttempt['commands'][number], tailCharacters = 400): string {
+  if (record.notVerified === 'setup-failed') {
+    return `${label}: \`${record.command.argv.join(' ')}\` did not run, because a setup command before it did not pass`;
+  }
   const outcome = record.outcome === 'passed'
     ? `passed in ${record.elapsedMs} ms`
     : record.outcome === 'failed'
       ? `exited with ${record.exitCode}`
       : `not verified (${record.notVerified ?? 'unknown'})`;
   const tail = record.output.tail.trim();
-  return `${label}: \`${record.command.argv.join(' ')}\` ${outcome}${tail === '' ? '' : `; ${tail.slice(-400)}`}`;
+  return `${label}: \`${record.command.argv.join(' ')}\` ${outcome}${tail === '' ? '' : `; ${tail.slice(-tailCharacters)}`}`;
 }
 
 function attemptRecord(

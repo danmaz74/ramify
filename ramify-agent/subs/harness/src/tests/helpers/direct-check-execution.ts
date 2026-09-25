@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { GateEvidence, ScenarioCheckSummary } from '../../checks/records.js';
-import { checkOutputPath, commandStart, inPlaceCheckExecution, type CheckExecutionContext, type CheckExecutionPort } from '../../checks/execution.js';
+import { checkOutputPath, commandStart, inPlaceCheckExecution, notRun, type CheckExecutionContext, type CheckExecutionPort } from '../../checks/execution.js';
 import type { PlannedCheck } from '../../checks/verify.js';
 import { outputTailBytes, type CommandOutcome, type CommandRun } from '../../../subs/evidence/src/run-command.js';
 import { scenarioRunName } from '../../../subs/scenarios/src/profiles.js';
@@ -145,8 +145,16 @@ function directCheckExecution(
       const commands = [];
       let interrupted = false;
       let cancelled = false;
+      // As the real executors do, a setup command that did not pass keeps
+      // every later command from running, and none of them is scripted.
+      let setupFailed = false;
       for (const [checkIndex, check] of checks.entries()) {
         const outputFile = checkOutputPath(request.directory, checkIndex, check);
+        if (setupFailed && !interrupted && !request.signal.aborted) {
+          await writeFile(outputFile, '');
+          commands.push(notRun(check, outputFile, new Date(Date.UTC(2000, 0, 1)).toISOString(), 'setup-failed'));
+          continue;
+        }
         if (interrupted || request.signal.aborted) {
           const run = await commandRun(outputFile, { outcome: { kind: 'cancelled' } }, invocationIndex);
           const record = request.classify(check, run, outputFile);
@@ -180,12 +188,16 @@ function directCheckExecution(
         if (record.notVerified === 'interrupted') {
           interrupted = true;
           cancelled = true;
+        } else if (check.kind === 'setup' && record.outcome !== 'passed') {
+          setupFailed = true;
         }
       }
+      // A preparation that failed publishes nothing, as ramify-audit's does not.
+      const published = !cancelled && !setupFailed;
       return {
         commands,
-        audited: cancelled ? null : request.context.sourceCommit,
-        evidence: cancelled ? null : (evidence ?? testEvidence)(request.context),
+        audited: published ? request.context.sourceCommit : null,
+        evidence: published ? (evidence ?? testEvidence)(request.context) : null,
       };
     },
   };

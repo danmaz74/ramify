@@ -37,6 +37,8 @@ export interface CheckExecutionRequest {
 /** One command of a gate as it starts: its kind and its place among the gate's commands, counted from one. */
 export interface GateCommandStart {
   readonly kind: CheckCommandKind;
+  /** A setup command's declared name, such as `build`. */
+  readonly name?: string;
   readonly position: number;
   readonly total: number;
 }
@@ -46,7 +48,8 @@ export type GateCommandStarted = (command: GateCommandStart) => Promise<void>;
 
 /** The announcement of one planned check, at its index among `checks`. */
 export function commandStart(checks: readonly PlannedCheck[], index: number): GateCommandStart {
-  return { kind: checks[index]!.kind, position: index + 1, total: checks.length };
+  const check = checks[index]!;
+  return { kind: check.kind, ...(check.name === undefined ? {} : { name: check.name }), position: index + 1, total: checks.length };
 }
 
 /**
@@ -102,17 +105,23 @@ export interface CheckExecutionResult {
   readonly auditOverall?: 'pass' | 'fail' | null;
 }
 
-/** Today's runner: execute the verified commands in the project's working directory. */
+/**
+ * Today's runner: execute the verified commands in the project's working
+ * directory. The project's setup commands come first; once one of them has
+ * not passed, no later command runs, and each is recorded as not run
+ * because of it.
+ */
 export const inPlaceCheckExecution: CheckExecutionPort = {
   async run(checks, request) {
     const commands: GateCommandRecord[] = [];
     const startedAt = new Date().toISOString();
     let interrupted = false;
+    let setupFailed = false;
     for (const [index, check] of checks.entries()) {
       const outputFile = outputPath(request.directory, index, check);
-      if (interrupted) {
+      if (interrupted || setupFailed) {
         await writeFile(outputFile, '');
-        commands.push(notRun(check, outputFile, startedAt));
+        commands.push(notRun(check, outputFile, startedAt, interrupted ? 'interrupted' : 'setup-failed'));
         continue;
       }
 
@@ -143,6 +152,7 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
       const record = request.classify(check, run, outputFile);
       commands.push(record);
       if (record.notVerified === 'interrupted') interrupted = true;
+      else if (check.kind === 'setup' && record.outcome !== 'passed') setupFailed = true;
     }
     return { commands, audited: null, evidence: null };
   },
@@ -157,17 +167,28 @@ function outputPath(directory: string, index: number, check: PlannedCheck): stri
   return join(directory, `${String(index + 1).padStart(2, '0')}-${check.kind}.log`);
 }
 
-function notRun(check: PlannedCheck, outputFile: string, startedAt: string): GateCommandRecord {
+/**
+ * The record of a command that never ran: an earlier one was interrupted,
+ * or a setup command before it did not pass.
+ */
+export function notRun(
+  check: PlannedCheck,
+  outputFile: string,
+  startedAt: string,
+  reason: 'interrupted' | 'setup-failed',
+  tail = '',
+): GateCommandRecord {
   return {
     kind: check.kind,
+    ...(check.name === undefined ? {} : { name: check.name }),
     command: check.command,
     ...(check.selection === undefined ? {} : { selection: check.selection }),
     startedAt,
     elapsedMs: 0,
     exitCode: null,
     outcome: 'not-verified',
-    notVerified: 'interrupted',
+    notVerified: reason,
     runnerError: null,
-    output: { path: outputFile, bytes: 0, truncated: false, tail: '' },
+    output: { path: outputFile, bytes: Buffer.byteLength(tail), truncated: false, tail },
   };
 }

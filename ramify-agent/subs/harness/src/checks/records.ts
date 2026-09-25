@@ -103,8 +103,13 @@ export interface TestSelection extends Omit<TestSelectionPolicy, 'outsideModules
   readonly resolved: string[];
 }
 
-/** The kinds of command a gate runs. `scenarios` is one Cucumber run per module, with the mode's setup and teardown around them. */
-export type CheckCommandKind = 'ramify-check' | 'type-check' | 'tests' | 'conformance' | 'scenarios';
+/**
+ * The kinds of command a gate runs. `scenarios` is one Cucumber run per
+ * module, with the mode's setup and teardown around them. `setup` is one of
+ * the project's declared setup commands, such as its build, which run in
+ * order before every other command of the gate.
+ */
+export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'conformance' | 'scenarios';
 
 /**
  * Why a command was not verified. Every one of them means the command did not
@@ -120,10 +125,12 @@ export type CheckCommandKind = 'ramify-check' | 'type-check' | 'tests' | 'confor
  *   falls back to an earlier list. A failed discovery is infrastructure: the
  *   inventory the harness needs could not be refreshed, and no repair of the
  *   source would change that.
+ * - `setup-failed`: a setup command before it did not pass, so it never ran.
+ *   It is not a cause of its own: the setup command's record is.
  */
 export type NotVerified =
   | 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection'
-  | 'interrupted' | 'discovery-error' | 'required-suite-missing';
+  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed';
 
 /**
  * A format of the type checker's output the project declares in
@@ -179,6 +186,8 @@ export interface GateRuleRecord {
 /** One command of an attempt, as the attempt records it. */
 export interface GateCommandRecord {
   readonly kind: CheckCommandKind;
+  /** A setup command's declared name, such as `build`; absent for every other kind and for an unnamed one. */
+  readonly name?: string;
   readonly command: CheckCommand;
   readonly selection?: TestSelection;
   readonly startedAt: string;

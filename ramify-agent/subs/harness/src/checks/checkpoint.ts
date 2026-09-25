@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { ScenarioMode, ScenarioSelection } from '../../subs/scenarios/src/profiles.js';
 import type { ScenarioModule } from '../../subs/scenarios/src/records.js';
 import type { ScenarioState } from '../../subs/scenarios/src/states.js';
@@ -150,6 +151,43 @@ export function scopedChecks(commands: ProjectCommands, tests: ResolvedTests, sc
     { kind: 'ramify-check', command: commands.ramifyCheck, attribution: 'project' },
     ...(scenarios === undefined ? [] : [scenarios]),
   ];
+}
+
+// The project's setup.
+
+/** How long one setup command may run where it declares no bound: ten minutes, as ramify-audit's own default. */
+export const defaultSetupTimeoutMs = 600_000;
+
+/** One setup command the project declares in its captured `ramify-agent.json`. */
+export interface SetupDeclaration {
+  readonly name?: string | undefined;
+  readonly command: readonly string[];
+  /** Relative to the project root, which it defaults to. */
+  readonly cwd?: string | undefined;
+  readonly timeoutMs?: number | undefined;
+  /** Added to the environment the harness builds for every command. */
+  readonly env?: Readonly<Record<string, string>> | undefined;
+}
+
+/**
+ * The project's setup commands as a gate's first checks, in the order the
+ * project declares them. Every check after them needs what they prepare,
+ * such as a build output the repository ignores, so an executor runs none
+ * of the others once one of them has not passed. A setup command is a
+ * command of the whole project.
+ */
+export function setupChecks(setup: readonly SetupDeclaration[], projectRoot: string): PlannedCheck[] {
+  return setup.map(entry => ({
+    kind: 'setup' as const,
+    ...(entry.name === undefined ? {} : { name: entry.name }),
+    command: checkCommand({
+      argv: [...entry.command],
+      cwd: entry.cwd === undefined || entry.cwd === '' || entry.cwd === '.' ? projectRoot : join(projectRoot, entry.cwd),
+      timeoutMs: entry.timeoutMs ?? defaultSetupTimeoutMs,
+      ...(entry.env === undefined ? {} : { envAdditions: { ...entry.env } }),
+    }),
+    attribution: 'project' as const,
+  }));
 }
 
 // The scenario check.
