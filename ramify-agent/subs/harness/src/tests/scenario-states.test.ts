@@ -23,6 +23,7 @@ import { passingScenarioSummary, type DirectCheckScript, type DirectCheckStep } 
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { copyFixture } from './helpers/fixture.js';
 import { treeCandidates } from './helpers/candidates.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import {
   addModule, assign, byRole, completionProposed, installMiniRunner, outline, partialReport, submit, treeInputs, write,
 } from './helpers/iterations.js';
@@ -132,14 +133,26 @@ interface RunOptions {
 
 /** A run whose Git answers are the scenario's own data, after the commit of the feature files. */
 async function run(root: string, script: Parameters<typeof byRole>[0], commits: readonly CommitResponse[], options: RunOptions = {}) {
-  const answered = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits] });
+  const hasFinal = commits.some(commit => commit.subject === finalSubject);
+  const before = commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? 'scenarios-00';
+  const final = hasFinal ? finalCandidate(root, before, commits.at(-1)?.commit ?? before) : null;
+  const answered = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits],
+    ...(final === null ? {} : { previews: final.previews }) });
   const git = options.git?.(answered) ?? answered;
+  const baseCandidates = treeCandidates(root);
+  const candidates = final === null ? baseCandidates : {
+    ...baseCandidates,
+    async commitTree(project: string, commit: string) {
+      const answer = await baseCandidates.commitTree(project, commit);
+      return commit === before ? final.previews[0]!.tree : answer;
+    },
+  };
   const opened = await openRuns(root, {
     script: byRole(script),
     inputs: treeInputs(),
     git,
     readinessExecution: directReadinessExecution(),
-    candidates: treeCandidates(root),
+    candidates,
     ...(options.checkScript === undefined ? {} : { checkScript: options.checkScript }),
   });
   if (options.detached !== true) cleanups.push(() => opened.service.close());
@@ -458,7 +471,7 @@ describe('rejected declarations', () => {
     }, [unchanged('wi-001'), unchanged('wi-002'), unchanged(finalSubject)]);
 
     expect(onlyRun(service, plan).state).toBe('completed');
-    const architect = agent!.sessions.find(session => session.spec.role === 'local-architect')!;
+    const architect = agent!.sessions.find(session => session.spec.submission.name === 'submit_work_item_result')!;
     expect(architect.verdicts).toHaveLength(2);
     const answer = JSON.parse((architect.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string }>; remainingAttempts: number };
     expect(answer.errors).toEqual([expect.objectContaining({ path: 'scenarios.0', message: 'sc-002 is a scenario of review-tags, not of review-note, which this work item implements' })]);
@@ -699,7 +712,7 @@ describe('§9: work-item completion', () => {
     }, [unchanged('wi-001'), unchanged(finalSubject)]);
 
     expect(onlyRun(service, plan).state).toBe('completed');
-    const architects = agent!.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = agent!.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result');
     expect(architects).toHaveLength(2);
     expect(architects[1]!.spec.prompt).toContain('## Completion was refused');
     expect(architects[1]!.spec.prompt).toContain('- sc-001 is pending: nothing has declared it; declare it with the request where existing step definitions bind it, or assign an iteration that writes them');

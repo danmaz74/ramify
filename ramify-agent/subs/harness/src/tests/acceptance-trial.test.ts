@@ -29,6 +29,7 @@ import {
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, partialReport, submit, treeInputs, write } from './helpers/iterations.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import { approveRun, onlyRun, openRuns, runEventsOnDisk, runPath, startRun, until } from './helpers/runs.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 
 /*
  * The scripted acceptance trial, Plan 10's runnable outcome: one run on a
@@ -178,11 +179,15 @@ interface Trial {
 
 /** Starts the plan with the review stop, approves it at the stop, and runs it to its end. */
 async function reviewedRun(root: string, planId: string, script: Parameters<typeof byWork>[0], commits: readonly CommitResponse[], failing: Readonly<Record<string, number>>): Promise<Trial> {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(planId, 'scenarios-00'), ...commits] });
+  const before = commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? 'scenarios-00';
+  const final = finalCandidate(root, before, commits.at(-1)?.commit ?? before);
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(planId, 'scenarios-00'), ...commits],
+    previews: final.previews });
   const opened = await openRuns(root, {
     script: byWork(script),
     inputs: treeInputs(),
     git,
+    candidates: final.candidates,
     readinessExecution: directReadinessExecution(),
     checkExecution: trialExecution(failing),
     stopGraceMs: 30_000,

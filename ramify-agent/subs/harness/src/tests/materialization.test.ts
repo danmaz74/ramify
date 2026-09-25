@@ -24,9 +24,10 @@ import {
   addModule, assign, byRole, completionProposed, installMiniRunner, outline, shell, submit, treeInputs, write,
 } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
-import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { assertUnchangedGit, openUnchangedRuns } from './helpers/unchanged-run.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 
 /*
  * The feature files on the run branch, architecture §5 and §12.
@@ -178,7 +179,7 @@ describe('materializing the feature files', () => {
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
     const { service, git } = await openUnchangedRuns(fixture.root, {
-      script: [{ kind: 'submit', input: { entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [] } }],
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
       unchangedCheckpoints: [`final verification of plan "${plan}"`],
     });
     cleanups.push(() => service.close());
@@ -395,8 +396,10 @@ describe('an engineer and the feature files', () => {
       leaves: async where => appendFile(join(where, notesFeature), '# tampered\n'),
     }]);
 
+    const finalEvidence = finalCandidate(project, 'scenarios-revision');
     const scripted = gateGit(project, {
       head: base,
+      previews: finalEvidence.previews,
       commits: [
         gateScenariosCommit(plan, 'scenarios-revision', base, [notesFeature]),
         // The shell's change is written back before the gate commits, so the
@@ -422,6 +425,7 @@ describe('an engineer and the feature files', () => {
       }),
       inputs: treeInputs(),
       git: scripted.git,
+      candidates: finalEvidence.candidates,
       readinessExecution: directReadinessExecution(),
       commandExecution: commands,
     });
@@ -455,7 +459,11 @@ describe('an engineer and the feature files', () => {
     // it lies inside the scope; the observation says why.
     const engineer = opened.agent!.sessions.filter(session => session.spec.role === 'engineer')[0]!;
     expect(engineer.denied).toHaveLength(2);
-    const observations = await readFile(runPath(project, plan, runId, runLayout.observations('inv-0003')), 'utf8');
+    const events = await runEventsOnDisk(project, plan, runId);
+    const engineerStart = events.find(event => event.type === 'invocation-started' && event.data.role === 'engineer');
+    if (engineerStart?.type !== 'invocation-started') throw new Error('Missing engineer invocation');
+    const observations = await readFile(runPath(project, plan, runId,
+      runLayout.observations(engineerStart.data.invocation)), 'utf8');
     const refusals = observations.split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { verdict?: string; reason?: string } })
       .filter(line => line.type === 'guard');
     expect(refusals.map(line => [line.data.verdict, line.data.reason])).toEqual([
@@ -465,7 +473,6 @@ describe('an engineer and the feature files', () => {
 
     // The shell's change reached the gate: a guarded change no record
     // authorized, from the rendering's hash.
-    const events = await runEventsOnDisk(project, plan, runId);
     const gateIds = events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate);
     const attempts = await Promise.all(gateIds.map(async id =>
       JSON.parse(await readFile(runPath(project, plan, runId, runLayout.gate(id)), 'utf8')) as GateAttempt));

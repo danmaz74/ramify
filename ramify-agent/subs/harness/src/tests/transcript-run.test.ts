@@ -17,6 +17,7 @@ import { read } from './helpers/iterations.js';
 import { emptyAnalysis, installTestRunner, onlyRun, runPath, startRun } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { blobsIn, portEventsOf, transcribed } from './helpers/transcripts.js';
 
 vi.mock('node:child_process', async original =>
@@ -140,7 +141,9 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
       // A fork's first entry is its start, naming the point it was forked from.
       expect(entries[0], session).toMatchObject({ type: 'started', start: 'opened', fork: sessions.get(session)!.fork });
     }
-    expect(transcripts.get('ses-0003')![0]).toMatchObject({
+    const placementFork = [...sessions.values()].find(session => session.role === 'global-fork');
+    if (!placementFork) throw new Error('Missing placement fork session');
+    expect(transcripts.get(placementFork.id)![0]).toMatchObject({
       requested: 'fork', fork: { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'placement-request', generation: 1 },
     });
 
@@ -192,9 +195,11 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
       events.filter(event => event.type === 'invocation-ended' && event.data.submission !== null).length,
     );
     expect(decisions).toEqual(expect.arrayContaining(['post-write-check', 'brief-appended', 'note-appended']));
-    const repair = transcripts.get('ses-0007')!;
+    const repairSession = [...sessions.values()].find(session => session.role === 'engineer' && session.work.workItem === 'wi-002');
+    if (!repairSession) throw new Error('Missing provider repair session');
+    const repair = transcripts.get(repairSession.id)!;
     const note = repair.findIndex(entry => entry.type === 'harness' && entry.decision.kind === 'note-appended');
-    expect(repair[note + 1]).toMatchObject({ type: 'started', invocation: 'inv-0010', start: 'continued' });
+    expect(repair[note + 1]).toMatchObject({ type: 'started', invocation: 'inv-0014', start: 'continued' });
     expect(repair[note]).toMatchObject({ invocation: null, decision: { text: { stored: 'inline', text: 'Continuing iteration wi-002.i01.' } } });
 
     // Engineer and local-architect prompts name their module cwd, so two
@@ -204,10 +209,11 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
       if (entry.type !== 'started' || entry.systemPrompt.stored !== 'blob') continue;
       prompts.set(entry.role, (prompts.get(entry.role) ?? new Set()).add(entry.systemPrompt.hash));
     }
-    expect(prompts.size).toBe(5);
+    expect(prompts.size).toBe(6);
+    expect(prompts.get('context-selector')?.size).toBe(1);
     expect(prompts.get('engineer')?.size).toBe(2);
-    expect(prompts.get('local-architect')?.size).toBe(2);
-    expect([...prompts].filter(([role]) => role !== 'engineer' && role !== 'local-architect').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1]);
+    expect(prompts.get('local-architect')?.size).toBe(4);
+    expect([...prompts].filter(([role]) => role !== 'engineer' && role !== 'local-architect').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1, 1]);
     expect((await blobsIn(scenario.path(runLayout.blobs))).length).toBeGreaterThanOrEqual(prompts.size);
 
     // No record, event or observation quotes a body. An assistant's text is
@@ -239,10 +245,12 @@ describe('a transcript that cannot be written', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
+    const final = finalCandidate(fixture.root, 'transcript-base');
     const git = scriptedGit(fixture.root, { head: 'transcript-base', checkpoints: [
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
-    ] });
+    ], previews: final.previews });
     const { service } = await openRunsWithoutProcesses(fixture.root, git, {
+      candidates: final.candidates,
       script: [{ kind: 'message', text: 'Orienting.' }, { kind: 'submit', input: emptyAnalysis() }],
       // A directory where the first session's transcript would be: every
       // append to it fails.

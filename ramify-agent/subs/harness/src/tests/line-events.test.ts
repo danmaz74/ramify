@@ -1,5 +1,6 @@
 import { mockGit } from './helpers/mock-git.js';
 import { scenariosCommit, scriptedGit } from './helpers/scripted-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import type { LineChange } from '../kpi/lines.js';
 import { readFile } from 'node:fs/promises';
@@ -10,7 +11,7 @@ import { runLayout, type LineEventSummary } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
-import { onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { architectIndex, moduleEntry } from './helpers/views.js';
 
 /*
@@ -194,6 +195,7 @@ describe('what one writer invocation changed', () => {
 describe('a run captures each writer\'s line events when the observation happens', () => {
   test('the summary beside the invocation names what that invocation wrote', async () => {
     const root = await target();
+    const final = finalCandidate(root, 'source-revision');
     const git = scriptedGit(root, { head: 'base', checkpoints: [
       scenariosCommit('review-notes'),
       { subject: 'wi-001.i01', commit: 'source-revision', changes: [
@@ -201,13 +203,13 @@ describe('a run captures each writer\'s line events when the observation happens
       ] },
       { subject: 'wi-001', commit: null, changes: [] },
       { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
-    ] });
+    ], previews: final.previews });
     const counts = vi.spyOn(git, 'worktreeLineChanges')
       .mockResolvedValueOnce([]).mockResolvedValueOnce([
         lines(`${notesDirectory}/src/notes.ts`, 1, 1), lines(`${notesDirectory}/src/store.ts`, 1),
       ]);
     const { service } = await openRuns(root, {
-      git, readinessExecution: directReadinessExecution(),
+      git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
       // The engineer's writes are what Git reports once the feature files are committed.
       afterWrite: async write => { if (write === 'scenarios-materialized') git.givenWrites(); },
       script: byRole({
@@ -226,8 +228,12 @@ describe('a run captures each writer\'s line events when the observation happens
     await service.settled('review-notes', receipt.jobId);
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 
-    const summary = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.lineEvents('inv-0003')), 'utf8')) as LineEventSummary;
-    expect(summary.invocation).toBe('inv-0003');
+    const engineerStart = (await runEventsOnDisk(root, 'review-notes', receipt.jobId))
+      .find(event => event.type === 'invocation-started' && event.data.role === 'engineer');
+    if (engineerStart?.type !== 'invocation-started') throw new Error('Missing engineer invocation');
+    const summary = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId,
+      runLayout.lineEvents(engineerStart.data.invocation)), 'utf8')) as LineEventSummary;
+    expect(summary.invocation).toBe(engineerStart.data.invocation);
     expect(summary.paths.map(path => path.path).sort()).toEqual([
       `${notesDirectory}/src/notes.ts`,
       `${notesDirectory}/src/store.ts`,

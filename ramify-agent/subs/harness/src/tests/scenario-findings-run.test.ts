@@ -10,6 +10,7 @@ import { runLayout } from '../run/records.js';
 import type { RunService } from '../run/service.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { treeCandidates, type ScriptedCandidates } from './helpers/candidates.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged, type CommitResponse } from './helpers/contracts-git.js';
 import { passingScenarioSummary, type DirectCheckScript, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -74,9 +75,20 @@ interface RunOptions {
 
 /** A run of one work item on the notes module, with Git and the audited trees answered. */
 async function run(root: string, script: Parameters<typeof byRole>[0], commits: readonly CommitResponse[], options: RunOptions) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits] });
-  const candidates = treeCandidates(root);
-  options.candidates?.(candidates);
+  const hasFinal = commits.some(commit => commit.subject === finalSubject);
+  const before = commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? 'scenarios-00';
+  const final = hasFinal ? finalCandidate(root, before, commits.at(-1)?.commit ?? before) : null;
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted(plan, 'scenarios-00'), ...commits],
+    ...(final === null ? {} : { previews: final.previews }) });
+  const baseCandidates = treeCandidates(root);
+  options.candidates?.(baseCandidates);
+  const candidates: ScriptedCandidates = final === null ? baseCandidates : {
+    ...baseCandidates,
+    async commitTree(project: string, commit: string) {
+      const answer = await baseCandidates.commitTree(project, commit);
+      return commit === before ? final.previews[0]!.tree : answer;
+    },
+  };
   const roles = byRole(script) as (spec: SessionSpec) => readonly ScriptStep[];
   const opened = await openRuns(root, {
     script: (spec: SessionSpec): readonly ScriptStep[] => {
@@ -185,7 +197,7 @@ describe('CF13: a repeated failure is promoted and a passing gate of the same sc
     expect(third).toMatchObject({ carried: ['check-finding-decided'], findings: undefined });
     expect(candidates.calls).toEqual([
       'commitTree revision-02', 'commitTree revision-01',
-      'commitTree revision-03', 'commitTree revision-01', 'commitTree revision-02',
+      'commitTree revision-03', 'commitTree revision-01', 'commitTree revision-02', 'commitTree revision-03',
     ]);
 
     const log = await runEventsOnDisk(root, plan, runId);
@@ -203,8 +215,8 @@ describe('CF13: a repeated failure is promoted and a passing gate of the same sc
           actor: { kind: 'harness' },
           decision: {
             action: 'fix-by-check',
-            candidate: { kind: 'tree', id: 'tree-of-revision-03' },
-            witness: { attempt: third!.gate, source: { kind: 'tree', id: 'tree-of-revision-03' }, coverage: 'complete', outcome: 'passed', obligation: { subject: 'scenario:sc-001', revision: 1 } },
+            candidate: { kind: 'tree', id: 'a'.repeat(40) },
+            witness: { attempt: third!.gate, source: { kind: 'tree', id: 'a'.repeat(40) }, coverage: 'complete', outcome: 'passed', obligation: { subject: 'scenario:sc-001', revision: 1 } },
           },
         },
       },
@@ -272,7 +284,7 @@ describe('CF13: a pass on the tree that failed is intermittent evidence, and the
     if (detail === undefined || !detail.ok || detail.view.kind !== 'detail') throw new Error('no detail');
     // Both failures were on one tree; the failed executions stay in the history.
     expect(detail.view.reports.items.map(report => report.source.id)).toEqual(['tree-of-revision-01', 'tree-of-revision-01']);
-    expect(detail.view.decisions.items.map(decision => [decision.decision.action, decision.source.id])).toEqual([['fix-by-check', 'tree-of-revision-02']]);
+    expect(detail.view.decisions.items.map(decision => [decision.decision.action, decision.source.id])).toEqual([['fix-by-check', 'a'.repeat(40)]]);
     git.assertAnswered();
   }, 120_000);
 });

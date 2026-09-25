@@ -75,7 +75,7 @@ describe('the session fixture over HTTP', () => {
     expect(reconstruction).toMatchObject({ role: 'engineer', lineage: { replaces: { reason: 'reconstructed' } } });
     expect(sessions.find(session => session.session === reconstruction.lineage.replaces!.session)).toMatchObject({ finished: 'replaced' });
     expect(sessions.flatMap(session => session.invocations).filter(invocation => invocation.degraded !== null).map(invocation => invocation.degraded))
-      .toContainEqual(expect.objectContaining({ requested: 'continue', actual: 'fresh' }));
+      .toContainEqual(expect.objectContaining({ requested: 'fork', actual: 'fresh' }));
     // The project's list and the run's snapshot count the degraded starts the log records.
     const degraded = sessions.map(session => [session.session, session.invocations.filter(invocation => invocation.degraded !== null).length] as const)
       .filter(([, count]) => count > 0);
@@ -97,12 +97,13 @@ describe('the session fixture over HTTP', () => {
     expect(sessions.map(session => [session.session, session.role, session.state])).toEqual([
       ['ses-0001', 'initial-architect', 'suspended'],
       ['ses-0002', 'local-architect', 'suspended'],
-      ['ses-0003', 'global-fork', 'finished'],
-      ['ses-0004', 'engineer', 'live'],
+      ['ses-0003', 'context-selector', 'finished'],
+      ['ses-0004', 'global-fork', 'finished'],
+      ['ses-0005', 'engineer', 'live'],
     ]);
-    expect(live.engineer).toBe('ses-0004');
-    expect(sessions[3]!.reaches).toEqual({ kind: 'work-item', workItem: 'wi-001', capability: 'badge-tone', module: 'collection-review/workspace/shared-ui' });
-    expect(sessions[2]!.reaches).toMatchObject({ kind: 'request', capability: 'badge-tone' });
+    expect(live.engineer).toBe('ses-0005');
+    expect(byRole(sessions, 'engineer')[0]!.reaches).toEqual({ kind: 'work-item', workItem: 'wi-001', capability: 'badge-tone', module: 'collection-review/workspace/shared-ui' });
+    expect(byRole(sessions, 'global-fork')[0]!.reaches).toMatchObject({ kind: 'request', capability: 'badge-tone' });
     // The project's list: live and suspended first, across the runs.
     const list = await get(protocolPaths.sessions(), sessionListResponseSchema);
     expect(list.sessions.slice(0, 3).map(entry => entry.state)).toEqual(['live', 'suspended', 'suspended']);
@@ -127,8 +128,8 @@ describe('the session fixture over HTTP', () => {
     await until(async () => runResponseSchema.parse(await (await fetch(`${server.url}${protocolPaths.run(planId, runId)}`)).json()).run.state === 'completed', 60_000);
     const ended = await get(protocolPaths.runSessionUpdates(planId, runId, version, [{ session: engineer, after: cursor }]), sessionUpdatesResponseSchema);
     expect(ended.sessions.map(session => [session.session, session.state]).sort()).toEqual([
-      ['ses-0001', 'finished'], ['ses-0002', 'finished'], ['ses-0004', 'finished'],
+      ['ses-0001', 'finished'], ['ses-0002', 'finished'], ['ses-0005', 'finished'],
     ]);
     settings.git.assertComplete();
-  });
+  }, 90_000);
 });

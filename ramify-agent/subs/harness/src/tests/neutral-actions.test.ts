@@ -14,6 +14,7 @@ import { declaringScenarios } from './helpers/declarations.js';
 import { gateGit, scenariosCommit } from './helpers/gate-git.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runPath, startRun } from './helpers/runs.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 
 /*
  * Neutral tool actions. What a call does reaches the harness as its action,
@@ -119,8 +120,10 @@ async function engineerRecord(naming: Naming) {
   const root = fixture.root;
   const badge = await readFile(join(root, outside), 'utf8');
 
+  const final = finalCandidate(root, 'revision-01');
   const scripted = gateGit(root, {
     head: 'revision-00',
+    previews: final.previews,
     commits: [
       // The run's feature files, committed once readiness has passed.
       scenariosCommit('review-notes', 'scenarios-00', 'revision-00'),
@@ -149,6 +152,7 @@ async function engineerRecord(naming: Naming) {
     agent,
     inputs: treeInputs(),
     git: scripted.git,
+    candidates: final.candidates,
     readinessExecution: directReadinessExecution(),
   });
   cleanups.push(() => service.close());

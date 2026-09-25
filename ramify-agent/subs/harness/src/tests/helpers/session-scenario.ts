@@ -13,6 +13,7 @@ import { openRuns, runEventsOnDisk, runPath, startRun } from './runs.js';
 import { accepted, added, answeredGit, modified, scenariosCommitted, unchanged } from './contracts-git.js';
 import { declaringScenarios } from './declarations.js';
 import { directReadinessExecution } from './external-tools.js';
+import { finalCandidate } from './final-candidate.js';
 
 /*
  * One scripted run whose sessions take every relation a run records: a
@@ -177,8 +178,10 @@ export interface SessionScenario {
 /** Runs the scenario to completion and answers its log. */
 export async function runSessionScenario(options: SessionScenarioOptions): Promise<SessionScenario> {
   const root = await target(options.cleanup, options.root);
+  const final = finalCandidate(root, 'revision-03');
   const git = answeredGit(root, {
     head: 'revision-00',
+    previews: final.previews,
     commits: [
       // The run's feature files, committed once readiness has passed.
       scenariosCommitted('review-notes'),
@@ -232,6 +235,7 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
   let providerAttempt: string | undefined;
   const opened = await openRuns(root, {
     git,
+    candidates: final.candidates,
     inputs: treeInputs(),
     readinessExecution: directReadinessExecution(),
     model: 'provider/model-7',

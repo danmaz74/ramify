@@ -20,6 +20,7 @@ import { emptyAnalysis, runPath, startRun, stopRun, testPolicy, until } from './
 import { declaringScenarios } from './declarations.js';
 import { scenariosCommit, scriptedGit, type ScriptedGit } from './scripted-git.js';
 import { runSessionScenario } from './session-scenario.js';
+import { finalCandidate } from './final-candidate.js';
 
 /*
  * Sessions in every state, and every lineage relation, for the browser
@@ -269,8 +270,10 @@ export interface LiveRunSettings {
 /** The agent and run settings the server that drives the live run is started with. */
 export function liveRunSettings(root: string, pacer: Pacer, checkExecution: CheckExecutionPort = createPassingCheckExecution()): LiveRunSettings {
   const planId = sessionPlans.live;
+  const final = finalCandidate(root, `scenarios-of-${planId}`);
   const git = scriptedGit(root, {
     head: 'session-fixture-live',
+    previews: final.previews,
     checkpoints: [
       // The run's feature files, committed once readiness has passed.
       scenariosCommit(planId),
@@ -285,6 +288,7 @@ export function liveRunSettings(root: string, pacer: Pacer, checkExecution: Chec
     runs: {
       inputs: treeInputs(),
       git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
       checkExecution,
       policy: projectRoot => testPolicy(projectRoot),
