@@ -5,6 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
 import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { contextSelectorToolName, workOrientationToolName } from '../context-selection/submissions.js';
+import { coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import { runLayout } from '../run/records.js';
 import { iterationLayout } from '../work/iterations.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -69,10 +70,14 @@ test('an assigned NFR reaches the engineer with its exact classification while u
       ? submit(assign('collection-review/workspace/reviews/core', { citedItems: ['nfr-001'] }, outline()))
       : submit({ ...requestCompletion(), scenarios: ['sc-001'] });
     if (spec.role === 'engineer') return submit(completionProposed('The existing behavior satisfies the assignment.', { scenarios: ['sc-001'] }));
+    if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [
+      { nfr: 'nfr-001', result: 'satisfied', inspectedScope: ['subs/workspace/subs/reviews/subs/core/src'],
+        evidence: ['The scripted timeout check passes.'], uncertainty: '' },
+    ] });
     return [];
   }));
   let firstIterationAttempt: string | undefined;
-  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(),
+  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(), previewCount: 5,
     unchangedCheckpoints: [scenariosCommit('revision-diff'), 'wi-001.i01', 'wi-001.i01', 'wi-001', 'final verification of plan "revision-diff"'],
     checkScript: ({ check, context }) => {
       if (context.checkpoint !== 'iteration') return {};

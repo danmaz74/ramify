@@ -64,6 +64,7 @@ describe('an implementation run with no entry capabilities', () => {
       'analysis-accepted',
       'gate-started',
       'readiness-passed',
+      'nonfunctional-phase-started',
       'candidate-prepared',
       'nonfunctional-assessed',
       'nonfunctional-round-closed',
@@ -181,7 +182,7 @@ describe('an implementation run with no entry capabilities', () => {
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
       'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'gate-started', 'readiness-passed', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
+      'gate-started', 'readiness-passed', 'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-failed',
     ]);
     // The unchanged tree needs no new commit, but its current revision was
