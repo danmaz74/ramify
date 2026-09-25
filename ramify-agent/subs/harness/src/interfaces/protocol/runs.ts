@@ -959,6 +959,8 @@ export const gateViewSchema = z.object({
     rule: text,
     outcome: z.enum(['passed', 'failed']),
     violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
+    /** What the rule could not establish, or found and did not attribute to this attempt. */
+    limits: z.array(text).optional(),
   }).strict()),
   commands: z.array(z.object({
     kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),

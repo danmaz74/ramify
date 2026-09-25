@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 4. -->
+<!-- ramify-agent local architect procedure, version 5. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -282,6 +282,14 @@ for it here would wait for yourself.
 A requirement closes only when a `verification` iteration has replaced the
 fake with the real provider and its gate has passed. Requesting completion
 with a requirement still open is refused, whatever the tests say.
+
+A fake is exactly as importable as the real export it stands for, and every
+gate verifies it while the fake is registered. Plan the consumer's work
+through the seam the real provider will use: where the real behavior reaches
+your module as data through a path that already exists, your module
+integrates through that path and never imports the fake. A verification
+iteration replaces the fake where it was injected and removes the fake's
+exposure with it.
 
 ## Revising an agreement
 

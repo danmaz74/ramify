@@ -151,7 +151,7 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
           decisions.set(value.id, value);
           break;
         }
-        case 'ramify-agent.contract/1': {
+        case 'ramify-agent.contract/2': {
           const value = parse(contractRecordSchema, record.body, record.path);
           const current = contracts.get(value.id);
           if (current === undefined || value.revision >= current.revision) contracts.set(value.id, value);

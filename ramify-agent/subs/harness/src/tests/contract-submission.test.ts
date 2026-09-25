@@ -23,6 +23,7 @@ import type { WorkItem } from '../work/records.js';
 
 const reviews = 'collection-review/workspace/reviews';
 const validation = 'collection-review/workspace/reviews/validation';
+const validationDirectory = 'subs/workspace/subs/reviews/subs/validation';
 
 /** The declared module tree of the fixture, which the rules are judged against. */
 async function evidence(exists: (path: string) => Promise<boolean> = async () => true) {
@@ -44,7 +45,11 @@ function established(extra: Record<string, unknown> = {}) {
     artifacts: {
       interface: [{ path: 'subs/a/src/interfaces/note-limit.ts', exports: ['NoteLimit'] }],
       conformance: [{ path: 'subs/a/src/tests/note-limit.conformance.test.ts' }],
-      fake: [{ path: 'subs/a/src/fakes/note-limit.fake.ts', exports: ['createNoteLimitFake'] }],
+      fake: [{
+        path: 'subs/a/src/fakes/note-limit.fake.ts',
+        exports: ['createNoteLimitFake'],
+        standsFor: [{ fake: 'createNoteLimitFake', path: `${validationDirectory}/src/note-limit.ts`, export: 'createNoteLimit', exposure: { to: ['parent'], reexposed: [] } }],
+      }],
       exposure: [{ path: 'subs/a/module.ramify', declaration: 'expose-src NoteLimit from "interfaces/note-limit.ts" to parent' }],
     },
     fakeInjections: ['subs/b/src/notes.ts'],

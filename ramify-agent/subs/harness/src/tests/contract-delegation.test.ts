@@ -216,7 +216,11 @@ const establishedContract = {
   artifacts: {
     interface: [{ path: `${providerDirectory}/src/interfaces/note-limit.ts`, exports: ['noteLimitCases'] }],
     conformance: [{ path: `${providerDirectory}/src/tests/note-limit.conformance.test.ts` }],
-    fake: [{ path: `${providerDirectory}/src/fakes/note-limit.fake.ts`, exports: ['createNoteLimitFake'] }],
+    fake: [{
+      path: `${providerDirectory}/src/fakes/note-limit.fake.ts`,
+      exports: ['createNoteLimitFake'],
+      standsFor: [{ fake: 'createNoteLimitFake', path: `${providerDirectory}/src/note-limit.ts`, export: 'createNoteLimit', exposure: { to: [], reexposed: [] } }],
+    }],
     exposure: [{ path: `${providerDirectory}/module.ramify`, declaration: 'expose-src noteLimitCases from "interfaces/note-limit.ts" to parent' }],
   },
   fakeInjections: [`${consumerDirectory}/src/notes.ts`],

@@ -233,7 +233,7 @@ const submissionSchemas: Readonly<Record<string, unknown>> = {
   'ramify-agent.local-architect-submission/1': localArchitectSubmissionSchema,
   'ramify-agent.engineer-submission/1': engineerSubmissionSchema,
   'ramify-agent.fork-submission/1': forkSubmissionSchema,
-  'ramify-agent.contract-submission/1': contractSubmissionSchema,
+  'ramify-agent.contract-submission/2': contractSubmissionSchema,
 };
 
 /** What the composed runs wrote, walked value by value against the schemas that describe it. */
@@ -311,6 +311,9 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.observation.kind', values: ['plan-deviation'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
   { union: 'submission fork.kind', values: ['deviation'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
   { union: 'run log.type', values: ['scenarios-rewording', 'scenarios-reworded'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the harness renders the feature file from it, commits it, and the finding shows the old and the new text' },
+  // A fake's parity: the real export each fake stands for, exposed to the parent in a run, re-exposed to descendants at registration.
+  { union: 'record ramify-agent.contract/2.artifacts.fake[].standsFor[].exposure.to[]', values: ['parent'], file: 'subs/harness/src/tests/fake-exposure-parity.test.ts', test: 'a contract that re-exposes its fake where the real export will not be fails the gate in scope, and a repair that removes it passes' },
+  { union: 'record ramify-agent.contract/2.artifacts.fake[].standsFor[].exposure.to[]', values: ['descendants'], file: 'subs/harness/src/tests/fake-exposure-parity.test.ts', test: 'the registered contract records what each fake stands for, as submitted' },
   // Plan 12 iteration 7: a person's CheckFinding commands.
   { union: 'command.type', values: ['respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-command'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },

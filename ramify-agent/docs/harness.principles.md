@@ -265,6 +265,19 @@ Explicit names make fakes recognizable in source and generated architectural
 evidence. A contract and fake can establish a capability's intended placement;
 their presence does not establish that its real implementation is ready.
 
+### A Fake Is Exactly As Importable As What It Stands For
+
+A fake is placed and used at the seam where the real provider will act, and
+exactly the modules that will receive the real export receive the fake. A
+fake that reaches further is wired where the real provider never acts, and
+retiring it means re-plumbing its consumer. The agreement names the real
+export each fake stands for, and the gates verify the parity while the fake
+is registered.
+
+Retiring a fake is the harness's and its agents' concern: verification
+replaces it with the real provider and removes its exposure with it. Ramify,
+the build and the audit stay out of it.
+
 ### A Plan's Acceptance Is Its Scenarios
 
 A plan's acceptance is a set of Gherkin scenarios: the plan's own, and those

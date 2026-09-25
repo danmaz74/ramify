@@ -212,7 +212,11 @@ const establishedContract = {
   artifacts: {
     interface: [{ path: `${providerDirectory}/src/interfaces/note-limit.ts`, exports: ['noteLimitCases'] }],
     conformance: [{ path: `${providerDirectory}/src/tests/note-limit.conformance.test.ts` }],
-    fake: [{ path: `${providerDirectory}/src/fakes/note-limit.fake.ts`, exports: ['createNoteLimitFake'] }],
+    fake: [{
+      path: `${providerDirectory}/src/fakes/note-limit.fake.ts`,
+      exports: ['createNoteLimitFake'],
+      standsFor: [{ fake: 'createNoteLimitFake', path: `${providerDirectory}/src/note-limit.ts`, export: 'createNoteLimit', exposure: { to: [], reexposed: [] } }],
+    }],
     exposure: [{ path: `${providerDirectory}/module.ramify`, declaration: 'expose-src noteLimitCases from "interfaces/note-limit.ts" to parent' }],
   },
   fakeInjections: [`${consumerDirectory}/src/notes.ts`],
@@ -316,7 +320,12 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
     const contractSelection = contractGate.commands.find(command => command.selection !== undefined)!.selection!;
     expect(contractSelection.extraSuites).toEqual([suite]);
     expect(contractSelection.resolved).toEqual(expect.arrayContaining([suite, `${consumerDirectory}/src/tests/notes.test.ts`]));
-    expect(contractGate.rules).toEqual([{ rule: 'fake-naming', outcome: 'passed', violations: [] }]);
+    // The fixture's declared module tree records no originals, so the
+    // parity rule says it compared nothing rather than passing silently.
+    expect(contractGate.rules).toEqual([
+      { rule: 'fake-naming', outcome: 'passed', violations: [] },
+      { rule: 'fake-exposure-parity', outcome: 'passed', violations: [], limits: [expect.stringContaining('the architect view records no such original')] },
+    ]);
 
     // The provider's gate ran the same suite, and its assignment carried the
     // obligation that says it runs against the real implementation.

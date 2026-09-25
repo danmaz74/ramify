@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 3. -->
+<!-- ramify-agent engineer procedure, version 4. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -48,6 +48,14 @@ authorizes: the attempt's cause is `guarded-change`, the verdict is never
 `passed`, and the iteration goes back to the local architect. Only the
 architect records such an authorization, and only on a later assignment. If
 the work seems to need one, report it rather than making it.
+
+## Fakes
+
+A fake is exactly as importable as the real export it stands for, and the gate
+verifies it while the fake is registered. Use a fake only where the real
+export will be used, and never add an exposure that gives a module the fake
+when the real export will not reach it. When you replace a fake with the real
+export, remove the declarations that exposed the fake with it.
 
 ## `shell`
 

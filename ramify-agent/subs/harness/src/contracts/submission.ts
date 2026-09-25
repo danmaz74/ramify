@@ -5,7 +5,9 @@ import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { slugSchema } from '../analysis/records.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
-import { contractAuthoritySchema, contractModeSchema } from './records.js';
+import { isFakeFile } from './naming.js';
+import { ancestorsOf, ownerOf } from './parity.js';
+import { contractAuthoritySchema, contractModeSchema, standsForSchema } from './records.js';
 
 /*
  * What an engineer writes when the behavior it needs is outside its scope,
@@ -41,6 +43,9 @@ export type NeedAsBehavior = z.infer<typeof needAsBehaviorSchema>;
 /** One artifact the session wrote, as it names it. The harness hashes it itself. */
 const artifactBody = z.object({ path: text, exports: z.array(text) }).strict();
 
+/** A fake file, and the real provider export each of its exported names stands for. */
+const fakeBody = artifactBody.extend({ standsFor: z.array(standsForSchema) }).strict();
+
 export const contractSubmissionSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('established'),
@@ -51,7 +56,7 @@ export const contractSubmissionSchema = z.discriminatedUnion('kind', [
     artifacts: z.object({
       interface: z.array(artifactBody),
       conformance: z.array(z.object({ path: text }).strict()),
-      fake: z.array(artifactBody),
+      fake: z.array(fakeBody),
       exposure: z.array(z.object({ path: text, declaration: text }).strict()),
     }).strict(),
     /** Where the consumer holds the fake, which verification replaces with the real provider. */
@@ -163,6 +168,7 @@ async function establishedErrors(value: EstablishedContract, evidence: ContractE
         expected: 'at least one exported name',
       });
     }
+    errors.push(...standsForErrors(value, index));
   } else {
     const forbidden: Array<readonly [readonly unknown[], string]> = [
       [value.artifacts.fake, 'artifacts.fake'],
@@ -186,6 +192,72 @@ async function establishedErrors(value: EstablishedContract, evidence: ContractE
     }
   }
 
+  return errors;
+}
+
+/**
+ * Each fake export names the one real provider export it stands for: a file
+ * of the provider module, which need not exist yet, and its export name, with
+ * the exposure the agreement declares for it. The fake is compared with that
+ * exposure at the gate, so every ancestor it names must be one that can
+ * re-expose what the provider exposes.
+ */
+function standsForErrors(value: EstablishedContract, index: ArchitectIndex | null): SubmissionError[] {
+  const errors: SubmissionError[] = [];
+  const provider = index === null ? undefined : findModule(index, value.provider);
+  for (const [position, entry] of value.artifacts.fake.entries()) {
+    const named = new Map<string, number>();
+    for (const [at, standsFor] of entry.standsFor.entries()) {
+      const path = `artifacts.fake.${position}.standsFor.${at}`;
+      named.set(standsFor.fake, (named.get(standsFor.fake) ?? 0) + 1);
+      if (!entry.exports.includes(standsFor.fake)) {
+        errors.push({ path: `${path}.fake`, message: `"${standsFor.fake}" is not one of this fake file's exports`, expected: `one of ${entry.exports.join(', ') || 'its exports'}` });
+      }
+      const target = toPosix(standsFor.path);
+      if (target === '' || target.startsWith('/') || target.split('/').includes('..')) {
+        errors.push({ path: `${path}.path`, message: `"${standsFor.path}" is not a project-relative path`, expected: 'a path relative to the project root' });
+      } else if (isFakeFile(target)) {
+        errors.push({ path: `${path}.path`, message: `"${standsFor.path}" is a fake; a fake stands for the real provider export`, expected: 'the provider file that holds, or will hold, the real export' });
+      } else if (provider !== undefined && index !== null && ownerOf(index, target)?.module !== provider.module) {
+        errors.push({
+          path: `${path}.path`,
+          message: `"${standsFor.path}" is not a file of the provider ${provider.module}; the real export a fake stands for is the provider's`,
+          expected: `a path beneath ${provider.dir === '' ? 'the root module' : `${provider.dir}/`} and no child module`,
+        });
+      }
+      const channels = new Set<string>();
+      for (const channel of standsFor.exposure.to) {
+        if (channels.has(channel)) errors.push({ path: `${path}.exposure.to`, message: `"${channel}" is named twice`, expected: 'each channel once' });
+        channels.add(channel);
+      }
+      const ancestors = provider === undefined || index === null ? null : ancestorsOf(index, provider.module);
+      const by = new Set<string>();
+      for (const [step, reexposed] of standsFor.exposure.reexposed.entries()) {
+        if (by.has(reexposed.by)) {
+          errors.push({ path: `${path}.exposure.reexposed.${step}.by`, message: `"${reexposed.by}" re-exposes the real export once, with every channel in its "to"`, expected: 'each ancestor once' });
+        }
+        by.add(reexposed.by);
+        if (ancestors !== null && !ancestors.includes(reexposed.by)) {
+          errors.push({
+            path: `${path}.exposure.reexposed.${step}.by`,
+            message: `"${reexposed.by}" is not an ancestor of the provider ${value.provider}; only an ancestor re-exposes what it received`,
+            expected: ancestors.length === 0 ? 'no re-exposure' : `one of ${ancestors.join(', ')}`,
+          });
+        }
+      }
+    }
+    for (const name of entry.exports) {
+      const count = named.get(name) ?? 0;
+      if (count === 1) continue;
+      errors.push({
+        path: `artifacts.fake.${position}.standsFor`,
+        message: count === 0
+          ? `The fake export "${name}" names no real export it stands for; a fake is exactly as importable as what it stands for, so the agreement names it`
+          : `The fake export "${name}" stands for ${count} real exports; name the one it stands for`,
+        expected: `exactly one entry whose "fake" is "${name}"`,
+      });
+    }
+  }
   return errors;
 }
 

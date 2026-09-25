@@ -1,4 +1,4 @@
-<!-- ramify-agent contract procedure, version 1. -->
+<!-- ramify-agent contract procedure, version 2. -->
 Do this, in order:
 
 1. Read the need in the message below. It states behavior: use cases,
@@ -8,8 +8,13 @@ Do this, in order:
    extending an agreement.
 3. Decide where the agreement belongs, by authority and not by convenience.
 4. Write the interface, the conformance suite and the fake.
-5. Integrate the fake in the requesting consumer. Existing behavior stays
-   real: the fake replaces only the missing part.
+5. Integrate the fake at the seam where the real provider will act: in the
+   requesting consumer where it will call the real export, on the provider
+   side where the real behavior reaches the consumer as data through a path
+   that already exists. Expose the fake exactly as the real export will be
+   exposed, and no further. Existing behavior stays real: the fake replaces
+   only the missing part. If that seam lies outside your write scope, report
+   `incomplete` and name it; never widen the fake's exposure instead.
 6. Run `run_scope_tests` until the consumer's tests pass against the fake and
    the fake passes the conformance suite.
 7. Submit.
@@ -38,8 +43,15 @@ The agreement stands and the consumer runs against the fake.
 - `artifacts` names what you wrote: the interface with its exported names,
   the conformance suite, the fake with its exported names, and the exposure
   declarations you changed.
-- `fakeInjections` names every location in the consumer that holds the fake.
-  Verification replaces each of them with the real provider, and the
+- `artifacts.fake[].standsFor` names, for each exported fake name, the real
+  provider export it stands for: the provider file that holds it or will
+  hold it, its export name, and the exposure you declare for it — `to`, where
+  its owner exposes it, and `reexposed`, each ancestor that re-exposes it and
+  where to, nearest first. Until the real export exists the gate compares the
+  fake with that declaration; afterwards, with the real export itself.
+- `fakeInjections` names every location that holds the fake: in the
+  consumer, or on the provider side where the fake stands in for the real
+  call. Verification replaces each of them with the real provider, and the
   delegation does not close while one of them still reaches the fake, so name
   them all.
 - `summary` is what you established, in your own words. It is the only text

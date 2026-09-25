@@ -15,7 +15,7 @@ const secondRequirement = 'rq-second';
 
 function contract(revision: number, mode: 'fake-backed' | 'access-only' = 'fake-backed') {
   return contractRecordSchema.parse({
-    schema: 'ramify-agent.contract/1', id: contractId, revision,
+    schema: 'ramify-agent.contract/2', id: contractId, revision,
     capability: { id: provider, revision: 1, hash }, decision: null,
     authority: { kind: 'provider', owner: reviews, rationale: 'Provider owns the behavior.' },
     provider: reviews, behavior: 'Shared behavior.', mode,

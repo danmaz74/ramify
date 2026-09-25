@@ -556,7 +556,7 @@ describe('the records this iteration establishes', () => {
       const mode = index === 0 ? 'fake-backed' : 'access-only';
       const id = `ct-00${index + 1}`;
       const read = await store.roundTrip(contractsLayout.contract(id, 1), {
-        schema: 'ramify-agent.contract/1',
+        schema: 'ramify-agent.contract/2',
         id, revision: 1, capability,
         // Null where the initial analysis placed the capability and no
         // decision was taken, which is what an entry capability leaves.
@@ -568,7 +568,10 @@ describe('the records this iteration establishes', () => {
         artifacts: {
           interface: [{ path: 'subs/orders/src/interfaces/note-limit.ts', exports: ['NoteLimit'], hash: 'b'.repeat(64) }],
           conformance: mode === 'fake-backed' ? [{ path: 'subs/orders/src/tests/note-limit.conformance.test.ts', hash: 'c'.repeat(64) }] : [],
-          fake: mode === 'fake-backed' ? [{ path: 'subs/orders/src/fakes/note-limit.fake.ts', exports: ['createNoteLimitFake'], hash: 'd'.repeat(64) }] : [],
+          fake: mode === 'fake-backed' ? [{
+            path: 'subs/orders/src/fakes/note-limit.fake.ts', exports: ['createNoteLimitFake'], hash: 'd'.repeat(64),
+            standsFor: [{ fake: 'createNoteLimitFake', path: 'subs/orders/src/note-limit.ts', export: 'createNoteLimit', exposure: { to: ['parent'], reexposed: [{ by: 'shop', to: ['descendants'] }] } }],
+          }] : [],
           exposure: [{ path: 'subs/orders/module.ramify', declaration: 'expose-src NoteLimit from "interfaces/note-limit.ts" to parent' }],
         },
         establishedBy: { iteration: 'wi-001.i02', gate: 'ga-0003' },
@@ -610,10 +613,13 @@ describe('the records this iteration establishes', () => {
   });
 
   test('both outcomes of a harness-verified gate rule are representable', () => {
-    for (const outcome of ['passed', 'failed'] as const) {
-      const rule = { rule: 'fake-naming' as const, outcome, violations: outcome === 'failed' ? [{ rule: 'file-suffix', path: 'a.ts', detail: 'd' }] : [] };
-      expect(gateRuleSchema.safeParse(rule).success).toBe(true);
+    for (const name of ['fake-naming', 'fake-exposure-parity'] as const) {
+      for (const outcome of ['passed', 'failed'] as const) {
+        const rule = { rule: name, outcome, violations: outcome === 'failed' ? [{ rule: 'file-suffix', path: 'a.ts', detail: 'd' }] : [] };
+        expect(gateRuleSchema.safeParse(rule).success).toBe(true);
+      }
     }
+    expect(gateRuleSchema.safeParse({ rule: 'fake-exposure-parity', outcome: 'passed', violations: [], limits: ['not compared'] }).success).toBe(true);
   });
 
   test('both module notices are representable, with and without a decision', () => {
@@ -947,7 +953,7 @@ describe('the run protocol a client reads', () => {
       {
         type: 'contract-registered', data: {},
         records: [{ path: 'contracts/ct-001/1.json', body: {
-          schema: 'ramify-agent.contract/1', id: 'ct-001', revision: 1, capability: { id: 'send-email', revision: 1, hash: hash64 }, decision: 'gd-001',
+          schema: 'ramify-agent.contract/2', id: 'ct-001', revision: 1, capability: { id: 'send-email', revision: 1, hash: hash64 }, decision: 'gd-001',
           authority: { kind: 'provider', owner: 'shop', rationale: 'r' }, provider: 'shop', behavior: 'b', mode: 'fake-backed',
           artifacts: { interface: [], conformance: [], fake: [], exposure: [] }, establishedBy: { iteration: 'wi-001.i01', gate: 'ga-0002' },
         } }],

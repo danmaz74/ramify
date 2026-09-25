@@ -720,9 +720,11 @@ const verifiedPlannedCheckSchema = plannedCheckSchema
 
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
-  rule: z.literal('fake-naming'),
+  rule: z.enum(['fake-naming', 'fake-exposure-parity']),
   outcome: z.enum(['passed', 'failed']),
   violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
+  /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
+  limits: z.array(text).optional(),
 }).strict();
 
 export const gateAttemptSchema = z.object({

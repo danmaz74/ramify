@@ -171,9 +171,11 @@ export type GateNext = 'accept' | 'repair' | 'retry-infrastructure' | 'return-to
  * and what it found is the diagnostics the engineer repairs from.
  */
 export interface GateRuleRecord {
-  readonly rule: 'fake-naming';
+  readonly rule: 'fake-naming' | 'fake-exposure-parity';
   readonly outcome: 'passed' | 'failed';
   readonly violations: ReadonlyArray<{ readonly rule: string; readonly path: string; readonly detail: string }>;
+  /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
+  readonly limits?: readonly string[];
 }
 
 /** One command of an attempt, as the attempt records it. */
