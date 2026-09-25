@@ -13,6 +13,7 @@ import { assignmentBodySchema, assignmentErrors, type AssignmentBody } from './a
 import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import { decompositionSchema } from './records.js';
+import type { EngineerBounds } from '../run/policy.js';
 
 /*
  * What a local architect submits at a coordination point. This iteration
@@ -151,6 +152,8 @@ export interface WorkEvidence {
   readonly scenarios?: DeclarationContext | undefined;
   /** For an integration work item: the scope its engineer must be given. */
   readonly integration?: IntegrationScope | undefined;
+  /** The policy's engineer bounds and their ceilings, which an assignment's `bounds` is judged against. */
+  readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
 }
 
 /** The same evidence, as the placement rules read it. */
@@ -213,6 +216,7 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
       ...(evidence.harnessOnly === undefined ? {} : { harnessOnly: evidence.harnessOnly }),
       ...(evidence.integration === undefined ? {} : { integration: evidence.integration }),
       ...(evidence.scenarios === undefined ? {} : { scenarios: evidence.scenarios }),
+      ...(evidence.bounds === undefined ? {} : { bounds: evidence.bounds }),
     }),
   ];
   return errors.length === 0 ? shape : { ok: false, errors };

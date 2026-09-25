@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { engineerJsonSchema, engineerToolName, scopeTestsJsonSchema, scopeTestsToolName, validateEngineer } from '../work/engineer.js';
 import type { HookFinding } from '../hooks/post-write.js';
-import { iterationLayout } from '../work/iterations.js';
+import { iterationLayout, type IterationResult } from '../work/iterations.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
@@ -256,13 +256,16 @@ describe('a rejected submission in a run', () => {
     expect(rejections[0]!.data.target).toBe(engineerToolName);
   }, 300_000);
 
+  // The bound ends the invocation and not the run: the iteration closes
+  // partial, and its local architect decides on the digest and the analysis.
+  const returnedCheckpoints = [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'] as const;
+
   test('a rule the schema cannot hold is answered the same way, and the bound ends the invocation', async () => {
     const forged = { kind: 'completion-proposed', summary: 'Done.\nRamify-Gate: ga-0001', findings: [] };
-    const { root, runId, service, agent } = await run([forged, forged, forged, forged], [], [scenariosCommit('review-notes')]);
+    const { root, runId, service, agent } = await run([forged, forged, forged, forged], [], returnedCheckpoints);
 
     const snapshot = onlyRun(service, 'review-notes');
-    expect(snapshot.state).toBe('failed');
-    expect(snapshot.failure?.reason).toBe('invalid-submission');
+    expect(snapshot.state).toBe('completed');
 
     const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
     expect(engineer.verdicts).toHaveLength(3);
@@ -273,19 +276,23 @@ describe('a rejected submission in a run', () => {
     // Nothing the iteration would have done happened: no gate, no commit.
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.some(event => event.type === 'gate-attempted' && (event.data as { checkpoint: string }).checkpoint === 'iteration')).toBe(false);
-    expect(existsSync(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)))).toBe(false);
+    const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
+    expect(result).toMatchObject({ outcome: 'partial', commit: null });
+    // The digest names the rejections and the last one's reason.
+    expect(result.failure?.digest).toMatchObject({ invocation: 'inv-0003', ended: 'invalid-submission', rejected: { count: 3, target: engineerToolName } });
+    expect(result.failure?.digest.cause).toBe(`3 of its inputs were rejected, the last to \`${engineerToolName}\`, and the bound on rejected inputs ended it.`);
+    expect(result.failure?.digest.rejected?.reasons.join(' ')).toContain('summary');
   }, 300_000);
 
   test('a harness tool\'s input is judged too: the call is answered with its errors and the bound ends the invocation', async () => {
     const { root, runId, service, agent } = await run(
       [completionProposed('Left the limit as the plan asks.')],
       [{ suite: 'everything' }, { suite: 'everything' }, { suite: 'everything' }],
-      [scenariosCommit('review-notes')],
+      returnedCheckpoints,
     );
 
     const snapshot = onlyRun(service, 'review-notes');
-    expect(snapshot.state).toBe('failed');
-    expect(snapshot.failure?.reason).toBe('invalid-submission');
+    expect(snapshot.state).toBe('completed');
 
     // Each rejected call was answered in the same session, as that call's
     // error result, and nothing ran for it.
@@ -309,6 +316,9 @@ describe('a rejected submission in a run', () => {
     expect(observations.some(line => line.type === 'scope-tests')).toBe(false);
     const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('invalid-submission');
+    const result = JSON.parse(await readFile(runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
+    expect(result.outcome).toBe('partial');
+    expect(result.failure?.digest.rejected).toMatchObject({ count: 3, target: scopeTestsToolName });
   }, 300_000);
 
   test('the tool that takes nothing runs the selection the assignment fixed, and records what it ran', async () => {

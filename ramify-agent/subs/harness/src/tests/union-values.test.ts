@@ -6,7 +6,7 @@ import { runEventSchema, terminalRunEvents, type RunEvent } from '../run/log.js'
 import { observationSchema } from '../run/observations.js';
 import {
   capabilityStateSchema, decisionViewSchema, hypothesisStandingSchema, metricSchema, metricStateSchema,
-  roleSchema, runEventRefKindSchema, runFailureReasonSchema, runNoticeSchema, runPhaseSchema, workItemStateSchema,
+  failureCauseSchema, roleSchema, runEventRefKindSchema, runFailureReasonSchema, runNoticeSchema, runPhaseSchema, workItemStateSchema,
 } from '../interfaces/protocol/runs.js';
 import { errorCodeSchema, errorHttpStatus, errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { decisionsOf } from '../projections/analysis.js';
@@ -541,6 +541,34 @@ describe('the records this iteration establishes', () => {
       }, iterationSchemas.result);
       expect(read.outcome).toBe(outcome);
     }
+
+    // A partial result an engineer's failure closed carries its digest and
+    // the analysis: every judged cause, and an analysis that is unavailable.
+    const digest = {
+      invocation: 'inv-0003', role: 'engineer', ended: 'failed', interruption: 'idle-timeout',
+      cause: 'The idle bound fired: no port event for 300000 ms.', rejected: null, elapsedMs: 300_000,
+      bounds: { commandTimeoutMs: 600_000, idleMs: 300_000, absoluteMs: 3_600_000 },
+      inFlight: [{ tool: 'shell', callId: 'c1', runningMs: 290_000, command: { text: 'npm test', timeoutMs: 600_000, output: 'invocations/inv-0003/shell/001.log', tail: ['ok'] } }],
+      changes: { paths: [{ path: 'src/a.ts', added: 3, deleted: 1, binary: false }], more: 0, uncommitted: 1, gaps: [] },
+      lastMessage: 'Running the suite.', transcript: 'transcripts/ses-0003.jsonl', outputs: ['invocations/inv-0003/shell/001.log'],
+    };
+    const analyses = [
+      ...failureCauseSchema.options.map(cause => ({
+        outcome: 'analyzed', invocation: 'inv-0004', attempting: 'a', finished: 'f', whenEnded: 'w', cause, recommendation: 'r', evidence: ['e'],
+      })),
+      { outcome: 'unavailable', invocation: null, reason: 'the analysis ended `failed`' },
+    ];
+    for (const [index, analysis] of analyses.entries()) {
+      const read = await store.roundTrip(iterationLayout.result('wi-003', index + 1), {
+        schema: 'ramify-agent.iteration-result/1',
+        iteration: `wi-003.i${String(index + 1).padStart(2, '0')}`,
+        outcome: 'partial', invocations: ['inv-0003'], gate: null, commit: null,
+        findings: ['f'], changedAssumptions: [], artifacts: [],
+        failure: { digest, analysis },
+      }, iterationSchemas.result);
+      expect(read.failure?.analysis).toEqual(analysis);
+      expect(read.failure?.digest).toEqual(digest);
+    }
   });
 
   test('every contract, obligation and requirement value is written and read back', async () => {
@@ -818,7 +846,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst']);
   });
 
   test('every failure reason and every phase is named', () => {

@@ -2,6 +2,7 @@ import {
   runQueryLimits,
   type GateView, type WorkItemResponse, type WorkItemSummary,
 } from '../interfaces/protocol/runs.js';
+import { digestLines } from '../work/failure.js';
 import { originKindOf, type WorkItem } from '../work/records.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { ProjectionError, type RunView } from './inputs.js';
@@ -160,6 +161,7 @@ export function workItemOf(view: RunView, id: string): WorkItemResponse {
               findings: [...result.findings],
               changedAssumptions: [...result.changedAssumptions],
               recommendation: result.recommendation ?? null,
+              failure: result.failure === undefined ? null : { digest: digestLines(result.failure.digest), analysis: result.failure.analysis },
             },
         gates: [...view.gates.keys()].filter(gate => gateBody(view, gate).subject.iteration === assignment.id).map(gate => gateSummary(gateBody(view, gate))),
         invocations: [...view.records.invocations.values()]

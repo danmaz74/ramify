@@ -1,7 +1,8 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
-import { planRefSchema, recordRefSchema } from '../run/records.js';
+import { failureAnalysisSchema, roleSchema } from '../interfaces/protocol/runs.js';
+import { invocationOutcomeSchema, planRefSchema, recordRefSchema } from '../run/records.js';
 import { slugSchema } from '../analysis/records.js';
 import type { WorkItemId } from './records.js';
 
@@ -101,6 +102,23 @@ export const checkpointSchema = z.enum(['readiness', 'iteration', 'contract', 'b
 export const iterationKindSchema = z.enum(['ordinary', 'breaking', 'contract', 'verification', 'repair', 'integration']);
 export type IterationKind = z.infer<typeof iterationKindSchema>;
 
+/** One bound an assignment raises: the value, and why the work needs it. */
+const raisedBoundSchema = z.object({ ms: z.int().positive(), reason: text }).strict();
+
+/**
+ * The bounds an assignment raises for every engineer invocation of its
+ * iteration: the longest one shell command may run, the idle bound and the
+ * absolute bound of each invocation. A bound it leaves out is the policy's.
+ * Each is at most the policy's ceiling, and a command's timeout is never
+ * longer than the invocation that runs it.
+ */
+export const assignedBoundsSchema = z.object({
+  commandTimeoutMs: raisedBoundSchema.optional(),
+  idleMs: raisedBoundSchema.optional(),
+  absoluteMs: raisedBoundSchema.optional(),
+}).strict();
+export type AssignedBounds = z.infer<typeof assignedBoundsSchema>;
+
 export const iterationAssignmentSchema = z.object({
   schema: z.literal('ramify-agent.iteration-assignment/1'),
   id: text,
@@ -147,6 +165,8 @@ export const iterationAssignmentSchema = z.object({
    * what its step definitions bind, and nothing requires exactly these.
    */
   scenarios: z.array(text).optional(),
+  /** The bounds the local architect raised for this iteration's engineers; absent, the policy's. */
+  bounds: assignedBoundsSchema.optional(),
 }).strict();
 export type IterationAssignment = z.infer<typeof iterationAssignmentSchema>;
 
@@ -165,6 +185,58 @@ export const moduleNoticeSchema = z.object({
 }).strict();
 export type ModuleNotice = z.infer<typeof moduleNoticeSchema>;
 
+const count = z.int().nonnegative();
+
+/**
+ * What an engineer that ended without a result left, derived by the harness
+ * from what it already holds, and bounded as a gate summary is: why it
+ * ended, what was in flight, what it changed, what it said last and where
+ * its transcript is. Its local architect reads it without the transcript.
+ */
+export const failureDigestSchema = z.object({
+  invocation: text,
+  role: roleSchema,
+  ended: invocationOutcomeSchema.shape.ended,
+  interruption: invocationOutcomeSchema.shape.interruption.unwrap().nullable(),
+  /** Why it ended, in one line: the bound that fired, the error, or the rejections. */
+  cause: text,
+  /** The submissions or tool inputs rejected in the invocation, with the last rejection's reasons. */
+  rejected: z.object({ count, target: text, reasons: z.array(z.string()) }).strict().nullable(),
+  elapsedMs: count,
+  /** The bounds the invocation ran under. */
+  bounds: z.object({ commandTimeoutMs: z.int().positive(), idleMs: z.int().positive(), absoluteMs: z.int().positive() }).strict(),
+  /** The tool calls in flight when it ended; a shell call names its command and the end of its output. */
+  inFlight: z.array(z.object({
+    tool: text,
+    callId: z.string(),
+    runningMs: count,
+    command: z.object({
+      text: z.string(),
+      timeoutMs: z.int().positive(),
+      /** The command's complete output, relative to the run's directory; null where none was written. */
+      output: z.string().nullable(),
+      tail: z.array(z.string()),
+    }).strict().nullable(),
+  }).strict()),
+  /** What the invocation changed, from its line events, and what is uncommitted in the tree. */
+  changes: z.object({
+    paths: z.array(z.object({ path: text, added: count, deleted: count, binary: z.boolean() }).strict()),
+    /** Changed paths beyond the ones listed. */
+    more: count,
+    /** Paths the tree changes beyond the last accepted commit; null where unknown. */
+    uncommitted: count.nullable(),
+    /** Why the counts are missing or partial, where they are. */
+    gaps: z.array(z.string()),
+  }).strict(),
+  /** The engineer's last assistant text, shortened; null where it wrote none. */
+  lastMessage: z.string().nullable(),
+  /** The session's transcript, relative to the run's directory. */
+  transcript: text,
+  /** The complete outputs of the invocation's shell calls, relative to the run's directory. */
+  outputs: z.array(text),
+}).strict();
+export type FailureDigest = z.infer<typeof failureDigestSchema>;
+
 export const iterationResultSchema = z.object({
   schema: z.literal('ramify-agent.iteration-result/1'),
   iteration: text,
@@ -179,6 +251,11 @@ export const iterationResultSchema = z.object({
   changedAssumptions: z.array(z.string()),
   recommendation: z.string().optional(),
   artifacts: z.array(z.string()),
+  /**
+   * Where an engineer ended without a result: the harness's digest, then the
+   * failure analysis, both read by the local architect before it decides.
+   */
+  failure: z.object({ digest: failureDigestSchema, analysis: failureAnalysisSchema }).strict().optional(),
 }).strict();
 export type IterationResult = z.infer<typeof iterationResultSchema>;
 

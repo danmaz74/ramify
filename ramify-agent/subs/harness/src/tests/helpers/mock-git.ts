@@ -8,7 +8,7 @@ export function mockGit(answers: Partial<GitService> = {}): Mocked<GitService> &
   const operations: readonly (keyof GitService)[] = [
     'currentHead', 'isCleanRepository', 'createRunBranch', 'commitAccepted',
     'findCommitByTrailer', 'findCommitByTrailers', 'changedPaths', 'changedEntries',
-    'diffNameStatus', 'diffNumstat', 'commitNameStatus', 'worktreeLineChanges',
+    'diffNameStatus', 'diffNumstat', 'commitNameStatus', 'worktreeLineChanges', 'worktreePatch',
   ];
   for (const operation of operations) {
     const answer = answers[operation] as ((...args: unknown[]) => unknown) | undefined;

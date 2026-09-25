@@ -260,6 +260,10 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
       if (responses.lines === undefined) throw new Error('This scenario states no line measurements');
       return responses.lines.map(entry => ({ ...entry }));
     },
+    async worktreePatch(project) {
+      asked('worktreePatch', project);
+      throw new Error('This scenario states no patch');
+    },
   });
 
   return Object.assign(mock, {

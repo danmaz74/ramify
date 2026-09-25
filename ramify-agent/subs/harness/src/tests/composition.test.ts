@@ -20,6 +20,7 @@ import { localArchitectSubmissionSchema } from '../work/submission.js';
 import { engineerSubmissionSchema, scopeTestsInputSchema } from '../work/engineer.js';
 import { forkSubmissionSchema } from '../architecture/submission.js';
 import { contractSubmissionSchema } from '../contracts/submission.js';
+import { failureAnalysisSubmissionSchema } from '../work/failure.js';
 import { shellInputSchema } from '../tools/shell.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema, metricsResponseSchema,
@@ -210,6 +211,7 @@ function unionRoots(): Record<string, unknown> {
     'submission engineer': engineerSubmissionSchema,
     'submission fork': forkSubmissionSchema,
     'submission contract': contractSubmissionSchema,
+    'submission failure-analysis': failureAnalysisSubmissionSchema,
     'tool shell': shellInputSchema,
     'tool run_scope_tests': scopeTestsInputSchema,
     'command': runCommandSchema,
@@ -234,6 +236,7 @@ const submissionSchemas: Readonly<Record<string, unknown>> = {
   'ramify-agent.engineer-submission/1': engineerSubmissionSchema,
   'ramify-agent.fork-submission/1': forkSubmissionSchema,
   'ramify-agent.contract-submission/1': contractSubmissionSchema,
+  'ramify-agent.failure-analysis-submission/1': failureAnalysisSubmissionSchema,
 };
 
 /** What the composed runs wrote, walked value by value against the schemas that describe it. */
@@ -523,6 +526,12 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'every error in the engineer\'s own write scope is in scope, and the engineer repairs it' },
   { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings-and-type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'beside a failed Ramify check, both attribute the cause, and the local architect answers the module violation' },
   { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
+  // An engineer that ends without a result returns to its architect, digested and analyzed first.
+  { union: 'run log[session-opened].data.role', values: ['failure-analyst'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis.outcome', values: ['analyzed'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis[analyzed].cause', values: ['bound-too-tight'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis.outcome', values: ['unavailable'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'leaves the digest alone, says the analysis was unavailable, and never fails the run' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis[analyzed].cause', values: ['environment-problem', 'work-problem', 'agent-behavior', 'unknown'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'reaches the iteration\'s result and the next briefing' },
 ];
 
 /**

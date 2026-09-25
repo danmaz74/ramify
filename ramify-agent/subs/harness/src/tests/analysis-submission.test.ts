@@ -416,7 +416,7 @@ describe('the scripted fake\'s demonstration, which `serve --agent fake` runs', 
 describe('the prompt package', () => {
   test('offers exactly the submission members this iteration produces', async () => {
     const { manifest } = await loadPromptPackages();
-    expect(Object.keys(manifest.packages).sort()).toEqual(['contract-engineer', 'engineer', 'global-fork', 'initial-architect', 'local-architect', 'reviewer']);
+    expect(Object.keys(manifest.packages).sort()).toEqual(['contract-engineer', 'engineer', 'failure-analyst', 'global-fork', 'initial-architect', 'local-architect', 'reviewer']);
     const initial = manifest.packages['initial-architect']!;
     expect(initial.package).toBe('initial-architect/2');
     expect(initial.submissionKinds).toEqual(['initial-analysis']);
@@ -426,7 +426,7 @@ describe('the prompt package', () => {
     // Each role is offered exactly the members a run of this iteration
     // produces, and no other.
     const local = manifest.packages['local-architect']!;
-    expect(local.package).toBe('local-architect/4');
+    expect(local.package).toBe('local-architect/5');
     // The reconciliation fork's submission is the package's second.
     expect(local.submissionKinds).toEqual(['assign', 'request-placement', 'request-completion', 'yield-for-providers', 'unresolved', 'reconciliation']);
 
@@ -436,14 +436,14 @@ describe('the prompt package', () => {
     expect(fork.hash).toMatch(/^[0-9a-f]{64}$/);
 
     const engineer = manifest.packages['engineer']!;
-    expect(engineer.package).toBe('engineer/2');
+    expect(engineer.package).toBe('engineer/3');
     expect(engineer.submissionKinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'contract-needed']);
     expect(engineer.hash).toMatch(/^[0-9a-f]{64}$/);
 
     // The contract sub-session is an engineer invocation with the contract
     // skill, and the skill is a file of its package like any other.
     const contract = manifest.packages['contract-engineer']!;
-    expect(contract.package).toBe('contract-engineer/1');
+    expect(contract.package).toBe('contract-engineer/2');
     expect(contract.submissionKinds).toEqual(['established', 'incomplete']);
     expect(contract.files.some(file => file.kind === 'skill' && file.path.endsWith('contract.skill.md'))).toBe(true);
     expect(contract.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -457,6 +457,14 @@ describe('the prompt package', () => {
     expect(procedures).toEqual(['code-review.procedure.md', 'design-review.procedure.md', 'scope-review.procedure.md']);
     expect(reviewer.files.filter(file => file.kind === 'system').map(file => file.path.split('/').at(-1)).sort()).toEqual(['reviewer-orientation.system.md', 'reviewer.system.md']);
     expect(reviewer.files.filter(file => file.kind === 'submission-schema').map(file => file.path).sort()).toEqual(['orientation.schema.json', 'review.schema.json']);
+
+    // A failure analyst reads what a failed engineer left and submits one
+    // account; its system prompt and procedure are files of its package.
+    const analyst = manifest.packages['failure-analyst']!;
+    expect(analyst.package).toBe('failure-analyst/1');
+    expect(analyst.submissionKinds).toEqual(['failure-analysis']);
+    expect(analyst.files.filter(file => file.kind !== 'skill').map(file => file.path.split('/').at(-1)).sort())
+      .toEqual(['failure-analysis.procedure.md', 'failure-analysis.schema.json', 'failure-analyst.system.md']);
   });
 
   test('asks for the entry assignments, which become the work items', async () => {
