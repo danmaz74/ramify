@@ -243,11 +243,14 @@ hiding or measured complexity justifies it.
     invalid; and what readiness asks of a valid one: the modules' test areas
     its support code must match, and whether each mode's commands resolve.
     Its optional `typeCheck.output` declares the format the type check
-    prints, which committing gates read error locations from. Its optional
-    `setup` declares the project's setup commands, such as its build, each
+    prints, which committing gates read error locations from, and its
+    optional `timeouts` the gate command timeouts, which `start-run`
+    captures into the policy in place of the harness's own
+    (`withProjectTimeouts` in `policy.ts`). Its optional `setup` declares
+    the project's setup commands, such as its build, each
     `{ name?, command, cwd?, timeoutMs?, env? }` with `cwd` inside the
-    project and a positive bound, ten minutes by default; every gate runs
-    them first.
+    project and a positive bound, ten minutes by default, which `timeouts`
+    does not replace; every gate runs them first.
   - `readiness.ts`: the readiness steps, their bounded recovery and the
     discovery of the project's test files. A failure a preparation can
     repair consumes one recovery; one it cannot consumes none. The baseline
@@ -272,17 +275,19 @@ hiding or measured complexity justifies it.
     executor could not honor. Each invocation writes its session's
     transcript beside its observations: its start before the session
     starts, and its end and point after the log's. An engineer or contract
-    session that ends `failed`, by a bound, a provider error or an adapter
-    fault, ends its iteration and not the run: the iteration closes
+    session that ends without a result, by a bound, a provider error, an
+    adapter fault, stopping on its own or rejected submissions at their
+    bound, ends its iteration and not the run: the iteration closes
     `partial` with the failure, its interruption and its invocation as a
     finding, what the session wrote stays uncommitted in the tree, and the
-    local architect's next turn reads it. The work item's
-    `maxIterationsPerWorkItem` bounds an engineer that keeps failing. A
-    writer release that could not be confirmed still ends the run
-    `agent-failed`, since no writer and no gate may follow it. Every other
-    role's failed invocation still ends the run, except a reviewer's, which
-    its review retries, and a reconciliation fork's, which refuses its
-    assessment.
+    local architect's next turn reads it pre-analyzed (see `work/failure.ts`
+    below). The work item's `maxIterationsPerWorkItem` bounds an engineer
+    that keeps failing. A writer release that could not be confirmed still
+    ends the run `agent-failed`, since no writer and no gate may follow it.
+    Every other role's failed invocation still ends the run, except a
+    reviewer's, which its review retries, a reconciliation fork's, which
+    refuses its assessment, and a failure analyst's, which is an analysis
+    that is unavailable.
   - `port-events.ts`: what one session's port events leave in its
     observations and transcript, and the policy's two bounds on one
     session: no port event for `invocationIdleMs`, and
@@ -290,7 +295,11 @@ hiding or measured complexity justifies it.
     runs for the session, a `shell` call or a scoped test run, is the
     harness's work and not the session's silence: it holds the idle bound
     for the command's own timeout plus a margin of one minute. Its release
-    starts the idle bound afresh, and the absolute bound is unchanged.
+    starts the idle bound afresh, and the absolute bound is unchanged, so
+    every command stays bounded. An engineer's idle and absolute bounds are
+    its iteration's: the policy's, or what its assignment raised them to.
+    It also keeps the calls in flight, at the moment a bound fires, and the
+    session's last assistant text, which a failure digest reads.
   - `mutations.ts`: what a writer changed, read from `git status` when it
     settles. That snapshot is the only observation that sees a write no
     guard saw; comparing it with the write scope fills `outsideScope`, and
@@ -372,8 +381,9 @@ hiding or measured complexity justifies it.
     `request-placement`, which asks the global architect where a capability
     belongs; `request-completion`, which commits an outline and asks for the
     work item's gate; `yield-for-providers`, which names the open
-    requirements this work item waits for; and `unresolved`, which ends the
-    run with a conflict rather than weakening the request.
+    requirements this work item waits for; and `unresolved`, which states a
+    conflict rather than weakening the request, for the global architect to
+    answer.
   - `assignment.ts`: the assignment body an architect submits and the rules
     the schema cannot hold: the module is one the refreshed view has or one
     an accepted proposal creates, an included child is a direct child and
@@ -384,10 +394,29 @@ hiding or measured complexity justifies it.
     guarantee the outline records as broken, and only it may state the
     explicitly broad base `{ modules, rationale }`, whose rationale may not
     be blank. An authorization names a guarded path and arrives with the
-    outline revision that records it.
+    outline revision that records it. Its optional `bounds` raise an
+    engineer's command maximum, idle bound and absolute bound for the
+    iteration, each with a reason: raised above the policy's value, at most
+    the policy's ceiling, and a command never longer than the invocation
+    that runs it.
   - `iterations.ts`: the `IterationAssignment` with its captured
-    `WriteScope`, the `IterationResult` and the notice a created or removed
-    module becomes, and where each is materialized beneath the run.
+    `WriteScope` and the bounds it raised, the `IterationResult` and the
+    notice a created or removed module becomes, and where each is
+    materialized beneath the run. A result an engineer's failure closed
+    carries `failure`: the `FailureDigest` and the `FailureAnalysis`.
+  - `failure.ts`: an engineer that ended without a result, as its local
+    architect learns of it, in two layers. The digest is the harness's own,
+    bounded as a gate summary is: why the session ended, the call in flight
+    with the last 30 lines of a command's output, what it changed and
+    whether that is uncommitted, what it said last and where its transcript
+    is. The analysis is a failure analyst's, a reader session over the
+    evidence the harness writes into the iteration's `failure-evidence/`
+    (the digest, the transcript as text, the command outputs and the patch):
+    what it was attempting, what it finished, what it was doing when it
+    ended, the cause as `bound-too-tight`, `environment-problem`,
+    `work-problem`, `agent-behavior` or `unknown`, and a recommendation. An
+    analysis that fails or is invalid is `unavailable`, and never fails the
+    run.
   - `scope.ts`: capturing a write scope's real paths. An ordinary assignment
     reaches the assigned module's own source area and its two declaration
     files, plus the complete directory of each immediate child it named, plus
@@ -420,7 +449,11 @@ hiding or measured complexity justifies it.
     and API view, the hypotheses it received with their rationales, the
     registry, and the placement decided for it — its own, and the
     consequences of a decision that names it. Where a view cannot be materialized the message says so, so
-    that absence is never read as a refusal.
+    that absence is never read as a refusal. It states an engineer's bounds
+    and their ceilings, and after an engineer that ended without a result,
+    the digest, then the analysis, then the architect's options: a fresh
+    iteration, a completion request or `unresolved`, and, where a bound
+    ended it, which bound and that it may be raised up to its ceiling.
   - `scenario-briefing.ts`: what the briefings say of a work item's
     scenarios (architecture §6). The local architect is given every
     scenario of its entry with its ID, state, text, feature file and, for a
@@ -456,6 +489,17 @@ hiding or measured complexity justifies it.
     carries `Fake`, and a re-export keeps that designation. It reads the
     source and not the submission, because the source is what generated
     architectural evidence will show.
+  - `parity.ts`: the fake-exposure-parity rule the contract gate and every
+    later iteration gate verify while a fake is registered. Each fake export
+    names the real provider export it stands for; the modules that receive
+    the fake must be those that receive the real export. Both are read from
+    the architect view's exposure chains (`to` and `reexposed`) over the
+    module tree, with the agreement's declared exposure in place of a real
+    export that does not exist yet, and the source area in place of its
+    tags. A violation another agreement's fake has that no file of the
+    iteration's write scope decides is a limit, not a failure; so is a fake
+    the view does not record. A retired fake is out of the rule, and a
+    declaration that still exposes it is a violation.
   - `verification.ts`: what closes a delegation beside a passing gate. No
     location the requirement named may still reach the fake, by an import of
     one of its files or by one of its exported names.
@@ -480,7 +524,8 @@ hiding or measured complexity justifies it.
     it exists for.
   - `session.ts`: what a contract sub-session is given: the need as the
     consumer wrote it, both sides of the seam, the existing consumers when it
-    extends an agreement, and the naming rule its gate will verify.
+    extends an agreement, and the naming and exposure-parity rules its gate
+    will verify.
 - `projections/`: every answer of the run protocol, computed from what the
   run service's `committed` hands out (the run's record, its directory and
   the complete lines of its log with their record bodies) and from the run's
@@ -514,7 +559,10 @@ hiding or measured complexity justifies it.
   can produce. The rendered prompt is never stored: it may hold file
   contents. The contract package is an engineer's with the contract skill
   beside the module architect's: the role is an engineer, and the skill is
-  what makes the invocation a contract iteration.
+  what makes the invocation a contract iteration. An engineer's prompt
+  states the longest one of its commands may run, its iteration's. The
+  failure analyst's package reads what a failed engineer left and submits
+  one short account; like a reviewer it reads and writes nothing else.
 - `guard/`: the write guard. A write is intercepted before it executes: the
   one target its action names is resolved against the invocation's working directory
   and then against the real filesystem — an existing path is its own real
@@ -537,7 +585,9 @@ hiding or measured complexity justifies it.
   the shell an engineer receives in place of the implementation's own: one
   command through the lifted executor, in its own process group, with a
   environment built from the same allowlist as every other child, a timeout
-  it may be given and an 8 KiB tail beside a file holding everything. The
+  it may be given up to its session's maximum (the policy's
+  `commandTimeoutMs`, or what the assignment raised it to) and an 8 KiB tail
+  beside a file holding everything. The
   allowlist is deliberate here: the command is one an agent wrote, so a
   wider environment would hand it every secret of the person's session. It declares itself mutating, so the post-write
   hook check runs after it, and it settles what it left running before the
@@ -834,6 +884,22 @@ pi actually made and what the snapshot tools answered.
   revisions are never combined. A fork that cannot decide returns findings
   and gaps, which consume one retry of `forkRetriesPerRequest` and are never
   appended; exhaustion returns an unresolved outcome to the local architect.
+- **An unresolved request.** A local architect's `unresolved` answer is
+  recorded as an `UnresolvedRequest` and forks the architect context like a
+  placement request. The fork answers with a placement `decision`, whose
+  constraints name only what a local architect can assign; a `deviation`,
+  recorded beside the plan, which the work item goes on under; `environment`,
+  when the conflict lies in how the gate or the harness runs; or
+  `nothing-possible`, which fails the run. An `environment` answer carries a
+  bounded diagnosis and a suggestion for the operator. `environment-reported`
+  commits the `EnvironmentProblem` and its CheckFinding, and the run holds the
+  work item until the operator answers: `resume`, or a waiver, returns the
+  work item to its continued local architect with the diagnosis and the
+  operator's note, to retry from its last outline; `end` fails the run. Nothing
+  is placed, no deviation is recorded and the plan file is untouched. The run
+  snapshot's `environmentProblems` states each one with its work item,
+  request, diagnosis, suggestion and answer. A later `unresolved` answer
+  answered with `environment` holds the run again.
 - **A decision and its brief.** `decision-accepted` commits the decision, the
   registry entries it creates or revises and the hypothesis revisions it
   makes, in one transition, and it is the intent of the parent append. The
@@ -854,8 +920,11 @@ pi actually made and what the snapshot tools answered.
   That assignment is a committed record, so a caller that dies discovers the
   outcome without the original reply. The sub-session is an engineer
   invocation with the contract skill, scoped to the requesting consumer, the
-  contract, its conformance suite, its fake and the exposure declarations on
-  the path between the two sides. Only `established` followed by a passing
+  contract, its conformance suite, its fake, the injection sites the need
+  names (files of the consumer or of the provider that hold the fake, and
+  nothing else of the provider) and the exposure declarations on the path
+  between the two sides. A revision's scope holds the injection sites the
+  agreement in force recorded. Only `established` followed by a passing
   contract gate registers; `incomplete` registers nothing.
 - **Registration and scheduling.** `contract-registered` commits the
   contract, one obligation keyed `ob-<contract-id>`, one requirement per
@@ -893,11 +962,26 @@ pi actually made and what the snapshot tools answered.
   allowed and recorded. `request-completion` commits an outline and runs the
   `work-item` gate; requesting completion with no iteration is a legitimate
   outcome, because a goal existing behavior already satisfies is verified
-  reuse and the gate is what verifies it. `unresolved` ends the run with the
-  conflict and its evidence rather than weakening the request. A failing gate
+  reuse and the gate is what verifies it. `unresolved` states the conflict
+  and its evidence rather than weakening the request, and a fork of the
+  global architect answers it. A failing gate
   returns to the same architect, which may revise its outline; exhaustion of
   `repairRoundsPerWorkItemGate` fails the run with `repair-exhausted` and the
   original cause preserved.
+- **An engineer that ends without a result.** A bound, a provider error, an
+  adapter fault, a session that stops on its own and rejected submissions at
+  their bound all end the iteration `partial` and return to the local
+  architect; only an unconfirmed writer release, and the run's own limits,
+  end the run. Before the architect is briefed the harness records the
+  failure digest and runs one `failure-analyst` invocation, a reader with
+  `read`, `grep` and `ls` over the iteration's `failure-evidence/`, bounded
+  at ten minutes; both go into the iteration's result. The architect may
+  raise the next iteration's bounds in `assignment.bounds`, up to the
+  policy's ceilings: 30 minutes for a command, 30 for the idle bound and 3
+  hours for an invocation. They apply to every engineer invocation of that
+  iteration, budget returns included, and the shell's schema and the
+  engineer's prompt state the command maximum. `runAbsoluteMs` is
+  unchanged.
 - **Readiness.** The project root, a clean git repository, the compiler
   configuration, the test runner, the project's configuration, its scenario
   harness, the independent nested packages whose tests the gate runs
@@ -1233,6 +1317,14 @@ The run's own tests are beside them.
 - `engineer-submission.test.ts` breaks the engineer's schema, its rules and
   its own test tool's input; `line-events.test.ts` covers what a writer
   changed and the session counts.
+- `engineer-failures.test.ts` composes runs on the scripted fake, with no
+  process: an engineer ended by its absolute bound in the middle of a shell
+  command, its digest with the command's tail and its analysis in the next
+  briefing, the architect raising the bound, and the next engineer's shell
+  taking the larger timeout; an analysis that fails or ends without a
+  submission, which leaves the digest alone; every judged cause; each
+  refused `bounds` value; and a hold under raised bounds, which lasts the
+  command's timeout and the margin while the absolute bound keeps running.
 - `shell-tool.test.ts` runs real commands through the shell: a descendant
   the command left behind, settled by its process group; a command still
   running, settled with its group before anything follows; a bounded tail

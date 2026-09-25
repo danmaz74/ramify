@@ -265,6 +265,21 @@ Explicit names make fakes recognizable in source and generated architectural
 evidence. A contract and fake can establish a capability's intended placement;
 their presence does not establish that its real implementation is ready.
 
+### A Fake Is Exactly As Importable As What It Stands For
+
+A fake is placed and used at the seam where the real provider will act, and
+exactly the modules that will receive the real export receive the fake. A
+fake that reaches further is wired where the real provider never acts, and
+retiring it means re-plumbing its consumer. The agreement names the real
+export each fake stands for, and the gates verify the parity while the fake
+is registered. The agreement also names the files that hold the fake, on
+either side of the seam; the contract iteration may write exactly those
+files beyond its scope, and nothing else of the provider's internals.
+
+Retiring a fake is the harness's and its agents' concern: verification
+replaces it with the real provider and removes its exposure with it. Ramify,
+the build and the audit stay out of it.
+
 ### A Plan's Acceptance Is Its Scenarios
 
 A plan's acceptance is a set of Gherkin scenarios: the plan's own, and those
@@ -375,6 +390,10 @@ goal is reached; the work is partially complete, with its needs; a contract
 needs revision; the request cannot be satisfied as specified; the implementation
 map is wrong. The harness acts on nothing else.
 
+A request that cannot be satisfied because of how the gate or the harness runs
+is an environment problem: it is reported to the operator, never answered as a
+placement or a deviation.
+
 ### The Harness Stays Small; Ramify Stays Outside Its Control Loop
 
 The harness chooses agent scopes, orders seams and handles discoveries.
@@ -385,6 +404,17 @@ environment. A violation reaches the agent as an ordinary error.
 
 A runtime failure, such as a crashed session or malformed output, is never a
 semantic outcome.
+
+### An Engineer's Failure Is Its Architect's Decision
+
+An engineer that ends without a result ends its iteration, not the run. Its
+local architect decides what comes next; only what the harness itself cannot
+continue from ends the run.
+
+The harness reports the failure pre-analyzed: a digest of what it already
+holds, then a model's analysis, so the decision needs no transcript. A bound
+that proves too tight is the architect's to raise, within the policy's
+ceilings.
 
 ### Agent Invocations Should Be Considered Idempotent
 

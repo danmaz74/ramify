@@ -74,7 +74,7 @@ export function registerContract(request: RegistrationRequest): Registration {
   };
 
   const contract = contractRecordSchema.parse({
-    schema: 'ramify-agent.contract/1',
+    schema: 'ramify-agent.contract/2',
     id: request.contract,
     revision: request.revision,
     capability: request.capability.ref,
@@ -86,7 +86,18 @@ export function registerContract(request: RegistrationRequest): Registration {
     artifacts: {
       interface: submission.artifacts.interface.map(entry => ({ path: entry.path, exports: [...entry.exports], hash: hash(entry.path) })),
       conformance: submission.artifacts.conformance.map(entry => ({ path: entry.path, hash: hash(entry.path) })),
-      fake: submission.artifacts.fake.map(entry => ({ path: entry.path, exports: [...entry.exports], hash: hash(entry.path) })),
+      fake: submission.artifacts.fake.map(entry => ({
+        path: entry.path,
+        exports: [...entry.exports],
+        hash: hash(entry.path),
+        standsFor: entry.standsFor.map(standsFor => ({
+          ...standsFor,
+          exposure: {
+            to: [...standsFor.exposure.to],
+            reexposed: standsFor.exposure.reexposed.map(step => ({ by: step.by, to: [...step.to] })),
+          },
+        })),
+      })),
       exposure: submission.artifacts.exposure.map(entry => ({ path: entry.path, declaration: entry.declaration })),
     },
     establishedBy: request.establishedBy,

@@ -88,6 +88,7 @@ expose-sub runPhaseSchema, RunPhase, runQueryLimits, measurementPolicySchema fro
 expose-sub kpiPolicySchema, lineagePolicySchema, runNoticeSchema, RunNotice, RunNoticeKind from harness to descendants
 expose-sub runDecisionRequestsSchema, RunDecisionRequests from harness to descendants
 expose-sub runPlanDeviationsSchema, RunPlanDeviations from harness to descendants
+expose-sub runEnvironmentProblemSchema, RunEnvironmentProblem from harness to descendants
 expose-sub runSnapshotSchema, RunSnapshot, unservedRunSchema, UnservedRun from harness to descendants
 expose-sub runListResponseSchema, RunListResponse, runResponseSchema, RunResponse from harness to descendants
 expose-sub runEventRefKindSchema, RunEventRefKind, projectedRunEventSchema from harness to descendants

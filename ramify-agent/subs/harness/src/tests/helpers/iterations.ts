@@ -10,6 +10,8 @@ import type { AssignmentBody } from '../../work/assignment.js';
 import type { z } from 'zod';
 import type { engineerSubmissionSchema } from '../../work/engineer.js';
 import type { LocalArchitectSubmission } from '../../work/submission.js';
+import type { FailureCause } from '../../interfaces/protocol/runs.js';
+import type { FailureAnalysisSubmission } from '../../work/failure.js';
 import { installScriptedCucumber } from './project-config.js';
 
 /** An engineer submission as an agent sends it: a declaration's `scenarios` may be left out. */
@@ -84,6 +86,29 @@ export function unsuitableScope(detail = 'What the goal needs is owned by anothe
 /** One turn of one role, as the fake plays it. */
 export type Turn = readonly ScriptStep[];
 
+/** A failure analyst's submission, as an agent sends it. */
+export function failureAnalysis(cause: FailureCause = 'unknown', extra: Partial<FailureAnalysisSubmission> = {}): FailureAnalysisSubmission {
+  return {
+    attempting: 'The goal of the iteration, as its prompt stated it.',
+    finished: 'Nothing the patch shows as complete.',
+    whenEnded: 'It was waiting on the call the digest names.',
+    cause,
+    recommendation: 'Assign a fresh iteration from the tree as it stands.',
+    evidence: ['transcript.md: the last entries before the end'],
+    ...extra,
+  };
+}
+
+/**
+ * The failure analyst's fake: it reads the digest and the transcript the
+ * harness prepared and submits an account. A script that gives the role no
+ * turn of its own gets this one, so every composed run whose engineer ends
+ * without a result exercises the analysis.
+ */
+export function failureAnalystFake(cause: FailureCause = 'unknown', extra: Partial<FailureAnalysisSubmission> = {}): Turn {
+  return submit(failureAnalysis(cause, extra), read('digest.md'), read('transcript.md'));
+}
+
 /**
  * A script that answers each role in turn: the nth invocation of a role runs
  * that role's nth turn, and the last turn repeats once they are spent.
@@ -93,7 +118,7 @@ export function byRole(plan: Readonly<Record<string, readonly Turn[]>>): Script 
   return (spec: SessionSpec): readonly ScriptStep[] => {
     const seen = counts.get(spec.role) ?? 0;
     counts.set(spec.role, seen + 1);
-    const turns = plan[spec.role] ?? [];
+    const turns = plan[spec.role] ?? (spec.role === 'failure-analyst' ? [failureAnalystFake()] : []);
     if (turns.length === 0) return [{ kind: 'end', message: `no turn scripted for ${spec.role}` }];
     return turns[Math.min(seen, turns.length - 1)]!;
   };
@@ -114,7 +139,7 @@ export function byWork(plan: Readonly<Record<string, readonly Turn[]>>): Script 
   return (spec: SessionSpec): readonly ScriptStep[] => {
     const named = /\bwi-\d+/.exec(spec.prompt.split('\n')[0] ?? '')?.[0];
     const key = named === undefined ? spec.role : `${spec.role}:${named}`;
-    const turns = plan[key] ?? plan[spec.role] ?? [];
+    const turns = plan[key] ?? plan[spec.role] ?? (spec.role === 'failure-analyst' ? [failureAnalystFake()] : []);
     if (turns.length === 0) return [{ kind: 'end', message: `no turn scripted for ${key}` }];
     const seen = counts.get(key) ?? 0;
     counts.set(key, seen + 1);

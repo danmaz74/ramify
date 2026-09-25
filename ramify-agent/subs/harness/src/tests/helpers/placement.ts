@@ -103,3 +103,11 @@ export function forkDeviation(extra: Partial<Extract<ForkSubmission, { kind: 'de
 export function forkNothingPossible(reason = 'Every requirement of the plan rests on the missing surface.'): ForkSubmission {
   return { kind: 'nothing-possible', reason, evidence: ['plans/revision-diff/plan.md, lines 9–14'] };
 }
+
+/** The global architect's answer that the conflict lies in how the gate runs: an environment problem for the operator. */
+export function forkEnvironment(
+  diagnosis = 'The work-item gate runs `npm test`, whose tests import `dist/src`; nothing builds `dist` in the gate\'s worktree, so every attempt fails before a test runs.',
+  suggestion = 'Declare a build step in `ramify-agent.json` that runs before the gate\'s tests.',
+): ForkSubmission {
+  return { kind: 'environment', diagnosis, suggestion };
+}

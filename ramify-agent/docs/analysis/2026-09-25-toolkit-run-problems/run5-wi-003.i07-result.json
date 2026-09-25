@@ -1,0 +1,15 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-003.i07",
+  "outcome": "unsuitable",
+  "invocations": [
+    "inv-0047"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "unsuitable (scope): The two stale root CLI assertions are updated and pass (including companion JSON details: [], proposal: null and role-labelled related location); fresh build, npm test, check:self and run_scope_tests pass. But unchanged npm run reference:cases fails 10 tests whose independent expectations require changes outside the allowed write scope, not suppression of actual provider evidence. scripts/reference-harness/equivalence-sequences.ts:176 (hundred-owner-sequence and merge-live), scripts/reference-harness/increment.test.ts (commonjs-module-target-limit, declare-global-note), scripts/reference-harness/resident-fixtures.test.ts:75,87 (mapping removal and later-file creation), and scripts/reference-harness/plan5-live-sequences.ts:149 (hundred-owner-sequence-live) expect empty coverage/complete coverage despite legitimate signature-inferred notes for exposed inferred `value`. scripts/reference-harness/plan2b.test.ts:31 expects metrics 'unavailable' although actual architect view reports 'measured'. scripts/reference-harness/plan5-live-cases.ts:48 expects one rechecked access on import-added but the published source revision reports two. scripts/reference-harness/self-cases.ts:40-42 compares an unfiltered disk file list including generated .ramify API-view pages against the inventory, which intentionally excludes generated view files (both self-positive and self-negative fail). These external reference scripts/expectations are outside write scope; adjusting them or reverting truthful analysis outputs would weaken the requested guarantees. Reference run log: shell/006.log, Failed Tests 10."
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

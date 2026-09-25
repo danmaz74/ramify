@@ -726,10 +726,14 @@ Autonomous decisions select how to fulfill the request. They do not authorize
 silently weakening its acceptance conditions. When a local architect finds a
 requirement cannot be met as stated, the global architect either fixes the
 placement, records a plan deviation that keeps as much of the requirement as
-the conflict allows, or finds nothing of the plan worth doing, which ends the
-run with the conflict. A deviation is never silent: it is a CheckFinding the
-user accepts or rejects, and a run that recorded one completes with it to
-review rather than claiming plain success. If the agents cannot find a viable
+the conflict allows, reports an environment problem, or finds nothing of the
+plan worth doing, which ends the run with the conflict. An environment
+problem is a conflict in how the gate or the harness runs, not in the plan or
+the architecture: the run holds the work item until the operator resumes the
+run, and the local architect then retries with the diagnosis. It is never
+answered as a placement or a deviation. A deviation is never silent: it is a
+CheckFinding the user accepts or rejects, and a run that recorded one
+completes with it to review rather than claiming plain success. If the agents cannot find a viable
 execution within the request and run limits otherwise, the run ends with an
 explanation of the unresolved conflict.
 
@@ -959,14 +963,37 @@ Use a few explicit failure categories to select recovery:
 | Failed assertion, type error or Ramify violation within scope | Return diagnostics to the engineer for bounded repair. |
 | Runner failure, unavailable daemon or other execution infrastructure failure | Harness attempts bounded infrastructure recovery; do not ask the engineer to repair application code without evidence of a code defect. |
 | Invalid or lost agent session | Replace or reconstruct the session from durable records after settling its tools; preserve outstanding work and repair counters. |
-| Engineer or contract session that fails: an idle or absolute bound, a provider error or an adapter fault | After its writer settles, close the iteration as partial with the failure as a finding and return to the local architect. The work item's iteration limit bounds repeated failures; an unconfirmed settlement still ends the run. |
+| Engineer or contract session that ends without a result: an idle or absolute bound, a provider error, an adapter fault, a session that stops on its own, or rejected submissions at their bound | After its writer settles, record the failure digest, run the failure analysis, close the iteration as partial with both and return to the local architect. The work item's iteration limit bounds repeated failures; an unconfirmed settlement still ends the run. |
 | Required change outside the assignment or to an established obligation | Return to the local architect for a scoped assignment or recorded obligation revision. |
 
 An invocation's idle bound measures the session's silence, not the harness's
 work. A command the harness runs for the session, such as a shell call or a
 scoped test run, holds the idle bound for the command's own timeout plus a
 margin, because that timeout already bounds it; the invocation's absolute
-bound is unchanged.
+bound is unchanged, so every command stays bounded.
+
+An engineer's failure is its local architect's decision, and the architect
+decides without reading a transcript. Before it is briefed the harness
+records a digest from what it already holds: why the session ended, the call
+in flight with the end of a command's output, what the session changed and
+whether it is uncommitted, what it said last and where its transcript is. A
+failure analyst then reads the transcript, the command outputs and the patch
+in a reader session of its own and submits a short account: what the
+engineer was attempting, what it finished, what it was doing when it ended,
+the cause as a bound too tight, an environment problem, a problem in the
+work, agent behavior or unknown, and a recommendation. An analysis that fails
+leaves the digest alone and never fails the run. The architect then assigns a
+fresh iteration, which starts from the tree with the uncommitted work,
+requests completion or answers `unresolved`.
+
+Where a bound ended it, the architect may raise that bound for the next
+iteration in the assignment's `bounds`, each with a reason: a command's
+maximum timeout, the idle bound and the invocation's absolute bound. The
+policy holds ceilings the architect cannot exceed (30 minutes, 30 minutes and
+3 hours), and a command's timeout is never longer than its invocation's
+absolute bound. The run's own absolute bound is unchanged. A project may also
+declare its gate command timeouts in `ramify-agent.json`
+([acceptance scenarios](acceptance-scenarios.md)).
 
 Preserve the original failure cause across recovery attempts. Repeatedly sending
 the same repair prompt to an invalid session is not recovery. Infrastructure

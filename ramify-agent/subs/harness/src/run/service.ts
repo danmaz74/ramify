@@ -58,7 +58,7 @@ import {
 } from '../reviews/submission.js';
 import type { AcceptedCommand, Receipt } from '../interfaces/protocol/jobs.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
-import type { Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
+import type { FailureAnalysis, Role, RunCommand, RunFailureReason } from '../interfaces/protocol/runs.js';
 import { CommandLedger, CommandRejection } from '../jobs/commands.js';
 import { commitRecord, readCommitted, recoverCommits, type RecordRef as CommitRecord } from '../jobs/commit.js';
 import { Mutex, PriorityMutex } from '../jobs/mutex.js';
@@ -66,7 +66,7 @@ import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planS
 import { ensureStateDirectory } from '../store/state-directory.js';
 import { planPath, readPlan } from '../plans/discover.js';
 import {
-  inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderGlobalForkPrompt,
+  inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
   type LoadedPackage,
 } from '../prompts/packages.js';
@@ -83,10 +83,12 @@ import {
 } from '../architecture/records.js';
 import { forkMessage, unresolvedForkMessage } from '../architecture/session.js';
 import {
-  defaultMaxPlanDeviations, deviationLayout, deviationText, planDeviationId, planDeviationSchema, planLines, unresolvedRequestId, unresolvedRequestSchema,
-  type DeviationBody, type PlanDeviation, type UnresolvedRequest,
+  defaultMaxPlanDeviations, deviationLayout, deviationText, environmentProblemId, environmentProblemSchema,
+  planDeviationId, planDeviationSchema, planLines, unresolvedRequestId, unresolvedRequestSchema,
+  type DeviationBody, type EnvironmentBody, type EnvironmentProblem, type PlanDeviation, type UnresolvedRequest,
 } from '../deviations/records.js';
 import { deviationCommands, isPlanDeviation, nextCheckFinding } from '../deviations/finding.js';
+import { environmentCommands, environmentOptions } from '../deviations/environment.js';
 import {
   forkJsonSchema, forkToolName, validateFork,
   type ForkSubmission, type PlacementEvidence, type PlacementRequestBody,
@@ -95,6 +97,7 @@ import { describePlan, initialAnalysisJsonSchema, initialAnalysisToolName, valid
 import { registerContract, registrationNeeded, type AttachedConsumer } from '../contracts/accept.js';
 import { cycleClosedBy, cycleIdentity, type DependencyCycle, type DependencyEdge } from '../contracts/graph.js';
 import { fakeNamingViolations, type NamedFile } from '../contracts/naming.js';
+import { fakeExposureParity, type StandIn } from '../contracts/parity.js';
 import {
   contractId, contractOfObligation, contractsLayout, obligationId, requirementId,
   type ConsumerRequirement, type ContractRecord, type ProviderObligation,
@@ -112,7 +115,9 @@ import {
 import { remainingInjections } from '../contracts/verification.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import { creationAuthority } from '../work/assignment.js';
-import { engineerEquipment, type EngineerEquipment, type EngineerEquipmentInputs, type EquipContext, type Equipment } from '../work/engineer-equipment.js';
+import {
+  engineerEquipment, type EngineerEquipment, type EngineerEquipmentInputs, type EquipContext, type Equipment, type ShellCallRecord,
+} from '../work/engineer-equipment.js';
 import {
   engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
@@ -120,11 +125,16 @@ import {
 import {
   iterationAssignmentSchema, iterationId, iterationLayout, iterationResultSchema, iterationSchemas, moduleNoticeSchema,
   workItemOfIteration,
-  type IterationAssignment, type IterationResult, type ModuleNotice,
+  type FailureDigest, type IterationAssignment, type IterationResult, type ModuleNotice,
 } from '../work/iterations.js';
+import {
+  digestLines, failureAnalysisJsonSchema, failureAnalysisMessage, failureAnalysisSubmissionDescription, failureAnalysisToolName,
+  failureDigest, renderTranscript, validateFailureAnalysis,
+  type AnalysisEvidence, type DigestShellCall, type FailureAnalysisSubmission,
+} from '../work/failure.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
+  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
@@ -141,8 +151,8 @@ import { planScenarioCheck, type ScenarioCheckInputs } from '../checks/checkpoin
 import { RunLog, type RunEvent, type RunEventInput, type RunEventOf } from './log.js';
 import type { Transaction } from '../../subs/ledger/src/ledger.js';
 import { ObservationLog } from './observations.js';
-import { endedOf, InvocationBounds, PortEventRecorder } from './port-events.js';
-import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages } from './policy.js';
+import { endedOf, InvocationBounds, PortEventRecorder, type CallInFlight } from './port-events.js';
+import { contextPolicyOf, defaultRunPolicy, discoverNestedPackages, engineerBoundsOf, withProjectTimeouts, type EngineerBounds } from './policy.js';
 import { captureProjectConfig, scenarioModules, supportFiles } from './project-config.js';
 import {
   commitForMaterialization, commitForScenarios, contentHash as featureContentHash, expectedFeatureFiles, expectedFeatureHashes, materializationMessage, rerenderFeatureFiles,
@@ -159,7 +169,7 @@ import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runR
 import {
   gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
   recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
-  type GateOperation, type Invocation, type InvocationOutcome, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
+  type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
   type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
 } from './records.js';
@@ -167,7 +177,7 @@ import { reduceSessions, type RunSessions } from './sessions.js';
 import { runSnapshot, type RunSnapshot } from './snapshot.js';
 import { InvocationTranscript, recordAppend, verdictNote } from '../transcripts/recorder.js';
 import { ContentStore } from '../transcripts/store.js';
-import { TranscriptWriter } from '../transcripts/writer.js';
+import { readBody, readTranscript, TranscriptWriter } from '../transcripts/writer.js';
 import { SubmissionJudge, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
 
@@ -343,6 +353,11 @@ interface InvocationRequest<T> {
   readonly workingDirectory?: string | undefined;
   /** A tighter absolute bound than the run policy's, such as a review attempt's. */
   readonly absoluteMs?: number | undefined;
+  /**
+   * An engineer's own idle and absolute bounds, which replace the policy's:
+   * the policy's defaults, or what its assignment raised them to.
+   */
+  readonly bounds?: { readonly idleMs: number; readonly absoluteMs: number } | undefined;
   /** Called once `invocation-started` is committed and before the session starts, such as to commit what the invocation is for. */
   readonly onStarted?: ((invocation: string, session: SessionId) => Promise<void>) | undefined;
   /**
@@ -452,6 +467,8 @@ interface IterationOutcome {
   readonly need?: {
     readonly need: NeedAsBehavior;
     readonly suggestedProvider?: string | undefined;
+    /** The files the fake must be injected in, as the engineer named them. */
+    readonly injectionSites?: readonly string[] | undefined;
     readonly invocation: string;
   } | undefined;
 }
@@ -474,6 +491,12 @@ interface InvocationResult<T> {
   readonly error?: string | undefined;
   /** The mode the executor actually started the session in; absent where none started. */
   readonly actual?: 'fresh' | 'continue' | 'fork' | undefined;
+  /** How long the invocation ran, where its session started. */
+  readonly elapsedMs?: number | undefined;
+  /** The tool calls in flight when it ended: when a bound fired, or when its outcome arrived. */
+  readonly inFlight?: readonly CallInFlight[] | undefined;
+  /** The text of its last assistant message that had any. */
+  readonly lastText?: string | null | undefined;
 }
 
 /** One invocation the run has open: the writer or a reader, and its session once it started. */
@@ -2425,6 +2448,10 @@ export class RunService {
     await writeOnce(join(directory, runLayout.promptManifest), `${JSON.stringify(promptManifest, null, 2)}\n`);
 
     const baseline = await this.freezeBaseline(directory, planId, manifest, packages);
+    // Read once, beside the policy. A missing or invalid file is captured
+    // with its reason; readiness reports it, and the start is not refused.
+    // The gate command timeouts it declares replace the policy's own.
+    const projectConfig = await captureProjectConfig(this.projectRoot);
     const record = runRecordSchema.parse({
       schema: jobSchemaVersion,
       jobId: runId,
@@ -2434,10 +2461,8 @@ export class RunService {
       createdAt: now.toISOString(),
       manifest,
       prompts: Object.fromEntries([...packages].map(([role, loaded]) => [role, { package: loaded.package, hash: loaded.hash }])),
-      policy,
-      // Read once, beside the policy. A missing or invalid file is captured
-      // with its reason; readiness reports it, and the start is not refused.
-      projectConfig: await captureProjectConfig(this.projectRoot),
+      policy: withProjectTimeouts(policy, projectConfig),
+      projectConfig,
       baseline: baseline.reference,
       // The plan's own scenarios, extracted once from the captured bytes. A
       // block that does not parse is a limitation, never a refusal.
@@ -2449,7 +2474,7 @@ export class RunService {
     const log = await RunLog.open(join(directory, runLayout.events), runId);
     const base = manifest.source?.commit ?? await this.git.currentHead(this.projectRoot);
     let run!: Run;
-    run = new Run(record, directory, log, base, this.newWriter(policy, () => this.accepted(run)));
+    run = new Run(record, directory, log, base, this.newWriter(record.policy, () => this.accepted(run)));
     run.index = await this.options.inputs.index(this.projectRoot, manifest).catch(() => null);
     const accepted = this.commands.accept(command, contentHash, runId, run.log.nextSequence, now);
     this.runs.set(run.key, run);
@@ -2899,10 +2924,21 @@ export class RunService {
     const context = contextPolicyOf(run.record.policy, request.role);
     const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context, transcript });
     // Every port event is activity; `touch` is what the idle bound resets.
-    // A command the equipment runs for the session holds it instead.
-    const bounds = new InvocationBounds(request.absoluteMs === undefined
-      ? run.record.policy.limits
-      : { ...run.record.policy.limits, invocationAbsoluteMs: Math.min(run.record.policy.limits.invocationAbsoluteMs, request.absoluteMs) });
+    // A command the equipment runs for the session holds it instead. An
+    // engineer's own bounds replace the policy's; a reader's may only be
+    // tighter.
+    const policyLimits = run.record.policy.limits;
+    const limits = {
+      ...policyLimits,
+      invocationIdleMs: request.bounds?.idleMs ?? policyLimits.invocationIdleMs,
+      invocationAbsoluteMs: request.bounds?.absoluteMs
+        ?? (request.absoluteMs === undefined ? policyLimits.invocationAbsoluteMs : Math.min(policyLimits.invocationAbsoluteMs, request.absoluteMs)),
+    };
+    const bounds = new InvocationBounds(limits);
+    // What was in flight at the moment a bound fired, before the stop it
+    // asks for ends those calls.
+    let inFlightAtBound: CallInFlight[] | undefined;
+    bounds.onReached(() => { inFlightAtBound = recorder.inFlight(); });
     const equipment: Equipment = request.equip?.({
       invocation: id,
       observations,
@@ -2956,7 +2992,7 @@ export class RunService {
       }, undefined, transcript);
       return {
         id, ended: 'failed', value: undefined, ref: '', outcomeKind: 'failed', session, kept: keptAs.kept,
-        interruption: 'adapter-fault', error: failure,
+        interruption: 'adapter-fault', error: failure, elapsedMs: 0, inFlight: [], lastText: null,
       };
     }
     const live = run.live.get(id);
@@ -2970,9 +3006,9 @@ export class RunService {
     // The policy's two bounds on one invocation. Either asks the session to
     // stop and ends the invocation as failed with the bound as its
     // interruption; settlement below is what then says whether it is gone.
-    const limits = run.record.policy.limits;
     const outcome = await bounds.outcome(agentSession);
     const interruption = bounds.interruption;
+    const inFlight = inFlightAtBound ?? recorder.inFlight();
     const elapsedMs = this.now().getTime() - started;
     if (outcome.kind === 'context-budget-reached') {
       budget = { threshold: context.budgetTokens ?? 0, observed: outcome.tokens, reportDelivered: outcome.report !== undefined };
@@ -3046,6 +3082,9 @@ export class RunService {
       ...(interruption === undefined ? {} : { interruption }),
       ...(ended === 'failed' && error !== undefined ? { error } : {}),
       actual: agentSession.start.mode,
+      elapsedMs,
+      inFlight,
+      lastText: recorder.lastText,
     };
   }
 
@@ -3386,6 +3425,8 @@ export class RunService {
     let unresolvedRequest: { id: string; findings: readonly string[]; gaps: readonly string[] } | undefined;
     /** The plan deviation the global architect recorded for this work item's last unresolved request, delivered once. */
     let deviationRecorded: PlanDeviation | undefined;
+    /** The environment problem the global architect reported for that request, after which the operator resumed the run, delivered once. */
+    let environmentResumed: { problem: EnvironmentProblem; note: string } | undefined;
     /** A cycle one of this item's registrations closed, delivered once as a finding. */
     let cycleFinding: DependencyCycle | undefined;
     /** Providers of this item's requirements that reported they cannot conform. */
@@ -3477,6 +3518,7 @@ export class RunService {
         // the one that just answered this architect's unresolved request.
         deviations: this.deviationsOf(run),
         ...(deviationRecorded === undefined ? {} : { deviationRecorded: deviationRecorded.id }),
+        ...(environmentResumed === undefined ? {} : { environmentResumed }),
         ...(returned === undefined ? {} : { reconciliation: this.reconciliationBriefing(run, returned, undelivered) }),
         ...(integration === undefined ? {} : { integration }),
         ...(scenarios.length === 0 ? {} : { scenarios }),
@@ -3490,8 +3532,13 @@ export class RunService {
             commit: lastResult.commit,
             ...(lastIterationGate === undefined ? {} : { gate: lastIterationGate }),
             ...(lastScenarios.length === 0 ? {} : { scenarios: lastScenarios }),
+            ...(lastResult.failure !== undefined
+              ? { bounds: lastResult.failure.digest.bounds, failure: lastResult.failure }
+              : lastAssignment === undefined ? {} : { bounds: this.engineerBounds(run, lastAssignment) }),
           },
         }),
+        bounds: engineerBoundsOf(run.record.policy.limits),
+        runDirectory: run.directory,
       });
       // A finding is delivered once: the next turn of this same architect
       // has it in its own history, and repeating it would read as a second
@@ -3499,6 +3546,7 @@ export class RunService {
       cycleFinding = undefined;
       blocked = undefined;
       deviationRecorded = undefined;
+      environmentResumed = undefined;
       released = null;
       revisionReports = [];
       returned = undefined;
@@ -3538,6 +3586,7 @@ export class RunService {
           harnessOnly,
           scenarios: this.declarationContext(run, item),
           ...(integration === undefined ? {} : { integration: integration.scope }),
+          bounds: engineerBoundsOf(run.record.policy.limits),
         }),
         scope: {
           write: null,
@@ -3562,9 +3611,10 @@ export class RunService {
       if (result.value.kind === 'unresolved') {
         // The request cannot be met as stated. The global architect answers
         // it: a placement fix, a plan deviation this work item goes on
-        // under, or nothing possible, which ends the run. What the work item
-        // declared and never passed is pending again first, as for a
-        // placement question.
+        // under, an environment problem the run holds for until the
+        // operator resumes it, or nothing possible, which ends the run. What
+        // the work item declared and never passed is pending again first,
+        // as for a placement question.
         if (!await this.withdrawScenarios(run, item, 'unresolved-requested')) return null;
         const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
           invocation: result.id, conflict: result.value.conflict, evidence: result.value.evidence,
@@ -3574,6 +3624,9 @@ export class RunService {
         if (resolution.kind === 'deviation') {
           deviationRecorded = resolution.deviation;
           continuing = 'deviation-recorded';
+        } else if (resolution.kind === 'environment') {
+          environmentResumed = { problem: resolution.problem, note: resolution.note };
+          continuing = 'environment-resumed';
         } else {
           continuing = 'placement-answered';
         }
@@ -3648,7 +3701,13 @@ export class RunService {
           if (contract === null) return null;
           if (contract.result?.outcome === 'exhausted' && !await this.withdrawScenarios(run, item, 'repair-exhausted')) return null;
           const reported = outcome.result;
-          lastResult = { ...reported, findings: [...reported.findings, ...contract.findings] };
+          // A contract engineer that ended without a result is reported
+          // with its digest and analysis, in place of the need's.
+          lastResult = {
+            ...reported,
+            findings: [...reported.findings, ...contract.findings],
+            ...(contract.result?.failure === undefined ? {} : { failure: contract.result.failure }),
+          };
           if (contract.cycle !== undefined) cycleFinding = contract.cycle;
         }
         continuing = 'iteration-closed';
@@ -4080,9 +4139,10 @@ export class RunService {
    * architect context with it, as for a placement request. The fork answers
    * with a placement decision, delivered as a placement answer is; with a
    * plan deviation, recorded with the CheckFinding that asks the person to
-   * accept or reject it, under which the work item goes on; or with nothing
-   * possible, which ends the run, as does a fork that cannot decide within
-   * its retries. Null once the run has ended.
+   * accept or reject it, under which the work item goes on; with an
+   * environment problem, which holds the work item until the operator
+   * resumes the run; or with nothing possible, which ends the run, as does a
+   * fork that cannot decide within its retries. Null once the run has ended.
    */
   private async resolveUnresolved(
     run: Run,
@@ -4165,6 +4225,7 @@ export class RunService {
           plan: { path: planFile, text: plan },
           deviations: this.deviationsOf(run),
           deviationLimit: this.deviationLimit(run),
+          environmentProblems: this.environmentProblemsOf(run),
           view,
           ...(unavailable === null ? {} : { viewUnavailable: unavailable }),
           registry: current.registry,
@@ -4185,7 +4246,7 @@ export class RunService {
           : {}),
         keep: ended => (context.session === null && ended === 'submitted' ? kept : finished('not-kept')),
         toolName: forkToolName,
-        description: 'End this fork with its answer to the unresolved request: a placement decision, a plan deviation, nothing possible, or the findings and gaps of a fork that could not decide. The harness validates it; an invalid submission is returned with every error and its path.',
+        description: 'End this fork with its answer to the unresolved request: a placement decision, a plan deviation, an environment problem, nothing possible, or the findings and gaps of a fork that could not decide. The harness validates it; an invalid submission is returned with every error and its path.',
         inputSchema: forkJsonSchema,
         submissionSchema: 'ramify-agent.fork-submission/1',
         validate: input => validateFork(input, placementEvidenceOf(current, index), {
@@ -4231,6 +4292,9 @@ export class RunService {
       }
       if (value.kind === 'deviation') {
         return this.recordDeviation(run, item, id, result.id, value.deviation, { path: planFile, text: plan });
+      }
+      if (value.kind === 'environment') {
+        return this.reportEnvironment(run, item, request, result.id, value);
       }
 
       // A placement fix: the evidence must still be what the fork decided on.
@@ -4325,6 +4389,87 @@ export class RunService {
   }
 
   /**
+   * Records the environment problem a fork reported, with its CheckFinding,
+   * as one line, and holds the work item until the operator answers it:
+   * nothing is placed, no deviation is recorded and the plan file is
+   * untouched. Their resumption returns the work item to its local
+   * architect with the diagnosis; their answer `end` ends the run.
+   */
+  private async reportEnvironment(
+    run: Run,
+    item: WorkItem,
+    request: UnresolvedRequest,
+    invocation: string,
+    body: EnvironmentBody,
+  ): Promise<UnresolvedResolution | null> {
+    const id = environmentProblemId(run.log.count('environment-reported') + 1);
+    let problem: EnvironmentProblem | undefined;
+    const committed = await commitCheckFindingChange(run, ({ log, state }) => {
+      if (log.all('environment-reported').some(event => event.data.request === request.id)) return { stale: `${request.id} is already answered with an environment problem` };
+      const record = environmentProblemSchema.parse({
+        schema: 'ramify-agent.environment-problem/1',
+        id,
+        request: request.id,
+        workItem: item.id,
+        invocation,
+        diagnosis: body.diagnosis,
+        suggestion: body.suggestion,
+        checkFinding: nextCheckFinding(state),
+      } satisfies EnvironmentProblem);
+      problem = record;
+      return {
+        commands: environmentCommands(state, record, request, item.module),
+        compose: decided => ({
+          event: {
+            type: 'environment-reported',
+            data: { request: request.id, problem: id, workItem: item.id, invocation, checkFinding: record.checkFinding, checkFindings: [...decided.events] },
+          },
+          records: [{ path: deviationLayout.environment(id), id, revision: 1, body: record }],
+        }),
+      };
+    }, this.now());
+    if (committed.kind === 'refused' && committed.refusal.reason === 'run-ended') return null;
+    if (committed.kind !== 'committed' || problem === undefined) {
+      await this.fail(run, 'internal', `Environment problem ${id} of ${request.id} could not be recorded: ${committed.kind === 'refused' ? committed.refusal.message : 'it was already recorded'}`);
+      return null;
+    }
+    run.notify();
+    const note = await this.awaitEnvironmentAnswer(run, problem);
+    return note === null ? null : { kind: 'environment', problem, note };
+  }
+
+  /**
+   * Waits for the operator's answer to an environment problem: the run goes
+   * no further meanwhile, with no time limit, and the run's decision
+   * requests say it waits. Their resumption answers with their note, or the
+   * empty string for none; their answer `end` ends the run with the
+   * diagnosis and their note. A stop or the service closing ends the wait.
+   */
+  private async awaitEnvironmentAnswer(run: Run, problem: EnvironmentProblem): Promise<string | null> {
+    for (;;) {
+      if (this.ignoring(run)) return null;
+      // Registered before the state is read, so an answer in between still wakes it.
+      const changed = run.changed();
+      const entry = checkFindingStateOf(run.log.ledger).findings.get(problem.checkFinding);
+      if (entry === undefined) {
+        await this.fail(run, 'internal', `Environment problem ${problem.id} names ${problem.checkFinding}, which is no CheckFinding`);
+        return null;
+      }
+      if (entry.pendingUserDecision === null) {
+        const settled = entry.decisions.find(decision => decision.id === entry.settledBy);
+        if (entry.reason === 'waived') return settled === undefined || settled.actor.kind !== 'user' ? '' : settled.rationale;
+        const answer = [...entry.decisions].reverse().find(decision => decision.decision.action === 'answer-user-decision');
+        const option = answer?.decision.action === 'answer-user-decision' ? answer.decision.option : null;
+        await this.fail(run, 'unresolvable-requirement',
+          `The operator ended the run on environment problem ${problem.id} of ${problem.workItem}${option === environmentOptions.end ? '' : ` (answer ${option ?? 'none'})`}: ${answer?.rationale ?? 'no answer was recorded'}. The global architect's diagnosis: ${problem.diagnosis}`,
+          [deviationLayout.environment(problem.id), deviationLayout.request(problem.request)]);
+        return null;
+      }
+      await changed;
+    }
+  }
+
+  /**
    * Waits for the person's decision on a deviation the run recorded past its
    * limit: the run goes no further meanwhile, with no time limit, and the
    * run's decision requests say it waits. Their acceptance lets the work item
@@ -4358,6 +4503,21 @@ export class RunService {
     return run.log.all('plan-deviation-recorded').flatMap(event => {
       const parsed = planDeviationSchema.safeParse(this.committedBody(run, deviationLayout.deviation(event.data.deviation)));
       return parsed.success ? [parsed.data] : [];
+    });
+  }
+
+  /**
+   * Every environment problem the run recorded, in order, with the
+   * operator's note where they resumed the run for it, else null.
+   */
+  private environmentProblemsOf(run: Run): Array<{ problem: EnvironmentProblem; resumed: string | null }> {
+    const findings = checkFindingStateOf(run.log.ledger).findings;
+    return run.log.all('environment-reported').flatMap(event => {
+      const parsed = environmentProblemSchema.safeParse(this.committedBody(run, deviationLayout.environment(event.data.problem)));
+      if (!parsed.success) return [];
+      const entry = findings.get(parsed.data.checkFinding);
+      const settled = entry?.reason === 'waived' ? entry.decisions.find(decision => decision.id === entry.settledBy) : undefined;
+      return [{ problem: parsed.data, resumed: settled === undefined ? null : settled.rationale }];
     });
   }
 
@@ -4659,7 +4819,12 @@ export class RunService {
         consumer: item.module,
         provider: revised.provider,
         providerDirectory,
-        rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake and this consumer's integration. ${body.scope.rationale}`,
+        // The agreement in force names where its fake is held; the revision
+        // rewrites the fake where it is.
+        injectionSites: [...committed.requirements.values()]
+          .filter(requirement => contractOfObligation(requirement.obligation) === revised.id)
+          .flatMap(requirement => requirement.evidence.fakeInjections),
+        rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake, the files that hold it and this consumer's integration. ${body.scope.rationale}`,
       })
       : await resolveWriteScope({
         projectRoot: this.projectRoot,
@@ -4728,6 +4893,7 @@ export class RunService {
       authorizations,
       ...(revised === undefined ? {} : { revisesContract: refOf(revised.id, revised.revision, revised) }),
       ...(revised !== undefined || body.scenarios === undefined || body.scenarios.length === 0 ? {} : { scenarios: [...body.scenarios] }),
+      ...(body.bounds === undefined || Object.keys(body.bounds).length === 0 ? {} : { bounds: body.bounds }),
     } satisfies IterationAssignment);
 
     await this.write(run, revised === undefined
@@ -4774,6 +4940,7 @@ export class RunService {
     readonly guarded: GuardedScope;
     readonly tests: TestSelectionPolicy;
     readonly scenarios?: EngineerEquipmentInputs['scenarios'];
+    readonly commandTimeoutMs: number;
   }): EngineerEquipment {
     return engineerEquipment({
       commandExecution: this.options.commandExecution,
@@ -4849,7 +5016,11 @@ export class RunService {
       return null;
     }
     const number = this.assignedCount(run, item.id);
-    const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot);
+    // Every engineer invocation of the iteration, a budget return's too,
+    // runs under the bounds its assignment raised, and its prompt states the
+    // longest a command may run.
+    const bounds = this.engineerBounds(run, assignment);
+    const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs);
     const measurementScope = {
       exactOwners: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules,
       subtrees: 'module' in assignment.scope.base ? assignment.scope.base.includedChildren : [],
@@ -4928,6 +5099,7 @@ export class RunService {
         guarded,
         tests: probed,
         scenarios: this.scopeScenarioCheck(run, item, probed),
+        commandTimeoutMs: bounds.commandTimeoutMs,
       });
 
       const result = await this.runInvocation<EngineerSubmission>(run, agent, {
@@ -4978,6 +5150,11 @@ export class RunService {
           kind: assignment.kind,
           openFindings: await tools.findingsAtCompletion(input),
           scenarios: this.declarationContext(run, item),
+          seams: {
+            index: run.index,
+            consumer: item.module,
+            providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
+          },
         }),
         acceptedText: value => {
           const check = tools.completionCheck();
@@ -4991,6 +5168,7 @@ export class RunService {
         writer: true,
         guarded,
         equip: tools.equip,
+        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       invocations.push(result.id);
@@ -5002,7 +5180,7 @@ export class RunService {
       // Two snapshots see the tree and not the history between them, so a
       // command that changed a file and put it back is invisible to them.
       const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
+      const lines = await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
         ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
         : []);
       if (this.ignoring(run)) return null;
@@ -5022,25 +5200,31 @@ export class RunService {
         continue;
       }
 
-      // An engineer whose session failed, whether a bound, the provider or
-      // the adapter ended it, leaves its iteration without a result and not
+      // An engineer that ended without a result, whether a bound, the
+      // provider or the adapter ended it, it stopped on its own or its
+      // submissions were rejected to the bound, leaves its iteration and not
       // the run: the iteration closes partial, what the session wrote stays
       // uncommitted in the tree as a partial report's does, and the local
-      // architect decides what comes next. The work item's iteration bound
-      // counts it like any other. A writer not confirmed settled blocks every
-      // later writer and gate, so that failure still ends the run here.
-      if (result.ended === 'failed' && !run.writer.isUnsettled) {
-        findings.push(`${failedWithoutResult('engineer', assignment.id, result)}; nothing of it was committed, and what it wrote stays uncommitted in the tree`);
-        return close('partial');
-      }
+      // architect decides what comes next, from the digest and the analysis
+      // the harness prepares first. The work item's iteration bound counts
+      // it like any other. A writer not confirmed settled blocks every later
+      // writer and gate, so that failure still ends the run here.
       if (result.ended !== 'submitted' || result.value === undefined) {
-        await this.fail(
-          run,
-          result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
-          `The engineer of ${assignment.id} ended without a result (${result.ended})`,
-          [runLayout.outcome(result.id)],
-        );
-        return null;
+        if (run.writer.isUnsettled) {
+          await this.fail(
+            run,
+            result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
+            `The engineer of ${assignment.id} ended without a result (${result.ended})`,
+            [runLayout.outcome(result.id)],
+          );
+          return null;
+        }
+        findings.push(`${failedWithoutResult('engineer', assignment.id, result)}; nothing of it was committed, and what it wrote stays uncommitted in the tree`);
+        const failure = await this.failureOf(run, agent, packages, {
+          item, assignment, number, role: 'engineer', result, bounds, lines, after, shellLog: tools.shellLog(),
+        });
+        if (failure === null) return null;
+        return close('partial', { failure });
       }
 
       if (result.value.kind === 'partial') {
@@ -5074,6 +5258,7 @@ export class RunService {
           need: {
             need,
             ...(result.value.suggestedProvider === undefined ? {} : { suggestedProvider: result.value.suggestedProvider }),
+            ...(result.value.injectionSites === undefined ? {} : { injectionSites: result.value.injectionSites }),
             invocation: result.id,
           },
         };
@@ -5245,7 +5430,7 @@ export class RunService {
       ? undefined
       : (records.results.get(reported.data.iteration)?.findings ?? []).join('; ');
 
-    return this.runContractSession(run, agent, baseline, item, assignment, loaded, {
+    return this.runContractSession(run, agent, packages, baseline, item, assignment, loaded, {
       provider: contract.provider,
       capability: contract.capability.id,
       number: this.assignedCount(run, item.id),
@@ -5282,6 +5467,7 @@ export class RunService {
     request: {
       readonly need: NeedAsBehavior;
       readonly suggestedProvider?: string | undefined;
+      readonly injectionSites?: readonly string[] | undefined;
       readonly invocation: string;
       readonly requestedBy: string;
     },
@@ -5310,6 +5496,15 @@ export class RunService {
     if (providerDirectory === null) {
       return { findings: [`the refreshed architect view has no directory for "${entry.owner}", so no contract scope could be captured`] };
     }
+    // The submission judged each site against the view it had; the owner
+    // the registry resolves now is the one the scope opens.
+    const misplaced = (request.injectionSites ?? []).filter(site => {
+      const owner = index === null ? undefined : moduleOwning(index, site);
+      return owner === undefined || (owner.module !== item.module && owner.module !== entry.owner);
+    });
+    if (misplaced.length > 0) {
+      return { findings: [`the injection site${misplaced.length === 1 ? '' : 's'} ${misplaced.map(site => `"${site}"`).join(', ')} ${misplaced.length === 1 ? 'lies' : 'lie'} in neither ${item.module} nor ${entry.owner}, and ${injectionSiteRule}; no contract iteration was started`] };
+    }
 
     const outline = (records.outlines.get(item.id) ?? []).at(-1);
     if (outline === undefined) {
@@ -5329,7 +5524,8 @@ export class RunService {
       consumer: item.module,
       provider: entry.owner,
       providerDirectory,
-      rationale: `The agreement between ${item.module} and ${entry.owner}: the contract, its conformance suite, its fake, the consumer's integration and the exposure declarations on the path between them. The provider's implementation is not this iteration's.`,
+      injectionSites: request.injectionSites ?? [],
+      rationale: `The agreement between ${item.module} and ${entry.owner}: the contract, its conformance suite, its fake, the consumer's integration, the files the fake is injected in and the exposure declarations on the path between them. The rest of the provider's implementation is not this iteration's.`,
     });
 
     const subArtifacts = this.requiredArtifacts(committedRecords(run.log.ledger.replay()));
@@ -5342,7 +5538,7 @@ export class RunService {
       stage: 0,
       kind: 'contract',
       goal: `Establish the agreement that gives ${item.module} the behavior of "${entry.capability}", which ${entry.owner} owns, and integrate it in ${item.module} against a fake.`,
-      approach: `${item.module} stated the need as behavior. Design the interface, write the conformance suite and the fake, integrate the fake in ${item.module}, and leave ${entry.owner} to implement the provider.`,
+      approach: `${item.module} stated the need as behavior. Design the interface, write the conformance suite and the fake, integrate the fake at the seam where ${entry.owner}'s real export will act, exposed exactly as that export will be, and leave ${entry.owner} to implement the provider.`,
       scope,
       requirementRefs: [],
       externalCapabilities: [{ capability: entry.capability, owner: entry.owner, role: 'request' }],
@@ -5375,7 +5571,7 @@ export class RunService {
     await this.afterWrite('contract-requested', run.record.jobId);
     if (this.ignoring(run)) return null;
 
-    return this.runContractSession(run, agent, baseline, item, assignment, loaded, {
+    return this.runContractSession(run, agent, packages, baseline, item, assignment, loaded, {
       need: request.need,
       provider: entry.owner,
       capability: entry.capability,
@@ -5401,6 +5597,8 @@ export class RunService {
       readonly consumer: string;
       readonly provider: string;
       readonly providerDirectory: string;
+      /** The files the agreement names as holding the fake, on either side. */
+      readonly injectionSites: readonly string[];
       readonly rationale: string;
     },
   ) {
@@ -5414,6 +5612,7 @@ export class RunService {
         { path: `${subject.providerDirectory}/src/interfaces`, purpose: 'contract', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/tests`, purpose: 'conformance', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/fakes`, purpose: 'fake', kind: 'directory' },
+        ...[...new Set(subject.injectionSites)].map(path => ({ path, purpose: 'fake-injection' as const })),
         ...declarationsBetween(index, subject.consumer, subject.provider).map(path => ({ path, purpose: 'exposure-declaration' as const })),
       ],
       read: [subject.provider, subject.consumer],
@@ -5426,6 +5625,7 @@ export class RunService {
   private async runContractSession(
     run: Run,
     agent: AgentPort,
+    packages: ReadonlyMap<string, LoadedPackage>,
     baseline: MeasurementSnapshot,
     item: WorkItem,
     assignment: IterationAssignment,
@@ -5440,7 +5640,11 @@ export class RunService {
       readonly requestedBy?: RequestRelation | undefined;
     },
   ): Promise<ContractOutcome | null> {
-    const systemPrompt = renderContractPrompt(loaded, this.projectRoot);
+    // A revision its architect assigned may raise the bounds, as any
+    // assignment may; a sub-session an engineer's need opened runs under
+    // the policy's.
+    const bounds = this.engineerBounds(run, assignment);
+    const systemPrompt = renderContractPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs);
     const measurementScope = {
       exactOwners: [item.module, subject.provider],
       subtrees: [],
@@ -5466,6 +5670,7 @@ export class RunService {
         scopeRevision: assignment.scope.revision,
         guarded,
         tests: assignment.gate.tests,
+        commandTimeoutMs: bounds.commandTimeoutMs,
       });
       const index = await this.refreshIndex(run);
 
@@ -5499,9 +5704,10 @@ export class RunService {
         toolName: contractToolName,
         description: 'End your turn with the result of this contract iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
         inputSchema: contractJsonSchema,
-        submissionSchema: 'ramify-agent.contract-submission/1',
+        submissionSchema: 'ramify-agent.contract-submission/2',
         validate: input => validateContract(input, {
           index,
+          consumer: item.module,
               exists: (path: string) => stat(join(this.projectRoot, path)).then(found => found.isFile(), () => false),
         }),
         scope: {
@@ -5512,6 +5718,7 @@ export class RunService {
         writer: true,
         guarded,
         equip: tools.equip,
+        bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       invocations.push(result.id);
@@ -5519,7 +5726,7 @@ export class RunService {
       session = sessionRef === undefined ? undefined : result.session;
 
       const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-      await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
+      const lines = await this.recordLineEvents(run, result.id, before, after, tools.shellCalls() > 0
         ? ['unguarded-shell: this invocation ran unguarded commands, so a change one of them made and reverted is not in these counts']
         : []);
       if (this.ignoring(run)) return null;
@@ -5535,26 +5742,31 @@ export class RunService {
         return this.ignoring(run) ? null : { findings, result: closed };
       }
 
-      // A failed contract session is closed as a threshold return is: it
-      // established no agreement, and its local architect decides what
-      // comes next. An unsettled writer still ends the run, as for the
+      // A contract session that ended without a result is closed as a
+      // threshold return is: it established no agreement, and its local
+      // architect decides what comes next, from the digest and the analysis
+      // prepared first. An unsettled writer still ends the run, as for the
       // engineer.
-      if (result.ended === 'failed' && !run.writer.isUnsettled) {
-        findings.push(`${failedWithoutResult('contract engineer', assignment.id, result)}; nothing was registered`);
-        const closed = await this.closeIteration(run, item, subject.number, assignment, {
-          outcome: 'partial', invocations, findings, gate: null, commit: null,
-        });
-        return this.ignoring(run) ? null : { findings, result: closed };
-      }
-
       if (result.ended !== 'submitted' || result.value === undefined) {
-        await this.fail(
-          run,
-          result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
-          `The contract engineer of ${assignment.id} ended without a result (${result.ended})`,
-          [runLayout.outcome(result.id)],
-        );
-        return null;
+        if (run.writer.isUnsettled) {
+          await this.fail(
+            run,
+            result.ended === 'invalid-submission' ? 'invalid-submission' : result.ended === 'failed' ? 'agent-failed' : 'internal',
+            `The contract engineer of ${assignment.id} ended without a result (${result.ended})`,
+            [runLayout.outcome(result.id)],
+          );
+          return null;
+        }
+        findings.push(`${failedWithoutResult('contract engineer', assignment.id, result)}; nothing was registered`);
+        const failure = await this.failureOf(run, agent, packages, {
+          item, assignment, number: subject.number, role: 'contract-engineer', result, bounds, lines, after, shellLog: tools.shellLog(),
+        });
+        if (failure === null) return null;
+        const closed = await this.closeIteration(run, item, subject.number, assignment, {
+          outcome: 'partial', invocations, findings, gate: null, commit: null, failure,
+        });
+        await this.finishSession(run, session, 'work-closed');
+        return this.ignoring(run) ? null : { findings, result: closed };
       }
 
       if (result.value.kind === 'incomplete') {
@@ -5637,7 +5849,19 @@ export class RunService {
     const tests = await resolveTestSelection({ projectRoot: this.projectRoot, index, policy });
     await this.recordRunnerGaps(run, invocation);
 
-    const rules = [await this.fakeNamingRule(submission)];
+    const writeScope = writeScopePaths(this.projectRoot, assignment);
+    // The agreement's own fakes are this gate's to answer; another
+    // agreement's fake is judged too, attributed by the write scope. A
+    // revision replaces the fakes of the revision in force.
+    const declared: StandIn[] = submission.artifacts.fake.flatMap(entry => entry.standsFor.map(standsFor => ({
+      contract: 'the agreement under this gate', fakePath: entry.path, standsFor, declaredHere: true,
+    })));
+    const parity = await this.fakeExposureParityRule(index, [
+      ...declared,
+      ...this.registeredStandIns(run, assignment.revisesContract?.id)
+        .filter(standIn => !declared.some(own => own.fakePath === standIn.fakePath && own.standsFor.fake === standIn.standsFor.fake)),
+    ], writeScope);
+    const rules = [await this.fakeNamingRule(submission), ...(parity === null ? [] : [parity])];
     const modules = await this.pendingModules(run, assignment.id);
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
@@ -5653,7 +5877,7 @@ export class RunService {
       subject: { workItem: item.id, iteration: assignment.id },
       tests,
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope: writeScopePaths(this.projectRoot, assignment),
+      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       rules,
     }, submission.summary, modules, assignment.goal);
@@ -5686,6 +5910,35 @@ export class RunService {
     }
     const violations = fakeNamingViolations(files, submission.artifacts.fake.map(entry => entry.path));
     return { rule: 'fake-naming', outcome: violations.length === 0 ? 'passed' : 'failed', violations };
+  }
+
+  /**
+   * The fake-exposure-parity rule over the given fakes, on the architect
+   * view refreshed for this gate: each fake is exactly as importable as the
+   * real export it stands for. No rule where no fake is registered.
+   */
+  private async fakeExposureParityRule(
+    index: ArchitectIndex | null,
+    standIns: readonly StandIn[],
+    writeScope: readonly string[],
+  ): Promise<GateRuleRecord | null> {
+    if (standIns.length === 0) return null;
+    return fakeExposureParity({
+      index,
+      standIns,
+      writeScope,
+      read: path => readFile(join(this.projectRoot, path), 'utf8').catch(() => null),
+    });
+  }
+
+  /** Every fake the registered agreements name, at the revision in force, except those of `except`. */
+  private registeredStandIns(run: Run, except?: string): StandIn[] {
+    const records = committedRecords(run.log.ledger.replay());
+    return [...records.contracts.values()]
+      .filter(contract => contract.mode === 'fake-backed' && contract.id !== except)
+      .flatMap(contract => contract.artifacts.fake.flatMap(entry => entry.standsFor.map(standsFor => ({
+        contract: contract.id, fakePath: entry.path, standsFor, declaredHere: false,
+      }))));
   }
 
   /**
@@ -6110,10 +6363,16 @@ export class RunService {
     // beside it as the probe that tells a failure inside this iteration's
     // scope from one outside it.
     const allProject = assignment.gate.tests.policy === 'all-project';
-    const tests = allProject ? undefined : await this.resolveTests(run, assignment);
-    const probe = allProject ? await this.resolveProbe(run, assignment) : undefined;
+    const index = await this.refreshIndex(run);
+    const tests = allProject ? undefined : await this.resolveTests(run, assignment, index);
+    const probe = allProject ? await this.resolveProbe(run, assignment, index) : undefined;
     await this.recordRunnerGaps(run, invocation);
 
+    // While an agreement's fake is registered, a write of this iteration
+    // that makes it more or less importable than its real export fails the
+    // gate; what no file of its scope decides is not this iteration's.
+    const writeScope = writeScopePaths(this.projectRoot, assignment);
+    const parity = await this.fakeExposureParityRule(index, this.registeredStandIns(run), writeScope);
     const modules = await this.pendingModules(run, assignment.id);
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
@@ -6130,8 +6389,9 @@ export class RunService {
       ...(tests === undefined ? {} : { tests }),
       ...(probe === undefined || probe.selection.resolved.length === 0 ? {} : { scopeProbe: probe }),
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope: writeScopePaths(this.projectRoot, assignment),
+      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
+      ...(parity === null ? {} : { rules: [parity] }),
     }, summary, modules, assignment.goal);
 
     if (attempt.verdict !== 'passed') {
@@ -6143,15 +6403,18 @@ export class RunService {
     return attempt;
   }
 
-  /** Resolves the assignment's captured policy against the tree as it stands now. */
-  private async resolveTests(run: Run, assignment: IterationAssignment) {
-    const index = await this.refreshIndex(run);
+  /**
+   * Resolves the assignment's captured policy against the tree as it stands
+   * now, on `refreshed` where the caller has just refreshed the view.
+   */
+  private async resolveTests(run: Run, assignment: IterationAssignment, refreshed?: ArchitectIndex | null) {
+    const index = refreshed === undefined ? await this.refreshIndex(run) : refreshed;
     return resolveTestSelection({ projectRoot: this.projectRoot, index, policy: assignment.gate.tests });
   }
 
   /** The assignment's own modules, resolved anew, as an all-project checkpoint's probe. */
-  private async resolveProbe(run: Run, assignment: IterationAssignment) {
-    const index = await this.refreshIndex(run);
+  private async resolveProbe(run: Run, assignment: IterationAssignment, refreshed?: ArchitectIndex | null) {
+    const index = refreshed === undefined ? await this.refreshIndex(run) : refreshed;
     return resolveTestSelection({
       projectRoot: this.projectRoot,
       index,
@@ -6285,6 +6548,8 @@ export class RunService {
       readonly gate: string | null;
       readonly commit: string | null;
       readonly recommendation?: string | undefined;
+      /** Where an engineer ended without a result: its digest and its analysis. */
+      readonly failure?: IterationResult['failure'] | undefined;
     },
   ): Promise<IterationResult> {
     // The notices are read from the commit itself, never from an agent's
@@ -6301,6 +6566,7 @@ export class RunService {
       changedAssumptions: [],
       ...(body.recommendation === undefined ? {} : { recommendation: body.recommendation }),
       artifacts: [],
+      ...(body.failure === undefined ? {} : { failure: body.failure }),
     } satisfies IterationResult);
 
     const data = { workItem: item.id, iteration: assignment.id, outcome: result.outcome, gate: result.gate, commit: result.commit, notices };
@@ -6377,11 +6643,204 @@ export class RunService {
     before: LineSnapshot,
     after: LineSnapshot,
     gaps: readonly string[] = [],
-  ): Promise<void> {
+  ): Promise<LineEventSummary | null> {
     // An invocation the run's bounds refused was never started, and has no line events.
-    if (invocation === '') return;
+    if (invocation === '') return null;
     const summary = lineEvents({ invocation, before, after, index: run.index, gaps });
     await writeFileAtomic(run.path(runLayout.lineEvents(invocation)), `${JSON.stringify(summary, null, 2)}\n`);
+    return summary;
+  }
+
+  /** The bounds one iteration's engineers run under: the policy's, and what its assignment raised. */
+  private engineerBounds(run: Run, assignment: IterationAssignment): EngineerBounds {
+    const { defaults } = engineerBoundsOf(run.record.policy.limits);
+    return {
+      commandTimeoutMs: assignment.bounds?.commandTimeoutMs?.ms ?? defaults.commandTimeoutMs,
+      idleMs: assignment.bounds?.idleMs?.ms ?? defaults.idleMs,
+      absoluteMs: assignment.bounds?.absoluteMs?.ms ?? defaults.absoluteMs,
+    };
+  }
+
+  /**
+   * What an engineer that ended without a result leaves its local architect,
+   * ready before the architect is briefed: the harness's digest, then the
+   * failure analysis. Neither ends the run: what cannot be read is a gap in
+   * the digest, and an analysis that fails is unavailable. Null only for a
+   * run that is ending.
+   */
+  private async failureOf(
+    run: Run,
+    agent: AgentPort,
+    packages: ReadonlyMap<string, LoadedPackage>,
+    subject: {
+      readonly item: WorkItem;
+      readonly assignment: IterationAssignment;
+      readonly number: number;
+      readonly role: Role;
+      readonly result: InvocationResult<unknown>;
+      readonly bounds: EngineerBounds;
+      readonly lines: LineEventSummary | null;
+      readonly after: LineSnapshot;
+      readonly shellLog: readonly ShellCallRecord[];
+    },
+  ): Promise<NonNullable<IterationResult['failure']> | null> {
+    const digest = await this.failureDigestOf(run, subject);
+    const analysis = await this.analyzeFailure(run, agent, packages, subject, digest);
+    if (this.ignoring(run)) return null;
+    return { digest, analysis };
+  }
+
+  /** The digest of one failed invocation, from what the harness already holds. */
+  private async failureDigestOf(
+    run: Run,
+    subject: {
+      readonly role: Role;
+      readonly result: InvocationResult<unknown>;
+      readonly bounds: EngineerBounds;
+      readonly lines: LineEventSummary | null;
+      readonly after: LineSnapshot;
+      readonly shellLog: readonly ShellCallRecord[];
+    },
+  ): Promise<FailureDigest> {
+    const { result } = subject;
+    const rejections = await ObservationLog.open(run.path(runLayout.observations(result.id)))
+      .then(log => log.observations.flatMap(observation => (observation.type === 'rejection' ? [observation.data] : [])))
+      .catch(() => []);
+    const shellCalls: DigestShellCall[] = subject.shellLog.map(call => ({
+      callId: call.callId,
+      command: call.command,
+      timeoutMs: call.timeoutMs,
+      output: relative(run.directory, call.outputFile).split('\\').join('/'),
+    }));
+    // The complete output of each shell call in flight, which its tail is read from.
+    const outputs = new Map<string, string>();
+    for (const call of result.inFlight ?? []) {
+      const shell = subject.shellLog.find(entry => entry.callId === call.callId);
+      if (shell === undefined) continue;
+      const text = await readFile(shell.outputFile, 'utf8').catch(() => undefined);
+      if (text !== undefined) outputs.set(call.callId, text);
+    }
+    return failureDigest({
+      invocation: result.id,
+      role: subject.role,
+      ended: result.ended,
+      interruption: result.interruption,
+      error: result.error,
+      elapsedMs: result.elapsedMs ?? 0,
+      bounds: subject.bounds,
+      rejections,
+      inFlight: result.inFlight ?? [],
+      shellCalls,
+      outputs,
+      lines: subject.lines,
+      uncommitted: subject.after.available ? subject.after.changes.length : null,
+      lastMessage: result.lastText ?? null,
+      transcript: runLayout.transcript(result.session),
+    });
+  }
+
+  /**
+   * The failure analysis: a model's account of one failed invocation, in a
+   * reader session of its own, before the local architect is briefed. It
+   * reads the evidence the harness writes into its working directory and
+   * submits once. Whatever happens to it, it never fails the run: a missing
+   * package, a refused start, a failed or invalid session and any error of
+   * its own are an unavailable analysis with the reason.
+   */
+  private async analyzeFailure(
+    run: Run,
+    agent: AgentPort,
+    packages: ReadonlyMap<string, LoadedPackage>,
+    subject: { readonly item: WorkItem; readonly assignment: IterationAssignment; readonly number: number; readonly result: InvocationResult<unknown> },
+    digest: FailureDigest,
+  ): Promise<FailureAnalysis> {
+    const unavailable = (reason: string, invocation: string | null = null): FailureAnalysis => ({ outcome: 'unavailable', invocation, reason });
+    const loaded = packages.get('failure-analyst');
+    if (loaded === undefined) return unavailable('no prompt package is loaded for the failure analyst');
+    if (run.record.policy.context['failure-analyst'] === undefined) return unavailable(`the run's policy (${run.record.policy.version}) has no context policy for the failure analyst`);
+    if (this.ignoring(run)) return unavailable('the run is ending');
+    try {
+      const workspace = run.path(join(dirname(iterationLayout.result(subject.item.id, subject.number)), 'failure-evidence'));
+      const evidence = await this.failureEvidence(run, workspace, subject.result, digest);
+      const attempt = run.log.all('invocation-started')
+        .filter(event => event.data.role === 'failure-analyst' && event.data.work.iteration === subject.assignment.id).length + 1;
+      const result = await this.runInvocation<FailureAnalysisSubmission>(run, agent, {
+        role: 'failure-analyst',
+        work: { workItem: subject.item.id, iteration: subject.assignment.id },
+        attempt,
+        loaded,
+        systemPrompt: renderFailureAnalystPrompt(loaded, workspace),
+        prompt: failureAnalysisMessage({
+          iteration: subject.assignment.id,
+          goal: subject.assignment.goal,
+          projectRoot: this.projectRoot,
+          runDirectory: run.directory,
+          digest,
+          evidence,
+        }),
+        start: { mode: 'fresh' },
+        toolName: failureAnalysisToolName,
+        description: failureAnalysisSubmissionDescription,
+        inputSchema: failureAnalysisJsonSchema,
+        submissionSchema: 'ramify-agent.failure-analysis-submission/1',
+        validate: input => validateFailureAnalysis(input),
+        keep: () => finished('work-closed'),
+        scope: { write: null, measurement: null, size: null },
+        reader: true,
+        workingDirectory: workspace,
+        absoluteMs: failureAnalysisMs,
+        equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
+      });
+      if (result.id === '') return unavailable('the run\'s bounds refused its invocation');
+      if (result.ended === 'submitted' && result.value !== undefined) {
+        return { outcome: 'analyzed', invocation: result.id, ...result.value, evidence: [...result.value.evidence] };
+      }
+      const why = [result.interruption, result.error].filter(part => part !== undefined && part !== '').join(': ');
+      return unavailable(`the analysis ended \`${result.ended}\`${why === '' ? '' : ` (${why})`}`, result.id);
+    } catch (error) {
+      this.warn(`Run ${run.record.jobId}: the failure analysis of ${subject.assignment.id} could not be run: ${message(error)}`);
+      return unavailable(`it could not be run: ${message(error)}`);
+    }
+  }
+
+  /**
+   * The analyst's working directory: the digest, the failed invocation's
+   * transcript as text, the complete outputs of its shell calls and the
+   * patch of the uncommitted work. What cannot be written is named instead.
+   */
+  private async failureEvidence(run: Run, workspace: string, result: InvocationResult<unknown>, digest: FailureDigest): Promise<AnalysisEvidence> {
+    const files: Array<{ path: string; holds: string }> = [];
+    const missing: string[] = [];
+    await mkdir(join(workspace, 'outputs'), { recursive: true });
+    await writeFileAtomic(join(workspace, 'digest.md'), `${digestLines(digest, run.directory).join('\n')}\n`);
+    files.push({ path: 'digest.md', holds: 'the digest above' });
+    try {
+      await this.transcriptOf(run, result.session).drain();
+      const read = await readTranscript(run.path(runLayout.transcript(result.session)));
+      const text = await renderTranscript(read.entries, result.id, body => readBody(run.directory, run.store, body));
+      await writeFileAtomic(join(workspace, 'transcript.md'), text === '' ? '(the transcript holds no entry of this invocation)\n' : `${text}\n`);
+      files.push({ path: 'transcript.md', holds: `the invocation's transcript, numbered as \`${digest.transcript}\` numbers it; a long one keeps its start and its end` });
+    } catch (error) {
+      missing.push(`the transcript, which could not be read: ${message(error)}`);
+    }
+    for (const output of digest.outputs) {
+      const name = `outputs/${output.split('/').slice(-3).join('-')}`;
+      try {
+        const text = await readFile(run.path(output), 'utf8');
+        await writeFileAtomic(join(workspace, name), text.length <= failureOutputCharacters ? text : `… ${text.length - failureOutputCharacters} characters of its start are left out …\n${text.slice(-failureOutputCharacters)}`);
+        files.push({ path: name, holds: `the complete output of \`${output}\`` });
+      } catch (error) {
+        missing.push(`the output \`${output}\`, which could not be read: ${message(error)}`);
+      }
+    }
+    try {
+      const patch = await this.git.worktreePatch(this.projectRoot, this.accepted(run));
+      await writeFileAtomic(join(workspace, 'diff.patch'), patch);
+      files.push({ path: 'diff.patch', holds: `the patch of the tracked files against the last accepted commit \`${this.accepted(run)}\`${patch === '' ? '; it is empty' : ''}` });
+    } catch (error) {
+      missing.push(`the patch of the uncommitted work, which Git could not give: ${message(error)}`);
+    }
+    return { directory: workspace, files, missing };
   }
 
   /** The API views of the modules one iteration writes, for the engineer's briefing. */
@@ -6738,8 +7197,11 @@ export class RunService {
     recordedMessage?: string,
   ): Promise<GateAttempt> {
     const identity = prepared.request;
-    // A reader contributed nothing to the source this commit holds.
-    const invocations = run.log.all('invocation-started').filter(event => event.data.role !== 'reviewer').map(event => event.data.invocation);
+    // A reader, a reviewer or a failure analyst, contributed nothing to the
+    // source this commit holds.
+    const invocations = run.log.all('invocation-started')
+      .filter(event => event.data.role !== 'reviewer' && event.data.role !== 'failure-analyst')
+      .map(event => event.data.invocation);
     const message = recordedMessage ?? commitMessage({
       runId: run.record.jobId, planId: run.record.planId,
       gate: {
@@ -7429,10 +7891,15 @@ function finalScenarioGaps(attempt: GateAttempt, required: readonly string[]): s
   return missing.length === 0 ? null : `${missing.join(', ')} did not pass in it`;
 }
 
-/** What one unresolved request resolved to: a placement fix, or a plan deviation the work item goes on under. */
+/**
+ * What one unresolved request resolved to: a placement fix, a plan deviation
+ * the work item goes on under, or an environment problem the operator
+ * answered by resuming the run, with their note.
+ */
 type UnresolvedResolution =
   | { readonly kind: 'decided'; readonly decision: PlacementDecision }
-  | { readonly kind: 'deviation'; readonly deviation: PlanDeviation };
+  | { readonly kind: 'deviation'; readonly deviation: PlanDeviation }
+  | { readonly kind: 'environment'; readonly problem: EnvironmentProblem; readonly note: string };
 
 /** What one placement request resolved to, for the local architect that made it. */
 type PlacementResolution =
@@ -7589,7 +8056,11 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     },
     guardedChanges: [...prepared.guardedChanges],
-    rules: prepared.rules.map(rule => ({ ...rule, violations: rule.violations.map(violation => ({ ...violation })) })),
+    rules: prepared.rules.map(({ limits, ...rule }) => ({
+      ...rule,
+      violations: rule.violations.map(violation => ({ ...violation })),
+      ...(limits === undefined ? {} : { limits: [...limits] }),
+    })),
     unauthorized: prepared.unauthorized,
     ruleFailed: prepared.ruleFailed,
     timeoutMs: prepared.timeoutMs,
@@ -7716,6 +8187,12 @@ function requestedSession<T>(request: InvocationRequest<T>): Invocation['session
   }
   return { requested: 'fresh', actual: 'fresh', ref: '' };
 }
+
+/** How long a failure analysis may run: it reads a bounded set of files and submits once. */
+const failureAnalysisMs = 600_000;
+
+/** How much of one command output the analyst is given, from its end. */
+const failureOutputCharacters = 400_000;
 
 /**
  * Why one implementation session ended without a result, as its local

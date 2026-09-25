@@ -20,6 +20,7 @@ import { localArchitectSubmissionSchema } from '../work/submission.js';
 import { engineerSubmissionSchema, scopeTestsInputSchema } from '../work/engineer.js';
 import { forkSubmissionSchema } from '../architecture/submission.js';
 import { contractSubmissionSchema } from '../contracts/submission.js';
+import { failureAnalysisSubmissionSchema } from '../work/failure.js';
 import { shellInputSchema } from '../tools/shell.js';
 import {
   analysisResponseSchema, capabilityListResponseSchema, decisionListResponseSchema, gateResponseSchema, metricsResponseSchema,
@@ -210,6 +211,7 @@ function unionRoots(): Record<string, unknown> {
     'submission engineer': engineerSubmissionSchema,
     'submission fork': forkSubmissionSchema,
     'submission contract': contractSubmissionSchema,
+    'submission failure-analysis': failureAnalysisSubmissionSchema,
     'tool shell': shellInputSchema,
     'tool run_scope_tests': scopeTestsInputSchema,
     'command': runCommandSchema,
@@ -233,7 +235,8 @@ const submissionSchemas: Readonly<Record<string, unknown>> = {
   'ramify-agent.local-architect-submission/1': localArchitectSubmissionSchema,
   'ramify-agent.engineer-submission/1': engineerSubmissionSchema,
   'ramify-agent.fork-submission/1': forkSubmissionSchema,
-  'ramify-agent.contract-submission/1': contractSubmissionSchema,
+  'ramify-agent.contract-submission/2': contractSubmissionSchema,
+  'ramify-agent.failure-analysis-submission/1': failureAnalysisSubmissionSchema,
 };
 
 /** What the composed runs wrote, walked value by value against the schemas that describe it. */
@@ -311,6 +314,16 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.observation.kind', values: ['plan-deviation'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
   { union: 'submission fork.kind', values: ['deviation'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the deviation is recorded, the work item goes on under it, and the run completes with it to review' },
   { union: 'run log.type', values: ['scenarios-rewording', 'scenarios-reworded'], file: 'subs/harness/src/tests/plan-deviations.test.ts', test: 'the harness renders the feature file from it, commits it, and the finding shows the old and the new text' },
+  // A fake's parity: the real export each fake stands for, exposed to the parent in a run, re-exposed to descendants at registration.
+  { union: 'record ramify-agent.contract/2.artifacts.fake[].standsFor[].exposure.to[]', values: ['parent'], file: 'subs/harness/src/tests/fake-exposure-parity.test.ts', test: 'a contract that re-exposes its fake where the real export will not be fails the gate in scope, and a repair that removes it passes' },
+  { union: 'record ramify-agent.contract/2.artifacts.fake[].standsFor[].exposure.to[]', values: ['descendants'], file: 'subs/harness/src/tests/fake-exposure-parity.test.ts', test: 'the registered contract records what each fake stands for, as submitted' },
+  // An unresolved request the global architect answers with an environment problem, which holds the run for the operator.
+  { union: 'run log.type', values: ['environment-reported'], file: 'subs/harness/src/tests/environment-problems.test.ts', test: 'the run holds with the diagnosis in its status; a resume returns the work item to its local architect, and the run completes' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['environment-resumed'], file: 'subs/harness/src/tests/environment-problems.test.ts', test: 'the run holds with the diagnosis in its status; a resume returns the work item to its local architect, and the run completes' },
+  { union: 'run log[iteration-closed].data.checkFindings[][check-finding-opened].data.report.observation.kind', values: ['environment-problem'], file: 'subs/harness/src/tests/environment-problems.test.ts', test: 'the run holds with the diagnosis in its status; a resume returns the work item to its local architect, and the run completes' },
+  { union: 'submission fork.kind', values: ['environment'], file: 'subs/harness/src/tests/environment-problems.test.ts', test: 'the run holds with the diagnosis in its status; a resume returns the work item to its local architect, and the run completes' },
+  { union: 'query runs.runs[].environmentProblems[].answer', values: ['waiting', 'resumed'], file: 'subs/harness/src/tests/environment-problems.test.ts', test: 'the run holds with the diagnosis in its status; a resume returns the work item to its local architect, and the run completes' },
+  { union: 'query runs.runs[].environmentProblems[].answer', values: ['ended'], file: 'subs/harness/src/tests/environment-problems.test.ts', test: 'the operator\'s answer end ends the run with the diagnosis and their note' },
   // Plan 12 iteration 7: a person's CheckFinding commands.
   { union: 'command.type', values: ['respond-to-check-finding', 'waive-check-finding', 'revoke-check-finding-waiver'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
   { union: 'run log[check-findings-recorded].data.cause.kind', values: ['user-command'], file: 'subs/harness/src/tests/check-findings-commands.test.ts', test: 'an answer, a waiver and a revocation commit one decision each; a retry returns its receipt; conflicts, stale revisions and stale versions are refused' },
@@ -530,6 +543,12 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'every error in the engineer\'s own write scope is in scope, and the engineer repairs it' },
   { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings-and-type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'beside a failed Ramify check, both attribute the cause, and the local architect answers the module violation' },
   { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
+  // An engineer that ends without a result returns to its architect, digested and analyzed first.
+  { union: 'run log[session-opened].data.role', values: ['failure-analyst'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis.outcome', values: ['analyzed'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis[analyzed].cause', values: ['bound-too-tight'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis.outcome', values: ['unavailable'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'leaves the digest alone, says the analysis was unavailable, and never fails the run' },
+  { union: 'record ramify-agent.iteration-result/1.failure.analysis[analyzed].cause', values: ['environment-problem', 'work-problem', 'agent-behavior', 'unknown'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'reaches the iteration\'s result and the next briefing' },
 ];
 
 /**

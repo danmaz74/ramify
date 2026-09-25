@@ -1,0 +1,29 @@
+{
+  "schema": "ramify-agent.invocation-outcome/1",
+  "invocation": "inv-0049",
+  "ended": "failed",
+  "rejectedSubmissions": 0,
+  "interruption": "idle-timeout",
+  "disposition": "incomplete",
+  "session": {
+    "ref": "/tmp/ramify-run-sed2/plans/self-explaining-denials/.harness/jobs/20260925T013619Z-5fa043/invocations/inv-0049/session/2026-09-25T04-37-15-847Z_01a0d6da-73c7-72bf-86bc-f3f25faa7b0a.jsonl#287d1ea4",
+    "mode": "fresh"
+  },
+  "submission": null,
+  "settled": {
+    "confirmed": true,
+    "at": "2026-09-25T05:15:29.572Z",
+    "groupsKilled": 0,
+    "lateWrites": []
+  },
+  "outsideScope": [],
+  "usage": {
+    "input": 78708,
+    "output": 9585,
+    "cacheRead": 2217600,
+    "cacheWrite": 0,
+    "total": 2305893
+  },
+  "elapsedMs": 2292851,
+  "error": "No port event for 300000 ms"
+}

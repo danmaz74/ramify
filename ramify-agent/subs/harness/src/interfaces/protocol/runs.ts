@@ -29,7 +29,9 @@ export type RunId = z.infer<typeof runIdSchema>;
  * The roles a run invokes. The long-lived global parent is no role: briefs
  * append to it without inference, and its maintenance is recorded against
  * the fork that performed it. A reviewer reads one frozen candidate beside
- * the run's one writer and writes nothing.
+ * the run's one writer and writes nothing. A failure analyst reads what an
+ * engineer that ended without a result left, before its local architect is
+ * told, and writes nothing either.
  */
 export const roleSchema = z.enum([
   'initial-architect',
@@ -38,6 +40,7 @@ export const roleSchema = z.enum([
   'engineer',
   'contract-engineer',
   'reviewer',
+  'failure-analyst',
 ]);
 export type Role = z.infer<typeof roleSchema>;
 
@@ -229,7 +232,9 @@ export type RunNoticeKind = RunNotice['kind'];
  * open. A work item with one is held before its gate until a person
  * answers, with no time limit, and the run advances no further meanwhile.
  * A plan deviation's request holds nothing, except one recorded past the
- * run's limit, which holds the work item whose request it answered.
+ * run's limit, which holds the work item whose request it answered. An
+ * environment problem's request holds the work item whose request it
+ * answered.
  * `waiting` says the run is held now: it is running, no stop was requested,
  * and a work item has an open request. A run with no CheckFinding, such as
  * one begun before CheckFindings existed, has none.
@@ -258,6 +263,25 @@ export const runPlanDeviationsSchema = z.object({
   toReview: count,
 }).strict();
 export type RunPlanDeviations = z.infer<typeof runPlanDeviationsSchema>;
+
+/**
+ * An environment problem the global architect reported for an unresolved
+ * request: the conflict lies in how the gate or the harness runs, not in
+ * the plan or the architecture. The run holds the work item until the
+ * operator answers its CheckFinding: `waiting` until then, then `resumed`,
+ * which returns the work item to its local architect, or `ended`, which
+ * ends the run.
+ */
+export const runEnvironmentProblemSchema = z.object({
+  problem: text,
+  request: text,
+  workItem: text,
+  checkFinding: text,
+  diagnosis: text,
+  suggestion: text,
+  answer: z.enum(['waiting', 'resumed', 'ended']),
+}).strict();
+export type RunEnvironmentProblem = z.infer<typeof runEnvironmentProblemSchema>;
 
 /**
  * A run as its log states it. Status lives in the log: every field here is
@@ -307,6 +331,8 @@ export const runSnapshotSchema = z.object({
   notices: z.array(runNoticeSchema),
   decisionRequests: runDecisionRequestsSchema,
   planDeviations: runPlanDeviationsSchema,
+  /** Every environment problem the run reported, in the order the log recorded them. */
+  environmentProblems: z.array(runEnvironmentProblemSchema),
 }).strict();
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 
@@ -648,6 +674,47 @@ const scopeView = z.object({
   read: z.array(text),
 }).strict();
 
+/**
+ * A failure analyst's judgment of why an engineer ended without a result:
+ * the bound was too tight for the work, the environment failed it, the work
+ * itself was the problem, the agent's own behavior kept it from finishing,
+ * or the evidence does not say.
+ */
+export const failureCauseSchema = z.enum(['bound-too-tight', 'environment-problem', 'work-problem', 'agent-behavior', 'unknown']);
+export type FailureCause = z.infer<typeof failureCauseSchema>;
+
+/**
+ * The analysis of one engineer that ended without a result, as its
+ * iteration's result records it: the analyst's short account, or why there
+ * is none. An analysis that failed or was invalid is `unavailable`, and the
+ * local architect is briefed with the digest alone.
+ */
+export const failureAnalysisSchema = z.discriminatedUnion('outcome', [
+  z.object({
+    outcome: z.literal('analyzed'),
+    /** The analyst's invocation. */
+    invocation: text,
+    /** What the engineer was attempting. */
+    attempting: text,
+    /** What it had finished. */
+    finished: text,
+    /** What it was doing when it ended. */
+    whenEnded: text,
+    cause: failureCauseSchema,
+    /** Advice to the local architect, which decides. */
+    recommendation: text,
+    /** What the account rests on: a transcript entry, an output line, a diff hunk. */
+    evidence: z.array(text),
+  }).strict(),
+  z.object({
+    outcome: z.literal('unavailable'),
+    /** The analyst's invocation, where one started. */
+    invocation: text.nullable(),
+    reason: text,
+  }).strict(),
+]);
+export type FailureAnalysis = z.infer<typeof failureAnalysisSchema>;
+
 /** `GET /api/v1/plans/:planId/runs/:runId/work-items/:workItem`: one work item's outlines, iterations, gates and requirements. */
 export const workItemResponseSchema = z.object({
   workItem: workItemSummarySchema,
@@ -679,6 +746,12 @@ export const workItemResponseSchema = z.object({
       findings: z.array(z.string()),
       changedAssumptions: z.array(z.string()),
       recommendation: z.string().nullable(),
+      /**
+       * Where an engineer ended without a result: the harness's digest of
+       * what it left, as the lines its local architect read, and the
+       * analysis that followed.
+       */
+      failure: z.object({ digest: z.array(z.string()), analysis: failureAnalysisSchema }).strict().nullable(),
     }).strict().nullable(),
     gates: z.array(gateSummary),
     invocations: z.array(z.object({ id: text, role: roleSchema, ended: text.nullable(), outsideScope: z.array(text) }).strict()),
@@ -959,6 +1032,8 @@ export const gateViewSchema = z.object({
     rule: text,
     outcome: z.enum(['passed', 'failed']),
     violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
+    /** What the rule could not establish, or found and did not attribute to this attempt. */
+    limits: z.array(text).optional(),
   }).strict()),
   commands: z.array(z.object({
     kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),

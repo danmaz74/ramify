@@ -251,6 +251,12 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
       }
       return [...options.lines];
     },
+    async worktreePatch(project, base = 'HEAD') {
+      expect(project).toBe(root);
+      expectAgainst(base);
+      record('worktreePatch', base);
+      throw new Error('This scenario states no patch');
+    },
   });
 
   return {

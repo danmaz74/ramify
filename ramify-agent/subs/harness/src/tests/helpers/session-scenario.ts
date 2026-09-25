@@ -112,7 +112,11 @@ const establishedContract = {
   artifacts: {
     interface: [{ path: seam.interface, exports: ['noteLimitCases'] }],
     conformance: [{ path: seam.conformance }],
-    fake: [{ path: seam.fake, exports: ['createNoteLimitFake'] }],
+    fake: [{
+      path: seam.fake,
+      exports: ['createNoteLimitFake'],
+      standsFor: [{ fake: 'createNoteLimitFake', path: seam.real, export: 'createNoteLimit', exposure: { to: [], reexposed: [] } }],
+    }],
     exposure: [{ path: `${providerDirectory}/module.ramify`, declaration: 'expose-src noteLimitCases from "interfaces/note-limit.ts" to parent' }],
   },
   fakeInjections: [seam.consumer],

@@ -4,7 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
-import { ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
+import { EnvironmentProblems, ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
 import { newCommandId, type ConnectionState, type ProtocolClient } from './client.js';
@@ -22,7 +22,9 @@ import { SessionTimeline } from './session-timeline.js';
  * notices first: every module created or removed, every detected dependency
  * cycle, resolved or not, during the run and after it, and every degraded
  * start. A run that waits for the person's decision says so above every
- * area, and its banner opens each request's answer form. Stop and Approve
+ * area, and its banner opens each request's answer form. An environment
+ * problem the global architect reported shows its diagnosis and suggestion
+ * in the overview, with the answer form that resumes the run. Stop and Approve
  * are its commands; Start is on the Plan page. The
  * connection to the harness is shown apart from the run's state: losing it
  * changes nothing in the run.
@@ -180,6 +182,9 @@ function Overview({ client, run, events, onApproved, onOpenGate }: {
         )}
       </section>
       <ReviewPanel client={client} run={run} onApproved={onApproved} />
+      {run.environmentProblems.length > 0 && (
+        <EnvironmentProblems client={client} planId={run.planId} runId={run.jobId} version={run.version} problems={run.environmentProblems} onOpenGate={onOpenGate} />
+      )}
       {run.planDeviations.recorded > 0 && <PlanDeviations client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />}
       <ModuleCheckFindings client={client} planId={run.planId} runId={run.jobId} version={run.version} onOpenGate={onOpenGate} />
       <section className="panel" aria-labelledby="events-heading">
@@ -505,6 +510,7 @@ function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }
                     <p className="muted">Scope: {iteration.scope.modules.join(', ')}{iteration.scope.includedChildren.length ? ` with ${iteration.scope.includedChildren.join(', ')}` : ''}. {iteration.scope.rationale}</p>
                     <p>Result: {iteration.result ? `${iteration.result.outcome}${iteration.result.commit ? `, commit ${iteration.result.commit.slice(0, 12)}` : ''}` : 'open'}</p>
                     {iteration.result && iteration.result.findings.length > 0 && <ul>{iteration.result.findings.map(finding => <li key={finding}>{finding}</li>)}</ul>}
+                    {iteration.result?.failure && <IterationFailure failure={iteration.result.failure} />}
                     <p className="muted">Gates: {iteration.gates.map(gate => `${gate.id} ${gate.verdict}${gate.cause ? ` (${gate.cause})` : ''}`).join(', ') || 'none'}</p>
                     <p className="muted">Sessions: {iteration.invocations.map(invocation => `${invocation.id} ${invocation.role} ${invocation.ended ?? 'running'}`).join(', ')}</p>
                     {iteration.invocations.some(invocation => invocation.outsideScope.length > 0) && (
@@ -760,5 +766,27 @@ function MetricRow({ metric }: { readonly metric: Metric | LineageMetric }) {
       <td>{metric.coverage ? `${metric.coverage.covered} of ${metric.coverage.total}` : '—'}</td>
       <td>{metric.note ?? ''}{metric.evidence.length > 0 && <details><summary>evidence</summary><ul>{metric.evidence.map(item => <li key={item}>{item}</li>)}</ul></details>}</td>
     </tr>
+  );
+}
+
+type IterationFailureView = NonNullable<NonNullable<WorkItemResponse['iterations'][number]['result']>['failure']>;
+
+/** An engineer that ended without a result: the harness's digest and the failure analysis its architect read. */
+function IterationFailure({ failure }: { failure: IterationFailureView }) {
+  const analysis = failure.analysis;
+  return (
+    <details className="iteration-failure">
+      <summary>Ended without a result{analysis.outcome === 'analyzed' ? ` · cause: ${analysis.cause}` : ' · analysis unavailable'}</summary>
+      <pre aria-label="Failure digest">{failure.digest.join('\n')}</pre>
+      {analysis.outcome === 'analyzed' ? (
+        <dl aria-label="Failure analysis">
+          <dt>Attempting</dt><dd>{analysis.attempting}</dd>
+          <dt>Finished</dt><dd>{analysis.finished}</dd>
+          <dt>When it ended</dt><dd>{analysis.whenEnded}</dd>
+          <dt>Cause</dt><dd>{analysis.cause}</dd>
+          <dt>Recommendation</dt><dd>{analysis.recommendation}</dd>
+        </dl>
+      ) : <p className="muted">The failure analysis is unavailable: {analysis.reason}.</p>}
+    </details>
   );
 }

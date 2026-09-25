@@ -100,7 +100,11 @@ export function established(seam: Seam) {
         exports: seam.trims === true ? [`${seam.name}Cases`, `${seam.name}TrimCases`] : [`${seam.name}Cases`],
       }],
       conformance: [{ path: path.conformance }],
-      fake: [{ path: path.fake, exports: [`create${seam.name}Fake`] }],
+      fake: [{
+        path: path.fake,
+        exports: [`create${seam.name}Fake`],
+        standsFor: [{ fake: `create${seam.name}Fake`, path: path.real, export: `create${seam.name}`, exposure: { to: [], reexposed: [] } }],
+      }],
       exposure: [{ path: path.declaration, declaration: `expose-src ${seam.name}Cases from "interfaces/${seam.capability}.ts" to parent` }],
     },
     fakeInjections: [path.consumer],

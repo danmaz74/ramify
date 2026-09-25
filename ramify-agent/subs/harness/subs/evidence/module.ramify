@@ -10,7 +10,7 @@ expose-src RamifyCli, RamifyRun, RamifyCheckResult, MaterializeResult, ramifyVer
 // Reading what Ramify generates: the architect view, a requester API view and
 // the measurement document. Their file formats stay here.
 expose-src architectViewDirectory, ArchitectMeta, readArchitectMeta, coverageLimitsOf, ArchitectIndex, loadArchitectIndex, loadModuleTree from "views.ts" to parent
-expose-src ModuleEntry, SymbolRecord, findModule, symbolRecords, SourceArea, ApiViewSnapshot, readApiView, findInView from "views.ts" to parent
+expose-src ModuleEntry, SymbolRecord, ExposureChannel, findModule, symbolRecords, SourceArea, ApiViewSnapshot, readApiView, findInView from "views.ts" to parent
 expose-src isTestingModule from "views.ts" to parent
 expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurement, documentSchema, moduleSchema from "measure.ts" to parent
 
@@ -28,7 +28,7 @@ expose-src guardedFilesHash from "guarded-files.ts" to parent
 // Git, for the run branch: a clean-repository check, the branch, the commit a
 // gate audits, recovery by exact trailers, and what changed.
 expose-src GitError, CommitTrailer, isCleanRepository, createRunBranch, commitAccepted, findCommitByTrailer, findCommitByTrailers, changedPaths, diffNumstat from "git.ts" to parent
-expose-src commitNameStatus, diffNameStatus, worktreeLineChanges, changedEntries from "git.ts" to parent
+expose-src commitNameStatus, diffNameStatus, worktreeLineChanges, worktreePatch, changedEntries from "git.ts" to parent
 
 // A committed candidate read from Git's objects, which a review snapshot is
 // served from: its tree, its files, a search and its diff from a base.

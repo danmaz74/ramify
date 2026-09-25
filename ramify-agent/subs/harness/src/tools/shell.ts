@@ -36,18 +36,27 @@ export const shellToolName = 'shell';
 /** What a command is given when it names no timeout of its own. */
 export const shellDefaultTimeoutMs = 120_000;
 
-/** The longest a single command may run, whatever it asks for. */
+/**
+ * The longest a single command may run, whatever it asks for, unless its
+ * iteration's assignment raised it; the run policy's `commandTimeoutMs`
+ * holds the same default.
+ */
 export const shellMaxTimeoutMs = 600_000;
 
 /**
  * The tool's input, strict as rule 10 requires: one command and an optional
- * timeout. Nothing else, and no field for anything the harness already
- * knows.
+ * timeout up to the maximum the session was given. Nothing else, and no
+ * field for anything the harness already knows.
  */
-export const shellInputSchema = z.object({
-  command: z.string().min(1),
-  timeoutMs: z.int().positive().max(shellMaxTimeoutMs).optional(),
-}).strict();
+export function shellInputSchemaFor(maxTimeoutMs: number) {
+  return z.object({
+    command: z.string().min(1),
+    timeoutMs: z.int().positive().max(maxTimeoutMs).optional(),
+  }).strict();
+}
+
+/** The input with the shell's own maximum. */
+export const shellInputSchema = shellInputSchemaFor(shellMaxTimeoutMs);
 export type ShellInput = z.infer<typeof shellInputSchema>;
 
 export const shellJsonSchema = z.toJSONSchema(shellInputSchema) as JsonSchema;
@@ -86,6 +95,8 @@ export interface ShellOptions {
   readonly starting: (call: ShellCall) => Promise<void>;
   /** Records how the call ended. */
   readonly ended: (call: ShellCall, result: ShellResult) => Promise<void>;
+  /** The longest one command may run; the shell's own maximum when absent. */
+  readonly maxTimeoutMs?: number | undefined;
 }
 
 /**
@@ -112,6 +123,11 @@ export function createShellTool(options: ShellOptions): ShellTool {
   }
   const running = new Set<Running>();
   let calls = 0;
+  const maxTimeoutMs = options.maxTimeoutMs ?? shellMaxTimeoutMs;
+  const inputSchema = shellInputSchemaFor(maxTimeoutMs);
+  // A command asked for no timeout of its own gets the default, and never
+  // more than the maximum this session was given.
+  const defaultTimeoutMs = Math.min(shellDefaultTimeoutMs, maxTimeoutMs);
 
   const definition: ToolDefinition = {
     name: shellToolName,
@@ -120,8 +136,9 @@ export function createShellTool(options: ShellOptions): ShellTool {
       'built environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
       'What this writes passes no write guard: it is observed afterwards, and a change outside your scope is',
       'reported rather than prevented. Stay inside your scope here as you do with `edit` and `write`.',
+      `A command runs for ${defaultTimeoutMs} ms unless \`timeoutMs\` asks for more, up to ${maxTimeoutMs} ms.`,
     ].join(' '),
-    inputSchema: shellJsonSchema,
+    inputSchema: z.toJSONSchema(inputSchema) as JsonSchema,
     mutating: true,
     // A shell call is a command; its text is the one field of the input read.
     action: input => {
@@ -131,13 +148,13 @@ export function createShellTool(options: ShellOptions): ShellTool {
     async execute(input: unknown, signal: AbortSignal): Promise<ToolResult> {
       const judged = await options.judge(input);
       if (!judged.ok) return { isError: true, text: judged.text };
-      const request = shellInputSchema.parse(input);
+      const request = inputSchema.parse(input);
 
       calls += 1;
       const call: ShellCall = {
         call: calls,
         command: request.command,
-        timeoutMs: request.timeoutMs ?? shellDefaultTimeoutMs,
+        timeoutMs: request.timeoutMs ?? defaultTimeoutMs,
         outputFile: options.outputFile(calls),
       };
       await options.starting(call);

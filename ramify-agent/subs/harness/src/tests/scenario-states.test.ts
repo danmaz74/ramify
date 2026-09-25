@@ -407,8 +407,10 @@ describe('rejected declarations', () => {
       'initial-architect': [submit(analysis([entry('review-note', notes), entry('review-tags', tags)]))],
       'local-architect': [
         submit(assign(notes, {}, outline())),
-        // A request of wi-001 that names wi-002's scenario, then its own.
-        submit({ ...requestCompletion(), scenarios: ['sc-002'] }, { kind: 'submit', input: { ...requestCompletion(), scenarios: ['sc-001'] } }),
+        // The iteration came back without a result; each work item's
+        // request declares its own scenario.
+        submit({ ...requestCompletion(), scenarios: ['sc-001'] }),
+        submit({ ...requestCompletion(), scenarios: ['sc-002'] }),
       ],
       engineer: [
         [
@@ -417,12 +419,12 @@ describe('rejected declarations', () => {
           { kind: 'submit', input: completionProposed('Done.', { scenarios: ['sc-099'] }) },
         ],
       ],
-    }, []);
+    }, [unchanged('wi-001'), unchanged('wi-002'), unchanged(finalSubject)]);
 
-    // The third rejection is the bound: the invocation ends, and the run fails.
+    // The third rejection is the bound: the invocation ends, and its
+    // iteration returns to the local architect, which goes on.
     const snapshot = onlyRun(service, plan);
-    expect(snapshot.state).toBe('failed');
-    expect(snapshot.failure?.reason).toBe('invalid-submission');
+    expect(snapshot.state).toBe('completed');
     const engineer = agent!.sessions.find(session => session.spec.role === 'engineer')!;
     const answers = engineer.verdicts.map(verdict => JSON.parse((verdict as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as {
       errors: Array<{ path: string; message: string; expected?: string }>;
@@ -435,8 +437,11 @@ describe('rejected declarations', () => {
     }]);
     expect(engineer.verdicts.at(-1)).toMatchObject({ accepted: false, final: true });
     const log = await events(root, runId);
-    expect(log.some(event => event.type === 'scenario-declared')).toBe(false);
+    // No declaration of the engineer's was applied; the architects' own were.
+    expect(log.filter(event => event.type === 'scenario-declared').map(event => (event.data as { by: string }).by))
+      .not.toContain('inv-0003');
     expect(log.some(event => event.type === 'gate-attempted' && (event.data as { checkpoint: string }).checkpoint === 'iteration')).toBe(false);
+    expect(log.filter(event => event.type === 'iteration-closed').map(event => (event.data as { outcome: string }).outcome)).toEqual(['partial']);
   }, 120_000);
 
   test('a local architect\'s request is judged the same way, and a corrected request is accepted', async () => {

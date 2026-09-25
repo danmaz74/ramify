@@ -1,6 +1,6 @@
 # Problems found running ramify-agent on the Ramify toolkit
 
-**Date:** 2026-09-24 (runs) and 2026-09-25 (this record).
+**Date:** 2026-09-24 and 2026-09-25 (runs) and 2026-09-25 (this record).
 **Evidence:** the records named below are copied into
 [2026-09-25-toolkit-run-problems/](2026-09-25-toolkit-run-problems/). The
 complete run records lived in temporary directories under `/tmp` and are not
@@ -12,7 +12,7 @@ This was the first real run of the harness on a project other than the
 pre-planned iterations. The model was `openai-codex/gpt-6-sol:high` on pi
 0.87.1. The goal was to see the harness delegate across several modules.
 
-It did delegate across modules before it stopped:
+It did delegate across modules before its first run's failure (run 4):
 - two placement decisions;
 - a contract between `ramify/cli` and `ramify/analysis`;
 - a work item created in `ramify/analysis` from that contract's obligation;
@@ -20,9 +20,13 @@ It did delegate across modules before it stopped:
 - nine scenarios bound and passing against the contract's fake;
 - six reviews, which opened seven CheckFindings.
 
-The run then failed, and the `ramify/analysis` work never started. Four runs
-were needed to get that far. This document lists every problem found, with its
-evidence and its status.
+Run 4 failed there, and the `ramify/analysis` work never started. A second
+run, run 5, used the fixes below and reached further: `wi-003`, the
+`ramify/analysis` work item, started and committed iterations; a fork
+answered an unresolved request; reconciliation ran three rounds. Run 5 then
+failed too, on an engineer killed by the harness's own idle bound. Five runs
+were needed to get this far. This document lists every problem found, with
+its evidence and its status.
 
 ## The runs
 
@@ -32,6 +36,7 @@ evidence and its status.
 | `20260924T213823Z-c0f512` | worktree | stopped | readiness, Ramify check | [H2](#h2-the-command-output-cap-was-smaller-than-a-ramify-report) |
 | `20260924T214637Z-53bc9b` | worktree | failed (`internal`) | first commit after readiness | [H3](#h3-the-run-branch-name-collides-with-an-existing-branch) |
 | `20260924T215457Z-2ff23b` | clone | failed (`unresolvable-requirement`) | after 49.5 min, event 193 | [H6](#h6-no-assignment-can-write-a-file-outside-every-module), [H7](#h7-one-unresolvable-requirement-ends-the-whole-run), [P1](#p1-the-plan-required-a-change-no-assignment-could-make) |
+| `20260925T013619Z-5fa043` | clone | failed (`agent-failed`) | after 3h39m, `wi-003.i08` engineer idle-timeout | [H13](#h13-the-audit-worktree-has-no-build), [H14](#h14-an-engineer-failure-ended-the-run), [H15](#h15-the-fake-was-more-importable-than-the-export-it-stands-for), [H16](#h16-the-global-architect-answered-an-environment-problem-as-a-placement) |
 
 The first three runs used the git worktree
 `/tmp/ramify-run-self-explaining-denials`; run 4 used the clone
@@ -43,8 +48,8 @@ setup commit `e64f9015`:
 - Cucumber was added, with a World and hooks in `src/tests/support/`;
 - `ramify-agent.json` was added.
 
-Each run's event timeline is in `run-<id>-events.txt`, and its decisive events
-with their data are in `run-<id>-outcomes.txt`.
+Each of these four runs' event timeline is in `run-<id>-events.txt`, and its
+decisive events with their data are in `run-<id>-outcomes.txt`.
 
 Run 4 used 10.86 M tokens, most of them cache reads:
 
@@ -58,6 +63,13 @@ Run 4 used 10.86 M tokens, most of them cache reads:
 | initial architect | 1 | 448,209 |
 
 The review count includes the orientation step that design reviews fork from.
+
+Run 5, `20260925T013619Z-5fa043`, started 01:36Z and failed 05:15Z on a fresh
+clone, `/tmp/ramify-run-sed2` (setup commit `3c0d8b4a` on ramify-agent
+`799eecb4`), carrying run 4's fixes. It used about 28.8 M tokens over 3h39m; a
+per-role breakdown was not extracted. Its run records are the individual
+files named in H13 to H16 below, copied from
+`/tmp/ramify-run-sed2/plans/self-explaining-denials/.harness/jobs/20260925T013619Z-5fa043/`.
 
 ## Summary
 
@@ -76,6 +88,10 @@ The review count includes the orientation step that design reviews fork from.
 | H10 | The hook says nothing when a description error removes import findings | fixed, `345f30fc` |
 | H11 | Engineers never see warnings or analysis limits | fixed, `345f30fc` |
 | H12 | The scripted fake agent's analysis lacks the required scenario lists | fixed, `345f30fc` |
+| H13 | The audit worktree has no build | pending publish |
+| H14 | An engineer failure ended the run | fixed, `f0d6ac6c`, `42e81ba6` |
+| H15 | The fake was more importable than the export it stands for | fixed, `a015ce0d` |
+| H16 | The global architect answered an environment problem as a placement | fixed, `b0a1f99a` |
 | **Web client** | | |
 | W1 | Cards and edges disappear while panning | fixed, `8c1397ed` |
 | W2 | The view jumps back to the selected card | fixed, `8c1397ed` |
@@ -405,6 +421,140 @@ instead.
 
 **Status.** Fixed in `345f30fc`. A test now validates every submission of the
 script.
+
+### H13. The audit worktree has no build
+
+**What happened.** Run 5 reached `wi-003`'s completion gate. The whole-project
+IPC tests failed with `ENOENT lstat .../dist/src` from
+`subs/daemon/src/discovery.ts`'s `runtimeFiles`, at both `ga-0008` and
+`ga-0009` (about 20 built-CLI/daemon tests, for example
+`subs/daemon/src/tests/ipc.test.ts`); type-check, the Ramify check, the scoped
+tests and the scenarios passed. The engineer reported this as an unresolved
+request, `ur-001`: the analysis provider cannot produce a production build
+inside an honest analysis-module iteration, and weakening the daemon's
+runtime-tree check to work around it would drop an unrelated guarantee.
+
+**Cause.** A work item's gate runs in a ramify-audit isolated worktree.
+`dist/` is gitignored, so the worktree never has a build, and
+`subs/daemon/src/discovery.ts`'s `runtimePaths` refuses to select an endpoint
+without a complete `dist/src` and `dist/subs`.
+
+**Evidence.**
+- `run5-ur-001.json`: the unresolved request, naming `ga-0008`/`ga-0009` and
+  quoting `discovery.ts`'s and `ipc-fixture.ts`'s requirement.
+- `run5-gd-ur-001.json`: the global architect's `reuse` decision on the
+  request.
+
+**Status.** Decision (owner): ramify-audit owns preparing the worktree,
+including setup commands; the project declares them in `ramify-agent.json`
+(`setup: [{name, command, cwd?, env?, timeoutMs?}]`), and ramify-agent
+forwards them. A setup failure after readiness passed is a failed check
+attributed in-scope; an environment failure (timeout, spawn, link) is
+infrastructure. Implemented in ramify-audit branch
+`feat/workspace-setup-commands` (`c56abf4`, `b587cb9`, version to become
+0.1.1: `nodejs` preparation with `packageDirectories` and `setupCommands`,
+error codes `setup-command-failed`, `setup-command-timed-out`,
+`dependency-link-failed`, evidence `workspacePreparation`), not yet
+published. Implemented in ramify-agent branch `fix/run-setup-commands`
+(`dbb6777d`: readiness step `baseline-setup`, gate command kind `setup`,
+reason `setup-failed`), not yet merged; it waits for the published
+ramify-audit. Pending publish.
+
+### H14. An engineer failure ended the run
+
+**What happened.** The engineer of `wi-003.i08` was 38 minutes into a 600 s
+`npm test` shell call when the harness's idle bound killed it: no port event
+for 300,000 ms. `inv-0049`'s outcome recorded `interruption: "idle-timeout"`,
+and the one failed engineer failed the whole run: `job-failed`,
+`agent-failed`, "The engineer of wi-003.i08 ended without a result (failed)".
+
+**Cause.** A failed engineer had no path back to its local architect and
+failed the run outright, and a long-running, legitimate command could still
+trip the harness's own idle bound.
+
+**Evidence.**
+- `run5-inv-0049-outcome.json`: `interruption: "idle-timeout"`,
+  `error: "No port event for 300000 ms"`, `elapsedMs: 2292851`.
+- the job's final event, `job-failed`, reason `agent-failed`.
+
+**Status.** Decisions (owner): an engineer failing never ends the run; the
+local architect decides; the harness pre-analyzes the failure; raising a
+timeout is the architect's to do; every command stays bounded. Implemented in
+two steps:
+- `c0d2b38e` merged as `f0d6ac6c`: `InvocationBounds.hold()` pauses the idle
+  clock for a running command's timeout plus 60 s; a failed engineer closes
+  the iteration as a partial result instead of failing the run;
+- `72dfc505` merged as `42e81ba6`: every non-submitted ending returns to the
+  local architect; a deterministic failure digest, plus a new read-only role,
+  `failure-analyst`, whose analysis reaches the next briefing; the
+  assignment's `bounds` block (`commandTimeoutMs`, `idleMs`, `absoluteMs`,
+  each with a reason, ceilings 30 min / 30 min / 3 h); `ramify-agent.json`
+  `timeouts` for gate commands, capped at 2 h.
+
+Not done: resuming the killed session (undecided).
+
+### H15. The fake was more importable than the export it stands for
+
+**What happened.** Contract `ct-001` (provider `ramify/analysis`, fake
+`subs/analysis/src/fakes/enrich-import-diagnostics.fake.ts`) exposed the fake
+to descendants at the root (`expose-sub enrichImportDiagnosticsFake from
+analysis to descendants`), while the real `enrichImportDiagnostics` was
+exposed only to the parent. Production CLI files
+`subs/cli/src/command-support.ts` and `changed-command.ts` imported the fake.
+Iteration `wi-003.i05`'s build then refused to bundle it: "Compiled client
+bundles excluded modules:
+dist/subs/analysis/src/fakes/enrich-import-diagnostics.fake.js".
+
+**Cause.** Ramify's exposure and tag rules did not compare a fake's
+importability against the real export it stands for, so a contract could
+expose a fake more broadly than the export it will eventually replace.
+
+**Evidence.** `run5-wi-003.i05-result.json`: the `unsuitable` finding quoting
+the build's refusal and naming both CLI consumers.
+
+**Status.** The owner's framing: using a fake in production code before
+retirement is normal; a fake must be exactly as importable as the real export
+it stands for; retiring it is the harness's and agents' concern, not
+Ramify's, the build's or the audit's. Fixed in `7d6efe73` and `7eeb4c61`,
+merged as `a015ce0d`: a contract record `/2` with `standsFor` per fake
+export; a `contracts/parity.ts` rule enforced at the contract and iteration
+gates, with violation kinds extra-exposure, missing-exposure, owner, tags,
+retired-fake-exposure, in-scope attribution, and recorded limits when the
+view cannot compare; `injectionSites` on `contract-needed` become
+single-file `fake-injection` extra locations of the contract scope; prompt
+guidance to place the fake at the real seam.
+
+### H16. The global architect answered an environment problem as a placement
+
+**What happened.** `ur-001` (H13's missing `dist/src`) got decision
+`gd-ur-001`, outcome `reuse`, with the constraint "run the existing
+production build before tests" — a remedy no engineer can carry out, because
+the gate runs in a fresh worktree. The local architect then widened `wi-003`
+by one obstacle per iteration: iteration 05 hit the build failing on the fake
+(H15); iteration 06 found the root CLI tests expecting the old text;
+iteration 07 found ten reference-harness tests expecting stale figures;
+iteration 08 was the H14 kill.
+
+**Cause.** The global architect had only a placement answer and a
+plan-deviation answer for an unresolved request. Neither fits a problem that
+lies in the environment the run executes in rather than in the model or the
+plan, so the architect reused the existing placement and stated a constraint
+no engineer could meet.
+
+**Evidence.**
+- `run5-gd-ur-001.json`: `outcome: "reuse"`, the constraint naming running the
+  build "before tests".
+- `run5-wi-003.i06-result.json`, `run5-wi-003.i07-result.json`: the widening
+  iterations.
+- the job's `job-failed` event at iteration 08 (H14).
+
+**Status.** Decision (owner, accepting the proposal): a fourth fork answer,
+`environment` (a diagnosis and a suggestion), holds the run for the operator
+through a run-owned CheckFinding (`resume`/`end`); on resume the work item
+returns to its local architect. Prompt guidance: a remedy no engineer can
+carry out in a write scope is `environment`, never a placement or a
+deviation. Fixed in `c1ffa136`, merged as `b0a1f99a`.
+
 ## Web client
 
 Found while watching run 4, and investigated and fixed by a subagent. The fix
@@ -611,13 +761,24 @@ the form `owner:file#binding`, such as `app/catalog/core:records.ts#findRecord`"
   `3cbed96a-2ba6-4ac4-8e13-72364ddcd1c3`). Its first run, on `799eecb4`,
   failed in `progress-fixture.test.ts` only, because the H8 fix changed a call
   count that the fixture pinned.
+- **E5. Audit of the H14-H16 fixes.** The same request passed on `51cbb4ee`
+  (run `29393a02-b9ba-404d-b577-c9d9140d30cc`, 221 s, report commit
+  `6f139491`). A first attempt on `b0a1f99a` produced no verdict: a
+  concurrent session's `npm ci`, run through a symlink it had made to this
+  checkout's `ramify-agent/node_modules`, emptied that directory fifteen
+  seconds into the suite, and ramify-audit's command timeout then killed
+  `npm` without its process tree, so the orphaned vitest held the audit for
+  seventeen more minutes. Neither is a ramify-agent defect; the tree kill is
+  fixed in ramify-audit 0.1.1 with H13. H13 itself is audited when it merges.
 
 ## Not reached
 
-The run ended before these could be observed with a real model:
-- reconciliation of CheckFindings, including whether the two reports of P2's
-  defect are joined as one issue (they were opened as separate findings);
-- a provider work item in another module (`wi-003`) and the replacement of a
-  fake by the real provider;
-- a work item's completion and its unresolved signals;
+Run 5 reached `wi-003`, its unresolved signal, and three reconciliation
+rounds. These still were not observed with a real model:
+- a work item completing after an `unresolved` signal is answered
+  `environment` and the run is resumed (H16 is untested with a live run);
+- the fake's retirement from CLI production imports (H15) verified against a
+  ramify-audit worktree that has a build (H13);
+- whether the two reports of P2's defect are joined as one issue in
+  reconciliation (they were opened as separate findings);
 - the final gate.

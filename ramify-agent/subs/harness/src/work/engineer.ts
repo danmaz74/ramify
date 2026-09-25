@@ -18,6 +18,7 @@ import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
 import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IterationAssignment } from './iterations.js';
+import { injectionSiteRule, moduleOwning } from './scope.js';
 import { engineerScenarioSection, type EngineerScenarios } from './scenario-briefing.js';
 import { scopePaths } from './scope.js';
 
@@ -92,6 +93,14 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     need: needAsBehaviorSchema,
     /** Where the engineer believes the behavior belongs; the harness resolves the owner itself. */
     suggestedProvider: modulePathSchema.optional(),
+    /**
+     * The files where the fake must be injected, when they are known: in this
+     * module, or on the provider side where the real behavior will act and
+     * reach this module as data through a path that already exists. Each
+     * lies in the consumer's or the provider's own contents, and the
+     * contract iteration may write exactly those files beyond its scope.
+     */
+    injectionSites: z.array(text).optional(),
     /** What this iteration did before it stopped, in the engineer's own words. */
     summary: text,
   }).strict(),
@@ -157,6 +166,12 @@ export interface EngineerEvidence {
   readonly openFindings?: readonly HookFinding[] | undefined;
   /** The work item's entry and the run's tracked scenarios, which a declaration's IDs are judged against. */
   readonly scenarios?: DeclarationContext | undefined;
+  /** What a `contract-needed` injection site is judged against: the view, this module, and the registry's owner of a capability. */
+  readonly seams?: {
+    readonly index: ArchitectIndex | null;
+    readonly consumer: string;
+    readonly providerOf: (capability: string) => string | undefined;
+  } | undefined;
 }
 
 /**
@@ -198,6 +213,28 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
       path: 'need.outputs',
       message: 'A need names what the behavior answers or what it changes; with neither there is nothing to agree on',
       expected: 'at least one entry in "outputs" or in "sideEffects"',
+    });
+  }
+
+  // An injection site opens one file of the provider to the contract
+  // iteration, so it is judged here, where the engineer can still correct it.
+  if (value.kind === 'contract-needed') {
+    const seams = evidence.seams;
+    const provider = seams?.providerOf(value.need.capability);
+    (value.injectionSites ?? []).forEach((site, position) => {
+      const path = `injectionSites.${position}`;
+      if (site.startsWith('/') || site.split('/').includes('..')) {
+        errors.push({ path, message: `"${site}" is not a project-relative path; ${injectionSiteRule}`, expected: 'a path relative to the project root' });
+        return;
+      }
+      if (seams === undefined || seams.index === null) return;
+      const owner = moduleOwning(seams.index, site);
+      if (owner !== undefined && (owner.module === seams.consumer || owner.module === provider)) return;
+      errors.push({
+        path,
+        message: `"${site}" lies in ${owner === undefined ? 'no module\'s own contents' : `the own contents of "${owner.module}"`}, and ${injectionSiteRule}`,
+        expected: `a file of ${seams.consumer}${provider === undefined ? '' : ` or of ${provider}`}`,
+      });
     });
   }
 

@@ -5,11 +5,14 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
-import { deviationText, type PlanDeviation } from '../deviations/records.js';
+import { deviationText, type EnvironmentProblem, type PlanDeviation } from '../deviations/records.js';
 import type { IterationApiViews } from './engineer.js';
 import type { IntegrationBriefing } from './integration.js';
 import { architectScenarioSection, type BriefedScenario } from './scenario-briefing.js';
 import type { WorkItem, WorkItemOutline } from './records.js';
+import type { EngineerBounds } from '../run/policy.js';
+import { analysisLines, boundOf, digestLines } from './failure.js';
+import type { IterationResult } from './iterations.js';
 
 /*
  * What a local architect is given for one work item: the goal, its
@@ -124,6 +127,11 @@ export interface WorkItemBriefing {
   readonly deviations?: readonly PlanDeviation[] | undefined;
   /** The deviation that just answered this architect's unresolved request. */
   readonly deviationRecorded?: string | undefined;
+  /**
+   * The environment problem that just answered this architect's unresolved
+   * request, after which the operator resumed the run, with their note.
+   */
+  readonly environmentResumed?: { readonly problem: EnvironmentProblem; readonly note: string } | undefined;
   /** The outline revisions already committed for this item, oldest first. */
   readonly outlines: readonly WorkItemOutline[];
   /** What this work item owes and is owed across a delegation. */
@@ -149,7 +157,15 @@ export interface WorkItemBriefing {
     readonly gate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
     /** The scenarios its passing gate ran, each with the step definitions that bound it. */
     readonly scenarios?: readonly string[] | undefined;
+    /** The bounds its engineers ran under. */
+    readonly bounds?: EngineerBounds | undefined;
+    /** Where its engineer ended without a result: the harness's digest and the failure analysis. */
+    readonly failure?: IterationResult['failure'] | undefined;
   } | undefined;
+  /** The bounds an engineer runs under unless an assignment raises them, and the ceilings it may raise them to. */
+  readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
+  /** The run's directory, which the paths of a failure digest are relative to. */
+  readonly runDirectory?: string | undefined;
   /**
    * The reconciliation of this work item's completion request that returns
    * it to this architect: the correction it chose, with the CheckFindings
@@ -352,10 +368,22 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     lines.push('', 'Nothing was placed and nothing was registered. Decide what to do with the work item on the evidence you have, or answer `unresolved`.', '');
   }
 
+  if (briefing.environmentResumed !== undefined) lines.push(...environmentSection(briefing.environmentResumed));
+
+  if (briefing.bounds !== undefined) {
+    const { defaults, ceilings } = briefing.bounds;
+    lines.push('## The bounds of an engineer', '');
+    lines.push(`Unless an assignment raises them, one shell command may run ${defaults.commandTimeoutMs} ms, a session may go ${defaults.idleMs} ms without a sign of activity, and one invocation may run ${defaults.absoluteMs} ms.`);
+    lines.push(`\`assignment.bounds\` raises them for one iteration, each with its reason, up to ${ceilings.commandTimeoutMs}, ${ceilings.idleMs} and ${ceilings.absoluteMs} ms.`, '');
+  }
+
   if (briefing.lastIteration !== undefined) {
     const last = briefing.lastIteration;
     lines.push('## The iteration you last assigned', '');
     lines.push(`\`${last.id}\` ended \`${last.outcome}\`${last.commit === null ? ', with nothing committed' : `, committed as ${last.commit}`}.`);
+    if (last.bounds !== undefined && last.failure === undefined) {
+      lines.push(`Its engineers ran under a command maximum of ${last.bounds.commandTimeoutMs} ms, an idle bound of ${last.bounds.idleMs} ms and an absolute bound of ${last.bounds.absoluteMs} ms.`);
+    }
     for (const finding of last.findings) lines.push(`- Finding: ${finding}`);
     if (last.recommendation !== undefined) {
       lines.push(`- Recommendation: ${last.recommendation}`);
@@ -370,7 +398,11 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
       lines.push(...last.scenarios);
       lines.push('', 'A definition outside the owner\'s own step files reached the run through an import, which Ramify verified.');
     }
-    lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');
+    if (last.failure === undefined) {
+      lines.push('', 'Assign the next iteration, or request completion and let the work item\'s gate answer.', '');
+    } else {
+      lines.push(...failureSection(last.failure, briefing.bounds?.ceilings, briefing.runDirectory));
+    }
   }
 
   if (briefing.reconciliation !== undefined) lines.push(...reconciliationSection(briefing.reconciliation));
@@ -386,6 +418,37 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
 
   lines.push('Read your module, decide, and submit.');
   return lines.join('\n');
+}
+
+/** What each bound is called, and the field of `assignment.bounds` that raises it. */
+const boundFields = { idleMs: 'the idle bound', absoluteMs: 'the absolute bound of an invocation' } as const;
+
+/**
+ * An engineer that ended without a result, as its architect decides on it:
+ * the harness's digest, the failure analysis, and the options it has.
+ */
+function failureSection(failure: NonNullable<IterationResult['failure']>, ceilings: EngineerBounds | undefined, runDirectory: string | undefined): string[] {
+  const { digest, analysis } = failure;
+  const lines: string[] = [
+    '',
+    `### Its ${digest.role === 'contract-engineer' ? 'contract engineer' : 'engineer'} ended without a result`,
+    '',
+    'What the harness derived from what it holds:',
+    '',
+    ...digestLines(digest, runDirectory),
+    '',
+    '### The failure analysis',
+    '',
+    ...analysisLines(analysis),
+    '',
+    'Your options: assign a fresh iteration, which starts from the tree with the uncommitted work in it; request completion and let the work item\'s gate answer; or answer `unresolved`.',
+  ];
+  const bound = boundOf(digest);
+  if (bound !== null) {
+    lines.push(`${boundFields[bound][0]!.toUpperCase()}${boundFields[bound].slice(1)} ended it, at ${digest.bounds[bound]} ms. If the work needs more, raise \`assignment.bounds.${bound}\` in the next assignment${ceilings === undefined ? '' : `, up to ${ceilings[bound]} ms`}, and \`commandTimeoutMs\` with it where a command needs longer${ceilings === undefined ? '' : `, up to ${ceilings.commandTimeoutMs} ms`}.`);
+  }
+  lines.push('');
+  return lines;
 }
 
 /**
@@ -404,6 +467,28 @@ function deviationSection(deviations: readonly PlanDeviation[], recorded: string
   lines.push('The plan file is unchanged. Each deviation below amends it for the rest of this run, and your work and its reviews are judged against the plan as amended.', '');
   for (const deviation of deviations) lines.push(deviationText(deviation), '');
   return lines;
+}
+
+/**
+ * The environment problem that answered this architect's unresolved
+ * request: it was reported to the operator, who resumed the run. The work
+ * item retries from its last outline.
+ */
+function environmentSection({ problem, note }: { readonly problem: EnvironmentProblem; readonly note: string }): string[] {
+  return [
+    '## The environment problem was reported, and the run resumed',
+    '',
+    `The global architect answered \`${problem.request}\` with environment problem \`${problem.id}\`: the conflict lies in how the gate or the harness runs, not in the plan or the architecture. Its diagnosis:`,
+    '',
+    ...problem.diagnosis.split('\n').map(line => `> ${line}`),
+    '',
+    `What it suggested to the operator: ${problem.suggestion}`,
+    '',
+    note.trim() === '' ? 'The operator resumed the run and left no note.' : `The operator resumed the run, with this note: ${note}`,
+    '',
+    'Nothing was placed, no deviation was recorded and the plan is unchanged. Retry from your last outline: assign the iteration again, or request completion again for a fresh gate attempt. If the same failure returns, answer `unresolved` again with the new evidence.',
+    '',
+  ];
 }
 
 /** What a reconciliation returns to the local architect: its correction, and its brief where the session lacks it. */

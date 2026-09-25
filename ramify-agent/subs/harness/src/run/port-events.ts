@@ -37,8 +37,19 @@ export interface PortEventRecorderOptions {
  * tool, context and compaction observations, the implementation's own input
  * rejections, activity and read excursions, and the transcript's entries.
  */
+/** One tool call the session had started and not finished. */
+export interface CallInFlight {
+  readonly callId: string;
+  readonly tool: string;
+  /** How long it had run, at the moment asked about. */
+  readonly runningMs: number;
+}
+
 export class PortEventRecorder {
   private readonly calls = new Map<string, string>();
+  /** The calls started and not finished, with when each started, in epoch milliseconds. */
+  private readonly open = new Map<string, { readonly tool: string; readonly startedAt: number }>();
+  private said: string | null = null;
   readonly usage: UsageTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
   private usageObserved = false;
   private contextObserved = false;
@@ -56,6 +67,16 @@ export class PortEventRecorder {
     return this.usageObserved;
   }
 
+  /** The tool calls started and not finished, oldest first, and how long each had run at `at`. */
+  inFlight(at: number = Date.now()): CallInFlight[] {
+    return [...this.open].map(([callId, call]) => ({ callId, tool: call.tool, runningMs: Math.max(0, at - call.startedAt) }));
+  }
+
+  /** The text of the session's last assistant message that had any; null where none had. */
+  get lastText(): string | null {
+    return this.said;
+  }
+
   /** Records one event. What is counted is counted before its ordered durable write. */
   record(event: AgentEvent): Promise<void> {
     // The transcript queues its own entry in order; a failed write there is
@@ -65,7 +86,15 @@ export class PortEventRecorder {
       this.usageObserved = true;
       for (const part of ['input', 'output', 'cacheRead', 'cacheWrite', 'total'] as const) this.usage[part] += event.usage[part];
     }
-    if (event.type === 'tool-started') this.calls.set(event.tool, event.callId);
+    if (event.type === 'tool-started') {
+      this.calls.set(event.tool, event.callId);
+      this.open.set(event.callId, { tool: event.tool, startedAt: Date.now() });
+    }
+    if (event.type === 'tool-finished') this.open.delete(event.callId);
+    if (event.type === 'message' && event.role === 'assistant') {
+      const text = event.blocks.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n').trim();
+      if (text !== '') this.said = text;
+    }
     if (event.type === 'context-observed') this.contextObserved = true;
     const recordRejection = event.type === 'tool-finished' && !event.reachedTool
       ? this.options.judge.countImplementationRejection(event.callId, event.tool, event.errorText ?? 'the input was rejected before the tool ran')
@@ -184,10 +213,16 @@ export class InvocationBounds {
   private expired: () => void = () => undefined;
   private session: AgentSession | undefined;
   private reached: 'idle-timeout' | 'absolute-timeout' | undefined;
+  private readonly reachedListeners: Array<(bound: 'idle-timeout' | 'absolute-timeout') => void> = [];
   /** The time each held command may run until, with the margin. */
   private readonly holds = new Set<{ readonly until: number }>();
 
   constructor(private readonly limits: InvocationLimits, private readonly marginMs = commandHoldMarginMs) {}
+
+  /** Calls `listener` at the moment a bound fires, before the session is asked to stop. */
+  onReached(listener: (bound: 'idle-timeout' | 'absolute-timeout') => void): void {
+    this.reachedListeners.push(listener);
+  }
 
   /** The bound that ended the session, if one did. */
   get interruption(): 'idle-timeout' | 'absolute-timeout' | undefined {
@@ -244,6 +279,13 @@ export class InvocationBounds {
   private expire(bound: 'idle-timeout' | 'absolute-timeout'): void {
     if (this.reached !== undefined) return;
     this.reached = bound;
+    for (const listener of this.reachedListeners) {
+      try {
+        listener(bound);
+      } catch {
+        // What a listener observes is never the bound's concern.
+      }
+    }
     void this.session?.stop().catch(() => undefined);
     this.expired();
   }

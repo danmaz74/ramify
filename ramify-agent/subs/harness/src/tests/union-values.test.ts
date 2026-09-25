@@ -6,7 +6,7 @@ import { runEventSchema, terminalRunEvents, type RunEvent } from '../run/log.js'
 import { observationSchema } from '../run/observations.js';
 import {
   capabilityStateSchema, decisionViewSchema, hypothesisStandingSchema, metricSchema, metricStateSchema,
-  roleSchema, runEventRefKindSchema, runFailureReasonSchema, runNoticeSchema, runPhaseSchema, workItemStateSchema,
+  failureCauseSchema, roleSchema, runEventRefKindSchema, runFailureReasonSchema, runNoticeSchema, runPhaseSchema, workItemStateSchema,
 } from '../interfaces/protocol/runs.js';
 import { errorCodeSchema, errorHttpStatus, errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { decisionsOf } from '../projections/analysis.js';
@@ -107,14 +107,14 @@ describe('the run log', () => {
       'gate-started', 'gate-committing', 'gate-command-started', 'gate-attempted', 'check-findings-recorded',
       'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished',
       'reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended', 'reconciliation-refused',
-      'unresolved-requested', 'plan-deviation-recorded', 'scenarios-rewording', 'scenarios-reworded', 'stop-requested',
+      'unresolved-requested', 'plan-deviation-recorded', 'environment-reported', 'scenarios-rewording', 'scenarios-reworded', 'stop-requested',
       'job-completed', 'job-failed', 'job-stopped', 'job-interrupted',
     ]);
     for (const terminal of terminalRunEvents) expect(types).toContain(terminal);
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed']);
     expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
     expect(requestReasonSchema.options).toEqual(['contract-needed']);
@@ -483,7 +483,7 @@ describe('the records this iteration establishes', () => {
   test('every iteration kind, extra purpose and result outcome is written and read back', async () => {
     const store = await ledger();
     expect(iterationKindSchema.options).toEqual(['ordinary', 'breaking', 'contract', 'verification', 'repair', 'integration']);
-    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'outside-modules']);
+    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'fake-injection', 'outside-modules']);
 
     const outlineRef = { id: 'wi-001', revision: 1, hash: 'd'.repeat(64) };
     for (const [index, kind] of iterationKindSchema.options.entries()) {
@@ -541,6 +541,34 @@ describe('the records this iteration establishes', () => {
       }, iterationSchemas.result);
       expect(read.outcome).toBe(outcome);
     }
+
+    // A partial result an engineer's failure closed carries its digest and
+    // the analysis: every judged cause, and an analysis that is unavailable.
+    const digest = {
+      invocation: 'inv-0003', role: 'engineer', ended: 'failed', interruption: 'idle-timeout',
+      cause: 'The idle bound fired: no port event for 300000 ms.', rejected: null, elapsedMs: 300_000,
+      bounds: { commandTimeoutMs: 600_000, idleMs: 300_000, absoluteMs: 3_600_000 },
+      inFlight: [{ tool: 'shell', callId: 'c1', runningMs: 290_000, command: { text: 'npm test', timeoutMs: 600_000, output: 'invocations/inv-0003/shell/001.log', tail: ['ok'] } }],
+      changes: { paths: [{ path: 'src/a.ts', added: 3, deleted: 1, binary: false }], more: 0, uncommitted: 1, gaps: [] },
+      lastMessage: 'Running the suite.', transcript: 'transcripts/ses-0003.jsonl', outputs: ['invocations/inv-0003/shell/001.log'],
+    };
+    const analyses = [
+      ...failureCauseSchema.options.map(cause => ({
+        outcome: 'analyzed', invocation: 'inv-0004', attempting: 'a', finished: 'f', whenEnded: 'w', cause, recommendation: 'r', evidence: ['e'],
+      })),
+      { outcome: 'unavailable', invocation: null, reason: 'the analysis ended `failed`' },
+    ];
+    for (const [index, analysis] of analyses.entries()) {
+      const read = await store.roundTrip(iterationLayout.result('wi-003', index + 1), {
+        schema: 'ramify-agent.iteration-result/1',
+        iteration: `wi-003.i${String(index + 1).padStart(2, '0')}`,
+        outcome: 'partial', invocations: ['inv-0003'], gate: null, commit: null,
+        findings: ['f'], changedAssumptions: [], artifacts: [],
+        failure: { digest, analysis },
+      }, iterationSchemas.result);
+      expect(read.failure?.analysis).toEqual(analysis);
+      expect(read.failure?.digest).toEqual(digest);
+    }
   });
 
   test('every contract, obligation and requirement value is written and read back', async () => {
@@ -556,7 +584,7 @@ describe('the records this iteration establishes', () => {
       const mode = index === 0 ? 'fake-backed' : 'access-only';
       const id = `ct-00${index + 1}`;
       const read = await store.roundTrip(contractsLayout.contract(id, 1), {
-        schema: 'ramify-agent.contract/1',
+        schema: 'ramify-agent.contract/2',
         id, revision: 1, capability,
         // Null where the initial analysis placed the capability and no
         // decision was taken, which is what an entry capability leaves.
@@ -568,7 +596,10 @@ describe('the records this iteration establishes', () => {
         artifacts: {
           interface: [{ path: 'subs/orders/src/interfaces/note-limit.ts', exports: ['NoteLimit'], hash: 'b'.repeat(64) }],
           conformance: mode === 'fake-backed' ? [{ path: 'subs/orders/src/tests/note-limit.conformance.test.ts', hash: 'c'.repeat(64) }] : [],
-          fake: mode === 'fake-backed' ? [{ path: 'subs/orders/src/fakes/note-limit.fake.ts', exports: ['createNoteLimitFake'], hash: 'd'.repeat(64) }] : [],
+          fake: mode === 'fake-backed' ? [{
+            path: 'subs/orders/src/fakes/note-limit.fake.ts', exports: ['createNoteLimitFake'], hash: 'd'.repeat(64),
+            standsFor: [{ fake: 'createNoteLimitFake', path: 'subs/orders/src/note-limit.ts', export: 'createNoteLimit', exposure: { to: ['parent'], reexposed: [{ by: 'shop', to: ['descendants'] }] } }],
+          }] : [],
           exposure: [{ path: 'subs/orders/module.ramify', declaration: 'expose-src NoteLimit from "interfaces/note-limit.ts" to parent' }],
         },
         establishedBy: { iteration: 'wi-001.i02', gate: 'ga-0003' },
@@ -610,10 +641,13 @@ describe('the records this iteration establishes', () => {
   });
 
   test('both outcomes of a harness-verified gate rule are representable', () => {
-    for (const outcome of ['passed', 'failed'] as const) {
-      const rule = { rule: 'fake-naming' as const, outcome, violations: outcome === 'failed' ? [{ rule: 'file-suffix', path: 'a.ts', detail: 'd' }] : [] };
-      expect(gateRuleSchema.safeParse(rule).success).toBe(true);
+    for (const name of ['fake-naming', 'fake-exposure-parity'] as const) {
+      for (const outcome of ['passed', 'failed'] as const) {
+        const rule = { rule: name, outcome, violations: outcome === 'failed' ? [{ rule: 'file-suffix', path: 'a.ts', detail: 'd' }] : [] };
+        expect(gateRuleSchema.safeParse(rule).success).toBe(true);
+      }
     }
+    expect(gateRuleSchema.safeParse({ rule: 'fake-exposure-parity', outcome: 'passed', violations: [], limits: ['not compared'] }).success).toBe(true);
   });
 
   test('both module notices are representable, with and without a decision', () => {
@@ -693,14 +727,14 @@ describe('the records this iteration establishes', () => {
 
   test('every member of the fork submission this iteration offers', () => {
     const kinds = forkSubmissionSchema.options.map(option => option.shape.kind.value);
-    expect(kinds).toEqual(['decision', 'partial', 'deviation', 'nothing-possible']);
+    expect(kinds).toEqual(['decision', 'partial', 'deviation', 'nothing-possible', 'environment']);
     // The package offers exactly the members a run of this iteration
-    // produces, and each has one: a deviation and nothing possible answer an
-    // unresolved request only.
+    // produces, and each has one: a deviation, an environment problem and
+    // nothing possible answer an unresolved request only.
     expect([...forkSubmissionKinds]).toEqual(kinds);
   });
 
-  test('an unresolved request and the plan deviation that answers it are written and read back', async () => {
+  test('an unresolved request, the plan deviation and the environment problem that answer it are written and read back', async () => {
     const store = await ledger();
     const request = await store.roundTrip(deviationLayout.request('ur-001'), {
       schema: 'ramify-agent.unresolved-request/1', id: 'ur-001', workItem: 'wi-001', requester: 'shop/orders', invocation: 'inv-0004',
@@ -719,6 +753,12 @@ describe('the records this iteration establishes', () => {
       }, deviationSchemas.planDeviation);
       expect(read.held).toBe(held);
     }
+    const problem = await store.roundTrip(deviationLayout.environment('ep-001'), {
+      schema: 'ramify-agent.environment-problem/1', id: 'ep-001', request: 'ur-001', workItem: 'wi-001', invocation: 'inv-0005',
+      diagnosis: 'The gate runs `npm test`, which imports `dist/src`; nothing builds it in the gate\'s worktree.',
+      suggestion: 'Declare a build step in `ramify-agent.json`.', checkFinding: 'cf-0002',
+    }, deviationSchemas.environmentProblem);
+    expect(problem.checkFinding).toBe('cf-0002');
   });
 
   test('the two events a contract revision writes carry every binding it scheduled', () => {
@@ -818,7 +858,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst']);
   });
 
   test('every failure reason and every phase is named', () => {
@@ -947,7 +987,7 @@ describe('the run protocol a client reads', () => {
       {
         type: 'contract-registered', data: {},
         records: [{ path: 'contracts/ct-001/1.json', body: {
-          schema: 'ramify-agent.contract/1', id: 'ct-001', revision: 1, capability: { id: 'send-email', revision: 1, hash: hash64 }, decision: 'gd-001',
+          schema: 'ramify-agent.contract/2', id: 'ct-001', revision: 1, capability: { id: 'send-email', revision: 1, hash: hash64 }, decision: 'gd-001',
           authority: { kind: 'provider', owner: 'shop', rationale: 'r' }, provider: 'shop', behavior: 'b', mode: 'fake-backed',
           artifacts: { interface: [], conformance: [], fake: [], exposure: [] }, establishedBy: { iteration: 'wi-001.i01', gate: 'ga-0002' },
         } }],
@@ -991,6 +1031,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'fork-returned-partial': { request: 'pr-001', invocation: 'inv-0002', retry: 1 },
     'unresolved-requested': { request: 'ur-001', workItem: 'wi-001', requester: 'm', invocation: 'inv-0002' },
     'plan-deviation-recorded': { request: 'ur-001', deviation: 'pd-001', workItem: 'wi-001', invocation: 'inv-0003', checkFinding: 'cf-0001', held: false, checkFindings: [] },
+    'environment-reported': { request: 'ur-001', problem: 'ep-001', workItem: 'wi-001', invocation: 'inv-0003', checkFinding: 'cf-0001', checkFindings: [] },
     'scenarios-rewording': { deviation: 'pd-001', rewording: 1, scenarios: ['sc-001'], files: ['src/tests/features/p/e.feature'] },
     'scenarios-reworded': { deviation: 'pd-001', commit: 'c' },
     'decision-accepted': { request: 'pr-001', decision: 'gd-001', workItem: 'wi-001', invocation: 'inv-0002', registry: 0, hypotheses: 0 },

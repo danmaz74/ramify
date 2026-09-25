@@ -20,6 +20,8 @@ export function scenariosCommit(planId: string, commit = `scenarios-of-${planId}
 export interface GitScript {
   readonly head: string;
   readonly checkpoints: readonly GitCheckpoint[];
+  /** The working tree's patch against the head, where the scenario states one; otherwise Git cannot say. */
+  readonly patch?: string | undefined;
 }
 
 export interface ScriptedGit extends GitService {
@@ -101,6 +103,11 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     async worktreeLineChanges(project, base = 'HEAD') {
       check('worktreeLineChanges', project, () => expect(base).toBe(head));
       throw new Error('Line measurements are unavailable in this lifecycle scenario');
+    },
+    async worktreePatch(project, base = 'HEAD') {
+      check('worktreePatch', project, () => expect(base).toBe(head));
+      if (script.patch === undefined) throw new Error('The working tree\'s patch is unavailable in this lifecycle scenario');
+      return script.patch;
     },
     async findCommitByTrailer() { return unsupported('findCommitByTrailer'); },
     async diffNumstat() { return unsupported('diffNumstat'); },

@@ -299,7 +299,7 @@ export const checkFindingReportViewSchema = z.object({
   attempt: text,
   source: checkFindingSourceViewSchema,
   observation: z.object({
-    kind: z.enum(['check-failed', 'review-concern', 'plan-deviation']),
+    kind: z.enum(['check-failed', 'review-concern', 'plan-deviation', 'environment-problem']),
     summary: text,
     locations: z.array(z.object({ path: text, startLine: z.int().positive().nullable(), endLine: z.int().positive().nullable() }).strict()),
     evidence: z.array(z.object({ kind: text, ref: text }).strict()),

@@ -157,6 +157,21 @@ export const runPolicySchema = z.object({
     laterRoundMinimumRisk: z.enum(['medium', 'high']).optional(),
     /** The plan deviations a run records before the next one waits for the person; absent before plan deviations existed, which means five. */
     maxPlanDeviations: z.int().nonnegative().optional(),
+    /**
+     * The longest one shell command of an engineer may run unless its
+     * assignment raises it; absent before assignments could raise bounds,
+     * which means the shell's own maximum.
+     */
+    commandTimeoutMs: z.int().positive().optional(),
+    /**
+     * The ceilings an assignment may raise an engineer's bounds to: one
+     * shell command, the idle bound and the absolute bound of each of its
+     * invocations. Absent before assignments could raise bounds, which means
+     * the defaults of `run/policy.ts`.
+     */
+    maxCommandTimeoutMs: z.int().positive().optional(),
+    maxInvocationIdleMs: z.int().positive().optional(),
+    maxInvocationAbsoluteMs: z.int().positive().optional(),
   }).strict(),
   /**
    * The context policy of each role. The reviewer's is absent from a run
@@ -170,6 +185,8 @@ export const runPolicySchema = z.object({
     engineer: contextPolicySchema,
     'contract-engineer': contextPolicySchema,
     reviewer: contextPolicySchema.optional(),
+    /** Absent from a run captured before failure analysis existed, which analyzes nothing. */
+    'failure-analyst': contextPolicySchema.optional(),
   }).strict() satisfies z.ZodType<Partial<Record<Role, z.infer<typeof contextPolicySchema>>>>,
   /** A transcript body larger than `inlineBodyBytes` is stored in the content store, not in its entry. */
   transcript: z.object({ inlineBodyBytes: z.int().positive() }).strict(),
@@ -220,6 +237,13 @@ export type AcceptanceMode = z.infer<typeof acceptanceModeSchema>;
 /** Whether readiness loads full mode with `--dry-run` or executes it. */
 export const fullModeReadinessSchema = z.enum(['dry-run', 'run']);
 
+/** The longest a project may give one gate command: two hours. */
+export const projectCommandTimeoutCeilingMs = 7_200_000;
+
+const projectTimeout = z.int().positive().max(projectCommandTimeoutCeilingMs, {
+  error: `A command timeout is at most ${projectCommandTimeoutCeilingMs} ms (two hours)`,
+});
+
 /** The formats of a type checker's output the gate reads error locations from. */
 export const typeCheckOutputSchema = z.enum(['tsc']);
 
@@ -262,9 +286,22 @@ export const projectConfigSchema = z.object({
    */
   typeCheck: z.object({ output: typeCheckOutputSchema.optional() }).strict().optional(),
   /**
+   * The timeouts of the gate's commands for this project, in milliseconds,
+   * each replacing the harness's own: the type check, the project's tests
+   * (and each nested package's), the scoped test run and the complete
+   * Ramify check. Each is bounded by `projectCommandTimeoutCeilingMs`.
+   */
+  timeouts: z.object({
+    typeCheck: projectTimeout.optional(),
+    tests: projectTimeout.optional(),
+    scopedTests: projectTimeout.optional(),
+    ramifyCheck: projectTimeout.optional(),
+  }).strict().optional(),
+  /**
    * The project's setup commands, run in order before every gate's checks:
    * in place at the project root, and by ramify-audit in the worktree of an
-   * audited commit, whose ignored build outputs are otherwise absent.
+   * audited commit, whose ignored build outputs are otherwise absent. Each
+   * carries its own bound, which `timeouts` does not replace.
    */
   setup: z.array(setupCommandSchema).optional(),
   acceptance: z.object({
@@ -540,10 +577,12 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
  * Why a suspended session is continued: its placement request was answered,
  * the iteration it assigned closed, its completion was refused while
  * evidence was owed, a gate failed after its result and it repairs, the
- * reconciliation of its completion request chose a correction, or its
- * unresolved request was answered with a plan deviation.
+ * reconciliation of its completion request chose a correction, its
+ * unresolved request was answered with a plan deviation, or the operator
+ * resumed the run after its unresolved request was answered with an
+ * environment problem.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**
@@ -751,9 +790,11 @@ const verifiedPlannedCheckSchema = plannedCheckSchema
 
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
-  rule: z.literal('fake-naming'),
+  rule: z.enum(['fake-naming', 'fake-exposure-parity']),
   outcome: z.enum(['passed', 'failed']),
   violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
+  /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
+  limits: z.array(text).optional(),
 }).strict();
 
 export const gateAttemptSchema = z.object({

@@ -120,6 +120,11 @@ function describe(event: RunEvent): [string, Ref[]] {
         `Plan deviation ${event.data.deviation} was recorded for ${event.data.request}${event.data.held ? '; the run waits for your decision on it' : '; it awaits your review and holds nothing'}`,
         [...ref('request', event.data.request), ...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
       ];
+    case 'environment-reported':
+      return [
+        `The global architect answered ${event.data.request} with environment problem ${event.data.problem}: the run holds ${event.data.workItem} until you resume it or end the run`,
+        [...ref('request', event.data.request), ...ref('work-item', event.data.workItem), ...ref('invocation', event.data.invocation)],
+      ];
     case 'scenarios-rewording':
       return [`Plan deviation ${event.data.deviation} rewords ${event.data.scenarios.join(', ')}`, event.data.scenarios.flatMap(scenario => ref('scenario', scenario))];
     case 'scenarios-reworded':

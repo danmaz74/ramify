@@ -106,9 +106,9 @@ export function contractMessage(briefing: ContractBriefing): string {
     '   implementation; a port the consumer defined belongs with the consumer; an agreement between peers',
     '   belongs at their common ancestor. Reuse alone never creates a neutral definitions module.',
     '3. Design the interface, write the conformance suite, and write the fake.',
-    '4. Integrate the fake in the consumer and fix consumer and fake failures until the consumer\'s relevant',
-    '   tests pass against the fake and the fake passes the conformance suite. Existing behavior stays real:',
-    '   the fake replaces only the missing part.',
+    '4. Integrate the fake at the seam where the real provider will act, and fix consumer and fake failures',
+    '   until the consumer\'s relevant tests pass against the fake and the fake passes the conformance suite.',
+    '   Existing behavior stays real: the fake replaces only the missing part.',
     '',
     'You do not implement the provider, and you do not change unrelated consumers. If the design you need',
     'would break an existing consumer, look for a compatible one first and report the conflict if there is none.',
@@ -124,12 +124,27 @@ export function contractMessage(briefing: ContractBriefing): string {
     'real provider implement it. The gate verifies this: generated architectural evidence must never present',
     'a fake under a production-looking name.',
     '',
+    '## Exposure',
+    '',
+    'A fake is exactly as importable as the real export it stands for: the modules that receive one receive the',
+    'other. Name the real export each fake export stands for, and the exposure you declare for it; the gate',
+    'compares the fake with it, and fails an extra or a missing exposure. Where the real behavior reaches the',
+    'consumer as data through a path that already exists, inject the fake on the provider side and let the',
+    'consumer integrate through that path: never give the consumer an import path the real export will not have.',
+    '',
     '## What you may write',
     '',
     ...paths.roots.map(root => `- \`${root}/\` and everything beneath it`),
     ...paths.files.map(file => `- \`${file}\``),
     '',
     'Nothing else. The caller\'s writes are suspended while you work: one implementation writer at a time.',
+    '',
+  );
+  const injectionSites = assignment.scope.extra.filter(entry => entry.purpose === 'fake-injection').map(entry => entry.path);
+  lines.push(
+    injectionSites.length === 0
+      ? 'No file beyond these was named as holding the fake. If the seam where the real provider will act lies elsewhere, report `incomplete` and name that file: the consumer\'s engineer names it as an injection site in its next `contract-needed`, and the next contract iteration may write it.'
+      : `The agreement names ${injectionSites.map(site => `\`${site}\``).join(', ')} as holding the fake; ${injectionSites.length === 1 ? 'it is' : 'they are'} writable and nothing else of the provider is.`,
     '',
   );
 

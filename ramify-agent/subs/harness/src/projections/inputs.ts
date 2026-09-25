@@ -96,10 +96,11 @@ const supported: Readonly<Record<string, string>> = Object.fromEntries([
   'ramify-agent.hypothesis/1', 'ramify-agent.capability/1', 'ramify-agent.work-item/1',
   'ramify-agent.work-item-outline/1', 'ramify-agent.iteration-assignment/1', 'ramify-agent.iteration-result/1',
   'ramify-agent.invocation/1', 'ramify-agent.invocation-outcome/1', 'ramify-agent.placement-request/1',
-  'ramify-agent.placement-decision/1', 'ramify-agent.contract/1', 'ramify-agent.provider-obligation/1',
+  'ramify-agent.placement-decision/1', 'ramify-agent.contract/2', 'ramify-agent.provider-obligation/1',
   'ramify-agent.consumer-requirement/1', 'ramify-agent.gate-attempt/3', 'ramify-agent.gate-audit-outcome/1', 'ramify-agent.entry-assignments/1',
   'ramify-agent.readiness-attempt/1', 'ramify-agent.infrastructure-recovery/1', 'ramify-agent.measurement-snapshot/1',
   'ramify-agent.line-events/1', 'ramify-agent.scenario/1', 'ramify-agent.unresolved-request/1', 'ramify-agent.plan-deviation/1',
+  'ramify-agent.environment-problem/1',
 ].map(schema => [familyOf(schema), schema]));
 
 function familyOf(schema: string): string {
@@ -156,7 +157,7 @@ export function runView(run: CommittedRun): RunView {
         case 'ramify-agent.iteration-assignment/1':
           assignments.push({ body: parse(iterationAssignmentSchema, record.body, run, record.path), ...at });
           break;
-        case 'ramify-agent.contract/1':
+        case 'ramify-agent.contract/2':
           contracts.push({ body: parse(contractRecordSchema, record.body, run, record.path), ...at });
           break;
         case 'ramify-agent.entry-assignments/1':

@@ -480,6 +480,17 @@ export async function diffPatch(root: string, from: string, to: string, path?: s
 }
 
 /**
+ * The patch of the working tree's tracked changes against `base`, as
+ * `git diff` prints it: what an engineer's uncommitted work changed in files
+ * Git already tracks. A file it created is not in it; `worktreeLineChanges`
+ * names those.
+ */
+export async function worktreePatch(root: string, base: string = 'HEAD', signal?: AbortSignal): Promise<string> {
+  const run = await gitOk(root, ['diff', '--no-color', '--no-renames', '--no-ext-diff', base, '--'], signal);
+  return run.stdout;
+}
+
+/**
  * The read-only boundary a review snapshot is served from: one committed
  * candidate and its diff from a base, by Git's objects alone. Consumer tests
  * inject scripted answers, as they do for `GitService`.
@@ -514,13 +525,14 @@ export interface GitService {
   readonly diffNumstat: typeof diffNumstat;
   readonly commitNameStatus: typeof commitNameStatus;
   readonly worktreeLineChanges: typeof worktreeLineChanges;
+  readonly worktreePatch: typeof worktreePatch;
 }
 
 /** The process-backed adapter. Consumer tests should supply a scripted GitService. */
 export const gitService: GitService = {
   currentHead, isCleanRepository, createRunBranch, commitAccepted,
   findCommitByTrailer, findCommitByTrailers, changedPaths, changedEntries,
-  diffNameStatus, diffNumstat, commitNameStatus, worktreeLineChanges,
+  diffNameStatus, diffNumstat, commitNameStatus, worktreeLineChanges, worktreePatch,
 };
 
 /** The commit the working directory is on, or '' where Git cannot say. */

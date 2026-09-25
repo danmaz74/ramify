@@ -87,6 +87,9 @@ function entryOf(document: ModuleDocument): ModuleEntry {
   };
 }
 
+/** Where an owner, or an ancestor that re-exposes what it received, exposes an original. */
+export type ExposureChannel = 'parent' | 'descendants';
+
 /** An exported original, as the architect view records it under its owner. */
 export interface SymbolRecord {
   readonly module: string;
@@ -94,6 +97,14 @@ export interface SymbolRecord {
   readonly binding?: string;
   readonly as?: readonly string[];
   readonly file: string;
+  /** `exposed` when the owner exposes it, `internal` when no declaration does. */
+  readonly role?: 'exposed' | 'internal';
+  /** Where the owner exposes it; absent for an internal original. */
+  readonly to?: readonly ExposureChannel[];
+  /** The required tags an importer needs, from the source area's classification. */
+  readonly tags?: readonly string[];
+  /** Each ancestor that re-exposes what it received, and where to, nearest first. */
+  readonly reexposed?: ReadonlyArray<{ readonly by: string; readonly to: readonly ExposureChannel[] }>;
 }
 
 export interface ArchitectIndex {
@@ -126,7 +137,10 @@ export async function loadArchitectIndex(projectRoot: string): Promise<Architect
         for (const line of text.split('\n')) {
           if (!line.trim()) continue;
           const record = JSON.parse(line) as SymbolRecord;
-          records.push({ module: record.module, name: record.name, binding: record.binding, as: record.as, file: record.file });
+          records.push({
+            module: record.module, name: record.name, binding: record.binding, as: record.as, file: record.file,
+            role: record.role, to: record.to, tags: record.tags, reexposed: record.reexposed,
+          });
         }
       }
       symbols.set(document.module, records);

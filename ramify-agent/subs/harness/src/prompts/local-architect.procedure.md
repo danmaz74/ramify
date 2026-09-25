@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 4. -->
+<!-- ramify-agent local architect procedure, version 6. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -69,6 +69,17 @@ write.
   definitions bind, and nothing requires exactly these. Each must be a
   scenario of this work item.
 
+- `assignment.bounds` is optional: the bounds this iteration's engineers
+  need beyond the policy's. `commandTimeoutMs` is the longest one shell
+  command may run, `idleMs` how long a session may go without a sign of
+  activity, and `absoluteMs` how long one invocation may run. Each is
+  `{ "ms": …, "reason": … }`, raised above the policy's value and at most its
+  ceiling; the message states both. A command's timeout is never longer than
+  the invocation that runs it, so raise `absoluteMs` with it where it must.
+  They apply to every engineer invocation of the iteration. Raise one when
+  the work needs it, such as a test suite longer than the command maximum,
+  not to wait out a session that is stuck.
+
 You do not choose the gate, the tests it runs or the files it guards: the
 harness derives them from the kind, the scope and the evidence required, and
 freezes them on the assignment. Each attempt resolves the current test files
@@ -76,6 +87,24 @@ again, so a test the iteration writes runs before it is accepted.
 
 The harness then runs the engineer, the gate, and the repair rounds the
 policy allows, and returns the result to you.
+
+## An engineer that ended without a result
+
+A bound may end an engineer's session, its provider or adapter may fail, it
+may stop on its own, or its submissions may be rejected until the bound on
+them is reached. None of that ends the run: its iteration closes `partial`,
+nothing of it is committed, and what it wrote stays in the tree. The message
+gives you the harness's digest of it, and then a failure analysis: what it
+was attempting, what it finished, what it was doing when it ended, the cause
+as the analyst judges it and a recommendation. Where the analysis is
+unavailable, you decide on the digest; the transcript is named there if you
+must read it.
+
+Then decide, as after any iteration: assign a fresh iteration, which starts
+from the tree with the uncommitted work in it; request completion; or answer
+`unresolved`. Where a bound ended it and the work needs more, raise that
+bound in the next assignment, up to its ceiling. The work item's iteration
+bound counts every iteration, a failed one included.
 
 ## Scenarios
 
@@ -260,11 +289,16 @@ answer. It may fix a placement, which reaches you as a placement decision. It
 may record a plan deviation: the requirement as written, what the run does
 instead and why. The deviation binds the rest of the run, and you go on with
 the work item under it, meeting the rest of the plan as written. The person
-reviews it later. Or it may find that nothing of the plan is worth doing
-around the conflict, and the run ends.
+reviews it later. It may find that the conflict lies in how the gate or the
+harness runs, such as a prerequisite the gate's command lacks, and report it
+to the operator: the run waits, and when the operator resumes it you are
+continued with the diagnosis and retry from your last outline. Or it may
+find that nothing of the plan is worth doing around the conflict, and the
+run ends.
 
 Answer `unresolved` for a conflict once. A conflict a deviation already
-answers is settled for this run.
+answers is settled for this run. After an environment problem, ask again
+only when the same failure returns.
 
 ## `yield-for-providers`
 
@@ -282,6 +316,14 @@ for it here would wait for yourself.
 A requirement closes only when a `verification` iteration has replaced the
 fake with the real provider and its gate has passed. Requesting completion
 with a requirement still open is refused, whatever the tests say.
+
+A fake is exactly as importable as the real export it stands for, and every
+gate verifies it while the fake is registered. Plan the consumer's work
+through the seam the real provider will use: where the real behavior reaches
+your module as data through a path that already exists, your module
+integrates through that path and never imports the fake. A verification
+iteration replaces the fake where it was injected and removes the fake's
+exposure with it.
 
 ## Revising an agreement
 

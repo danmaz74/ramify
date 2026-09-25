@@ -16,7 +16,7 @@ import { ownerOf } from '../kpi/lines.js';
 import type { ObservationLog } from '../run/observations.js';
 import type { TranscriptNotes } from '../transcripts/recorder.js';
 import { ToolInputJudge, validateAgainst } from '../run/submissions.js';
-import { createShellTool, shellInputSchema, shellToolName, type ShellTool } from '../tools/shell.js';
+import { createShellTool, shellInputSchemaFor, shellMaxTimeoutMs, shellToolName, type ShellTool } from '../tools/shell.js';
 import { createScopeTestsTool, scopeTestsInputSchema, scopeTestsToolName, type ScopeScenarioCheck } from './engineer.js';
 
 /*
@@ -97,6 +97,22 @@ export interface EngineerEquipmentInputs {
    * streams and log.
    */
   readonly outputPath: (kind: 'shell' | 'hook' | 'scenarios', invocation: string, number: number) => string;
+  /** The longest one shell command may run: the policy's, or what the assignment raised it to. */
+  readonly commandTimeoutMs?: number | undefined;
+}
+
+/** One shell call of the invocation now equipped, as the harness saw it start and end. */
+export interface ShellCallRecord {
+  readonly callId: string;
+  readonly call: number;
+  readonly command: string;
+  readonly timeoutMs: number;
+  /** The file the complete output is written to. */
+  readonly outputFile: string;
+  /** Epoch milliseconds. */
+  readonly startedAt: number;
+  /** Epoch milliseconds; null while the command runs. */
+  endedAt: number | null;
 }
 
 /**
@@ -131,6 +147,8 @@ export interface EngineerEquipment {
   readonly findingsAtCompletion: (input: unknown) => Promise<readonly HookFinding[]>;
   /** What the last fresh check answered, or null where none has run. */
   readonly completionCheck: () => CompletionCheck | null;
+  /** The shell calls of the invocation now equipped, in order. */
+  readonly shellLog: () => readonly ShellCallRecord[];
 }
 
 /**
@@ -150,6 +168,9 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
   /** How many checks of this invocation have written a log, which names the next one's. */
   let hookChecks = 0;
   let completion: CompletionCheck | null = null;
+  let shellLog: ShellCallRecord[] = [];
+  const maxTimeoutMs = inputs.commandTimeoutMs ?? shellMaxTimeoutMs;
+  const shellSchema = shellInputSchemaFor(maxTimeoutMs);
   const equip = (session: EquipContext): Equipment => {
     // The findings this invocation has already been told about, so a
     // hook check reports what is newly introduced and not the same
@@ -158,6 +179,8 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     current = session;
     hookChecks = 0;
     completion = null;
+    shellLog = [];
+    const calls = new Map<number, ShellCallRecord>();
     // What each guarded call resolved to, which is what the mutation
     // observation of that call names.
     const mutated = new Map<string, string[]>();
@@ -170,11 +193,12 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     shellJudge = new ToolInputJudge({
       tool: shellToolName,
       bound: inputs.bounds.rejectedToolInputsPerTurn,
-      validate: input => validateAgainst(shellInputSchema, input),
+      validate: input => validateAgainst(shellSchema, input),
       observations: session.observations,
     });
     shell = createShellTool({
       commandExecution,
+      maxTimeoutMs,
       workingDirectory: projectRoot,
       judge: input => shellJudge!.judge(input, session.callId(shellToolName)),
       outputFile: call => inputs.outputPath('shell', session.invocation, call),
@@ -187,6 +211,12 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
         // The complete output is a file of the invocation, which the
         // call's result in the transcript names rather than copies.
         session.transcript?.output(session.callId(shellToolName), call.outputFile);
+        const record: ShellCallRecord = {
+          callId: session.callId(shellToolName), call: call.call, command: call.command, timeoutMs: call.timeoutMs,
+          outputFile: call.outputFile, startedAt: Date.now(), endedAt: null,
+        };
+        calls.set(call.call, record);
+        shellLog.push(record);
         if (shellGapRecorded) return;
         shellGapRecorded = true;
         await session.observations.record({
@@ -197,7 +227,10 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
           },
         });
       },
-      ended: async () => undefined,
+      ended: async call => {
+        const record = calls.get(call.call);
+        if (record !== undefined) record.endedAt = Date.now();
+      },
     });
 
     // Each call's scenario check keeps its profiles and streams apart.
@@ -390,6 +423,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     openFindings: () => seen?.open() ?? [],
     findingsAtCompletion,
     completionCheck: () => completion,
+    shellLog: () => shellLog,
   };
 }
 
