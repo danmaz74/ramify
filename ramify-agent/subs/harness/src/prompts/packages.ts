@@ -12,7 +12,7 @@ import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToo
 import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
 import { failureAnalysisJsonSchema, failureAnalysisToolName } from '../work/failure.js';
 import { contextSelectorJsonSchema, contextSelectorToolName, workOrientationJsonSchema, workOrientationToolName } from '../context-selection/submissions.js';
-import { coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
+import { coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName, nonfunctionalRepairJsonSchema, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 import { shellMaxTimeoutMs } from '../tools/shell.js';
 
@@ -54,6 +54,8 @@ const selectorSystemFile = fileURLToPath(new URL('../context-selection/selector.
 const selectorProcedureFile = fileURLToPath(new URL('../context-selection/selector.procedure.md', import.meta.url));
 const nonfunctionalCoordinatorSystemFile = fileURLToPath(new URL('../nonfunctional/coordinator.system.md', import.meta.url));
 const nonfunctionalAssessmentProcedureFile = fileURLToPath(new URL('../nonfunctional/assessment.procedure.md', import.meta.url));
+const nonfunctionalRepairSystemFile = fileURLToPath(new URL('../nonfunctional/repair.system.md', import.meta.url));
+const nonfunctionalRepairProcedureFile = fileURLToPath(new URL('../nonfunctional/repair.procedure.md', import.meta.url));
 
 /** The contract skill the harness supplies with a contract iteration. */
 const contractSkillFile = fileURLToPath(new URL('./contract.skill.md', import.meta.url));
@@ -149,6 +151,9 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['reviewer', await loadReviewer(options)],
     ['failure-analyst', await loadFailureAnalyst(options)],
     ['nonfunctional-coordinator', await loadNonfunctionalCoordinator(options)],
+    ['nonfunctional-repair-engineer', await loadPackage({ role: 'nonfunctional-repair-engineer', name: 'nonfunctional-repair-engineer/1',
+      systemFile: nonfunctionalRepairSystemFile, procedureFile: nonfunctionalRepairProcedureFile,
+      schema: nonfunctionalRepairJsonSchema, submissionKinds: ['completed', 'partial'], options })],
   ]);
   const manifest = promptPackageManifestSchema.parse({
     schema: 'ramify-agent.prompt-manifest/1',
@@ -442,8 +447,12 @@ export function renderFailureAnalystPrompt(loaded: LoadedPackage, workingDirecto
   return render(loaded, workingDirectory, failureAnalysisToolName, { workingDirectory });
 }
 
-export function renderNonfunctionalCoordinatorPrompt(loaded: LoadedPackage, projectRoot: string): string {
-  return render(loaded, projectRoot, coordinatorAssessmentToolName);
+export function renderNonfunctionalCoordinatorPrompt(loaded: LoadedPackage, projectRoot: string, toolName: string = coordinatorAssessmentToolName): string {
+  return render(loaded, projectRoot, toolName);
+}
+
+export function renderNonfunctionalRepairPrompt(loaded: LoadedPackage, projectRoot: string): string {
+  return render(loaded, projectRoot, nonfunctionalRepairToolName);
 }
 
 function render(loaded: LoadedPackage, projectRoot: string, submissionTool: string, extra: Readonly<Record<string, string>> = {}): string {

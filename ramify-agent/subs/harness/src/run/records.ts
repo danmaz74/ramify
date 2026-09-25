@@ -14,7 +14,7 @@ import { documentManifestSchema, catalogSchema } from '../../subs/plan-evidence/
 import { assessmentSchema, roundSchema } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import { incorporationSchema } from '../analysis/evidence-contracts.js';
 import { contextSelectionSchema, assignmentContextSchema } from '../context-selection/contracts.js';
-import { preparedCandidateSchema, nonfunctionalDeviationSchema } from './nonfunctional-records.js';
+import { preparedCandidateSchema, nonfunctionalDeviationSchema, nonfunctionalRepairAssignmentSchema } from './nonfunctional-records.js';
 
 /*
  * The durable records of one implementation run, and where each of them is
@@ -569,7 +569,9 @@ export const usageSchema = z.object({
 }).strict();
 
 /** The work one invocation, and the session it belongs to, is for: none for the initial architect. */
-export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict();
+export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional(),
+  nonfunctionalRepair: text.optional(),
+}).strict();
 export type InvocationWork = z.infer<typeof invocationWorkSchema>;
 
 // Lineage: how a session relates to others, by harness points and never by
@@ -946,6 +948,7 @@ export const runLayout = {
   candidate: (id: string): string => join('nonfunctional', 'candidates', `${id}.json`),
   assessment: (id: string): string => join('nonfunctional', 'assessments', `${id}.json`),
   nonfunctionalRound: (number: number): string => join('nonfunctional', 'rounds', `${number}.json`),
+  nonfunctionalRepairAssignment: (id: string): string => join('nonfunctional', 'repairs', `${id}.json`),
   nonfunctionalDeviation: (id: string): string => join('deviations', `${id}.json`),
   events: 'events.jsonl',
   promptManifest: join('prompts', 'manifest.json'),
@@ -990,6 +993,7 @@ export const runSchemas = {
   preparedCandidate: { schema: 'ramify-agent.prepared-candidate/1', body: preparedCandidateSchema },
   assessment: { schema: 'ramify-agent.nonfunctional-assessment/1', body: assessmentSchema },
   nonfunctionalRound: { schema: 'ramify-agent.nonfunctional-round/1', body: roundSchema },
+  nonfunctionalRepairAssignment: { schema: 'ramify-agent.nonfunctional-repair-assignment/1', body: nonfunctionalRepairAssignmentSchema },
   nonfunctionalDeviation: { schema: 'ramify-agent.nonfunctional-deviation/1', body: nonfunctionalDeviationSchema },
   promptManifest: { schema: 'ramify-agent.prompt-manifest/1', body: promptPackageManifestSchema },
   entries: { schema: 'ramify-agent.entry-assignments/1', body: entryAssignmentsSchema },

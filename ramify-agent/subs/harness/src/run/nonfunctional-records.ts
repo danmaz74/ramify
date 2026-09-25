@@ -16,6 +16,15 @@ export const preparedCandidateSchema = z.object({
   writerSettled: z.literal(true),
 }).strict();
 
+/** Authority for exactly one project-wide repair batch in a numbered round. */
+export const nonfunctionalRepairAssignmentSchema = z.object({
+  schema: z.literal('ramify-agent.nonfunctional-repair-assignment/1'),
+  id: text, round: z.int().positive().max(3), assessment: text, candidate: text,
+  nfrs: z.array(z.string().regex(/^nfr-\d{3,}$/)).min(1),
+  startingModule: text, task: text, evidence: z.array(text), uncertainty: z.string(),
+}).strict();
+export type NonfunctionalRepairAssignment = z.infer<typeof nonfunctionalRepairAssignmentSchema>;
+
 /** A read-only projection; absent Plan 13 evidence is unavailable. */
 export const mergeReadinessSchema = z.object({
   status: z.enum(['ready', 'pending-review', 'rejected', 'gate-failed', 'unavailable']),

@@ -36,3 +36,16 @@ export async function engineerWorkingDirectory(projectRoot: string, scope: Write
   }
   return canonical;
 }
+
+/** A repair starts in an existing module source directory; it never bootstraps one. */
+export async function repairWorkingDirectory(projectRoot: string, module: string, index: ArchitectIndex | null): Promise<string> {
+  const directory = directoryOf(index, module);
+  if (directory === null) throw new Error(`Repair starting module ${module} is not in the current architect view`);
+  const target = await resolveRealTarget(projectRoot, join(directory, 'src'));
+  if (!target.ok || !isContained(projectRoot, target.resolved)) {
+    throw new Error(`Repair starting module ${module} has no contained src directory`);
+  }
+  const found = await stat(target.resolved).catch(() => null);
+  if (!found?.isDirectory()) throw new Error(`Repair starting module ${module} has no existing src directory`);
+  return await realpath(target.resolved);
+}

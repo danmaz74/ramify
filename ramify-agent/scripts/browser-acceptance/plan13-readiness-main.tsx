@@ -6,7 +6,7 @@ import { RunPage } from '../../subs/web/src/run-page.js';
 import { checkFindingKey, StubClient } from '../../subs/web/src/tests/helpers/stub-client.js';
 import '../../subs/web/src/styles.css';
 
-type Mode = 'pending' | 'accepted' | 'rejected' | 'gate-failed' | 'legacy-unavailable';
+type Mode = 'pending' | 'accepted' | 'rejected' | 'gate-failed' | 'source-unavailable';
 interface Case {
   run: RunSnapshot;
   events: ProjectedRunEvent[];

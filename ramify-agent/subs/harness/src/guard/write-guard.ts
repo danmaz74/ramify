@@ -118,6 +118,7 @@ export function blockExplanation(decision: GuardDecisionRecord, scope: GuardedSc
       '',
       'A feature file is rendered by the harness from the plan\'s scenarios: bind its steps with step definitions in a module\'s steps directory instead.',
       'The project\'s configuration for the harness, ramify-agent.json, is captured when the run starts and no agent changes it.',
+      'Captured plan and principles documents are also run inputs; edit source files within the authorized implementation scope instead.',
       'Do not retry the same target, and do not write it another way: a change to it fails the gate as a guarded change.',
     ].join('\n');
   }

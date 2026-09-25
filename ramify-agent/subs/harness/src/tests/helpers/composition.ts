@@ -25,6 +25,7 @@ import { scriptedScenarioRun } from './project-config.js';
 import { directReadinessExecution } from './external-tools.js';
 import { announcingCheckExecution, createPassingCheckExecution } from './direct-check-execution.js';
 import { deleted, modified, scenarioGit, untracked, type GitResponses, type ScenarioGit } from './recovery-git.js';
+import { scriptedCandidates } from './candidates.js';
 import {
   staleCrashLock, freeze, installTestRunner, openRuns, shapeOnlyInputs, startRun, stopRun, testPolicy,
   type OpenRunsOptions,
@@ -195,6 +196,8 @@ export interface Scenario {
   inputs(): RunInputs;
   /** What Git answers this scenario, in the order its commits are made. */
   readonly git: GitResponses;
+  /** The final audited revision and its exact tree for a completed run. */
+  readonly finalCandidate?: { readonly head: string; readonly tree: string };
   /** The commands this scenario's engineer runs, and what each one answers. */
   readonly commands?: readonly StatedCommand[] | undefined;
   /** A command the scenario sends while it runs, such as a stop. */
@@ -319,6 +322,7 @@ const iteration: Scenario = {
   },
   exercises: 'the run, the analysis, readiness, one work item worked by an ordinary and a repair iteration, a budget return, the shell, a module removed, the gates and their commits',
   ends: 'completed',
+  finalCandidate: { head: source(1), tree: '1'.repeat(40) },
   target: () => fixtureWith([
     {
       directory: notesDirectory, name: 'notes', files: {
@@ -421,6 +425,7 @@ const delegation: Scenario = {
   },
   exercises: 'a contract sub-session, registration, a yield, the provider, conformance, resumption and verification',
   ends: 'completed',
+  finalCandidate: { head: source(3), tree: '2'.repeat(40) },
   target: () => fixtureWith([notesModule, limitsModule]),
   script: root => byWork({
     'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
@@ -462,6 +467,7 @@ const placement: Scenario = {
   },
   exercises: 'placement requests, the view refresh, a partial fork, the decisions, the parent appends and the deliveries',
   ends: 'completed',
+  finalCandidate: { head: materialized, tree: '3'.repeat(40) },
   target: () => fixtureWith([], 'exit-0'),
   script: () => byRole({
     'initial-architect': [submit(analysis(
@@ -534,6 +540,7 @@ const access: Scenario = {
   },
   exercises: 'two access-only agreements, under the consumer\'s and an independent authority, and the work that uses them',
   ends: 'completed',
+  finalCandidate: { head: source(2), tree: '4'.repeat(40) },
   target: () => fixtureWith([
     notesModule,
     {
@@ -617,6 +624,7 @@ const breaking: Scenario = {
   },
   exercises: 'a staged outline with a breaking change, a compatible stage, and a breaking iteration with a broad scope and an all-project gate',
   ends: 'completed',
+  finalCandidate: { head: source(2), tree: '5'.repeat(40) },
   target: () => fixtureWith([
     {
       directory: notesDirectory, name: 'notes', files: {
@@ -744,6 +752,7 @@ const testless: Scenario = {
   },
   exercises: 'an engineer that reports the goal outside its scope, and an empty required selection: not verified, never a pass, and back to the architect',
   ends: 'completed',
+  finalCandidate: { head: materialized, tree: '6'.repeat(40) },
   target: () => fixtureWith([{ directory: limitsDirectory, name: 'limits', files: { 'src/limits.ts': 'export const limits = [];\n' } }]),
   script: () => byRole({
     'initial-architect': [submit(analysis([entry('note-limits', limits)]))],
@@ -783,6 +792,7 @@ const revision: Scenario = {
   },
   exercises: 'a provider that cannot conform, the revision its consumer assigns, and the evidence it reopens',
   ends: 'completed',
+  finalCandidate: { head: source(4), tree: '7'.repeat(40) },
   target: () => fixtureWith([notesModule, limitsModule]),
   script: root => byWork({
     'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
@@ -926,6 +936,29 @@ export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
   'agent-fails': agentFails, 'no-submission': noSubmission, 'invalid-analysis': invalidAnalysis, 'over-limit': overLimit,
 };
 
+/** The completed path makes four exact tree previews; the final gate's unchanged commit keeps its head. */
+export function compositionGit(root: string, scenario: Scenario): ScenarioGit {
+  const final = scenario.finalCandidate;
+  if (scenario.ends === 'completed' && final === undefined) {
+    throw new Error(`${scenario.name} must state the final audited candidate`);
+  }
+  if (final !== undefined && (scenario.ends !== 'completed' || final.head !== scenario.git.after)) {
+    throw new Error(`${scenario.name} has a final candidate inconsistent with its stated Git outcome`);
+  }
+  return scenarioGit(root, {
+    ...scenario.git,
+    ...(final === undefined ? {} : { previews: Array.from({ length: 4 }, () => ({ repositoryRoot: root, head: final.head, tree: final.tree })) }),
+  });
+}
+
+/** Only the revision audited by a completed scenario has a scripted candidate tree. */
+export function compositionCandidates(root: string, scenario: Scenario) {
+  const final = scenario.finalCandidate;
+  return scriptedCandidates(root, final === undefined ? {} : {
+    [final.head]: { tree: final.tree, files: {}, base: scenario.git.head, changes: [] },
+  });
+}
+
 /**
  * One run of a scenario, driven to its end, with nothing interrupting it.
  * `watch` is called after every durable write, while the run is running.
@@ -933,13 +966,14 @@ export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
 export async function runToEnd(scenario: Scenario, watch?: (service: RunService, runId: string) => Promise<void>) {
   const target = await scenario.target();
   const agent = createScriptedAgent(declaringScenarios(scenario.script(target.root)));
-  const git = scenarioGit(target.root, scenario.git);
+  const git = compositionGit(target.root, scenario);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let runId = '';
   let stopped = false;
   const opened = await openRuns(target.root, {
     agent,
     git,
+    candidates: compositionCandidates(target.root, scenario),
     // Every gate announces its commands, as the real executors do.
     readinessExecution: announcingCheckExecution(directReadinessExecution()),
     checkExecution: announcingCheckExecution(createPassingCheckExecution()),
@@ -955,7 +989,7 @@ export async function runToEnd(scenario: Scenario, watch?: (service: RunService,
   const receipt = await opened.service.execute(startRun(plan));
   await opened.service.settled(plan, receipt.jobId);
   commands.assertComplete();
-  git.assertComplete();
+  try { git.assertComplete(); } catch (error) { throw new Error(`${scenario.name}: Git script incomplete`, { cause: error }); }
   void runId;
   return {
     root: target.root,
@@ -995,7 +1029,7 @@ export interface CrashPoint {
 export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const target = await scenario.target();
   const agent = createScriptedAgent(declaringScenarios(scenario.script(target.root)));
-  const git = scenarioGit(target.root, scenario.git);
+  const git = compositionGit(target.root, scenario);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let resolveFrozen: (runId: string) => void = () => undefined;
   const frozen = new Promise<string>(resolve => { resolveFrozen = resolve; });
@@ -1004,6 +1038,7 @@ export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const opened = await openRuns(target.root, {
     agent,
     git,
+    candidates: compositionCandidates(target.root, scenario),
     // Every gate announces its commands, as the real executors do.
     readinessExecution: announcingCheckExecution(directReadinessExecution()),
     checkExecution: announcingCheckExecution(createPassingCheckExecution()),

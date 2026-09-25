@@ -163,8 +163,8 @@ function bootstrapDirectory(bootstrap: WriteScope['bootstrap'], module: string):
 
 /**
  * The scope as the guard compares against it. `denied` are canonical files
- * the guard refuses whatever the scope contains: the tracked feature files
- * and the project's configuration, which only the harness writes.
+ * the guard refuses whatever the scope contains: tracked feature files,
+ * captured source documents, and project configuration.
  */
 export function guardedScopeOf(scope: WriteScope, denied: readonly string[] = []): GuardedScope {
   return { revision: scope.revision, roots: scope.resolved.roots, files: scope.resolved.files, denied };
@@ -176,9 +176,9 @@ export function guardedScopeOf(scope: WriteScope, denied: readonly string[] = []
  * both project-relative in. A path that cannot be resolved is left out,
  * since nothing could write it either.
  */
-export async function deniedFiles(projectRoot: string, featureFiles: readonly string[]): Promise<string[]> {
+export async function deniedFiles(projectRoot: string, protectedFiles: readonly string[]): Promise<string[]> {
   const denied: string[] = [];
-  for (const path of [projectConfigurationFile, ...featureFiles]) {
+  for (const path of [projectConfigurationFile, ...protectedFiles]) {
     const target = await resolveRealTarget(projectRoot, path);
     if (target.ok && !denied.includes(target.resolved)) denied.push(target.resolved);
   }

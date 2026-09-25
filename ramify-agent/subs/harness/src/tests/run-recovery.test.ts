@@ -25,6 +25,7 @@ import { architectureLayout } from '../architecture/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { decision as decisionBody, forkDecision, requestPlacement } from './helpers/placement.js';
 import { createScriptedAgent, type Script } from '../../subs/agent/src/scripted.js';
+import { scriptedCandidates } from './helpers/candidates.js';
 import { declaringScenarios } from './helpers/declarations.js';
 import type { OpenRunsOptions } from './helpers/runs.js';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
@@ -112,7 +113,7 @@ function stateGit(
  * project after readiness, which is what the three commit boundaries below
  * are about.
  */
-const lateCommit: readonly CommitResponse[] = [{ commit: source(1), against: base, changes: untracked('src/late.ts') }];
+const lateCommit: readonly CommitResponse[] = [materialize, { commit: source(1), against: materialized, changes: untracked('src/late.ts') }];
 const lateRecovery: readonly RecoveredCommit[] = [{ gate: 'ga-0002', answers: [null, source(1)] }];
 
 async function target(
@@ -188,6 +189,7 @@ function commitCount(root: string): number {
 /** Whether the frozen run has written everything the boundary is named for. */
 async function reached(root: string, runId: string, events: string, write: RunWrite): Promise<boolean> {
   const types = await eventTypes(events);
+  const gateCommits = gitOf(root).commits().filter(call => call.gate !== 'scenarios' && call.commit !== null).length;
   switch (write) {
     case 'job-created': return types.length >= 1;
     case 'session-opened': return types.includes('session-opened');
@@ -213,11 +215,11 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'iteration-closed': return types.includes('iteration-closed');
     case 'work-item-completed': return types.includes('work-item-completed');
     // The operation intent is in the log and the commit is not made yet.
-    case 'gate-attempted': return types.includes('gate-committing') && commitCount(root) === 0;
+    case 'gate-attempted': return types.includes('gate-committing') && gateCommits === 0;
     // The commit is made and the exact revision has not completed audit yet.
-    case 'gate-committing': return types.includes('gate-committing') && !types.includes('gate-attempted') && commitCount(root) === 1;
+    case 'gate-committing': return types.includes('gate-committing') && !types.includes('gate-attempted') && gateCommits === 1;
     // The complete attempt is the effect's completion line.
-    case 'gate-committed': return types.includes('gate-attempted') && commitCount(root) === 1;
+    case 'gate-committed': return types.includes('gate-attempted') && gateCommits === 1;
     case 'placement-requested': return types.includes('placement-requested');
     case 'view-refreshed': return types.includes('view-refreshed');
     case 'fork-returned-partial': return types.includes('fork-returned-partial');
@@ -236,6 +238,11 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'evidence-reopened': return types.includes('evidence-reopened');
     case 'revision-needed': return types.includes('revision-needed');
     case 'dependency-cycle-detected': return types.includes('dependency-cycle-detected');
+    case 'nonfunctional-phase-started':
+    case 'nonfunctional-repair-assigned':
+    case 'nonfunctional-repair-committed':
+    case 'nonfunctional-assessed':
+    case 'candidate-prepared': return types.includes(write);
     case 'job-completed': return types.includes('job-completed');
   }
 }
@@ -544,27 +551,25 @@ describe('the recovery table', () => {
   test('a crash between the commit intent and the commit performs the effect again and makes one commit', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-attempted', true);
+    const { runId } = await crashAfter(root, 'gate-attempted', true, oneWorkItem());
 
     // The verified operation is durable and no commit was made for it.
-    expect(git.commits()).toEqual([]);
+    expect(git.commits()).toEqual([{ gate: 'scenarios', commit: materialized }]);
 
     const { recovery } = await reopen(root);
     expect(recovery.effects).toEqual([`review-notes/${runId}: the commit and audit of gate ga-0002`]);
     // The restart looked the gate's commit up, was told there is none, and
     // made exactly one for it.
-    expect(git.commits()).toEqual([{ gate: 'ga-0002', commit: source(1) }]);
+    expect(git.commits()).toEqual([{ gate: 'scenarios', commit: materialized }, { gate: 'ga-0002', commit: source(1) }]);
     expect(git.recovered()).toEqual([]);
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-interrupted',
-    ]);
-    // The architect context the run kept is finished as a run end finishes
-    // it, so the recovered run holds no suspended session.
-    expect(events.at(-2)!.data).toEqual({ session: 'ses-0001', reason: 'run-ended' });
-    expect([...reduceSessions(events).values()].map(session => session.state)).toEqual(['finished']);
+    expect(events.some(event => event.type === 'nonfunctional-phase-started')).toBe(false);
+    expect(events.filter(event => event.type === 'gate-attempted')).toHaveLength(1);
+    expect(events.at(-1)!.type).toBe('job-interrupted');
+    // The ordinary work-item gate retains its interruption contract. All
+    // retained architect sessions are released, without another invocation.
+    expect([...reduceSessions(events).values()].every(session => session.state === 'finished')).toBe(true);
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate('ga-0002')), 'utf8')) as { commit: string | null };
     expect(attempt.commit).toBe(source(1));
     git.assertComplete();
@@ -573,11 +578,11 @@ describe('the recovery table', () => {
   test('a crash after the commit, before its completion line, finds the commit and makes no second one', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-committing', true);
+    const { runId } = await crashAfter(root, 'gate-committing', true, oneWorkItem());
 
     // The commit was made before the crash, and its attempt is not written.
     const before = [...git.commits()];
-    expect(before).toEqual([{ gate: 'ga-0002', commit: source(1) }]);
+    expect(before).toEqual([{ gate: 'scenarios', commit: materialized }, { gate: 'ga-0002', commit: source(1) }]);
 
     const { recovery } = await reopen(root);
     expect(recovery.effects).toEqual([`review-notes/${runId}: the commit and audit of gate ga-0002`]);
@@ -594,7 +599,7 @@ describe('the recovery table', () => {
   test('a crash after the complete attempt leaves the commit alone and appends the interruption only', async () => {
     const root = await target(lateCommit, lateRecovery, source(1));
     const git = gitOf(root);
-    const { runId } = await crashAfter(root, 'gate-committed', true);
+    const { runId } = await crashAfter(root, 'gate-committed', true, oneWorkItem());
 
     const before = [...git.commits()];
     const { recovery } = await reopen(root);
@@ -609,10 +614,13 @@ describe('the recovery table', () => {
   }, 180_000);
 
   test('a restart of a completed run rewrites nothing and appends nothing', async () => {
-    const root = await target([unchanged(base)]);
+    const root = await target();
+    const tree = 'a'.repeat(40);
+    gits.set(root, scenarioGit(root, { head: base, after: base, commits: [unchanged(base)],
+      previews: Array.from({ length: 4 }, () => ({ repositoryRoot: root, head: base, tree })) }));
     const git = gitOf(root);
     const { service } = await openRuns(root, {
-      git,
+      git, candidates: scriptedCandidates(root, { [base]: { tree, base, files: {}, changes: [] } }),
       readinessExecution: directReadinessExecution(),
       script: [{ kind: 'submit', input: emptyAnalysis() }],
     });

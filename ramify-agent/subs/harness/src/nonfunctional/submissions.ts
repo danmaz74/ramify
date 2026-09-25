@@ -69,6 +69,7 @@ export const coordinatorActionSchema = z.discriminatedUnion('kind', [
 ]);
 export type CoordinatorAction = z.infer<typeof coordinatorActionSchema>;
 export const coordinatorActionJsonSchema = z.toJSONSchema(coordinatorActionSchema);
+export const coordinatorActionToolName = 'submit_nonfunctional_action';
 
 export interface ActionContext {
   readonly decision: RoundDecision;
@@ -94,6 +95,9 @@ export function validateCoordinatorAction(input: unknown, context: ActionContext
     value.nfrs.forEach((nfr, index) => {
       if (!unresolved.has(nfr)) errors.push({ path: `nfrs.${index}`, message: `${nfr} is not unresolved in this assessment` });
     });
+    if (!value.nfrs.some(nfr => !covered.has(nfr))) {
+      errors.push({ path: 'nfrs', message: 'Investigation must cover at least one unresolved NFR without committed investigation evidence' });
+    }
     if (context.decision.action === 'investigate'
       && !value.nfrs.some(nfr => undetermined.has(nfr) && !covered.has(nfr))) {
       errors.push({ path: 'nfrs', message: 'The required investigation must cover an undetermined NFR without committed investigation evidence' });
@@ -112,7 +116,8 @@ export function validateCoordinatorAction(input: unknown, context: ActionContext
       }
     });
   } else {
-    if (context.decision.action !== 'repair-or-close') {
+    if (context.decision.action !== 'repair-or-close'
+      && !(context.decision.action === 'close' && context.decision.unresolved.length > 0)) {
       errors.push({ path: 'kind', message: `Closing unresolved work is not permitted while the next step is ${context.decision.action}` });
     }
     const submitted = new Set(value.deviations.map(item => item.nfr));
@@ -138,6 +143,7 @@ export const coordinatorInvestigationSchema = z.object({
 }).strict();
 export type CoordinatorInvestigation = z.infer<typeof coordinatorInvestigationSchema>;
 export const coordinatorInvestigationJsonSchema = z.toJSONSchema(coordinatorInvestigationSchema);
+export const coordinatorInvestigationToolName = 'submit_nonfunctional_investigation';
 
 export function validateCoordinatorInvestigation(input: unknown, targetNfrs: readonly string[]): SubmissionValidation<CoordinatorInvestigation> {
   const shape = validateAgainst(coordinatorInvestigationSchema, input);
@@ -158,3 +164,4 @@ export const nonfunctionalRepairSubmissionSchema = z.discriminatedUnion('kind', 
 ]);
 export type NonfunctionalRepairSubmission = z.infer<typeof nonfunctionalRepairSubmissionSchema>;
 export const nonfunctionalRepairJsonSchema = z.toJSONSchema(nonfunctionalRepairSubmissionSchema);
+export const nonfunctionalRepairToolName = 'submit_nonfunctional_repair';

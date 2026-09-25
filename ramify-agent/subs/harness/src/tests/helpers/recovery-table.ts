@@ -6,7 +6,7 @@ import type { RunEvent } from '../../run/log.js';
 import type { RunWrite } from '../../run/service.js';
 import { reduceSessions } from '../../run/sessions.js';
 import {
-  crashAt, committedGates, fileHashes, identityOf, logLines, materialized, plan, recordText, recoveryCompletions, removeRecordFiles,
+  crashAt, committedGates, compositionCandidates, fileHashes, identityOf, logLines, materialized, plan, recordText, recoveryCompletions, removeRecordFiles,
   runDirectory, scenarios, source, statedCommands, committedRecords, type CrashPoint, type LogLine, type ScenarioName,
 } from './composition.js';
 import { scenariosCommitName, type GitResponses } from './recovery-git.js';
@@ -16,8 +16,9 @@ import { onlyRun, openRuns } from './runs.js';
 /*
  * The recovery tables of the ten state machines, composed into one table
  * keyed by the durable boundary a crash can land after. The keys are the
- * run service's own `RunWrite` union, so a boundary the service gains
- * without a row here is a type error, not a silent gap.
+ * existing interrupted-run boundaries. The five resumable non-functional
+ * boundaries have a separate witness in nonfunctional-recovery.test.ts;
+ * together their keys exhaust the run service's `RunWrite` union.
  *
  * Every row is held to the same checks, whatever its machine: recovery
  * calls no agent; every record file the log commits is materialized again,
@@ -92,7 +93,18 @@ const scenariosLookup = (answer: string | null) => (responses: GitResponses): Gi
 
 const interrupted: RunEvent['type'][] = ['job-interrupted'];
 
-/** One row per durable boundary of the run log. */
+// These boundaries resume the same phase; the table below intentionally tests
+// the older interruption contract. Their dedicated tests exercise actual resume.
+export const nonfunctionalRecoveryBoundaries = {
+  'nonfunctional-phase-started': 'nonfunctional-recovery.test.ts',
+  'candidate-prepared': 'nonfunctional-recovery.test.ts',
+  'nonfunctional-assessed': 'nonfunctional-recovery.test.ts',
+  'nonfunctional-repair-assigned': 'nonfunctional-recovery.test.ts',
+  'nonfunctional-repair-committed': 'nonfunctional-recovery.test.ts',
+} as const satisfies Partial<Record<RunWrite, string>>;
+type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries>;
+
+/** One row per durable boundary with the interrupted-run recovery contract. */
 export const recoveryTable = {
   'job-created': {
     machines: ['SM1'], scenario: 'iteration', appended: interrupted,
@@ -278,7 +290,7 @@ export const recoveryTable = {
     machines: ['SM6'], scenario: 'cycle', appended: interrupted,
     stated: 'The detection stands once; the return to the architect belongs to a run started again',
   },
-} satisfies Record<RunWrite, RecoveryRow>;
+} satisfies Record<InterruptedRunWrite, RecoveryRow>;
 
 /** The rows a boundary alone cannot place: the same write, at a moment another machine owns. */
 export const narrowedRows: ReadonlyArray<RecoveryRow & { readonly name: string; readonly write: RunWrite }> = [
@@ -352,7 +364,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     // The same Git answers the restart: the commit the interrupted run made
     // is the one this one finds by the attempt's identity trailers.
     const first = await openRuns(root, {
-      agent, git, readinessExecution: directReadinessExecution(),
+      agent, git, candidates: compositionCandidates(root, scenario), readinessExecution: directReadinessExecution(),
       // Recovery runs no command; one it ran would fail here rather than
       // starting a process.
       commandExecution: statedCommands(root, []),
@@ -452,7 +464,7 @@ export async function verifyRow(row: RecoveryRow & { readonly name: string; read
     reopened.pop();
     const askedAgain = { made: git.commits().length, found: git.recovered().length };
     const second = await openRuns(root, {
-      agent, git, readinessExecution: directReadinessExecution(),
+      agent, git, candidates: compositionCandidates(root, scenario), readinessExecution: directReadinessExecution(),
       commandExecution: statedCommands(root, []),
       inputs: scenario.inputs(),
     });

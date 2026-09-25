@@ -57,6 +57,7 @@ describe('non-functional coordinator submissions', () => {
   it('permits sequential investigation of unresolved IDs after the first investigation', () => {
     const investigate = { kind: 'investigate', nfrs: ['nfr-002'], question: 'Inspect the retry path', scope: ['src/retry.ts'] };
     expect(validateCoordinatorAction(investigate, actionContext({ investigatedNfrs: ['nfr-001'] })).ok).toBe(true);
+    expect(validateCoordinatorAction({ ...investigate, nfrs: ['nfr-001'] }, actionContext({ investigatedNfrs: ['nfr-001'] })).ok).toBe(false);
     expect(validateCoordinatorAction({ ...investigate, nfrs: ['nfr-001'] }, actionContext({ decision: { action: 'investigate', round: 1, undetermined: ['nfr-001'] } })).ok).toBe(true);
     expect(validateCoordinatorAction(investigate, actionContext({ decision: { action: 'investigate', round: 1, undetermined: ['nfr-001'] } })).ok).toBe(false);
     expect(validateCoordinatorAction({ ...investigate, nfrs: ['nfr-999'] }, actionContext()).ok).toBe(false);

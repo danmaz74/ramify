@@ -357,3 +357,120 @@ sequential investigation, project-wide guarded repair from a module `src/`
 working directory, complete reassessment after repair, and bounded deviation
 creation. It must also protect every captured source document in engineer
 guards and retain final tree revalidation after slow audit.
+
+## Iteration 7 — bounded repairs and same-run phase recovery
+
+**Starting revision:** `77727d8a` after iteration 6. A durable phase marker
+opts in only runs whose ordinary work and reviews have settled. The coordinator
+can make sequential read-only investigations, with each investigation covering
+at least one previously uninvestigated unresolved NFR. It may authorize one
+repair assignment in a round. The assignment is committed before its child
+starts and names the assessed candidate, target NFRs, and starting module.
+The repair engineer starts in that module's actual existing `src/` directory,
+has project-wide source scope, and remains subject to the write guard. Every
+captured plan, companion, linked document and principles file joins the
+guard's denied set alongside tracked feature files and project configuration.
+After a settled repair, scenario rendering and a fresh Git preview prepare a
+new candidate, and the coordinator reassesses the entire fixed NFR catalog.
+Round replay checks assignment authority, target coverage, candidate binding
+and the three-round bound; a third unresolved round closes exhausted. The
+iteration 8 CheckFinding transaction is integrated at the exhausted close and
+before the final gate as a coordinated follow-on change.
+
+Recovery continues only a phase-marked run. Before external effects or agent
+work, it authenticates the fixed catalog and captured documents, prompt
+package hashes, the round bound, ordinary-work settlement, and every prior
+writer's unique confirmed release. It resumes a committed repair assignment
+without creating another, reconciles a durable accepted child result before
+`nonfunctional-repair-committed`, and reads a committed reassessment rather
+than repeating it. An uncertain writer fails closed. Final-gate restart uses
+the recorded attempt and candidate binding; a pending keyed commit is replayed
+once. A source tree change during downtime, assessment, or final verification
+refuses the candidate, including after round three.
+
+**Verification:** These focused commands passed:
+
+```sh
+npx vitest run subs/harness/src/tests/nonfunctional-phase.test.ts subs/harness/src/tests/nonfunctional-submissions.test.ts subs/harness/src/tests/plan13-composed-functional.test.ts subs/harness/src/tests/run.test.ts subs/harness/src/tests/plan-deviations.test.ts
+npx vitest run subs/harness/src/tests/nonfunctional-repair.test.ts subs/harness/src/tests/nonfunctional-recovery.test.ts
+npx vitest run subs/harness/src/tests/nonfunctional-recovery.test.ts -t 'a final gate resumes'
+npx vitest run subs/harness/src/tests/nonfunctional-recovery.test.ts -t 'refuses downtime drift'
+npx vitest run subs/harness/src/tests/plan-evidence-required-runtime.test.ts
+npx vitest run subs/harness/src/tests/nonfunctional-recovery.test.ts -t 'round three exhausts'
+npx tsc --noEmit --pretty false
+npm run build:web
+npm run check:self
+```
+
+The real-Git repair witness starts with two NFRs, investigates the undetermined
+one before a targeted repair, writes two modules from the selected module's
+`src/`, denies an attempted plan write, and reassesses both NFRs on the
+post-repair candidate. Its second action prompt names the actual accepted
+investigation submission. A full-RunService test rejects a required missing
+companion before analysis acceptance. The recovery witness covers phase start,
+candidate preparation, assessment, repair assignment, accepted child result, repair
+commit, reassessment, three final-gate checkpoints, an unconfirmed writer,
+and an assigned repair whose tree changes during downtime: one run resumes
+where safe and otherwise fails closed. The round-three witness uses real Git
+and an audit worktree, then changes source during final verification and
+observes `inputs-changed` with no completion. The current self-check completed
+12 owners, 523 source files and 43 resources,
+with 0 errors, 0 warnings and 299 analysis limits. The full post-edit suite
+and audit remain the plan's later gate.
+
+
+## Iteration 8 — deviations and merge readiness
+
+The harness records each unresolved NFR after the final exhausted round as an
+exact-source deviation and run-owned CheckFinding in one ledger transaction.
+The record names the actual assessment, coordinator invocation, candidate,
+original passage and source hash, plus the proposed alternative or uncertainty.
+It creates no work item or contract request. Recovery verifies an existing
+record before skipping it. Both normal execution and phase resumption use the
+same transaction path before the final gate.
+
+Passing gates permit completion pending user review. The versioned harness
+projection derives merge readiness from the closed assessment phase, accepted
+catalog, final candidate/audit binding and current user decisions. The web
+renders that verdict and exact source passage. Acceptance changes review
+standing without rewriting the gate; revocation returns the deviation to
+pending review, and rejection retains a follow-up reason. An optional separate
+audit-overall record must agree when present; the durable gate attempt itself
+must carry its passing verdict, audited commit and audit evidence.
+
+**Verification:** `nonfunctional-deviation-runtime.test.ts` passed all three
+real-Git cases at the default three-round limit: pending/accept/retry/revoke/stale
+revision, rejection with a fresh service/ledger rebuild, and a failed final test
+gate that remains failed after acceptance. `nonfunctional-submissions.test.ts`
+passed eight tests after the action prompt gained the current assessment,
+permitted next step and actual investigation report paths. The composed
+functional trial queries readiness from the real harness projection; its root
+and companion document contribute two NFRs while the engineer cites one. The
+empty-catalog runtime witness also reports ready after a real audit-worktree
+execution binds the exact assessed tree.
+
+The Chromium readiness witness passed 14 checks over five actual run-query
+projections: pending, accepted, rejected, gate-failed and source-unavailable.
+It opened the actual CheckFinding history and displayed its complete source
+quote/path. This is a component-browser witness using real ledger projections,
+not a live HTTP or model run. The initial artifact was generated while source
+was dirty; iteration 9 reruns it from the committed implementation. Main and
+browser TypeScript checks passed. Commands include:
+
+```sh
+npx vitest run subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts --maxWorkers=1
+npx vitest run subs/harness/src/tests/nonfunctional-submissions.test.ts --maxWorkers=1
+npx tsx scripts/browser-acceptance/plan13-readiness.ts
+npm run type-check
+```
+
+**Regression corrections:** older scripted Git fixtures now declare exact final
+candidate previews and audit-tree answers; they continue to reject unstated
+operations. The composed review fixture gives a queued attempt a smaller budget
+than its settlement window and explicitly observes concurrent readers. A
+revisited work item keeps its immutable context selection but opens a fresh
+architect session when the orientation session has finished. The existing
+contract-revision composition reproduces and verifies that correction without
+reselection. The five-file composition/recovery group passed 54 tests, the
+contract/gate/integration group passed 16, and the earlier recovery suite passed
+32. These focused results do not replace the final whole-suite audit.

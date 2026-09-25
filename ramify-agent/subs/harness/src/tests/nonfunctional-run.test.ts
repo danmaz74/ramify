@@ -5,6 +5,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { commitTree, gitService } from '../../subs/evidence/src/git.js';
 import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { RunQueries } from '../projections/queries.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 
@@ -36,6 +37,11 @@ test('an empty fixed catalog records a candidate-bound empty assessment and audi
   if (prepared?.type !== 'candidate-prepared' || bound?.type !== 'candidate-bound-to-gate') return;
   expect(bound.data.tree).toBe(prepared.data.tree);
   expect(await commitTree(fixture.root, bound.data.commit)).toBe(prepared.data.tree);
+  const readiness = await new RunQueries(service).mergeReadiness('review-notes', receipt.jobId,
+    service.getRun('review-notes', receipt.jobId)!.version);
+  expect(readiness.readiness.status, readiness.readiness.reason).toBe('ready');
+  expect(readiness.readiness).toMatchObject({ candidate: { tree: prepared.data.tree },
+    finalGate: bound.data.gate, gateCommit: bound.data.commit, checkFindings: [] });
 }, 30_000);
 
 test('a mutation during final verification refuses completion after auditing the assessed commit', async () => {

@@ -45,7 +45,7 @@ function submitted(spec: SessionSpec) {
     catalog: [
       { classification: 'advice' as const, passage: cited(companion, 'Use Redis if practical.'), conditions: [], uncertainty: 'Tentative suggestion.' },
       { classification: 'non-functional-requirement' as const, passage: cited(companion, 'The service must preserve a 30 second timeout.'),
-        conditions: [{ text: 'for the service', source: 'inferred' as const }], uncertainty: '' },
+        conditions: [{ text: 'The service', source: 'stated' as const }, { text: 'for the service', source: 'inferred' as const }], uncertainty: '' },
     ],
   };
 }

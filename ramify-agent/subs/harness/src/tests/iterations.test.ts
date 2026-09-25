@@ -169,7 +169,7 @@ describe('G8: a work item revised across several iterations keeps every obligati
     const invocations = events.filter(event => event.type === 'invocation-started'
       && event.data.role === 'local-architect' && architectTurns.has(event.data.invocation));
     expect(invocations).toHaveLength(4);
-    expect(new Set(invocations.map(event => event.data.session)).size).toBe(1);
+    expect(new Set(invocations.flatMap(event => event.type === 'invocation-started' ? [event.data.session] : [])).size).toBe(1);
 
     // An obligation an earlier revision opened is not lost: the work item's
     // own gate is the only thing that closes it, and each accepted iteration

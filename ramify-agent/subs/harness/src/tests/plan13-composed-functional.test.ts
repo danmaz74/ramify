@@ -9,6 +9,7 @@ import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/
 import { contextSelectorToolName, workOrientationToolName } from '../context-selection/submissions.js';
 import { coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import { runLayout } from '../run/records.js';
+import { RunQueries } from '../projections/queries.js';
 import { copyFixture } from './helpers/fixture.js';
 import { withPlan13Fixture } from './helpers/declarations.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
@@ -50,7 +51,9 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   const selectedQuote = 'The service must preserve a 30 second timeout.';
   const uncitedQuote = 'Every review must retain an audit record.';
   const advice = 'Use Redis if practical.';
-  writeFileSync(plan, `# Request\n\n${selectedQuote}\n${uncitedQuote}\n${advice}\n\n# Acceptance\n\nThe scenario passes.\n`);
+  writeFileSync(plan, `# Request\n\n${selectedQuote}\n${advice}\nSee [audit requirements](audit.md).\n\n# Acceptance\n\nThe scenario passes.\n`);
+  writeFileSync(join(dirname(plan), 'audit.md'), `# Audit requirements\n\n${uncitedQuote}\n`);
+  let documents: Array<{ id: string; path: string; sha256: string }> = [];
   let passages: Array<{ document: string; sha256: string; start: number; end: number; quote: string }> = [];
   let localTurn = 0;
   const agent = createScriptedAgent(withPlan13Fixture(spec => {
@@ -58,11 +61,15 @@ test('functional work cites one NFR while the coordinator assesses the complete 
       const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
       if (!captured) throw new Error('Missing captured plan');
       const directory = dirname(dirname(captured));
-      const root = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents[0]!;
-      const bytes = readFileSync(join(directory, root.storedAt));
+      const capturedDocuments = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents;
+      documents = capturedDocuments.map(({ id, path, sha256 }) => ({ id, path, sha256 }));
       passages = [selectedQuote, uncitedQuote, advice].map(quote => {
-        const start = bytes.indexOf(Buffer.from(quote));
-        return { document: root.id, sha256: root.sha256, start, end: start + Buffer.byteLength(quote), quote };
+        for (const document of capturedDocuments) {
+          const bytes = readFileSync(join(directory, document.storedAt));
+          const start = bytes.indexOf(Buffer.from(quote));
+          if (start >= 0) return { document: document.id, sha256: document.sha256, start, end: start + Buffer.byteLength(quote), quote };
+        }
+        throw new Error(`Missing captured passage: ${quote}`);
       });
       return submit({ ...analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]),
         catalog: [
@@ -117,13 +124,15 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   expect(accepted?.data.catalog).toEqual({ nfr: 2, advice: 1 });
   const catalog = JSON.parse(await readFile(join(directory, accepted!.data.evidence!.catalog.path), 'utf8'));
   expect(catalog.items.map((item: { id: string; classification: string }) => [item.id, item.classification])).toEqual([
-    ['nfr-001', 'non-functional-requirement'], ['nfr-002', 'non-functional-requirement'], ['adv-001', 'advice'],
+    ['nfr-001', 'non-functional-requirement'], ['adv-001', 'advice'], ['nfr-002', 'non-functional-requirement'],
   ]);
   const engineers = agent.sessions.filter(session => session.spec.role === 'engineer');
   expect(engineers).toHaveLength(1);
   expect(engineers[0]!.spec.prompt).toContain(selectedQuote);
   expect(engineers[0]!.spec.prompt).not.toContain(uncitedQuote);
   expect(engineers[0]!.spec.prompt).not.toContain(advice);
+  expect(passages[0]!.document).not.toBe(passages[1]!.document);
+  expect(documents.some(document => document.path === 'plans/revision-diff/audit.md')).toBe(true);
   const coordinator = agent.sessions.filter(session => session.spec.role === 'nonfunctional-coordinator');
   expect(coordinator).toHaveLength(1);
   expect(coordinator[0]!.spec.prompt).toContain(selectedQuote);
@@ -134,6 +143,14 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   expect(assessment.results.map((item: { nfr: string }) => item.nfr)).toEqual(['nfr-001', 'nfr-002']);
   expect(assessment.candidate.tree).toBe(tree);
   expect(events.find(event => event.type === 'candidate-prepared')?.data.tree).toBe(tree);
+  const bound = events.find(event => event.type === 'candidate-bound-to-gate');
+  expect(bound?.type).toBe('candidate-bound-to-gate');
+  if (bound?.type !== 'candidate-bound-to-gate') throw new Error('Missing final candidate binding');
+  const readiness = await new RunQueries(opened.service).mergeReadiness('revision-diff', receipt.jobId,
+    opened.service.getRun('revision-diff', receipt.jobId)!.version);
+  expect(readiness.readiness.status, readiness.readiness.reason).toBe('ready');
+  expect(readiness.readiness).toMatchObject({ candidate: { tree },
+    finalGate: bound.data.gate, gateCommit: bound.data.commit, checkFindings: [] });
   expect(git.operations().previewCandidateTree).toBe(5);
   git.assertComplete();
   if (exportPath !== undefined) {
@@ -158,7 +175,7 @@ test('functional work cites one NFR while the coordinator assesses the complete 
       trial: 'functional-two-nfr-one-cited', boundary: 'actual harness state machine with scripted agent, Git and checks; no process/model quality claim',
       run: { id: receipt.jobId, state: last?.type, durationMs: first && last ? Date.parse(last.at) - Date.parse(first.at) : null,
         eventCount: events.length, finalGate: [...events].reverse().find(event => event.type === 'gate-attempted' && event.data.checkpoint === 'final')?.data ?? null },
-      source: { manifestHash: catalog.manifestHash, catalogHash: hash(catalogBytes),
+      source: { documents, manifestHash: catalog.manifestHash, catalogHash: hash(catalogBytes),
         selectionHash: hash(selectionBytes), assignmentContextHash: hash(assignmentBytes), packageHash: hash(packageBytes),
         catalogCounts: accepted!.data.catalog, catalogItems: catalog.items.map((item: { id: string; classification: string }) => ({ id: item.id, classification: item.classification })),
         selectedIds: selection.selected.map((item: { item: string }) => item.item), citedIds: assignment.citedItems,

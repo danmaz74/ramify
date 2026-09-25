@@ -309,7 +309,7 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'nonfunctional-repair-committed':
       return [`Non-functional round ${event.data.round} repaired`, ref('invocation', event.data.invocation)];
     case 'nonfunctional-round-closed':
-      return [`Non-functional round ${event.data.round} closed: ${event.data.outcome}`, []];
+      return [`Non-functional round ${event.data.round} closed: ${event.data.outcome}`, ref('invocation', event.data.actionInvocation)];
     case 'nonfunctional-deviation-recorded':
       return [`Non-functional deviation ${event.data.deviation} recorded for ${event.data.nfr}`, []];
     case 'candidate-bound-to-gate':

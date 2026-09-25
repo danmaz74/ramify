@@ -65,6 +65,12 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
     return view.record.manifest.documentManifest === undefined
       ? legacyNonfunctionalCoverage(view.record.manifest) : unavailable(evidence.reason);
   }
+  const accepted = view.events.find(event => event.type === 'analysis-accepted');
+  const marker = view.events.find(event => event.type === 'nonfunctional-phase-started');
+  if (accepted?.type !== 'analysis-accepted' || marker?.type !== 'nonfunctional-phase-started'
+    || accepted.data.evidence?.catalog.hash !== marker.data.catalogHash) {
+    return unavailable('The assessment phase is not bound to the accepted catalog');
+  }
   const completed = view.events.find(event => event.type === 'job-completed');
   const bound = [...view.events].reverse().find(event => event.type === 'candidate-bound-to-gate'
     && event.data.gate === completed?.data.gate);
@@ -73,7 +79,8 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
   const audit = view.gateAuditOutcomes.get(bound.data.gate)?.body;
   if (gate?.checkpoint !== 'final' || gate.verdict !== 'passed'
     || gate.audited !== bound.data.commit || completed.data.commit !== bound.data.commit
-    || audit?.overall !== 'pass' || audit.audited !== bound.data.commit) {
+    || gate.evidence === null
+    || (audit !== undefined && (audit.overall !== 'pass' || audit.audited !== bound.data.commit))) {
     return unavailable('The final gate, audit and candidate binding disagree');
   }
   const nfrIds = evidence.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
@@ -147,9 +154,6 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
       }
     }
     const current = currentDeviationDecision(entry);
-    if (!current && entry.decisions.some(decision => decision.actor.kind === 'user')) {
-      return unavailable(`Deviation ${record.id} has no current user decision at this revision`);
-    }
     if (current && !authenticUserCommand(view, record.checkFinding, current)) {
       return unavailable(`Deviation ${record.id} has no accepted current user command`);
     }

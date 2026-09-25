@@ -176,7 +176,11 @@ export const runEventSchema = z.discriminatedUnion('type', [
     candidate: text, nfrs: z.array(text), startingModule: text,
   }).strict()),
   event('nonfunctional-repair-committed', z.object({ round: z.int().positive(), invocation: text, assignment: text }).strict()),
-  event('nonfunctional-round-closed', z.object({ round: z.int().positive(), record: text, outcome: z.enum(['satisfied', 'continue', 'exhausted', 'unavailable']) }).strict()),
+  event('nonfunctional-round-closed', z.object({ round: z.int().positive(), record: text,
+    outcome: z.enum(['satisfied', 'continue', 'exhausted', 'unavailable']),
+    /** Accepted coordinator close submission for unresolved choices; absent on earlier runs. */
+    actionInvocation: text.optional(),
+  }).strict()),
   event('nonfunctional-deviation-recorded', z.object({ deviation: text, nfr: text, assessment: text, checkFinding: text,
     checkFindings: checkFindingEventsField,
   }).strict()),
