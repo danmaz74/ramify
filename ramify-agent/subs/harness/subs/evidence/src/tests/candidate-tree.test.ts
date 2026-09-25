@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { commitAccepted, commitTree, createRunBranch } from '../git.js';
+import { commitAccepted, commitTree, createRunBranch, gitService } from '../git.js';
 import { previewCandidateTree } from '../candidate-tree.js';
 import { testRepository, withoutGitConfiguration, type TestRepository } from './helpers/git.js';
 
@@ -47,6 +47,7 @@ test('preview matches a whole-worktree commit and preserves staged user index by
   await rm(join(repo.root, 'delete.txt'));
   const indexBefore = await readFile(join(repo.root, '.git', 'index'));
   const preview = await withPrivateTemporaryDirectory(() => previewCandidateTree(repo.root));
+  expect(await withPrivateTemporaryDirectory(() => gitService.previewCandidateTree(repo.root))).toEqual(preview);
   expect(preview).toMatchObject({ repositoryRoot: repo.root, head: expect.stringMatching(/^[0-9a-f]{40}$/), tree: expect.stringMatching(/^[0-9a-f]{40}$/) });
   expect(await readFile(join(repo.root, '.git', 'index'))).toEqual(indexBefore);
   const commit = await commitAccepted(repo.root, 'preview witness');

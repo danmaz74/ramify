@@ -1,5 +1,6 @@
 import { expect, type Mocked } from 'vitest';
 import type { GitService } from '../../../subs/evidence/src/git.js';
+import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
 import { mockGit } from './mock-git.js';
 
 /*
@@ -32,6 +33,8 @@ export interface CommitResponse {
 export interface GitAnswers {
   /** The revision the fixture is on before the run commits anything. */
   readonly head: string;
+  /** Exact ordered candidate tree answers; omitted means no preview may be requested. */
+  readonly previews?: readonly CandidateTreePreview[] | undefined;
   readonly commits: readonly CommitResponse[];
   /**
    * Revisions Git reports for a gate's identity trailers, or a scenario
@@ -72,6 +75,7 @@ const runBranchPrefix = 'ramify-agent-run/';
 /** A scripted external Git for one scenario. */
 export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
   let index = 0;
+  let previewIndex = 0;
   let head = answers.head;
   let branch: string | null = null;
   const messages: string[] = [];
@@ -91,6 +95,17 @@ export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
   const pending = (): readonly GitChange[] => answers.commits[index]?.changes ?? [];
 
   const git = mockGit({
+    async previewCandidateTree(project) {
+      const answer = answers.previews?.[previewIndex];
+      check('previewCandidateTree', () => {
+        expect(project).toBe(root);
+        expect(answer, 'no additional tree preview was scripted').toBeDefined();
+        expect(answer!.repositoryRoot).toBe(root);
+        expect(answer!.head).toBe(head);
+      });
+      previewIndex += 1;
+      return answer!;
+    },
     async currentHead(project) {
       check('currentHead', () => expect(project).toBe(root));
       return head;
@@ -182,6 +197,7 @@ export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
       expect(failures).toEqual([]);
       expect(git.unexpected).toEqual([]);
       expect(index).toBe(answers.commits.length);
+      expect(previewIndex).toBe(answers.previews?.length ?? 0);
     },
   });
 }

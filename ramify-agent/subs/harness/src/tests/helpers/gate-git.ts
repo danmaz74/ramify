@@ -1,5 +1,6 @@
 import { expect } from 'vitest';
 import type { LineChange } from '../../kpi/lines.js';
+import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
 import { mockGit } from './mock-git.js';
 
 /*
@@ -59,6 +60,8 @@ export interface TrailedCommit {
 export interface GateGitOptions {
   /** The revision the project is on before the run commits anything. */
   readonly head: string;
+  /** Exact ordered candidate tree answers; omitted means no preview may be requested. */
+  readonly previews?: readonly CandidateTreePreview[] | undefined;
   /** The commit boundaries this scenario reaches, in order. */
   readonly commits: readonly GateCommit[];
   /**
@@ -135,6 +138,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
   let branch: string | null = null;
   let gate: string | null = null;
   let cursor = 0;
+  let previewCursor = 0;
   for (const range of options.diffs ?? []) ranges.set(`${range.from}..${range.to}`, range.changes);
 
   function record(operation: string, detail = ''): void {
@@ -169,6 +173,16 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
   }
 
   const git = mockGit({
+    async previewCandidateTree(project) {
+      expect(project).toBe(root);
+      const answer = options.previews?.[previewCursor];
+      if (answer === undefined) fail(`Git was asked for tree preview ${previewCursor + 1}; this scenario scripts ${options.previews?.length ?? 0}`);
+      expect(answer.repositoryRoot).toBe(root);
+      expect(answer.head).toBe(head);
+      previewCursor += 1;
+      record('previewCandidateTree', answer.tree);
+      return answer;
+    },
     async currentHead(project) {
       expect(project).toBe(root);
       record('currentHead', head);
@@ -272,6 +286,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
       expect(failures).toEqual([]);
       expect(git.unexpected).toEqual([]);
       expect(`${cursor} of ${options.commits.length} commit boundaries`).toBe(`${options.commits.length} of ${options.commits.length} commit boundaries`);
+      expect(previewCursor).toBe(options.previews?.length ?? 0);
     },
   };
 }

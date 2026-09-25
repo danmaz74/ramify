@@ -1,5 +1,6 @@
 import { expect } from 'vitest';
 import type { CommitTrailer, GitService } from '../../../subs/evidence/src/git.js';
+import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
 import type { LineChange } from '../../kpi/lines.js';
 import { mockGit } from './mock-git.js';
 
@@ -57,6 +58,8 @@ export interface RecoveredCommit {
 export interface GitResponses {
   /** The revision the project is on before the run commits anything. */
   readonly head: string;
+  /** Exact ordered candidate tree answers; omitted means no preview may be requested. */
+  readonly previews?: readonly CandidateTreePreview[] | undefined;
   readonly commits: readonly CommitResponse[];
   /** The accepted boundary after the last supplied commit response is consumed. */
   readonly after?: string | undefined;
@@ -128,6 +131,7 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
   let head = responses.head;
   let branch: string | null = null;
   let cursor = 0;
+  let previewCursor = 0;
   let lastGate: string | null = null;
   const made: CommitCall[] = [];
   const found: string[] = [];
@@ -164,6 +168,17 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
   // and throws for every other one, so an unstated boundary fails rather
   // than passing silently.
   const mock = mockGit({
+    async previewCandidateTree(project) {
+      asked('previewCandidateTree', project);
+      const answer = responses.previews?.[previewCursor];
+      if (answer === undefined) unanswered(`Git was asked for tree preview ${previewCursor + 1}; this scenario states ${responses.previews?.length ?? 0}`);
+      check(() => {
+        expect(answer.repositoryRoot).toBe(root);
+        expect(answer.head).toBe(head);
+      });
+      previewCursor += 1;
+      return answer;
+    },
     async currentHead(project) {
       asked('currentHead', project);
       return head;
@@ -281,6 +296,7 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
       expect(failures, 'Git answers this scenario was asked for wrongly').toEqual([]);
       expect(mock.unexpected, 'Git operations this scenario states no answer for').toEqual([]);
       expect(cursor, 'stated commit responses consumed').toBe(responses.commits.length);
+      expect(previewCursor, 'stated tree previews consumed').toBe(responses.previews?.length ?? 0);
     },
   }) as unknown as ScenarioGit;
 }

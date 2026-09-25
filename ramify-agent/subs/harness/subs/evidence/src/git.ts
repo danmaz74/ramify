@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand, childEnvironment } from './run-command.js';
 import type { CommandOutcome } from './run-command.js';
+import type { previewCandidateTree } from './candidate-tree.js';
 
 /*
  * Git, for the run branch. Each function is one thin call over `runCommand`:
@@ -513,6 +514,7 @@ export const gitCandidateSource: CandidateSource = { commitTree, treeEntries, re
  * the project's root explicit, just as the command adapter does.
  */
 export interface GitService {
+  readonly previewCandidateTree: typeof previewCandidateTree;
   readonly currentHead: typeof currentHead;
   readonly isCleanRepository: typeof isCleanRepository;
   readonly createRunBranch: typeof createRunBranch;
@@ -530,6 +532,7 @@ export interface GitService {
 
 /** The process-backed adapter. Consumer tests should supply a scripted GitService. */
 export const gitService: GitService = {
+  previewCandidateTree: async (projectRoot, signal) => (await import('./candidate-tree.js')).previewCandidateTree(projectRoot, signal),
   currentHead, isCleanRepository, createRunBranch, commitAccepted,
   findCommitByTrailer, findCommitByTrailers, changedPaths, changedEntries,
   diffNameStatus, diffNumstat, commitNameStatus, worktreeLineChanges, worktreePatch,

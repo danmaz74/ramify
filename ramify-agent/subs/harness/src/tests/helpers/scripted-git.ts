@@ -1,5 +1,6 @@
 import { expect } from 'vitest';
 import type { GitService } from '../../../subs/evidence/src/git.js';
+import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
 
 export interface GitCheckpoint {
   readonly subject: string;
@@ -20,6 +21,8 @@ export function scenariosCommit(planId: string, commit = `scenarios-of-${planId}
 export interface GitScript {
   readonly head: string;
   readonly checkpoints: readonly GitCheckpoint[];
+  /** Exact ordered tree previews, never inferred from checkpoint commits. */
+  readonly previews?: readonly CandidateTreePreview[] | undefined;
   /** The working tree's patch against the head, where the scenario states one; otherwise Git cannot say. */
   readonly patch?: string | undefined;
 }
@@ -40,6 +43,7 @@ export interface ScriptedGit extends GitService {
  */
 export function scriptedGit(root: string, script: GitScript): ScriptedGit {
   let index = 0;
+  let previewIndex = 0;
   // Gate attempts after readiness's `ga-0001`; the scenarios commit is no gate's.
   let gates = 0;
   let head = script.head;
@@ -59,6 +63,16 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     throw new Error(failures.at(-1));
   }
   return {
+    async previewCandidateTree(project) {
+      const answer = script.previews?.[previewIndex];
+      check('previewCandidateTree', project, () => {
+        expect(answer, 'no additional tree preview was scripted').toBeDefined();
+        expect(answer!.repositoryRoot).toBe(root);
+        expect(answer!.head).toBe(head);
+      });
+      previewIndex += 1;
+      return answer!;
+    },
     async currentHead(project) { check('currentHead', project); return head; },
     async isCleanRepository(project) { check('isCleanRepository', project); return true; },
     async createRunBranch(project, runId) {
@@ -113,7 +127,11 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     async diffNumstat() { return unsupported('diffNumstat'); },
     async commitNameStatus() { return unsupported('commitNameStatus'); },
     givenWrites() { pending = script.checkpoints[index]!.changes; },
-    assertComplete() { expect(failures).toEqual([]); expect(index).toBe(script.checkpoints.length); },
+    assertComplete() {
+      expect(failures).toEqual([]);
+      expect(index).toBe(script.checkpoints.length);
+      expect(previewIndex).toBe(script.previews?.length ?? 0);
+    },
     head: () => head,
     commits: () => made,
     branch: () => branch,
