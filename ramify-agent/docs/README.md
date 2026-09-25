@@ -39,6 +39,10 @@ Design documents for the separate agent harness:
   draft analysis: debugging generalizes the capability requirement as a
   correction, while refactoring is a plan kind of its own with target
   assertions and a protected boundary
+- [Plan requirements, advisory items and context selection](analysis/2026-09-25-plan-requirements-and-context-selection.md),
+  initial analysis for evidence capture, one-time context selection and
+  non-functional work; [Plan 13](plans/13-plan-evidence-and-nonfunctional-work/main-plan.md)
+  records the later decisions that narrow its catalog and coordinator
 - [Plan execution dashboard](analysis/2026-09-23-plan-execution-dashboard/README.md),
   inventory of what the web client shows and the harness records, with
   screenshots, and a [design proposal](analysis/2026-09-23-plan-execution-dashboard/design-proposal.md)
@@ -131,6 +135,9 @@ Design documents for the separate agent harness:
 - [Plan 12: CheckFindings and iteration reviews](plans/12-check-findings/main-plan.md),
   proposed v1 implementation of durable CheckFindings, background code, scope
   and design reviews, work-item reconciliation and selected factual evidence
+- [Plan 13: plan evidence, context selection and non-functional work](plans/13-plan-evidence-and-nonfunctional-work/main-plan.md),
+  proposed capture and delivery of plan and principles evidence, with bounded
+  non-functional assessment and repair
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and

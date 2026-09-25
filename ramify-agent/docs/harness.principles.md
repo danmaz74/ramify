@@ -52,6 +52,13 @@ a signal.
 authors. A scenario a person approved, translated by an agent, is a person's
 requirement verified through an agent's reading of it.
 
+### Free-Text Judgment Requires an Agent or LLM
+
+Whenever the harness must interpret free text and make a judgment, it uses an
+agent or at least an LLM. Regexes, keyword matching and similar heuristics
+cannot decide the meaning of free text or substitute for that judgment.
+Deterministic parsing remains appropriate for explicitly structured inputs.
+
 ### Bounded Context Is What Makes Agents Efficient
 
 Here, search space means the information available for an invocation to

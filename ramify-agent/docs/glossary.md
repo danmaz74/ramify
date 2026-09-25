@@ -51,12 +51,23 @@ of judgment, by the agent applying it or reviewing against it.
 
 ## Plan
 
-A **plan** is a person's request for a feature, written as
-`plans/<plan-id>/plan.md` in the target project.
+A **plan** is a person's request for a change to a target project, rooted at
+`plans/<plan-id>/plan.md` and possibly expressed in accompanying documents.
 
 The harness reads and captures a plan and never edits it. The plans that
 deliver ramify-agent itself are development documents under `docs/plans/` and
 are not plans in this sense.
+
+## Plan evidence
+
+**Plan evidence** is a captured plan document or passage, identified by its
+source path and revision, that establishes what the plan said.
+
+## Principles evidence
+
+**Principles evidence** is a captured passage from a `.principles.md` document,
+identified by its source path and revision, that establishes what the
+principle said.
 
 ## Capability
 
