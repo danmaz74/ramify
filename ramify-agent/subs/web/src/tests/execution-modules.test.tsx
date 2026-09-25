@@ -98,9 +98,9 @@ test('main selection highlights several modules; module selection counts hidden 
   fireEvent.click(within(execution).getByRole('button', { name: /Status requires theme tokens, requirement/ }));
   expect(within(modules).getByRole('treeitem', { name: /project\/ui.*highlighted/ }).getAttribute('data-highlighted')).toBe('true');
   expect(within(modules).getByRole('treeitem', { name: /project\/theme.*highlighted/ }).getAttribute('data-highlighted')).toBe('true');
-  fireEvent.click(within(execution).getByRole('button', { name: 'Collapse Status badge' }));
+  fireEvent.click(within(execution).getByRole('button', { name: 'Collapse status-badge' }));
   fireEvent.keyDown(within(modules).getByRole('treeitem', { name: /project\/ui/ }), { key: 'Enter' });
-  expect(within(execution).getByRole('button', { name: 'Expand Status badge, 3 matches inside' }).textContent).toContain('3 matches inside');
+  expect(within(execution).getByRole('button', { name: 'Expand status-badge, 3 matches inside' }).textContent).toContain('3 matches inside');
   const detail = screen.getByLabelText('Details for module project/ui');
   expect(detail.textContent).toContain('3 directly related execution nodes; 3 hidden in collapsed branches');
   fireEvent.click(within(detail).getByRole('button', { name: /Renders the status badge.*hidden; reveal/ }));

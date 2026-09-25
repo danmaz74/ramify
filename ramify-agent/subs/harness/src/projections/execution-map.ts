@@ -31,6 +31,7 @@ export async function executionMapOf(view: RunView, tree: ModuleTree): Promise<E
 
 const key = (kind: ExecutionNode['kind'], id: string): string => `${kind}:${id}`;
 const count = (total: number) => ({ state: 'complete' as const, known: total, total });
+/** A role or checkpoint token in title case; a capability keeps its id as its label. */
 const label = (name: string) => name.replace(/(^|[-\s])\S/g, part => part.toUpperCase()).replaceAll('-', ' ');
 
 /** First commit establishes placement in the run; the latest revision supplies displayed data. */
@@ -141,8 +142,8 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     const requirements = [...view.records.requirements.values()].filter(requirement => requirement.forCapability === registry.capability);
     const requirementKeys = requirements.map(requirement => key('requirement', requirement.id));
     const verifiedCount = requirements.filter(requirement => verified.has(`${requirement.id}@${requirement.revision}`)).length;
-    add({ ...base(key('capability', registry.capability), label(registry.capability), source), kind: 'capability',
-      level: registry.origin === 'entry' ? 'entry' : 'lower', state: capability.state, reason: capability.reason,
+    add({ ...base(key('capability', registry.capability), registry.capability, source), kind: 'capability',
+      level: registry.origin === 'entry' ? 'entry' : 'lower', behavior: registry.behavior, state: capability.state, reason: capability.reason,
       owner: registry.owner,
       proposed: registry.proposed === undefined ? null : { parent: registry.proposed.parent,
         directory: registry.proposed.directory, purpose: registry.proposed.purpose, tags: [...registry.proposed.tags] },

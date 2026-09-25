@@ -128,8 +128,9 @@ const nodeBase = {
 
 /** One canonical card per durable element; graph links carry relationships. */
 export const executionNodeSchema = z.discriminatedUnion('kind', [
+  /** A capability's label is its id as registered; `behavior` is its registered behavior. */
   z.object({ ...nodeBase, kind: z.literal('capability'), level: z.enum(['entry', 'lower']),
-    state: capabilityStateSchema, reason: text, owner: modulePathSchema.nullable(),
+    behavior: text, state: capabilityStateSchema, reason: text, owner: modulePathSchema.nullable(),
     proposed: z.object({ parent: modulePathSchema, directory: text, purpose: text, tags: z.array(z.string()) }).strict().nullable(),
     scenarios: z.object({ coverage: executionCountCoverageSchema,
       passed: count, failed: count, other: count, noRealRun: count, unavailable: count }).strict(),

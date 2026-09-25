@@ -5,7 +5,7 @@ import type { ExecutionNode } from '../../harness/src/interfaces/protocol/execut
 import type { ProjectedRunEvent } from '../../harness/src/interfaces/protocol/runs.js';
 import type { ProtocolClient } from './client.js';
 import type { ExecutionMapSnapshot } from './execution-map-client.js';
-import { estimatedCardHeight, executionLayout, runBandKey, settlePositions } from './execution-map-layout.js';
+import { cardWidth, estimatedCardHeight, executionLayout, runBandKey, settlePositions } from './execution-map-layout.js';
 import { ExecutionModules } from './execution-modules.js';
 import { executionMapVisualTokens as tokens } from './execution-map-tokens.js';
 import { waitingLabel } from './decision-waits.js';
@@ -18,6 +18,8 @@ type CardData = { node: ExecutionNode | null; collapsed: boolean; hiddenCount: n
   selected: boolean; related: boolean; flash: boolean; hasChildren: boolean; repairFrom: string | null;
   /** When a running gate started, from its `gate-started` event; null when the event is not at hand. */
   startedAt: string | null;
+  /** The command a running gate is on, as `gateStep` words it; null for any other card. */
+  step: string | null;
   /** The module line, from `moduleText`. */
   module: string;
   /** A work item the run holds for the person's decision, as the run's snapshot states it. */
@@ -78,6 +80,22 @@ function gateFacts(node: GateNode, repairFrom: string | null): string {
     !node.active && node.audit !== 'not-applicable' ? auditWords[node.audit] : null].filter(Boolean).join(' · ');
 }
 
+/** A gate's verdict in words, or Running while it runs. */
+function verdictText(node: GateNode): string {
+  return node.verdict === null ? 'Running' : verdictWords[node.verdict];
+}
+
+/** The command a running gate started last, as the map's current activity states it. */
+type ExecutionGateCommand = NonNullable<ExecutionMapSnapshot['current']['gateCommand']>;
+const commandWords: Record<ExecutionGateCommand['kind'], string> = {
+  tests: 'Tests', 'type-check': 'Type check', 'ramify-check': 'Ramify check', conformance: 'Conformance', scenarios: 'Scenarios',
+};
+
+/** The command a running gate is on, and its place among the gate's commands: "Type check (2 of 4)". */
+function gateStep(command: ExecutionGateCommand): string {
+  return `${commandWords[command.kind]} (${command.position} of ${command.total})`;
+}
+
 function elapsedText(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s`
@@ -91,23 +109,47 @@ function Elapsed({ since }: { since: string }) {
   return <> for {elapsedText(now - Date.parse(since))}</>;
 }
 
-function ScenarioSummary({ node, collapsed }: { node: Extract<ExecutionNode, { kind: 'capability' }>; collapsed: boolean }) {
+/** A scenario's latest result from a gate that was not a dry run; a scenario no such gate has run is not run yet. */
+function realResultText(result: Extract<ExecutionNode, { kind: 'scenario' }>['latestRealResult']): string {
+  return result === 'no-real-run' ? 'not run yet' : result;
+}
+
+type CapabilityNode = Extract<ExecutionNode, { kind: 'capability' }>;
+/** Scenario results in the order the summary names and draws them; "not run yet" is a scenario no real (not dry-run) gate has run. */
+const scenarioBuckets = [['passed', 'passed', 'completed'], ['failed', 'failed', 'failed'], ['other', 'other', 'attention'],
+  ['noRealRun', 'not run yet', 'todo'], ['unavailable', 'unavailable', 'todo']] as const;
+
+/**
+ * A capability's scenario results, naming only the results that occur, out of its scenarios: "3 passed · 1 failed of 4",
+ * or "2 of 2 not run yet" when every counted scenario has one result.
+ */
+function scenarioText(scenarios: CapabilityNode['scenarios']): string {
+  const coverage = scenarios.coverage;
+  if (coverage.state === 'unavailable') return `Scenarios unavailable: ${coverage.reason}`;
+  if (coverage.known === 0 && coverage.state === 'complete') return 'No scenarios';
+  const present = scenarioBuckets.filter(([field]) => scenarios[field] > 0);
+  const of = coverage.state === 'partial' ? `${coverage.known} known${coverage.total === null ? '' : ` of ${coverage.total}`}` : `${coverage.known}`;
+  if (present.length === 1) return `${scenarios[present[0]![0]]} of ${of} ${present[0]![1]}`;
+  return `${present.map(([field, words]) => `${scenarios[field]} ${words}`).join(' · ')} of ${of}`;
+}
+
+function ScenarioSummary({ node, collapsed }: { node: CapabilityNode; collapsed: boolean }) {
   const s = node.scenarios;
-  const parts = [s.passed, s.failed, s.other, s.noRealRun, s.unavailable];
-  const labels = ['passed', 'failed', 'other', 'no real run', 'unavailable'];
-  const colors = ['completed', 'failed', 'attention', 'todo', 'todo'] as const;
+  const parts = scenarioBuckets.map(([field]) => s[field]);
+  const colors = scenarioBuckets.map(([, , color]) => color);
   const known = s.coverage.state === 'unavailable' ? 0 : s.coverage.known;
-  return <div className="execution-scenario-summary" aria-label={`Scenarios ${countText(s.coverage)}`}>
+  const text = scenarioText(s);
+  return <div className="execution-scenario-summary" aria-label={`Scenarios: ${text}`}>
     {collapsed && known <= 20 ? <div className="execution-dots" aria-hidden="true">{parts.flatMap((count, i) =>
       Array.from({ length: count }, (_, j) => <i key={`${i}-${j}`} style={{ backgroundColor: statusColor[colors[i]!] }} />))}</div>
       : <div className="execution-segments" aria-hidden="true">{parts.map((count, i) => count > 0 &&
         <i key={i} style={{ width: `${known ? count / known * 100 : 0}%`, backgroundColor: statusColor[colors[i]!] }} />)}</div>}
-    <small>{labels.map((label, i) => `${parts[i]} ${label}`).join(' · ')}; {countText(s.coverage)}</small>
+    <small aria-hidden="true">{text}</small>
   </div>;
 }
 
 function ExecutionCard({ data }: NodeProps<CardNode>) {
-  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, startedAt, module, awaitingDecision, onSelect, onToggle } = data;
+  const { node, collapsed, hiddenCount, hiddenMatches, active, selected, related, flash, hasChildren, repairFrom, startedAt, step, module, awaitingDecision, onSelect, onToggle } = data;
   if (node === null) return <div className="execution-card execution-run-band"><strong>Run band</strong><small>Initial architecture, integration and run-wide evidence</small><Handle type="source" position={Position.Right} isConnectable={false} /></div>;
   const role = node.kind === 'session' ? tokens.roleIdentity[node.role] : null;
   const roleAccent = node.kind === 'session' ? tokens.light.role[node.role] : null;
@@ -123,14 +165,17 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
         ? <small className={`execution-gate-mark audit-${node.audit}`} aria-label={`Verdict ${node.verdict ?? 'running'}; audit ${node.audit}`}>
           {node.verdict === null ? <>Running{startedAt && <Elapsed since={startedAt} />}</> : verdictWords[node.verdict]}</small>
         : <small className={roleAccent ? 'execution-role-label' : undefined} style={roleAccent ? { color: roleAccent } : undefined}>{node.kind === 'session' ? <><RoleIcon role={node.role} /> {role!.label}</> : node.kind.replace('-', ' ')}</small>}
-      <strong>{node.label}</strong>
+      {node.kind === 'gate' && step && <small className="execution-gate-step">{step}</small>}
+      {/* A capability is named by its id as registered, with its registered behavior as the description. */}
+      {node.kind === 'capability' ? <><strong><code className="execution-capability-id">{node.label}</code></strong>
+        <small className="execution-capability-behavior" title={node.behavior}>{node.behavior}</small></> : <strong>{node.label}</strong>}
       {awaitingDecision && <small className="execution-decision-mark">{waitingLabel}</small>}
       <small>{module}</small>
       {node.kind === 'session' && node.role === 'local-architect' && <small>Local architect lane · {node.invocations.length} invocation{node.invocations.length === 1 ? '' : 's'} across the work item</small>}
       {node.kind === 'iteration' && <small>Iteration {node.ordinal} · outline {node.outlineRevision} · {node.outcome ?? node.state}</small>}
       {node.kind === 'requirement' && <small>{node.state} · provider {node.providerStage} · revision {node.currentRevision}</small>}
       {node.kind === 'contract' && <small>{node.mode} · revision {node.revision} · {node.state}</small>}
-      {node.kind === 'scenario' && <small>{node.latestRealResult} · {node.state}</small>}
+      {node.kind === 'scenario' && <small>{realResultText(node.latestRealResult)} · {node.state}</small>}
       {node.kind === 'capability' && <><small>{node.state} · {node.reason}</small><ScenarioSummary node={node} collapsed={collapsed} />
         {!collapsed && <small>Requirements: {node.directRequirements.verified} verified of {countText(node.directRequirements.coverage)} direct current-revision requirements</small>}</>}
       {node.kind === 'gate' && gateFacts(node, repairFrom) && <small>{gateFacts(node, repairFrom)}</small>}
@@ -142,6 +187,11 @@ function ExecutionCard({ data }: NodeProps<CardNode>) {
   </div>;
 }
 const nodeTypes = { execution: ExecutionCard };
+/** The lowest zoom at which card text stays readable: the initial view and a requested centring never open below it. */
+const readableZoom = 0.8;
+const fitPadding = 0.15;
+/** The space above and left of the run's top when the initial view opens there. */
+const fitMargin = 24;
 /** Heights of the cards of each kind in the real run's canvas, used until a card is measured. */
 const estimatedHeights: Partial<Record<ExecutionNode['kind'] | 'run-band', number>> = { 'run-band': 110, capability: 210, gate: 140, session: 100 };
 
@@ -159,20 +209,20 @@ function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }:
     ...[...map.moduleMap.modules, ...map.moduleMap.outsideTree].flatMap(row =>
       row.direct.filter(relation => relation.element === node.key).map(relation => `${row.module} (${relation.role})`))]);
   return <section className="execution-detail" aria-label={`Details for ${node.label}`}>
-    <h3>{node.label}</h3><p><code>{node.key}</code> · {node.kind}</p>
+    <h3>{node.kind === 'capability' ? <code>{node.label}</code> : node.label}</h3><p><code>{node.key}</code> · {node.kind}</p>
     {moduleRoles.size > 0 && <p>Modules: {[...moduleRoles].join('; ')}</p>}
-    {node.kind === 'capability' && <><p>{node.reason}</p><p>Scenarios {countText(node.scenarios.coverage)}; requirements {node.directRequirements.verified} verified of {countText(node.directRequirements.coverage)} direct current-revision requirements.</p>
+    {node.kind === 'capability' && <><p>{node.reason}</p><p>Scenarios: {scenarioText(node.scenarios)}; requirements {node.directRequirements.verified} verified of {countText(node.directRequirements.coverage)} direct current-revision requirements.</p>
       {capability.state.status === 'ready' && capability.state.data && (capability.state.data.detail.state === 'available'
         ? <p>{capability.state.data.detail.description}</p> : <p>Full description unavailable: {capability.state.data.detail.reason}</p>)}
       {capability.state.status === 'failed' && <p role="alert">Could not read description: {capability.state.error.message}</p>}</>}
-    {node.kind === 'scenario' && <><p>Latest real result: {node.latestRealResult}; lifecycle: {node.state}.</p>
+    {node.kind === 'scenario' && <><p>Latest real result: {realResultText(node.latestRealResult)}; lifecycle: {node.state}.</p>
       {scenario.state.status === 'ready' && scenario.state.data && (scenario.state.data.detail.state === 'available'
         ? <><pre>{scenario.state.data.detail.source.join('\n')}</pre><h4>Result history</h4>
           {scenario.state.data.detail.gates.length ? <ol>{scenario.state.data.detail.gates.map((g, i) => <li key={`${g.gate}:${i}`}>{g.gate}: {g.status}{g.dryRun ? ' (dry run)' : ''}; gate {g.verdict}; {g.checkpoint}</li>)}</ol>
             : <p>No recorded gate result.</p>}</> : <p>Full scenario unavailable: {scenario.state.data.detail.reason}</p>)}
       {scenario.state.status === 'failed' && <p role="alert">Could not read scenario: {scenario.state.error.message}</p>}</>}
     {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}{node.audit !== 'not-applicable' ? `; audit ${node.audit}` : ''}{node.repairRound > 0 ? `; repair round ${node.repairRound}` : ''}; cause {node.cause ?? 'none'}.</p>
-      {node.active ? <p>The gate is running; its full check result will be available when this attempt settles.</p>
+      {node.active ? <p>The gate is running{map.current.runningGate === node.key && map.current.gateCommand ? `: ${gateStep(map.current.gateCommand)}` : ''}; its full check result will be available when this attempt settles.</p>
         : <button type="button" onClick={() => onOpenGate(node.key.slice('gate:'.length))}>Open full check and audit detail</button>}
       {gate.state.status === 'ready' && gate.state.data && <><p>Attempt commit {gate.state.data.commit ?? 'none'}; audited commit {gate.state.data.audited ?? 'none'}; audit evidence {gate.state.data.evidence?.runRef ?? 'not published'}.</p>
         {gate.state.data.commands.map((command, i) => <div key={i} className="command"><p>{command.kind}: {command.outcome}; exit {command.exitCode ?? 'none'}; {command.elapsedMs} ms.</p>
@@ -204,16 +254,21 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   // (each pan frame among them), so each carries its measured size back: a card without one is hidden, and its edges
   // dropped, until the canvas measures it again.
   const [measured, setMeasured] = useState<ReadonlyMap<string, { width: number; height: number }>>(new Map());
-  const onNodesChange = (changes: NodeChange<CardNode>[]) => setMeasured(current => {
-    let next: Map<string, { width: number; height: number }> | null = null;
-    for (const change of changes) if (change.type === 'dimensions' && change.dimensions) {
-      const known = current.get(change.id);
-      if (known && Math.abs(known.width - change.dimensions.width) < 1 && Math.abs(known.height - change.dimensions.height) < 1) continue;
-      next ??= new Map(current);
-      next.set(change.id, { width: change.dimensions.width, height: change.dimensions.height });
-    }
-    return next ?? current;
-  });
+  const onNodesChange = (changes: NodeChange<CardNode>[]) => {
+    setMeasured(current => {
+      let next: Map<string, { width: number; height: number }> | null = null;
+      for (const change of changes) if (change.type === 'dimensions' && change.dimensions) {
+        const known = current.get(change.id);
+        if (known && Math.abs(known.width - change.dimensions.width) < 1 && Math.abs(known.height - change.dimensions.height) < 1) continue;
+        next ??= new Map(current);
+        next.set(change.id, { width: change.dimensions.width, height: change.dimensions.height });
+      }
+      return next ?? current;
+    });
+    // Only a card the person dragged keeps a stored position.
+    const dragged = changes.flatMap(change => change.type === 'position' && change.position ? [[change.id, change.position] as const] : []);
+    if (dragged.length) onPositions(new Map([...positions, ...dragged]));
+  };
   const heights = useMemo(() => new Map([...measured].map(([key, size]) => [key, size.height])), [measured]);
   const heightOf = useMemo(() => {
     const kinds = new Map(map.nodes.map(node => [node.key, node.kind]));
@@ -242,12 +297,9 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     }
     return counts;
   }, [allPlace, collapsed, hiddenMatches]);
+  // Every card follows the layout, which a version update, a measured card or a collapsed branch recomputes, so collapsing
+  // a branch closes its gap. Only a card the person dragged keeps its stored position.
   const effectivePositions = useMemo(() => settlePositions(layout.placements, positions, heightOf), [layout, positions, heightOf]);
-  // A card's position is kept once the canvas has measured it; until then it follows the layout.
-  useEffect(() => {
-    const fresh = layout.placements.filter(p => !positions.has(p.key) && heights.has(p.key));
-    if (fresh.length) onPositions(new Map([...positions, ...fresh.map(p => [p.key, effectivePositions.get(p.key)!] as const)]));
-  }, [effectivePositions, positions, heights, layout, onPositions]);
   // The canvas centres a card only when a person asks for it (a card, list or event jump, Now, Focus on map). A version
   // update, an expanded branch or a measured card leaves the pan and zoom where the person put them.
   const [centring, setCentring] = useState<{ key: string; nonce: number } | null>(null);
@@ -279,12 +331,34 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
     if (!at || layout.hidden.has(centring.key)) return;
     setCentring(null);
     void flow.setCenter(at.x + 120, at.y + 48, {
-      zoom: Math.max(viewport.zoom, 0.8), duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 300,
+      zoom: Math.max(viewport.zoom, readableZoom), duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 300,
     });
   }, [centring, effectivePositions, layout]);
+  // The initial view, once every placed card is measured: the whole run when it fits at a readable zoom; otherwise a
+  // readable zoom centred on the active card, or on the top of the run when nothing is active. Later updates keep the view.
+  const pane = useRef<HTMLDivElement>(null);
+  const [initialView, setInitialView] = useState(false);
+  useEffect(() => {
+    if (initialView || !layout.placements.every(p => measured.has(p.key))) return;
+    setInitialView(true);
+    const width = pane.current?.clientWidth ?? 0, height = pane.current?.clientHeight ?? 0;
+    const cards = layout.placements.map(p => ({ key: p.key, ...(effectivePositions.get(p.key) ?? p) }));
+    const left = Math.min(...cards.map(card => card.x)), top = Math.min(...cards.map(card => card.y));
+    const right = Math.max(...cards.map(card => card.x + (measured.get(card.key)?.width ?? cardWidth)));
+    const bottom = Math.max(...cards.map(card => card.y + heightOf(card.key)));
+    const fitZoom = Math.min(width / ((right - left) * (1 + 2 * fitPadding)), height / ((bottom - top) * (1 + 2 * fitPadding)));
+    // An unmeasured pane (as in a test renderer) cannot say whether the run fits, so it fits.
+    if (!width || !height || fitZoom >= readableZoom) { void flow.fitView({ padding: fitPadding, maxZoom: 1 }); return; }
+    const target = [map.current.runningGate, map.current.awaitedSession].find(key => key && effectivePositions.has(key) && !layout.hidden.has(key));
+    const at = target ? effectivePositions.get(target)! : null;
+    if (at && target) void flow.setCenter(at.x + cardWidth / 2, at.y + heightOf(target) / 2, { zoom: readableZoom, duration: 0 });
+    else void flow.setViewport({ x: fitMargin - left * readableZoom, y: fitMargin - top * readableZoom, zoom: readableZoom }, { duration: 0 });
+  }, [initialView, layout, measured, effectivePositions, heightOf, map.current]);
   const active = new Set([map.current.awaitedSession, map.current.runningGate].filter((key): key is string => key !== null));
   const repairs = new Map(map.links.filter(l => l.kind === 'repair-of' && l.from.coverage !== 'unresolved' && l.to.coverage !== 'unresolved')
     .map(l => [l.from.key, l.to.key]));
+  /** The mark of the gate a repair gate repairs, or null for a gate that repairs none. */
+  const repairFrom = (key: string) => { const prior = byKey.get(repairs.get(key) ?? ''); return prior?.kind === 'gate' ? prior.verdict ? verdictMarks[prior.verdict] : '…' : null; };
   const eventTimes = useMemo(() => new Map(events.map(event => [event.sequence, event.at])), [events]);
   const startedAt = (key: string) => {
     const node = byKey.get(key);
@@ -299,8 +373,9 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       hasChildren: hasChildren.has(p.key),
       awaitingDecision: byKey.get(p.key)?.kind === 'work-item' && waitingWorkItems.has(p.key.slice('work-item:'.length)),
       startedAt: startedAt(p.key),
+      step: p.key === map.current.runningGate && map.current.gateCommand ? gateStep(map.current.gateCommand) : null,
       module: (() => { const node = byKey.get(p.key); return node ? moduleText(node, byKey) : ''; })(),
-      repairFrom: (() => { const prior = byKey.get(repairs.get(p.key) ?? ''); return prior?.kind === 'gate' ? prior.verdict === 'failed' ? '✗' : prior.verdict === 'passed' ? '✓' : '?' : null; })(),
+      repairFrom: repairFrom(p.key),
       onSelect: jump, onToggle: toggle }, draggable: false, selectable: true }));
   const visible = new Set(nodes.map(node => node.id));
   const edges: Edge[] = [];
@@ -316,8 +391,8 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
   return <div className="execution-area area-wide" aria-label="Execution map">
     <header className="execution-heading"><h2>Execution map</h2><div className="execution-actions">
       <button type="button" onClick={focusNow} disabled={!map.current.runningGate && !map.current.awaitedSession}>Now</button>
-      <button type="button" onClick={() => void flow.fitView({ padding: 0.15 })}>Fit</button>
-      <button type="button" onClick={() => { onPositions(new Map(layout.placements.map(p => [p.key, { x: p.x, y: p.y }]))); void flow.fitView({ padding: 0.15 }); }}>Relayout</button>
+      <button type="button" onClick={() => void flow.fitView({ padding: fitPadding })}>Fit</button>
+      <button type="button" onClick={() => { onPositions(new Map()); void flow.fitView({ padding: fitPadding }); }}>Relayout</button>
     </div></header>
     <p className="muted">Version {map.runVersion}{map.freshness === 'stale' ? ' · stale connection' : ''}; nodes {map.coverage.nodes.shown} / {map.coverage.nodes.total}, links {map.coverage.links.shown} / {map.coverage.links.total}, {map.tree.status === 'available' ? `modules ${map.coverage.modules.shown} / ${map.coverage.modules.total}` : `recorded module rows ${map.coverage.modules.shown} / ${map.coverage.modules.total} (hierarchy unavailable)`}.
       {map.links.filter(link => link.from.coverage === 'unresolved' || link.to.coverage === 'unresolved').length > 0 &&
@@ -328,9 +403,9 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       <summary>Coverage gaps ({map.coverage.gaps.length}) · first: <span className="execution-coverage-preview">{map.coverage.gaps.slice(0, 2).join('; ')}</span></summary>
       <ol>{map.coverage.gaps.map((gap, index) => <li key={`${index}:${gap}`}>{gap}</li>)}</ol>
     </details>}
-    <div className="execution-workspace"><div className="execution-maps"><div className="execution-viewport" aria-label="Zoomable execution canvas">
+    <div className="execution-workspace"><div className="execution-maps"><div className="execution-viewport" aria-label="Zoomable execution canvas" ref={pane}>
       <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} viewport={viewport} onMove={(_, next) => onViewport(next)} onNodesChange={onNodesChange}
-        nodesDraggable={false} nodesConnectable={false} elementsSelectable deleteKeyCode={null} fitView minZoom={0.2} maxZoom={2}>
+        nodesDraggable={false} nodesConnectable={false} elementsSelectable deleteKeyCode={null} minZoom={0.2} maxZoom={2}>
         <Background /><Controls showInteractive={false} />
       </ReactFlow></div>
       <ExecutionModules map={map} selectedModule={selectedModule} highlightedModules={highlightedModules}
@@ -342,7 +417,7 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
           <li key={n.key}><button type="button" onClick={() => jump(n.key)}><span className="execution-role-label" style={{ color: tokens.light.role[n.role] }}><RoleIcon role={n.role} /> {tokens.roleIdentity[n.role].label}</span> · {n.label} · {n.state} · {n.workItem ?? n.reach.kind} · {moduleText(n, byKey)}</button>
             {' '}<button type="button" onClick={() => onOpenSession(n.key.slice('session:'.length))}>Transcript</button></li>)}</ul></section>
         <section aria-label="All gates"><h3>All gates ({map.nodes.filter(n => n.kind === 'gate').length})</h3><ul>{map.nodes.filter(n => n.kind === 'gate').map(n => n.kind === 'gate' &&
-          <li key={n.key}><button type="button" onClick={() => jump(n.key)}>{n.label} · {n.checkpoint} · {n.subject.workItem ?? 'run-wide'}{n.subject.iteration ? ` / ${n.subject.iteration}` : ''} · {n.verdict ?? 'running'} · audit {n.audit} · round {n.repairRound}</button></li>)}</ul></section>
+          <li key={n.key}><button type="button" onClick={() => jump(n.key)}>{[n.label, verdictText(n), moduleText(n, byKey), gateFacts(n, repairFrom(n.key))].filter(Boolean).join(' · ')}</button></li>)}</ul></section>
         <section aria-label="References"><h3>References</h3><ul>{layout.references.filter(l => l.kind === 'provider-for' || l.kind === 'depends-on' || l.from.coverage === 'unresolved' || l.to.coverage === 'unresolved').map(l =>
           <li key={l.id}>{l.kind}: {l.from.key} → {l.to.key}{l.from.coverage === 'unresolved' || l.to.coverage === 'unresolved' ? ' · unresolved' : ' · shared or cycle reference'}</li>)}</ul></section>
       </aside></div>

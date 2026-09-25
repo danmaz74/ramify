@@ -94,8 +94,8 @@ export function executionLayout(nodes: readonly ExecutionNode[], links: readonly
 }
 
 /**
- * Where each placed card is drawn. A card keeps its `kept` position across version updates; a card without one
- * takes its layout position, or the first free place below it in its column. A kept card moves only when a card
+ * Where each placed card is drawn. A card the person dragged keeps its `kept` position; every other card takes its
+ * layout position, or the first free place below it in its column. A kept card moves only when a card
  * above it in its column has grown into it, and then just below that card. No two cards of a column meet.
  */
 export function settlePositions(placements: readonly ExecutionPlacement[], kept: ReadonlyMap<string, CardPosition>,
