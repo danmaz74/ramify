@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { copyFixture } from './helpers/fixture.js';
 import { emptyAnalysis, initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { commitTree, gitService } from '../../subs/evidence/src/git.js';
+import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
+import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -14,7 +16,9 @@ test('an empty fixed catalog records a candidate-bound empty assessment and audi
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
   await initRepository(fixture.root);
-  const { service } = await openRuns(fixture.root, { git: gitService, script: [{ kind: 'submit', input: emptyAnalysis() }] });
+  const { service } = await openRuns(fixture.root, { git: gitService,
+    checkExecution: createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(fixture.root) }),
+    script: [{ kind: 'submit', input: emptyAnalysis() }] });
   cleanups.unshift(() => service.close());
 
   const receipt = await service.execute(startRun('review-notes'));
