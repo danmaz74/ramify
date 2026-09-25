@@ -761,8 +761,15 @@ the form `owner:file#binding`, such as `app/catalog/core:records.ts#findRecord`"
   `3cbed96a-2ba6-4ac4-8e13-72364ddcd1c3`). Its first run, on `799eecb4`,
   failed in `progress-fixture.test.ts` only, because the H8 fix changed a call
   count that the fixture pinned.
-- **E5. Audit of the H13-H16 fixes.** No ramify-audit has run on ramify-agent
-  since `c1ffa136`/`b0a1f99a` (H16) merged. Status: pending.
+- **E5. Audit of the H14-H16 fixes.** The same request passed on `51cbb4ee`
+  (run `29393a02-b9ba-404d-b577-c9d9140d30cc`, 221 s, report commit
+  `6f139491`). A first attempt on `b0a1f99a` produced no verdict: a
+  concurrent session's `npm ci`, run through a symlink it had made to this
+  checkout's `ramify-agent/node_modules`, emptied that directory fifteen
+  seconds into the suite, and ramify-audit's command timeout then killed
+  `npm` without its process tree, so the orphaned vitest held the audit for
+  seventeen more minutes. Neither is a ramify-agent defect; the tree kill is
+  fixed in ramify-audit 0.1.1 with H13. H13 itself is audited when it merges.
 
 ## Not reached
 
