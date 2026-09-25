@@ -1,0 +1,28 @@
+{
+  "arm": "candidate",
+  "model": "openai-codex/gpt-6-sol",
+  "cwd": "/tmp/ramify-cwd-eval/architect-candidate/subs/workspace/subs/reviews/src",
+  "systemChars": 56894,
+  "systemBytes": 56924,
+  "userChars": 2332,
+  "userBytes": 2338,
+  "package": "local-architect/5",
+  "packageHash": "6f10b7a59e6dab8f4e79e583dc2dec1771bed16281c71271235996a0e1b7c89b",
+  "view": {
+    "module": "collection-review/workspace/reviews",
+    "views": [
+      {
+        "area": "src",
+        "path": "subs/workspace/subs/reviews/src/.ramify",
+        "revision": "rev/1:1e04eb7d-34d0-46ec-ad6a-354daf9005db:1",
+        "coverage": 1
+      },
+      {
+        "area": "src/tests",
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify",
+        "revision": "rev/1:1e04eb7d-34d0-46ec-ad6a-354daf9005db:1",
+        "coverage": 2
+      }
+    ]
+  }
+}

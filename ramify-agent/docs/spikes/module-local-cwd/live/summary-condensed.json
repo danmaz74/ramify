@@ -1,0 +1,86 @@
+{
+  "architect-baseline": {
+    "cwd": "/tmp/ramify-cwd-eval/architect-baseline",
+    "elapsedMs": 47735,
+    "accepted": true,
+    "toolCalls": 24,
+    "byCategory": {
+      "own-module": 14,
+      "global-architect-view": 2,
+      "own-generated-api": 5,
+      "foreign-source": 1,
+      "foreign-declaration": 1
+    },
+    "errors": 0,
+    "usage": {
+      "input": 45465,
+      "output": 1753,
+      "cacheRead": 70784,
+      "cacheWrite": 0,
+      "total": 118002
+    },
+    "systemBytes": 55203,
+    "promptBytes": 1892
+  },
+  "architect-candidate": {
+    "cwd": "/tmp/ramify-cwd-eval/architect-candidate/subs/workspace/subs/reviews/src",
+    "elapsedMs": 37131,
+    "accepted": true,
+    "toolCalls": 14,
+    "byCategory": {
+      "own-module": 7,
+      "own-generated-api": 6
+    },
+    "errors": 0,
+    "usage": {
+      "input": 21449,
+      "output": 1271,
+      "cacheRead": 30720,
+      "cacheWrite": 0,
+      "total": 53440
+    },
+    "systemBytes": 56924,
+    "promptBytes": 2338
+  },
+  "engineer-baseline": {
+    "cwd": "/tmp/ramify-cwd-eval/engineer-baseline",
+    "elapsedMs": 62957,
+    "accepted": true,
+    "toolCalls": 15,
+    "byCategory": {
+      "own-module": 5,
+      "own-generated-api": 4,
+      "other": 1
+    },
+    "errors": 1,
+    "usage": {
+      "input": 26893,
+      "output": 1470,
+      "cacheRead": 72832,
+      "cacheWrite": 0,
+      "total": 101195
+    },
+    "systemBytes": 19970,
+    "promptBytes": 2494
+  },
+  "engineer-candidate": {
+    "cwd": "/tmp/ramify-cwd-eval/engineer-candidate/subs/workspace/subs/reviews/src",
+    "elapsedMs": 65320,
+    "accepted": true,
+    "toolCalls": 15,
+    "byCategory": {
+      "own-module": 7,
+      "own-generated-api": 2
+    },
+    "errors": 0,
+    "usage": {
+      "input": 16589,
+      "output": 1456,
+      "cacheRead": 88832,
+      "cacheWrite": 0,
+      "total": 106877
+    },
+    "systemBytes": 21871,
+    "promptBytes": 2986
+  }
+}

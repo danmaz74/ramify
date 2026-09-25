@@ -1,0 +1,37 @@
+{
+  "matched": {
+    "architect-baseline": {
+      "sessionFile": "/tmp/ramify-cwd-eval/architect-baseline-artifacts/pi-session/2026-09-25T08-26-20-797Z_01a0d7ac-2efc-7562-8987-9ee5ca6bbae1.jsonl",
+      "headerCwd": "/tmp/ramify-cwd-eval/architect-baseline",
+      "timestamp": "2026-09-25T08:26:20.797Z",
+      "sessionId": "01a0d7ac-2efc-7562-8987-9ee5ca6bbae1"
+    },
+    "architect-candidate": {
+      "sessionFile": "/tmp/ramify-cwd-eval/architect-candidate-artifacts/pi-session/2026-09-25T08-29-16-082Z_01a0d7ae-dbb1-774a-b69a-e0dc0f455f4b.jsonl",
+      "headerCwd": "/tmp/ramify-cwd-eval/architect-candidate/subs/workspace/subs/reviews/src",
+      "timestamp": "2026-09-25T08:29:16.082Z",
+      "sessionId": "01a0d7ae-dbb1-774a-b69a-e0dc0f455f4b"
+    },
+    "engineer-baseline": {
+      "sessionFile": "/tmp/ramify-cwd-eval/engineer-baseline/plans/.harness/sessions/20260925T082453Z-8c8adb/session/2026-09-25T08-24-53-184Z_01a0d7aa-d8bf-731d-8d6a-c6a814ae1217.jsonl",
+      "headerCwd": "/tmp/ramify-cwd-eval/engineer-baseline",
+      "timestamp": "2026-09-25T08:24:53.184Z",
+      "sessionId": "01a0d7aa-d8bf-731d-8d6a-c6a814ae1217"
+    },
+    "engineer-candidate": {
+      "sessionFile": "/tmp/ramify-cwd-eval/engineer-candidate/plans/.harness/sessions/20260925T082925Z-104d3f/session/2026-09-25T08-29-25-438Z_01a0d7af-003d-74ac-9404-39750ccfac4e.jsonl",
+      "headerCwd": "/tmp/ramify-cwd-eval/engineer-candidate/subs/workspace/subs/reviews/src",
+      "timestamp": "2026-09-25T08:29:25.438Z",
+      "sessionId": "01a0d7af-003d-74ac-9404-39750ccfac4e"
+    }
+  },
+  "abortedSetupAttempt": {
+    "sessionFile": "/tmp/ramify-cwd-eval/architect-candidate-artifacts/pi-session/2026-09-25T08-28-45-764Z_01a0d7ae-6543-71bd-8251-7a9d74c5962a.jsonl",
+    "headerCwd": "/tmp/ramify-cwd-eval/architect-candidate/subs/workspace/subs/reviews",
+    "timestamp": "2026-09-25T08:28:45.764Z",
+    "sessionId": "01a0d7ae-6543-71bd-8251-7a9d74c5962a",
+    "reportedTotalTokens": 15376,
+    "modelResponses": 1,
+    "readSearchCalls": 7
+  }
+}

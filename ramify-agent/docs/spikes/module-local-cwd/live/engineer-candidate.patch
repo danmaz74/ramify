@@ -1,0 +1,71 @@
+diff --git a/subs/workspace/subs/reviews/src/session.ts b/subs/workspace/subs/reviews/src/session.ts
+index fc16c3a..7f30891 100644
+--- a/subs/workspace/subs/reviews/src/session.ts
++++ b/subs/workspace/subs/reviews/src/session.ts
+@@ -1,3 +1,4 @@
++import { revisionScopeSchema } from '../../contracts/src/interfaces/vocabulary.js';
+ import type { RevisionScope } from '../../contracts/src/interfaces/vocabulary.js';
+ 
+ /**
+@@ -33,6 +34,8 @@ export interface SessionBindingRequest {
+ export interface SessionTable {
+   /** Binds one session and returns the binding that is now in force. */
+   bind(sessionId: string | null, binding: SessionBindingRequest): SessionBinding;
++  /** Validates a JSON scope before binding; invalid input leaves the table unchanged. */
++  bindFromJson(sessionId: string | null, scope: unknown): SessionBinding;
+   /** The binding in force for one session; the default binding when it has none. */
+   resolveBinding(sessionId: string | null): SessionBinding;
+ }
+@@ -71,6 +74,11 @@ export function createSessionTable(): SessionTable {
+       return stored;
+     },
+ 
++    bindFromJson(sessionId, scope) {
++      const parsedScope = revisionScopeSchema.parse(scope);
++      return this.bind(sessionId, { scope: parsedScope });
++    },
++
+     resolveBinding(sessionId) {
+       return bindings.get(sessionId) ?? defaultBinding;
+     },
+diff --git a/subs/workspace/subs/reviews/src/tests/sessions.test.ts b/subs/workspace/subs/reviews/src/tests/sessions.test.ts
+index 050be30..dfbd446 100644
+--- a/subs/workspace/subs/reviews/src/tests/sessions.test.ts
++++ b/subs/workspace/subs/reviews/src/tests/sessions.test.ts
+@@ -250,6 +250,36 @@ describe('createSessionTable', () => {
+     expect(table.resolveBinding('b')).toEqual({ scope: { kind: 'all' }, boundAt: 2 });
+   });
+ 
++  it('validates JSON scopes and binds them just like bind, including null sessions', () => {
++    const table = createSessionTable();
++
++    expect(table.bindFromJson('a', { kind: 'latest', count: 2 })).toEqual({
++      scope: { kind: 'latest', count: 2 },
++      boundAt: 1,
++    });
++    expect(table.bindFromJson(null, { kind: 'all' })).toEqual({
++      scope: { kind: 'all' },
++      boundAt: 2,
++    });
++    expect(table.resolveBinding('a')).toEqual({ scope: { kind: 'latest', count: 2 }, boundAt: 1 });
++    expect(table.resolveBinding(null)).toEqual({ scope: { kind: 'all' }, boundAt: 2 });
++    expect(table.bind('a', { scope: { kind: 'all' } }).boundAt).toBe(3);
++  });
++
++  it('rejects invalid JSON without changing bindings or consuming a binding number', () => {
++    const table = createSessionTable();
++    const original = table.bind('a', { scope: { kind: 'latest', count: 2 } });
++
++    for (const invalid of [null, { kind: 'other' }, { kind: 'latest' }, { kind: 'latest', count: '2' }]) {
++      expect(() => table.bindFromJson('a', invalid)).toThrow();
++      expect(table.resolveBinding('a')).toEqual(original);
++      expect(() => table.bindFromJson('unbound', invalid)).toThrow();
++      expect(table.resolveBinding('unbound')).toEqual({ scope: { kind: 'all' }, boundAt: 0 });
++    }
++
++    expect(table.bindFromJson('unbound', { kind: 'all' }).boundAt).toBe(2);
++  });
++
+   it('keeps its own copy of the scope it was given', () => {
+     const table = createSessionTable();
+     const scope = { kind: 'latest' as const, count: 2 };

@@ -1,0 +1,486 @@
+{
+  "schema": "ramify-cwd-spike-summary/1",
+  "fixtureSeed": "4678ade40be7c38824ad9b1cd600a28f560726c0",
+  "model": "openai-codex/gpt-6-sol",
+  "tasks": {
+    "engineer": "Implement a safe JSON binding operation in the Reviews session table, within module `subs/workspace/subs/reviews` only. Add `bindFromJson(sessionId: string | null, scope: unknown): SessionBinding` to `SessionTable` and its implementation. It must validate `scope` with the existing shared `revisionScopeSchema` before changing any binding. A valid scope behaves exactly like `bind`; invalid input throws and leaves both the resolved binding and the binding counter unchanged. Add focused tests in this module's `src/tests/sessions.test.ts` for valid and invalid cases. Use this module's generated `src/.ramify/external` API view to discover the schema's importability and signature before importing it. Keep the public `bind` behavior intact. Run focused tests, and submit completion only after they pass. Do not read another module's source unless the API view is insufficient for behavior. The fixture's normal build and type check should remain valid.",
+    "architect": "workItemMessage goal in /tmp/ramify-cwd-eval/architect-eval.mts"
+  },
+  "arms": {
+    "architect-baseline": {
+      "project": "/tmp/ramify-cwd-eval/architect-baseline",
+      "cwd": "/tmp/ramify-cwd-eval/architect-baseline",
+      "sessionHeaderCwd": "/tmp/ramify-cwd-eval/architect-baseline",
+      "sessionFile": "/tmp/ramify-cwd-eval/architect-baseline-artifacts/pi-session/2026-09-25T08-26-20-797Z_01a0d7ac-2efc-7562-8987-9ee5ca6bbae1.jsonl",
+      "elapsedMs": 47735,
+      "accepted": true,
+      "systemBytes": 55203,
+      "promptBytes": 1892,
+      "toolCalls": 24,
+      "readSearchCalls": 23,
+      "byCategory": {
+        "own-module": 14,
+        "global-architect-view": 2,
+        "own-generated-api": 5,
+        "foreign-source": 1,
+        "foreign-declaration": 1
+      },
+      "reads": [
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src/.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": ".ramify-architect",
+          "category": "global-architect-view"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/README.md",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/module.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/session.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/router.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/mcp.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src/.ramify/external",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src/tests/.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/.ramify/_meta.json",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+          "category": "foreign-source"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/contracts/module.ramify",
+          "category": "foreign-declaration"
+        },
+        {
+          "tool": "read",
+          "path": ".ramify-architect/module.json",
+          "category": "global-architect-view"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src/.ramify/external/subs",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src/tests/.ramify/external/subs",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "grep",
+          "path": "subs/workspace/subs/reviews/src/.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "grep",
+          "path": "subs/workspace/subs/reviews/src/tests/.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src/tests",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/subs",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        }
+      ],
+      "errors": [],
+      "shellRequests": [],
+      "usage": {
+        "input": 45465,
+        "output": 1753,
+        "cacheRead": 70784,
+        "cacheWrite": 0,
+        "total": 118002
+      }
+    },
+    "architect-candidate": {
+      "project": "/tmp/ramify-cwd-eval/architect-candidate",
+      "cwd": "/tmp/ramify-cwd-eval/architect-candidate/subs/workspace/subs/reviews/src",
+      "sessionHeaderCwd": "/tmp/ramify-cwd-eval/architect-candidate/subs/workspace/subs/reviews/src",
+      "sessionFile": "/tmp/ramify-cwd-eval/architect-candidate-artifacts/pi-session/2026-09-25T08-29-16-082Z_01a0d7ae-dbb1-774a-b69a-e0dc0f455f4b.jsonl",
+      "elapsedMs": 37131,
+      "accepted": true,
+      "systemBytes": 56924,
+      "promptBytes": 2338,
+      "toolCalls": 14,
+      "readSearchCalls": 13,
+      "byCategory": {
+        "own-module": 7,
+        "own-generated-api": 6
+      },
+      "reads": [
+        {
+          "tool": "read",
+          "path": "../README.md",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "../module.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": ".",
+          "category": "own-module"
+        },
+        {
+          "tool": "grep",
+          "path": ".ramify/external",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "grep",
+          "path": ".ramify/children",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "grep",
+          "path": "tests/.ramify/external",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "grep",
+          "path": "tests/.ramify/children",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "session.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "tests/sessions.test.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": ".ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "tests/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "ls",
+          "path": "tests",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "router.ts",
+          "category": "own-module"
+        }
+      ],
+      "errors": [],
+      "shellRequests": [],
+      "usage": {
+        "input": 21449,
+        "output": 1271,
+        "cacheRead": 30720,
+        "cacheWrite": 0,
+        "total": 53440
+      }
+    },
+    "engineer-baseline": {
+      "project": "/tmp/ramify-cwd-eval/engineer-baseline",
+      "cwd": "/tmp/ramify-cwd-eval/engineer-baseline",
+      "sessionHeaderCwd": "/tmp/ramify-cwd-eval/engineer-baseline",
+      "sessionFile": "/tmp/ramify-cwd-eval/engineer-baseline/plans/.harness/sessions/20260925T082453Z-8c8adb/session/2026-09-25T08-24-53-184Z_01a0d7aa-d8bf-731d-8d6a-c6a814ae1217.jsonl",
+      "elapsedMs": 62957,
+      "accepted": true,
+      "systemBytes": 19970,
+      "promptBytes": 2494,
+      "toolCalls": 15,
+      "readSearchCalls": 10,
+      "byCategory": {
+        "own-module": 5,
+        "own-generated-api": 4,
+        "other": 1
+      },
+      "reads": [
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/sessions.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "grep",
+          "path": "subs/workspace/subs/reviews/src/.ramify/external",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "ls",
+          "path": "subs/workspace/subs/reviews/src",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/session.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/module.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/tests/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "subs/workspace/subs/reviews/src/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "package.json",
+          "category": "other"
+        }
+      ],
+      "errors": [
+        {
+          "tool": "read",
+          "input": null,
+          "errorText": null
+        }
+      ],
+      "shellRequests": [
+        {
+          "command": "npm run type-check && npm run build",
+          "timeoutMs": 120000
+        }
+      ],
+      "usage": {
+        "input": 26893,
+        "output": 1470,
+        "cacheRead": 72832,
+        "cacheWrite": 0,
+        "total": 101195
+      },
+      "directRamifyCheck": {
+        "command": "ramify check --batch --root /tmp/ramify-cwd-eval/engineer-baseline --format json --no-snapshot",
+        "exitCode": 0,
+        "outcome": {
+          "execution": "completed",
+          "check": "passed",
+          "coverage": "partial"
+        },
+        "report": "/tmp/ramify-cwd-eval/check-baseline.json"
+      },
+      "focusedTest": {
+        "command": "npm test -- --run subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+        "exitCode": 0,
+        "passedFiles": 1,
+        "passedTests": 10
+      },
+      "diffCheck": {
+        "command": "git diff --check",
+        "exitCode": 0
+      },
+      "fullHarnessCheckpoint": "no terminal verdict",
+      "directArchitectMaterialize": {
+        "command": "ramify materialize --view architect --root /tmp/ramify-cwd-eval/engineer-baseline",
+        "exitCode": 0,
+        "modules": 15,
+        "records": 137,
+        "output": "/tmp/ramify-cwd-eval/materialize-baseline.out",
+        "daemonStopped": true
+      }
+    },
+    "engineer-candidate": {
+      "project": "/tmp/ramify-cwd-eval/engineer-candidate",
+      "cwd": "/tmp/ramify-cwd-eval/engineer-candidate/subs/workspace/subs/reviews/src",
+      "sessionHeaderCwd": "/tmp/ramify-cwd-eval/engineer-candidate/subs/workspace/subs/reviews/src",
+      "sessionFile": "/tmp/ramify-cwd-eval/engineer-candidate/plans/.harness/sessions/20260925T082925Z-104d3f/session/2026-09-25T08-29-25-438Z_01a0d7af-003d-74ac-9404-39750ccfac4e.jsonl",
+      "elapsedMs": 65320,
+      "accepted": true,
+      "systemBytes": 21871,
+      "promptBytes": 2986,
+      "toolCalls": 15,
+      "readSearchCalls": 9,
+      "byCategory": {
+        "own-module": 7,
+        "own-generated-api": 2
+      },
+      "reads": [
+        {
+          "tool": "read",
+          "path": "../README.md",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "../module.ramify",
+          "category": "own-module"
+        },
+        {
+          "tool": "ls",
+          "path": ".",
+          "category": "own-module"
+        },
+        {
+          "tool": "grep",
+          "path": ".ramify/external",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "tests/sessions.test.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "session.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": ".ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+          "category": "own-generated-api"
+        },
+        {
+          "tool": "read",
+          "path": "router.ts",
+          "category": "own-module"
+        },
+        {
+          "tool": "read",
+          "path": "mcp.ts",
+          "category": "own-module"
+        }
+      ],
+      "errors": [],
+      "shellRequests": [
+        {
+          "command": "cd '/tmp/ramify-cwd-eval/engineer-candidate' && cat package.json"
+        },
+        {
+          "command": "cd '/tmp/ramify-cwd-eval/engineer-candidate' && npm run type-check && npm run build",
+          "timeoutMs": 120000
+        }
+      ],
+      "usage": {
+        "input": 16589,
+        "output": 1456,
+        "cacheRead": 88832,
+        "cacheWrite": 0,
+        "total": 106877
+      },
+      "directRamifyCheck": {
+        "command": "ramify check --batch --root /tmp/ramify-cwd-eval/engineer-candidate --format json --no-snapshot",
+        "exitCode": 0,
+        "outcome": {
+          "execution": "completed",
+          "check": "passed",
+          "coverage": "partial"
+        },
+        "report": "/tmp/ramify-cwd-eval/check-candidate.json"
+      },
+      "focusedTest": {
+        "command": "npm test -- --run subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+        "exitCode": 0,
+        "passedFiles": 1,
+        "passedTests": 10
+      },
+      "diffCheck": {
+        "command": "git diff --check",
+        "exitCode": 0
+      },
+      "fullHarnessCheckpoint": "no terminal verdict",
+      "directArchitectMaterialize": {
+        "command": "ramify materialize --view architect --root /tmp/ramify-cwd-eval/engineer-candidate",
+        "exitCode": 0,
+        "modules": 15,
+        "records": 137,
+        "output": "/tmp/ramify-cwd-eval/materialize-candidate.out",
+        "daemonStopped": true
+      }
+    }
+  },
+  "abortedSetupAttempt": {
+    "role": "local-architect",
+    "arm": "candidate",
+    "reason": "evaluator initially set cwd to module directory instead of module src; terminated before submission",
+    "sessionFile": "/tmp/ramify-cwd-eval/architect-candidate-artifacts/pi-session/2026-09-25T08-28-45-764Z_01a0d7ae-6543-71bd-8251-7a9d74c5962a.jsonl",
+    "model": "openai-codex/gpt-6-sol",
+    "modelResponses": 1,
+    "readSearchCalls": 7,
+    "reportedTotalTokens": 15376,
+    "includedInMatchedMetrics": false
+  }
+}

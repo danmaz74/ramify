@@ -1,0 +1,919 @@
+{
+  "arm": "baseline",
+  "model": "openai-codex/gpt-6-sol",
+  "cwd": "/tmp/ramify-cwd-eval/architect-baseline",
+  "startedAt": 1790324780795,
+  "elapsedMs": 47735,
+  "start": {
+    "mode": "fresh"
+  },
+  "ref": "/tmp/ramify-cwd-eval/architect-baseline-artifacts/pi-session/2026-09-25T08-26-20-797Z_01a0d7ac-2efc-7562-8987-9ee5ca6bbae1.jsonl#d8909512",
+  "outcome": {
+    "kind": "submitted",
+    "input": {
+      "kind": "assign",
+      "outline": {
+        "changes": "Add a JSON-input binding method to the Reviews-owned session table, validating with the already exposed shared revisionScopeSchema before calling bind. Preserve existing bind/resolveBinding behavior; add direct focused tests in sessions.test.ts. No scenario entries or step bindings were supplied for this work item.",
+        "decomposition": {
+          "kind": "single-iteration",
+          "rationale": "The table and its tests are both Reviews-owned files, and the contracts schema is already visible through Reviews' generated source and test API views; no provider or cross-module change is needed."
+        },
+        "reuse": [
+          {
+            "capability": "revision-scope-schema",
+            "owner": "collection-review/workspace/contracts",
+            "role": "Use the exposed shared revisionScopeSchema as the only JSON validation source; it is already imported by Reviews router and MCP surfaces."
+          }
+        ],
+        "breakingChanges": [],
+        "stages": [],
+        "revisionReason": ""
+      },
+      "localDecisions": [
+        {
+          "decision": {
+            "question": "Where should validation of JSON input before session binding live?",
+            "outcome": "create",
+            "capability": "session-json-binding",
+            "changesExistingSymbols": true,
+            "owner": "collection-review/workspace/reviews",
+            "rationale": "This is an additive method on Reviews' existing SessionTable; the contracts module already owns the schema and this module owns the session state and its mutation.",
+            "constraints": [
+              "Keep bind and resolveBinding semantics intact.",
+              "Parse the unknown scope with the shared revisionScopeSchema before any counter increment or binding mutation.",
+              "Only Reviews' own source and test files may be written; do not modify children or contracts."
+            ],
+            "uncertainties": [],
+            "evidence": {
+              "citations": [
+                {
+                  "module": "collection-review/workspace/reviews",
+                  "file": "src/session.ts",
+                  "symbol": "SessionTable",
+                  "note": "Defines bind, resolveBinding and the private binding counter and map."
+                },
+                {
+                  "module": "collection-review/workspace/reviews",
+                  "file": "src/tests/sessions.test.ts",
+                  "symbol": "createSessionTable",
+                  "note": "Existing direct unit tests cover table bindings."
+                },
+                {
+                  "module": "collection-review/workspace/contracts",
+                  "file": "src/interfaces/vocabulary.ts",
+                  "symbol": "revisionScopeSchema",
+                  "note": "Shared schema exposed by contracts module's wildcard declaration and present in Reviews src and src/tests API views."
+                }
+              ],
+              "gaps": []
+            }
+          },
+          "registry": [
+            {
+              "capability": "session-json-binding",
+              "behavior": "SessionTable.bindFromJson accepts an unknown scope, validates against the shared revisionScopeSchema and binds only on successful parse; invalid input throws without consuming a binding number or changing state.",
+              "owner": "collection-review/workspace/reviews",
+              "consumers": []
+            }
+          ]
+        }
+      ],
+      "assignment": {
+        "stage": 0,
+        "kind": "ordinary",
+        "goal": "Add SessionTable.bindFromJson(sessionId: string | null, scope: unknown): SessionBinding and focused unit tests in Reviews src/tests/sessions.test.ts.",
+        "approach": "In Reviews src/session.ts import revisionScopeSchema from the existing contracts vocabulary exposure, add the method to SessionTable and its createSessionTable result. Parse before mutating, then delegate to bind with the parsed scope to retain copying/freezing and counter semantics. In sessions.test.ts cover accepted all and latest scopes (including null session id), rejection of malformed discriminants, non-positive/non-integer counts and non-object inputs, unchanged bindings on rejection, and unchanged counter demonstrated by the next successful bind. Do not change MCP/router, contracts, module declarations or child modules.",
+        "scope": {
+          "base": {
+            "module": "collection-review/workspace/reviews",
+            "includedChildren": []
+          },
+          "extra": [],
+          "read": [
+            "collection-review/workspace/contracts"
+          ],
+          "rationale": "Both src/session.ts and src/tests/sessions.test.ts are directly owned by Reviews; its core, ui and validation children are excluded. The shared schema is read-only and exposed in both generated Reviews API views at external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md."
+        },
+        "requirementRefs": [],
+        "externalCapabilities": [],
+        "completionEvidence": "The new method has the requested exact signature and validates unknown scope via the shared revisionScopeSchema before any state change; valid input produces the same frozen copied binding and boundAt sequence as bind, while invalid input throws and preserves existing/default binding and the next boundAt value. Focused new tests in Reviews src/tests/sessions.test.ts pass alongside existing tests, type check and Ramify check."
+      }
+    }
+  },
+  "submissions": [
+    {
+      "input": {
+        "kind": "assign",
+        "outline": {
+          "changes": "Add a JSON-input binding method to the Reviews-owned session table, validating with the already exposed shared revisionScopeSchema before calling bind. Preserve existing bind/resolveBinding behavior; add direct focused tests in sessions.test.ts. No scenario entries or step bindings were supplied for this work item.",
+          "decomposition": {
+            "kind": "single-iteration",
+            "rationale": "The table and its tests are both Reviews-owned files, and the contracts schema is already visible through Reviews' generated source and test API views; no provider or cross-module change is needed."
+          },
+          "reuse": [
+            {
+              "capability": "revision-scope-schema",
+              "owner": "collection-review/workspace/contracts",
+              "role": "Use the exposed shared revisionScopeSchema as the only JSON validation source; it is already imported by Reviews router and MCP surfaces."
+            }
+          ],
+          "breakingChanges": [],
+          "stages": [],
+          "revisionReason": ""
+        },
+        "localDecisions": [
+          {
+            "decision": {
+              "question": "Where should validation of JSON input before session binding live?",
+              "outcome": "create",
+              "capability": "session-json-binding",
+              "changesExistingSymbols": true,
+              "owner": "collection-review/workspace/reviews",
+              "rationale": "This is an additive method on Reviews' existing SessionTable; the contracts module already owns the schema and this module owns the session state and its mutation.",
+              "constraints": [
+                "Keep bind and resolveBinding semantics intact.",
+                "Parse the unknown scope with the shared revisionScopeSchema before any counter increment or binding mutation.",
+                "Only Reviews' own source and test files may be written; do not modify children or contracts."
+              ],
+              "uncertainties": [],
+              "evidence": {
+                "citations": [
+                  {
+                    "module": "collection-review/workspace/reviews",
+                    "file": "src/session.ts",
+                    "symbol": "SessionTable",
+                    "note": "Defines bind, resolveBinding and the private binding counter and map."
+                  },
+                  {
+                    "module": "collection-review/workspace/reviews",
+                    "file": "src/tests/sessions.test.ts",
+                    "symbol": "createSessionTable",
+                    "note": "Existing direct unit tests cover table bindings."
+                  },
+                  {
+                    "module": "collection-review/workspace/contracts",
+                    "file": "src/interfaces/vocabulary.ts",
+                    "symbol": "revisionScopeSchema",
+                    "note": "Shared schema exposed by contracts module's wildcard declaration and present in Reviews src and src/tests API views."
+                  }
+                ],
+                "gaps": []
+              }
+            },
+            "registry": [
+              {
+                "capability": "session-json-binding",
+                "behavior": "SessionTable.bindFromJson accepts an unknown scope, validates against the shared revisionScopeSchema and binds only on successful parse; invalid input throws without consuming a binding number or changing state.",
+                "owner": "collection-review/workspace/reviews",
+                "consumers": []
+              }
+            ]
+          }
+        ],
+        "assignment": {
+          "stage": 0,
+          "kind": "ordinary",
+          "goal": "Add SessionTable.bindFromJson(sessionId: string | null, scope: unknown): SessionBinding and focused unit tests in Reviews src/tests/sessions.test.ts.",
+          "approach": "In Reviews src/session.ts import revisionScopeSchema from the existing contracts vocabulary exposure, add the method to SessionTable and its createSessionTable result. Parse before mutating, then delegate to bind with the parsed scope to retain copying/freezing and counter semantics. In sessions.test.ts cover accepted all and latest scopes (including null session id), rejection of malformed discriminants, non-positive/non-integer counts and non-object inputs, unchanged bindings on rejection, and unchanged counter demonstrated by the next successful bind. Do not change MCP/router, contracts, module declarations or child modules.",
+          "scope": {
+            "base": {
+              "module": "collection-review/workspace/reviews",
+              "includedChildren": []
+            },
+            "extra": [],
+            "read": [
+              "collection-review/workspace/contracts"
+            ],
+            "rationale": "Both src/session.ts and src/tests/sessions.test.ts are directly owned by Reviews; its core, ui and validation children are excluded. The shared schema is read-only and exposed in both generated Reviews API views at external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md."
+          },
+          "requirementRefs": [],
+          "externalCapabilities": [],
+          "completionEvidence": "The new method has the requested exact signature and validates unknown scope via the shared revisionScopeSchema before any state change; valid input produces the same frozen copied binding and boundAt sequence as bind, while invalid input throws and preserves existing/default binding and the next boundAt value. Focused new tests in Reviews src/tests/sessions.test.ts pass alongside existing tests, type check and Ramify check."
+        }
+      },
+      "result": {
+        "ok": true,
+        "value": {
+          "kind": "assign",
+          "outline": {
+            "changes": "Add a JSON-input binding method to the Reviews-owned session table, validating with the already exposed shared revisionScopeSchema before calling bind. Preserve existing bind/resolveBinding behavior; add direct focused tests in sessions.test.ts. No scenario entries or step bindings were supplied for this work item.",
+            "decomposition": {
+              "kind": "single-iteration",
+              "rationale": "The table and its tests are both Reviews-owned files, and the contracts schema is already visible through Reviews' generated source and test API views; no provider or cross-module change is needed."
+            },
+            "reuse": [
+              {
+                "capability": "revision-scope-schema",
+                "owner": "collection-review/workspace/contracts",
+                "role": "Use the exposed shared revisionScopeSchema as the only JSON validation source; it is already imported by Reviews router and MCP surfaces."
+              }
+            ],
+            "breakingChanges": [],
+            "stages": [],
+            "revisionReason": ""
+          },
+          "localDecisions": [
+            {
+              "decision": {
+                "question": "Where should validation of JSON input before session binding live?",
+                "outcome": "create",
+                "capability": "session-json-binding",
+                "changesExistingSymbols": true,
+                "owner": "collection-review/workspace/reviews",
+                "rationale": "This is an additive method on Reviews' existing SessionTable; the contracts module already owns the schema and this module owns the session state and its mutation.",
+                "constraints": [
+                  "Keep bind and resolveBinding semantics intact.",
+                  "Parse the unknown scope with the shared revisionScopeSchema before any counter increment or binding mutation.",
+                  "Only Reviews' own source and test files may be written; do not modify children or contracts."
+                ],
+                "uncertainties": [],
+                "evidence": {
+                  "citations": [
+                    {
+                      "module": "collection-review/workspace/reviews",
+                      "file": "src/session.ts",
+                      "symbol": "SessionTable",
+                      "note": "Defines bind, resolveBinding and the private binding counter and map."
+                    },
+                    {
+                      "module": "collection-review/workspace/reviews",
+                      "file": "src/tests/sessions.test.ts",
+                      "symbol": "createSessionTable",
+                      "note": "Existing direct unit tests cover table bindings."
+                    },
+                    {
+                      "module": "collection-review/workspace/contracts",
+                      "file": "src/interfaces/vocabulary.ts",
+                      "symbol": "revisionScopeSchema",
+                      "note": "Shared schema exposed by contracts module's wildcard declaration and present in Reviews src and src/tests API views."
+                    }
+                  ],
+                  "gaps": []
+                }
+              },
+              "registry": [
+                {
+                  "capability": "session-json-binding",
+                  "behavior": "SessionTable.bindFromJson accepts an unknown scope, validates against the shared revisionScopeSchema and binds only on successful parse; invalid input throws without consuming a binding number or changing state.",
+                  "owner": "collection-review/workspace/reviews",
+                  "consumers": []
+                }
+              ]
+            }
+          ],
+          "assignment": {
+            "stage": 0,
+            "kind": "ordinary",
+            "goal": "Add SessionTable.bindFromJson(sessionId: string | null, scope: unknown): SessionBinding and focused unit tests in Reviews src/tests/sessions.test.ts.",
+            "approach": "In Reviews src/session.ts import revisionScopeSchema from the existing contracts vocabulary exposure, add the method to SessionTable and its createSessionTable result. Parse before mutating, then delegate to bind with the parsed scope to retain copying/freezing and counter semantics. In sessions.test.ts cover accepted all and latest scopes (including null session id), rejection of malformed discriminants, non-positive/non-integer counts and non-object inputs, unchanged bindings on rejection, and unchanged counter demonstrated by the next successful bind. Do not change MCP/router, contracts, module declarations or child modules.",
+            "scope": {
+              "base": {
+                "module": "collection-review/workspace/reviews",
+                "includedChildren": []
+              },
+              "extra": [],
+              "read": [
+                "collection-review/workspace/contracts"
+              ],
+              "rationale": "Both src/session.ts and src/tests/sessions.test.ts are directly owned by Reviews; its core, ui and validation children are excluded. The shared schema is read-only and exposed in both generated Reviews API views at external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md."
+            },
+            "requirementRefs": [],
+            "externalCapabilities": [],
+            "completionEvidence": "The new method has the requested exact signature and validates unknown scope via the shared revisionScopeSchema before any state change; valid input produces the same frozen copied binding and boundAt sequence as bind, while invalid input throws and preserves existing/default binding and the next boundAt value. Focused new tests in Reviews src/tests/sessions.test.ts pass alongside existing tests, type check and Ramify check."
+          }
+        }
+      }
+    }
+  ],
+  "toolEvents": [
+    {
+      "type": "tool-started",
+      "callId": "call_fw1bJSpoE6AjJ9FKXaIIElqy|fc_00868d573f38e101016ab63030aa9487d2bcebb17e04906833",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_Z9wOz8CGc1bx234Xwje8xREy|fc_00868d573f38e101016ab63030aaa487d2bbc2875a7c73b91d",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_7HR7sM30QE3t6j4oa9fj0N7R|fc_00868d573f38e101016ab63030aaac87d2b36eb58863db611c",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/.ramify"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src/.ramify",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_QHSttRHRPf8QleNmLxgiYhzN|fc_00868d573f38e101016ab63030aab487d29530670eef173efc",
+      "tool": "ls",
+      "input": {
+        "path": ".ramify-architect"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": ".ramify-architect",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_7HR7sM30QE3t6j4oa9fj0N7R|fc_00868d573f38e101016ab63030aaac87d2b36eb58863db611c",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_fw1bJSpoE6AjJ9FKXaIIElqy|fc_00868d573f38e101016ab63030aa9487d2bcebb17e04906833",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_Z9wOz8CGc1bx234Xwje8xREy|fc_00868d573f38e101016ab63030aaa487d2bbc2875a7c73b91d",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_QHSttRHRPf8QleNmLxgiYhzN|fc_00868d573f38e101016ab63030aab487d29530670eef173efc",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_umvr2hvBhGRbq7oilzmcwm2Z|fc_00868d573f38e101016ab63035bd0c87d28c6cd4e50f8eb5aa",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/README.md",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/README.md",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_LmoISq9CIqQSZfvL3cDTcAvF|fc_00868d573f38e101016ab63035bd2087d2b66f87d3e922735f",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/module.ramify",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/module.ramify",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_Bd7ZgNLOvXwQp99nsKE9RHAt|fc_00868d573f38e101016ab63035bd3087d2bd7200dac13ef8a4",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/session.ts",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/src/session.ts",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_y7TqaK8h6vjm1WhIa1EREtC2|fc_00868d573f38e101016ab63035bd3887d287987a3a49ac0348",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/router.ts",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/src/router.ts",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_7zVGFVUAYIi2A68Rj7csmol6|fc_00868d573f38e101016ab63035bd4087d2afd37ed3322e318c",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/mcp.ts",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/src/mcp.ts",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_IrKKMwBmvaxZaIzMggbOHsTb|fc_00868d573f38e101016ab63035bd4887d2a3f5fd69cd5158aa",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/src/tests/sessions.test.ts",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_umvr2hvBhGRbq7oilzmcwm2Z|fc_00868d573f38e101016ab63035bd0c87d28c6cd4e50f8eb5aa",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_LmoISq9CIqQSZfvL3cDTcAvF|fc_00868d573f38e101016ab63035bd2087d2b66f87d3e922735f",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_Bd7ZgNLOvXwQp99nsKE9RHAt|fc_00868d573f38e101016ab63035bd3087d2bd7200dac13ef8a4",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_y7TqaK8h6vjm1WhIa1EREtC2|fc_00868d573f38e101016ab63035bd3887d287987a3a49ac0348",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_7zVGFVUAYIi2A68Rj7csmol6|fc_00868d573f38e101016ab63035bd4087d2afd37ed3322e318c",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_IrKKMwBmvaxZaIzMggbOHsTb|fc_00868d573f38e101016ab63035bd4887d2a3f5fd69cd5158aa",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_lrA42ZRzigehnHc7DSP3uP1O|fc_00868d573f38e101016ab6303c926487d29ccf9a4cefbe7fe9",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/.ramify/external"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src/.ramify/external",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_pYY9E3OftqMoCybBrwpA7WyV|fc_00868d573f38e101016ab6303c927887d2af2ee57fa969034c",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_iTPiSMK3sxee6GgCyKWLwR1X|fc_00868d573f38e101016ab6303c928487d2a96c09cecfefc6f4",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/.ramify/_meta.json",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/src/.ramify/_meta.json",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_VSDYuzwwqgYt9B2GJ57c24h1|fc_00868d573f38e101016ab6303c928c87d2983ba0346a90df3c",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/contracts/src/interfaces/vocabulary.ts",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_i4v74D5eyeZC16K9Nv8LiIxW|fc_00868d573f38e101016ab6303c929487d2912c77bddea30034",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/contracts/module.ramify",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/contracts/module.ramify",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_VoLfJL5gxUCcod8xbjdh360E|fc_00868d573f38e101016ab6303c929c87d2b0977d914390ab86",
+      "tool": "read",
+      "input": {
+        "path": ".ramify-architect/module.json",
+        "offset": null,
+        "limit": null
+      },
+      "action": {
+        "kind": "read",
+        "path": ".ramify-architect/module.json",
+        "range": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_lrA42ZRzigehnHc7DSP3uP1O|fc_00868d573f38e101016ab6303c926487d29ccf9a4cefbe7fe9",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_pYY9E3OftqMoCybBrwpA7WyV|fc_00868d573f38e101016ab6303c927887d2af2ee57fa969034c",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_VSDYuzwwqgYt9B2GJ57c24h1|fc_00868d573f38e101016ab6303c928c87d2983ba0346a90df3c",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_iTPiSMK3sxee6GgCyKWLwR1X|fc_00868d573f38e101016ab6303c928487d2a96c09cecfefc6f4",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_i4v74D5eyeZC16K9Nv8LiIxW|fc_00868d573f38e101016ab6303c929487d2912c77bddea30034",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_VoLfJL5gxUCcod8xbjdh360E|fc_00868d573f38e101016ab6303c929c87d2b0977d914390ab86",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_vNjyc4yTYgvpdUq7OuToxOFT|fc_00868d573f38e101016ab63042094087d2b0016fc1ba2e2809",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/.ramify/external/subs"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src/.ramify/external/subs",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_antzbmXIBQCiOdV53DT26yxI|fc_00868d573f38e101016ab63042095487d2b025dce18c82a4a9",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify/external/subs"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify/external/subs",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_6b8Y0si49o3Wn9ufeSsMkCXU|fc_00868d573f38e101016ab63042095c87d2930beb107ab2ecb6",
+      "tool": "grep",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/.ramify",
+        "pattern": "revisionScopeSchema",
+        "literal": true
+      },
+      "action": {
+        "kind": "search",
+        "pattern": "revisionScopeSchema",
+        "path": "subs/workspace/subs/reviews/src/.ramify",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_al6wZQtPFQ2hSN4H6LL24ACb|fc_00868d573f38e101016ab63042096487d2a12e205fd695c886",
+      "tool": "grep",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify",
+        "pattern": "revisionScopeSchema",
+        "literal": true
+      },
+      "action": {
+        "kind": "search",
+        "pattern": "revisionScopeSchema",
+        "path": "subs/workspace/subs/reviews/src/tests/.ramify",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_lD6kbhoKFfRGlHzvxyElaWKz|fc_00868d573f38e101016ab63042096c87d29e05b25601a55eb1",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/tests"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/src/tests",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_qhcj0uB31HWkDHsmn2Vs4CvZ|fc_00868d573f38e101016ab63042097487d2aa4fc22c59b10a76",
+      "tool": "ls",
+      "input": {
+        "path": "subs/workspace/subs/reviews/subs"
+      },
+      "action": {
+        "kind": "search",
+        "pattern": null,
+        "path": "subs/workspace/subs/reviews/subs",
+        "glob": null
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_vNjyc4yTYgvpdUq7OuToxOFT|fc_00868d573f38e101016ab63042094087d2b0016fc1ba2e2809",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_antzbmXIBQCiOdV53DT26yxI|fc_00868d573f38e101016ab63042095487d2b025dce18c82a4a9",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_qhcj0uB31HWkDHsmn2Vs4CvZ|fc_00868d573f38e101016ab63042097487d2aa4fc22c59b10a76",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_lD6kbhoKFfRGlHzvxyElaWKz|fc_00868d573f38e101016ab63042096c87d29e05b25601a55eb1",
+      "tool": "ls",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_6b8Y0si49o3Wn9ufeSsMkCXU|fc_00868d573f38e101016ab63042095c87d2930beb107ab2ecb6",
+      "tool": "grep",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_al6wZQtPFQ2hSN4H6LL24ACb|fc_00868d573f38e101016ab63042096487d2a12e205fd695c886",
+      "tool": "grep",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_dQf93DyxBuFwJQkVeFzTSIp1|fc_00868d573f38e101016ab6304498a487d2b9a506590c4c1153",
+      "tool": "read",
+      "input": {
+        "path": "subs/workspace/subs/reviews/src/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+        "offset": 120,
+        "limit": 50
+      },
+      "action": {
+        "kind": "read",
+        "path": "subs/workspace/subs/reviews/src/.ramify/external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md",
+        "range": {
+          "start": 120,
+          "count": 50
+        }
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_dQf93DyxBuFwJQkVeFzTSIp1|fc_00868d573f38e101016ab6304498a487d2b9a506590c4c1153",
+      "tool": "read",
+      "isError": false,
+      "reachedTool": true
+    },
+    {
+      "type": "tool-started",
+      "callId": "call_Cqmbgx15MgdD2SkHv8uDtbj7|fc_00868d573f38e101016ab6304ee77c87d281d2a6ff73b6863d",
+      "tool": "submit_work_item_result",
+      "input": {
+        "kind": "assign",
+        "outline": {
+          "changes": "Add a JSON-input binding method to the Reviews-owned session table, validating with the already exposed shared revisionScopeSchema before calling bind. Preserve existing bind/resolveBinding behavior; add direct focused tests in sessions.test.ts. No scenario entries or step bindings were supplied for this work item.",
+          "decomposition": {
+            "kind": "single-iteration",
+            "rationale": "The table and its tests are both Reviews-owned files, and the contracts schema is already visible through Reviews' generated source and test API views; no provider or cross-module change is needed."
+          },
+          "reuse": [
+            {
+              "capability": "revision-scope-schema",
+              "owner": "collection-review/workspace/contracts",
+              "role": "Use the exposed shared revisionScopeSchema as the only JSON validation source; it is already imported by Reviews router and MCP surfaces."
+            }
+          ],
+          "breakingChanges": [],
+          "stages": [],
+          "revisionReason": ""
+        },
+        "localDecisions": [
+          {
+            "decision": {
+              "question": "Where should validation of JSON input before session binding live?",
+              "outcome": "create",
+              "capability": "session-json-binding",
+              "changesExistingSymbols": true,
+              "owner": "collection-review/workspace/reviews",
+              "rationale": "This is an additive method on Reviews' existing SessionTable; the contracts module already owns the schema and this module owns the session state and its mutation.",
+              "constraints": [
+                "Keep bind and resolveBinding semantics intact.",
+                "Parse the unknown scope with the shared revisionScopeSchema before any counter increment or binding mutation.",
+                "Only Reviews' own source and test files may be written; do not modify children or contracts."
+              ],
+              "uncertainties": [],
+              "evidence": {
+                "citations": [
+                  {
+                    "module": "collection-review/workspace/reviews",
+                    "file": "src/session.ts",
+                    "symbol": "SessionTable",
+                    "note": "Defines bind, resolveBinding and the private binding counter and map."
+                  },
+                  {
+                    "module": "collection-review/workspace/reviews",
+                    "file": "src/tests/sessions.test.ts",
+                    "symbol": "createSessionTable",
+                    "note": "Existing direct unit tests cover table bindings."
+                  },
+                  {
+                    "module": "collection-review/workspace/contracts",
+                    "file": "src/interfaces/vocabulary.ts",
+                    "symbol": "revisionScopeSchema",
+                    "note": "Shared schema exposed by contracts module's wildcard declaration and present in Reviews src and src/tests API views."
+                  }
+                ],
+                "gaps": []
+              }
+            },
+            "registry": [
+              {
+                "capability": "session-json-binding",
+                "behavior": "SessionTable.bindFromJson accepts an unknown scope, validates against the shared revisionScopeSchema and binds only on successful parse; invalid input throws without consuming a binding number or changing state.",
+                "owner": "collection-review/workspace/reviews",
+                "consumers": []
+              }
+            ]
+          }
+        ],
+        "assignment": {
+          "stage": 0,
+          "kind": "ordinary",
+          "goal": "Add SessionTable.bindFromJson(sessionId: string | null, scope: unknown): SessionBinding and focused unit tests in Reviews src/tests/sessions.test.ts.",
+          "approach": "In Reviews src/session.ts import revisionScopeSchema from the existing contracts vocabulary exposure, add the method to SessionTable and its createSessionTable result. Parse before mutating, then delegate to bind with the parsed scope to retain copying/freezing and counter semantics. In sessions.test.ts cover accepted all and latest scopes (including null session id), rejection of malformed discriminants, non-positive/non-integer counts and non-object inputs, unchanged bindings on rejection, and unchanged counter demonstrated by the next successful bind. Do not change MCP/router, contracts, module declarations or child modules.",
+          "scope": {
+            "base": {
+              "module": "collection-review/workspace/reviews",
+              "includedChildren": []
+            },
+            "extra": [],
+            "read": [
+              "collection-review/workspace/contracts"
+            ],
+            "rationale": "Both src/session.ts and src/tests/sessions.test.ts are directly owned by Reviews; its core, ui and validation children are excluded. The shared schema is read-only and exposed in both generated Reviews API views at external/subs/workspace/subs/contracts/src/interfaces/vocabulary.ts.md."
+          },
+          "requirementRefs": [],
+          "externalCapabilities": [],
+          "completionEvidence": "The new method has the requested exact signature and validates unknown scope via the shared revisionScopeSchema before any state change; valid input produces the same frozen copied binding and boundAt sequence as bind, while invalid input throws and preserves existing/default binding and the next boundAt value. Focused new tests in Reviews src/tests/sessions.test.ts pass alongside existing tests, type check and Ramify check."
+        }
+      },
+      "action": {
+        "kind": "harness"
+      },
+      "mutating": false
+    },
+    {
+      "type": "tool-finished",
+      "callId": "call_Cqmbgx15MgdD2SkHv8uDtbj7|fc_00868d573f38e101016ab6304ee77c87d281d2a6ff73b6863d",
+      "tool": "submit_work_item_result",
+      "isError": false,
+      "reachedTool": true
+    }
+  ]
+}
