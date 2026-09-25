@@ -395,6 +395,48 @@ describe('run_scope_tests', () => {
   });
 });
 
+describe('run_scope_tests over an outside-modules path', () => {
+  test('runs each test file outside every module on its own, and a run that selected nothing fails the call', async () => {
+    const root = await directory();
+    await mkdir(join(root, 'subs/shelf/src/tests'), { recursive: true });
+    await writeFile(join(root, 'subs/shelf/src/tests/shelf.test.ts'), 'export {};\n');
+    await mkdir(join(root, 'scripts'), { recursive: true });
+    await writeFile(join(root, 'scripts/report.test.ts'), 'export {};\n');
+    const calls: string[][] = [];
+    // The project's runner includes only module sources, so the outside file
+    // on its own selects nothing, and the runner says so with a failing exit.
+    const runner: CommandRunner = async (request: CommandRequest): Promise<CommandRun> => {
+      calls.push([...request.argv]);
+      const outside = request.argv.includes('scripts/report.test.ts');
+      return {
+        outcome: { kind: 'completed', exitCode: outside ? 1 : 0 },
+        startedAt: new Date(0).toISOString(),
+        elapsedMs: 1,
+        output: { path: null, bytes: 0, truncated: false, tail: outside ? 'No test files found, exiting with code 1' : '1 passed' },
+        stdout: '',
+        stderr: '',
+      };
+    };
+    const observed: Array<{ readonly outcome: string; readonly resolved: readonly string[] }> = [];
+    const tool = createScopeTestsTool({
+      commandExecution: runner,
+      projectRoot: root,
+      commands: { scopedTests: checkCommand({ argv: ['vitest', 'run'], cwd: root, timeoutMs: 60_000 }) } as unknown as ProjectCommands,
+      policy: { policy: 'owned-by-scope', exactOwners: [shelf], subtrees: [], extraSuites: [], outsideModules: ['scripts'] },
+      refresh: async () => architectIndex([moduleEntry('sample', '', null), moduleEntry(shelf, 'subs/shelf', 'sample')]),
+      judge: async () => ({ ok: true }),
+      observe: async observation => { observed.push(observation); },
+    });
+    const result = await tool.execute({}, new AbortController().signal);
+    expect(calls).toEqual([['vitest', 'run', 'subs/shelf/src/tests/shelf.test.ts'], ['vitest', 'run', 'scripts/report.test.ts']]);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('2 test file(s) in 2 runs');
+    expect(result.text).toContain('Run of scripts/report.test.ts: Outcome: failed (exit 1)');
+    expect(result.text).toContain('No test files found');
+    expect(observed).toEqual([expect.objectContaining({ outcome: 'failed', resolved: ['scripts/report.test.ts', 'subs/shelf/src/tests/shelf.test.ts'] })]);
+  });
+});
+
 describe('diagnostics from a recorded failing stream', () => {
   /** One scenario check over the recordings, one run per stream, as a gate's `scenarios` command records it. */
   async function recordedCheck(runs: Array<[string, string]>, exits: number[]): Promise<ScenarioCheckSummary> {

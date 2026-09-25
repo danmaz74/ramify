@@ -6,6 +6,8 @@ import { planRefSchema } from '../run/records.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
 import { extraPurposeSchema } from './iterations.js';
+import { plansDirectory } from '../plans/discover.js';
+import { inOwnContents, ownContentsWithin, within } from './scope.js';
 import { assignedScenarioErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
@@ -71,11 +73,26 @@ export const scopeBaseBodySchema = z.union([
   }).strict(),
 ]);
 
+/**
+ * One location beyond the base. Every purpose but `outside-modules` names a
+ * file in a module's own contents. `outside-modules` names a file, or with
+ * `kind: "directory"` a directory whose new files it may create, outside
+ * every module's own contents, and `reason` names the plan requirement that
+ * only a change there meets. The schema accepts a blank reason so the rule
+ * beside it can say what is missing.
+ */
+export const extraLocationSchema = z.object({
+  path: text,
+  purpose: extraPurposeSchema,
+  kind: z.enum(['file', 'directory']).optional(),
+  reason: z.string().optional(),
+}).strict();
+
 /** The write scope as the architect states it: no revision, no captured paths. */
 export const scopeBodySchema = z.object({
   base: scopeBaseBodySchema,
-  /** Locations beyond the base: a contract, a conformance suite, a fake, an exposure declaration, a consumer. */
-  extra: z.array(z.object({ path: text, purpose: extraPurposeSchema }).strict()),
+  /** Locations beyond the base: a contract, a conformance suite, a fake, an exposure declaration, a consumer, a path outside modules. */
+  extra: z.array(extraLocationSchema),
   /** The declared read scope beyond the base; soft. */
   read: z.array(modulePathSchema),
   rationale: text,
@@ -129,6 +146,8 @@ export interface AssignmentEvidence {
   readonly contracts?: ReadonlySet<string> | undefined;
   /** The guarded paths of this project, which are the only ones an authorization can name. */
   readonly guardedPaths?: ReadonlySet<string> | undefined;
+  /** The files only the harness writes, which no extra location may name. */
+  readonly harnessOnly?: ReadonlySet<string> | undefined;
   /** Whether this submission carries an outline revision, which is what records an authorization. */
   readonly revising?: boolean | undefined;
   /**
@@ -265,22 +284,92 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     });
   }
 
+  // An extra location is classified as Ramify classifies it: a module owns
+  // its source area and its two declaration files, and nothing else beneath
+  // its directory. A path outside every module's own contents is reachable
+  // only as `outside-modules`, which in turn never reaches a module's own.
+  const authorized = new Set(authorizations.map(authorization => toPosix(authorization.path)));
+  const harnessOnly = evidence.harnessOnly ?? new Set<string>();
+  const directories = index === null ? [] : [...index.modules.values()].map(module => ({ module: module.module, dir: toPosix(module.dir) }));
+  if (ownerDirectory !== null && !known && narrow !== null) directories.push({ module: narrow.module, dir: toPosix(ownerDirectory) });
   body.scope.extra.forEach((entry, position) => {
-    const path = `assignment.scope.extra.${position}.path`;
+    const at = `assignment.scope.extra.${position}`;
+    const path = `${at}.path`;
     const target = toPosix(entry.path);
     if (target === '' || target.startsWith('/') || target.split('/').includes('..')) {
       errors.push({ path, message: `"${entry.path}" is not a project-relative path`, expected: 'a path relative to the project root' });
       return;
     }
-    if (index === null) return;
-    const owners = [...index.modules.values()].map(module => toPosix(module.dir));
-    if (ownerDirectory !== null) owners.push(toPosix(ownerDirectory));
-    const inside = owners.some(directory => directory === '' || target === directory || target.startsWith(`${directory}/`));
-    if (!inside) {
+    const outsideModules = entry.purpose === 'outside-modules';
+    const directory = entry.kind === 'directory';
+    if (directory && !outsideModules) {
+      errors.push({
+        path: `${at}.kind`,
+        message: `An extra location for "${entry.purpose}" is one file; only an "outside-modules" location may name a directory`,
+        expected: '"file", or no kind',
+      });
+    }
+    if (outsideModules && (entry.reason ?? '').trim() === '') {
+      errors.push({
+        path: `${at}.reason`,
+        message: `A path outside every module is assigned for a plan requirement only a change there meets; "${entry.path}" names none`,
+        expected: 'the plan requirement the change serves',
+      });
+    }
+    // The plans and the run's state beneath them, and the repository's own
+    // metadata, are no project file an engineer changes.
+    if (within(target, plansDirectory) || target.split('/').includes('.git')) {
       errors.push({
         path,
-        message: `"${entry.path}" lies under no module of the refreshed view and under no module this assignment may create`,
-        expected: 'a path under an existing or authorized module',
+        message: `"${entry.path}" lies in ${target.split('/').includes('.git') ? 'the repository\'s metadata' : `${plansDirectory}/, which holds the plans and the harness's state`}; no assignment writes there`,
+        expected: 'a file of the project',
+      });
+      return;
+    }
+    const covered = (file: string) => (directory ? within(file, target) : file === target);
+    const reserved = [...harnessOnly].filter(covered).sort();
+    if (reserved.length > 0) {
+      errors.push({
+        path,
+        message: `${reserved.map(file => `"${file}"`).join(', ')} ${reserved.length === 1 ? 'is' : 'are'} written by the harness alone, so no assignment names ${reserved.length === 1 ? 'it' : 'them'}`,
+        expected: 'a path the harness does not write',
+      });
+      return;
+    }
+    // A guarded file passes the gate changed only with an authorization, so
+    // an extra location that makes one writable without it is refused here
+    // rather than at the gate. A contract iteration's scope and
+    // authorizations are the harness's, so what it states here decides none.
+    const unauthorized = body.kind === 'contract'
+      ? []
+      : [...(evidence.guardedPaths ?? [])].filter(file => covered(file) && !authorized.has(file)).sort();
+    if (unauthorized.length > 0) {
+      errors.push({
+        path,
+        message: `${unauthorized.map(file => `"${file}"`).join(', ')} ${unauthorized.length === 1 ? 'is a guarded file' : 'are guarded files'}; a change to ${unauthorized.length === 1 ? 'it' : 'them'} passes the gate only with an authorization recorded by an outline revision`,
+        expected: `an entry in "assignment.authorizations" for ${unauthorized.map(file => `"${file}"`).join(', ')}, with an "outline" revision on the same submission that states why`,
+      });
+    }
+    if (index === null) return;
+    const owner = directories.find(candidate => inOwnContents(candidate.dir, target));
+    if (outsideModules) {
+      const reached = owner ?? (directory ? directories.find(candidate => ownContentsWithin(candidate.dir, target)) : undefined);
+      if (reached !== undefined) {
+        errors.push({
+          path,
+          message: owner !== undefined
+            ? `"${entry.path}" lies in the own contents of "${owner.module}", and "outside-modules" names only paths outside every module`
+            : `The directory "${entry.path}" holds the own contents of "${reached.module}", and "outside-modules" names only paths outside every module`,
+          expected: 'a path outside every module\'s src/, module.ramify and README.md, or another purpose',
+        });
+      }
+      return;
+    }
+    if (owner === undefined) {
+      errors.push({
+        path,
+        message: `"${entry.path}" lies in the own contents (src/, module.ramify, README.md) of no module of the refreshed view and of no module this assignment may create`,
+        expected: 'a path in an existing or authorized module\'s own contents; a file outside every module is assigned as "outside-modules" with a "reason"',
       });
     }
   });
@@ -377,6 +466,8 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
   return errors;
 }
 
+/** A project-relative path in posix form; the project root itself is `''`, never `'.'`. */
 function toPosix(path: string): string {
-  return posix.normalize(path.split(sep).join('/')).replace(/^\.\//, '').replace(/\/$/, '');
+  const normalized = posix.normalize(path.split(sep).join('/')).replace(/^\.\//, '').replace(/\/$/, '');
+  return normalized === '.' ? '' : normalized;
 }

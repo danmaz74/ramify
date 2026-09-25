@@ -86,7 +86,7 @@ export function allProjectChecks(
   checks.push({ kind: 'type-check', command: commands.typeCheck, attribution: 'project' });
   checks.push({ kind: 'ramify-check', command: commands.ramifyCheck, attribution: 'project' });
   if (scenarios !== undefined) checks.push(scenarios);
-  if (scopeProbe !== undefined) checks.push(scopedTestCheck(commands, scopeProbe));
+  if (scopeProbe !== undefined) checks.push(...scopedTestChecks(commands, scopeProbe));
   return checks;
 }
 
@@ -94,6 +94,8 @@ export function allProjectChecks(
 export interface ResolvedTests {
   readonly selection: TestSelection;
   readonly failure: SelectionFailure | null;
+  /** The selected suites beneath the scope's `outside-modules` paths. */
+  readonly outside?: readonly string[] | undefined;
 }
 
 /** The project's own runner over exactly the files the selection resolved to. */
@@ -109,6 +111,32 @@ export function scopedTestCheck(commands: ProjectCommands, tests: ResolvedTests)
 }
 
 /**
+ * The runs of the project's own runner one resolved selection needs. The
+ * owners' tests run together; each suite beneath an `outside-modules` path
+ * runs on its own. A runner given several files silently leaves out one its
+ * configuration does not include, so only a run of that file alone says
+ * that it selected nothing. An outside suite is required on its own run, and
+ * the owners' run is left out where it has no file of its own.
+ */
+export function scopedTestChecks(commands: ProjectCommands, tests: ResolvedTests): PlannedCheck[] {
+  const outside = new Set(tests.outside ?? []);
+  if (outside.size === 0 || tests.failure !== null) return [scopedTestCheck(commands, tests)];
+  const own: ResolvedTests = {
+    selection: {
+      ...tests.selection,
+      extraSuites: tests.selection.extraSuites.filter(suite => !outside.has(suite)),
+      resolved: tests.selection.resolved.filter(file => !outside.has(file)),
+    },
+    failure: null,
+  };
+  const alone = [...outside].sort().map(suite => scopedTestCheck(commands, {
+    selection: { policy: tests.selection.policy, exactOwners: [], subtrees: [], extraSuites: [suite], resolved: [suite] },
+    failure: null,
+  }));
+  return own.selection.resolved.length === 0 ? alone : [scopedTestCheck(commands, own), ...alone];
+}
+
+/**
  * The checks of an `owned-by-scope` checkpoint: the resolved test files
  * through the project's own runner, the type check and the complete Ramify
  * check, and the scenario check where one is planned. The selection is
@@ -117,7 +145,7 @@ export function scopedTestCheck(commands: ProjectCommands, tests: ResolvedTests)
  */
 export function scopedChecks(commands: ProjectCommands, tests: ResolvedTests, scenarios?: PlannedCheck | undefined): PlannedCheck[] {
   return [
-    scopedTestCheck(commands, tests),
+    ...scopedTestChecks(commands, tests),
     { kind: 'type-check', command: commands.typeCheck, attribution: 'project' },
     { kind: 'ramify-check', command: commands.ramifyCheck, attribution: 'project' },
     ...(scenarios === undefined ? [] : [scenarios]),

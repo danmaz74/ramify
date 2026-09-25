@@ -481,7 +481,7 @@ describe('the records this iteration establishes', () => {
   test('every iteration kind, extra purpose and result outcome is written and read back', async () => {
     const store = await ledger();
     expect(iterationKindSchema.options).toEqual(['ordinary', 'breaking', 'contract', 'verification', 'repair', 'integration']);
-    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer']);
+    expect(extraPurposeSchema.options).toEqual(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'outside-modules']);
 
     const outlineRef = { id: 'wi-001', revision: 1, hash: 'd'.repeat(64) };
     for (const [index, kind] of iterationKindSchema.options.entries()) {
@@ -498,7 +498,9 @@ describe('the records this iteration establishes', () => {
           base: kind === 'breaking'
             ? { modules: ['shop', 'shop/orders'], rationale: 'the guarantee changes in both' }
             : { module: 'shop/orders', includedChildren: ['shop/orders/pricing'] },
-          extra: extraPurposeSchema.options.map(purpose => ({ path: `subs/orders/src/${purpose}.ts`, purpose })),
+          extra: extraPurposeSchema.options.map(purpose => (purpose === 'outside-modules'
+            ? { path: 'scripts/report', purpose, kind: 'directory' as const, reason: 'the plan requires the report' }
+            : { path: `subs/orders/src/${purpose}.ts`, purpose })),
           read: ['shop'],
           bootstrap: kind === 'ordinary' ? [{ capability: outlineRef, directory: 'subs/orders/subs/pricing' }] : [],
           rationale: 'r',
@@ -510,7 +512,7 @@ describe('the records this iteration establishes', () => {
         evidenceObligations: [{ suite: ['subs/orders/src/tests/conformance.test.ts'], against: 'fake' }],
         gate: kind === 'breaking'
           ? { checkpoint: 'breaking-iteration', tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] } }
-          : { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [] } },
+          : { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['shop/orders'], subtrees: [], extraSuites: [], outsideModules: ['scripts/report'] } },
         guarded: [{ path: 'package.json', hash: 'e'.repeat(64) }],
         // An authorization names a guarded path, the reason, and the record
         // that authorized it. Both states are representable: none, and one.

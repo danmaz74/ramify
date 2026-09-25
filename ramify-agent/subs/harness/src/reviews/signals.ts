@@ -73,11 +73,12 @@ export async function candidateModuleIndex(source: CandidateSource, projectRoot:
 
 /**
  * The modules a concern concerns: the owner of each location on the
- * candidate's module tree, once each in location order, or the work item's
- * module when no location falls inside a module.
+ * candidate's module tree, once each in location order. A location no
+ * module's own contents hold, such as a file an `outside-modules` scope
+ * reached, has no other owner and concerns the work item's module.
  */
 export function concernModules(index: ArchitectIndex | null, locations: readonly CheckFindingLocation[], workItemModule: string | null): string[] {
-  const owners = [...new Set(locations.flatMap(location => ownerOf(index, location.path) ?? []))];
+  const owners = [...new Set(locations.flatMap(location => ownerOf(index, location.path) ?? workItemModule ?? []))];
   if (owners.length > 0) return owners;
   return workItemModule === null ? [] : [workItemModule];
 }

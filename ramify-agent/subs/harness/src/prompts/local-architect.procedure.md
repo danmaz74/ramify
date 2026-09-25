@@ -42,7 +42,16 @@ write.
   scope, whatever lies beneath it.
 - `assignment.scope.extra` names single locations beyond that base: a
   contract, a conformance suite, a fake, an exposure declaration, a consumer.
-  Each must lie under a module that exists or one this assignment creates.
+  Each must lie in a module's own contents — its `src/`, its `module.ramify`
+  or its `README.md` — of a module that exists or one this assignment
+  creates.
+- Where a plan requirement can be met only by changing a file outside every
+  module's own contents, such as a project script, name it in
+  `assignment.scope.extra` with purpose `outside-modules` and a `reason`
+  naming that requirement. `kind: "directory"` lets the engineer create files
+  beneath it. The gate runs the test files there, each on its own. Such a
+  location never reaches a module's own contents, and the files only the
+  harness writes are never one.
 - `assignment.scope.read` is the reading you expect beyond the base. It is
   advice, not a boundary.
 - `assignment.externalCapabilities` names behavior other modules own that
@@ -146,12 +155,14 @@ iteration comes back to you. A deletion is a change like any other.
 If the request genuinely supersedes what one of those files states, record a
 revision of your outline saying so and name the path in
 `assignment.authorizations`, with the reason, on the assignment that carries
-the work. The outline revision is the record that authorizes it, and the
-authorization stands for that one iteration. You may authorize only a path
-the harness guards. Do not authorize a change that narrows what the tests
-discover or disables a suite the request did not supersede: every unrelated
-guarantee stays binding, and recording a break does not discharge its
-consequences.
+the work. Naming a guarded file, such as a contract's fake or conformance
+suite, in `assignment.scope.extra` is not enough: an assignment that does so
+without its authorization is refused. The outline revision is the record
+that authorizes it, and the authorization stands for that one iteration. You
+may authorize only a path the harness guards. Do not authorize a change that
+narrows what the tests discover or disables a suite the request did not
+supersede: every unrelated guarantee stays binding, and recording a break
+does not discharge its consequences.
 
 ## Placement: what is yours, and what is not
 

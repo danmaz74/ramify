@@ -7,7 +7,7 @@ import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ProjectCommands } from '../checks/checkpoint.js';
-import { scopedTestCheck, type ScenarioCheckPlanning } from '../checks/checkpoint.js';
+import { scopedTestChecks, type ScenarioCheckPlanning } from '../checks/checkpoint.js';
 import { describeScenarioCheck, scenarioCheckLines } from '../checks/diagnostics.js';
 import { runScenarioCheck, scenarioCheckPassed } from '../checks/scenario-check.js';
 import { checkCommandEnvironment } from '../checks/records.js';
@@ -360,7 +360,6 @@ async function runScopeTestSelection(options: ScopeTestsOptions, signal: AbortSi
 }> {
   const index = await options.refresh();
   const resolved = await resolveTestSelection({ projectRoot: options.projectRoot, index, policy: options.policy });
-  const check = scopedTestCheck(options.commands, resolved);
   if (resolved.failure !== null) {
     return {
       observation: { resolved: resolved.selection.resolved, outcome: 'not-verified', notVerified: resolved.failure.failed, exitCode: null, elapsedMs: 0 },
@@ -373,29 +372,47 @@ async function runScopeTestSelection(options: ScopeTestsOptions, signal: AbortSi
       text: 'The selection is empty: this assignment owns no test file yet. Writing the first one is part of the work.',
     };
   }
-  const run = await (options.commandExecution ?? runCommand)({
-    argv: check.command.argv,
-    cwd: check.command.cwd,
-    env: checkCommandEnvironment(check.command),
-    timeoutMs: check.command.timeoutMs,
-    ...(signal === undefined ? {} : { signal }),
-  });
-  const exitCode = run.outcome.kind === 'completed' ? run.outcome.exitCode : null;
-  const outcome = run.outcome.kind !== 'completed' ? 'not-verified' : exitCode === 0 ? 'passed' : 'failed';
+  // A suite beneath an `outside-modules` path runs on its own, as at the
+  // gate, so one the runner does not select fails rather than vanishing.
+  const checks = scopedTestChecks(options.commands, resolved);
+  const runs = [];
+  for (const check of checks) {
+    const run = await (options.commandExecution ?? runCommand)({
+      argv: check.command.argv,
+      cwd: check.command.cwd,
+      env: checkCommandEnvironment(check.command),
+      timeoutMs: check.command.timeoutMs,
+      ...(signal === undefined ? {} : { signal }),
+    });
+    const exitCode = run.outcome.kind === 'completed' ? run.outcome.exitCode : null;
+    const outcome = run.outcome.kind !== 'completed' ? 'not-verified' as const : exitCode === 0 ? 'passed' as const : 'failed' as const;
+    runs.push({ run, exitCode, outcome, files: check.selection?.resolved ?? [] });
+    if (signal?.aborted === true) break;
+  }
+  const worst = runs.find(entry => entry.outcome === 'not-verified') ?? runs.find(entry => entry.outcome === 'failed') ?? runs[0]!;
+  const elapsedMs = runs.reduce((total, entry) => total + entry.run.elapsedMs, 0);
+  const outcomeLine = (entry: typeof worst, elapsed: number) =>
+    `Outcome: ${entry.outcome}${entry.exitCode === null ? '' : ` (exit ${entry.exitCode})`}, ${(elapsed / 1000).toFixed(1)} s.`;
   return {
     observation: {
       resolved: resolved.selection.resolved,
-      outcome,
-      notVerified: run.outcome.kind === 'completed' ? null : run.outcome.kind,
-      exitCode,
-      elapsedMs: run.elapsedMs,
+      outcome: worst.outcome,
+      notVerified: worst.run.outcome.kind === 'completed' ? null : worst.run.outcome.kind,
+      exitCode: worst.exitCode,
+      elapsedMs,
     },
-    text: [
-      `${resolved.selection.resolved.length} test file(s): ${resolved.selection.resolved.join(', ')}`,
-      `Outcome: ${outcome}${exitCode === null ? '' : ` (exit ${exitCode})`}, ${(run.elapsedMs / 1000).toFixed(1)} s.`,
-      '',
-      run.output.tail,
-    ].join('\n'),
+    text: runs.length === 1
+      ? [
+        `${resolved.selection.resolved.length} test file(s): ${resolved.selection.resolved.join(', ')}`,
+        outcomeLine(worst, elapsedMs),
+        '',
+        worst.run.output.tail,
+      ].join('\n')
+      : [
+        `${resolved.selection.resolved.length} test file(s) in ${runs.length} runs; each file outside every module runs on its own.`,
+        outcomeLine(worst, elapsedMs),
+        ...runs.flatMap(entry => ['', `Run of ${entry.files.join(', ')}: ${outcomeLine(entry, entry.run.elapsedMs)}`, '', entry.run.output.tail]),
+      ].join('\n'),
   };
 }
 

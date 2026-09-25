@@ -94,10 +94,12 @@ export interface TestSelectionPolicy {
   readonly subtrees: string[];
   /** Suites a registered evidence obligation requires; each must be selected. */
   readonly extraSuites: string[];
+  /** Paths outside every module whose test files each resolution finds anew and adds to `extraSuites`. */
+  readonly outsideModules?: string[] | undefined;
 }
 
 /** A policy resolved against the current tree, recorded on the attempt that ran it. */
-export interface TestSelection extends TestSelectionPolicy {
+export interface TestSelection extends Omit<TestSelectionPolicy, 'outsideModules'> {
   readonly resolved: string[];
 }
 

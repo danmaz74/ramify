@@ -29,8 +29,13 @@ export function workItemOfIteration(id: IterationId): WorkItemId | null {
   return workItem !== undefined && workItem !== '' && tail !== undefined ? workItem : null;
 }
 
-/** What a location beyond the base was assigned for. */
-export const extraPurposeSchema = z.enum(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer']);
+/**
+ * What a location beyond the base was assigned for. `outside-modules` is a
+ * path outside every module's own contents, such as a project script, where
+ * only a change meets a plan requirement; it carries that requirement as its
+ * reason.
+ */
+export const extraPurposeSchema = z.enum(['contract', 'conformance', 'fake', 'exposure-declaration', 'consumer', 'outside-modules']);
 
 /**
  * What one iteration may write. `base` is the assigned module's own contents
@@ -53,12 +58,14 @@ export const writeScopeSchema = z.object({
    * Locations assigned beyond the base. A contract iteration is given
    * directories, because the files it will write do not exist yet and their
    * names are the agreement's to choose; an architect's own extra location
-   * is one file, which is the default.
+   * is one file, which is the default, or a directory outside every module.
    */
   extra: z.array(z.object({
     path: text,
     purpose: extraPurposeSchema,
     kind: z.enum(['file', 'directory']).optional(),
+    /** For `outside-modules`: the plan requirement the change serves. */
+    reason: text.optional(),
   }).strict()),
   /** The declared read scope beyond the base; soft. */
   read: z.array(modulePathSchema),
@@ -81,6 +88,11 @@ export const testSelectionPolicySchema = z.object({
   subtrees: z.array(modulePathSchema),
   /** Suites a registered evidence obligation requires; each must be selected. */
   extraSuites: z.array(text),
+  /**
+   * The assignment's `outside-modules` paths. Each attempt resolves the test
+   * files beneath them anew, and they join `extraSuites`.
+   */
+  outsideModules: z.array(text).optional(),
 }).strict();
 
 export const checkpointSchema = z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']);
