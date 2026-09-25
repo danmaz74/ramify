@@ -1,0 +1,15 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-003.i05",
+  "outcome": "unsuitable",
+  "invocations": [
+    "inv-0043"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "unsuitable (scope): The required fresh production build fails before promoting dist or writing a fresh runtime identity: `npm run build` exits with `Compiled client bundles excluded modules: dist/subs/analysis/src/fakes/enrich-import-diagnostics.fake.js`. Production CLI files `subs/cli/src/command-support.ts` and `subs/cli/src/changed-command.ts` import that fake, while `scripts/compiled-client.ts` prohibits bundling any analysis module. Fixing that production dependency/build selection is outside this iteration's write scope, and the assignment expressly forbids editing build scripts or bypassing the build. The stale dist causes three unchanged full-suite CLI tests to fail; scope tests, type-check and Ramify check pass. Analysis and descriptions fixes and linked-report regressions remain in the working tree, but the fresh-build prerequisite and unchanged full-suite evidence cannot be achieved within this scope."
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}

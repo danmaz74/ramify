@@ -1,0 +1,77 @@
+{
+  "schema": "ramify-agent.placement-decision/1",
+  "id": "gd-ur-001",
+  "authority": "global",
+  "request": "ur-001",
+  "workItem": "wi-003",
+  "invocation": "inv-0041",
+  "question": "Does wi-003's missing dist/src prerequisite for the whole-project IPC test gate require changing ownership of enrich-import-diagnostics or departing from the plan?",
+  "outcome": "reuse",
+  "capability": "enrich-import-diagnostics",
+  "changesExistingSymbols": true,
+  "owner": "ramify/analysis",
+  "rationale": "Keep the already registered analysis diagnostic provider and its owner. The reported IPC failure concerns a missing production-build prerequisite for daemon endpoint selection, not ownership or feasibility of diagnostic enrichment. The project already supplies an outside-module production build command that creates the required runtime tree; preparing the build before rerunning the unchanged whole-project gate preserves the plan's checks and daemon's complete-build validation. The real-report findings still need actual repair and verification; synthetic conformance is not a substitute.",
+  "constraints": [
+    "Do not bypass daemon runtime-path or build-identity verification, alter test discovery, or treat a failed gate as passed.",
+    "Run the existing production build before tests that use the public daemon client; rerun the original tests and the plan's npm run check:self and reference harness without weakening acceptance.",
+    "Keep build orchestration in project scripts outside modules; implementation of explanatory analysis diagnostics remains in ramify/analysis.",
+    "Do not mark the real-report medium-risk findings repaired until verified against the real provider."
+  ],
+  "uncertainties": [
+    "The original ga-0008 and ga-0009 logs are not present in the inspected view; the reported ENOENT is consistent with the inspected source but those gate runs were not independently reproduced.",
+    "The current dist/src directory exists, but its correspondence to the final changed source and the result of a fresh build and unchanged gates have not been verified.",
+    "The specific medium-risk real-report findings are not provided; their repair status remains open."
+  ],
+  "evidence": {
+    "view": {
+      "status": "materialized",
+      "revision": "rev/1:1c08debf-4865-40d4-a10f-050987151f9e:137",
+      "input": "input/1:87075e3399404bb7ad559be502ded0848d4acb7c81a9317cc62d594daa18ee3c",
+      "coverageLimits": [
+        "cut: 377",
+        "detailsUnavailable: 1",
+        "dynamicTitles: 21"
+      ]
+    },
+    "citations": [
+      {
+        "module": "ramify/analysis",
+        "file": ".ramify-architect/analysis/module.json",
+        "note": "Analysis owns report composition and consumed report data; refreshed view rev/1:1c08debf-4865-40d4-a10f-050987151f9e:137."
+      },
+      {
+        "module": "ramify/daemon",
+        "file": "subs/daemon/src/discovery.ts",
+        "note": "runtimePaths requires dist/src and dist/subs; selectEndpoint checks the package's complete runtime tree and reports missing or incomplete builds."
+      },
+      {
+        "module": "ramify/daemon",
+        "file": "subs/daemon/src/tests/ipc-fixture.ts",
+        "note": "Public-client test setup calls selectEndpoint with packageRoot process.cwd()."
+      },
+      {
+        "module": "ramify",
+        "file": "package.json",
+        "note": "Project scripts separate build from test; npm run build invokes scripts/build-production.ts, while npm test runs Vitest alone."
+      },
+      {
+        "module": "ramify",
+        "file": "scripts/build-production.ts",
+        "note": "Outside-module build script stages and promotes compiled runtime outputs including src and subs, then writes runtime identity before promoting dist."
+      }
+    ],
+    "gaps": [
+      "The original failing gate logs and an independent run of npm run build and the unchanged tests are unavailable with read-only tools.",
+      "The view has cut 377, detailsUnavailable 1 and dynamicTitles 21; an empty search does not prove absence of other behavior or risks."
+    ]
+  },
+  "registry": [
+    {
+      "id": "enrich-import-diagnostics",
+      "revision": 2,
+      "hash": "696d99ad58a44d42867f5a09621e693eb2601fd868dd24e268d0f16a7abae7c5"
+    }
+  ],
+  "hypothesisRevisions": [],
+  "brief": "Reuse gd-001's enrich-import-diagnostics in ramify/analysis for wi-003; there is no placement change or plan deviation. Verified subs/daemon/src/tests/ipc-fixture.ts calls selectEndpoint with process.cwd() for public-client tests; subs/daemon/src/discovery.ts insists on a full dist/src and dist/subs build; package.json defines build separately from test and the outside-module scripts/build-production.ts produces and promotes the build with runtime identity. Missing dist/src is a gate-prerequisite problem, not a reason to weaken daemon validation or drop plan line 125: prepare the production build and rerun the unmodified full gate, npm run check:self and reference harness. The build script is outside all modules and stays there as an outside-modules location; do not assign it to analysis. Do not report success yet: ga-0008/ga-0009 logs were only supplied by the requester, no tests were run here, a current dist/src listing does not establish freshness, and the medium-risk real-report findings must still be repaired or assessed against the real provider. Refreshed architect rev/1:1c08debf-4865-40d4-a10f-050987151f9e:137 (input input/1:87075e3399404bb7ad559be502ded0848d4acb7c81a9317cc62d594daa18ee3c; cut 377, detailsUnavailable 1, dynamicTitles 21). No hypothesis or earlier decision changes. Guidance read: discovery.md and report.md. Source read: package.json, subs/daemon/src/discovery.ts, subs/daemon/src/tests/ipc-fixture.ts, scripts/build-production.ts; view read: .ramify-architect/_meta.json, README.md, analysis/module.json, daemon/tests.jsonl."
+}

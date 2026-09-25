@@ -1,0 +1,15 @@
+{
+  "schema": "ramify-agent.iteration-result/1",
+  "iteration": "wi-003.i06",
+  "outcome": "unsuitable",
+  "invocations": [
+    "inv-0045"
+  ],
+  "gate": null,
+  "commit": null,
+  "findings": [
+    "unsuitable (scope): The requested unchanged full project gate cannot pass within this write scope. After a successful fresh npm run build (dist/runtime-identity.json emitted; compiled CLI has no fake), type-check, run_scope_tests, and check:self, `npm test` fails in the out-of-scope consumers `src/tests/batch-cli.test.ts` (expects `Original: fixture/interfaces/api.ts#privateValue`, whereas the provider now publishes `Original: fixture:interfaces/api.ts#privateValue`) and `src/tests/companion-cli.test.ts` (expects the fake's `Original:`/unlabelled `Related:` formatting instead of the published diagnostic's `Original declaration:`/`Related (related):`). These specific consumer tests need adjustment to provider-published formatting; I did not modify them. The unchanged `npm run reference:cases` also reports 10 failures in out-of-scope scripts/reference-harness tests, including unexpected `signature-inferred` coverage and a plan2b metrics expectation. No excluded-module checks or build scripts were modified."
+  ],
+  "changedAssumptions": [],
+  "artifacts": []
+}
