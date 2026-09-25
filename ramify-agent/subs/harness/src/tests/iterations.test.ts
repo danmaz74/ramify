@@ -5,6 +5,7 @@ import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
 import { ObservationLog, type Observation, type ObservationOf } from '../run/observations.js';
+import { scriptedCandidates } from './helpers/candidates.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
@@ -87,11 +88,16 @@ async function target(options: { readonly notes?: boolean } = {}) {
 /** Opens a run over `root` with the scripted fake and the stated Git answers. */
 async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly GateCommit[]) {
   // The feature files' commit comes before every boundary a scenario states.
-  const scripted = gateGit(root, { head: base, commits: [scenarios, ...commits] });
+  const before = commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? materialized;
+  const after = commits.at(-1)?.commit ?? before;
+  const tree = 'a'.repeat(40);
+  const scripted = gateGit(root, { head: base, commits: [scenarios, ...commits],
+    previews: [before, before, before, after].map(head => ({ repositoryRoot: root, head, tree })) });
   const opened = await openRuns(root, {
     script: byRole(plan),
     inputs: treeInputs(),
     git: scripted.git,
+    candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }),
     readinessExecution: directReadinessExecution(),
   });
   cleanups.push(() => opened.service.close());
@@ -143,7 +149,7 @@ describe('G8: a work item revised across several iterations keeps every obligati
       unchanged,
     ]);
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const events = await runEventsOnDisk(root, 'review-notes', runId);
 
     // Three assignments, three accepted iterations, and four outline
@@ -160,8 +166,10 @@ describe('G8: a work item revised across several iterations keeps every obligati
     // third result is the one that wrote the first outline.
     const architectTurns = new Set(revisions.map(event => (event.data as { invocation: string }).invocation));
     expect(architectTurns.size).toBe(4);
-    const invocations = events.filter(event => event.type === 'invocation-started' && (event.data as { role: string }).role === 'local-architect');
+    const invocations = events.filter(event => event.type === 'invocation-started'
+      && event.data.role === 'local-architect' && architectTurns.has(event.data.invocation));
     expect(invocations).toHaveLength(4);
+    expect(new Set(invocations.map(event => event.data.session)).size).toBe(1);
 
     // An obligation an earlier revision opened is not lost: the work item's
     // own gate is the only thing that closes it, and each accepted iteration
@@ -216,7 +224,7 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
       engineer: [submit(completionProposed('Nothing needed changing.'))],
     }, [unchanged, unchanged, unchanged, unchanged]);
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const first = await readAssignment(root, runId, 'wi-001', 1);
     const second = await readAssignment(root, runId, 'wi-001', 2);
     expect(first.gate.tests.subtrees).toEqual([]);
@@ -269,7 +277,7 @@ describe('X1a: an engineer reaches its context budget', () => {
       engineer: [budgetTurn, budgetTurn, budgetTurn],
     }, [unchanged, unchanged]);
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const result = await readResult(root, runId, 'wi-001', 1);
     expect(result.outcome).toBe('partial');
     expect(result.invocations).toHaveLength(3);
@@ -324,7 +332,7 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
       unchanged,
     ]);
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const result = await readResult(root, runId, 'wi-001', 1);
     const invocation = result.invocations[0]!;
     const path = runPath(root, 'review-notes', runId, runLayout.observations(invocation));
@@ -353,7 +361,7 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
     expect(result.commit).toBe('revision-01');
     expect(operationsOf(scripted)).toEqual([
       'changedEntries', 'changedPaths', 'commitAccepted', 'createRunBranch',
-      'currentHead', 'diffNameStatus', 'findCommitByTrailers', 'isCleanRepository', 'worktreeLineChanges',
+      'currentHead', 'diffNameStatus', 'findCommitByTrailers', 'isCleanRepository', 'previewCandidateTree', 'worktreeLineChanges',
     ]);
     // No external tool was started for any of this.
     expectNoProcesses();

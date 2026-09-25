@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
+import { scriptedCandidates } from './helpers/candidates.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
 import {
@@ -175,9 +176,15 @@ async function run(
   commits: readonly CommitResponse[],
   options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
 ) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
+  const materialization = scenariosCommitted('review-notes');
+  const before = commits.slice(0, -1).flatMap(commit => commit.commit ?? []).at(-1) ?? materialization.commit!;
+  const after = commits.at(-1)?.commit ?? before;
+  const tree = 'a'.repeat(40);
+  const git = answeredGit(root, { head: 'revision-00', commits: [materialization, ...commits],
+    previews: [before, before, before, after].map(head => ({ repositoryRoot: root, head, tree })) });
   const opened = await openRuns(root, {
-    script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(), ...options,
+    script: byRole(plan), inputs: treeInputs(), git,
+    candidates: scriptedCandidates(root, { [after]: { tree, base: before, files: {}, changes: [] } }), readinessExecution: directReadinessExecution(), ...options,
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -315,7 +322,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
       'contract-engineer': [submit(establishedContract, ...contractWrites)],
     }, delegationCommits('wi-001.i03'));
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const log = await events(root, runId);
     const types = typesOf(log);
 
@@ -426,7 +433,7 @@ describe('a contract sub-session that fails registers nothing, and its caller go
       unchanged('final verification of plan "review-notes"'),
     ]);
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const types = typesOf(await events(root, runId));
     expect(types).toContain('contract-requested');
     expect(types).not.toContain('contract-registered');
@@ -481,7 +488,7 @@ describe('X1b: a contract sub-session that returns incomplete registers nothing'
       unchanged('final verification of plan "review-notes"'),
     ]);
 
-    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const log = await events(root, runId);
     const types = typesOf(log);
     expect(types).toContain('contract-requested');
