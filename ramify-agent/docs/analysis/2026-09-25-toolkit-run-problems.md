@@ -94,7 +94,7 @@ The review count includes the orientation step that design reviews fork from.
 | E1 | The main checkout's ramify-agent dependencies were stale | fixed |
 | E2 | The toolkit build `/ramify/dist` is stale | fixed, rebuilt |
 | E3 | pi 0.87.1 changed how system messages reach the adapter | fixed, `20db7eb9` |
-| E4 | No audit has run since `20db7eb9`, `193fc421` and `8c1397ed` | open |
+| E4 | No audit has run since `20db7eb9`, `193fc421` and `8c1397ed` | fixed, audit passes on `6144cd4b` |
 
 ## Harness
 
@@ -605,8 +605,12 @@ the form `owner:file#binding`, such as `app/catalog/core:records.ts#findRecord`"
   passed on as user messages. Fixed in `20db7eb9`, with the adapter's test
   helper adapted. The adapter's tests (56) and the related harness tests (157)
   pass. A live session and a live fork probe on `gpt-6-sol` passed.
-- **E4. No audit.** No ramify-audit has run on `ramify-agent` since
-  `20db7eb9`, `193fc421` or `8c1397ed`.
+- **E4. No audit.** No ramify-audit had run on `ramify-agent` since
+  `20db7eb9`, `193fc421` or `8c1397ed`. The request
+  `audit/toolkit-run-fixes.request.json` passed on `6144cd4b` (run
+  `3cbed96a-2ba6-4ac4-8e13-72364ddcd1c3`). Its first run, on `799eecb4`,
+  failed in `progress-fixture.test.ts` only, because the H8 fix changed a call
+  count that the fixture pinned.
 
 ## Not reached
 
