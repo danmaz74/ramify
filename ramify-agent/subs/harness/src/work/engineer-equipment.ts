@@ -1,4 +1,4 @@
-import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
+import { runCommand, type CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import type {
@@ -41,6 +41,12 @@ export interface EquipContext {
   readonly reminders: () => string[];
   /** The invocation's transcript, told what the harness decides and where a call's complete output is. */
   readonly transcript?: TranscriptNotes | undefined;
+  /**
+   * Holds the invocation's idle bound while one command the equipment runs
+   * for it is in flight, for that command's own timeout; the returned
+   * release is called when the command ends. Absent, nothing is held.
+   */
+  readonly hold?: ((timeoutMs: number) => () => void) | undefined;
 }
 
 /** The tools and the guard of one invocation. */
@@ -156,6 +162,10 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     // observation of that call names.
     const mutated = new Map<string, string[]>();
     let shellGapRecorded = false;
+    // A command run for the session is the harness's work and not the
+    // session's silence, so each one holds the idle bound for its own
+    // timeout while it runs.
+    const commandExecution = heldCommands(inputs.commandExecution ?? runCommand, session.hold);
 
     shellJudge = new ToolInputJudge({
       tool: shellToolName,
@@ -164,7 +174,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       observations: session.observations,
     });
     shell = createShellTool({
-      commandExecution: inputs.commandExecution,
+      commandExecution,
       workingDirectory: projectRoot,
       judge: input => shellJudge!.judge(input, session.callId(shellToolName)),
       outputFile: call => inputs.outputPath('shell', session.invocation, call),
@@ -202,7 +212,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
       settle: () => shell!.settle(),
       tools: [shell.definition, createScopeTestsTool({
-        commandExecution: inputs.commandExecution,
+        commandExecution,
         projectRoot,
         commands: inputs.commands,
         policy: inputs.tests,
@@ -417,4 +427,20 @@ async function writeScopeSource(projectRoot: string, guarded: GuardedScope): Pro
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * A command runner whose every command holds an invocation's idle bound
+ * while it runs, for its own timeout. Without a hold it is the runner itself.
+ */
+export function heldCommands(runner: CommandRunner, hold: ((timeoutMs: number) => () => void) | undefined): CommandRunner {
+  if (hold === undefined) return runner;
+  return async request => {
+    const release = hold(request.timeoutMs);
+    try {
+      return await runner(request);
+    } finally {
+      release();
+    }
+  };
 }

@@ -390,6 +390,52 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
 
 });
 
+describe('a contract sub-session that fails registers nothing, and its caller goes on', () => {
+  test('the contract iteration closes partial with the failure, and the run continues', async () => {
+    const root = await target();
+    const { service, runId, git } = await run(root, {
+      'initial-architect': [submit(analysis([entry('review-notes', consumer)]))],
+      'local-architect': [
+        submit({ ...assign(consumer, {}, outline()), localDecisions: [placeTheLimit] }),
+        submit(assign(consumer, { goal: 'Carry the limit in this module, since the agreement was not established.' })),
+        submit(requestCompletion()),
+      ],
+      engineer: [
+        submit(contractNeeded),
+        submit(completionProposed('The limit is carried here, because the agreement was not established.'),
+          write(`${consumerDirectory}/src/notes.ts`, [
+            'export function addNote(note) {',
+            "  return note.length <= 500 ? note : '';",
+            '}',
+            '',
+          ].join('\n'))),
+      ],
+      // The session writes the interface, and then its provider fails.
+      'contract-engineer': [[
+        write(`${providerDirectory}/src/interfaces/note-limit.ts`, contractFile),
+        { kind: 'fail', error: 'the provider refused the request' },
+      ]],
+    }, [
+      accepted('wi-001.i03', 'revision-01', [...added(seam.interface), ...modified(seam.consumer)]),
+      unchanged('wi-001'),
+      unchanged('final verification of plan "review-notes"'),
+    ]);
+
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    const types = typesOf(await events(root, runId));
+    expect(types).toContain('contract-requested');
+    expect(types).not.toContain('contract-registered');
+
+    const result = await readJson<{ outcome: string; findings: string[]; invocations: string[] }>(root, runId, iterationLayout.result('wi-001', 2));
+    expect(result.outcome).toBe('partial');
+    expect(result.findings).toContain(
+      `the contract engineer of wi-001.i02 ended without a result (failed: the provider refused the request; invocation ${result.invocations[0]}); nothing was registered`,
+    );
+    expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01']);
+    git.assertAnswered();
+  }, 60_000);
+});
+
 describe('X1b: a contract sub-session that returns incomplete registers nothing', () => {
   test('no contract and no obligation are committed, and its caller accounts for the partial work', async () => {
     const root = await target();

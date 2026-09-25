@@ -959,7 +959,14 @@ Use a few explicit failure categories to select recovery:
 | Failed assertion, type error or Ramify violation within scope | Return diagnostics to the engineer for bounded repair. |
 | Runner failure, unavailable daemon or other execution infrastructure failure | Harness attempts bounded infrastructure recovery; do not ask the engineer to repair application code without evidence of a code defect. |
 | Invalid or lost agent session | Replace or reconstruct the session from durable records after settling its tools; preserve outstanding work and repair counters. |
+| Engineer or contract session that fails: an idle or absolute bound, a provider error or an adapter fault | After its writer settles, close the iteration as partial with the failure as a finding and return to the local architect. The work item's iteration limit bounds repeated failures; an unconfirmed settlement still ends the run. |
 | Required change outside the assignment or to an established obligation | Return to the local architect for a scoped assignment or recorded obligation revision. |
+
+An invocation's idle bound measures the session's silence, not the harness's
+work. A command the harness runs for the session, such as a shell call or a
+scoped test run, holds the idle bound for the command's own timeout plus a
+margin, because that timeout already bounds it; the invocation's absolute
+bound is unchanged.
 
 Preserve the original failure cause across recovery attempts. Repeatedly sending
 the same repair prompt to an invalid session is not recovery. Infrastructure
