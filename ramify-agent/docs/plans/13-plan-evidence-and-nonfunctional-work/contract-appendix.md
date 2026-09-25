@@ -116,15 +116,24 @@ unavailable passages. Failure or invalid output consumes the captured retry
 bound and leaves selection unavailable; omission never waives an NFR. The
 continuation package contains the original qualified passages, not summaries.
 The `context-selection-recorded` event fixes its hash and forbids rerunning
-selection for that work item.
+selection for that work item. Its selection and package paths are immutable,
+content-addressed files. The event hashes and accepted catalog are verified
+before a recorded package is read. `examined` and `unavailable` name catalog
+`nfr-NNN`/`adv-NNN` IDs or captured principle `doc-NNN` IDs. A selected
+principle uses its `doc-NNN` ID and an exact passage from that captured
+principle document; multiple distinct passages from one document may be
+selected. The principle index names the immutable stored path and byte hash.
+Selector scope judgments and conditions remain separate from source text.
 
 Delivery uses a deterministic `appendKey` derived from run, work item,
 selection and destination session. `context-package-appended` records the
 destination session/ref, actual outcome (`appended`, `already-present`,
 `session-lost`, `failed`, `no-session`) and reason. Recovery retries an unknown
-append by that key. If the session is lost, a reconstructed session receives
-the recorded package and a new delivery event; selector output is never
-regenerated. The architect cites selected IDs per assignment;
+append by that key. If the session is lost, a fresh organizing prompt carries
+the exact recorded package. `context-package-prompt-bound` identifies that
+invocation, destination session and package hash; it records prompt delivery,
+not an append outcome. Selector output is never regenerated. The architect
+cites selected IDs per assignment;
 `assignmentContextSchema` binds that citation to the package hash. Engineer
 and contract sessions, including fresh continuations, receive the original
 source passages labeled as requirement, suggestion or architect choice.

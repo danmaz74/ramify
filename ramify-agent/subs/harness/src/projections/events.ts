@@ -290,8 +290,12 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Orientation recorded for ${event.data.workItem}`, ref('work-item', event.data.workItem)];
     case 'context-selection-recorded':
       return [`Context selected for ${event.data.workItem}`, ref('work-item', event.data.workItem)];
+    case 'context-package-append-requested':
+      return [`Context package append requested for ${event.data.workItem}`, ref('session', event.data.session)];
     case 'context-package-appended':
       return [`Context package delivery for ${event.data.workItem}: ${event.data.outcome}`, ref('session', event.data.session)];
+    case 'context-package-prompt-bound':
+      return [`Recorded context package bound to ${event.data.workItem}'s invocation`, [...ref('session', event.data.session), ...ref('invocation', event.data.invocation)]];
     case 'candidate-prepared':
       return [`Candidate ${event.data.candidate} prepared`, []];
     case 'nonfunctional-assessed':

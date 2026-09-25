@@ -1178,4 +1178,5 @@ export function identityOf(event: RunEvent): string | null {
 export const recoveryCompletions: ReadonlySet<RunEvent['type']> = new Set([
   'invocation-ended', 'writer-released', 'gate-attempted', 'brief-appended', 'global-context-rebuilt',
   'decision-delivered', 'scenarios-materialized', 'session-finished', 'job-interrupted',
+  'context-package-appended',
 ]);

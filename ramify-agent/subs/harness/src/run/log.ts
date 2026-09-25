@@ -151,12 +151,17 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }).strict()),
   /** The manifest is committed only after every immutable document byte file is durable. */
   event('document-manifest-committed', z.object({ manifest: text, hash: z.string().regex(/^[0-9a-f]{64}$/), documents: z.int().positive() }).strict()),
-  event('work-orientation-recorded', z.object({ workItem: text, invocation: text, packetHash: z.string().regex(/^[0-9a-f]{64}$/), point: text.nullable() }).strict()),
+  event('work-orientation-recorded', z.object({ workItem: text, invocation: text, packetHash: z.string().regex(/^[0-9a-f]{64}$/), packet: text.optional(), point: text.nullable() }).strict()),
   /** A work item's one read-only selection and exact continuation package. */
-  event('context-selection-recorded', z.object({ workItem: text, selection: text, packageHash: z.string().regex(/^[0-9a-f]{64}$/) }).strict()),
+  event('context-selection-recorded', z.object({ workItem: text, selection: text, selectionHash: z.string().regex(/^[0-9a-f]{64}$/).optional(), packageHash: z.string().regex(/^[0-9a-f]{64}$/), package: text.optional() }).strict()),
+  event('context-package-append-requested', z.object({ workItem: text, selection: text, session: sessionIdSchema.nullable(), appendKey: text }).strict()),
   event('context-package-appended', z.object({
     workItem: text, selection: text, session: sessionIdSchema.nullable(), appendKey: text,
     ref: text.nullable(), outcome: z.enum(['appended', 'already-present', 'session-lost', 'failed', 'no-session']), reason: z.string().nullable(),
+  }).strict()),
+  /** The exact package was bound into this invocation's prompt; its outcome says whether the session ran. */
+  event('context-package-prompt-bound', z.object({
+    workItem: text, selection: text, packageHash: z.string().regex(/^[0-9a-f]{64}$/), invocation: text, session: sessionIdSchema,
   }).strict()),
   /** The resulting tree is recorded only after all source-mutating preparation. */
   event('candidate-prepared', z.object({ candidate: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),

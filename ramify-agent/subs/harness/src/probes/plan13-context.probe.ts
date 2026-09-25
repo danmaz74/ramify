@@ -108,15 +108,25 @@ async function report(value: unknown): Promise<void> {
 
 async function main(): Promise<number> {
   const requestedModel = option('--model') ?? 'openai-codex/gpt-6-sol';
+  const implementationStart = await implementationRevision();
+  const implementationWitness = async () => {
+    const end = await implementationRevision();
+    return {
+      start: implementationStart,
+      end,
+      sourceStable: implementationStart.files.every((entry, index) =>
+        end.files[index]?.file === entry.file && end.files[index]?.sha256 === entry.sha256),
+    };
+  };
   const readiness = await piReadiness({ model: requestedModel });
   if (!readiness.ready) {
-    await report({ probe: 'plan13-context', ran: false, requestedModel, gap: readiness.reason });
+    await report({ probe: 'plan13-context', ran: false, requestedModel, gap: readiness.reason,
+      implementation: await implementationWitness() });
     return 2;
   }
   const scratch = await mkdtemp(join(tmpdir(), 'ramify-plan13-context-probe-'));
   const sessions: AgentSession[] = [];
   try {
-    const implementation = await implementationRevision();
     const project = join(scratch, 'project');
     const runDirectory = join(scratch, 'captured-run');
     const planText = '# Probe plan\n\nNFR: Keep audit lookup below 100 ms at p95.\nAdvice: Prefer a local cache.\n';
@@ -187,7 +197,8 @@ async function main(): Promise<number> {
     const parentResult = await bounded(parent);
     if (parentResult.kind !== 'submitted' || orientation === null) {
       await report({ probe: 'plan13-context', ran: true, requestedModel, readinessModel: readiness.model,
-        gap: 'Parent orientation did not submit', parent: { start: parent.start, ...parentResult, usage: usage(parentEvents) }, implementation });
+        gap: 'Parent orientation did not submit', parent: { start: parent.start, ...parentResult, usage: usage(parentEvents) },
+        implementation: await implementationWitness() });
       return 2;
     }
     const parentPoint = parent.ref;
@@ -234,7 +245,7 @@ async function main(): Promise<number> {
         gap: 'Selector did not produce a validated package', sourceCommit,
         parent: { start: parent.start, ...parentResult, usage: usage(parentEvents) },
         selector: { requested: 'fork', actual: selector.start, ...selectorResult, usage: usage(selectorEvents), rejectedSubmissions },
-        implementation });
+        implementation: await implementationWitness() });
       return 2;
     }
     const packageCheck = validateContextSelection(selectedPackage.selection, catalog, manifest, capturedBytes);
@@ -243,7 +254,7 @@ async function main(): Promise<number> {
     if (packageCheck.status !== 'available' || !selectedAll || !selectedPackage.package.complete) {
       await report({ probe: 'plan13-context', ran: true, requestedModel, readinessModel: readiness.model,
         gap: 'Package did not contain all exact required probe passages', selectedIds: [...selectedIds],
-        validation: packageCheck.status, implementation });
+        validation: packageCheck.status, implementation: await implementationWitness() });
       return 2;
     }
     const appendKey = `probe:wi-001:${selectedPackage.package.hash}`;
@@ -251,7 +262,7 @@ async function main(): Promise<number> {
     const repeatedAppend = await agent.appendContext(parentPoint, appendKey, selectedPackage.package.text);
     if (firstAppend.outcome === 'session-lost') {
       await report({ probe: 'plan13-context', ran: true, requestedModel, gap: 'Parent session was lost before package append',
-        append: { first: firstAppend.outcome, repeated: repeatedAppend.outcome }, implementation });
+        append: { first: firstAppend.outcome, repeated: repeatedAppend.outcome }, implementation: await implementationWitness() });
       return 2;
     }
     const continuationEvents: AgentEvent[] = [];
@@ -284,6 +295,7 @@ async function main(): Promise<number> {
     const degradedMatchesActual = selectedPackage.selection.degraded === !actualFork;
     const actualContinuation = continued.start.mode === 'continue';
     const appendIdempotent = firstAppend.outcome === 'appended' && repeatedAppend.outcome === 'already-present';
+    const implementation = await implementationWitness();
     const reportBody = {
       probe: 'plan13-context', ran: true, requestedModel, readinessModel: readiness.model,
       actualModels: [...new Set([...usage(parentEvents), ...usage(selectorEvents), ...usage(continuationEvents)].map(entry => entry.model))],
@@ -306,7 +318,8 @@ async function main(): Promise<number> {
       witnessBoundary: 'actual pi AgentPort sessions and context-selection helpers; not full RunService orchestration',
     };
     await report(reportBody);
-    return actualFork && degradedMatchesActual && actualContinuation && appendIdempotent && quoteMatches && continuedResult.kind === 'submitted' ? 0 : 2;
+    return implementation.sourceStable && actualFork && degradedMatchesActual && actualContinuation
+      && appendIdempotent && quoteMatches && continuedResult.kind === 'submitted' ? 0 : 2;
   } finally {
     await Promise.allSettled(sessions.map(session => session.stop()));
     await rm(scratch, { recursive: true, force: true });

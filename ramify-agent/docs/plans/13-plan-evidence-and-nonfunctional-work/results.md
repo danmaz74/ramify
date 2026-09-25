@@ -202,3 +202,46 @@ The accepted catalog is fixed; assignment delivery may cite its IDs but may
 not add or reclassify items. The current harness recovery policy interrupts
 an in-flight run after a crash; this iteration did not add same-run resume.
 No CheckFinding was opened.
+
+## Iteration 4 — work-item orientation and source selection
+
+**Starting revision:** `1fd20542` after the iteration 3 handoff. The local
+architect now makes a dedicated, assignment-free orientation submission for
+each new work item. Its full briefing and accepted orientation are stored as
+an immutable, hashed packet. A foreground, read-only context-selector fork
+receives that packet, the verified accepted catalog and immutable principle
+index. The harness validates examined, selected and unavailable IDs and exact
+passages, then writes content-addressed selection and package files before
+recording their paths and hashes. A principle is cited by captured `doc-NNN`
+ID with its exact passage. Missing or invalid output exhausts the captured
+retry bound and fails before assignment. Source changes before selection,
+during selection or before delivery refuse the package.
+
+The selected package is appended to the parent with a deterministic key.
+Recovery replays a pending append by the same key and records its actual
+outcome without rerunning selection. Every organizing invocation also receives
+the exact recorded package in its prompt, including a fresh invocation when
+the parent session is lost. A prompt-bound event names the invocation,
+destination session and package hash separately from the append outcome.
+Old runs without accepted evidence retain their earlier path.
+
+**Verification:** Five focused Vitest files passed, 52 tests. New runtime
+cases cover a selected NFR and advice retaining exact captured passages,
+one orientation and selection, invalid selector output failing within the
+retry bound, source mutation during selection, and a lost parent session
+receiving the same package in a fresh prompt. The composition recovery table
+passes the pending append and all other 28 boundary rows. `npm run type-check`,
+`npm run build:web` and `npm run check:self` passed; self-check reported 0
+errors, 0 warnings, 0 denied accesses and 298 analysis limits. The focused
+command was:
+
+```sh
+npx vitest run subs/harness/src/tests/context-selection-runtime.test.ts subs/harness/src/tests/context-selection-submissions.test.ts subs/harness/src/tests/context-selection.test.ts subs/harness/src/tests/composition-recovery.test.ts subs/harness/src/tests/placement.test.ts --maxWorkers=1 --testTimeout=10000
+```
+
+The full post-edit audit remains iteration 9's gate. Recovery of a committed
+pending append is exercised; a process interruption before the orientation
+or selector phase still interrupts the ordinary run and is not claimed as a
+same-run resume. This iteration does not claim live assignment citation or
+engineer/contract delivery; those are iteration 5 consumers of the recorded
+selection.

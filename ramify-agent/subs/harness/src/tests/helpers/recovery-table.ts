@@ -142,6 +142,23 @@ export const recoveryTable = {
     machines: ['SM4'], scenario: 'iteration', appended: interrupted,
     stated: 'No second start, and nothing delivered',
   },
+  'work-orientation-recorded': {
+    machines: ['SM4'], scenario: 'iteration', appended: interrupted,
+    stated: 'The immutable orientation packet stays committed and the run is interrupted without a second orientation',
+  },
+  'context-selection-recorded': {
+    machines: ['SM4'], scenario: 'iteration', appended: interrupted,
+    stated: 'The immutable selection and package stay committed; recovery does not rerun the selector',
+  },
+  'context-package-append-requested': {
+    machines: ['SM4'], scenario: 'iteration', appended: ['context-package-appended', 'job-interrupted'],
+    effect: /the context append of wi-001/,
+    stated: 'Recovery retries the same keyed package append and records its actual outcome without selecting again',
+  },
+  'context-package-appended': {
+    machines: ['SM4'], scenario: 'iteration', appended: interrupted,
+    stated: 'The completed context append remains once and recovery does not append it again',
+  },
   'hypotheses-delivered': {
     machines: ['SM4', 'SM3'], scenario: 'iteration', appended: interrupted,
     stated: 'Re-materializes the work item and the hypothesis; nothing is delivered a second time',
@@ -288,7 +305,7 @@ export const narrowedRows: ReadonlyArray<RecoveryRow & { readonly name: string; 
  */
 const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   ...Object.fromEntries(Object.keys(recoveryTable).map(write => [write, write])) as Record<RunWrite, RunEvent['type']>,
-  'job-created': 'job-started',
+  'job-created': 'document-manifest-committed',
   'analysis-evidence-staged': 'invocation-ended',
   'readiness-attempted': 'readiness-passed',
   'scenarios-committed': 'scenarios-materializing',

@@ -595,7 +595,7 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
  * resumed the run after its unresolved request was answered with an
  * environment problem.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**
@@ -606,7 +606,7 @@ export type ContinueReason = z.infer<typeof continueReasonSchema>;
  * point after its completion request; an unresolved request forks the
  * architect context, as a placement request does.
  */
-export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request']);
+export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection']);
 
 /** Why a session takes another's place: a lost engineer is reconstructed from records, or the architect context is rebuilt. */
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
@@ -938,6 +938,9 @@ export const runLayout = {
   documentBytes: (id: string): string => join('input', 'documents', `${id}.bin`),
   catalogVersion: (hash: string): string => join('analysis', 'catalog', `${hash}.json`),
   incorporationVersion: (hash: string): string => join('analysis', 'incorporation', `${hash}.json`),
+  orientationPacket: (workItem: string, hash: string): string => join('work', workItem, 'orientation', `${hash}.txt`),
+  selectionVersion: (workItem: string, hash: string): string => join('work', workItem, 'selection', `${hash}.json`),
+  contextPackage: (workItem: string, hash: string): string => join('work', workItem, 'context', `${hash}.txt`),
   selection: (workItem: string): string => join('work', workItem, 'context-selection.json'),
   assignmentContext: (assignment: string): string => join('assignments', `${assignment}-context.json`),
   candidate: (id: string): string => join('nonfunctional', 'candidates', `${id}.json`),

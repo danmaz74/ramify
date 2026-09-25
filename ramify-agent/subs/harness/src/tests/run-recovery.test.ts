@@ -184,6 +184,10 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'invocation-ended': return types.includes('invocation-ended');
     case 'session-finished': return types.includes('session-finished');
     case 'analysis-accepted': return types.includes('analysis-accepted');
+    case 'work-orientation-recorded': return types.includes('work-orientation-recorded');
+    case 'context-selection-recorded': return types.includes('context-selection-recorded');
+    case 'context-package-append-requested': return types.includes('context-package-append-requested');
+    case 'context-package-appended': return types.includes('context-package-appended');
     case 'analysis-evidence-staged': return types.includes('invocation-ended') && !types.includes('analysis-accepted');
     case 'readiness-attempted': return types.includes('readiness-passed') || types.includes('readiness-failed');
     // The materialization's intent is in the log; its commit is made at the second.

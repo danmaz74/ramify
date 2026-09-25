@@ -67,11 +67,19 @@ import { ensureStateDirectory } from '../store/state-directory.js';
 import { planPath, readPlan } from '../plans/discover.js';
 import { discoverDocuments } from '../../subs/plan-evidence/src/discovery.js';
 import { assignCatalog, verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { readAcceptedEvidence } from '../analysis/evidence.js';
+import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
+import { contextSelectionSchema } from '../context-selection/contracts.js';
+import { readRecordedContextSelection } from '../context-selection/recorded.js';
+import { contextSelectorJsonSchema, contextSelectorSubmissionSchema, contextSelectorToolName,
+  orientationPacket, prepareContextSelection, workOrientationJsonSchema, workOrientationSubmissionSchema,
+  workOrientationToolName, type ContextSelectorSubmission, type WorkOrientationSubmission } from '../context-selection/submissions.js';
 import { headingAnchor, resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
 import { documentChanges, readCapturedDocuments } from './document-inputs.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
+  renderContextSelectorPrompt, renderWorkOrientationPrompt,
   type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
@@ -183,7 +191,7 @@ import { runSnapshot, type RunSnapshot } from './snapshot.js';
 import { InvocationTranscript, recordAppend, verdictNote } from '../transcripts/recorder.js';
 import { ContentStore } from '../transcripts/store.js';
 import { readBody, readTranscript, TranscriptWriter } from '../transcripts/writer.js';
-import { SubmissionJudge, type SubmissionValidation } from './submissions.js';
+import { SubmissionJudge, validateAgainst, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
 
 /*
@@ -221,6 +229,10 @@ export type RunWrite =
   | 'session-finished'
   | 'analysis-accepted'
   | 'analysis-evidence-staged'
+  | 'work-orientation-recorded'
+  | 'context-selection-recorded'
+  | 'context-package-append-requested'
+  | 'context-package-appended'
   | 'readiness-attempted'
   | 'scenarios-materializing'
   | 'scenarios-committed'
@@ -2172,6 +2184,42 @@ export class RunService {
         performed.push(`the parent append of decision ${decision.id}`);
         continue;
       }
+      if (event.type === 'context-package-append-requested') {
+        const agent = this.options.agent;
+        const selected = run.log.all('context-selection-recorded').find(candidate => candidate.data.workItem === event.data.workItem
+          && candidate.data.selection === event.data.selection);
+        const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
+        if (agent === undefined || selected === undefined || evidence.status === 'unavailable') {
+          this.warn(`Run ${run.record.jobId}: context append ${pending.key} lacks its agent or verified selection`);
+          continue;
+        }
+        const recorded = await readRecordedContextSelection(run.directory, selected, evidence.catalog, evidence.manifest, evidence.bytes);
+        if (recorded.status === 'unavailable') {
+          this.warn(`Run ${run.record.jobId}: context append ${pending.key} is unavailable: ${recorded.reason}`);
+          continue;
+        }
+        const orientation = run.log.all('work-orientation-recorded').find(candidate => candidate.data.workItem === event.data.workItem);
+        await run.log.ledger.effect<BriefAppend>({
+          key: pending.key, serialize: work => run.mutex.run(work),
+          intent: () => { throw new Error(`The intent of ${pending.key} is already committed`); },
+          perform: async key => {
+            if (event.data.session === null || orientation?.data.point === null || orientation === undefined) {
+              return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
+            }
+            try {
+              const answer = await agent.appendContext(orientation.data.point, key, recorded.packageText);
+              return answer.outcome === 'session-lost'
+                ? { session: event.data.session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
+                : { session: event.data.session, ref: answer.ref, outcome: answer.outcome, reason: null };
+            } catch (error) { return { session: event.data.session, ref: null, outcome: 'failed', reason: message(error) }; }
+          },
+          complete: result => ({ event: run.log.next({ type: 'context-package-appended', data: {
+            workItem: event.data.workItem, selection: event.data.selection, appendKey: event.data.appendKey, ...result,
+          } }), records: [] }),
+        });
+        performed.push(`the context append of ${event.data.workItem}`);
+        continue;
+      }
       if (event.type === 'reconciliation-assessed') {
         // The assessment is committed and its brief is not in the local
         // architect's session yet. The append is keyed by the
@@ -3339,6 +3387,204 @@ export class RunService {
     };
   }
 
+  /** One work item's accepted source package, selected before its first assignment. */
+  private async orientAndSelectWorkContext(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
+    item: WorkItem, local: LoadedPackage, briefing: string, workingDirectory: string,
+  ): Promise<{ readonly kind: 'skip' | 'failed' } | { readonly kind: 'ready'; readonly text: string; readonly selection: string; readonly packageHash: string; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
+    const accepted = run.log.find('analysis-accepted');
+    if (!accepted?.data.evidence && !run.record.manifest.documentManifest) return { kind: 'skip' }; // old single-plan run
+    const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (sourceChanges.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed before context selection: ${sourceChanges.join('; ')}`, [runLayout.documentManifest]);
+      return { kind: 'failed' };
+    }
+    const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
+    if (evidence.status === 'unavailable') {
+      await this.fail(run, 'inputs-changed', `The accepted context evidence is unavailable: ${evidence.reason}`);
+      return { kind: 'failed' };
+    }
+    const selector = packages.get('context-selector');
+    if (selector === undefined || run.record.policy.context['context-selector'] === undefined) {
+      await this.fail(run, 'internal', 'The run has no context selector package or captured context policy');
+      return { kind: 'failed' };
+    }
+    const orientationStart = workOrientationMessage(briefing);
+    let orientation = run.log.all('work-orientation-recorded').find(event => event.data.workItem === item.id);
+    if (orientation === undefined) {
+      // A completed dedicated orientation may precede its own event if the
+      // harness stopped at that boundary. Its accepted submission is enough
+      // to publish the same packet without another model call.
+      let prior: { id: string; session: SessionId; ref: string | null; value: WorkOrientationSubmission } | undefined;
+      for (const ended of [...run.log.all('invocation-ended')].reverse()) {
+        if (ended.data.submission === null || !ended.data.kept) continue;
+        const started = run.log.all('invocation-started').find(event => event.data.invocation === ended.data.invocation);
+        if (started?.data.role !== 'local-architect' || started.data.work.workItem !== item.id) continue;
+        const recordedInvocation = this.committedBody(run, runLayout.invocation(ended.data.invocation)) as Invocation | null;
+        if (recordedInvocation?.prompt.inputsHash !== inputsHash([
+          renderWorkOrientationPrompt(local, this.projectRoot, workingDirectory), orientationStart,
+        ])) continue;
+        const raw = await readIfExists(run.path(runLayout.submission(ended.data.invocation)));
+        if (raw === undefined || sha256(raw) !== ended.data.submission) continue;
+        try {
+          const submitted = JSON.parse(raw.toString('utf8')) as { schema?: string };
+          if (submitted.schema !== 'ramify-agent.work-orientation/1') continue;
+          const { schema: _schema, ...body } = submitted;
+          void _schema;
+          const value = workOrientationSubmissionSchema.parse(body);
+          const outcome = this.committedBody(run, runLayout.outcome(ended.data.invocation)) as { session?: { ref?: string } };
+          prior = { id: ended.data.invocation, session: started.data.session, ref: outcome.session?.ref ?? null, value };
+          break;
+        } catch { /* Another local submission is not an orientation. */ }
+      }
+      if (prior === undefined) {
+        const count = run.record.policy.limits.forkRetriesPerRequest + 1;
+        for (let attempt = 1; attempt <= count && !this.ignoring(run); attempt++) {
+          const result = await this.runInvocation<WorkOrientationSubmission>(run, agent, {
+            role: 'local-architect', work: { workItem: item.id }, attempt, loaded: local,
+            systemPrompt: renderWorkOrientationPrompt(local, this.projectRoot, workingDirectory),
+            prompt: orientationStart, workingDirectory, start: { mode: 'fresh' },
+            toolName: workOrientationToolName, description: 'Record your orientation before making an assignment.',
+            inputSchema: workOrientationJsonSchema, submissionSchema: 'ramify-agent.work-orientation/1',
+            validate: input => validateAgainst(workOrientationSubmissionSchema, input),
+            scope: { write: null, measurement: null, size: null },
+            keep: (ended, value) => ended === 'submitted' && value !== undefined ? kept : finished('not-kept'),
+          });
+          if (result.ended === 'submitted' && result.value !== undefined) {
+            prior = { id: result.id, session: result.session, ref: result.kept && result.ref !== '' ? result.ref : null, value: result.value };
+            break;
+          }
+        }
+      }
+      if (prior === undefined) {
+        await this.fail(run, 'invalid-submission', `No valid work orientation was obtained for ${item.id} within the captured retry bound`);
+        return { kind: 'failed' };
+      }
+      const packet = orientationPacket({ workItem: item.id, briefing, submission: prior.value });
+      const path = runLayout.orientationPacket(item.id, packet.hash);
+      await writeOnce(run.path(path), packet.text);
+      await this.write(run, { type: 'work-orientation-recorded', data: { workItem: item.id, invocation: prior.id, packetHash: packet.hash, packet: path, point: prior.ref } });
+      await this.afterWrite('work-orientation-recorded', run.record.jobId);
+      orientation = run.log.all('work-orientation-recorded').find(event => event.data.workItem === item.id);
+    }
+    if (orientation === undefined || !orientation.data.packet
+      || orientation.data.packet !== runLayout.orientationPacket(item.id, orientation.data.packetHash)) {
+      await this.fail(run, 'inputs-changed', `The recorded orientation packet of ${item.id} is unavailable`);
+      return { kind: 'failed' };
+    }
+    const packetBytes = await readIfExists(run.path(orientation.data.packet));
+    if (packetBytes === undefined || sha256(packetBytes) !== orientation.data.packetHash) {
+      await this.fail(run, 'inputs-changed', `The recorded orientation packet of ${item.id} changed`, [orientation.data.packet]);
+      return { kind: 'failed' };
+    }
+    const packet = packetBytes.toString('utf8');
+    const parentStarted = run.log.all('invocation-started').find(event => event.data.invocation === orientation!.data.invocation);
+    const parentSession = parentStarted?.data.session;
+    let selectionEvent = run.log.all('context-selection-recorded').find(event => event.data.workItem === item.id);
+    if (selectionEvent === undefined) {
+      const count = run.record.policy.limits.forkRetriesPerRequest + 1;
+      for (let attempt = 1; attempt <= count && !this.ignoring(run); attempt++) {
+        const forked = orientation.data.point !== null && parentSession !== undefined;
+        const workspace = run.path(join('work', item.id, 'selector-workspace'));
+        await mkdir(workspace, { recursive: true });
+        const result = await this.runInvocation<ContextSelectorSubmission>(run, agent, {
+          role: 'context-selector', work: { workItem: item.id }, attempt, loaded: selector,
+          systemPrompt: renderContextSelectorPrompt(selector, this.projectRoot),
+          prompt: contextSelectorMessage(packet, evidence.catalog, evidence.manifest, run.directory),
+          start: forked ? { mode: 'fork', from: orientation.data.point! } : { mode: 'fresh' },
+          ...(forked ? { fork: { from: { session: parentSession, invocation: orientation.data.invocation }, reason: 'context-selection' as const, briefs: [] } } : {}),
+          ...(forked ? {} : { degraded: { requested: 'fork' as const, reason: 'the recorded orientation has no retained session point' } }),
+          toolName: contextSelectorToolName, description: 'Select exact captured context for this work item.',
+          inputSchema: contextSelectorJsonSchema, submissionSchema: 'ramify-agent.context-selector-submission/1',
+          validate: input => {
+            const parsed = validateAgainst(contextSelectorSubmissionSchema, input);
+            if (!parsed.ok) return parsed;
+            const checked = prepareContextSelection(parsed.value, {
+              workItem: item.id, orientationInvocation: orientation!.data.invocation,
+              orientationPoint: orientation!.data.point, selectorInvocation: 'candidate', degraded: !forked,
+            }, evidence.catalog, evidence.manifest, evidence.bytes);
+            return checked.status === 'available' ? parsed : { ok: false, errors: checked.errors.map(message => ({ path: 'selected', message })) };
+          },
+          scope: { write: null, measurement: null, size: null }, workingDirectory: workspace,
+          equip: () => ({ builtinTools: ['read', 'grep', 'ls'] }), keep: () => finished('not-kept'),
+        });
+        if (result.ended !== 'submitted' || result.value === undefined) continue;
+        const prepared = prepareContextSelection(result.value, {
+          workItem: item.id, orientationInvocation: orientation.data.invocation,
+          orientationPoint: orientation.data.point, selectorInvocation: result.id,
+          degraded: !forked || result.actual !== 'fork',
+        }, evidence.catalog, evidence.manifest, evidence.bytes);
+        if (prepared.status === 'unavailable') continue;
+        const changed = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+        if (changed.length > 0) {
+          await this.fail(run, 'inputs-changed', `The captured plan evidence changed during context selection: ${changed.join('; ')}`, [runLayout.documentManifest]);
+          return { kind: 'failed' };
+        }
+        const selectionText = `${JSON.stringify(prepared.selection)}\n`;
+        const selectionHash = sha256(selectionText);
+        const selectionPath = runLayout.selectionVersion(item.id, selectionHash);
+        const packagePath = runLayout.contextPackage(item.id, prepared.package.hash);
+        await writeOnce(run.path(selectionPath), selectionText);
+        await writeOnce(run.path(packagePath), prepared.package.text);
+        await this.write(run, { type: 'context-selection-recorded', data: {
+          workItem: item.id, selection: selectionPath, selectionHash,
+          packageHash: prepared.package.hash, package: packagePath,
+        } });
+        await this.afterWrite('context-selection-recorded', run.record.jobId);
+        selectionEvent = run.log.all('context-selection-recorded').find(event => event.data.workItem === item.id);
+        break;
+      }
+    }
+    if (selectionEvent === undefined) {
+      await this.fail(run, 'invalid-submission', `No valid context selection was obtained for ${item.id} within the captured retry bound`);
+      return { kind: 'failed' };
+    }
+    const recorded = await readRecordedContextSelection(run.directory, selectionEvent, evidence.catalog, evidence.manifest, evidence.bytes);
+    if (recorded.status === 'unavailable') {
+      await this.fail(run, 'inputs-changed', `The recorded context selection of ${item.id} is unavailable: ${recorded.reason}`, [selectionEvent.data.selection]);
+      return { kind: 'failed' };
+    }
+    const changedBeforeDelivery = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (changedBeforeDelivery.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed before context delivery: ${changedBeforeDelivery.join('; ')}`, [runLayout.documentManifest]);
+      return { kind: 'failed' };
+    }
+    // The package is also carried by the next prompt. That is the exact
+    // reconstruction input if the executor lost the parent's session.
+    let session = parentSession;
+    let ref = orientation.data.point ?? undefined;
+    const appendKey = sha256(`${run.record.jobId}\n${item.id}\n${selectionEvent.data.selection}\n${session ?? 'no-session'}`);
+    const appended = run.log.all('context-package-appended').find(event => event.data.appendKey === appendKey);
+    if (appended === undefined) {
+      const outcome = await run.log.ledger.effect<BriefAppend>({
+        key: `context:${appendKey}`, serialize: work => run.mutex.run(work),
+        intent: () => ({ event: run.log.next({ type: 'context-package-append-requested', data: {
+          workItem: item.id, selection: selectionEvent!.data.selection, session: session ?? null, appendKey,
+        } }), records: [] }),
+        perform: async key => {
+          await this.afterWrite('context-package-append-requested', run.record.jobId);
+          if (session === undefined || ref === undefined) return { session: null, ref: null, outcome: 'no-session', reason: 'No retained parent point' };
+          try {
+            const answer = await agent.appendContext(ref, key, recorded.packageText);
+            return answer.outcome === 'session-lost'
+              ? { session, ref: null, outcome: 'session-lost', reason: 'The parent session was lost' }
+              : { session, ref: answer.ref, outcome: answer.outcome, reason: null };
+          } catch (error) { return { session, ref: null, outcome: 'failed', reason: message(error) }; }
+        },
+        complete: result => ({ event: run.log.next({ type: 'context-package-appended', data: {
+          workItem: item.id, selection: selectionEvent!.data.selection, appendKey, ...result,
+        } }), records: [] }),
+      });
+      await this.afterWrite('context-package-appended', run.record.jobId);
+      if (outcome.outcome === 'appended' || outcome.outcome === 'already-present') ref = outcome.ref ?? undefined;
+      else { session = undefined; ref = undefined; }
+    } else if (appended.data.outcome === 'appended' || appended.data.outcome === 'already-present') {
+      ref = appended.data.ref ?? undefined;
+    } else { session = undefined; ref = undefined; }
+    return { kind: 'ready', text: recorded.packageText, selection: selectionEvent.data.selection,
+      packageHash: selectionEvent.data.packageHash, session, ref };
+  }
+
   /**
    * The work item responsible for each subject revision. A registration
    * binds its obligation to the provider work item it started and each of
@@ -3502,6 +3748,7 @@ export class RunService {
     let sessionRef: string | undefined;
     /** The session this architect's turns share, while the harness keeps it; `sessionRef` is its executor's point. */
     let session: SessionId | undefined;
+    let contextPackage: { readonly text: string; readonly selection: string; readonly packageHash: string } | undefined;
     /** Why its next turn continues that session: what happened since its last turn. */
     let continuing: ContinueReason | undefined;
     let attempt = 0;
@@ -3579,7 +3826,7 @@ export class RunService {
       const scenarioLedger = trackedScenarios(run.log.ledger.replay());
       const scenarios = entryScenariosOf(scenarioLedger.records, scenarioLedger.states, 'entry' in item.origin ? item.origin.entry : null);
       const lastScenarios = lastResult === undefined ? [] : await this.passedScenarioLines(run, lastResult);
-      const prompt = workItemMessage({
+      let prompt = workItemMessage({
         item,
         plan,
         onboarding,
@@ -3637,6 +3884,17 @@ export class RunService {
         workingDirectory,
         ...(moduleEntry !== undefined || proposal !== undefined ? { moduleDirectory: moduleEntry?.dir ?? proposal!.directory } : {}),
       });
+      if (attempt === 1) {
+        const context = await this.orientAndSelectWorkContext(run, agent, packages, item, loaded, prompt, workingDirectory);
+        if (context.kind === 'failed') return null;
+        if (context.kind === 'ready') {
+          contextPackage = { text: context.text, selection: context.selection, packageHash: context.packageHash };
+          session = resumes === null ? context.session : undefined;
+          sessionRef = resumes === null ? context.ref : undefined;
+          continuing = sessionRef === undefined ? undefined : 'context-selected';
+        }
+      }
+      if (contextPackage !== undefined) prompt = `${prompt}\n\n# Recorded context selection\n\n${contextPackage.text}`;
       // A finding is delivered once: the next turn of this same architect
       // has it in its own history, and repeating it would read as a second
       // detection.
@@ -3671,6 +3929,12 @@ export class RunService {
         description: 'End this turn with the work item\'s result. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
         inputSchema: localArchitectJsonSchema,
         submissionSchema: 'ramify-agent.local-architect-submission/1',
+        ...(contextPackage === undefined ? {} : { onStarted: async (invocation: string, destination: SessionId) => {
+          await this.write(run, { type: 'context-package-prompt-bound', data: {
+            workItem: item.id, selection: contextPackage!.selection, packageHash: contextPackage!.packageHash,
+            invocation, session: destination,
+          } });
+        } }),
         validate: input => validateLocalArchitect(input, {
           index,
           registry,

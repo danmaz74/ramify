@@ -281,12 +281,12 @@ describe('X1c: a fork that returns partial findings and no decision', () => {
     expect(types(events)).not.toContain('decision-accepted');
     expect(types(events)).not.toContain('brief-appended');
     expect(types(events)).not.toContain('decision-delivered');
-    expect(agent.sessions.map(session => session.spec.role).sort()).toEqual(
-      ['global-fork', 'global-fork', 'global-fork', 'initial-architect', 'local-architect', 'local-architect', 'local-architect'],
-    );
+    expect(agent.sessions.filter(session => session.spec.role === 'context-selector')).toHaveLength(2);
+    expect(agent.sessions.filter(session => session.spec.role === 'local-architect' && session.spec.submission.name === 'submit_work_orientation')).toHaveLength(2);
+    expect(agent.sessions.filter(session => session.spec.role === 'local-architect' && session.spec.submission.name === 'submit_work_item_result')).toHaveLength(3);
 
     // The unresolved outcome reached the local architect that asked.
-    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = agent.sessions.filter(session => session.spec.role === 'local-architect' && session.spec.submission.name === 'submit_work_item_result');
     expect(architects[1]!.spec.prompt).toContain('pr-001');
     expect(architects[1]!.spec.prompt).toContain('was not resolved');
     expect(architects[1]!.spec.prompt).toContain('two modules could own it');
@@ -402,15 +402,22 @@ describe('a start the executor could not honor', () => {
     // The executor forgets the architect context and the local architect's
     // session as soon as each first invocation ends, so the fork and the
     // continuation it asks for both start fresh.
-    let ends = 0;
+    let forgotInitial = false;
+    let forgotLocal = false;
     const opened = await openRuns(project, {
       agent,
       inputs: treeInputs(),
       unchangedCheckpoints: unchangedPlacementCheckpoints,
       afterWrite: async write => {
         if (write !== 'invocation-ended') return;
-        ends += 1;
-        if (ends <= 2) expect(agent.forget(agent.sessions[ends - 1]!.ref)).toBe(true);
+        const last = agent.sessions.at(-1);
+        if (last?.spec.role === 'initial-architect' && !forgotInitial) {
+          forgotInitial = true;
+          expect(agent.forget(last.ref)).toBe(true);
+        } else if (last?.spec.submission.name === 'submit_work_item_result' && !forgotLocal) {
+          forgotLocal = true;
+          expect(agent.forget(last.ref)).toBe(true);
+        }
       },
     });
     cleanups.push(() => opened.service.close());
@@ -419,16 +426,17 @@ describe('a start the executor could not honor', () => {
 
     const events = await runEventsOnDisk(project, 'revision-diff', receipt.jobId);
     const degraded = events.flatMap(event => (event.type === 'invocation-ended' && event.data.degraded !== undefined ? [[event.data.invocation, event.data.degraded]] : []));
-    expect(degraded).toEqual([
-      ['inv-0003', { requested: 'fork', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') }],
-      ['inv-0004', { requested: 'continue', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') }],
+    expect(degraded.map(([, relation]) => relation)).toEqual([
+      { requested: 'fork', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') },
+      { requested: 'continue', actual: 'fresh', reason: expect.stringContaining('is not known to the scripted agent') },
     ]);
     // The relations requested stay as they were asked for: the fork still
     // names its source point, and the continuation its session's last one.
     const sessions = reduceSessions(events);
-    expect(sessions.get('ses-0003')!.fork).toMatchObject({ from: { session: 'ses-0001', invocation: 'inv-0001' } });
-    const continued = events.find(event => event.type === 'invocation-started' && event.data.invocation === 'inv-0004')!;
-    expect(continued.data).toMatchObject({ start: 'continued', continues: { from: { session: 'ses-0002', invocation: 'inv-0002' }, reason: 'placement-answered' } });
+    const placementFork = [...sessions.values()].find(entry => entry.fork?.reason === 'placement-request');
+    expect(placementFork?.fork).toMatchObject({ from: { session: 'ses-0001', invocation: 'inv-0001' } });
+    const continued = events.find(event => event.type === 'invocation-started' && event.data.continues?.reason === 'placement-answered')!;
+    expect(continued.data).toMatchObject({ start: 'continued', continues: { reason: 'placement-answered' } });
     // Only a start that degraded says so.
     expect(events.filter(event => event.type === 'invocation-ended').length).toBeGreaterThan(degraded.length);
   }, 120_000);

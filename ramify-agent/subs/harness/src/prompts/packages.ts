@@ -11,6 +11,7 @@ import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '.
 import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
 import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
 import { failureAnalysisJsonSchema, failureAnalysisToolName } from '../work/failure.js';
+import { contextSelectorJsonSchema, contextSelectorToolName, workOrientationJsonSchema, workOrientationToolName } from '../context-selection/submissions.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 import { shellMaxTimeoutMs } from '../tools/shell.js';
 
@@ -47,6 +48,9 @@ const designReviewProcedureFile = fileURLToPath(new URL('./design-review.procedu
 const orientationSystemFile = fileURLToPath(new URL('./reviewer-orientation.system.md', import.meta.url));
 const failureAnalystSystemFile = fileURLToPath(new URL('./failure-analyst.system.md', import.meta.url));
 const failureAnalysisProcedureFile = fileURLToPath(new URL('./failure-analysis.procedure.md', import.meta.url));
+const workOrientationProcedureFile = fileURLToPath(new URL('../context-selection/orientation.procedure.md', import.meta.url));
+const selectorSystemFile = fileURLToPath(new URL('../context-selection/selector.system.md', import.meta.url));
+const selectorProcedureFile = fileURLToPath(new URL('../context-selection/selector.procedure.md', import.meta.url));
 
 /** The contract skill the harness supplies with a contract iteration. */
 const contractSkillFile = fileURLToPath(new URL('./contract.skill.md', import.meta.url));
@@ -106,6 +110,7 @@ export interface LoadedPackage {
    * submission. Only the local architect's package has them.
    */
   readonly reconciliation?: { readonly procedure: string; readonly submissionSchema: string } | undefined;
+  readonly workOrientation?: { readonly procedure: string; readonly submissionSchema: string } | undefined;
 }
 
 export interface PromptPackageOptions {
@@ -115,7 +120,8 @@ export interface PromptPackageOptions {
 /** The versions of the packages this iteration ships. */
 export const initialArchitectPackage = 'initial-architect/2';
 export const globalForkPackage = 'global-fork/3';
-export const localArchitectPackage = 'local-architect/6';
+export const localArchitectPackage = 'local-architect/7';
+export const contextSelectorPackage = 'context-selector/1';
 export const engineerPackage = 'engineer/3';
 export const contractEngineerPackage = 'contract-engineer/2';
 export const reviewerPackage = 'reviewer/3';
@@ -133,6 +139,7 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['initial-architect', await loadInitialArchitect(options)],
     ['global-fork', await loadGlobalFork(options)],
     ['local-architect', await loadLocalArchitect(options)],
+    ['context-selector', await loadContextSelector(options)],
     ['engineer', await loadEngineer(options)],
     ['contract-engineer', await loadContractEngineer(options)],
     ['reviewer', await loadReviewer(options)],
@@ -189,20 +196,31 @@ function loadGlobalFork(options: PromptPackageOptions): Promise<LoadedPackage> {
 async function loadLocalArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
   const reconciliation = await readFile(reconciliationProcedureFile, 'utf8');
   const reconciliationSchema = `${JSON.stringify(reconciliationJsonSchema, null, 2)}\n`;
+  const workOrientation = await readFile(workOrientationProcedureFile, 'utf8');
+  const workOrientationSchema = `${JSON.stringify(workOrientationJsonSchema, null, 2)}\n`;
   const loaded = await loadPackage({
     role: 'local-architect',
     name: localArchitectPackage,
     systemFile: localSystemFile,
     procedureFile: localProcedureFile,
     schema: localArchitectJsonSchema,
-    submissionKinds: [...localArchitectSubmissionKinds, 'reconciliation'],
+    submissionKinds: [...localArchitectSubmissionKinds, 'reconciliation', 'work-orientation'],
     extraFiles: [
       describe(reconciliationProcedureFile, reconciliation, 'procedure'),
       { path: 'reconciliation.schema.json', hash: sha256(reconciliationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(reconciliationSchema) },
+      describe(workOrientationProcedureFile, workOrientation, 'procedure'),
+      { path: 'work-orientation.schema.json', hash: sha256(workOrientationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(workOrientationSchema) },
     ],
     options,
   });
-  return { ...loaded, reconciliation: { procedure: withoutVersionComment(reconciliation).trim(), submissionSchema: reconciliationSchema } };
+  return { ...loaded, reconciliation: { procedure: withoutVersionComment(reconciliation).trim(), submissionSchema: reconciliationSchema },
+    workOrientation: { procedure: withoutVersionComment(workOrientation).trim(), submissionSchema: workOrientationSchema } };
+}
+
+function loadContextSelector(options: PromptPackageOptions): Promise<LoadedPackage> {
+  return loadPackage({ role: 'context-selector', name: contextSelectorPackage,
+    systemFile: selectorSystemFile, procedureFile: selectorProcedureFile,
+    schema: contextSelectorJsonSchema, submissionKinds: ['context-selection'], options });
 }
 
 /**
@@ -375,6 +393,16 @@ export function renderGlobalForkPrompt(loaded: LoadedPackage, projectRoot: strin
 /** The rendered system prompt of a local architect. It is never stored either. */
 export function renderLocalArchitectPrompt(loaded: LoadedPackage, projectRoot: string, workingDirectory: string = projectRoot): string {
   return render(loaded, projectRoot, localArchitectToolName, { workingDirectory });
+}
+
+export function renderWorkOrientationPrompt(loaded: LoadedPackage, projectRoot: string, workingDirectory: string = projectRoot): string {
+  const orientation = loaded.workOrientation;
+  if (orientation === undefined) throw new Error(`The ${loaded.package} package has no work orientation procedure`);
+  return render({ ...loaded, procedure: orientation.procedure, submissionSchema: orientation.submissionSchema }, projectRoot, workOrientationToolName, { workingDirectory });
+}
+
+export function renderContextSelectorPrompt(loaded: LoadedPackage, projectRoot: string): string {
+  return render(loaded, projectRoot, contextSelectorToolName);
 }
 
 /** The rendered system prompt of a local architect's reconciliation fork. It is never stored either. */

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { documentManifestSchema } from '../../../subs/plan-evidence/src/interfaces/contracts.js';
+import { contextSelectorToolName, workOrientationToolName } from '../../context-selection/submissions.js';
 
 /*
  * Scripted local architects that declare their work item's scenarios.
@@ -41,6 +42,10 @@ export function declaringScenarios(script: Script): Script {
   let entries: string[] = [];
   let byEntry = new Map<string, string[]>();
   return (spec: SessionSpec): readonly ScriptStep[] => {
+    if (spec.submission.name === workOrientationToolName) return [{ kind: 'submit', input: {
+      focus: 'Understand this work item before assigning it.', currentUnderstanding: 'The captured work item briefing governs this orientation.', questions: [],
+    } }];
+    if (spec.submission.name === contextSelectorToolName) return [{ kind: 'submit', input: { examined: [], selected: [], unavailable: [] } }];
     const steps = typeof script === 'function' ? script(spec) : script;
     if (spec.role === 'initial-architect') {
       const prepared = steps.map(step => step.kind === 'submit' && isAnalysis(step.input)
