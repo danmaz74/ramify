@@ -397,7 +397,7 @@ describe('the prompt package', () => {
 
     const fork = manifest.packages['global-fork']!;
     expect(fork.package).toBe('global-fork/2');
-    expect(fork.submissionKinds).toEqual(['decision', 'partial']);
+    expect(fork.submissionKinds).toEqual(['decision', 'partial', 'deviation', 'nothing-possible']);
     expect(fork.hash).toMatch(/^[0-9a-f]{64}$/);
 
     const engineer = manifest.packages['engineer']!;
