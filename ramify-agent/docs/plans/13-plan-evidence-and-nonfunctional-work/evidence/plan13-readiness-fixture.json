@@ -8,30 +8,30 @@
     "sourcePath": "plans/review-notes/plan.md"
   },
   "trial": {
-    "runId": "20260925T151640Z-654d88",
+    "runId": "20260925T153900Z-abd0bb",
     "catalogHash": "17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336",
     "roundsClosed": 3,
     "assessments": 3,
     "candidate": "cand-003",
     "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
     "finalGate": "ga-0002",
-    "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+    "gateCommit": "c685e16b80d9a4de8953f25c3073b26198cebbab",
     "deviations": 1,
     "acceptedAndRevokedCommands": 2
   },
   "cases": {
     "pending": {
       "run": {
-        "jobId": "20260925T151640Z-654d88",
+        "jobId": "20260925T153900Z-abd0bb",
         "planId": "review-notes",
         "agent": "scripted",
         "version": 47,
         "state": "completed",
         "phase": "ended",
         "stopRequested": false,
-        "startedAt": "2026-09-25T15:16:40.576Z",
-        "updatedAt": "2026-09-25T15:16:59.913Z",
-        "endedAt": "2026-09-25T15:16:59.913Z",
+        "startedAt": "2026-09-25T15:39:00.883Z",
+        "updatedAt": "2026-09-25T15:39:20.292Z",
+        "endedAt": "2026-09-25T15:39:20.292Z",
         "failure": null,
         "current": null,
         "waits": [],
@@ -70,21 +70,21 @@
       "events": [
         {
           "sequence": 1,
-          "at": "2026-09-25T15:16:40.576Z",
+          "at": "2026-09-25T15:39:00.883Z",
           "transition": "job-started",
           "summary": "The run started",
           "refs": []
         },
         {
           "sequence": 2,
-          "at": "2026-09-25T15:16:40.576Z",
+          "at": "2026-09-25T15:39:00.883Z",
           "transition": "document-manifest-committed",
           "summary": "Captured 1 plan document",
           "refs": []
         },
         {
           "sequence": 3,
-          "at": "2026-09-25T15:16:40.816Z",
+          "at": "2026-09-25T15:39:01.153Z",
           "transition": "session-opened",
           "summary": "The initial-architect session ses-0001 opened on scripted",
           "refs": [
@@ -96,7 +96,7 @@
         },
         {
           "sequence": 4,
-          "at": "2026-09-25T15:16:40.818Z",
+          "at": "2026-09-25T15:39:01.156Z",
           "transition": "invocation-started",
           "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
           "refs": [
@@ -112,7 +112,7 @@
         },
         {
           "sequence": 5,
-          "at": "2026-09-25T15:16:40.857Z",
+          "at": "2026-09-25T15:39:01.187Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
           "refs": [
@@ -128,7 +128,7 @@
         },
         {
           "sequence": 6,
-          "at": "2026-09-25T15:16:40.873Z",
+          "at": "2026-09-25T15:39:01.202Z",
           "transition": "analysis-accepted",
           "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
           "refs": [
@@ -140,7 +140,7 @@
         },
         {
           "sequence": 7,
-          "at": "2026-09-25T15:16:41.083Z",
+          "at": "2026-09-25T15:39:01.414Z",
           "transition": "gate-started",
           "summary": "Gate ga-0001 (readiness) started",
           "refs": [
@@ -152,7 +152,7 @@
         },
         {
           "sequence": 8,
-          "at": "2026-09-25T15:16:41.402Z",
+          "at": "2026-09-25T15:39:01.766Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
           "refs": [
@@ -164,7 +164,7 @@
         },
         {
           "sequence": 9,
-          "at": "2026-09-25T15:16:41.637Z",
+          "at": "2026-09-25T15:39:02.001Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
           "refs": [
@@ -176,7 +176,7 @@
         },
         {
           "sequence": 10,
-          "at": "2026-09-25T15:16:41.906Z",
+          "at": "2026-09-25T15:39:02.253Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
           "refs": [
@@ -188,7 +188,7 @@
         },
         {
           "sequence": 11,
-          "at": "2026-09-25T15:16:42.194Z",
+          "at": "2026-09-25T15:39:02.508Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
           "refs": [
@@ -200,7 +200,7 @@
         },
         {
           "sequence": 12,
-          "at": "2026-09-25T15:16:42.557Z",
+          "at": "2026-09-25T15:39:02.858Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
           "refs": [
@@ -212,7 +212,7 @@
         },
         {
           "sequence": 13,
-          "at": "2026-09-25T15:16:43.566Z",
+          "at": "2026-09-25T15:39:03.910Z",
           "transition": "readiness-passed",
           "summary": "Readiness passed at attempt 1",
           "refs": [
@@ -224,21 +224,21 @@
         },
         {
           "sequence": 14,
-          "at": "2026-09-25T15:16:43.572Z",
+          "at": "2026-09-25T15:39:03.938Z",
           "transition": "nonfunctional-phase-started",
           "summary": "Non-functional assessment phase started with 3 rounds",
           "refs": []
         },
         {
           "sequence": 15,
-          "at": "2026-09-25T15:16:44.671Z",
+          "at": "2026-09-25T15:39:05.111Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-001 prepared",
           "refs": []
         },
         {
           "sequence": 16,
-          "at": "2026-09-25T15:16:44.687Z",
+          "at": "2026-09-25T15:39:05.127Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
           "refs": [
@@ -250,7 +250,7 @@
         },
         {
           "sequence": 17,
-          "at": "2026-09-25T15:16:44.689Z",
+          "at": "2026-09-25T15:39:05.129Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
           "refs": [
@@ -266,7 +266,7 @@
         },
         {
           "sequence": 18,
-          "at": "2026-09-25T15:16:44.722Z",
+          "at": "2026-09-25T15:39:05.158Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
           "refs": [
@@ -282,14 +282,14 @@
         },
         {
           "sequence": 19,
-          "at": "2026-09-25T15:16:45.913Z",
+          "at": "2026-09-25T15:39:06.233Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-001 recorded for round 1",
           "refs": []
         },
         {
           "sequence": 20,
-          "at": "2026-09-25T15:16:45.929Z",
+          "at": "2026-09-25T15:39:06.237Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
           "refs": [
@@ -301,7 +301,7 @@
         },
         {
           "sequence": 21,
-          "at": "2026-09-25T15:16:45.933Z",
+          "at": "2026-09-25T15:39:06.238Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
           "refs": [
@@ -317,7 +317,7 @@
         },
         {
           "sequence": 22,
-          "at": "2026-09-25T15:16:45.949Z",
+          "at": "2026-09-25T15:39:06.243Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
           "refs": [
@@ -333,7 +333,7 @@
         },
         {
           "sequence": 23,
-          "at": "2026-09-25T15:16:47.042Z",
+          "at": "2026-09-25T15:39:07.396Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 1 closed: continue",
           "refs": [
@@ -345,14 +345,14 @@
         },
         {
           "sequence": 24,
-          "at": "2026-09-25T15:16:48.135Z",
+          "at": "2026-09-25T15:39:08.533Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-002 prepared",
           "refs": []
         },
         {
           "sequence": 25,
-          "at": "2026-09-25T15:16:48.138Z",
+          "at": "2026-09-25T15:39:08.536Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
           "refs": [
@@ -364,7 +364,7 @@
         },
         {
           "sequence": 26,
-          "at": "2026-09-25T15:16:48.139Z",
+          "at": "2026-09-25T15:39:08.537Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
           "refs": [
@@ -380,7 +380,7 @@
         },
         {
           "sequence": 27,
-          "at": "2026-09-25T15:16:48.144Z",
+          "at": "2026-09-25T15:39:08.541Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
           "refs": [
@@ -396,14 +396,14 @@
         },
         {
           "sequence": 28,
-          "at": "2026-09-25T15:16:49.267Z",
+          "at": "2026-09-25T15:39:09.730Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-002 recorded for round 2",
           "refs": []
         },
         {
           "sequence": 29,
-          "at": "2026-09-25T15:16:49.282Z",
+          "at": "2026-09-25T15:39:09.746Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
           "refs": [
@@ -415,7 +415,7 @@
         },
         {
           "sequence": 30,
-          "at": "2026-09-25T15:16:49.284Z",
+          "at": "2026-09-25T15:39:09.747Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
           "refs": [
@@ -431,7 +431,7 @@
         },
         {
           "sequence": 31,
-          "at": "2026-09-25T15:16:49.304Z",
+          "at": "2026-09-25T15:39:09.759Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
           "refs": [
@@ -447,7 +447,7 @@
         },
         {
           "sequence": 32,
-          "at": "2026-09-25T15:16:50.445Z",
+          "at": "2026-09-25T15:39:10.886Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 2 closed: continue",
           "refs": [
@@ -459,14 +459,14 @@
         },
         {
           "sequence": 33,
-          "at": "2026-09-25T15:16:51.606Z",
+          "at": "2026-09-25T15:39:12.068Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-003 prepared",
           "refs": []
         },
         {
           "sequence": 34,
-          "at": "2026-09-25T15:16:51.618Z",
+          "at": "2026-09-25T15:39:12.081Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
           "refs": [
@@ -478,7 +478,7 @@
         },
         {
           "sequence": 35,
-          "at": "2026-09-25T15:16:51.620Z",
+          "at": "2026-09-25T15:39:12.083Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
           "refs": [
@@ -494,7 +494,7 @@
         },
         {
           "sequence": 36,
-          "at": "2026-09-25T15:16:51.643Z",
+          "at": "2026-09-25T15:39:12.103Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
           "refs": [
@@ -510,14 +510,14 @@
         },
         {
           "sequence": 37,
-          "at": "2026-09-25T15:16:52.830Z",
+          "at": "2026-09-25T15:39:13.278Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-003 recorded for round 3",
           "refs": []
         },
         {
           "sequence": 38,
-          "at": "2026-09-25T15:16:52.834Z",
+          "at": "2026-09-25T15:39:13.280Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
           "refs": [
@@ -529,7 +529,7 @@
         },
         {
           "sequence": 39,
-          "at": "2026-09-25T15:16:52.835Z",
+          "at": "2026-09-25T15:39:13.281Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
           "refs": [
@@ -545,7 +545,7 @@
         },
         {
           "sequence": 40,
-          "at": "2026-09-25T15:16:52.841Z",
+          "at": "2026-09-25T15:39:13.286Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
           "refs": [
@@ -561,7 +561,7 @@
         },
         {
           "sequence": 41,
-          "at": "2026-09-25T15:16:53.972Z",
+          "at": "2026-09-25T15:39:14.417Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 3 closed: exhausted",
           "refs": [
@@ -573,14 +573,14 @@
         },
         {
           "sequence": 42,
-          "at": "2026-09-25T15:16:55.163Z",
+          "at": "2026-09-25T15:39:15.567Z",
           "transition": "nonfunctional-deviation-recorded",
           "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
           "refs": []
         },
         {
           "sequence": 43,
-          "at": "2026-09-25T15:16:56.588Z",
+          "at": "2026-09-25T15:39:16.966Z",
           "transition": "gate-committing",
           "summary": "Gate ga-0002 (final) is committing before audit",
           "refs": [
@@ -592,7 +592,7 @@
         },
         {
           "sequence": 44,
-          "at": "2026-09-25T15:16:58.569Z",
+          "at": "2026-09-25T15:39:18.900Z",
           "transition": "gate-attempted",
           "summary": "Gate ga-0002 (final): passed, next accept",
           "refs": [
@@ -604,7 +604,7 @@
         },
         {
           "sequence": 45,
-          "at": "2026-09-25T15:16:58.785Z",
+          "at": "2026-09-25T15:39:19.141Z",
           "transition": "candidate-bound-to-gate",
           "summary": "Candidate cand-003 bound to gate ga-0002",
           "refs": [
@@ -616,7 +616,7 @@
         },
         {
           "sequence": 46,
-          "at": "2026-09-25T15:16:59.908Z",
+          "at": "2026-09-25T15:39:20.287Z",
           "transition": "session-finished",
           "summary": "Session ses-0001 finished (run-ended)",
           "refs": [
@@ -628,7 +628,7 @@
         },
         {
           "sequence": 47,
-          "at": "2026-09-25T15:16:59.913Z",
+          "at": "2026-09-25T15:39:20.292Z",
           "transition": "job-completed",
           "summary": "The run completed after 0 work items, with 1 plan deviation to review",
           "refs": [
@@ -638,32 +638,32 @@
             },
             {
               "kind": "commit",
-              "id": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+              "id": "c685e16b80d9a4de8953f25c3073b26198cebbab"
             }
           ]
         }
       ],
       "readiness": {
-        "runId": "20260925T151640Z-654d88",
+        "runId": "20260925T153900Z-abd0bb",
         "version": 47,
         "readiness": {
           "status": "pending-review",
           "candidate": {
             "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-            "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-            "preparedAt": "2026-09-25T15:16:51.605Z"
+            "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+            "preparedAt": "2026-09-25T15:39:12.067Z"
           },
           "finalGate": "ga-0002",
           "checkFindings": [
             "cf-0001"
           ],
           "reason": "A plan deviation awaits user review",
-          "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+          "gateCommit": "c685e16b80d9a4de8953f25c3073b26198cebbab"
         }
       },
       "findings": {
         "protocol": "check-findings/1",
-        "runId": "20260925T151640Z-654d88",
+        "runId": "20260925T153900Z-abd0bb",
         "version": 47,
         "coverage": {
           "state": "unavailable",
@@ -753,8 +753,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                  "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+                  "preparedAt": "2026-09-25T15:39:12.067Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -780,7 +780,7 @@
       "details": {
         "cf-0001": {
           "protocol": "check-findings/1",
-          "runId": "20260925T151640Z-654d88",
+          "runId": "20260925T153900Z-abd0bb",
           "version": 47,
           "summary": {
             "id": "cf-0001",
@@ -845,8 +845,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                  "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+                  "preparedAt": "2026-09-25T15:39:12.067Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -976,16 +976,16 @@
     },
     "accepted": {
       "run": {
-        "jobId": "20260925T151640Z-654d88",
+        "jobId": "20260925T153900Z-abd0bb",
         "planId": "review-notes",
         "agent": "scripted",
         "version": 48,
         "state": "completed",
         "phase": "ended",
         "stopRequested": false,
-        "startedAt": "2026-09-25T15:16:40.576Z",
-        "updatedAt": "2026-09-25T15:16:59.968Z",
-        "endedAt": "2026-09-25T15:16:59.913Z",
+        "startedAt": "2026-09-25T15:39:00.883Z",
+        "updatedAt": "2026-09-25T15:39:20.356Z",
+        "endedAt": "2026-09-25T15:39:20.292Z",
         "failure": null,
         "current": null,
         "waits": [],
@@ -1024,21 +1024,21 @@
       "events": [
         {
           "sequence": 1,
-          "at": "2026-09-25T15:16:40.576Z",
+          "at": "2026-09-25T15:39:00.883Z",
           "transition": "job-started",
           "summary": "The run started",
           "refs": []
         },
         {
           "sequence": 2,
-          "at": "2026-09-25T15:16:40.576Z",
+          "at": "2026-09-25T15:39:00.883Z",
           "transition": "document-manifest-committed",
           "summary": "Captured 1 plan document",
           "refs": []
         },
         {
           "sequence": 3,
-          "at": "2026-09-25T15:16:40.816Z",
+          "at": "2026-09-25T15:39:01.153Z",
           "transition": "session-opened",
           "summary": "The initial-architect session ses-0001 opened on scripted",
           "refs": [
@@ -1050,7 +1050,7 @@
         },
         {
           "sequence": 4,
-          "at": "2026-09-25T15:16:40.818Z",
+          "at": "2026-09-25T15:39:01.156Z",
           "transition": "invocation-started",
           "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
           "refs": [
@@ -1066,7 +1066,7 @@
         },
         {
           "sequence": 5,
-          "at": "2026-09-25T15:16:40.857Z",
+          "at": "2026-09-25T15:39:01.187Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
           "refs": [
@@ -1082,7 +1082,7 @@
         },
         {
           "sequence": 6,
-          "at": "2026-09-25T15:16:40.873Z",
+          "at": "2026-09-25T15:39:01.202Z",
           "transition": "analysis-accepted",
           "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
           "refs": [
@@ -1094,7 +1094,7 @@
         },
         {
           "sequence": 7,
-          "at": "2026-09-25T15:16:41.083Z",
+          "at": "2026-09-25T15:39:01.414Z",
           "transition": "gate-started",
           "summary": "Gate ga-0001 (readiness) started",
           "refs": [
@@ -1106,7 +1106,7 @@
         },
         {
           "sequence": 8,
-          "at": "2026-09-25T15:16:41.402Z",
+          "at": "2026-09-25T15:39:01.766Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
           "refs": [
@@ -1118,7 +1118,7 @@
         },
         {
           "sequence": 9,
-          "at": "2026-09-25T15:16:41.637Z",
+          "at": "2026-09-25T15:39:02.001Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
           "refs": [
@@ -1130,7 +1130,7 @@
         },
         {
           "sequence": 10,
-          "at": "2026-09-25T15:16:41.906Z",
+          "at": "2026-09-25T15:39:02.253Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
           "refs": [
@@ -1142,7 +1142,7 @@
         },
         {
           "sequence": 11,
-          "at": "2026-09-25T15:16:42.194Z",
+          "at": "2026-09-25T15:39:02.508Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
           "refs": [
@@ -1154,7 +1154,7 @@
         },
         {
           "sequence": 12,
-          "at": "2026-09-25T15:16:42.557Z",
+          "at": "2026-09-25T15:39:02.858Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
           "refs": [
@@ -1166,7 +1166,7 @@
         },
         {
           "sequence": 13,
-          "at": "2026-09-25T15:16:43.566Z",
+          "at": "2026-09-25T15:39:03.910Z",
           "transition": "readiness-passed",
           "summary": "Readiness passed at attempt 1",
           "refs": [
@@ -1178,21 +1178,21 @@
         },
         {
           "sequence": 14,
-          "at": "2026-09-25T15:16:43.572Z",
+          "at": "2026-09-25T15:39:03.938Z",
           "transition": "nonfunctional-phase-started",
           "summary": "Non-functional assessment phase started with 3 rounds",
           "refs": []
         },
         {
           "sequence": 15,
-          "at": "2026-09-25T15:16:44.671Z",
+          "at": "2026-09-25T15:39:05.111Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-001 prepared",
           "refs": []
         },
         {
           "sequence": 16,
-          "at": "2026-09-25T15:16:44.687Z",
+          "at": "2026-09-25T15:39:05.127Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
           "refs": [
@@ -1204,7 +1204,7 @@
         },
         {
           "sequence": 17,
-          "at": "2026-09-25T15:16:44.689Z",
+          "at": "2026-09-25T15:39:05.129Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
           "refs": [
@@ -1220,7 +1220,7 @@
         },
         {
           "sequence": 18,
-          "at": "2026-09-25T15:16:44.722Z",
+          "at": "2026-09-25T15:39:05.158Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
           "refs": [
@@ -1236,14 +1236,14 @@
         },
         {
           "sequence": 19,
-          "at": "2026-09-25T15:16:45.913Z",
+          "at": "2026-09-25T15:39:06.233Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-001 recorded for round 1",
           "refs": []
         },
         {
           "sequence": 20,
-          "at": "2026-09-25T15:16:45.929Z",
+          "at": "2026-09-25T15:39:06.237Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
           "refs": [
@@ -1255,7 +1255,7 @@
         },
         {
           "sequence": 21,
-          "at": "2026-09-25T15:16:45.933Z",
+          "at": "2026-09-25T15:39:06.238Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
           "refs": [
@@ -1271,7 +1271,7 @@
         },
         {
           "sequence": 22,
-          "at": "2026-09-25T15:16:45.949Z",
+          "at": "2026-09-25T15:39:06.243Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
           "refs": [
@@ -1287,7 +1287,7 @@
         },
         {
           "sequence": 23,
-          "at": "2026-09-25T15:16:47.042Z",
+          "at": "2026-09-25T15:39:07.396Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 1 closed: continue",
           "refs": [
@@ -1299,14 +1299,14 @@
         },
         {
           "sequence": 24,
-          "at": "2026-09-25T15:16:48.135Z",
+          "at": "2026-09-25T15:39:08.533Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-002 prepared",
           "refs": []
         },
         {
           "sequence": 25,
-          "at": "2026-09-25T15:16:48.138Z",
+          "at": "2026-09-25T15:39:08.536Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
           "refs": [
@@ -1318,7 +1318,7 @@
         },
         {
           "sequence": 26,
-          "at": "2026-09-25T15:16:48.139Z",
+          "at": "2026-09-25T15:39:08.537Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
           "refs": [
@@ -1334,7 +1334,7 @@
         },
         {
           "sequence": 27,
-          "at": "2026-09-25T15:16:48.144Z",
+          "at": "2026-09-25T15:39:08.541Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
           "refs": [
@@ -1350,14 +1350,14 @@
         },
         {
           "sequence": 28,
-          "at": "2026-09-25T15:16:49.267Z",
+          "at": "2026-09-25T15:39:09.730Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-002 recorded for round 2",
           "refs": []
         },
         {
           "sequence": 29,
-          "at": "2026-09-25T15:16:49.282Z",
+          "at": "2026-09-25T15:39:09.746Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
           "refs": [
@@ -1369,7 +1369,7 @@
         },
         {
           "sequence": 30,
-          "at": "2026-09-25T15:16:49.284Z",
+          "at": "2026-09-25T15:39:09.747Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
           "refs": [
@@ -1385,7 +1385,7 @@
         },
         {
           "sequence": 31,
-          "at": "2026-09-25T15:16:49.304Z",
+          "at": "2026-09-25T15:39:09.759Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
           "refs": [
@@ -1401,7 +1401,7 @@
         },
         {
           "sequence": 32,
-          "at": "2026-09-25T15:16:50.445Z",
+          "at": "2026-09-25T15:39:10.886Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 2 closed: continue",
           "refs": [
@@ -1413,14 +1413,14 @@
         },
         {
           "sequence": 33,
-          "at": "2026-09-25T15:16:51.606Z",
+          "at": "2026-09-25T15:39:12.068Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-003 prepared",
           "refs": []
         },
         {
           "sequence": 34,
-          "at": "2026-09-25T15:16:51.618Z",
+          "at": "2026-09-25T15:39:12.081Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
           "refs": [
@@ -1432,7 +1432,7 @@
         },
         {
           "sequence": 35,
-          "at": "2026-09-25T15:16:51.620Z",
+          "at": "2026-09-25T15:39:12.083Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
           "refs": [
@@ -1448,7 +1448,7 @@
         },
         {
           "sequence": 36,
-          "at": "2026-09-25T15:16:51.643Z",
+          "at": "2026-09-25T15:39:12.103Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
           "refs": [
@@ -1464,14 +1464,14 @@
         },
         {
           "sequence": 37,
-          "at": "2026-09-25T15:16:52.830Z",
+          "at": "2026-09-25T15:39:13.278Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-003 recorded for round 3",
           "refs": []
         },
         {
           "sequence": 38,
-          "at": "2026-09-25T15:16:52.834Z",
+          "at": "2026-09-25T15:39:13.280Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
           "refs": [
@@ -1483,7 +1483,7 @@
         },
         {
           "sequence": 39,
-          "at": "2026-09-25T15:16:52.835Z",
+          "at": "2026-09-25T15:39:13.281Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
           "refs": [
@@ -1499,7 +1499,7 @@
         },
         {
           "sequence": 40,
-          "at": "2026-09-25T15:16:52.841Z",
+          "at": "2026-09-25T15:39:13.286Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
           "refs": [
@@ -1515,7 +1515,7 @@
         },
         {
           "sequence": 41,
-          "at": "2026-09-25T15:16:53.972Z",
+          "at": "2026-09-25T15:39:14.417Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 3 closed: exhausted",
           "refs": [
@@ -1527,14 +1527,14 @@
         },
         {
           "sequence": 42,
-          "at": "2026-09-25T15:16:55.163Z",
+          "at": "2026-09-25T15:39:15.567Z",
           "transition": "nonfunctional-deviation-recorded",
           "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
           "refs": []
         },
         {
           "sequence": 43,
-          "at": "2026-09-25T15:16:56.588Z",
+          "at": "2026-09-25T15:39:16.966Z",
           "transition": "gate-committing",
           "summary": "Gate ga-0002 (final) is committing before audit",
           "refs": [
@@ -1546,7 +1546,7 @@
         },
         {
           "sequence": 44,
-          "at": "2026-09-25T15:16:58.569Z",
+          "at": "2026-09-25T15:39:18.900Z",
           "transition": "gate-attempted",
           "summary": "Gate ga-0002 (final): passed, next accept",
           "refs": [
@@ -1558,7 +1558,7 @@
         },
         {
           "sequence": 45,
-          "at": "2026-09-25T15:16:58.785Z",
+          "at": "2026-09-25T15:39:19.141Z",
           "transition": "candidate-bound-to-gate",
           "summary": "Candidate cand-003 bound to gate ga-0002",
           "refs": [
@@ -1570,7 +1570,7 @@
         },
         {
           "sequence": 46,
-          "at": "2026-09-25T15:16:59.908Z",
+          "at": "2026-09-25T15:39:20.287Z",
           "transition": "session-finished",
           "summary": "Session ses-0001 finished (run-ended)",
           "refs": [
@@ -1582,7 +1582,7 @@
         },
         {
           "sequence": 47,
-          "at": "2026-09-25T15:16:59.913Z",
+          "at": "2026-09-25T15:39:20.292Z",
           "transition": "job-completed",
           "summary": "The run completed after 0 work items, with 1 plan deviation to review",
           "refs": [
@@ -1592,39 +1592,39 @@
             },
             {
               "kind": "commit",
-              "id": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+              "id": "c685e16b80d9a4de8953f25c3073b26198cebbab"
             }
           ]
         },
         {
           "sequence": 48,
-          "at": "2026-09-25T15:16:59.968Z",
+          "at": "2026-09-25T15:39:20.356Z",
           "transition": "check-findings-recorded",
           "summary": "1 CheckFinding event was recorded (a person's command accept-nfr-1)",
           "refs": []
         }
       ],
       "readiness": {
-        "runId": "20260925T151640Z-654d88",
+        "runId": "20260925T153900Z-abd0bb",
         "version": 48,
         "readiness": {
           "status": "ready",
           "candidate": {
             "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-            "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-            "preparedAt": "2026-09-25T15:16:51.605Z"
+            "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+            "preparedAt": "2026-09-25T15:39:12.067Z"
           },
           "finalGate": "ga-0002",
           "checkFindings": [
             "cf-0001"
           ],
           "reason": "The final gate passed and every fixed obligation is satisfied or accepted at this revision",
-          "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+          "gateCommit": "c685e16b80d9a4de8953f25c3073b26198cebbab"
         }
       },
       "findings": {
         "protocol": "check-findings/1",
-        "runId": "20260925T151640Z-654d88",
+        "runId": "20260925T153900Z-abd0bb",
         "version": 48,
         "coverage": {
           "state": "unavailable",
@@ -1697,8 +1697,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                  "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+                  "preparedAt": "2026-09-25T15:39:12.067Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -1724,7 +1724,7 @@
       "details": {
         "cf-0001": {
           "protocol": "check-findings/1",
-          "runId": "20260925T151640Z-654d88",
+          "runId": "20260925T153900Z-abd0bb",
           "version": 48,
           "summary": {
             "id": "cf-0001",
@@ -1772,8 +1772,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                  "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+                  "preparedAt": "2026-09-25T15:39:12.067Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -1920,16 +1920,16 @@
     },
     "source-unavailable": {
       "run": {
-        "jobId": "20260925T151640Z-654d88",
+        "jobId": "20260925T153900Z-abd0bb",
         "planId": "review-notes",
         "agent": "scripted",
         "version": 49,
         "state": "completed",
         "phase": "ended",
         "stopRequested": false,
-        "startedAt": "2026-09-25T15:16:40.576Z",
-        "updatedAt": "2026-09-25T15:16:59.980Z",
-        "endedAt": "2026-09-25T15:16:59.913Z",
+        "startedAt": "2026-09-25T15:39:00.883Z",
+        "updatedAt": "2026-09-25T15:39:20.371Z",
+        "endedAt": "2026-09-25T15:39:20.292Z",
         "failure": null,
         "current": null,
         "waits": [],
@@ -1968,21 +1968,21 @@
       "events": [
         {
           "sequence": 1,
-          "at": "2026-09-25T15:16:40.576Z",
+          "at": "2026-09-25T15:39:00.883Z",
           "transition": "job-started",
           "summary": "The run started",
           "refs": []
         },
         {
           "sequence": 2,
-          "at": "2026-09-25T15:16:40.576Z",
+          "at": "2026-09-25T15:39:00.883Z",
           "transition": "document-manifest-committed",
           "summary": "Captured 1 plan document",
           "refs": []
         },
         {
           "sequence": 3,
-          "at": "2026-09-25T15:16:40.816Z",
+          "at": "2026-09-25T15:39:01.153Z",
           "transition": "session-opened",
           "summary": "The initial-architect session ses-0001 opened on scripted",
           "refs": [
@@ -1994,7 +1994,7 @@
         },
         {
           "sequence": 4,
-          "at": "2026-09-25T15:16:40.818Z",
+          "at": "2026-09-25T15:39:01.156Z",
           "transition": "invocation-started",
           "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
           "refs": [
@@ -2010,7 +2010,7 @@
         },
         {
           "sequence": 5,
-          "at": "2026-09-25T15:16:40.857Z",
+          "at": "2026-09-25T15:39:01.187Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
           "refs": [
@@ -2026,7 +2026,7 @@
         },
         {
           "sequence": 6,
-          "at": "2026-09-25T15:16:40.873Z",
+          "at": "2026-09-25T15:39:01.202Z",
           "transition": "analysis-accepted",
           "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
           "refs": [
@@ -2038,7 +2038,7 @@
         },
         {
           "sequence": 7,
-          "at": "2026-09-25T15:16:41.083Z",
+          "at": "2026-09-25T15:39:01.414Z",
           "transition": "gate-started",
           "summary": "Gate ga-0001 (readiness) started",
           "refs": [
@@ -2050,7 +2050,7 @@
         },
         {
           "sequence": 8,
-          "at": "2026-09-25T15:16:41.402Z",
+          "at": "2026-09-25T15:39:01.766Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
           "refs": [
@@ -2062,7 +2062,7 @@
         },
         {
           "sequence": 9,
-          "at": "2026-09-25T15:16:41.637Z",
+          "at": "2026-09-25T15:39:02.001Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
           "refs": [
@@ -2074,7 +2074,7 @@
         },
         {
           "sequence": 10,
-          "at": "2026-09-25T15:16:41.906Z",
+          "at": "2026-09-25T15:39:02.253Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
           "refs": [
@@ -2086,7 +2086,7 @@
         },
         {
           "sequence": 11,
-          "at": "2026-09-25T15:16:42.194Z",
+          "at": "2026-09-25T15:39:02.508Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
           "refs": [
@@ -2098,7 +2098,7 @@
         },
         {
           "sequence": 12,
-          "at": "2026-09-25T15:16:42.557Z",
+          "at": "2026-09-25T15:39:02.858Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
           "refs": [
@@ -2110,7 +2110,7 @@
         },
         {
           "sequence": 13,
-          "at": "2026-09-25T15:16:43.566Z",
+          "at": "2026-09-25T15:39:03.910Z",
           "transition": "readiness-passed",
           "summary": "Readiness passed at attempt 1",
           "refs": [
@@ -2122,21 +2122,21 @@
         },
         {
           "sequence": 14,
-          "at": "2026-09-25T15:16:43.572Z",
+          "at": "2026-09-25T15:39:03.938Z",
           "transition": "nonfunctional-phase-started",
           "summary": "Non-functional assessment phase started with 3 rounds",
           "refs": []
         },
         {
           "sequence": 15,
-          "at": "2026-09-25T15:16:44.671Z",
+          "at": "2026-09-25T15:39:05.111Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-001 prepared",
           "refs": []
         },
         {
           "sequence": 16,
-          "at": "2026-09-25T15:16:44.687Z",
+          "at": "2026-09-25T15:39:05.127Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
           "refs": [
@@ -2148,7 +2148,7 @@
         },
         {
           "sequence": 17,
-          "at": "2026-09-25T15:16:44.689Z",
+          "at": "2026-09-25T15:39:05.129Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
           "refs": [
@@ -2164,7 +2164,7 @@
         },
         {
           "sequence": 18,
-          "at": "2026-09-25T15:16:44.722Z",
+          "at": "2026-09-25T15:39:05.158Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
           "refs": [
@@ -2180,14 +2180,14 @@
         },
         {
           "sequence": 19,
-          "at": "2026-09-25T15:16:45.913Z",
+          "at": "2026-09-25T15:39:06.233Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-001 recorded for round 1",
           "refs": []
         },
         {
           "sequence": 20,
-          "at": "2026-09-25T15:16:45.929Z",
+          "at": "2026-09-25T15:39:06.237Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
           "refs": [
@@ -2199,7 +2199,7 @@
         },
         {
           "sequence": 21,
-          "at": "2026-09-25T15:16:45.933Z",
+          "at": "2026-09-25T15:39:06.238Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
           "refs": [
@@ -2215,7 +2215,7 @@
         },
         {
           "sequence": 22,
-          "at": "2026-09-25T15:16:45.949Z",
+          "at": "2026-09-25T15:39:06.243Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
           "refs": [
@@ -2231,7 +2231,7 @@
         },
         {
           "sequence": 23,
-          "at": "2026-09-25T15:16:47.042Z",
+          "at": "2026-09-25T15:39:07.396Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 1 closed: continue",
           "refs": [
@@ -2243,14 +2243,14 @@
         },
         {
           "sequence": 24,
-          "at": "2026-09-25T15:16:48.135Z",
+          "at": "2026-09-25T15:39:08.533Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-002 prepared",
           "refs": []
         },
         {
           "sequence": 25,
-          "at": "2026-09-25T15:16:48.138Z",
+          "at": "2026-09-25T15:39:08.536Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
           "refs": [
@@ -2262,7 +2262,7 @@
         },
         {
           "sequence": 26,
-          "at": "2026-09-25T15:16:48.139Z",
+          "at": "2026-09-25T15:39:08.537Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
           "refs": [
@@ -2278,7 +2278,7 @@
         },
         {
           "sequence": 27,
-          "at": "2026-09-25T15:16:48.144Z",
+          "at": "2026-09-25T15:39:08.541Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
           "refs": [
@@ -2294,14 +2294,14 @@
         },
         {
           "sequence": 28,
-          "at": "2026-09-25T15:16:49.267Z",
+          "at": "2026-09-25T15:39:09.730Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-002 recorded for round 2",
           "refs": []
         },
         {
           "sequence": 29,
-          "at": "2026-09-25T15:16:49.282Z",
+          "at": "2026-09-25T15:39:09.746Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
           "refs": [
@@ -2313,7 +2313,7 @@
         },
         {
           "sequence": 30,
-          "at": "2026-09-25T15:16:49.284Z",
+          "at": "2026-09-25T15:39:09.747Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
           "refs": [
@@ -2329,7 +2329,7 @@
         },
         {
           "sequence": 31,
-          "at": "2026-09-25T15:16:49.304Z",
+          "at": "2026-09-25T15:39:09.759Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
           "refs": [
@@ -2345,7 +2345,7 @@
         },
         {
           "sequence": 32,
-          "at": "2026-09-25T15:16:50.445Z",
+          "at": "2026-09-25T15:39:10.886Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 2 closed: continue",
           "refs": [
@@ -2357,14 +2357,14 @@
         },
         {
           "sequence": 33,
-          "at": "2026-09-25T15:16:51.606Z",
+          "at": "2026-09-25T15:39:12.068Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-003 prepared",
           "refs": []
         },
         {
           "sequence": 34,
-          "at": "2026-09-25T15:16:51.618Z",
+          "at": "2026-09-25T15:39:12.081Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
           "refs": [
@@ -2376,7 +2376,7 @@
         },
         {
           "sequence": 35,
-          "at": "2026-09-25T15:16:51.620Z",
+          "at": "2026-09-25T15:39:12.083Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
           "refs": [
@@ -2392,7 +2392,7 @@
         },
         {
           "sequence": 36,
-          "at": "2026-09-25T15:16:51.643Z",
+          "at": "2026-09-25T15:39:12.103Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
           "refs": [
@@ -2408,14 +2408,14 @@
         },
         {
           "sequence": 37,
-          "at": "2026-09-25T15:16:52.830Z",
+          "at": "2026-09-25T15:39:13.278Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-003 recorded for round 3",
           "refs": []
         },
         {
           "sequence": 38,
-          "at": "2026-09-25T15:16:52.834Z",
+          "at": "2026-09-25T15:39:13.280Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
           "refs": [
@@ -2427,7 +2427,7 @@
         },
         {
           "sequence": 39,
-          "at": "2026-09-25T15:16:52.835Z",
+          "at": "2026-09-25T15:39:13.281Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
           "refs": [
@@ -2443,7 +2443,7 @@
         },
         {
           "sequence": 40,
-          "at": "2026-09-25T15:16:52.841Z",
+          "at": "2026-09-25T15:39:13.286Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
           "refs": [
@@ -2459,7 +2459,7 @@
         },
         {
           "sequence": 41,
-          "at": "2026-09-25T15:16:53.972Z",
+          "at": "2026-09-25T15:39:14.417Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 3 closed: exhausted",
           "refs": [
@@ -2471,14 +2471,14 @@
         },
         {
           "sequence": 42,
-          "at": "2026-09-25T15:16:55.163Z",
+          "at": "2026-09-25T15:39:15.567Z",
           "transition": "nonfunctional-deviation-recorded",
           "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
           "refs": []
         },
         {
           "sequence": 43,
-          "at": "2026-09-25T15:16:56.588Z",
+          "at": "2026-09-25T15:39:16.966Z",
           "transition": "gate-committing",
           "summary": "Gate ga-0002 (final) is committing before audit",
           "refs": [
@@ -2490,7 +2490,7 @@
         },
         {
           "sequence": 44,
-          "at": "2026-09-25T15:16:58.569Z",
+          "at": "2026-09-25T15:39:18.900Z",
           "transition": "gate-attempted",
           "summary": "Gate ga-0002 (final): passed, next accept",
           "refs": [
@@ -2502,7 +2502,7 @@
         },
         {
           "sequence": 45,
-          "at": "2026-09-25T15:16:58.785Z",
+          "at": "2026-09-25T15:39:19.141Z",
           "transition": "candidate-bound-to-gate",
           "summary": "Candidate cand-003 bound to gate ga-0002",
           "refs": [
@@ -2514,7 +2514,7 @@
         },
         {
           "sequence": 46,
-          "at": "2026-09-25T15:16:59.908Z",
+          "at": "2026-09-25T15:39:20.287Z",
           "transition": "session-finished",
           "summary": "Session ses-0001 finished (run-ended)",
           "refs": [
@@ -2526,7 +2526,7 @@
         },
         {
           "sequence": 47,
-          "at": "2026-09-25T15:16:59.913Z",
+          "at": "2026-09-25T15:39:20.292Z",
           "transition": "job-completed",
           "summary": "The run completed after 0 work items, with 1 plan deviation to review",
           "refs": [
@@ -2536,40 +2536,40 @@
             },
             {
               "kind": "commit",
-              "id": "e8cc3acb856d37f546d35ab576da54d028d9e073"
+              "id": "c685e16b80d9a4de8953f25c3073b26198cebbab"
             }
           ]
         },
         {
           "sequence": 48,
-          "at": "2026-09-25T15:16:59.968Z",
+          "at": "2026-09-25T15:39:20.356Z",
           "transition": "check-findings-recorded",
           "summary": "1 CheckFinding event was recorded (a person's command accept-nfr-1)",
           "refs": []
         },
         {
           "sequence": 49,
-          "at": "2026-09-25T15:16:59.980Z",
+          "at": "2026-09-25T15:39:20.371Z",
           "transition": "check-findings-recorded",
           "summary": "1 CheckFinding event was recorded (a person's command revoke-nfr-1)",
           "refs": []
         }
       ],
       "readiness": {
-        "runId": "20260925T151640Z-654d88",
+        "runId": "20260925T153900Z-abd0bb",
         "version": 49,
         "readiness": {
           "status": "unavailable",
           "candidate": null,
           "finalGate": null,
           "checkFindings": [],
-          "reason": "ENOENT: no such file or directory, open '/tmp/ramify-agent-gEvaCB/collection-review/plans/review-notes/.harness/jobs/20260925T151640Z-654d88/analysis/catalog/17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336.json'",
+          "reason": "ENOENT: no such file or directory, open '/tmp/ramify-agent-JbjEru/collection-review/plans/review-notes/.harness/jobs/20260925T153900Z-abd0bb/analysis/catalog/17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336.json'",
           "gateCommit": null
         }
       },
       "findings": {
         "protocol": "check-findings/1",
-        "runId": "20260925T151640Z-654d88",
+        "runId": "20260925T153900Z-abd0bb",
         "version": 49,
         "coverage": {
           "state": "unavailable",
@@ -2632,8 +2632,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                  "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+                  "preparedAt": "2026-09-25T15:39:12.067Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -2659,7 +2659,7 @@
       "details": {
         "cf-0001": {
           "protocol": "check-findings/1",
-          "runId": "20260925T151640Z-654d88",
+          "runId": "20260925T153900Z-abd0bb",
           "version": 49,
           "summary": {
             "id": "cf-0001",
@@ -2697,8 +2697,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "e8cc3acb856d37f546d35ab576da54d028d9e073",
-                  "preparedAt": "2026-09-25T15:16:51.605Z"
+                  "head": "c685e16b80d9a4de8953f25c3073b26198cebbab",
+                  "preparedAt": "2026-09-25T15:39:12.067Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -2860,16 +2860,16 @@
     },
     "gate-failed": {
       "run": {
-        "jobId": "20260925T151700Z-0b70a2",
+        "jobId": "20260925T153920Z-165bc4",
         "planId": "review-notes",
         "agent": "scripted",
         "version": 48,
         "state": "failed",
         "phase": "ended",
         "stopRequested": false,
-        "startedAt": "2026-09-25T15:17:00.144Z",
-        "updatedAt": "2026-09-25T15:17:18.411Z",
-        "endedAt": "2026-09-25T15:17:18.405Z",
+        "startedAt": "2026-09-25T15:39:20.522Z",
+        "updatedAt": "2026-09-25T15:39:38.576Z",
+        "endedAt": "2026-09-25T15:39:38.548Z",
         "failure": {
           "reason": "repair-exhausted",
           "message": "The final gate did not pass: failed (in-scope)",
@@ -2914,21 +2914,21 @@
       "events": [
         {
           "sequence": 1,
-          "at": "2026-09-25T15:17:00.144Z",
+          "at": "2026-09-25T15:39:20.522Z",
           "transition": "job-started",
           "summary": "The run started",
           "refs": []
         },
         {
           "sequence": 2,
-          "at": "2026-09-25T15:17:00.144Z",
+          "at": "2026-09-25T15:39:20.522Z",
           "transition": "document-manifest-committed",
           "summary": "Captured 1 plan document",
           "refs": []
         },
         {
           "sequence": 3,
-          "at": "2026-09-25T15:17:00.376Z",
+          "at": "2026-09-25T15:39:20.752Z",
           "transition": "session-opened",
           "summary": "The initial-architect session ses-0001 opened on scripted",
           "refs": [
@@ -2940,7 +2940,7 @@
         },
         {
           "sequence": 4,
-          "at": "2026-09-25T15:17:00.378Z",
+          "at": "2026-09-25T15:39:20.754Z",
           "transition": "invocation-started",
           "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
           "refs": [
@@ -2956,7 +2956,7 @@
         },
         {
           "sequence": 5,
-          "at": "2026-09-25T15:17:00.407Z",
+          "at": "2026-09-25T15:39:20.779Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
           "refs": [
@@ -2972,7 +2972,7 @@
         },
         {
           "sequence": 6,
-          "at": "2026-09-25T15:17:00.441Z",
+          "at": "2026-09-25T15:39:20.795Z",
           "transition": "analysis-accepted",
           "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
           "refs": [
@@ -2984,7 +2984,7 @@
         },
         {
           "sequence": 7,
-          "at": "2026-09-25T15:17:00.668Z",
+          "at": "2026-09-25T15:39:21.007Z",
           "transition": "gate-started",
           "summary": "Gate ga-0001 (readiness) started",
           "refs": [
@@ -2996,7 +2996,7 @@
         },
         {
           "sequence": 8,
-          "at": "2026-09-25T15:17:00.983Z",
+          "at": "2026-09-25T15:39:21.347Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
           "refs": [
@@ -3008,7 +3008,7 @@
         },
         {
           "sequence": 9,
-          "at": "2026-09-25T15:17:01.216Z",
+          "at": "2026-09-25T15:39:21.580Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
           "refs": [
@@ -3020,7 +3020,7 @@
         },
         {
           "sequence": 10,
-          "at": "2026-09-25T15:17:01.466Z",
+          "at": "2026-09-25T15:39:21.823Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
           "refs": [
@@ -3032,7 +3032,7 @@
         },
         {
           "sequence": 11,
-          "at": "2026-09-25T15:17:01.715Z",
+          "at": "2026-09-25T15:39:22.063Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
           "refs": [
@@ -3044,7 +3044,7 @@
         },
         {
           "sequence": 12,
-          "at": "2026-09-25T15:17:02.080Z",
+          "at": "2026-09-25T15:39:22.434Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
           "refs": [
@@ -3056,7 +3056,7 @@
         },
         {
           "sequence": 13,
-          "at": "2026-09-25T15:17:03.143Z",
+          "at": "2026-09-25T15:39:23.479Z",
           "transition": "readiness-passed",
           "summary": "Readiness passed at attempt 1",
           "refs": [
@@ -3068,21 +3068,21 @@
         },
         {
           "sequence": 14,
-          "at": "2026-09-25T15:17:03.160Z",
+          "at": "2026-09-25T15:39:23.488Z",
           "transition": "nonfunctional-phase-started",
           "summary": "Non-functional assessment phase started with 3 rounds",
           "refs": []
         },
         {
           "sequence": 15,
-          "at": "2026-09-25T15:17:04.325Z",
+          "at": "2026-09-25T15:39:24.569Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-001 prepared",
           "refs": []
         },
         {
           "sequence": 16,
-          "at": "2026-09-25T15:17:04.337Z",
+          "at": "2026-09-25T15:39:24.572Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
           "refs": [
@@ -3094,7 +3094,7 @@
         },
         {
           "sequence": 17,
-          "at": "2026-09-25T15:17:04.340Z",
+          "at": "2026-09-25T15:39:24.573Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
           "refs": [
@@ -3110,7 +3110,7 @@
         },
         {
           "sequence": 18,
-          "at": "2026-09-25T15:17:04.374Z",
+          "at": "2026-09-25T15:39:24.579Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
           "refs": [
@@ -3126,14 +3126,14 @@
         },
         {
           "sequence": 19,
-          "at": "2026-09-25T15:17:05.547Z",
+          "at": "2026-09-25T15:39:25.740Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-001 recorded for round 1",
           "refs": []
         },
         {
           "sequence": 20,
-          "at": "2026-09-25T15:17:05.560Z",
+          "at": "2026-09-25T15:39:25.752Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
           "refs": [
@@ -3145,7 +3145,7 @@
         },
         {
           "sequence": 21,
-          "at": "2026-09-25T15:17:05.563Z",
+          "at": "2026-09-25T15:39:25.755Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
           "refs": [
@@ -3161,7 +3161,7 @@
         },
         {
           "sequence": 22,
-          "at": "2026-09-25T15:17:05.585Z",
+          "at": "2026-09-25T15:39:25.779Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
           "refs": [
@@ -3177,7 +3177,7 @@
         },
         {
           "sequence": 23,
-          "at": "2026-09-25T15:17:06.717Z",
+          "at": "2026-09-25T15:39:26.898Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 1 closed: continue",
           "refs": [
@@ -3189,14 +3189,14 @@
         },
         {
           "sequence": 24,
-          "at": "2026-09-25T15:17:07.837Z",
+          "at": "2026-09-25T15:39:28.058Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-002 prepared",
           "refs": []
         },
         {
           "sequence": 25,
-          "at": "2026-09-25T15:17:07.848Z",
+          "at": "2026-09-25T15:39:28.069Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
           "refs": [
@@ -3208,7 +3208,7 @@
         },
         {
           "sequence": 26,
-          "at": "2026-09-25T15:17:07.850Z",
+          "at": "2026-09-25T15:39:28.072Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
           "refs": [
@@ -3224,7 +3224,7 @@
         },
         {
           "sequence": 27,
-          "at": "2026-09-25T15:17:07.872Z",
+          "at": "2026-09-25T15:39:28.091Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
           "refs": [
@@ -3240,14 +3240,14 @@
         },
         {
           "sequence": 28,
-          "at": "2026-09-25T15:17:09.025Z",
+          "at": "2026-09-25T15:39:29.220Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-002 recorded for round 2",
           "refs": []
         },
         {
           "sequence": 29,
-          "at": "2026-09-25T15:17:09.028Z",
+          "at": "2026-09-25T15:39:29.231Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
           "refs": [
@@ -3259,7 +3259,7 @@
         },
         {
           "sequence": 30,
-          "at": "2026-09-25T15:17:09.029Z",
+          "at": "2026-09-25T15:39:29.233Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
           "refs": [
@@ -3275,7 +3275,7 @@
         },
         {
           "sequence": 31,
-          "at": "2026-09-25T15:17:09.034Z",
+          "at": "2026-09-25T15:39:29.239Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
           "refs": [
@@ -3291,7 +3291,7 @@
         },
         {
           "sequence": 32,
-          "at": "2026-09-25T15:17:10.165Z",
+          "at": "2026-09-25T15:39:30.289Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 2 closed: continue",
           "refs": [
@@ -3303,14 +3303,14 @@
         },
         {
           "sequence": 33,
-          "at": "2026-09-25T15:17:11.303Z",
+          "at": "2026-09-25T15:39:31.446Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-003 prepared",
           "refs": []
         },
         {
           "sequence": 34,
-          "at": "2026-09-25T15:17:11.314Z",
+          "at": "2026-09-25T15:39:31.450Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
           "refs": [
@@ -3322,7 +3322,7 @@
         },
         {
           "sequence": 35,
-          "at": "2026-09-25T15:17:11.316Z",
+          "at": "2026-09-25T15:39:31.450Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
           "refs": [
@@ -3338,7 +3338,7 @@
         },
         {
           "sequence": 36,
-          "at": "2026-09-25T15:17:11.334Z",
+          "at": "2026-09-25T15:39:31.458Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
           "refs": [
@@ -3354,14 +3354,14 @@
         },
         {
           "sequence": 37,
-          "at": "2026-09-25T15:17:12.452Z",
+          "at": "2026-09-25T15:39:32.613Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-003 recorded for round 3",
           "refs": []
         },
         {
           "sequence": 38,
-          "at": "2026-09-25T15:17:12.463Z",
+          "at": "2026-09-25T15:39:32.624Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
           "refs": [
@@ -3373,7 +3373,7 @@
         },
         {
           "sequence": 39,
-          "at": "2026-09-25T15:17:12.466Z",
+          "at": "2026-09-25T15:39:32.627Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
           "refs": [
@@ -3389,7 +3389,7 @@
         },
         {
           "sequence": 40,
-          "at": "2026-09-25T15:17:12.485Z",
+          "at": "2026-09-25T15:39:32.644Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
           "refs": [
@@ -3405,7 +3405,7 @@
         },
         {
           "sequence": 41,
-          "at": "2026-09-25T15:17:13.590Z",
+          "at": "2026-09-25T15:39:33.771Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 3 closed: exhausted",
           "refs": [
@@ -3417,14 +3417,14 @@
         },
         {
           "sequence": 42,
-          "at": "2026-09-25T15:17:14.722Z",
+          "at": "2026-09-25T15:39:34.863Z",
           "transition": "nonfunctional-deviation-recorded",
           "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
           "refs": []
         },
         {
           "sequence": 43,
-          "at": "2026-09-25T15:17:16.115Z",
+          "at": "2026-09-25T15:39:36.293Z",
           "transition": "gate-committing",
           "summary": "Gate ga-0002 (final) is committing before audit",
           "refs": [
@@ -3436,7 +3436,7 @@
         },
         {
           "sequence": 44,
-          "at": "2026-09-25T15:17:18.192Z",
+          "at": "2026-09-25T15:39:38.306Z",
           "transition": "gate-attempted",
           "summary": "Gate ga-0002 (final): failed, next repair",
           "refs": [
@@ -3448,7 +3448,7 @@
         },
         {
           "sequence": 45,
-          "at": "2026-09-25T15:17:18.403Z",
+          "at": "2026-09-25T15:39:38.543Z",
           "transition": "candidate-bound-to-gate",
           "summary": "Candidate cand-003 bound to gate ga-0002",
           "refs": [
@@ -3460,7 +3460,7 @@
         },
         {
           "sequence": 46,
-          "at": "2026-09-25T15:17:18.404Z",
+          "at": "2026-09-25T15:39:38.546Z",
           "transition": "session-finished",
           "summary": "Session ses-0001 finished (run-ended)",
           "refs": [
@@ -3472,21 +3472,21 @@
         },
         {
           "sequence": 47,
-          "at": "2026-09-25T15:17:18.405Z",
+          "at": "2026-09-25T15:39:38.548Z",
           "transition": "job-failed",
           "summary": "The run failed (repair-exhausted): The final gate did not pass: failed (in-scope)",
           "refs": []
         },
         {
           "sequence": 48,
-          "at": "2026-09-25T15:17:18.411Z",
+          "at": "2026-09-25T15:39:38.576Z",
           "transition": "check-findings-recorded",
           "summary": "1 CheckFinding event was recorded (a person's command accept-gate-failed-nfr)",
           "refs": []
         }
       ],
       "readiness": {
-        "runId": "20260925T151700Z-0b70a2",
+        "runId": "20260925T153920Z-165bc4",
         "version": 48,
         "readiness": {
           "status": "gate-failed",
@@ -3499,7 +3499,7 @@
       },
       "findings": {
         "protocol": "check-findings/1",
-        "runId": "20260925T151700Z-0b70a2",
+        "runId": "20260925T153920Z-165bc4",
         "version": 48,
         "coverage": {
           "state": "unavailable",
@@ -3572,8 +3572,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "b9c6995e4b7945cd0d8c3051ffddbccda9c4dabb",
-                  "preparedAt": "2026-09-25T15:17:11.303Z"
+                  "head": "38ed54d5d6b878f06f2ef5c0a5e1e2a644bba333",
+                  "preparedAt": "2026-09-25T15:39:31.446Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -3599,7 +3599,7 @@
       "details": {
         "cf-0001": {
           "protocol": "check-findings/1",
-          "runId": "20260925T151700Z-0b70a2",
+          "runId": "20260925T153920Z-165bc4",
           "version": 48,
           "summary": {
             "id": "cf-0001",
@@ -3647,8 +3647,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "b9c6995e4b7945cd0d8c3051ffddbccda9c4dabb",
-                  "preparedAt": "2026-09-25T15:17:11.303Z"
+                  "head": "38ed54d5d6b878f06f2ef5c0a5e1e2a644bba333",
+                  "preparedAt": "2026-09-25T15:39:31.446Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -3795,16 +3795,16 @@
     },
     "rejected": {
       "run": {
-        "jobId": "20260925T151718Z-d28ead",
+        "jobId": "20260925T153938Z-679d7f",
         "planId": "review-notes",
         "agent": "scripted",
         "version": 48,
         "state": "completed",
         "phase": "ended",
         "stopRequested": false,
-        "startedAt": "2026-09-25T15:17:18.566Z",
-        "updatedAt": "2026-09-25T15:17:37.987Z",
-        "endedAt": "2026-09-25T15:17:37.986Z",
+        "startedAt": "2026-09-25T15:39:38.745Z",
+        "updatedAt": "2026-09-25T15:39:57.959Z",
+        "endedAt": "2026-09-25T15:39:57.952Z",
         "failure": null,
         "current": null,
         "waits": [],
@@ -3843,21 +3843,21 @@
       "events": [
         {
           "sequence": 1,
-          "at": "2026-09-25T15:17:18.566Z",
+          "at": "2026-09-25T15:39:38.745Z",
           "transition": "job-started",
           "summary": "The run started",
           "refs": []
         },
         {
           "sequence": 2,
-          "at": "2026-09-25T15:17:18.566Z",
+          "at": "2026-09-25T15:39:38.745Z",
           "transition": "document-manifest-committed",
           "summary": "Captured 1 plan document",
           "refs": []
         },
         {
           "sequence": 3,
-          "at": "2026-09-25T15:17:18.795Z",
+          "at": "2026-09-25T15:39:38.975Z",
           "transition": "session-opened",
           "summary": "The initial-architect session ses-0001 opened on scripted",
           "refs": [
@@ -3869,7 +3869,7 @@
         },
         {
           "sequence": 4,
-          "at": "2026-09-25T15:17:18.798Z",
+          "at": "2026-09-25T15:39:38.977Z",
           "transition": "invocation-started",
           "summary": "The initial-architect invocation inv-0001 started, opening session ses-0001",
           "refs": [
@@ -3885,7 +3885,7 @@
         },
         {
           "sequence": 5,
-          "at": "2026-09-25T15:17:18.824Z",
+          "at": "2026-09-25T15:39:39.003Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0001 ended: submitted; session ses-0001 is kept",
           "refs": [
@@ -3901,7 +3901,7 @@
         },
         {
           "sequence": 6,
-          "at": "2026-09-25T15:17:18.868Z",
+          "at": "2026-09-25T15:39:39.053Z",
           "transition": "analysis-accepted",
           "summary": "The initial analysis was accepted: 0 entry capabilities, 0 hypotheses, 0 work items",
           "refs": [
@@ -3913,7 +3913,7 @@
         },
         {
           "sequence": 7,
-          "at": "2026-09-25T15:17:19.082Z",
+          "at": "2026-09-25T15:39:39.288Z",
           "transition": "gate-started",
           "summary": "Gate ga-0001 (readiness) started",
           "refs": [
@@ -3925,7 +3925,7 @@
         },
         {
           "sequence": 8,
-          "at": "2026-09-25T15:17:19.388Z",
+          "at": "2026-09-25T15:39:39.601Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the tests started, command 1 of 5",
           "refs": [
@@ -3937,7 +3937,7 @@
         },
         {
           "sequence": 9,
-          "at": "2026-09-25T15:17:19.619Z",
+          "at": "2026-09-25T15:39:39.840Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the type check started, command 2 of 5",
           "refs": [
@@ -3949,7 +3949,7 @@
         },
         {
           "sequence": 10,
-          "at": "2026-09-25T15:17:19.861Z",
+          "at": "2026-09-25T15:39:40.082Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the Ramify check started, command 3 of 5",
           "refs": [
@@ -3961,7 +3961,7 @@
         },
         {
           "sequence": 11,
-          "at": "2026-09-25T15:17:20.147Z",
+          "at": "2026-09-25T15:39:40.360Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 4 of 5",
           "refs": [
@@ -3973,7 +3973,7 @@
         },
         {
           "sequence": 12,
-          "at": "2026-09-25T15:17:20.557Z",
+          "at": "2026-09-25T15:39:40.718Z",
           "transition": "gate-command-started",
           "summary": "Gate ga-0001 (readiness): the scenario check started, command 5 of 5",
           "refs": [
@@ -3985,7 +3985,7 @@
         },
         {
           "sequence": 13,
-          "at": "2026-09-25T15:17:21.571Z",
+          "at": "2026-09-25T15:39:41.714Z",
           "transition": "readiness-passed",
           "summary": "Readiness passed at attempt 1",
           "refs": [
@@ -3997,21 +3997,21 @@
         },
         {
           "sequence": 14,
-          "at": "2026-09-25T15:17:21.579Z",
+          "at": "2026-09-25T15:39:41.732Z",
           "transition": "nonfunctional-phase-started",
           "summary": "Non-functional assessment phase started with 3 rounds",
           "refs": []
         },
         {
           "sequence": 15,
-          "at": "2026-09-25T15:17:22.717Z",
+          "at": "2026-09-25T15:39:42.890Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-001 prepared",
           "refs": []
         },
         {
           "sequence": 16,
-          "at": "2026-09-25T15:17:22.720Z",
+          "at": "2026-09-25T15:39:42.901Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0002 opened on scripted",
           "refs": [
@@ -4023,7 +4023,7 @@
         },
         {
           "sequence": 17,
-          "at": "2026-09-25T15:17:22.721Z",
+          "at": "2026-09-25T15:39:42.903Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0002 started, opening session ses-0002",
           "refs": [
@@ -4039,7 +4039,7 @@
         },
         {
           "sequence": 18,
-          "at": "2026-09-25T15:17:22.728Z",
+          "at": "2026-09-25T15:39:42.926Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0002 ended: submitted; session ses-0002 finished (work-closed)",
           "refs": [
@@ -4055,14 +4055,14 @@
         },
         {
           "sequence": 19,
-          "at": "2026-09-25T15:17:23.873Z",
+          "at": "2026-09-25T15:39:44.069Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-001 recorded for round 1",
           "refs": []
         },
         {
           "sequence": 20,
-          "at": "2026-09-25T15:17:23.883Z",
+          "at": "2026-09-25T15:39:44.080Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0003 opened on scripted",
           "refs": [
@@ -4074,7 +4074,7 @@
         },
         {
           "sequence": 21,
-          "at": "2026-09-25T15:17:23.886Z",
+          "at": "2026-09-25T15:39:44.083Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0003 started, opening session ses-0003",
           "refs": [
@@ -4090,7 +4090,7 @@
         },
         {
           "sequence": 22,
-          "at": "2026-09-25T15:17:23.905Z",
+          "at": "2026-09-25T15:39:44.102Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0003 ended: submitted; session ses-0003 finished (work-closed)",
           "refs": [
@@ -4106,7 +4106,7 @@
         },
         {
           "sequence": 23,
-          "at": "2026-09-25T15:17:25.055Z",
+          "at": "2026-09-25T15:39:45.259Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 1 closed: continue",
           "refs": [
@@ -4118,14 +4118,14 @@
         },
         {
           "sequence": 24,
-          "at": "2026-09-25T15:17:26.224Z",
+          "at": "2026-09-25T15:39:46.442Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-002 prepared",
           "refs": []
         },
         {
           "sequence": 25,
-          "at": "2026-09-25T15:17:26.228Z",
+          "at": "2026-09-25T15:39:46.445Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0004 opened on scripted",
           "refs": [
@@ -4137,7 +4137,7 @@
         },
         {
           "sequence": 26,
-          "at": "2026-09-25T15:17:26.229Z",
+          "at": "2026-09-25T15:39:46.446Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0004 started, opening session ses-0004",
           "refs": [
@@ -4153,7 +4153,7 @@
         },
         {
           "sequence": 27,
-          "at": "2026-09-25T15:17:26.233Z",
+          "at": "2026-09-25T15:39:46.450Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0004 ended: submitted; session ses-0004 finished (work-closed)",
           "refs": [
@@ -4169,14 +4169,14 @@
         },
         {
           "sequence": 28,
-          "at": "2026-09-25T15:17:27.374Z",
+          "at": "2026-09-25T15:39:47.557Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-002 recorded for round 2",
           "refs": []
         },
         {
           "sequence": 29,
-          "at": "2026-09-25T15:17:27.385Z",
+          "at": "2026-09-25T15:39:47.568Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0005 opened on scripted",
           "refs": [
@@ -4188,7 +4188,7 @@
         },
         {
           "sequence": 30,
-          "at": "2026-09-25T15:17:27.387Z",
+          "at": "2026-09-25T15:39:47.570Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0005 started, opening session ses-0005",
           "refs": [
@@ -4204,7 +4204,7 @@
         },
         {
           "sequence": 31,
-          "at": "2026-09-25T15:17:27.407Z",
+          "at": "2026-09-25T15:39:47.588Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0005 ended: submitted; session ses-0005 finished (work-closed)",
           "refs": [
@@ -4220,7 +4220,7 @@
         },
         {
           "sequence": 32,
-          "at": "2026-09-25T15:17:28.517Z",
+          "at": "2026-09-25T15:39:48.688Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 2 closed: continue",
           "refs": [
@@ -4232,14 +4232,14 @@
         },
         {
           "sequence": 33,
-          "at": "2026-09-25T15:17:29.673Z",
+          "at": "2026-09-25T15:39:49.782Z",
           "transition": "candidate-prepared",
           "summary": "Candidate cand-003 prepared",
           "refs": []
         },
         {
           "sequence": 34,
-          "at": "2026-09-25T15:17:29.684Z",
+          "at": "2026-09-25T15:39:49.793Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0006 opened on scripted",
           "refs": [
@@ -4251,7 +4251,7 @@
         },
         {
           "sequence": 35,
-          "at": "2026-09-25T15:17:29.686Z",
+          "at": "2026-09-25T15:39:49.795Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0006 started, opening session ses-0006",
           "refs": [
@@ -4267,7 +4267,7 @@
         },
         {
           "sequence": 36,
-          "at": "2026-09-25T15:17:29.702Z",
+          "at": "2026-09-25T15:39:49.800Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0006 ended: submitted; session ses-0006 finished (work-closed)",
           "refs": [
@@ -4283,14 +4283,14 @@
         },
         {
           "sequence": 37,
-          "at": "2026-09-25T15:17:30.872Z",
+          "at": "2026-09-25T15:39:50.944Z",
           "transition": "nonfunctional-assessed",
           "summary": "Non-functional assessment nfa-003 recorded for round 3",
           "refs": []
         },
         {
           "sequence": 38,
-          "at": "2026-09-25T15:17:30.874Z",
+          "at": "2026-09-25T15:39:50.946Z",
           "transition": "session-opened",
           "summary": "The nonfunctional-coordinator session ses-0007 opened on scripted",
           "refs": [
@@ -4302,7 +4302,7 @@
         },
         {
           "sequence": 39,
-          "at": "2026-09-25T15:17:30.875Z",
+          "at": "2026-09-25T15:39:50.947Z",
           "transition": "invocation-started",
           "summary": "The nonfunctional-coordinator invocation inv-0007 started, opening session ses-0007",
           "refs": [
@@ -4318,7 +4318,7 @@
         },
         {
           "sequence": 40,
-          "at": "2026-09-25T15:17:30.878Z",
+          "at": "2026-09-25T15:39:50.951Z",
           "transition": "invocation-ended",
           "summary": "Invocation inv-0007 ended: submitted; session ses-0007 finished (work-closed)",
           "refs": [
@@ -4334,7 +4334,7 @@
         },
         {
           "sequence": 41,
-          "at": "2026-09-25T15:17:32.007Z",
+          "at": "2026-09-25T15:39:52.067Z",
           "transition": "nonfunctional-round-closed",
           "summary": "Non-functional round 3 closed: exhausted",
           "refs": [
@@ -4346,14 +4346,14 @@
         },
         {
           "sequence": 42,
-          "at": "2026-09-25T15:17:33.195Z",
+          "at": "2026-09-25T15:39:53.239Z",
           "transition": "nonfunctional-deviation-recorded",
           "summary": "Non-functional deviation nfd-001 recorded for nfr-001",
           "refs": []
         },
         {
           "sequence": 43,
-          "at": "2026-09-25T15:17:34.589Z",
+          "at": "2026-09-25T15:39:54.622Z",
           "transition": "gate-committing",
           "summary": "Gate ga-0002 (final) is committing before audit",
           "refs": [
@@ -4365,7 +4365,7 @@
         },
         {
           "sequence": 44,
-          "at": "2026-09-25T15:17:36.559Z",
+          "at": "2026-09-25T15:39:56.609Z",
           "transition": "gate-attempted",
           "summary": "Gate ga-0002 (final): passed, next accept",
           "refs": [
@@ -4377,7 +4377,7 @@
         },
         {
           "sequence": 45,
-          "at": "2026-09-25T15:17:36.796Z",
+          "at": "2026-09-25T15:39:56.833Z",
           "transition": "candidate-bound-to-gate",
           "summary": "Candidate cand-003 bound to gate ga-0002",
           "refs": [
@@ -4389,7 +4389,7 @@
         },
         {
           "sequence": 46,
-          "at": "2026-09-25T15:17:37.984Z",
+          "at": "2026-09-25T15:39:57.949Z",
           "transition": "session-finished",
           "summary": "Session ses-0001 finished (run-ended)",
           "refs": [
@@ -4401,7 +4401,7 @@
         },
         {
           "sequence": 47,
-          "at": "2026-09-25T15:17:37.986Z",
+          "at": "2026-09-25T15:39:57.952Z",
           "transition": "job-completed",
           "summary": "The run completed after 0 work items, with 1 plan deviation to review",
           "refs": [
@@ -4411,39 +4411,39 @@
             },
             {
               "kind": "commit",
-              "id": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b"
+              "id": "a72864aeb7f7c20e14634d043dd30a0c5ab3c1c8"
             }
           ]
         },
         {
           "sequence": 48,
-          "at": "2026-09-25T15:17:37.987Z",
+          "at": "2026-09-25T15:39:57.959Z",
           "transition": "check-findings-recorded",
           "summary": "1 CheckFinding event was recorded (a person's command reject-nfr-1)",
           "refs": []
         }
       ],
       "readiness": {
-        "runId": "20260925T151718Z-d28ead",
+        "runId": "20260925T153938Z-679d7f",
         "version": 48,
         "readiness": {
           "status": "rejected",
           "candidate": {
             "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-            "head": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b",
-            "preparedAt": "2026-09-25T15:17:29.672Z"
+            "head": "a72864aeb7f7c20e14634d043dd30a0c5ab3c1c8",
+            "preparedAt": "2026-09-25T15:39:49.781Z"
           },
           "finalGate": "ga-0002",
           "checkFindings": [
             "cf-0001"
           ],
           "reason": "A plan deviation was rejected for this candidate",
-          "gateCommit": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b"
+          "gateCommit": "a72864aeb7f7c20e14634d043dd30a0c5ab3c1c8"
         }
       },
       "findings": {
         "protocol": "check-findings/1",
-        "runId": "20260925T151718Z-d28ead",
+        "runId": "20260925T153938Z-679d7f",
         "version": 48,
         "coverage": {
           "state": "unavailable",
@@ -4506,8 +4506,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b",
-                  "preparedAt": "2026-09-25T15:17:29.672Z"
+                  "head": "a72864aeb7f7c20e14634d043dd30a0c5ab3c1c8",
+                  "preparedAt": "2026-09-25T15:39:49.781Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },
@@ -4533,7 +4533,7 @@
       "details": {
         "cf-0001": {
           "protocol": "check-findings/1",
-          "runId": "20260925T151718Z-d28ead",
+          "runId": "20260925T153938Z-679d7f",
           "version": 48,
           "summary": {
             "id": "cf-0001",
@@ -4571,8 +4571,8 @@
                 "assessment": "nfa-003",
                 "candidate": {
                   "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
-                  "head": "2f6cfa5e284b7a01aa5555bc5044cb6fd086a99b",
-                  "preparedAt": "2026-09-25T15:17:29.672Z"
+                  "head": "a72864aeb7f7c20e14634d043dd30a0c5ab3c1c8",
+                  "preparedAt": "2026-09-25T15:39:49.781Z"
                 },
                 "coordinatorInvocation": "inv-0006"
               },

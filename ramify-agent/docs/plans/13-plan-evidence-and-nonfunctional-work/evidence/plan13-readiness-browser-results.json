@@ -1,20 +1,20 @@
 {
-  "revision": "e299a20cf7bd7974919f4bc09d7745683a717a45",
-  "dirtyAtStart": true,
+  "revision": "aeeaf383e6710c57356811be8d4a846a75c3bb3a",
+  "dirtyAtStart": false,
   "chromium": "/usr/bin/chromium",
   "fixture": {
     "path": "plan13-readiness-fixture.json",
-    "sha256": "9cfe3c97d7a6e7579bd703d0ab1830471c916ab7fce782c6d8dc39ce53cfd98e"
+    "sha256": "c0d28e5e63f7ddd6a5b37b31f4adfd6f3a42e31197b3883547448d85b37c7d64"
   },
   "trial": {
-    "runId": "20260925T151640Z-654d88",
+    "runId": "20260925T153900Z-abd0bb",
     "catalogHash": "17e66b3f508f09faf9027266b46883c9f10ad690581f71e446ecff81b11d0336",
     "roundsClosed": 3,
     "assessments": 3,
     "candidate": "cand-003",
     "tree": "5b596be4d1123340a7baab7fd10cacc430e24c6d",
     "finalGate": "ga-0002",
-    "gateCommit": "e8cc3acb856d37f546d35ab576da54d028d9e073",
+    "gateCommit": "c685e16b80d9a4de8953f25c3073b26198cebbab",
     "deviations": 1,
     "acceptedAndRevokedCommands": 2
   },
