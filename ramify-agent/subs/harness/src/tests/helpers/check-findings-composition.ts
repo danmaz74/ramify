@@ -74,8 +74,8 @@ export function compositionCommits(): Record<string, ScriptedCommit> {
   return {
     'revision-01': { tree: 'tree-01', base: 'scenarios-00', changes: [{ status: 'A', path: store }], files: { ...declarations, ...guidance, ...notesStore } },
     'revision-02': { tree: 'tree-02', base: 'revision-01', changes: [{ status: 'A', path: tagStore }], files: { ...declarations, ...guidance, ...notesStore, ...tagSource } },
-    'revision-03': { tree: 'tree-03', base: 'revision-02', changes: [{ status: 'A', path: tagLimit }], files: { ...declarations, ...guidance, ...notesStore, ...tagSource, ...shortLimit } },
-    'revision-04': { tree: 'tree-04', base: 'revision-03', changes: [{ status: 'M', path: tagLimit }], files: { ...declarations, ...guidance, ...notesStore, ...tagSource, ...longLimit } },
+    'revision-03': { tree: '3'.repeat(40), base: 'revision-02', changes: [{ status: 'A', path: tagLimit }], files: { ...declarations, ...guidance, ...notesStore, ...tagSource, ...shortLimit } },
+    'revision-04': { tree: '4'.repeat(40), base: 'revision-03', changes: [{ status: 'M', path: tagLimit }], files: { ...declarations, ...guidance, ...notesStore, ...tagSource, ...longLimit } },
   };
 }
 
@@ -107,6 +107,20 @@ export function afterFinished(root: string, attempts: readonly string[]): Script
         const events = await runEventsOnDisk(root, plan, (await runIds(root))[0]!).catch(() => [] as RunEvent[]);
         const finished = new Set(events.flatMap(event => (event.type === 'review-attempt-finished' ? [event.data.attempt] : [])));
         if (attempts.every(attempt => finished.has(attempt))) return;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    },
+  };
+}
+
+/** Hold the code reviewer until the second reader has actually started. */
+function afterStarted(root: string, attempt: string): ScriptStep {
+  return {
+    kind: 'await',
+    until: async () => {
+      for (;;) {
+        const events = await runEventsOnDisk(root, plan, (await runIds(root))[0]!).catch(() => [] as RunEvent[]);
+        if (events.some(event => event.type === 'review-attempt-started' && event.data.attempt === attempt)) return;
         await new Promise(resolve => setTimeout(resolve, 10));
       }
     },
@@ -156,7 +170,7 @@ export function compositionScenario(root: string, policy: Partial<NonNullable<Ru
   return {
     commits: compositionCommits(),
     gates: compositionGates,
-    policy: { kinds: ['code', 'scope', 'design'], concurrency: 2, ...policy },
+    policy: { kinds: ['code', 'scope', 'design'], concurrency: 2, attemptMs: 5_000, ...policy },
     engineer: [],
     roles: {
       'initial-architect': [submit(analysis([entry('review-notes', notes), entry('catalog-tags', tags)]))],
@@ -186,7 +200,8 @@ export function compositionScenario(root: string, policy: Partial<NonNullable<Ru
       'rq-0001': review([store]), 'rq-0002': review([store]), 'rq-0003': review([store]),
       'rq-0004': review([tagStore]), 'rq-0005': review([tagStore]), 'rq-0006': review([tagStore]),
       // wi-002.i02: three concurrent readers, four concerns, committed in request order.
-      'rq-0007': review([tagLimit], [concerns.defect, concerns.simplification]),
+      'rq-0007': review([tagLimit], [concerns.defect, concerns.simplification],
+        (policy.concurrency ?? 2) > 1 ? [afterStarted(root, 'rq-0008.a01')] : []),
       'rq-0008': review([tagLimit], [concerns.scope], [afterFinished(root, ['rq-0007.a01'])]),
       'rq-0009': review([tagLimit], [concerns.design], [afterFinished(root, ['rq-0008.a01'])]),
       // wi-002.i03, the correction: one more low-risk signal from its code review.

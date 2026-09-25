@@ -111,9 +111,9 @@ describe('the composed run: a clean work item and a corrected one', () => {
     // Round 1 planned the correction; its acceptance claimed the repair on
     // the later candidate; round 2 fixed it within the non-low floor.
     const basis = (id: string) => readFile(runPath(root, plan, runId, reconciliationLayout.basis(id)), 'utf8').then(text => JSON.parse(text) as ReconciliationBasis);
-    expect(await basis('wi-002.rc01')).toMatchObject({ round: 1, floor: 'any', source: { commit: 'revision-03', tree: 'tree-03' } });
+    expect(await basis('wi-002.rc01')).toMatchObject({ round: 1, floor: 'any', source: { commit: 'revision-03', tree: '3'.repeat(40) } });
     expect((await basis('wi-002.rc01')).checkFindings.map(entry => entry.checkFinding)).toEqual(['cf-0004', 'cf-0001', 'cf-0003', 'cf-0002']);
-    expect(await basis('wi-002.rc02')).toMatchObject({ round: 2, floor: 'non-low', source: { commit: 'revision-04', tree: 'tree-04' } });
+    expect(await basis('wi-002.rc02')).toMatchObject({ round: 2, floor: 'non-low', source: { commit: 'revision-04', tree: '4'.repeat(40) } });
     const closed = eventsOf(events, 'iteration-closed').find(event => event.data.iteration === 'wi-002.i03')!;
     expect(closed.data.checkFindings!.map(event => [event.type, event.type === 'check-finding-decided' ? event.data.checkFinding : null])).toEqual([
       ['check-finding-decided', 'cf-0001'], ['check-finding-decided', 'cf-0004'],
@@ -175,7 +175,8 @@ async function restart(root: string) {
 /** The lines of the review, reconciliation and CheckFinding boundaries, where a crash is placed before and after. */
 function boundary(event: RunEvent): boolean {
   return event.type.startsWith('review-') || event.type.startsWith('reconciliation-')
-    || carriedCheckFindings(event).length > 0 || event.type === 'work-item-completed';
+    || carriedCheckFindings(event).length > 0 || event.type === 'work-item-completed'
+    || event.type === 'iteration-closed';
 }
 
 /** What a restart may add: the completions of what the log holds open, and the owed and unsettled reviews it finishes. */
