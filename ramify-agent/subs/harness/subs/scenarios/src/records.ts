@@ -25,7 +25,7 @@ export const scenarioRecordSchema = z.object({
   /** A module's declared-name path. */
   owner: z.string().min(1),
   origin: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('plan'), planScenario: z.string().regex(/^ps-\d{2,}$/), ref: z.object({ lines: lineRangeSchema }).strict() }).strict(),
+    z.object({ kind: z.literal('plan'), planScenario: z.string().regex(/^ps-\d{2,}$/), ref: z.object({ document: z.string().regex(/^doc-\d{3,}$/).optional(), lines: lineRangeSchema }).strict() }).strict(),
     z.object({ kind: z.literal('architect'), refs: z.array(scenarioPlanRefSchema) }).strict(),
   ]),
   /** The integration scenario this one is a sub-scenario of. */
@@ -131,7 +131,7 @@ export function assignScenarioIds(form: AcceptedScenarioForm, context: ScenarioI
       entry: scenario.entry,
       owner,
       origin: scenario.origin.kind === 'plan'
-        ? { kind: 'plan', planScenario: scenario.origin.planScenario, ref: { lines: [scenario.origin.lines[0], scenario.origin.lines[1]] } }
+        ? { kind: 'plan', planScenario: scenario.origin.planScenario, ref: { ...(scenario.origin.document === undefined ? {} : { document: scenario.origin.document }), lines: [scenario.origin.lines[0], scenario.origin.lines[1]] } }
         : { kind: 'architect', refs: scenario.origin.refs.map((ref) => ({ ...ref })) },
       partOf: scenario.partOf === null ? null : idsByPlanScenario.get(scenario.partOf)!,
       subScenarios: [],
@@ -151,7 +151,7 @@ export function assignScenarioIds(form: AcceptedScenarioForm, context: ScenarioI
       kind: 'integration',
       entry: null,
       owner,
-      origin: { kind: 'plan', planScenario: integration.planScenario, ref: { lines: [integration.lines[0], integration.lines[1]] } },
+      origin: { kind: 'plan', planScenario: integration.planScenario, ref: { ...(integration.document === undefined ? {} : { document: integration.document }), lines: [integration.lines[0], integration.lines[1]] } },
       partOf: null,
       subScenarios: integration.subScenarios.map((key) => idsByKey.get(key)!),
       name: integration.name,

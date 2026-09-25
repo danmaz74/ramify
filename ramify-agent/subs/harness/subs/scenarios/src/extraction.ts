@@ -16,6 +16,8 @@ const lineRangeSchema = z.tuple([z.int().positive(), z.int().positive()]);
 export const planScenarioSchema = z.object({
   /** `ps-01`, `ps-02`, … in document order. */
   id: z.string().regex(/^ps-\d{2,}$/),
+  /** Absent on an old single-plan run; its source is doc-001. */
+  document: z.string().regex(/^doc-\d{3,}$/).optional(),
   name: z.string(),
   /** Whether it is a `Scenario Outline` with examples. */
   outline: z.boolean(),
@@ -35,6 +37,7 @@ export type PlanScenario = z.infer<typeof planScenarioSchema>;
 /** A `gherkin` block that did not parse, with the parser's message and the block's lines. */
 export const planScenarioLimitationSchema = z.object({
   kind: z.literal('unparsable-gherkin'),
+  document: z.string().regex(/^doc-\d{3,}$/).optional(),
   /** The 1-based lines of the plan from the opening fence to the closing one. */
   lines: lineRangeSchema,
   message: z.string().min(1),
@@ -60,19 +63,31 @@ interface FencedBlock {
 }
 
 /** Every plan scenario and every unparsable `gherkin` block of a Markdown plan. */
-export function extractPlanScenarios(plan: string): PlanScenarioExtraction {
+export function extractPlanScenarios(plan: string, document?: string): PlanScenarioExtraction {
   const scenarios: PlanScenario[] = [];
   const limitations: PlanScenarioLimitation[] = [];
   for (const block of fencedBlocks(plan.split('\n'))) {
     if (block.language !== 'gherkin') continue;
     const extracted = extractBlock(block);
     if (!extracted.ok) {
-      limitations.push({ kind: 'unparsable-gherkin', lines: [block.open, block.close], message: extracted.message });
+      limitations.push({ kind: 'unparsable-gherkin', ...(document === undefined ? {} : { document }), lines: [block.open, block.close], message: extracted.message });
       continue;
     }
     for (const scenario of extracted.scenarios) {
-      scenarios.push({ ...scenario, id: `ps-${String(scenarios.length + 1).padStart(2, '0')}` });
+      scenarios.push({ ...scenario, ...(document === undefined ? {} : { document }), id: `ps-${String(scenarios.length + 1).padStart(2, '0')}` });
     }
+  }
+  return { scenarios, limitations };
+}
+
+/** Extract only the documents selected by incorporation, with one run-wide ID sequence. */
+export function extractDocumentScenarios(documents: readonly { readonly id: string; readonly text: string }[]): PlanScenarioExtraction {
+  const scenarios: PlanScenario[] = [];
+  const limitations: PlanScenarioLimitation[] = [];
+  for (const document of documents) {
+    const extracted = extractPlanScenarios(document.text, document.id);
+    for (const scenario of extracted.scenarios) scenarios.push({ ...scenario, id: `ps-${String(scenarios.length + 1).padStart(2, '0')}` });
+    limitations.push(...extracted.limitations);
   }
   return { scenarios, limitations };
 }

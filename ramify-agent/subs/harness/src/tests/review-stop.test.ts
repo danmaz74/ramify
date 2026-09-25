@@ -1,6 +1,6 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -73,6 +73,77 @@ async function types(root: string, runId: string): Promise<string[]> {
 }
 
 describe('a run started with the review stop', () => {
+  test('refuses approval when a captured companion changes', async () => {
+    const root = await target();
+    const path = join(root, 'plans', plan, 'plan.md');
+    await writeFile(path, `${await readFile(path, 'utf8')}\n[Companion](companion.md)\n`);
+    await writeFile(join(root, 'plans', plan, 'companion.md'), 'First version\n');
+    const { service } = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun(plan, 'scripted', undefined, true));
+    await until(() => phaseOf(service, receipt.jobId) === 'awaiting-review');
+    await writeFile(join(root, 'plans', plan, 'companion.md'), 'Second version\n');
+    await expect(service.execute(approveRun(plan, receipt.jobId, version(service, receipt.jobId), 'dana@example.com')))
+      .rejects.toMatchObject({ code: 'inputs-changed' });
+    expect(await types(root, receipt.jobId)).not.toContain('analysis-approved');
+    await service.execute(stopRun(plan, receipt.jobId, version(service, receipt.jobId)));
+    await service.settled(plan, receipt.jobId);
+  });
+
+  test('refuses completion when a companion changes during the final gate', async () => {
+    const root = await target();
+    const path = join(root, 'plans', plan, 'plan.md');
+    await writeFile(path, `${await readFile(path, 'utf8')}\n[Companion](companion.md)\n`);
+    await writeFile(join(root, 'plans', plan, 'companion.md'), 'First version\n');
+    let changed = false;
+    const { service } = await openRuns(root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }], unchangedCheckpoints: [finalVerification],
+      checkScript: async invocation => {
+        if (!changed && invocation.context.checkpoint === 'final') {
+          changed = true;
+          await writeFile(join(root, 'plans', plan, 'companion.md'), 'Changed during gate\n');
+        }
+        return {};
+      },
+    });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun(plan));
+    await service.settled(plan, receipt.jobId);
+    expect(changed).toBe(true);
+    expect(service.getRun(plan, receipt.jobId)).toMatchObject({ state: 'failed', failure: { reason: 'inputs-changed' } });
+    expect(await types(root, receipt.jobId)).not.toContain('job-completed');
+  });
+
+  test('recovery verifies captured bytes and reconstructs a missing manifest event', async () => {
+    const root = await target();
+    const first = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    cleanups.push(() => first.service.close());
+    const receipt = await first.service.execute(startRun(plan, 'scripted', undefined, true));
+    await until(() => phaseOf(first.service, receipt.jobId) === 'awaiting-review');
+    await first.service.close();
+    const eventsPath = runPath(root, plan, receipt.jobId, runLayout.events);
+    const firstLine = (await readFile(eventsPath, 'utf8')).split('\n')[0]!;
+    await writeFile(eventsPath, `${firstLine}\n`);
+    const restarted = await openRuns(root, { script: [] });
+    cleanups.push(() => restarted.service.close());
+    expect((await types(root, receipt.jobId)).slice(0, 2)).toEqual(['job-started', 'document-manifest-committed']);
+    expect(restarted.recovery.interrupted).toEqual([`${plan}/${receipt.jobId}`]);
+  });
+
+  test('recovery does not publish staged capture without job-started', async () => {
+    const root = await target();
+    const first = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
+    cleanups.push(() => first.service.close());
+    const receipt = await first.service.execute(startRun(plan, 'scripted', undefined, true));
+    await until(() => phaseOf(first.service, receipt.jobId) === 'awaiting-review');
+    await first.service.close();
+    await writeFile(runPath(root, plan, receipt.jobId, runLayout.events), '');
+    const restarted = await openRuns(root, { script: [] });
+    cleanups.push(() => restarted.service.close());
+    expect(restarted.recovery.skipped).toContain(`${plan}/${receipt.jobId}`);
+    expect(restarted.service.getRun(plan, receipt.jobId)).toBeUndefined();
+  });
+
   test('waits at awaiting-review holding the project, and an approval continues it to completion', async () => {
     const root = await target();
     const { service, git } = await openRuns(root, {
@@ -105,7 +176,7 @@ describe('a run started with the review stop', () => {
     expect(done).toMatchObject({ state: 'completed', phase: 'ended', review: { reviewer: 'dana@example.com', at: approved.acceptedAt, duringRun: false } });
     const events = await runEventsOnDisk(root, plan, receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
       'gate-started', 'readiness-passed', 'gate-committing', 'gate-attempted', 'session-finished', 'job-completed',
     ]);
     expect(events.find(event => event.type === 'analysis-approved')!.data).toMatchObject({
@@ -126,7 +197,7 @@ describe('a run started with the review stop', () => {
 
     expect(onlyRun(service, plan)).toMatchObject({ state: 'stopped', phase: 'ended', review: 'not-reviewed' });
     expect(await types(root, receipt.jobId)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'stop-requested',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'stop-requested',
       'session-finished', 'job-stopped',
     ]);
     // The architect's session, kept through the stop, is finished as the run ends.
@@ -152,7 +223,7 @@ describe('a run started with the review stop', () => {
     await until(() => phaseOf(first.service, receipt.jobId) === 'awaiting-review');
     // The waiting driver is woken by close, so the service quiesces at once.
     await first.service.close();
-    expect(await types(root, receipt.jobId)).toEqual(['job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested']);
+    expect(await types(root, receipt.jobId)).toEqual(['job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested']);
     // At the stop the architect's session is kept: suspended, to be continued after the approval.
     expect([...reduceSessions(await runEventsOnDisk(root, plan, receipt.jobId)).values()].map(one => [one.id, one.state]))
       .toEqual([['ses-0001', 'suspended']]);
@@ -178,7 +249,7 @@ describe('a run started with the review stop', () => {
     expect(restarted.recovery.interrupted).toEqual([`${plan}/${receipt.jobId}`]);
     expect(restarted.recovery.invocations).toEqual([]);
     expect(await types(root, receipt.jobId)).toEqual([
-      'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested',
       'session-finished', 'job-interrupted',
     ]);
     expect(restarted.agent!.sessions).toHaveLength(0);

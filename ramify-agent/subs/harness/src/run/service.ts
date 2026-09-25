@@ -65,6 +65,10 @@ import { Mutex, PriorityMutex } from '../jobs/mutex.js';
 import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planStateDirectory } from '../jobs/records.js';
 import { ensureStateDirectory } from '../store/state-directory.js';
 import { planPath, readPlan } from '../plans/discover.js';
+import { discoverDocuments } from '../../subs/plan-evidence/src/discovery.js';
+import { verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { headingAnchor, resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
+import { documentChanges, readCapturedDocuments } from './document-inputs.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
@@ -929,7 +933,21 @@ export class RunService {
    * was made; a later one is not part of its question.
    */
   private async scopeRequirements(run: Run, assignmentPath: string): Promise<CapturedInput[]> {
+    const changes = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (changes.length > 0) throw new EvidenceUnavailableError(changes.join('; '));
     const assignment = iterationAssignmentSchema.parse(this.committedBody(run, assignmentPath));
+    if (run.record.manifest.documentManifest) {
+      const captured = await readCapturedDocuments(run.directory, run.record.manifest);
+      const inputs: CapturedInput[] = [];
+      for (const reference of assignment.requirementRefs) {
+        const resolved = resolvePlanReference(captured.manifest, captured.bytes, reference);
+        if (resolved.status === 'unavailable') throw new EvidenceUnavailableError(resolved.reason);
+        const name = resolved.path === planPath(run.record.planId) ? 'plan' : resolved.path;
+        const ref = `${name}${reference.anchor === undefined ? `:${reference.lines?.[0]}-${reference.lines?.[1]}` : `#${headingAnchor(reference.anchor)}`}`;
+        if (!inputs.some(input => input.ref === ref)) inputs.push({ ref, hash: sha256(resolved.text), text: resolved.text });
+      }
+      return [...inputs, ...deviationInputs(this.deviationsOf(run))];
+    }
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
     return [...planExcerpts(plan, assignment.requirementRefs), ...deviationInputs(this.deviationsOf(run))];
   }
@@ -2073,6 +2091,14 @@ export class RunService {
         const record = runRecordSchema.parse(parsed);
         if (record.jobId !== jobId || record.planId !== planId) throw new Error('job.json names another run');
         const log = await RunLog.open(join(directory, runLayout.events), jobId);
+        if (record.manifest.documentManifest) {
+          const captured = await readCapturedDocuments(directory, record.manifest);
+          if (!log.find('job-started')) throw new Error('Document capture stopped before the run was published');
+          if (!log.find('document-manifest-committed')) await log.append({ type: 'document-manifest-committed', data: {
+            manifest: record.manifest.documentManifest.path, hash: record.manifest.documentManifest.hash,
+            documents: captured.manifest.documents.length,
+          } });
+        }
         const base = await this.runBase(record, log);
         let loaded!: Run;
         loaded = new Run(record, directory, log, base, this.newWriter(record.policy, () => this.accepted(loaded)));
@@ -2434,7 +2460,15 @@ export class RunService {
     // is created; a run saves no map.
     await ensureStateDirectory(planStateDirectory(this.projectRoot, planId), { gitignore: true });
     const captured = await capturePlan(this.projectRoot, planId);
-    const { manifest, packages, promptManifest, policy } = await this.captureInputs(captured);
+    const inputs = await this.captureInputs(captured);
+    const capturedDocuments = await discoverDocuments(this.projectRoot, planId, inputs.manifest.source ?? { commit: null, dirty: false })
+      .catch((error: unknown) => { throw new CommandRejection('unreadable', `Plan evidence cannot be captured: ${message(error)}`); });
+    if (!Buffer.from(capturedDocuments.bytes.get(capturedDocuments.manifest.root)!).equals(Buffer.from(captured))) {
+      throw new CommandRejection('inputs-changed', 'The root plan changed during input capture');
+    }
+    const documentManifestText = `${JSON.stringify(capturedDocuments.manifest, null, 2)}\n`;
+    const manifest = { ...inputs.manifest, documentManifest: { path: runLayout.documentManifest, hash: sha256(documentManifestText) } };
+    const { packages, promptManifest, policy } = inputs;
 
     const now = this.now();
     const runId = newJobId(now);
@@ -2445,7 +2479,17 @@ export class RunService {
     await mkdir(join(directory, 'input'), { recursive: true });
     await mkdir(join(directory, 'prompts'), { recursive: true });
     await mkdir(join(directory, 'measurements'), { recursive: true });
+    if (!verifyDocumentBytes(capturedDocuments.manifest.documents[0]!, captured)) throw new Error('Root plan bytes changed before installation');
     await writeOnce(join(directory, runLayout.capturedPlan), captured);
+    for (const document of capturedDocuments.manifest.documents) {
+      if (document.id === capturedDocuments.manifest.root) continue;
+      const bytes = capturedDocuments.bytes.get(document.id)!;
+      if (!verifyDocumentBytes(document, bytes)) throw new Error(`Document ${document.path} bytes changed before installation`);
+      await mkdir(dirname(join(directory, document.storedAt)), { recursive: true });
+      await writeOnce(join(directory, document.storedAt), bytes);
+    }
+    await writeOnce(join(directory, runLayout.documentManifest), documentManifestText);
+    await readCapturedDocuments(directory, manifest);
     await writeOnce(join(directory, runLayout.promptManifest), `${JSON.stringify(promptManifest, null, 2)}\n`);
 
     const baseline = await this.freezeBaseline(directory, planId, manifest, packages);
@@ -2480,6 +2524,9 @@ export class RunService {
     const accepted = this.commands.accept(command, contentHash, runId, run.log.nextSequence, now);
     this.runs.set(run.key, run);
     await run.log.append({ type: 'job-started', data: { command: accepted } }, now);
+    await run.log.append({ type: 'document-manifest-committed', data: {
+      manifest: runLayout.documentManifest, hash: manifest.documentManifest.hash, documents: capturedDocuments.manifest.documents.length,
+    } }, now);
     this.commands.remember(accepted);
 
     run.done = this.drive(run, agent, packages, baseline.snapshot)
@@ -2634,6 +2681,8 @@ export class RunService {
       const snapshot = runSnapshot(run.record, run.log.events);
       const refusal = approvalRefusal(run, snapshot);
       if (refusal !== null) throw new CommandRejection('conflict', refusal);
+      const changes = await documentChanges(this.projectRoot, planId, run.directory, run.record.manifest);
+      if (changes.length > 0) throw new CommandRejection('inputs-changed', changes.join('; '));
       const at = this.now();
       const accepted = this.commands.accept(command, contentHash, jobId, run.log.nextSequence, at);
       await run.log.append({
@@ -3110,6 +3159,7 @@ export class RunService {
       baseline.supplementary.map(entry => entry.path),
     );
     const shape = describePlan(plan);
+    const documents = run.record.manifest.documentManifest ? await readCapturedDocuments(run.directory, run.record.manifest) : undefined;
 
     const result = await this.runInvocation<InitialAnalysisSubmission>(run, agent, {
       role: 'initial-architect',
@@ -3123,7 +3173,7 @@ export class RunService {
       description: 'Submit the run\'s initial analysis. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
       inputSchema: initialAnalysisJsonSchema,
       submissionSchema: 'ramify-agent.initial-analysis/2',
-      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape, planScenarios: run.record.planScenarios.scenarios }),
+      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape, documents, planScenarios: run.record.planScenarios.scenarios }),
       // An accepted analysis session becomes the run's architect context:
       // briefs are appended to it and every placement request forks it.
       keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
@@ -3145,6 +3195,11 @@ export class RunService {
       return false;
     }
 
+    const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (sourceChanges.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed before analysis acceptance: ${sourceChanges.join('; ')}`, [runLayout.documentManifest]);
+      return false;
+    }
     const accepted = acceptAnalysis(result.value, {
       invocation: result.id,
       view: run.record.manifest.architectView,
@@ -7098,6 +7153,11 @@ export class RunService {
    */
   private async finalGate(run: Run): Promise<void> {
     run.writer.requireSettled('The final gate cannot run');
+    const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (sourceChanges.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed before final publication: ${sourceChanges.join('; ')}`, [runLayout.documentManifest]);
+      return;
+    }
     // The final gate waits for every latest requirement revision. A
     // capability still held by a fake is not implemented, whatever the
     // project's tests say about it.
@@ -7152,6 +7212,11 @@ export class RunService {
     const unproven = finalScenarioGaps(attempt, required.map(record => record.id));
     if (unproven !== null) {
       await this.fail(run, 'acceptance-incomplete', `The final gate passed, and its scenario check does not prove the plan's scenarios: ${unproven}`, [runLayout.gate(gateId)]);
+      return;
+    }
+    const lateSourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+    if (lateSourceChanges.length > 0) {
+      await this.fail(run, 'inputs-changed', `The captured plan evidence changed during final verification: ${lateSourceChanges.join('; ')}`, [runLayout.documentManifest, runLayout.gate(gateId)]);
       return;
     }
     const workItems = run.log.count('work-item-completed');
@@ -8356,7 +8421,7 @@ async function writeOnce(path: string, content: string | Uint8Array): Promise<vo
   await mkdir(join(path, '..'), { recursive: true });
   if (await writeFileExclusive(path, content) === 'exists') {
     const existing = await readIfExists(path);
-    if (existing === undefined) throw new Error(`${path} could not be written`);
+    if (existing === undefined || !existing.equals(Buffer.from(content))) throw new Error(`${path} already exists with different bytes`);
   }
 }
 

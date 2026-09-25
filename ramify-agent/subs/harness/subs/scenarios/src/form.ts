@@ -14,6 +14,7 @@ import { comparableSteps, dedent, normalizedText, parseGherkin, scenariosOf, sou
 
 /** A plan reference: a heading anchor, a line range, or both. The harness's own schema has the same shape. */
 export const scenarioPlanRefSchema = z.object({
+  document: z.string().regex(/^doc-\d{3,}$/).optional(),
   anchor: z.string().min(1).optional(),
   lines: z.tuple([z.int().nonnegative(), z.int().nonnegative()]).optional(),
 }).strict();
@@ -101,7 +102,7 @@ export interface ScenarioWarning {
 export interface FormScenario {
   readonly key: string;
   readonly entry: string;
-  readonly origin: { readonly kind: 'plan'; readonly planScenario: string; readonly lines: readonly [number, number] }
+  readonly origin: { readonly kind: 'plan'; readonly planScenario: string; readonly lines: readonly [number, number]; readonly document?: string }
     | { readonly kind: 'architect'; readonly refs: readonly ScenarioPlanRef[] };
   /** The plan scenario of the integration scenario this one is a sub-scenario of, or `null`. */
   readonly partOf: string | null;
@@ -113,6 +114,7 @@ export interface FormScenario {
 /** An integration scenario of the accepted form. Its text is the plan's. */
 export interface FormIntegration {
   readonly planScenario: string;
+  readonly document?: string;
   readonly lines: readonly [number, number];
   /** Keys, in the submitted order. */
   readonly subScenarios: readonly string[];
@@ -266,7 +268,7 @@ export function validateScenarioForm(
         key: scenario.key,
         entry: scenario.entry,
         origin: origin.kind === 'plan'
-          ? { kind: 'plan', planScenario: origin.planScenario, lines: extracted!.lines }
+          ? { kind: 'plan', planScenario: origin.planScenario, lines: extracted!.lines, ...(extracted!.document === undefined ? {} : { document: extracted!.document }) }
           : { kind: 'architect', refs: scenario.refs ?? [] },
         partOf: subOf.get(scenario.key) ?? null,
         name: extracted?.name ?? parsed[position]!.name,
@@ -277,6 +279,7 @@ export function validateScenarioForm(
       const extracted = plan.get(integration.planScenario)!;
       return {
         planScenario: integration.planScenario,
+        ...(extracted.document === undefined ? {} : { document: extracted.document }),
         lines: extracted.lines,
         subScenarios: [...integration.subScenarios],
         name: extracted.name,
@@ -308,6 +311,7 @@ function parseOneScenario(gherkin: string): { ok: true; scenario: ParsedScenario
 
 /** A place a scenario cites: plan lines with the anchors they sit under, or an explicit reference. */
 interface CitedLocation {
+  readonly document?: string | undefined;
   readonly lines?: readonly [number, number] | undefined;
   readonly anchors: readonly string[];
 }
@@ -317,16 +321,17 @@ function citationsOf(scenario: ScenarioSubmission, subOf: ReadonlyMap<string, st
   const planScenarios = [scenario.origin.kind === 'plan' ? scenario.origin.planScenario : undefined, subOf.get(scenario.key)];
   for (const id of planScenarios) {
     const extracted = id === undefined ? undefined : plan.get(id);
-    if (extracted) locations.push({ lines: extracted.lines, anchors: extracted.anchors });
+    if (extracted) locations.push({ document: extracted.document, lines: extracted.lines, anchors: extracted.anchors });
   }
   for (const ref of scenario.refs ?? []) {
-    locations.push({ lines: ref.lines, anchors: ref.anchor === undefined ? [] : [normalizedAnchor(ref.anchor)] });
+    locations.push({ document: ref.document, lines: ref.lines, anchors: ref.anchor === undefined ? [] : [normalizedAnchor(ref.anchor)] });
   }
   return locations;
 }
 
 /** A reference with lines is cited by overlapping lines; one with only an anchor, by that anchor; an empty one, by any scenario. */
 function cites(location: CitedLocation, ref: ScenarioPlanRef): boolean {
+  if ((location.document ?? 'doc-001') !== (ref.document ?? 'doc-001')) return false;
   if (ref.lines && location.lines) {
     return location.lines[0] <= ref.lines[1] && ref.lines[0] <= location.lines[1];
   }
@@ -339,7 +344,7 @@ function normalizedAnchor(anchor: string): string {
 }
 
 function describeRef(ref: ScenarioPlanRef): string {
-  const parts = [ref.anchor === undefined ? null : `#${ref.anchor}`, ref.lines ? `lines ${ref.lines[0]}–${ref.lines[1]}` : null];
+  const parts = [ref.document, ref.anchor === undefined ? null : `#${ref.anchor}`, ref.lines ? `lines ${ref.lines[0]}–${ref.lines[1]}` : null];
   return parts.filter((part) => part !== null).join(', ') || '{}';
 }
 

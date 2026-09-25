@@ -64,3 +64,73 @@ only until those paths are implemented. PE01 and PE14 have schema/replay
 evidence here; filesystem discovery, semantic judgment, live candidate
 binding, browser behavior and final merge readiness remain unverified until
 their assigned iterations. No CheckFinding was opened in this iteration.
+
+## Iteration 2 — capture plan and principles evidence
+
+**Starting revision:** `47f3dd66` (iteration 1 handoff). The independent
+non-functional pure-provider commit `dd0bc2df` landed while this iteration
+was in progress; it does not implement iteration 2 behavior. The execution
+worktree was clean at the handoff, and `/ramify` was not changed.
+
+The `plan-evidence` child now discovers the root plan, local text in its plan
+directory, linked local text and project-owned `*.principles.md` files. It
+resolves relative paths, including in-project `..` and symlinks, once by
+canonical path; rejects project escapes and invalid UTF-8; records missing
+links with byte offsets; and reports unreadable principles as partial scan
+coverage. Independent nested project roots are excluded from that scan.
+Markdown inline, reference-style and HTML links are supported. Discovery
+does not decide whether linked text is binding.
+
+Each new run stores exact bytes in `input/plan.md` and immutable companion
+files, with `input/documents.json` binding their paths, sizes and SHA-256
+hashes. The input manifest points to that file. Atomic exclusive writes are
+verified before `job.json` and `job-started` publish the run. Recovery refuses
+an incomplete prefix and reconstructs a missing manifest event only after
+all recorded bytes verify. Plan documents have `revision.dirty: null` because
+the implementation-source Git status excludes `plans/`; their byte hashes
+are authoritative. The appendix now states this publication order.
+
+The shared passage resolver retains exact whitespace and reports unknown
+documents, invalid ranges and changed bytes explicitly. Analysis reference
+validation uses the captured document set, and scope review reads its cited
+passages through the same resolver; old root-only references still read as
+`doc-001`. The run revalidates the captured corpus before analysis acceptance,
+approval, scope review and both sides of the final gate. A companion changed
+during the gate cannot lead to `job-completed`.
+
+The scenarios child can extract an explicit ordered document selection with
+one run-wide `ps-NN` sequence. Extracted scenarios and accepted origins carry
+document identity; citation matching requires that identity, so equal headings
+and line ranges in different files do not satisfy each other. Legacy records
+without a document still mean the root. Scenario content hashes retain their
+source-text meaning. Iteration 3 will accept the architect's incorporation
+judgment before supplying the selected documents to this extraction path.
+
+**Verification:** 16 focused Vitest files passed, 196 tests. The cases cover
+cycles and duplicate references, reference-style and parenthesized links,
+missing files, invalid text, in-project and escaping symlinks, nested project
+principles, exact passages, equal scenario ranges in two documents, approval
+refusal after a companion edit, mutation during the final gate, and both
+startup recovery prefixes. `npm run type-check`, `npm run build:web`, and
+`npm run check:self` passed. The self-check covered 12 owners and 486 source
+files with 0 errors, 0 warnings, 0 denied accesses and 297 analysis limits.
+The focused command, run from `ramify-agent/`, was:
+
+```sh
+npx vitest run subs/harness/subs/plan-evidence/src/tests subs/harness/subs/scenarios/src/tests subs/harness/src/tests/analysis-scenarios.test.ts subs/harness/src/tests/analysis-submission.test.ts subs/harness/src/tests/review-stop.test.ts subs/harness/src/tests/plan-deviations.test.ts subs/harness/src/tests/plan-evidence-compatibility.test.ts
+```
+
+The baseline full suite was already run by audit; no new full-suite audit is
+claimed for this intermediate commit.
+
+**Handoff to iteration 3:** Use the fixed manifest and byte reader in
+`run/document-inputs.ts`, `resolvePlanReference` for citations, and
+`extractDocumentScenarios` only after accepted incorporation selects the
+binding scenario documents. Missing links remain `unjudged` until the
+architect's required/unclear/advisory judgment is accepted. The initial
+architect still receives the root plan briefing; focused access to all
+captured sources and the catalog judgment are iteration 3 work. Later
+assignment authority must add every captured plan path to protected files;
+the current `deniedFiles` service path protects scenario files but does not
+yet include this manifest's plan set. No semantic classification or binding
+force was inferred by capture. No CheckFinding was opened.

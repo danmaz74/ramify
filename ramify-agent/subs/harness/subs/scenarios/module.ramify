@@ -7,7 +7,7 @@ module scenarios
 // run's message stream. The Gherkin parser and the message types stay
 // behind this boundary. Every named type a signature mentions is exposed
 // beside the symbol, so the parent can name what it receives.
-expose-src extractPlanScenarios, PlanScenario, planScenarioSchema from "extraction.ts" to parent
+expose-src extractPlanScenarios, extractDocumentScenarios, PlanScenario, planScenarioSchema from "extraction.ts" to parent
 expose-src PlanScenarioLimitation, planScenarioLimitationSchema from "extraction.ts" to parent
 expose-src PlanScenarioExtraction, planScenarioExtractionSchema from "extraction.ts" to parent
 

@@ -6,6 +6,8 @@ import { moduleProposalSchema, planRefSchema } from '../run/records.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 import { hypothesisChangeSchema, slugSchema } from './records.js';
 import type { PlanScenario } from '../../subs/scenarios/src/extraction.js';
+import { resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
+import type { DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import {
   integrationScenarioSubmissionSchema, scenarioSubmissionSchema, validateScenarioForm,
   type ScenarioFormResult, type ScenarioViewNames,
@@ -117,6 +119,8 @@ export interface AnalysisEvidence {
   readonly index: ArchitectIndex | null;
   /** The captured plan, or null where it could not be read. */
   readonly plan?: CapturedPlanShape | null | undefined;
+  /** New runs resolve every reference against its exact captured document. */
+  readonly documents?: { readonly manifest: DocumentManifest; readonly bytes: ReadonlyMap<string, Uint8Array> } | undefined;
   /** The plan scenarios captured with the plan; none when it has no `gherkin` block. */
   readonly planScenarios?: readonly PlanScenario[] | undefined;
 }
@@ -329,6 +333,11 @@ function planRefErrors(
     const path = `${at}.${index}`;
     if (ref.anchor === undefined && ref.lines === undefined) {
       errors.push({ path, message: 'A plan reference names a heading anchor or a line range', expected: 'anchor or lines' });
+      return;
+    }
+    if (evidence.documents) {
+      const resolved = resolvePlanReference(evidence.documents.manifest, evidence.documents.bytes, ref);
+      if (resolved.status === 'unavailable') errors.push({ path, message: resolved.reason, expected: 'a passage in the named captured document' });
       return;
     }
     const plan = evidence.plan;

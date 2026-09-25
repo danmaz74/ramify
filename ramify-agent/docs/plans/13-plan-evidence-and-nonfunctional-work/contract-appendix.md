@@ -34,7 +34,10 @@ path and SHA-256 of `input/documents.json`. That file is a
 `plans/<plan-id>/plan.md`, then each canonical captured local text path once in
 deterministic discovery order. `documents[]` records `id`, project-relative
 `path`, `kind`, SHA-256, byte count, run-relative `storedAt`, and captured
-source revision (`commit` and `dirty`). For the root, `storedAt` may refer to
+source revision (`commit` and `dirty`). Plan files are excluded from the
+implementation-source Git status, so their revision has `commit: null` and
+`dirty: null` (unknown): their exact SHA-256, not HEAD, is their identity.
+Principle files retain the implementation-source status. For the root, `storedAt` may refer to
 `input/plan.md`; companion and principle bytes use immutable
 `input/documents/doc-NNN.bin`. A document link records discovery only; the
 architect's incorporation judgment controls binding scenarios. The same
@@ -55,15 +58,18 @@ only `required` prevents analysis acceptance. The captured plan and principles
 sets have no arbitrary corpus-size cutoff.
 
 The ledger has an 8 MiB line bound, so document bytes and assembled packages
-are never event bodies. The harness stages each immutable byte file through an
-existing keyed effect, streams it to a temporary file, verifies byte count and
-SHA-256, then atomically installs it. The completed manifest may be large; it
-remains a separate immutable file whose ledger event carries only its path,
-hash and count. Catalogs and context packages use the same external
-immutable-file pattern, so none relies on fitting in one transaction. After a crash, recovery
-checks every committed/staged file's hash, finishes an idempotent install by
-key, or refuses a partial or changed set; it never reinterprets missing bytes.
-The manifest event follows durable file installation.
+are never event bodies. During start, the harness writes each immutable byte
+file through the existing flushed temporary-file and exclusive-link helper,
+verifies byte count and SHA-256, then writes the manifest and `job.json`.
+Before `job.json` and `job-started`, an interrupted start has only orphaned
+prepublication files, not an accepted run. An existing target must match the
+expected bytes; a changed or partial set is refused. The completed manifest
+may be large; it remains a separate immutable file whose ledger event carries
+only its path, hash and count. On recovery, the harness verifies every file
+and reconstructs a missing manifest event only when `job-started` and all
+matching files exist. Catalogs and context packages later use the same
+verified immutable-file pattern before their authoritative ledger reference.
+No document bytes depend on fitting in one transaction.
 
 An old `job.json` without `documentManifest` is a single-file run:
 `input/plan.md` is its implicit `doc-001` and its existing `planHash` is the

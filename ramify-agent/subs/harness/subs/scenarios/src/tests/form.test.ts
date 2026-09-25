@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { extractPlanScenarios } from '../extraction.js';
+import { extractDocumentScenarios, extractPlanScenarios } from '../extraction.js';
 import { validateScenarioForm, type ScenarioFormEntry, type ScenarioFormResult, type ScenarioFormRule, type ScenarioFormSubmission } from '../form.js';
 
 /*
@@ -72,6 +72,29 @@ function rejected(result: ScenarioFormResult, rule: ScenarioFormRule, path: stri
 }
 
 describe('an accepted form', () => {
+  test('identical headings and lines in two documents keep distinct origins and citations', () => {
+    const text = '# Same\n```gherkin\nScenario: Same\n  Given one\n  Then done\n```\n';
+    const extracted = extractDocumentScenarios([{ id: 'doc-001', text }, { id: 'doc-002', text }]);
+    expect(extracted.scenarios.map(item => [item.id, item.document, item.lines])).toEqual([
+      ['ps-01', 'doc-001', [3, 5]], ['ps-02', 'doc-002', [3, 5]],
+    ]);
+    const submission: ScenarioFormSubmission = {
+      scenarios: [
+        { key: 'one', entry: 'first', origin: { kind: 'plan', planScenario: 'ps-01' }, gherkin: extracted.scenarios[0]!.source.join('\n') },
+        { key: 'two', entry: 'second', origin: { kind: 'plan', planScenario: 'ps-02' }, gherkin: extracted.scenarios[1]!.source.join('\n') },
+      ], integrationScenarios: [],
+    };
+    const correct = [
+      { capability: 'first', acceptanceRefs: [{ document: 'doc-001', lines: [3, 5] as [number, number] }] },
+      { capability: 'second', acceptanceRefs: [{ document: 'doc-002', lines: [3, 5] as [number, number] }] },
+    ];
+    const accepted = validateScenarioForm(submission, extracted.scenarios, correct);
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) expect(accepted.form.scenarios[1]!.origin).toMatchObject({ document: 'doc-002' });
+    expect(rejected(validateScenarioForm(submission, extracted.scenarios, [
+      correct[0]!, { capability: 'second', acceptanceRefs: [{ document: 'doc-001', lines: [3, 5] }] },
+    ]), 6, 'entries.1.acceptanceRefs.0')).toContain('cited by none');
+  });
   test('carries the plan\'s text for a plan scenario, the submitted text for an architect scenario, and sub-scenarios by integration', () => {
     const result = validateScenarioForm(valid(), planScenarios, entries);
     if (!result.ok) throw new Error(result.message);

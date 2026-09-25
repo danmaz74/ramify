@@ -19,7 +19,8 @@ export const capturedDocumentSchema = z.object({
   /** Run-relative immutable file, written through the harness's ledger effect. */
   storedAt: projectPath,
   /** The source revision when captured; a dirty source retains its content hash. */
-  revision: z.object({ commit: text.nullable(), dirty: z.boolean() }).strict(),
+  /** `dirty: null` means Git status was not measured for this document. */
+  revision: z.object({ commit: text.nullable(), dirty: z.boolean().nullable() }).strict(),
 }).strict();
 export type CapturedDocument = z.infer<typeof capturedDocumentSchema>;
 
@@ -39,7 +40,8 @@ export const documentManifestSchema = z.object({
   missing: z.array(missingDocumentSchema),
   principlesScan: z.object({
     status: z.enum(['complete', 'partial', 'empty']),
-    unreadable: z.array(z.object({ path: projectPath, reason: text }).strict()),
+    /** `.` identifies the project root if even its directory listing fails. */
+    unreadable: z.array(z.object({ path: z.union([projectPath, z.literal('.')]), reason: text }).strict()),
   }).strict(),
 }).strict().superRefine((value, ctx) => {
   const ids = new Set<string>();
