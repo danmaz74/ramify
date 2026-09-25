@@ -12,7 +12,7 @@ import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
 import { workLayout, type WorkItem } from '../work/records.js';
-import { iterationLayout, type IterationAssignment } from '../work/iterations.js';
+import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
 import type { GateAttempt } from '../checks/records.js';
 
@@ -426,11 +426,14 @@ describe('a contract sub-session that fails registers nothing, and its caller go
     expect(types).toContain('contract-requested');
     expect(types).not.toContain('contract-registered');
 
-    const result = await readJson<{ outcome: string; findings: string[]; invocations: string[] }>(root, runId, iterationLayout.result('wi-001', 2));
+    const result = await readJson<IterationResult>(root, runId, iterationLayout.result('wi-001', 2));
     expect(result.outcome).toBe('partial');
     expect(result.findings).toContain(
       `the contract engineer of wi-001.i02 ended without a result (failed: the provider refused the request; invocation ${result.invocations[0]}); nothing was registered`,
     );
+    // Its local architect is briefed with the digest and the analysis, as for an engineer.
+    expect(result.failure?.digest).toMatchObject({ invocation: result.invocations[0], role: 'contract-engineer', ended: 'failed' });
+    expect(result.failure?.analysis.outcome).toBe('analyzed');
     expect(git.minted()).toEqual(['scenarios-of-review-notes', 'revision-01']);
     git.assertAnswered();
   }, 60_000);

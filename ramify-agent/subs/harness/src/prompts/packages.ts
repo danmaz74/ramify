@@ -10,7 +10,9 @@ import { forkJsonSchema, forkSubmissionKinds, forkToolName } from '../architectu
 import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '../contracts/submission.js';
 import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
 import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
+import { failureAnalysisJsonSchema, failureAnalysisToolName } from '../work/failure.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
+import { shellMaxTimeoutMs } from '../tools/shell.js';
 
 /*
  * One prompt package per role, versioned and hashed into the run's
@@ -43,6 +45,8 @@ const codeReviewProcedureFile = fileURLToPath(new URL('./code-review.procedure.m
 const scopeReviewProcedureFile = fileURLToPath(new URL('./scope-review.procedure.md', import.meta.url));
 const designReviewProcedureFile = fileURLToPath(new URL('./design-review.procedure.md', import.meta.url));
 const orientationSystemFile = fileURLToPath(new URL('./reviewer-orientation.system.md', import.meta.url));
+const failureAnalystSystemFile = fileURLToPath(new URL('./failure-analyst.system.md', import.meta.url));
+const failureAnalysisProcedureFile = fileURLToPath(new URL('./failure-analysis.procedure.md', import.meta.url));
 
 /** The contract skill the harness supplies with a contract iteration. */
 const contractSkillFile = fileURLToPath(new URL('./contract.skill.md', import.meta.url));
@@ -58,6 +62,7 @@ const submissionSchemaNames = {
   engineer: 'engineer.schema.json',
   'contract-engineer': 'contract-engineer.schema.json',
   reviewer: 'review.schema.json',
+  'failure-analyst': 'failure-analysis.schema.json',
 } as const;
 
 export function sha256(content: string | Uint8Array): string {
@@ -110,10 +115,11 @@ export interface PromptPackageOptions {
 /** The versions of the packages this iteration ships. */
 export const initialArchitectPackage = 'initial-architect/2';
 export const globalForkPackage = 'global-fork/2';
-export const localArchitectPackage = 'local-architect/4';
-export const engineerPackage = 'engineer/2';
-export const contractEngineerPackage = 'contract-engineer/1';
+export const localArchitectPackage = 'local-architect/5';
+export const engineerPackage = 'engineer/3';
+export const contractEngineerPackage = 'contract-engineer/2';
 export const reviewerPackage = 'reviewer/3';
+export const failureAnalystPackage = 'failure-analyst/1';
 
 /**
  * Loads every package a run offers. A role with no package yet has no entry:
@@ -130,6 +136,7 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['engineer', await loadEngineer(options)],
     ['contract-engineer', await loadContractEngineer(options)],
     ['reviewer', await loadReviewer(options)],
+    ['failure-analyst', await loadFailureAnalyst(options)],
   ]);
   const manifest = promptPackageManifestSchema.parse({
     schema: 'ramify-agent.prompt-manifest/1',
@@ -272,6 +279,23 @@ async function loadReviewer(options: PromptPackageOptions): Promise<LoadedPackag
   };
 }
 
+/**
+ * The failure analyst's package: it reads what an engineer that ended
+ * without a result left, and submits a short account before the local
+ * architect is briefed. It offers one submission.
+ */
+function loadFailureAnalyst(options: PromptPackageOptions): Promise<LoadedPackage> {
+  return loadPackage({
+    role: 'failure-analyst',
+    name: failureAnalystPackage,
+    systemFile: failureAnalystSystemFile,
+    procedureFile: failureAnalysisProcedureFile,
+    schema: failureAnalysisJsonSchema,
+    submissionKinds: ['failure-analysis'],
+    options,
+  });
+}
+
 async function loadPackage(request: {
   readonly role: Role;
   readonly name: string;
@@ -360,18 +384,28 @@ export function renderReconciliationPrompt(loaded: LoadedPackage, projectRoot: s
   return render({ ...loaded, procedure: reconciliation.procedure, submissionSchema: reconciliation.submissionSchema }, projectRoot, reconciliationToolName);
 }
 
-/** The rendered system prompt of an engineer. It is never stored either. */
-export function renderEngineerPrompt(loaded: LoadedPackage, projectRoot: string): string {
-  return render(loaded, projectRoot, engineerToolName);
+/**
+ * The rendered system prompt of an engineer, which states the longest one
+ * of its shell commands may run: the policy's, or what its assignment raised
+ * it to. It is never stored either.
+ */
+export function renderEngineerPrompt(loaded: LoadedPackage, projectRoot: string, commandTimeoutMs: number = shellMaxTimeoutMs): string {
+  return render(loaded, projectRoot, engineerToolName, { commandTimeoutMs: String(commandTimeoutMs) });
 }
 
-/** The rendered system prompt of one contract sub-session. It is never stored either. */
-export function renderContractPrompt(loaded: LoadedPackage, projectRoot: string): string {
-  return render(loaded, projectRoot, contractToolName);
+/** The rendered system prompt of one contract sub-session, with its command maximum. It is never stored either. */
+export function renderContractPrompt(loaded: LoadedPackage, projectRoot: string, commandTimeoutMs: number = shellMaxTimeoutMs): string {
+  return render(loaded, projectRoot, contractToolName, { commandTimeoutMs: String(commandTimeoutMs) });
 }
 
-function render(loaded: LoadedPackage, projectRoot: string, submissionTool: string): string {
+/** The rendered system prompt of a failure analyst, over the evidence in its working directory. It is never stored either. */
+export function renderFailureAnalystPrompt(loaded: LoadedPackage, workingDirectory: string): string {
+  return render(loaded, workingDirectory, failureAnalysisToolName, { workingDirectory });
+}
+
+function render(loaded: LoadedPackage, projectRoot: string, submissionTool: string, extra: Readonly<Record<string, string>> = {}): string {
   return fill(loaded.system, {
+    ...extra,
     projectRoot,
     skillDirectory: loaded.skillDirectory,
     skill: loaded.skill,

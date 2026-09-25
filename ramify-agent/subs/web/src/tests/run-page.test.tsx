@@ -477,7 +477,7 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
           id: 'wi-001.i02', kind: 'implementation', stage: 0, goal: 'Send the note', approach: 'non-breaking',
           scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
           checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [],
-          result: { outcome: 'exhausted', gate: 'ga-0005', commit: null, findings: [], changedAssumptions: [], recommendation: null },
+          result: { outcome: 'exhausted', gate: 'ga-0005', commit: null, findings: [], changedAssumptions: [], recommendation: null, failure: null },
           gates: [{ id: 'ga-0005', checkpoint: 'iteration', verdict: 'failed', cause: 'in-scope', next: 'exhausted', repairRound: 3 }],
           invocations: [],
         }],
@@ -505,6 +505,47 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
   const history = await screen.findByLabelText('Work item wi-001');
   expect(await within(history).findByText(/Result: exhausted/)).toBeTruthy();
   expect(history.textContent).toContain('ga-0005 failed');
+});
+
+test('an iteration whose engineer ended without a result shows the digest and the analysis its architect read', async () => {
+  const run: StubRun = {
+    ...stubRun(),
+    workItems: workItemListResponseSchema.parse({ workItems: [workItemSummary], total: 1 }),
+    workItem: {
+      'wi-001': workItemResponseSchema.parse({
+        workItem: workItemSummary,
+        outlines: [],
+        iterations: [{
+          id: 'wi-001.i01', kind: 'ordinary', stage: 0, goal: 'Send the note', approach: 'Change the source.',
+          scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
+          checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [],
+          result: {
+            outcome: 'partial', gate: null, commit: null, changedAssumptions: [], recommendation: null,
+            findings: ['the engineer of wi-001.i01 ended without a result (idle-timeout: No port event for 300000 ms; invocation inv-0003)'],
+            failure: {
+              digest: ['- Why it ended: The idle bound fired: no port event for 300000 ms.', '- What it said last: “Running the suite.”'],
+              analysis: {
+                outcome: 'analyzed', invocation: 'inv-0004', attempting: 'Adding the note limit.', finished: 'The limit and its test.',
+                whenEnded: 'Waiting on the whole suite.', cause: 'bound-too-tight', recommendation: 'Raise the command maximum.', evidence: ['transcript entry 41'],
+              },
+            },
+          },
+          gates: [],
+          invocations: [{ id: 'inv-0003', role: 'engineer', ended: 'failed', outsideScope: [] }, { id: 'inv-0004', role: 'failure-analyst', ended: 'submitted', outsideScope: [] }],
+        }],
+        gates: [], requirements: [], requests: [],
+      }),
+    },
+  };
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Work items' }));
+  fireEvent.click(await screen.findByRole('button', { name: /wi-001/ }));
+  const history = await screen.findByLabelText('Work item wi-001');
+  expect(await within(history).findByText(/Ended without a result · cause: bound-too-tight/)).toBeTruthy();
+  expect(within(history).getByLabelText('Failure digest').textContent).toContain('The idle bound fired');
+  const analysis = within(history).getByLabelText('Failure analysis');
+  expect(analysis.textContent).toContain('Waiting on the whole suite.');
+  expect(analysis.textContent).toContain('Raise the command maximum.');
 });
 
 test('one iteration shows its failed and passed audits, attempt-local commit, evidence refs and unpublished states', async () => {

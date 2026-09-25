@@ -386,6 +386,17 @@ environment. A violation reaches the agent as an ordinary error.
 A runtime failure, such as a crashed session or malformed output, is never a
 semantic outcome.
 
+### An Engineer's Failure Is Its Architect's Decision
+
+An engineer that ends without a result ends its iteration, not the run. Its
+local architect decides what comes next; only what the harness itself cannot
+continue from ends the run.
+
+The harness reports the failure pre-analyzed: a digest of what it already
+holds, then a model's analysis, so the decision needs no transcript. A bound
+that proves too tight is the architect's to raise, within the policy's
+ceilings.
+
 ### Agent Invocations Should Be Considered Idempotent
 
 When an agent gets interrupted for any reason, we should always be able to

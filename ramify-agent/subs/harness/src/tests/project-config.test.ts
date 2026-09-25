@@ -2,13 +2,14 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { captureProjectConfig, moduleTestAreas, parseProjectConfig } from '../run/project-config.js';
+import { withProjectTimeouts } from '../run/policy.js';
 import { readinessFailureReason } from '../run/readiness.js';
 import { runLayout, type ReadinessAttempt, type RunRecord } from '../run/records.js';
 import type { ArchitectIndex, ModuleEntry } from '../../subs/evidence/src/views.js';
 import { copyFixture, fixtureRoot, temporaryDirectory } from './helpers/fixture.js';
 import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from './helpers/external-tools.js';
 import { minimalProjectConfig, writeProjectConfig } from './helpers/project-config.js';
-import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
+import { emptyAnalysis, installTestRunner, onlyRun, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
 
 /*
@@ -101,11 +102,44 @@ describe('the ramify-agent.project/1 schema', () => {
     ['readiness on quick mode', changed(['acceptance', 'modes', 'quick', 'readiness'], 'run'), /acceptance\.modes\.quick: .*readiness/],
     ['a third mode', changed(['acceptance', 'modes', 'browser'], { command: ['x'] }), /acceptance\.modes: .*browser/],
     ['a field v1 does not define', changed(['tests'], { command: ['npm', 'test'] }), /<root>: .*tests/],
+    ['a timeout of zero', changed(['timeouts'], { tests: 0 }), /timeouts\.tests: /],
+    ['a timeout that is not a whole number of milliseconds', changed(['timeouts'], { typeCheck: 1.5 }), /timeouts\.typeCheck: /],
+    ['a timeout above the ceiling', changed(['timeouts'], { ramifyCheck: 7_200_001 }), /timeouts\.ramifyCheck: A command timeout is at most 7200000 ms \(two hours\)/],
+    ['a timeout for a command the gate does not run', changed(['timeouts'], { lint: 60_000 }), /timeouts: .*lint/],
   ])('rejects %s with the schema\'s message', (_name, text, message) => {
     const parsed = parseProjectConfig(text);
     expect(parsed).toHaveProperty('invalid');
     expect('invalid' in parsed ? parsed.invalid : '').toMatch(message);
     if (_name !== 'text that is not JSON') expect('invalid' in parsed ? parsed.invalid : '').toContain('does not validate against ramify-agent.project/1');
+  });
+
+  test('accepts gate command timeouts, each up to the ceiling', () => {
+    const timeouts = { typeCheck: 600_000, tests: 7_200_000, scopedTests: 900_000, ramifyCheck: 1_200_000 };
+    const parsed = parseProjectConfig(changed(['timeouts'], timeouts));
+    expect('config' in parsed && parsed.config.timeouts).toEqual(timeouts);
+    expect(parseProjectConfig(changed(['timeouts'], {}))).toHaveProperty('config');
+  });
+
+  test('its timeouts replace the policy\'s own gate command timeouts, and nothing else of the policy', () => {
+    const policy = testPolicy('/project', { nested: [{ directory: 'tools/catalog', testScript: 'vitest run' }] });
+    const captured = { path: 'ramify-agent.json', hash: 'a'.repeat(64), config: { ...minimalProjectConfig, timeouts: { typeCheck: 400_000, tests: 1_800_000, scopedTests: 700_000, ramifyCheck: 900_000 } } };
+    const timed = withProjectTimeouts(policy, captured);
+    expect(timed.commands.typeCheck.timeoutMs).toBe(400_000);
+    expect(timed.commands.allTests.timeoutMs).toBe(1_800_000);
+    expect(timed.commands.nestedPackages[0]!.tests!.timeoutMs).toBe(1_800_000);
+    expect(timed.commands.scopedTests.timeoutMs).toBe(700_000);
+    expect(timed.commands.ramifyCheck.timeoutMs).toBe(900_000);
+    // What the configuration does not name is the policy's.
+    expect(timed.commands.ramifyChanged).toEqual(policy.commands.ramifyChanged);
+    expect(timed.commands.nestedPackages[0]!.install).toEqual(policy.commands.nestedPackages[0]!.install);
+    expect({ ...timed, commands: undefined }).toEqual({ ...policy, commands: undefined });
+    expect(timed.commands.typeCheck.argv).toEqual(policy.commands.typeCheck.argv);
+
+    // One timeout replaces one command's; a missing or invalid file changes nothing.
+    const one = withProjectTimeouts(policy, { ...captured, config: { ...minimalProjectConfig, timeouts: { tests: 1_000_000 } } });
+    expect(one.commands.allTests.timeoutMs).toBe(1_000_000);
+    expect(one.commands.typeCheck).toEqual(policy.commands.typeCheck);
+    expect(withProjectTimeouts(policy, { path: 'ramify-agent.json', hash: null, invalid: 'missing' })).toBe(policy);
   });
 
   test('a missing, invalid or valid file is captured with its reason or its hash, never thrown', async () => {
@@ -212,6 +246,20 @@ describe('the project-config and acceptance-runner readiness steps', () => {
         },
       },
     });
+  }, 180_000);
+
+  test('gate command timeouts the configuration declares are the ones job.json captures in the policy', async () => {
+    const root = await fixture(async path => {
+      const config = JSON.parse(await readFile(join(path, 'ramify-agent.json'), 'utf8')) as Record<string, unknown>;
+      await writeProjectConfig(path, { ...config, timeouts: { tests: 1_800_000, typeCheck: 450_000 } });
+    });
+    const { snapshot, record } = await run(root, true);
+
+    expect(snapshot.state).toBe('completed');
+    expect('config' in record.projectConfig && record.projectConfig.config.timeouts).toEqual({ tests: 1_800_000, typeCheck: 450_000 });
+    expect(record.policy.commands.allTests.timeoutMs).toBe(1_800_000);
+    expect(record.policy.commands.typeCheck.timeoutMs).toBe(450_000);
+    expect(record.policy.commands.scopedTests.timeoutMs).toBe(testPolicy(root).commands.scopedTests.timeoutMs);
   }, 180_000);
 
   test('a configuration asking readiness to run full mode is captured with it', async () => {

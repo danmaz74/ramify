@@ -5,12 +5,13 @@ import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { planRefSchema } from '../run/records.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
-import { extraPurposeSchema } from './iterations.js';
+import { assignedBoundsSchema, extraPurposeSchema, type AssignedBounds } from './iterations.js';
 import { plansDirectory } from '../plans/discover.js';
 import { inOwnContents, ownContentsWithin, within } from './scope.js';
 import { assignedScenarioErrors, type DeclarationContext } from './declarations.js';
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
+import type { EngineerBounds } from '../run/policy.js';
 
 /*
  * The assignment a local architect submits, and the rules the schema cannot
@@ -131,6 +132,14 @@ export const assignmentBodySchema = z.object({
    * and the harness never requires that the engineer declare exactly these.
    */
   scenarios: z.array(text).optional(),
+  /**
+   * Bounds this iteration's engineers need beyond the policy's, each with
+   * its reason: the longest one shell command may run, the idle bound and
+   * the absolute bound of each invocation. Each is raised, never lowered,
+   * and at most the policy's ceiling; they apply to every engineer
+   * invocation of the iteration.
+   */
+  bounds: assignedBoundsSchema.optional(),
 }).strict();
 export type AssignmentBody = z.infer<typeof assignmentBodySchema>;
 
@@ -157,6 +166,8 @@ export interface AssignmentEvidence {
   readonly integration?: IntegrationScope | undefined;
   /** The work item's scenarios and the run's tracked ones, which `scenarios` is judged against. */
   readonly scenarios?: DeclarationContext | undefined;
+  /** The policy's engineer bounds and their ceilings, which `bounds` is judged against. */
+  readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
 }
 
 /** The registry entry that authorizes creating `module`, or undefined when none does. */
@@ -452,6 +463,8 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     errors.push(...assignedScenarioErrors(body.scenarios, evidence.scenarios ?? { entry: null, records: [] }));
   }
 
+  if (body.bounds !== undefined && evidence.bounds !== undefined) errors.push(...boundsErrors(body.bounds, evidence.bounds));
+
   const stages = evidence.outline?.stages.length ?? 0;
   if (stages === 0 ? body.stage !== 0 : body.stage >= stages) {
     errors.push({
@@ -463,6 +476,53 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
     });
   }
 
+  return errors;
+}
+
+/** What each bound is called where the architect reads it. */
+const boundNames: Readonly<Record<keyof EngineerBounds, string>> = {
+  commandTimeoutMs: 'a shell command\'s timeout',
+  idleMs: 'the idle bound',
+  absoluteMs: 'the absolute bound of an invocation',
+};
+
+/**
+ * The rules of raised bounds: each is raised and never lowered, none
+ * exceeds the policy's ceiling, and a command never outlasts the
+ * invocation that runs it.
+ */
+export function boundsErrors(
+  bounds: AssignedBounds,
+  policy: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds },
+): SubmissionError[] {
+  const errors: SubmissionError[] = [];
+  for (const name of ['commandTimeoutMs', 'idleMs', 'absoluteMs'] as const) {
+    const raised = bounds[name];
+    if (raised === undefined) continue;
+    const path = `assignment.bounds.${name}.ms`;
+    if (raised.ms > policy.ceilings[name]) {
+      errors.push({
+        path,
+        message: `${raised.ms} ms is above the policy's ceiling for ${boundNames[name]}, which is ${policy.ceilings[name]} ms`,
+        expected: `at most ${policy.ceilings[name]}`,
+      });
+    } else if (raised.ms < policy.defaults[name]) {
+      errors.push({
+        path,
+        message: `${raised.ms} ms is below the policy's ${policy.defaults[name]} ms for ${boundNames[name]}; a bound is raised here, never lowered`,
+        expected: `between ${policy.defaults[name]} and ${policy.ceilings[name]}`,
+      });
+    }
+  }
+  const command = bounds.commandTimeoutMs?.ms;
+  const absolute = bounds.absoluteMs?.ms ?? policy.defaults.absoluteMs;
+  if (command !== undefined && command > absolute) {
+    errors.push({
+      path: 'assignment.bounds.commandTimeoutMs.ms',
+      message: `A command's timeout of ${command} ms is longer than the ${absolute} ms its invocation may run${bounds.absoluteMs === undefined ? ', the policy\'s absolute bound' : ''}; raise \`absoluteMs\` with it, up to ${policy.ceilings.absoluteMs} ms`,
+      expected: `at most ${absolute}`,
+    });
+  }
   return errors;
 }
 

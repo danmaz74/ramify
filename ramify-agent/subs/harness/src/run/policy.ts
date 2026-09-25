@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkCommand, type CheckCommand } from '../checks/records.js';
 import type { Role } from '../interfaces/protocol/runs.js';
-import { reviewPolicyVersion, roles, runPolicySchema, type ReviewPolicy, type RunPolicy } from './records.js';
+import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig, type ReviewPolicy, type RunPolicy } from './records.js';
 
 /*
  * The policy one run runs under. It is hardcoded, captured in `job.json`
@@ -43,7 +43,38 @@ export const defaultLimits: RunPolicy['limits'] = {
   reconciliationRoundsPerWorkItem: 3,
   laterRoundMinimumRisk: 'medium',
   maxPlanDeviations: 5,
+  commandTimeoutMs: 600_000,
+  maxCommandTimeoutMs: 1_800_000,
+  maxInvocationIdleMs: 1_800_000,
+  maxInvocationAbsoluteMs: 10_800_000,
 };
+
+/**
+ * An engineer's bounds as its iteration applies them: the longest one shell
+ * command may run, the idle bound and the absolute bound of each of its
+ * invocations.
+ */
+export interface EngineerBounds {
+  readonly commandTimeoutMs: number;
+  readonly idleMs: number;
+  readonly absoluteMs: number;
+}
+
+/** The bounds an engineer runs under when its assignment raises none, and the ceilings an assignment may raise them to. */
+export function engineerBoundsOf(limits: RunPolicy['limits']): { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } {
+  return {
+    defaults: {
+      commandTimeoutMs: limits.commandTimeoutMs ?? defaultLimits.commandTimeoutMs!,
+      idleMs: limits.invocationIdleMs,
+      absoluteMs: limits.invocationAbsoluteMs,
+    },
+    ceilings: {
+      commandTimeoutMs: limits.maxCommandTimeoutMs ?? defaultLimits.maxCommandTimeoutMs!,
+      idleMs: limits.maxInvocationIdleMs ?? defaultLimits.maxInvocationIdleMs!,
+      absoluteMs: limits.maxInvocationAbsoluteMs ?? defaultLimits.maxInvocationAbsoluteMs!,
+    },
+  };
+}
 
 /**
  * The first trial's review policy (Plan 12): the code, scope and design
@@ -78,6 +109,9 @@ export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context
   // A reviewer reads a bounded diff and submits; running out of room is an
   // execution failure of its attempt, never a compacted half-review.
   reviewer: { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
+  // A failure analyst reads one failed session's evidence and submits a
+  // short account; it is never compacted either.
+  'failure-analyst': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
 };
 
 /**
@@ -266,6 +300,35 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
         directory: nested.directory,
         install: npmCommand(join(projectRoot, nested.directory), ['ci'], commandTimeouts.nestedInstall),
         tests: nested.testScript === null ? null : npmCommand(join(projectRoot, nested.directory), ['test'], commandTimeouts.allTests),
+      })),
+    },
+  });
+}
+
+/**
+ * The policy with the gate command timeouts a project's configuration
+ * declares in place of the harness's own: `typeCheck`, `tests` (the
+ * project's tests and each nested package's), `scopedTests` and
+ * `ramifyCheck`. A missing or invalid configuration changes nothing; its
+ * reason is readiness's to report.
+ */
+export function withProjectTimeouts(policy: RunPolicy, captured: CapturedProjectConfig): RunPolicy {
+  const timeouts = 'config' in captured ? captured.config.timeouts : undefined;
+  if (timeouts === undefined) return policy;
+  const timed = <T extends { readonly timeoutMs: number }>(command: T, timeoutMs: number | undefined): T =>
+    (timeoutMs === undefined ? command : { ...command, timeoutMs });
+  const { commands } = policy;
+  return runPolicySchema.parse({
+    ...policy,
+    commands: {
+      ...commands,
+      typeCheck: timed(commands.typeCheck, timeouts.typeCheck),
+      allTests: timed(commands.allTests, timeouts.tests),
+      scopedTests: timed(commands.scopedTests, timeouts.scopedTests),
+      ramifyCheck: timed(commands.ramifyCheck, timeouts.ramifyCheck),
+      nestedPackages: commands.nestedPackages.map(nested => ({
+        ...nested,
+        tests: nested.tests === null ? null : timed(nested.tests, timeouts.tests),
       })),
     },
   });

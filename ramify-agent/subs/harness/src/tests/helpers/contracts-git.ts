@@ -164,6 +164,10 @@ export function answeredGit(root: string, answers: GitAnswers): AnsweredGit {
       if (answers.lines === undefined) throw new Error('Line measurements are unavailable in this scenario');
       return answers.lines;
     },
+    async worktreePatch(project, base = 'HEAD') {
+      check('worktreePatch', () => { expect(project).toBe(root); expect(known.has(base)).toBe(true); });
+      throw new Error('The working tree\'s patch is unavailable in this scenario');
+    },
   }) as AnsweredGit;
 
   return Object.assign(git, {
