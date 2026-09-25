@@ -122,7 +122,7 @@ describe('the rules the schema cannot hold', () => {
 
   test('a completion is refused while a Ramify module violation from this session stands, and nothing else is', () => {
     const standing: HookFinding = {
-      identity: 'code=not-visible', code: 'not-visible', message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
+      identity: 'source-diagnostic/1:runtime', category: 'import', code: 'not-visible', message: 'collection-review:interfaces/protocol.ts#ToolResult: not-visible',
       file: 'subs/workspace/subs/reviews/src/mcp.ts', line: 13, importer: 'collection-review/workspace/reviews',
       original: { owner: 'collection-review', file: 'interfaces/protocol.ts', binding: 'ToolResult' },
     };

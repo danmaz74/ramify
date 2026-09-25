@@ -292,6 +292,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
           hookTimeoutMs: inputs.commands.hookTimeoutMs,
           seen: seen!,
           ran: hookChecks,
+          outsideModules: inputs.tests.outsideModules,
           logFile: check => inputs.outputPath('hook', session.invocation, check),
         }).catch(error => ({
           checks: [{
@@ -356,6 +357,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       hookTimeoutMs: completionCheckDeadlineMs,
       seen: standing,
       ran: hookChecks,
+      relayNotices: false,
       logFile: check => inputs.outputPath('hook', session.invocation, check),
     }).catch(error => ({ checks: [], gaps: [], text: null, failure: message(error) }));
     if ('failure' in outcome) return notChecked(`the check could not be run: ${outcome.failure}`);
