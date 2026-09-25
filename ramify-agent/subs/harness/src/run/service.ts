@@ -3327,7 +3327,7 @@ export class RunService {
 
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
     const onboarding = await onboardingOf(this.projectRoot, directoryOf(run.index, item.module));
-    const views = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, item.module);
+    let views = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, item.module);
     const systemPrompt = renderLocalArchitectPrompt(loaded, this.projectRoot);
     const scope = baselineScope(item.module, baseline.supplementary.map(entry => entry.path));
     const integration = await this.integrationOfItem(run, item);
@@ -3372,6 +3372,9 @@ export class RunService {
       // The view is refreshed before the architect's turn, so the rules its
       // submission is judged by are applied against the project as it stands.
       const index = await this.refreshIndex(run);
+      // A view that could not be materialized is materialized again for each
+      // later turn, rather than repeating a failure the project may have outgrown.
+      if (attempt > 1 && views.unavailable !== null) views = await apiViewsOf(this.options.ramify, this.projectRoot, run.index, item.module);
       // This turn is a coordination point: the hypothesis revisions this
       // work item holds reach it here, before it assigns anything.
       const hypotheses = await this.deliverHypotheses(run, item, current.hypotheses);
