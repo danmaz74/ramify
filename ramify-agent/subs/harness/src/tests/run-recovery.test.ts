@@ -24,7 +24,8 @@ import {
 import { architectureLayout } from '../architecture/records.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { decision as decisionBody, forkDecision, requestPlacement } from './helpers/placement.js';
-import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
+import { createScriptedAgent, type Script } from '../../subs/agent/src/scripted.js';
+import { declaringScenarios } from './helpers/declarations.js';
 import type { OpenRunsOptions } from './helpers/runs.js';
 import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { runLayout, type InvocationOutcome } from '../run/records.js';
@@ -87,6 +88,9 @@ const materialize: CommitResponse = { commit: materialized, against: base, chang
  * every restart over that project are answered by the same one.
  */
 const gits = new Map<string, ScenarioGit>();
+
+/** These recovery cases use explicit empty source selection and the fixture's scenario declarations. */
+const recoveryAgent = (script: Script) => createScriptedAgent(declaringScenarios(script));
 
 function gitOf(root: string): ScenarioGit {
   const git = gits.get(root);
@@ -163,8 +167,15 @@ async function crashAfter(
   const receipt = await service.execute(startRun('review-notes'));
   runId = receipt.jobId;
   const path = runPath(root, 'review-notes', runId, runLayout.events);
-  await until(async () => (ready !== undefined || frozenAtBoundary)
-    && (ready === undefined ? reached(root, runId, path, write) : ready(await eventTypes(path))), 90_000);
+  await until(async () => {
+    const types = await eventTypes(path);
+    if (types.includes('job-failed')) {
+      const failed = (await runEventsOnDisk(root, 'review-notes', runId)).find(event => event.type === 'job-failed');
+      throw new Error(`The fixture failed before ${write}: ${JSON.stringify(failed?.data)}`);
+    }
+    return (ready !== undefined || frozenAtBoundary)
+      && (ready === undefined ? reached(root, runId, path, write) : ready(types));
+  }, 90_000);
   await staleCrashLock(root);
   return { runId };
 }
@@ -298,12 +309,12 @@ describe('the recovery table', () => {
     expect(agent).toBeUndefined();
     expect(recovery.invocations).toEqual([]);
     const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.map(event => event.type)).toEqual(['job-started', 'session-opened', 'session-finished', 'job-interrupted']);
-    expect(events[2]!.data).toEqual({ session: 'ses-0001', reason: 'interrupted' });
+    expect(events.map(event => event.type)).toEqual(['job-started', 'document-manifest-committed', 'session-opened', 'session-finished', 'job-interrupted']);
+    expect(events.find(event => event.type === 'session-finished')!.data).toEqual({ session: 'ses-0001', reason: 'interrupted' });
     expect(reduceSessions(events).get('ses-0001')).toMatchObject({ state: 'finished', finished: 'interrupted', invocations: [] });
   }, 180_000);
 
-  test('a crash after job.json, before the first event, leaves a run that loads and is interrupted', async () => {
+  test('a crash after publishing the run and captured inputs leaves a run that loads and is interrupted', async () => {
     const root = await target();
     const { runId } = await crashAfter(root, 'job-created');
 
@@ -311,7 +322,7 @@ describe('the recovery table', () => {
     expect(recovery.interrupted).toEqual([`review-notes/${runId}`]);
     expect(recovery.skipped).toEqual([]);
     const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.map(event => event.type)).toEqual(['job-started', 'job-interrupted']);
+    expect(events.map(event => event.type)).toEqual(['job-started', 'document-manifest-committed', 'job-interrupted']);
     expect(onlyRun(service, 'review-notes').state).toBe('interrupted');
   }, 180_000);
 
@@ -323,7 +334,7 @@ describe('the recovery table', () => {
     expect(agent).toBeUndefined();
     expect(recovery.invocations).toEqual([`review-notes/${runId}: inv-0001`]);
     const events = await runEventsOnDisk(root, 'review-notes', runId);
-    expect(events.map(event => event.type)).toEqual(['job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'job-interrupted']);
+    expect(events.map(event => event.type)).toEqual(['job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'job-interrupted']);
     expect(events.filter(event => event.type === 'invocation-started')).toHaveLength(1);
     // The interrupted invocation's session is finished with it.
     expect(events.find(event => event.type === 'invocation-ended')!.data).toMatchObject({ session: 'ses-0001', kept: false, finished: 'interrupted' });
@@ -413,7 +424,7 @@ describe('the recovery table', () => {
 
   test('a crash after placement-requested leaves the request, and no fork and no decision', async () => {
     const root = await target([materialize], [], materialized);
-    const agent = createScriptedAgent(byRole(placementPlan()));
+    const agent = recoveryAgent(byRole(placementPlan()));
     const { runId } = await crashAfter(root, 'placement-requested', false, undefined, undefined, agent);
     await rm(runPath(root, 'review-notes', runId, architectureLayout.request('pr-001')));
 
@@ -435,15 +446,14 @@ describe('the recovery table', () => {
     const root = await target([materialize], [], materialized);
     // The fork is still investigating when the harness stops: its session
     // never answers.
-    const agent = createScriptedAgent(byRole({
+    const agent = recoveryAgent(byRole({
       ...placementPlan(),
       'global-fork': [[{ kind: 'hang' }]],
     }));
     const { runId } = await crashAfter(
       root, 'view-refreshed', false, undefined, undefined, agent,
       () => false,
-      types => types.filter(type => type === 'invocation-started').length === 3
-        && agent.sessions.filter(session => session.spec.role === 'global-fork').length === 1,
+      () => agent.sessions.filter(session => session.spec.role === 'global-fork').length === 1,
     );
 
     const { recovery } = await reopen(root, agent);
@@ -454,8 +464,10 @@ describe('the recovery table', () => {
     expect(types).not.toContain('brief-appended');
     // The fork's invocation was closed by recovery, with no agent call and
     // no second fork.
-    expect(recovery.invocations).toEqual([`review-notes/${runId}: inv-0003`]);
-    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
+    const fork = events.find(event => event.type === 'invocation-started' && event.data.role === 'global-fork');
+    if (fork?.type !== 'invocation-started') throw new Error('The fixture started no placement fork');
+    expect(recovery.invocations).toEqual([`review-notes/${runId}: ${fork.data.invocation}`]);
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome(fork.data.invocation)), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost' });
     // One fork ran and was interrupted; recovery started no second one.
     expect(agent.sessions.filter(session => session.spec.role === 'global-fork')).toHaveLength(1);
@@ -464,7 +476,7 @@ describe('the recovery table', () => {
   test('a crash between an accepted decision and the parent append appends the brief once', async () => {
     const root = await target([materialize], [], materialized);
     const brief = 'The note stays with the reviews module, which already holds a review run.';
-    const agent = createScriptedAgent(byRole(placementPlan(brief)));
+    const agent = recoveryAgent(byRole(placementPlan(brief)));
     const { runId } = await crashAfter(root, 'decision-accepted', false, undefined, undefined, agent);
     await rm(runPath(root, 'review-notes', runId, architectureLayout.decision('gd-001')));
 
@@ -491,7 +503,7 @@ describe('the recovery table', () => {
   test('G4: a crash after the append and before its completion answers already-present, and one brief exists', async () => {
     const root = await target([materialize], [], materialized);
     const brief = 'The note stays with the reviews module, which already holds a review run.';
-    const agent = createScriptedAgent(byRole(placementPlan(brief)));
+    const agent = recoveryAgent(byRole(placementPlan(brief)));
     const { runId } = await crashAfter(root, 'brief-appending', false, undefined, undefined, agent);
 
     // The append reached the parent before the crash: its key is in the
@@ -511,7 +523,7 @@ describe('the recovery table', () => {
 
   test('a crash after brief-appended delivers the decision once and starts nothing', async () => {
     const root = await target([materialize], [], materialized);
-    const agent = createScriptedAgent(byRole(placementPlan()));
+    const agent = recoveryAgent(byRole(placementPlan()));
     const { runId } = await crashAfter(root, 'brief-appended', false, undefined, undefined, agent);
 
     const before = await runEventsOnDisk(root, 'review-notes', runId);
@@ -526,7 +538,7 @@ describe('the recovery table', () => {
     expect(delivered[0]!.data).toEqual({ decision: 'gd-001', workItem: 'wi-001' });
     // Recovery called no agent: the local architect's next turn belongs to a
     // run that is started again.
-    expect(agent.sessions.filter(session => session.spec.role === 'local-architect')).toHaveLength(1);
+    expect(agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result')).toHaveLength(1);
   }, 180_000);
 
   test('a crash between the commit intent and the commit performs the effect again and makes one commit', async () => {
@@ -804,10 +816,12 @@ describe('the boundaries of an iteration', () => {
     const { runId } = await crashAfter(root, 'writer-acquired', false, oneIteration(), treeInputs());
 
     const { service, recovery } = await reopen(root);
-    expect(recovery.invocations).toEqual([`review-notes/${runId}: inv-0003`]);
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     expect(events.filter(event => event.type === 'writer-acquired')).toHaveLength(1);
-    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
+    const writer = events.find(event => event.type === 'writer-acquired');
+    if (writer?.type !== 'writer-acquired') throw new Error('The fixture acquired no writer');
+    expect(recovery.invocations).toEqual([`review-notes/${runId}: ${writer.data.invocation}`]);
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome(writer.data.invocation)), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost' });
     expect(onlyRun(service, 'review-notes').state).toBe('interrupted');
   }, 180_000);
@@ -845,10 +859,12 @@ describe('the boundaries of an iteration', () => {
     expect(await readFile(join(root, written), 'utf8')).toBe('export const store = new Map();\n');
 
     const { service, recovery } = await reopen(root);
-    expect(recovery.invocations).toEqual([`review-notes/${runId}: inv-0003`]);
     expect(await readFile(join(root, written), 'utf8')).toBe('export const store = new Map();\n');
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
+    const writer = events.find(event => event.type === 'writer-acquired');
+    if (writer?.type !== 'writer-acquired') throw new Error('The fixture acquired no writer');
+    expect(recovery.invocations).toEqual([`review-notes/${runId}: ${writer.data.invocation}`]);
     expect(events.filter(event => event.type === 'writer-released')).toHaveLength(1);
     expect(events.filter(event => event.type === 'writer-acquired')).toHaveLength(1);
     expect(events.at(-1)!.type).toBe('job-interrupted');
@@ -858,11 +874,11 @@ describe('the boundaries of an iteration', () => {
     expect(events.some(event => event.type === 'gate-attempted')).toBe(false);
     expect(commitCount(root)).toBe(1);
 
-    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome('inv-0003')), 'utf8')) as InvocationOutcome;
+    const outcome = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.outcome(writer.data.invocation)), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'failed', interruption: 'session-lost' });
     // The observation log is appended without a transaction, so what it
     // holds of an interrupted invocation is qualified rather than trusted.
-    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations('inv-0003')), 'utf8'))
+    const observations = (await readFile(runPath(root, 'review-notes', runId, runLayout.observations(writer.data.invocation)), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { kind?: string } });
     expect(observations.some(line => line.type === 'coverage-gap' && line.data.kind === 'observation-truncated')).toBe(true);
     expect(observations.some(line => line.type === 'coverage-gap' && line.data.kind === 'unguarded-shell')).toBe(true);
