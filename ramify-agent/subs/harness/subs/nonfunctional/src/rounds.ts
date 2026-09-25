@@ -2,9 +2,9 @@ import { assessmentCoverage, assessmentSchema, candidateSchema, roundSchema } fr
 import type { Assessment, Candidate } from './interfaces/contracts.js';
 import type { z } from 'zod';
 
-type ClosedRound = z.infer<typeof roundSchema>;
-type Phase = Assessment['phase'];
-type Outcome = ClosedRound['outcome'];
+export type ClosedRound = z.infer<typeof roundSchema>;
+export type Phase = Assessment['phase'];
+export type Outcome = ClosedRound['outcome'];
 
 /** Durable records are supplied by the harness; this owner never reads the ledger. */
 export interface RoundDecisionInput {
