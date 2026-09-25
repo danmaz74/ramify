@@ -1,5 +1,8 @@
 # Module-local session starting directories
 
+The [combined full-plan run](combined-plan-run.md) exercised both role changes
+together on the fixture's `review-notes` plan after the isolated trials below.
+
 **Date:** 2026-09-25. **Status:** completed isolated spike; not adopted or merged.
 
 ## Question and experimental boundary
