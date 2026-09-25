@@ -1036,14 +1036,16 @@ export const gateViewSchema = z.object({
     limits: z.array(text).optional(),
   }).strict()),
   commands: z.array(z.object({
-    kind: z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
+    /** A setup command's declared name, such as `build`; null for every other command and an unnamed one. */
+    name: text.nullable(),
     argv: z.array(z.string()),
     cwd: text,
     startedAt: z.string(),
     elapsedMs: count,
     exitCode: z.int().nullable(),
     outcome: gateVerdictSchema,
-    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing']).nullable(),
+    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed']).nullable(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     selection: z.object({
       policy: z.enum(['owned-by-scope', 'all-project']),
@@ -1059,6 +1061,10 @@ export const gateViewSchema = z.object({
       truncated: z.boolean(),
       tail: z.string().refine(tail => tailBytes(tail) <= runQueryLimits.outputTailBytes, 'An output tail is at most 8 KiB'),
     }).strict(),
+    /** How ramify-audit stopped the command's process tree, in words; null where it did not stop it. */
+    stopped: text.nullable(),
+    /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
+    outputIncomplete: z.boolean(),
     /** A `scenarios` command's summary; null for every other kind, and for one that recorded none. */
     scenarios: scenarioCheckViewSchema.nullable(),
   }).strict()),

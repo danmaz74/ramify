@@ -15,6 +15,7 @@ import type { HookFinding } from '../hooks/post-write.js';
 import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '../prompts/packages.js';
 import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
+import { captureProjectConfig } from '../run/project-config.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
@@ -512,6 +513,10 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     } else {
       progress({ type: 'gate-started' });
       const selection = await resolveTestSelection({ projectRoot, index: await refresh(), policy: tests });
+      // The project's declared setup, such as its build, runs first, as at
+      // every gate of a run.
+      const config = await captureProjectConfig(projectRoot);
+      const setup = 'config' in config ? config.config.setup : undefined;
       const attempt = await runCheckpoint(options.checkExecution ?? inPlaceCheckExecution, {
         id: gateAttemptId(1),
         checkpoint: 'iteration',
@@ -524,6 +529,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         tests: selection,
         guarded: guardedFiles,
         authorizations: [],
+        ...(setup === undefined ? {} : { setup }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
       const { auditOverall: _auditOverall, ...durableAttempt } = attempt;
@@ -534,9 +540,11 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         cause: attempt.cause,
         attempt: at(sessionLayout.gate),
         commands: attempt.commands.map(command => {
-          const outcomeText = command.outcome === 'not-verified' ? `not verified (${command.notVerified ?? 'unknown'})` : command.outcome;
+          const outcomeText = command.notVerified === 'setup-failed'
+            ? 'not run, because a setup command did not pass'
+            : command.outcome === 'not-verified' ? `not verified (${command.notVerified ?? 'unknown'})` : command.outcome;
           const last = command.output.tail.trim().split('\n').at(-1) ?? '';
-          return `${command.kind}: ${outcomeText}${last === '' ? '' : ` — ${last}`}`;
+          return `${command.kind}${command.name === undefined ? '' : ` "${command.name}"`}: ${outcomeText}${last === '' ? '' : ` — ${last}`}`;
         }),
       };
     }

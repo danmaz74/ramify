@@ -88,6 +88,35 @@ describe('the ramify-agent.project/1 schema', () => {
     expect(parseProjectConfig(changed(['acceptance', 'support'], []))).toHaveProperty('config');
   });
 
+  test('accepts setup commands in order, each with an optional name, directory, bound and environment', () => {
+    const setup = [
+      { name: 'build', command: ['npm', 'run', 'build'], timeoutMs: 900_000 },
+      { command: ['npm', 'run', 'build'], cwd: 'packages/ui', env: { NODE_ENV: 'production' } },
+      { command: ['node', 'scripts/generate.mjs'], cwd: '.' },
+    ];
+    const parsed = parseProjectConfig(changed(['setup'], setup));
+    expect('config' in parsed && parsed.config.setup).toEqual(setup);
+    // Without it, a gate runs no setup command.
+    const without = parseProjectConfig(JSON.stringify(valid()));
+    expect('config' in without && without.config.setup).toBeUndefined();
+  });
+
+  test.each([
+    ['a setup command that is empty', [{ command: [] }], /setup\.0\.command: /],
+    ['a setup command that is a string', [{ command: 'npm run build' }], /setup\.0\.command: /],
+    ['a setup directory that is absolute', [{ command: ['make'], cwd: '/usr/src' }], /setup\.0\.cwd: must be a relative directory inside the project/],
+    ['a setup directory that leaves the project', [{ command: ['make'], cwd: 'packages/../../elsewhere' }], /setup\.0\.cwd: must be a relative directory inside the project/],
+    ['a setup directory on a drive', [{ command: ['make'], cwd: 'C:\\build' }], /setup\.0\.cwd: must be a relative directory inside the project/],
+    ['a setup bound that is zero', [{ command: ['make'], timeoutMs: 0 }], /setup\.0\.timeoutMs: /],
+    ['a setup bound that is not whole', [{ command: ['make'], timeoutMs: 1.5 }], /setup\.0\.timeoutMs: /],
+    ['a setup environment value that is not text', [{ command: ['make'], env: { LEVEL: 3 } }], /setup\.0\.env\.LEVEL: /],
+    ['a setup field it does not define', [{ command: ['make'], shell: true }], /setup\.0: .*shell/],
+    ['setup that is not a list', { command: ['make'] }, /setup: /],
+  ])('rejects %s with the schema\'s message', (_name, setup, message) => {
+    const parsed = parseProjectConfig(changed(['setup'], setup));
+    expect('invalid' in parsed ? parsed.invalid : '').toMatch(message);
+  });
+
   test.each([
     ['text that is not JSON', '{ "schema": ', /is not JSON/],
     ['another version', changed(['schema'], 'ramify-agent.project/2'), /schema: /],

@@ -83,11 +83,23 @@ export async function gateDiagnostics(
 ): Promise<GateDiagnostics> {
   const summary: string[] = [];
   let findings: HookFinding[] = [];
+  // The commands a setup command that did not pass kept from running are
+  // named once, after it: they report nothing about the source.
+  const skipped = gate.commands.filter(command => command.notVerified === 'setup-failed');
+  const blocking = gate.commands.find(command => command.kind === 'setup' && command.outcome !== 'passed');
   for (const command of gate.commands) {
+    if (command.notVerified === 'setup-failed') continue;
     const outcome = command.outcome === 'not-verified'
       ? `not verified (${command.notVerified ?? 'unknown'})`
       : command.outcome;
-    const exit = command.exitCode === null ? '' : `, exit ${command.exitCode}`;
+    const exit = `${command.exitCode === null ? '' : `, exit ${command.exitCode}`}${stoppedNote(command)}`;
+    if (command.kind === 'setup') {
+      summary.push(...setupLines(command, outcome, exit));
+      if (command === blocking && skipped.length > 0) {
+        summary.push(`- not run, because ${setupTitle(command)} did not pass: ${skipped.map(entry => `\`${entry.kind}\``).join(', ')}`);
+      }
+      continue;
+    }
     if (command.kind === 'scenarios' && command.scenarios !== undefined) {
       const passed = command.outcome === 'passed';
       const lines = scenarioCheckLines(command.scenarios, names, { indent: '  ', only: passed ? 'passed' : 'all' });
@@ -118,6 +130,9 @@ export async function gateDiagnostics(
     summary.push(`- \`${command.kind}\`: ${outcome}${exit}; the end of what it printed:`);
     for (const line of tail) summary.push(`      ${line}`);
   }
+  if (blocking === undefined && skipped.length > 0) {
+    summary.push(`- not run, because a setup command did not pass: ${skipped.map(entry => `\`${entry.kind}\``).join(', ')}`);
+  }
   for (const rule of gate.rules ?? []) {
     if (rule.outcome !== 'failed') continue;
     summary.push(`- rule \`${rule.rule}\`: failed`);
@@ -129,6 +144,40 @@ export async function gateDiagnostics(
   }
   if (findings.length > 0 && audience === 'local-architect') summary.push(architectRemedy(findings));
   return { id: gate.id, cause: gate.cause, summary };
+}
+
+/**
+ * How ramify-audit stopped a command's process tree and whether what it
+ * printed may be incomplete, as a clause; empty for a command it did not
+ * stop and whose output is complete.
+ */
+function stoppedNote(command: GateCommandRecord): string {
+  const notes = [
+    ...(command.stopped === undefined ? [] : [command.stopped]),
+    ...(command.outputIncomplete === true ? ['its output may be incomplete'] : []),
+  ];
+  return notes.length === 0 ? '' : `; ${notes.join('; ')}`;
+}
+
+/** A setup command as a briefing names it: its declared name where it has one, and its argv. */
+function setupTitle(command: GateCommandRecord): string {
+  const argv = `\`${command.command.argv.join(' ')}\``;
+  return command.name === undefined ? `the setup command ${argv}` : `the setup command "${command.name}" (${argv})`;
+}
+
+/**
+ * One setup command's lines: passed in one line, and otherwise its exit code,
+ * where its complete output is, and the bounded end of what it printed. A
+ * build that exited non-zero failed on the source it was given, so what it
+ * printed is the diagnosis.
+ */
+function setupLines(command: GateCommandRecord, outcome: string, exit: string): string[] {
+  const title = `- \`setup\`, ${setupTitle(command)}`;
+  if (command.outcome === 'passed') return [`${title}: ${outcome}${exit}`];
+  const tail = outputTail(command);
+  const where = `; its complete output is in \`${command.output.path}\``;
+  if (tail.length === 0) return [`${title}: ${outcome}${exit}${where}; it printed nothing`];
+  return [`${title}: ${outcome}${exit}${where}; the end of what it printed:`, ...tail.map(line => `      ${line}`)];
 }
 
 /**

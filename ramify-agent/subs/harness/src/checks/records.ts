@@ -103,8 +103,13 @@ export interface TestSelection extends Omit<TestSelectionPolicy, 'outsideModules
   readonly resolved: string[];
 }
 
-/** The kinds of command a gate runs. `scenarios` is one Cucumber run per module, with the mode's setup and teardown around them. */
-export type CheckCommandKind = 'ramify-check' | 'type-check' | 'tests' | 'conformance' | 'scenarios';
+/**
+ * The kinds of command a gate runs. `scenarios` is one Cucumber run per
+ * module, with the mode's setup and teardown around them. `setup` is one of
+ * the project's declared setup commands, such as its build, which run in
+ * order before every other command of the gate.
+ */
+export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'conformance' | 'scenarios';
 
 /**
  * Why a command was not verified. Every one of them means the command did not
@@ -120,10 +125,12 @@ export type CheckCommandKind = 'ramify-check' | 'type-check' | 'tests' | 'confor
  *   falls back to an earlier list. A failed discovery is infrastructure: the
  *   inventory the harness needs could not be refreshed, and no repair of the
  *   source would change that.
+ * - `setup-failed`: a setup command before it did not pass, so it never ran.
+ *   It is not a cause of its own: the setup command's record is.
  */
 export type NotVerified =
   | 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection'
-  | 'interrupted' | 'discovery-error' | 'required-suite-missing';
+  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed';
 
 /**
  * A format of the type checker's output the project declares in
@@ -181,6 +188,8 @@ export interface GateRuleRecord {
 /** One command of an attempt, as the attempt records it. */
 export interface GateCommandRecord {
   readonly kind: CheckCommandKind;
+  /** A setup command's declared name, such as `build`; absent for every other kind and for an unnamed one. */
+  readonly name?: string;
   readonly command: CheckCommand;
   readonly selection?: TestSelection;
   readonly startedAt: string;
@@ -192,6 +201,14 @@ export interface GateCommandRecord {
   readonly runnerError: { readonly kind: string; readonly message: string } | null;
   /** The complete output is a file beside the attempt; `tail` has a fixed bound. */
   readonly output: { readonly path: string; readonly bytes: number; readonly truncated: boolean; readonly tail: string };
+  /**
+   * How ramify-audit stopped the command's process tree, in words, where it
+   * stopped it: a setup command that timed out or was cancelled in an
+   * audited worktree. Absent for every command it did not stop.
+   */
+  readonly stopped?: string;
+  /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
+  readonly outputIncomplete?: true;
   /** For a `scenarios` command: what its message streams said. Its outcome is read from this, not from the exit codes alone. */
   readonly scenarios?: ScenarioCheckSummary;
 }

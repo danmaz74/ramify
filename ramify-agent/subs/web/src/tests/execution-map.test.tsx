@@ -413,6 +413,23 @@ test('a running gate card and its detail name the command it is on', async () =>
   expect(canvas.querySelectorAll('.execution-gate-step')).toHaveLength(1);
 });
 
+test('a running gate on a setup command names it the build when the project named it build, and the setup otherwise', async () => {
+  const onCommand = async (gateCommand: NonNullable<ExecutionMapSnapshot['current']['gateCommand']>) => {
+    const running = { ...map, nodes: [...map.nodes, readiness], current: { awaitedSession: null, runningGate: readiness.key, source: readiness.sourceRefs[0]!, gateCommand } };
+    const c = { ...client(), getExecutionMap: async () => running } as ProtocolClient;
+    const rendered = render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);
+    const canvas = await screen.findByLabelText('Zoomable execution canvas');
+    const card = within(canvas).getByRole('button', { name: /^Readiness gate ga-0001, gate/ });
+    const lines = [...card.querySelectorAll('small')].map(line => line.textContent);
+    rendered.unmount();
+    return lines;
+  };
+  const source = { kind: 'run-event' as const, id: 'ev-9', sequence: 9, revision: null };
+  expect(await onCommand({ kind: 'setup', name: 'build', position: 1, total: 5, source })).toEqual(['Running', 'Build (1 of 5)', 'Run-wide']);
+  expect(await onCommand({ kind: 'setup', name: 'generate schemas', position: 2, total: 5, source })).toEqual(['Running', 'Setup (2 of 5)', 'Run-wide']);
+  expect(await onCommand({ kind: 'setup', position: 1, total: 4, source })).toEqual(['Running', 'Setup (1 of 4)', 'Run-wide']);
+});
+
 describe('the initial view', () => {
   const pane = (width: number, height: number) => {
     const spies = [vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width),

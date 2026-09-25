@@ -14,6 +14,8 @@ import type { ScenarioCheckPlan } from './scenario-check.js';
 /** One command a checkpoint intends to run, with the selection it was resolved from. */
 export interface PlannedCheck {
   readonly kind: CheckCommandKind;
+  /** A `setup` check's declared name, such as `build`. */
+  readonly name?: string | undefined;
   readonly command: CheckCommand;
   /** Resolved anew from the current tree; recorded on the attempt, never on the assignment. */
   readonly selection?: TestSelection | undefined;

@@ -247,12 +247,35 @@ const projectTimeout = z.int().positive().max(projectCommandTimeoutCeilingMs, {
 /** The formats of a type checker's output the gate reads error locations from. */
 export const typeCheckOutputSchema = z.enum(['tsc']);
 
+/** A project-relative directory inside the project: no absolute path, no drive and no `..` segment. */
+const projectDirectorySchema = z.string().refine(value => {
+  const normalized = value.replaceAll('\\', '/');
+  return !normalized.startsWith('/') && !/^[A-Za-z]:/u.test(normalized) && !normalized.split('/').includes('..');
+}, 'must be a relative directory inside the project');
+
+/**
+ * One command that prepares the project before a gate's checks run, such as
+ * its build. `command` is the argv as it stands; `cwd` is relative to the
+ * project root, which it defaults to; `env` is added to the environment the
+ * harness builds for every command.
+ */
+export const setupCommandSchema = z.object({
+  /** Labels the command in records and pages; `build` is shown as the build. */
+  name: text.optional(),
+  command: argvSchema,
+  cwd: projectDirectorySchema.optional(),
+  /** Positive milliseconds; ten minutes where it is not declared. */
+  timeoutMs: z.int().positive().optional(),
+  env: z.record(text, z.string()).optional(),
+}).strict();
+export type SetupCommandConfig = z.infer<typeof setupCommandSchema>;
+
 /**
  * `ramify-agent.json`, the target project's configuration for the harness:
  * only what the harness cannot derive. In v1 that is the scenario harness,
  * the support code Cucumber imports before any step file and the command of
  * each execution mode, and, optionally, the format of what the type check
- * prints.
+ * prints and the setup commands every gate runs first.
  */
 export const projectConfigSchema = z.object({
   schema: z.literal(projectConfigVersion),
@@ -274,6 +297,13 @@ export const projectConfigSchema = z.object({
     scopedTests: projectTimeout.optional(),
     ramifyCheck: projectTimeout.optional(),
   }).strict().optional(),
+  /**
+   * The project's setup commands, run in order before every gate's checks:
+   * in place at the project root, and by ramify-audit in the worktree of an
+   * audited commit, whose ignored build outputs are otherwise absent. Each
+   * carries its own bound, which `timeouts` does not replace.
+   */
+  setup: z.array(setupCommandSchema).optional(),
   acceptance: z.object({
     /** Project-relative files or globs, imported in order before any step file. */
     support: z.array(text),
@@ -391,15 +421,15 @@ export type EntryAssignments = z.infer<typeof entryAssignmentsSchema>;
 // Readiness and its recoveries.
 
 /**
- * The steps readiness verifies. The attempt records the five the baseline
- * gate verifies, the two acceptance steps among them, after `ramify-daemon`,
- * where they run, and `run-branch`, the run branch created and checked out,
- * last of all.
+ * The steps readiness verifies. The attempt records the six the baseline
+ * gate verifies, the project's setup first and the two acceptance steps
+ * among them, after `ramify-daemon`, where they run, and `run-branch`, the
+ * run branch created and checked out, last of all.
  */
 export const readinessSteps = [
   'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
   'baseline-acceptance', 'acceptance-full', 'nested-packages',
-  'test-discovery', 'ramify-daemon', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
+  'test-discovery', 'ramify-daemon', 'baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
   'run-branch',
 ] as const;
 export const readinessStepSchema = z.enum(readinessSteps);
@@ -703,7 +733,7 @@ const testSelectionSchema = z.object({
 }).strict();
 
 /** The kinds of command a gate runs. */
-const checkKindSchema = z.enum(['ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']);
+const checkKindSchema = z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']);
 
 /** What a `scenarios` check runs: one run per module, with the mode's setup and teardown around them. */
 const scenarioCheckPlanSchema = z.object({
@@ -738,6 +768,8 @@ export const scenarioCheckSummarySchema = z.object({
 
 const plannedCheckSchema = z.object({
   kind: checkKindSchema,
+  /** A setup command's declared name. */
+  name: text.optional(),
   command: checkCommandSchema,
   selection: testSelectionSchema.optional(),
   requiresTests: z.boolean().optional(),
@@ -754,7 +786,7 @@ const plannedCheckSchema = z.object({
 /** A durable gate operation exists only after every plan verified. */
 const verifiedPlannedCheckSchema = plannedCheckSchema
   .omit({ discovery: true })
-  .extend({ kind: z.enum(['ramify-check', 'type-check', 'tests', 'scenarios']) });
+  .extend({ kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'scenarios']) });
 
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
@@ -787,15 +819,21 @@ export const gateAttemptSchema = z.object({
   rules: z.array(gateRuleSchema).optional(),
   commands: z.array(z.object({
     kind: checkKindSchema,
+    /** A setup command's declared name. */
+    name: text.optional(),
     command: checkCommandSchema,
     selection: testSelectionSchema.optional(),
     startedAt: z.string(),
     elapsedMs: z.int().nonnegative(),
     exitCode: z.int().nullable(),
     outcome: z.enum(['passed', 'failed', 'not-verified']),
-    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing']).optional(),
+    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed']).optional(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     output: z.object({ path: z.string(), bytes: z.int().nonnegative(), truncated: z.boolean(), tail: z.string() }).strict(),
+    /** How ramify-audit stopped the command's process tree, in words; absent where it did not stop it. */
+    stopped: text.optional(),
+    /** The command's output streams stayed open after it ended, so what it printed may be incomplete. */
+    outputIncomplete: z.literal(true).optional(),
     /** A `scenarios` command's summary of its message streams. */
     scenarios: scenarioCheckSummarySchema.optional(),
   }).strict()),

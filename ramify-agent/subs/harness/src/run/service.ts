@@ -7155,10 +7155,12 @@ export class RunService {
     const scenarios = await this.scenarioInputs(run);
     const captured = run.record.projectConfig;
     const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
+    const setup = 'config' in captured ? captured.config.setup : undefined;
     const prepared = await prepareCheckpoint({
       ...request,
       ...(scenarios === undefined ? {} : { scenarios }),
       ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
+      ...(setup === undefined ? {} : { setup }),
     });
     if ('schema' in prepared) {
       await this.write(run, {
@@ -8034,7 +8036,7 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       head: request.head,
       checks: request.checks.map(({ discovery: _discovery, ...check }) => ({
         ...check,
-        kind: check.kind as 'ramify-check' | 'type-check' | 'tests' | 'scenarios',
+        kind: check.kind as 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'scenarios',
       })),
       selection: {
         policy: request.selection?.policy ?? 'all-project',

@@ -18,6 +18,7 @@ const ref = (kind: RunEventRefKind, id: string | null | undefined): Ref[] => (id
 
 /** Each kind of gate command, as a sentence names it. */
 const commandLabels: Record<RunEventOf<'gate-command-started'>['data']['kind'], string> = {
+  setup: 'the setup command',
   tests: 'the tests',
   'type-check': 'the type check',
   'ramify-check': 'the Ramify check',
@@ -237,7 +238,7 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Gate ${event.data.gate} (${event.data.checkpoint}) is committing before audit`, ref('gate', event.data.gate)];
     case 'gate-command-started':
       return [
-        `Gate ${event.data.gate} (${event.data.checkpoint}): ${commandLabels[event.data.kind]} started, command ${event.data.position} of ${event.data.total}`,
+        `Gate ${event.data.gate} (${event.data.checkpoint}): ${commandLabels[event.data.kind]}${event.data.name === undefined ? '' : ` "${event.data.name}"`} started, command ${event.data.position} of ${event.data.total}`,
         ref('gate', event.data.gate),
       ];
     case 'gate-attempted': {

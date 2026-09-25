@@ -184,6 +184,7 @@ project's scenarios, and the file holds only what the harness cannot derive.
 | `acceptance.modes.<mode>.command` | The argv that starts `cucumber-js` in that mode, with the mode's environment and loader, such as `TEST_MODE` and `--import tsx`, and passes the arguments the harness appends through to it. Both `quick` and `full` are required. |
 | `acceptance.modes.<mode>.setup`, `teardown` | Optional. Run once per gate attempt before the mode's first run and after its last, so a server or a database started for full mode serves every module's run. Without them, each run starts what its hooks start. |
 | `acceptance.modes.full.readiness` | `dry-run`, the default, or `run`: whether readiness executes full mode or only loads it. See [readiness](#4-readiness). |
+| `setup` | Optional. The project's setup commands, such as its build, in order: each `{ name?, command, cwd?, timeoutMs?, env? }`, where `command` is a non-empty argv, `cwd` a directory inside the project relative to its root (the root by default), `timeoutMs` a positive bound (ten minutes by default) and `env` names and values added to the command's environment. Every gate runs them before its other commands; see [setup commands](#setup-commands). |
 | `typeCheck.output` | Optional. The format the type check prints; `tsc` is the only one. Where it is declared, a failed type check at a gate is attributed by where its errors lie: every error inside the assignment's write scope makes the failure the engineer's to repair, and any error outside makes it `outside-assignment`. Without it, or where the output is truncated, holds a line the gate cannot read or names no error, a failed type check is attributed by which commands failed. |
 | `timeouts` | Optional. The gate's command timeouts for this project, in milliseconds, each a positive integer of at most 7,200,000 (two hours): `typeCheck`, `tests` (the project's tests and each nested package's), `scopedTests` (the scoped test run, which `run_scope_tests` uses too) and `ramifyCheck`. Each replaces the harness's own timeout of that command in the policy `start-run` captures into `job.json`; a command it does not name keeps the harness's. A project whose suite runs longer than the harness's 900 s declares `"timeouts": { "tests": 1800000 }`. |
 
@@ -229,6 +230,56 @@ The gate then reads `tsc`'s error lines, in its plain form
 lines, the pretty form's code excerpt and summary, npm's `> ` banner and its
 `npm error`, `npm ERR!` and `npm warn` lines. Each path is read relative to
 the command's working directory.
+
+#### Setup commands
+
+A project whose tests need a build output the repository ignores, such as
+`dist/`, declares the commands that make it:
+
+```json
+{
+  "schema": "ramify-agent.project/1",
+  "setup": [
+    { "name": "build", "command": ["npm", "run", "build"], "timeoutMs": 900000 },
+    { "command": ["npm", "run", "build"], "cwd": "packages/ui", "env": { "NODE_ENV": "production" } }
+  ],
+  "acceptance": { "...": "as above" }
+}
+```
+
+Every gate runs them first, in order, as commands of kind `setup`, recorded,
+announced with `gate-command-started` and shown like any other command; a
+setup command named `build` is shown as the build. Readiness and a
+standalone session's gate run them in place at the project root, and
+readiness records them as its `baseline-setup` step. A committing gate
+forwards them to ramify-audit: its `nodejs` preparation links the installed
+dependencies of the project and of each nested package into the worktree of
+the committed revision, then runs the commands there, their output captured
+beside the attempt and published with the audit's evidence.
+
+Once a setup command has not passed, no later command of the gate runs, and
+each is recorded as not verified for that reason, never as a selection that
+found nothing. A setup command that ran and exited non-zero fails the
+attempt: after readiness passed, the change since the last passing state is
+the assignment's own, so the failure is `in-scope` and the engineer repairs
+it, briefed with the command, its exit code and the end of what it printed.
+A work-item or final gate follows its own next step. One that timed out,
+could not start or was stopped is infrastructure, and takes the bounded
+retry. At readiness, a setup command that exits non-zero fails readiness
+with the end of its output and no recovery; one that timed out is rerun.
+ramify-audit stops the whole process tree of a setup command that timed out
+or was cancelled, and the command's record and briefing say how, and that
+its output may be incomplete where its output streams stayed open.
+
+A setup command must not install dependencies: the audited worktree already
+links the project's installed ones, and a package manager would follow the
+link and change or empty the project's own installation. ramify-audit
+refuses an installing command (`npm ci`, `pnpm install`, a bare `yarn` and
+the like) where its working directory, or one up to four levels below it,
+has a linked `node_modules`, so readiness refuses one first, at
+`baseline-setup`, before any command runs and with no recovery, saying what
+to remove from `setup`. Should a committing gate meet the refusal all the
+same, it is infrastructure, with ramify-audit's message.
 
 The `collection-review` fixture needs the configuration file, a full mode and
 the two scripts; its quick mode is the in-process `createTestSystem` its one
