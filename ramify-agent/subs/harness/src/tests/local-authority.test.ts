@@ -12,6 +12,7 @@ import { localDecision, registryChange, requestPlacement } from './helpers/place
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
 import { answeredGit, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -140,8 +141,10 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
 
     // Git is answered, not run. No iteration of this scenario writes source,
     // so every commit Git is asked for is one it reports as an unchanged tree.
+    const final = finalCandidate(project, 'scenarios-of-revision-diff');
     const git = answeredGit(project, {
       head: 'revision-00',
+      previews: final.previews,
       commits: [
         scenariosCommitted('revision-diff'),
         unchanged('wi-001.i01'), unchanged('wi-001'),
@@ -151,7 +154,8 @@ describe('G5, G6, G7: local authority, escalation and what a revision reaches', 
       ],
     });
     const opened = await openRuns(project, {
-      agent, inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+      agent, inputs: treeInputs(), git, candidates: final.candidates,
+      readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('revision-diff'));

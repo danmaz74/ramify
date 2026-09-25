@@ -13,6 +13,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { RunQueries } from '../projections/queries.js';
 import {
@@ -114,8 +115,10 @@ const latePath = `${notesDirectory}/src/late.ts`;
 describe('a change to the working directory blocks nothing', () => {
   test('a verified gate makes one commit before audit, including a late change before that commit', async () => {
     const root = await target();
+    const final = finalCandidate(root, 'revision-01');
     const scripted = gateGit(root, {
       head: base,
+      previews: final.previews,
       commits: [
         scenarios,
         {
@@ -130,6 +133,7 @@ describe('a change to the working directory blocks nothing', () => {
       script: byRole(onePass([storeWrite])),
       inputs: treeInputs(),
       git: scripted.git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
       afterWrite: async current => {
         // A late write lands after verification and before the commit. It
@@ -272,8 +276,10 @@ describe('a change to the working directory blocks nothing', () => {
 
   test('a later source change invalidates nothing: the accepted commit stays as it is', async () => {
     const root = await target();
+    const final = finalCandidate(root, 'revision-01');
     const scripted = gateGit(root, {
       head: base,
+      previews: final.previews,
       commits: [
         scenarios,
         { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] },
@@ -285,6 +291,7 @@ describe('a change to the working directory blocks nothing', () => {
       script: byRole(onePass([storeWrite])),
       inputs: treeInputs(),
       git: scripted.git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());
@@ -310,8 +317,10 @@ describe('a change to the working directory blocks nothing', () => {
 describe('the accepted boundary after an audit infrastructure retry', () => {
   test('an unchanged retry accepts the earlier commit, and later unchanged checkpoints retain it without repeating notices', async () => {
     const root = await target({ withNotes: false });
+    const final = finalCandidate(root, 'revision-01');
     const scripted = gateGit(root, {
       head: base,
+      previews: final.previews,
       commits: [
         scenarios,
         // The attempt whose audit could not run still committed what the
@@ -372,6 +381,7 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
       }),
       inputs: treeInputs(),
       git: scripted.git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
       checkExecution,
     });

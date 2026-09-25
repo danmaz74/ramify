@@ -10,6 +10,7 @@ import { forkDecision, registryChange, requestPlacement } from './helpers/placem
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
 import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -81,12 +82,14 @@ const created: GateCommit = {
 };
 
 /** A copy of the fixture whose runner answers, with Git's answers stated. */
-async function target(answers: Omit<GateGitOptions, 'head'>, options: { readonly miniRunner?: boolean } = {}) {
+async function target(answers: Omit<GateGitOptions, 'head'> & { readonly finalHead: string }, options: { readonly miniRunner?: boolean } = {}) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   if (options.miniRunner === false) await installTestRunner(fixture.root);
   else await installMiniRunner(fixture.root);
-  return { root: fixture.root, scripted: gateGit(fixture.root, { head: base, ...answers }) };
+  const { finalHead, ...gitAnswers } = answers;
+  const final = finalCandidate(fixture.root, finalHead);
+  return { root: fixture.root, scripted: gateGit(fixture.root, { head: base, ...gitAnswers, previews: final.previews }), final };
 }
 
 async function readResult(root: string, runId: string, number: number): Promise<IterationResult> {
@@ -99,7 +102,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
     // not this test's to run: the runner answers for them, and what is being
     // proved is the rejection and the guard. Nothing the engineer wrote
     // reached the tree, so every boundary is an unchanged one.
-    const { root, scripted } = await target({ commits: [scenarios, unchanged, unchanged, unchanged] }, { miniRunner: false });
+    const { root, scripted, final } = await target({ commits: [scenarios, unchanged, unchanged, unchanged], finalHead: materialized }, { miniRunner: false });
     const opened = await openRuns(root, {
       script: byRole({
         'initial-architect': [submit(analysis([entry('review-note', reviews)]))],
@@ -120,6 +123,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
       }),
       inputs: treeInputs(),
       git: scripted.git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());
@@ -156,7 +160,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
 
 describe('G10: global placement authorizes a new owner without claiming it exists', () => {
   test('a create decision and its registry proposal lead to a bootstrap assignment that passes its gate', async () => {
-    const { root, scripted } = await target({ commits: [scenarios, created, unchanged, unchanged] });
+    const { root, scripted, final } = await target({ commits: [scenarios, created, unchanged, unchanged], finalHead: 'revision-01' });
     const proposal = {
       parent: reviews,
       directory: notesDirectory,
@@ -203,6 +207,7 @@ describe('G10: global placement authorizes a new owner without claiming it exist
       }),
       inputs: treeInputs(),
       git: scripted.git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());

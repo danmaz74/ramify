@@ -6,6 +6,7 @@ import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
 import { workLayout } from '../work/records.js';
+import { localArchitectToolName } from '../work/submission.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry } from './helpers/analysis.js';
 import {
@@ -17,6 +18,7 @@ import {
 } from './helpers/runs.js';
 import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 
 /*
@@ -377,14 +379,17 @@ const revision = (commit: string, ...paths: string[]): GateCommit => ({
 async function run(
   root: string,
   script: Parameters<typeof byRole>[0],
-  answers: Omit<GateGitOptions, 'head'>,
+  answers: Omit<GateGitOptions, 'head'> & { readonly finalHead?: string },
   options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
 ) {
-  const scripted = gateGit(root, { head: base, ...answers });
+  const { finalHead, ...gitAnswers } = answers;
+  const final = finalHead === undefined ? undefined : finalCandidate(root, finalHead);
+  const scripted = gateGit(root, { head: base, ...gitAnswers, ...(final === undefined ? {} : { previews: final.previews }) });
   const opened = await openRuns(root, {
     script: byRole(script),
     inputs: treeInputs(),
     git: scripted.git,
+    ...(final === undefined ? {} : { candidates: final.candidates }),
     readinessExecution: directReadinessExecution(),
     ...options,
   });
@@ -523,6 +528,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
         unchanged,
         unchanged,
       ],
+      finalHead: 'revision-03',
     });
 
     expect(onlyRun(service, plan).state).toBe('completed');
@@ -634,6 +640,7 @@ describe('the breaking-iteration boundary is not green by default', () => {
         { commit: null, against: 'revision-02' },
         { commit: null, against: 'revision-02' },
       ],
+      finalHead: 'revision-02',
       diffs: [{
         from: materialized,
         to: 'revision-02',
@@ -692,7 +699,7 @@ describe('the broad scope is a planned exception', () => {
     });
 
     expect(onlyRun(service, plan).state).toBe('failed');
-    const local = agent!.sessions.find(session => session.spec.role === 'local-architect')!;
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
     expect(local.verdicts[0]).toMatchObject({ accepted: false });
     const answer = JSON.parse((local.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string }> };
     expect(answer.errors.map(error => error.path)).toEqual(['assignment.scope.base.rationale']);
@@ -760,6 +767,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
         unchanged,
         unchanged,
       ],
+      finalHead: 'revision-02',
       diffs: [{ from: materialized, to: 'revision-02', changes: [{ status: 'M', path: 'vitest.config.ts' }] }],
     });
 
@@ -915,6 +923,7 @@ describe('a break discovered during work', () => {
         unchanged,
         unchanged,
       ],
+      finalHead: 'revision-01',
     });
 
     expect(onlyRun(service, plan).state).toBe('completed');

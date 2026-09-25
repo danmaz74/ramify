@@ -9,6 +9,7 @@ import {
 } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import type { RunEvent } from '../run/log.js';
 import { contractsLayout, type ConsumerRequirement, type ContractRecord, type ProviderObligation } from '../contracts/records.js';
@@ -169,11 +170,14 @@ async function run(
   root: string,
   plan: Parameters<typeof byRole>[0],
   commits: readonly CommitResponse[],
+  finalHead: string,
   options: Omit<Parameters<typeof openRuns>[1], 'git'> = {},
 ) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
+  const final = finalCandidate(root, finalHead);
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
   const opened = await openRuns(root, {
-    script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(), ...options,
+    script: byRole(plan), inputs: treeInputs(), git, candidates: final.candidates,
+    readinessExecution: directReadinessExecution(), ...options,
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -306,7 +310,7 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
       // A retained real boundary: this scenario is about what the gate's
       // own commands ran and printed, so the project's test runner really
       // runs. Git and the command line remain answered.
-    }, delegationCommits('wi-001.i03'), { checkExecution: createLocalCommandCheckExecution() });
+    }, delegationCommits('wi-001.i03'), 'revision-03', { checkExecution: createLocalCommandCheckExecution() });
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 
     const log = await events(root, runId);

@@ -7,6 +7,7 @@ import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, readDeclaredTree, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -174,9 +175,11 @@ const reportWithFake = "import { createNoteLimitFake } from './fakes/note-limit.
 const reportWithReal = "import { createNoteLimit } from './note-limit.ts';\n\nconst limit = createNoteLimit();\n\nexport function reportNote(note) {\n  return { note, within: limit.withinLimit(note) };\n}\n";
 const consumerReadingReport = "import { reportNote } from '../../limits/src/report.ts';\n\nexport function addNote(note) {\n  return reportNote(note).within ? note : '';\n}\n";
 
-async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
-  const opened = await openRuns(root, { script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution() });
+async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[], finalHead: string) {
+  const final = finalCandidate(root, finalHead);
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
+  const opened = await openRuns(root, { script: byRole(plan), inputs: treeInputs(), git,
+    candidates: final.candidates, readinessExecution: directReadinessExecution() });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
   await opened.service.settled('review-notes', receipt.jobId);
@@ -219,7 +222,7 @@ describe('the contract iteration writes the named injection sites', () => {
       accepted('wi-001.i03', 'revision-03', modified(seam.consumer)),
       unchanged('wi-001'),
       unchanged('final verification of plan "review-notes"'),
-    ]);
+    ], 'revision-03');
     expect(onlyRun(service, 'review-notes').failure).toBeNull();
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 

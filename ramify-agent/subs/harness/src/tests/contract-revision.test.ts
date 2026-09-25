@@ -7,6 +7,7 @@ import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byWork, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -84,10 +85,13 @@ function consumerModule(directory: string, name: string, file: string) {
  * it reports for each commit the harness attempts, or that the tree was
  * unchanged.
  */
-async function run(root: string, plan: Parameters<typeof byWork>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
+async function run(root: string, plan: Parameters<typeof byWork>[0], commits: readonly CommitResponse[], finalHead?: string) {
+  const final = finalHead === undefined ? undefined : finalCandidate(root, finalHead);
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits],
+    ...(final === undefined ? {} : { previews: final.previews }) });
   const opened = await openRuns(root, {
     script: byWork(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+    ...(final === undefined ? {} : { candidates: final.candidates }),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -193,7 +197,7 @@ describe('P4: an ordinary provider engineer reports inability to conform through
       accepted('wi-001.i04', 'revision-04', modified(seam.consumer)),
       unchanged('wi-001'),
       unchanged('final verification of plan "review-notes"'),
-    ]);
+    ], 'revision-04');
 
     expect(onlyRun(service, 'review-notes').failure).toBeNull();
     expect(onlyRun(service, 'review-notes').state).toBe('completed');

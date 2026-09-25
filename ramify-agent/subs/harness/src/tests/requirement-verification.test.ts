@@ -7,6 +7,7 @@ import { localDecision, registryChange } from './helpers/placement.js';
 import { addModule, assign, byRole, completionProposed, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { accepted, added, answeredGit, modified, unchanged, type CommitResponse, scenariosCommitted } from './helpers/contracts-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -231,10 +232,12 @@ const seam = {
   note: `${consumerDirectory}/src/limit-note.ts`,
 };
 
-async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[]) {
-  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits] });
+async function run(root: string, plan: Parameters<typeof byRole>[0], commits: readonly CommitResponse[], finalHead: string) {
+  const final = finalCandidate(root, finalHead);
+  const git = answeredGit(root, { head: 'revision-00', commits: [scenariosCommitted('review-notes'), ...commits], previews: final.previews });
   const opened = await openRuns(root, {
-    script: byRole(plan), inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+    script: byRole(plan), inputs: treeInputs(), git, candidates: final.candidates,
+    readinessExecution: directReadinessExecution(),
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('review-notes'));
@@ -288,7 +291,7 @@ describe('a requirement whose fake is still injected is not verified', () => {
       accepted('wi-001.i04', 'revision-04', modified(seam.consumer)),
       unchanged('wi-001'),
       unchanged('final verification of plan "review-notes"'),
-    ]);
+    ], 'revision-04');
 
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
     const log = await runEventsOnDisk(root, 'review-notes', runId);
@@ -407,7 +410,7 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
       accepted('wi-001.i03', 'revision-02', modified(seam.consumer)),
       unchanged('wi-001'),
       unchanged('final verification of plan "review-notes"'),
-    ]);
+    ], 'revision-02');
 
     // The run finishes: the agreement was refused, and the caller carried
     // the work itself.

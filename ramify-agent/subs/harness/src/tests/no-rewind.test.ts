@@ -12,6 +12,7 @@ import { addModule, assign, byRole, completionProposed, edit, installMiniRunner,
 import { onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy } from './helpers/runs.js';
 import { createMappedCheckExecution, type DirectCheckInvocation, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { accepted, answeredGit, modified, scenariosCommitted, unchanged } from './helpers/contracts-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 
 vi.mock('node:child_process', async original =>
@@ -184,8 +185,10 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
         return isProjectTests(invocation) && !repaired ? alertsFailed : {};
       },
     });
+    const final = finalCandidate(root, 'revision-02');
     const git = answeredGit(root, {
       head: 'revision-00',
+      previews: final.previews,
       commits: [
         scenariosCommitted('review-notes'),
         accepted('wi-001.i01', 'revision-01', modified(`${notesDirectory}/src/notes.ts`, `${notesDirectory}/src/tests/notes.test.ts`)),
@@ -220,6 +223,7 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
       checkExecution,
       readinessExecution: directReadinessExecution(),
       git,
+      candidates: final.candidates,
     });
     cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('review-notes'));
@@ -288,8 +292,10 @@ describe('adding work leaves every completed piece completed', () => {
         return notesFailed;
       },
     });
+    const final = finalCandidate(root, 'revision-03');
     const git = answeredGit(root, {
       head: 'revision-00',
+      previews: final.previews,
       commits: [
         scenariosCommitted('review-notes'),
         // The failed attempt's own commit, the repaired attempt beside it,
@@ -325,6 +331,7 @@ describe('adding work leaves every completed piece completed', () => {
       checkExecution,
       readinessExecution: directReadinessExecution(),
       git,
+      candidates: final.candidates,
       afterWrite: async (write, runId) => {
         // The moment the first iteration closes, the shape of everything it
         // wrote is taken; nothing that follows may change any of it.

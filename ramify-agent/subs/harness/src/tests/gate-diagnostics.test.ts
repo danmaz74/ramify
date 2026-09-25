@@ -1,4 +1,6 @@
 import { mockGit } from './helpers/mock-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
+import { localArchitectToolName } from '../work/submission.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -182,7 +184,16 @@ describe('a module violation at the iteration gate, over a run', () => {
     await installMiniRunner(root);
 
     let head = 'base';
+    const final = finalCandidate(root, 'repaired-source');
+    let previewIndex = 0;
     const git = mockGit({
+      previewCandidateTree: async project => {
+        expect(project).toBe(root);
+        const preview = final.previews[previewIndex++];
+        if (preview === undefined) throw new Error(`Unscripted final tree preview ${previewIndex}`);
+        expect(preview.head).toBe(head);
+        return preview;
+      },
       currentHead: async () => head,
       isCleanRepository: async () => true,
       createRunBranch: async (_root, runId) => ({ branch: `ramify-agent-run/${runId}`, created: true }),
@@ -200,7 +211,7 @@ describe('a module violation at the iteration gate, over a run', () => {
       .mockImplementationOnce(async (_root, message) => { expect(message).toMatch(/^Scenarios of /u); head = 'scenarios'; return head; })
       .mockImplementationOnce(async () => { head = 'repaired-source'; return head; }).mockResolvedValue(null);
     const opened = await openRuns(root, {
-      inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
       checkScript: ({ check, context }) => check.kind === 'ramify-check' && context.attemptId === 'ga-0002'
         ? { stdout: checkReport([notVisible(source, 13)]), outcome: { kind: 'completed', exitCode: 1 } }
         : {},
@@ -245,7 +256,7 @@ describe('a module violation at the iteration gate, over a run', () => {
 
     // What the architect was given: the failing command, the finding itself,
     // and what it leaves the architect to decide.
-    const architects = opened.agent!.sessions.filter(session => session.spec.role === 'local-architect');
+    const architects = opened.agent!.sessions.filter(session => session.spec.submission.name === localArchitectToolName);
     expect(architects).toHaveLength(3);
     const briefing = architects[1]!.spec.prompt;
     expect(briefing).toContain('## The iteration you last assigned');
@@ -254,6 +265,7 @@ describe('a module violation at the iteration gate, over a run', () => {
     expect(briefing).toContain(`${notesDirectory}/src/notes.ts:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`)`);
     expect(briefing).toContain('submit `request-placement` where another owner would have to expose a symbol');
     expect(git.commitAccepted).toHaveBeenCalledTimes(5);
+    expect(previewIndex).toBe(final.previews.length);
     expect(git.unexpected).toEqual([]);
   }, 300_000);
 });

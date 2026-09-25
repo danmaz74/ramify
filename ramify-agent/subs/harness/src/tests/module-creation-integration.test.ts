@@ -10,6 +10,8 @@ import { forkDecision, registryChange, requestPlacement } from './helpers/placem
 import { architectureLayout, type PlacementDecision } from '../architecture/records.js';
 import { analysisLayout, type RegistryEntry } from '../analysis/records.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
+import { localArchitectToolName } from '../work/submission.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import { installTestRunner, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 
@@ -73,12 +75,14 @@ const created: GateCommit = {
 };
 
 /** A copy of the fixture whose runner answers, with Git's answers stated. */
-async function target(answers: Omit<GateGitOptions, 'head'>, options: { readonly miniRunner?: boolean } = {}) {
+async function target(answers: Omit<GateGitOptions, 'head'> & { readonly finalHead: string }, options: { readonly miniRunner?: boolean } = {}) {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   if (options.miniRunner === false) await installTestRunner(fixture.root);
   else await installMiniRunner(fixture.root);
-  return { root: fixture.root, scripted: gateGit(fixture.root, { head: base, ...answers }) };
+  const { finalHead, ...gitAnswers } = answers;
+  const final = finalCandidate(fixture.root, finalHead);
+  return { root: fixture.root, scripted: gateGit(fixture.root, { head: base, ...gitAnswers, previews: final.previews }), final };
 }
 
 async function readResult(root: string, runId: string, number: number): Promise<IterationResult> {
@@ -87,7 +91,7 @@ async function readResult(root: string, runId: string, number: number): Promise<
 
 describe('G9: an accepted proposed entry owner reaches implementation', () => {
   test('a bootstrap assignment creates the module with nested source and its first test, and the notice is read from the commit', async () => {
-    const { root, scripted } = await target({ commits: [scenarios, created, unchanged, unchanged] });
+    const { root, scripted, final } = await target({ commits: [scenarios, created, unchanged, unchanged], finalHead: 'revision-01' });
     // This scenario keeps the real architect view: what it proves is that
     // the module the engineer created is in the refreshed view before its
     // own gate can pass.
@@ -109,12 +113,13 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
 
     const opened = await openRuns(root, {
       script: spec => {
-        if (spec.role === 'local-architect') architectScopes.push({ directory: spec.scope.workingDirectory, prompt: spec.prompt });
+        if (spec.submission.name === localArchitectToolName) architectScopes.push({ directory: spec.scope.workingDirectory, prompt: spec.prompt });
         return typeof script === 'function' ? script(spec) : script;
       },
       ramify: daemon.ramify,
       inputs: viewedInputs(daemon.ramify, message => unavailable.push(message)),
       git: scripted.git,
+      candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
     });
     cleanups.push(() => opened.service.close());

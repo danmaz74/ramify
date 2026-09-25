@@ -11,6 +11,7 @@ import { copyFixture, temporaryDirectory } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs } from './helpers/iterations.js';
 import { mockGit } from './helpers/mock-git.js';
+import { finalCandidate } from './helpers/final-candidate.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { createMappedCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
@@ -127,7 +128,16 @@ describe('the declared setup over a run', () => {
     await writeFile(join(root, 'ramify-agent.json'), `${JSON.stringify({ ...config, setup: [{ name: 'build', command: ['node', 'scripts/build.mjs'] }] }, null, 2)}\n`);
 
     let head = 'base';
+    const final = finalCandidate(root, 'repaired-build');
+    let previewIndex = 0;
     const git = mockGit({
+      previewCandidateTree: async project => {
+        expect(project).toBe(root);
+        const preview = final.previews[previewIndex++];
+        if (preview === undefined) throw new Error(`Unscripted final tree preview ${previewIndex}`);
+        expect(preview.head).toBe(head);
+        return preview;
+      },
       currentHead: async () => head,
       isCleanRepository: async () => true,
       createRunBranch: async (_root, runId) => ({ branch: `ramify-agent-run/${runId}`, created: true }),
@@ -143,7 +153,7 @@ describe('the declared setup over a run', () => {
       .mockImplementationOnce(async () => { head = 'repaired-build'; return head; })
       .mockResolvedValue(null);
     const opened = await openRuns(root, {
-      inputs: treeInputs(), git, readinessExecution: directReadinessExecution(),
+      inputs: treeInputs(), git, candidates: final.candidates, readinessExecution: directReadinessExecution(),
       // The engineer's first change breaks the build; its repair builds.
       checkScript: ({ check, context }) => check.kind === 'setup' && context.sourceCommit === 'broken-build'
         ? { stderr: `${buildError}\n`, outcome: { kind: 'completed', exitCode: 2 } }
@@ -162,6 +172,7 @@ describe('the declared setup over a run', () => {
     await opened.service.settled('review-notes', receipt.jobId);
     const runId = receipt.jobId;
     expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
+    expect(previewIndex).toBe(final.previews.length);
 
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     const ids = [...new Set(events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate))];
