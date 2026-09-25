@@ -52,6 +52,20 @@ export function inOwnContents(dir: string, path: string): boolean {
   return within(target, ownArea(dir)) || target === ownFile(dir, 'module.ramify') || target === ownFile(dir, 'README.md');
 }
 
+/** The module of the view whose own contents hold a project-relative path, or undefined for a path outside every module. */
+export function moduleOwning(index: ArchitectIndex, path: string): ModuleEntry | undefined {
+  return [...index.modules.values()]
+    .filter(entry => inOwnContents(entry.dir, path))
+    .sort((a, b) => b.dir.length - a.dir.length)[0];
+}
+
+/**
+ * The rule a fake injection site is judged by: it lies in the own contents
+ * of the consumer or of the provider, so a contract iteration may write it
+ * and nothing else of either module's internals is opened by naming it.
+ */
+export const injectionSiteRule = 'a fake injection site lies in the consumer\'s or the provider\'s own contents (src/, module.ramify or README.md)';
+
 /** Whether any part of the own contents of the module at `dir` lies inside `directory`. */
 export function ownContentsWithin(dir: string, directory: string): boolean {
   return [ownArea(dir), ownFile(dir, 'module.ramify'), ownFile(dir, 'README.md')].some(path => within(path, directory));

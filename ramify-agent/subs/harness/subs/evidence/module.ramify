@@ -10,7 +10,7 @@ expose-src RamifyCli, RamifyRun, RamifyCheckResult, MaterializeResult, ramifyVer
 // Reading what Ramify generates: the architect view, a requester API view and
 // the measurement document. Their file formats stay here.
 expose-src architectViewDirectory, ArchitectMeta, readArchitectMeta, coverageLimitsOf, ArchitectIndex, loadArchitectIndex, loadModuleTree from "views.ts" to parent
-expose-src ModuleEntry, SymbolRecord, findModule, symbolRecords, SourceArea, ApiViewSnapshot, readApiView, findInView from "views.ts" to parent
+expose-src ModuleEntry, SymbolRecord, ExposureChannel, findModule, symbolRecords, SourceArea, ApiViewSnapshot, readApiView, findInView from "views.ts" to parent
 expose-src isTestingModule from "views.ts" to parent
 expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurement, documentSchema, moduleSchema from "measure.ts" to parent
 

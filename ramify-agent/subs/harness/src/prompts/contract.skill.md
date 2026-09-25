@@ -1,4 +1,4 @@
-<!-- ramify-agent contract skill, version 1. -->
+<!-- ramify-agent contract skill, version 2. -->
 ### Delegation is executable evidence, never prose
 
 The consumer implements its real behavior against a fake of what it lacks.
@@ -57,3 +57,17 @@ declaration where the file is the same. A consumer that receives a function
 but not the types it is written in cannot use it cleanly, and Ramify does not
 expose them for you. A class or an enum that a signature mentions is exposed
 too; its importers take it with `import type` where they need only the type.
+
+### A fake is exactly as importable as what it stands for
+
+Place and use the fake at the seam where the real provider will act. The
+modules that receive the fake are exactly those that will receive the real
+export it stands for: the same owner, the same source area, the same
+exposure and re-exposure. The gate compares the two, and fails an agreement
+whose fake reaches a module the real export will not, or misses one it will.
+
+When the real behavior acts inside the provider and reaches the consumer as
+data through a path that already exists, inject the fake on the provider
+side, where the real export will be called, and let the consumer integrate
+through that path. Never give the consumer an import path the real export
+will not have: retiring the fake would then mean re-plumbing the consumer.

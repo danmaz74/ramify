@@ -61,8 +61,42 @@ export type ContractMode = z.infer<typeof contractModeSchema>;
 /** One artifact of the agreement, with the bytes it had when the gate passed. */
 const artifact = z.object({ path: text, exports: z.array(text), hash: sha256Schema }).strict();
 
+/** Where an owner, or an ancestor that re-exposes what it received, exposes an original. */
+export const exposureChannelSchema = z.enum(['parent', 'descendants']);
+
+/**
+ * An original's exposure as the architect view records it: where its owner
+ * exposes it, and each ancestor that re-exposes it and where to, nearest
+ * first. Empty `to` and `reexposed` are an original no declaration exposes.
+ */
+export const exposureChainSchema = z.object({
+  to: z.array(exposureChannelSchema),
+  reexposed: z.array(z.object({ by: modulePathSchema, to: z.array(exposureChannelSchema).min(1) }).strict()),
+}).strict();
+export type ExposureChain = z.infer<typeof exposureChainSchema>;
+
+/**
+ * The real provider export one fake export stands for: the file of the
+ * provider module that holds it, or will hold it, and its export name. The
+ * file need not exist when the agreement is established. `exposure` is the
+ * exposure the agreement declares for the real export; the fake is compared
+ * with it while the real export does not exist, and with the real export as
+ * the architect view records it once it does.
+ */
+export const standsForSchema = z.object({
+  /** The fake's exported name, one of its artifact's `exports`. */
+  fake: text,
+  path: text,
+  export: text,
+  exposure: exposureChainSchema,
+}).strict();
+export type StandsFor = z.infer<typeof standsForSchema>;
+
+/** A fake file of the agreement, and the real export each of its exported names stands for. */
+const fakeArtifact = artifact.extend({ standsFor: z.array(standsForSchema) }).strict();
+
 export const contractRecordSchema = z.object({
-  schema: z.literal('ramify-agent.contract/1'),
+  schema: z.literal('ramify-agent.contract/2'),
   id: text,
   revision: z.int().positive(),
   /** The registry entry of the capability this agreement is for. */
@@ -80,8 +114,12 @@ export const contractRecordSchema = z.object({
   artifacts: z.object({
     interface: z.array(artifact),
     conformance: z.array(z.object({ path: text, hash: sha256Schema }).strict()),
-    /** `.fake` files whose exported names carry `Fake`; the contract gate verifies both. */
-    fake: z.array(artifact),
+    /**
+     * `.fake` files whose exported names carry `Fake`, the contract gate
+     * verifies both, and each name's real export: a fake is exactly as
+     * importable as what it stands for.
+     */
+    fake: z.array(fakeArtifact),
     exposure: z.array(z.object({ path: text, declaration: text }).strict()),
   }).strict(),
   establishedBy: z.object({ iteration: text, gate: text }).strict(),
@@ -132,7 +170,7 @@ export const contractsLayout = {
 
 /** The schema literal of each kind, for a reader that answers unsupported version. */
 export const contractSchemas = {
-  contract: { schema: 'ramify-agent.contract/1', body: contractRecordSchema },
+  contract: { schema: 'ramify-agent.contract/2', body: contractRecordSchema },
   obligation: { schema: 'ramify-agent.provider-obligation/1', body: providerObligationSchema },
   requirement: { schema: 'ramify-agent.consumer-requirement/1', body: consumerRequirementSchema },
 } as const;

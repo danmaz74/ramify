@@ -469,6 +469,17 @@ hiding or measured complexity justifies it.
     carries `Fake`, and a re-export keeps that designation. It reads the
     source and not the submission, because the source is what generated
     architectural evidence will show.
+  - `parity.ts`: the fake-exposure-parity rule the contract gate and every
+    later iteration gate verify while a fake is registered. Each fake export
+    names the real provider export it stands for; the modules that receive
+    the fake must be those that receive the real export. Both are read from
+    the architect view's exposure chains (`to` and `reexposed`) over the
+    module tree, with the agreement's declared exposure in place of a real
+    export that does not exist yet, and the source area in place of its
+    tags. A violation another agreement's fake has that no file of the
+    iteration's write scope decides is a limit, not a failure; so is a fake
+    the view does not record. A retired fake is out of the rule, and a
+    declaration that still exposes it is a violation.
   - `verification.ts`: what closes a delegation beside a passing gate. No
     location the requirement named may still reach the fake, by an import of
     one of its files or by one of its exported names.
@@ -493,7 +504,8 @@ hiding or measured complexity justifies it.
     it exists for.
   - `session.ts`: what a contract sub-session is given: the need as the
     consumer wrote it, both sides of the seam, the existing consumers when it
-    extends an agreement, and the naming rule its gate will verify.
+    extends an agreement, and the naming and exposure-parity rules its gate
+    will verify.
 - `projections/`: every answer of the run protocol, computed from what the
   run service's `committed` hands out (the run's record, its directory and
   the complete lines of its log with their record bodies) and from the run's
@@ -872,8 +884,11 @@ pi actually made and what the snapshot tools answered.
   That assignment is a committed record, so a caller that dies discovers the
   outcome without the original reply. The sub-session is an engineer
   invocation with the contract skill, scoped to the requesting consumer, the
-  contract, its conformance suite, its fake and the exposure declarations on
-  the path between the two sides. Only `established` followed by a passing
+  contract, its conformance suite, its fake, the injection sites the need
+  names (files of the consumer or of the provider that hold the fake, and
+  nothing else of the provider) and the exposure declarations on the path
+  between the two sides. A revision's scope holds the injection sites the
+  agreement in force recorded. Only `established` followed by a passing
   contract gate registers; `incomplete` registers nothing.
 - **Registration and scheduling.** `contract-registered` commits the
   contract, one obligation keyed `ob-<contract-id>`, one requirement per

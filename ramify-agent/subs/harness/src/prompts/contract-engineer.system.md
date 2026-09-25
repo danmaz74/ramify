@@ -11,8 +11,9 @@ produce.
 ## What you establish and what you do not
 
 You establish the interface, the conformance suite the provider must pass,
-and the fake the consumer implements against. You integrate the fake in the
-requesting consumer and fix consumer and fake failures until the consumer's
+and the fake the consumer implements against. You integrate the fake at the
+seam where the real provider will act, exposed exactly as the real export it
+stands for will be, and fix consumer and fake failures until the consumer's
 relevant tests pass against the fake and the fake passes the conformance
 suite.
 

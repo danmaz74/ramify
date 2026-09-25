@@ -23,12 +23,13 @@ import type { WorkItem } from '../work/records.js';
 
 const reviews = 'collection-review/workspace/reviews';
 const validation = 'collection-review/workspace/reviews/validation';
+const validationDirectory = 'subs/workspace/subs/reviews/subs/validation';
 
 /** The declared module tree of the fixture, which the rules are judged against. */
 async function evidence(exists: (path: string) => Promise<boolean> = async () => true) {
   const fixture = await copyFixture();
   try {
-    return { index: await readDeclaredTree(fixture.root), exists };
+    return { index: await readDeclaredTree(fixture.root), consumer: reviews, exists };
   } finally {
     await fixture.remove();
   }
@@ -44,10 +45,14 @@ function established(extra: Record<string, unknown> = {}) {
     artifacts: {
       interface: [{ path: 'subs/a/src/interfaces/note-limit.ts', exports: ['NoteLimit'] }],
       conformance: [{ path: 'subs/a/src/tests/note-limit.conformance.test.ts' }],
-      fake: [{ path: 'subs/a/src/fakes/note-limit.fake.ts', exports: ['createNoteLimitFake'] }],
+      fake: [{
+        path: 'subs/a/src/fakes/note-limit.fake.ts',
+        exports: ['createNoteLimitFake'],
+        standsFor: [{ fake: 'createNoteLimitFake', path: `${validationDirectory}/src/note-limit.ts`, export: 'createNoteLimit', exposure: { to: ['parent'], reexposed: [] } }],
+      }],
       exposure: [{ path: 'subs/a/module.ramify', declaration: 'expose-src NoteLimit from "interfaces/note-limit.ts" to parent' }],
     },
-    fakeInjections: ['subs/b/src/notes.ts'],
+    fakeInjections: ['subs/workspace/subs/reviews/src/notes.ts'],
     summary: 'The agreement is established and the consumer runs against the fake.',
     ...extra,
   };
@@ -101,7 +106,7 @@ describe('the contract submission', () => {
     expect(unplaced.ok).toBe(false);
     if (!unplaced.ok) expect(unplaced.errors.map(error => error.path)).toContain('provider');
 
-    const absent = await validateContract(established(), { index: known.index, exists: async path => !path.endsWith('.fake.ts') });
+    const absent = await validateContract(established(), { index: known.index, consumer: reviews, exists: async path => !path.endsWith('.fake.ts') });
     expect(absent.ok).toBe(false);
     if (!absent.ok) expect(absent.errors[0]!.path).toBe('artifacts.fake.0.path');
 

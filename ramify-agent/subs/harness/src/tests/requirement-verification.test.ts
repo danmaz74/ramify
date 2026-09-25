@@ -44,7 +44,7 @@ const provider = 'collection-review/workspace/reviews/limits';
 const providerDirectory = 'subs/workspace/subs/reviews/subs/limits';
 
 const contract: ContractRecord = {
-  schema: 'ramify-agent.contract/1',
+  schema: 'ramify-agent.contract/2',
   id: 'ct-001',
   revision: 1,
   capability: { id: 'note-limit', revision: 1, hash: 'a'.repeat(64) },
@@ -56,7 +56,12 @@ const contract: ContractRecord = {
   artifacts: {
     interface: [{ path: `${providerDirectory}/src/interfaces/note-limit.ts`, exports: ['noteLimitCases'], hash: 'b'.repeat(64) }],
     conformance: [{ path: `${providerDirectory}/src/tests/note-limit.conformance.test.ts`, hash: 'c'.repeat(64) }],
-    fake: [{ path: `${providerDirectory}/src/fakes/note-limit.fake.ts`, exports: ['createNoteLimitFake'], hash: 'd'.repeat(64) }],
+    fake: [{
+      path: `${providerDirectory}/src/fakes/note-limit.fake.ts`,
+      exports: ['createNoteLimitFake'],
+      hash: 'd'.repeat(64),
+      standsFor: [standingFor('createNoteLimitFake')],
+    }],
     exposure: [],
   },
   establishedBy: { iteration: 'wi-001.i02', gate: 'ga-0002' },
@@ -173,6 +178,11 @@ const placeTheLimit = localDecision(
   [registryChange({ capability: 'note-limit', owner: provider, behavior: 'A note of at most 500 characters is within the limit.' })],
 );
 
+/** What each fake export of these agreements stands for: the real note limit, exposed as the fake is. */
+function standingFor(fake: string) {
+  return { fake, path: `${providerDirectory}/src/note-limit.ts`, export: 'createNoteLimit', exposure: { to: [], reexposed: [] } };
+}
+
 function establishedWith(fakePath: string, fakeExports: readonly string[]) {
   return {
     kind: 'established' as const,
@@ -183,7 +193,7 @@ function establishedWith(fakePath: string, fakeExports: readonly string[]) {
     artifacts: {
       interface: [{ path: `${providerDirectory}/src/interfaces/note-limit.ts`, exports: ['noteLimitCases'] }],
       conformance: [{ path: `${providerDirectory}/src/tests/note-limit.conformance.test.ts` }],
-      fake: [{ path: fakePath, exports: [...fakeExports] }],
+      fake: [{ path: fakePath, exports: [...fakeExports], standsFor: fakeExports.map(standingFor) }],
       exposure: [{ path: `${providerDirectory}/module.ramify`, declaration: 'expose-src noteLimitCases from "interfaces/note-limit.ts" to parent' }],
     },
     fakeInjections: [`${consumerDirectory}/src/notes.ts`],
@@ -363,8 +373,16 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
             interface: [{ path: `${providerDirectory}/src/interfaces/note-limit.ts`, exports: ['noteLimitCases'] }],
             conformance: [{ path: `${providerDirectory}/src/tests/note-limit.conformance.test.ts` }],
             fake: [
-              { path: `${providerDirectory}/src/fakes/note-limit.fake.ts`, exports: ['createNoteLimitFake', 'createNoteLimit'] },
-              { path: `${providerDirectory}/src/fakes/note-limit-stand-in.ts`, exports: ['createNoteLimitStandInFake'] },
+              {
+                path: `${providerDirectory}/src/fakes/note-limit.fake.ts`,
+                exports: ['createNoteLimitFake', 'createNoteLimit'],
+                standsFor: [standingFor('createNoteLimitFake'), standingFor('createNoteLimit')],
+              },
+              {
+                path: `${providerDirectory}/src/fakes/note-limit-stand-in.ts`,
+                exports: ['createNoteLimitStandInFake'],
+                standsFor: [standingFor('createNoteLimitStandInFake')],
+              },
             ],
             exposure: [],
           },

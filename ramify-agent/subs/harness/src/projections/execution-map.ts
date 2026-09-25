@@ -274,7 +274,7 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
     if (known().has(key('work-item', request.workItem))) relate('requested-by', key('placement-request', request.id), key('work-item', request.workItem), source);
   }
   for (const contract of view.records.contracts.values()) {
-    const source = recordSource(view, 'ramify-agent.contract/1', contract.id, 'contract', true);
+    const source = recordSource(view, 'ramify-agent.contract/2', contract.id, 'contract', true);
     if (source === null) { gaps.push(`Contract ${contract.id} has no retained source.`); continue; }
     const conformed = view.events.some(event => event.type === 'provider-conformed' &&
       event.data.obligation === `ob-${contract.id}` && event.data.revision === contract.revision);

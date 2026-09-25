@@ -236,7 +236,12 @@ export function gateOf(view: RunView, id: string): GateView {
       after: change.after,
       authorizedBy: change.authorizedBy === null ? null : { id: change.authorizedBy.id, revision: change.authorizedBy.revision },
     })),
-    rules: (gate.rules ?? []).map(rule => ({ rule: rule.rule, outcome: rule.outcome, violations: rule.violations.map(violation => ({ ...violation })) })),
+    rules: (gate.rules ?? []).map(rule => ({
+      rule: rule.rule,
+      outcome: rule.outcome,
+      violations: rule.violations.map(violation => ({ ...violation })),
+      ...(rule.limits === undefined ? {} : { limits: [...rule.limits] }),
+    })),
     commands: gate.commands.map(command => ({
       kind: command.kind,
       argv: [...command.command.argv],

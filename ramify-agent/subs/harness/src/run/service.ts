@@ -95,6 +95,7 @@ import { describePlan, initialAnalysisJsonSchema, initialAnalysisToolName, valid
 import { registerContract, registrationNeeded, type AttachedConsumer } from '../contracts/accept.js';
 import { cycleClosedBy, cycleIdentity, type DependencyCycle, type DependencyEdge } from '../contracts/graph.js';
 import { fakeNamingViolations, type NamedFile } from '../contracts/naming.js';
+import { fakeExposureParity, type StandIn } from '../contracts/parity.js';
 import {
   contractId, contractOfObligation, contractsLayout, obligationId, requirementId,
   type ConsumerRequirement, type ContractRecord, type ProviderObligation,
@@ -131,7 +132,7 @@ import {
 } from '../work/failure.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
-  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
+  captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, scopeProbePolicyOf, testPolicyOf,
   type GuardedScenarioFiles,
 } from '../work/scope.js';
 import { committedRecords, refOf } from '../work/committed.js';
@@ -464,6 +465,8 @@ interface IterationOutcome {
   readonly need?: {
     readonly need: NeedAsBehavior;
     readonly suggestedProvider?: string | undefined;
+    /** The files the fake must be injected in, as the engineer named them. */
+    readonly injectionSites?: readonly string[] | undefined;
     readonly invocation: string;
   } | undefined;
 }
@@ -4705,7 +4708,12 @@ export class RunService {
         consumer: item.module,
         provider: revised.provider,
         providerDirectory,
-        rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake and this consumer's integration. ${body.scope.rationale}`,
+        // The agreement in force names where its fake is held; the revision
+        // rewrites the fake where it is.
+        injectionSites: [...committed.requirements.values()]
+          .filter(requirement => contractOfObligation(requirement.obligation) === revised.id)
+          .flatMap(requirement => requirement.evidence.fakeInjections),
+        rationale: `The revision of ${revised.id}: the contract, its conformance suite, its fake, the files that hold it and this consumer's integration. ${body.scope.rationale}`,
       })
       : await resolveWriteScope({
         projectRoot: this.projectRoot,
@@ -5031,6 +5039,11 @@ export class RunService {
           kind: assignment.kind,
           openFindings: await tools.findingsAtCompletion(input),
           scenarios: this.declarationContext(run, item),
+          seams: {
+            index: run.index,
+            consumer: item.module,
+            providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
+          },
         }),
         acceptedText: value => {
           const check = tools.completionCheck();
@@ -5134,6 +5147,7 @@ export class RunService {
           need: {
             need,
             ...(result.value.suggestedProvider === undefined ? {} : { suggestedProvider: result.value.suggestedProvider }),
+            ...(result.value.injectionSites === undefined ? {} : { injectionSites: result.value.injectionSites }),
             invocation: result.id,
           },
         };
@@ -5342,6 +5356,7 @@ export class RunService {
     request: {
       readonly need: NeedAsBehavior;
       readonly suggestedProvider?: string | undefined;
+      readonly injectionSites?: readonly string[] | undefined;
       readonly invocation: string;
       readonly requestedBy: string;
     },
@@ -5370,6 +5385,15 @@ export class RunService {
     if (providerDirectory === null) {
       return { findings: [`the refreshed architect view has no directory for "${entry.owner}", so no contract scope could be captured`] };
     }
+    // The submission judged each site against the view it had; the owner
+    // the registry resolves now is the one the scope opens.
+    const misplaced = (request.injectionSites ?? []).filter(site => {
+      const owner = index === null ? undefined : moduleOwning(index, site);
+      return owner === undefined || (owner.module !== item.module && owner.module !== entry.owner);
+    });
+    if (misplaced.length > 0) {
+      return { findings: [`the injection site${misplaced.length === 1 ? '' : 's'} ${misplaced.map(site => `"${site}"`).join(', ')} ${misplaced.length === 1 ? 'lies' : 'lie'} in neither ${item.module} nor ${entry.owner}, and ${injectionSiteRule}; no contract iteration was started`] };
+    }
 
     const outline = (records.outlines.get(item.id) ?? []).at(-1);
     if (outline === undefined) {
@@ -5389,7 +5413,8 @@ export class RunService {
       consumer: item.module,
       provider: entry.owner,
       providerDirectory,
-      rationale: `The agreement between ${item.module} and ${entry.owner}: the contract, its conformance suite, its fake, the consumer's integration and the exposure declarations on the path between them. The provider's implementation is not this iteration's.`,
+      injectionSites: request.injectionSites ?? [],
+      rationale: `The agreement between ${item.module} and ${entry.owner}: the contract, its conformance suite, its fake, the consumer's integration, the files the fake is injected in and the exposure declarations on the path between them. The rest of the provider's implementation is not this iteration's.`,
     });
 
     const subArtifacts = this.requiredArtifacts(committedRecords(run.log.ledger.replay()));
@@ -5402,7 +5427,7 @@ export class RunService {
       stage: 0,
       kind: 'contract',
       goal: `Establish the agreement that gives ${item.module} the behavior of "${entry.capability}", which ${entry.owner} owns, and integrate it in ${item.module} against a fake.`,
-      approach: `${item.module} stated the need as behavior. Design the interface, write the conformance suite and the fake, integrate the fake in ${item.module}, and leave ${entry.owner} to implement the provider.`,
+      approach: `${item.module} stated the need as behavior. Design the interface, write the conformance suite and the fake, integrate the fake at the seam where ${entry.owner}'s real export will act, exposed exactly as that export will be, and leave ${entry.owner} to implement the provider.`,
       scope,
       requirementRefs: [],
       externalCapabilities: [{ capability: entry.capability, owner: entry.owner, role: 'request' }],
@@ -5461,6 +5486,8 @@ export class RunService {
       readonly consumer: string;
       readonly provider: string;
       readonly providerDirectory: string;
+      /** The files the agreement names as holding the fake, on either side. */
+      readonly injectionSites: readonly string[];
       readonly rationale: string;
     },
   ) {
@@ -5474,6 +5501,7 @@ export class RunService {
         { path: `${subject.providerDirectory}/src/interfaces`, purpose: 'contract', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/tests`, purpose: 'conformance', kind: 'directory' },
         { path: `${subject.providerDirectory}/src/fakes`, purpose: 'fake', kind: 'directory' },
+        ...[...new Set(subject.injectionSites)].map(path => ({ path, purpose: 'fake-injection' as const })),
         ...declarationsBetween(index, subject.consumer, subject.provider).map(path => ({ path, purpose: 'exposure-declaration' as const })),
       ],
       read: [subject.provider, subject.consumer],
@@ -5565,9 +5593,10 @@ export class RunService {
         toolName: contractToolName,
         description: 'End your turn with the result of this contract iteration. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
         inputSchema: contractJsonSchema,
-        submissionSchema: 'ramify-agent.contract-submission/1',
+        submissionSchema: 'ramify-agent.contract-submission/2',
         validate: input => validateContract(input, {
           index,
+          consumer: item.module,
               exists: (path: string) => stat(join(this.projectRoot, path)).then(found => found.isFile(), () => false),
         }),
         scope: {
@@ -5709,7 +5738,19 @@ export class RunService {
     const tests = await resolveTestSelection({ projectRoot: this.projectRoot, index, policy });
     await this.recordRunnerGaps(run, invocation);
 
-    const rules = [await this.fakeNamingRule(submission)];
+    const writeScope = writeScopePaths(this.projectRoot, assignment);
+    // The agreement's own fakes are this gate's to answer; another
+    // agreement's fake is judged too, attributed by the write scope. A
+    // revision replaces the fakes of the revision in force.
+    const declared: StandIn[] = submission.artifacts.fake.flatMap(entry => entry.standsFor.map(standsFor => ({
+      contract: 'the agreement under this gate', fakePath: entry.path, standsFor, declaredHere: true,
+    })));
+    const parity = await this.fakeExposureParityRule(index, [
+      ...declared,
+      ...this.registeredStandIns(run, assignment.revisesContract?.id)
+        .filter(standIn => !declared.some(own => own.fakePath === standIn.fakePath && own.standsFor.fake === standIn.standsFor.fake)),
+    ], writeScope);
+    const rules = [await this.fakeNamingRule(submission), ...(parity === null ? [] : [parity])];
     const modules = await this.pendingModules(run, assignment.id);
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
@@ -5725,7 +5766,7 @@ export class RunService {
       subject: { workItem: item.id, iteration: assignment.id },
       tests,
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope: writeScopePaths(this.projectRoot, assignment),
+      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
       rules,
     }, submission.summary, modules, assignment.goal);
@@ -5758,6 +5799,35 @@ export class RunService {
     }
     const violations = fakeNamingViolations(files, submission.artifacts.fake.map(entry => entry.path));
     return { rule: 'fake-naming', outcome: violations.length === 0 ? 'passed' : 'failed', violations };
+  }
+
+  /**
+   * The fake-exposure-parity rule over the given fakes, on the architect
+   * view refreshed for this gate: each fake is exactly as importable as the
+   * real export it stands for. No rule where no fake is registered.
+   */
+  private async fakeExposureParityRule(
+    index: ArchitectIndex | null,
+    standIns: readonly StandIn[],
+    writeScope: readonly string[],
+  ): Promise<GateRuleRecord | null> {
+    if (standIns.length === 0) return null;
+    return fakeExposureParity({
+      index,
+      standIns,
+      writeScope,
+      read: path => readFile(join(this.projectRoot, path), 'utf8').catch(() => null),
+    });
+  }
+
+  /** Every fake the registered agreements name, at the revision in force, except those of `except`. */
+  private registeredStandIns(run: Run, except?: string): StandIn[] {
+    const records = committedRecords(run.log.ledger.replay());
+    return [...records.contracts.values()]
+      .filter(contract => contract.mode === 'fake-backed' && contract.id !== except)
+      .flatMap(contract => contract.artifacts.fake.flatMap(entry => entry.standsFor.map(standsFor => ({
+        contract: contract.id, fakePath: entry.path, standsFor, declaredHere: false,
+      }))));
   }
 
   /**
@@ -6182,10 +6252,16 @@ export class RunService {
     // beside it as the probe that tells a failure inside this iteration's
     // scope from one outside it.
     const allProject = assignment.gate.tests.policy === 'all-project';
-    const tests = allProject ? undefined : await this.resolveTests(run, assignment);
-    const probe = allProject ? await this.resolveProbe(run, assignment) : undefined;
+    const index = await this.refreshIndex(run);
+    const tests = allProject ? undefined : await this.resolveTests(run, assignment, index);
+    const probe = allProject ? await this.resolveProbe(run, assignment, index) : undefined;
     await this.recordRunnerGaps(run, invocation);
 
+    // While an agreement's fake is registered, a write of this iteration
+    // that makes it more or less importable than its real export fails the
+    // gate; what no file of its scope decides is not this iteration's.
+    const writeScope = writeScopePaths(this.projectRoot, assignment);
+    const parity = await this.fakeExposureParityRule(index, this.registeredStandIns(run), writeScope);
     const modules = await this.pendingModules(run, assignment.id);
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
@@ -6202,8 +6278,9 @@ export class RunService {
       ...(tests === undefined ? {} : { tests }),
       ...(probe === undefined || probe.selection.resolved.length === 0 ? {} : { scopeProbe: probe }),
       guarded: this.guardedAtGate(run, assignment.guarded),
-      writeScope: writeScopePaths(this.projectRoot, assignment),
+      writeScope,
       authorizations: assignment.authorizations.map(entry => ({ path: entry.path, by: entry.by })),
+      ...(parity === null ? {} : { rules: [parity] }),
     }, summary, modules, assignment.goal);
 
     if (attempt.verdict !== 'passed') {
@@ -6215,15 +6292,18 @@ export class RunService {
     return attempt;
   }
 
-  /** Resolves the assignment's captured policy against the tree as it stands now. */
-  private async resolveTests(run: Run, assignment: IterationAssignment) {
-    const index = await this.refreshIndex(run);
+  /**
+   * Resolves the assignment's captured policy against the tree as it stands
+   * now, on `refreshed` where the caller has just refreshed the view.
+   */
+  private async resolveTests(run: Run, assignment: IterationAssignment, refreshed?: ArchitectIndex | null) {
+    const index = refreshed === undefined ? await this.refreshIndex(run) : refreshed;
     return resolveTestSelection({ projectRoot: this.projectRoot, index, policy: assignment.gate.tests });
   }
 
   /** The assignment's own modules, resolved anew, as an all-project checkpoint's probe. */
-  private async resolveProbe(run: Run, assignment: IterationAssignment) {
-    const index = await this.refreshIndex(run);
+  private async resolveProbe(run: Run, assignment: IterationAssignment, refreshed?: ArchitectIndex | null) {
+    const index = refreshed === undefined ? await this.refreshIndex(run) : refreshed;
     return resolveTestSelection({
       projectRoot: this.projectRoot,
       index,
@@ -7858,7 +7938,11 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
       ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     },
     guardedChanges: [...prepared.guardedChanges],
-    rules: prepared.rules.map(rule => ({ ...rule, violations: rule.violations.map(violation => ({ ...violation })) })),
+    rules: prepared.rules.map(({ limits, ...rule }) => ({
+      ...rule,
+      violations: rule.violations.map(violation => ({ ...violation })),
+      ...(limits === undefined ? {} : { limits: [...limits] }),
+    })),
     unauthorized: prepared.unauthorized,
     ruleFailed: prepared.ruleFailed,
     timeoutMs: prepared.timeoutMs,
