@@ -164,7 +164,7 @@ export function compositionScenario(root: string, policy: Partial<NonNullable<Ru
         submit(assign(notes, { goal: 'Add the note store.' }, outline())),
         submit(requestCompletion()),
       ],
-      'engineer:wi-001': [submit(completionProposed('Added the note store.'), write(store, 'export const store = new Map(); // v1\n'))],
+      'engineer:wi-001': [submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map(); // v1\n'))],
       'local-architect:wi-002': [
         submit(assign(tags, { goal: 'Add the tag store.' }, outline())),
         submit(assign(tags, { goal: 'Limit a tag to the plan\'s length.' })),
@@ -173,9 +173,9 @@ export function compositionScenario(root: string, policy: Partial<NonNullable<Ru
         submit(requestCompletion()),
       ],
       'engineer:wi-002': [
-        submit(completionProposed('Added the tag store.'), write(tagStore, 'export const tags = new Set<string>();\n')),
-        submit(completionProposed('Limited a tag.'), write(tagLimit, 'export const tagLimit = (text: string) => text.length <= 50;\n')),
-        submit(completionProposed('Corrected the tag limit.'), write(tagLimit, 'export const tagLimit = (text: string) => text.length <= 500;\n')),
+        submit(completionProposed('Added the tag store.'), write('tags.ts', 'export const tags = new Set<string>();\n')),
+        submit(completionProposed('Limited a tag.'), write('limit.ts', 'export const tagLimit = (text: string) => text.length <= 50;\n')),
+        submit(completionProposed('Corrected the tag limit.'), write('limit.ts', 'export const tagLimit = (text: string) => text.length <= 500;\n')),
       ],
     },
     reviewers: {

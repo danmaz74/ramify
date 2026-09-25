@@ -44,7 +44,7 @@ describe('a projection never writes, and no query appends an event', () => {
     cleanups.push(target.remove);
     const { root } = target;
     const ports = protocolPorts(root);
-    const opened = await openRuns(root, { ...ports, script: protocolScript(), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
+    const opened = await openRuns(root, { ...ports, script: protocolScript(root), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
     const receipt = await opened.service.execute(startRun(plan));
     const runId = receipt.jobId;
     await opened.service.settled(plan, runId);

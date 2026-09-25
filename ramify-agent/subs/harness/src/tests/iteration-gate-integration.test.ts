@@ -65,10 +65,10 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
         engineer: [
           // The first attempt proposes completion with the defect still there.
-          submit(completionProposed('Added the note store.'), write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n')),
+          submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map();\n')),
           // The repair is a real edit of the real defect.
           submit(completionProposed('Raised the limit to 500, which is what the test states.'),
-            edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500')),
+            edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500')),
         ],
       }),
       inputs: treeInputs(),

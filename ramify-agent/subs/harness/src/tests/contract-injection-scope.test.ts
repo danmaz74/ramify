@@ -199,10 +199,10 @@ describe('the contract iteration writes the named injection sites', () => {
       engineer: [
         submit({ kind: 'contract-needed', need, summary: 'The limit is owned elsewhere; it reaches the notes as the report says.', injectionSites: [seam.report] }),
         submit(completionProposed('The real limit is implemented and the report is made with it.'),
-          write(seam.real, 'export function createNoteLimit() {\n  return { withinLimit: (note) => note.length <= 500 };\n}\n'),
-          write(seam.report, reportWithReal)),
+          write(join(root, seam.real), 'export function createNoteLimit() {\n  return { withinLimit: (note) => note.length <= 500 };\n}\n'),
+          write(join(root, seam.report), reportWithReal)),
         submit(completionProposed('The notes read the report, which the real limit now makes.'),
-          write(seam.consumer, `${consumerReadingReport}// verified against the real limit\n`)),
+          write(join(root, seam.consumer), `${consumerReadingReport}// verified against the real limit\n`)),
       ],
       'contract-engineer': [submit(establishedContract,
         write(seam.interface, "export const noteLimitCases = [{ note: 'x'.repeat(501), within: false }];\n"),

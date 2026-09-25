@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -162,7 +163,7 @@ describe('P4: an ordinary provider engineer reports inability to conform through
       ],
       'engineer:wi-001': [
         submit(contractNeeded(agreed)),
-        submit(completionProposed('The notes now use the revised real limit.'), write(paths(relaxed).consumer, consumerAgainstReal(relaxed))),
+        submit(completionProposed('The notes now use the revised real limit.'), write(join(root, paths(relaxed).consumer), consumerAgainstReal(relaxed))),
       ],
       'contract-engineer:wi-001': [
         submit(established(agreed), ...contractWrites(agreed)),
@@ -179,7 +180,7 @@ describe('P4: an ordinary provider engineer reports inability to conform through
           reason: 'provider-cannot-conform',
           detail: 'The agreed suite requires a note of 500 characters to be kept, and the store this module writes to indexes 300.',
         }),
-        submit(completionProposed('The real limit is implemented at the revised length.'), ...providerWrites(relaxed)),
+        submit(completionProposed('The real limit is implemented at the revised length.'), ...providerWrites(relaxed, root)),
       ],
     }, [
       // The agreement's files when it is established, the same files again

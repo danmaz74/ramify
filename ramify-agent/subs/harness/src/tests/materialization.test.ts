@@ -388,9 +388,10 @@ describe('an engineer and the feature files', () => {
     const project = fixture.root;
     // What the engineer's shell leaves, stated and written directly: one
     // line appended to the feature file. No shell runs.
-    const tamper = `printf '# tampered\\n' >> ${notesFeature}`;
+    const tamper = `printf '# tampered\\n' >> '${join(project, notesFeature)}'`;
     const commands = statedCommands(project, [{
       argv: () => ['bash', '-c', tamper],
+      cwd: () => join(project, notesDirectory, 'src'),
       leaves: async where => appendFile(join(where, notesFeature), '# tampered\n'),
     }]);
 
@@ -413,8 +414,8 @@ describe('an engineer and the feature files', () => {
         ],
         engineer: [
           submit(completionProposed('Tried to mark the scenario done.'),
-            write(notesFeature, 'Feature: review-note\n'),
-            write('ramify-agent.json', '{}\n'),
+            write(join(project, notesFeature), 'Feature: review-note\n'),
+            write(join(project, 'ramify-agent.json'), '{}\n'),
             shell(tamper)),
           submit(completionProposed('Nothing else was needed.')),
         ],

@@ -111,7 +111,7 @@ describe('the module-capability comparison of a completed scripted run, over HTT
     const target = await protocolTarget();
     cleanups.push(target.remove);
     const { root } = target;
-    const opened = await openRuns(root, { git: gitService, script: protocolScript(), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
+    const opened = await openRuns(root, { git: gitService, script: protocolScript(root), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
     const runId = (await opened.service.execute(startRun(plan))).jobId;
     await opened.service.settled(plan, runId);
     await opened.service.close();

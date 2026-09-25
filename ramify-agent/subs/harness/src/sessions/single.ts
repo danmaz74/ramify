@@ -28,6 +28,7 @@ import { InvocationTranscript, verdictNote } from '../transcripts/recorder.js';
 import { ContentStore } from '../transcripts/store.js';
 import { TranscriptWriter } from '../transcripts/writer.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
+import { engineerWorkingDirectory } from '../work/engineer-directory.js';
 import {
   engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
   type EngineerSubmission,
@@ -260,6 +261,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     if (!list.includes(target.resolved)) list.push(target.resolved);
   }
   const scope = { ...own, resolved: { ...own.resolved, roots, files } };
+  const workingDirectory = await engineerWorkingDirectory(projectRoot, scope, initial)
+    .catch(error => ({ error: message(error) }));
+  if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
   // The project's configuration for the harness is never an agent's to write.
   const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
   const tests = testPolicyOf('ordinary', base, []);
@@ -299,8 +303,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     guarded: guardedFiles,
     authorizations: [],
   };
-  const systemPrompt = renderEngineerPrompt(loaded, projectRoot);
-  const prompt = iterationMessage({ assignment, projectRoot, base: head, views });
+  const systemPrompt = renderEngineerPrompt(loaded, projectRoot, undefined, workingDirectory);
+  const prompt = iterationMessage({ assignment, projectRoot, workingDirectory, base: head, views });
   const shown = scopePaths(projectRoot, scope);
 
   const record: SessionRecord = sessionRecordSchema.parse({
@@ -338,6 +342,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const tools = engineerEquipment({
     commandExecution: options.commandExecution,
     projectRoot,
+    workingDirectory,
     ramify,
     commands: policy.commands,
     bounds: limits,
@@ -374,7 +379,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   const excursions = new ExcursionWatcher({ projectRoot, index: initial, scope: guarded });
   const context = contextPolicyOf(policy, 'engineer');
-  const recorder = new PortEventRecorder({ projectRoot, observations, judge, excursions, context, transcript });
+  const recorder = new PortEventRecorder({ projectRoot, workingDirectory, observations, judge, excursions, context, transcript });
   const bounds = new InvocationBounds(limits);
   const equipment = tools.equip({
     invocation: id,
@@ -388,7 +393,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
 
   const spec: SessionSpec = {
     role: 'engineer',
-    scope: { workingDirectory: projectRoot },
+    scope: { workingDirectory },
     systemPrompt,
     prompt,
     session: { mode: 'fresh' },

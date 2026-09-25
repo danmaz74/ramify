@@ -67,7 +67,7 @@ export function protocolPolicy(projectRoot: string): RunPolicy {
 }
 
 /** The script: two work items, one of which creates a module, each declaring its scenario with its completion request. */
-export function protocolScript() {
+export function protocolScript(root: string) {
   return declaringScenarios(byWork({
     'initial-architect': [submit(analysis(
       [
@@ -82,16 +82,16 @@ export function protocolScript() {
     'local-architect:wi-002': [submit(assign(drafts, {}, outline())), submit(requestCompletion())],
     'engineer:wi-001': [submit(
       completionProposed('Raised the note limit where the test asks for it.'),
-      read('subs/workspace/subs/reviews/src/router.ts'),
-      edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
-      shell(`printf 'export const outside = true;\\n' > ${outsidePath}`),
+      read(join(root, 'subs/workspace/subs/reviews/src/router.ts')),
+      edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
+      shell(`printf 'export const outside = true;\\n' > '${join(root, outsidePath)}'`),
     )],
     'engineer:wi-002': [submit(
       completionProposed('Created the drafts module with its first behavior and the test that states it.'),
-      write(`${draftsDirectory}/module.ramify`, 'ramify 1\nmodule drafts\n'),
-      write(`${draftsDirectory}/README.md`, '# drafts\n\nKeeps a reviewer\'s unsent drafts.\n'),
-      write(`${draftsDirectory}/src/drafts.ts`, 'export const draftLimit = 20;\n'),
-      write(`${draftsDirectory}/src/tests/drafts.test.ts`, [
+      write('../module.ramify', 'ramify 1\nmodule drafts\n'),
+      write('../README.md', '# drafts\n\nKeeps a reviewer\'s unsent drafts.\n'),
+      write('drafts.ts', 'export const draftLimit = 20;\n'),
+      write('tests/drafts.test.ts', [
         'import { test, expect } from \'vitest\';',
         'import { draftLimit } from \'../drafts.ts\';',
         '',

@@ -46,12 +46,12 @@ describe('CF05: readers beside the writer, confined to the audited candidate', (
     const waitForWriter = (index: 0 | 1): ScriptStep => ({ kind: 'await', until: async () => { readersWaiting[index].open(); await writerWrote.opened; } });
     const run = await reviewRun(root, cleanups, {
       engineer: [
-        submit(completionProposed('Added the note store.'), write(store, 'export const store = new Map(); // v1\n')),
-        submit(completionProposed('Stated the note limit.'), write(limit, 'export const limit = (text: string) => text.length <= 50;\n')),
+        submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map(); // v1\n')),
+        submit(completionProposed('Stated the note limit.'), write('limit.ts', 'export const limit = (text: string) => text.length <= 50;\n')),
         submit(completionProposed('Exported the store.'),
           { kind: 'await', until: () => Promise.all(readersWaiting.map(waiting => waiting.opened)) },
-          write(store, 'export const store = new Map(); // v3\n'),
-          write(`${notesDirectory}/src/index.ts`, 'export * from \'./store.js\';\n'),
+          write('store.ts', 'export const store = new Map(); // v3\n'),
+          write('index.ts', 'export * from \'./store.js\';\n'),
           { kind: 'await', until: async () => { writerWrote.open(); } }),
       ],
       reviewers: {
@@ -203,12 +203,12 @@ describe('CF04: invalid, timed-out and unavailable reviews are not verified', ()
       candidates: scripted => { source = scripted; },
       policy: { attemptMs: 1_000, concurrency: 1 },
       engineer: [
-        submit(completionProposed('Added the note store.'), write(store, 'export const store = new Map(); // v1\n')),
-        submit(completionProposed('Stated the note limit.'), write(limit, 'export const limit = (text: string) => text.length <= 50;\n')),
+        submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map(); // v1\n')),
+        submit(completionProposed('Stated the note limit.'), write('limit.ts', 'export const limit = (text: string) => text.length <= 50;\n')),
         submit(completionProposed('Exported the store.'),
           // The third candidate cannot be read by the time its reader starts.
           { kind: 'await', until: async () => { source.fail('treeEntries', 'revision-03'); } },
-          write(store, 'export const store = new Map(); // v3\n'), write(`${notesDirectory}/src/index.ts`, 'export * from \'./store.js\';\n')),
+          write('store.ts', 'export const store = new Map(); // v3\n'), write('index.ts', 'export * from \'./store.js\';\n')),
       ],
       reviewers: {
         'rq-0001#1': malformed,

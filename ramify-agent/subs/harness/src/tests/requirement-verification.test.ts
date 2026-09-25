@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -261,13 +262,13 @@ describe('a requirement whose fake is still injected is not verified', () => {
       engineer: [
         submit({ kind: 'contract-needed', need, summary: 'The limit is owned elsewhere.' }),
         submit(completionProposed('The real limit is implemented.'),
-          write(`${providerDirectory}/src/note-limit.ts`, realProvider),
-          write(`${providerDirectory}/src/tests/note-limit.subjects.ts`, bothSubjects)),
+          write(join(root, providerDirectory, 'src/note-limit.ts'), realProvider),
+          write(join(root, providerDirectory, 'src/tests/note-limit.subjects.ts'), bothSubjects)),
         // The tests pass, and the fake is exactly where it was.
         submit(completionProposed('The behavior is verified.'),
-          write(`${consumerDirectory}/src/limit-note.ts`, '/** Where the limit came from. */\nexport const provider = \'the limits module\';\n')),
+          write(join(root, consumerDirectory, 'src/limit-note.ts'), '/** Where the limit came from. */\nexport const provider = \'the limits module\';\n')),
         submit(completionProposed('The consumer now uses the real note limit.'),
-          write(`${consumerDirectory}/src/notes.ts`, replaced)),
+          write(join(root, consumerDirectory, 'src/notes.ts'), replaced)),
       ],
       'contract-engineer': [submit(
         establishedWith(`${providerDirectory}/src/fakes/note-limit.fake.ts`, ['createNoteLimitFake']),
@@ -363,7 +364,7 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
       engineer: [
         submit({ kind: 'contract-needed', need, summary: 'The limit is owned elsewhere.' }),
         submit(completionProposed('The limit is carried here instead.'),
-          write(`${consumerDirectory}/src/notes.ts`, "export function addNote(note) {\n  return note.length <= 500 ? note : '';\n}\n")),
+          write(join(root, consumerDirectory, 'src/notes.ts'), "export function addNote(note) {\n  return note.length <= 500 ? note : '';\n}\n")),
       ],
       // Every command of this agreement passes; only the naming rule fails.
       'contract-engineer': [submit(

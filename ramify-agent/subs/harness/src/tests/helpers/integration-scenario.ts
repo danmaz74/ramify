@@ -156,9 +156,9 @@ export async function integrationProject(cleanups: Cleanups): Promise<string> {
 export const entryTurns = {
   'initial-architect': [submit(integrationAnalysis())],
   'local-architect:wi-001': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-  'engineer:wi-001': [submit(completionProposed('The note\'s sub-scenario is bound.', { scenarios: ['sc-001'] }), write(noteSteps, noteStepFile))],
+  'engineer:wi-001': [submit(completionProposed('The note\'s sub-scenario is bound.', { scenarios: ['sc-001'] }), write('tests/steps/review-note.steps.ts', noteStepFile))],
   'local-architect:wi-002': [submit(assign(tags, {}, outline())), submit(requestCompletion())],
-  'engineer:wi-002': [submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write(tagSteps, tagStepFile))],
+  'engineer:wi-002': [submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', tagStepFile))],
 };
 
 /** The integration work item's assignment: the ancestor, with both children on the paths to the owners. */
@@ -171,9 +171,9 @@ export const bindAtAncestor = assign(reviews, {
 /** The engineer that binds it: the ancestor's step file, the two exposures, and the declaration. */
 export const bindTurn = submit(
   completionProposed('The integration scenario binds to both sub-scenarios\' definitions.', { scenarios: ['sc-003'] }),
-  write(ancestorSteps, ancestorStepFile),
-  write(notesModule, exposing('notes', 'reviewNoteSteps', 'review-note.steps.ts')),
-  write(tagsModule, exposing('tags', 'reviewTagsSteps', 'review-tags.steps.ts')),
+  write('tests/steps/integration.steps.ts', ancestorStepFile),
+  write('../subs/notes/module.ramify', exposing('notes', 'reviewNoteSteps', 'review-note.steps.ts')),
+  write('../subs/tags/module.ramify', exposing('tags', 'reviewTagsSteps', 'review-tags.steps.ts')),
 );
 
 /** The commits of the two entries' work items, then the integration item's iteration. */

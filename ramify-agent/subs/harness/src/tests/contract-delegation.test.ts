@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -306,10 +307,10 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
       engineer: [
         submit(contractNeeded),
         submit(completionProposed('The real note limit is implemented and the conformance suite runs against it.'),
-          write(`${providerDirectory}/src/note-limit.ts`, realProvider),
-          write(`${providerDirectory}/src/tests/note-limit.subjects.ts`, bothSubjects)),
+          write(join(root, providerDirectory, 'src/note-limit.ts'), realProvider),
+          write(join(root, providerDirectory, 'src/tests/note-limit.subjects.ts'), bothSubjects)),
         submit(completionProposed('The consumer now uses the real note limit.'),
-          write(`${consumerDirectory}/src/notes.ts`, verified)),
+          write(join(root, consumerDirectory, 'src/notes.ts'), verified)),
       ],
       'contract-engineer': [submit(establishedContract, ...contractWrites)],
     }, delegationCommits('wi-001.i03'));
@@ -407,7 +408,7 @@ describe('a contract sub-session that fails registers nothing, and its caller go
       engineer: [
         submit(contractNeeded),
         submit(completionProposed('The limit is carried here, because the agreement was not established.'),
-          write(`${consumerDirectory}/src/notes.ts`, [
+          write(join(root, consumerDirectory, 'src/notes.ts'), [
             'export function addNote(note) {',
             "  return note.length <= 500 ? note : '';",
             '}',
@@ -458,7 +459,7 @@ describe('X1b: a contract sub-session that returns incomplete registers nothing'
       engineer: [
         submit(contractNeeded),
         submit(completionProposed('The limit is carried here, because the agreement was not established.'),
-          write(`${consumerDirectory}/src/notes.ts`, [
+          write(join(root, consumerDirectory, 'src/notes.ts'), [
             'export function addNote(note) {',
             "  return note.length <= 500 ? note : '';",
             '}',

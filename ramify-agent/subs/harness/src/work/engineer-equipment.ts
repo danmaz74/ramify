@@ -70,6 +70,8 @@ export interface EngineerEquipmentInputs {
   /** External command execution. Tests script outcomes; actual process tests use the default. */
   readonly commandExecution?: CommandRunner | undefined;
   readonly projectRoot: string;
+  /** The port session's cwd; built-in writes and the shell resolve relative paths here. */
+  readonly workingDirectory?: string | undefined;
   /** The Ramify command line the hook check runs. */
   readonly ramify: RamifyCli;
   /** The project's own commands: the scoped test run's template and the hook check's timeout. */
@@ -159,6 +161,7 @@ export interface EngineerEquipment {
  */
 export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEquipment {
   const { projectRoot } = inputs;
+  const workingDirectory = inputs.workingDirectory ?? projectRoot;
   let seen: FindingsSeen | undefined;
   let toolJudge: ToolInputJudge<Record<string, never>> | undefined;
   let shellJudge: ToolInputJudge<{ command: string; timeoutMs?: number }> | undefined;
@@ -199,7 +202,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     shell = createShellTool({
       commandExecution,
       maxTimeoutMs,
-      workingDirectory: projectRoot,
+      workingDirectory,
       judge: input => shellJudge!.judge(input, session.callId(shellToolName)),
       outputFile: call => inputs.outputPath('shell', session.invocation, call),
       // The call itself is already an `activity` observation holding
@@ -286,7 +289,7 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
           // and reported in `outsideScope`. Nothing here prevents them.
           return { allow: true };
         }
-        const decision = await decideWrite(inputs.guarded, projectRoot, call.action);
+        const decision = await decideWrite(inputs.guarded, workingDirectory, call.action);
         await session.observations.record({
           type: 'guard',
           data: {

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -208,7 +209,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
       ],
       'engineer:wi-001': [
         submit(contractNeeded(forNotes)),
-        submit(completionProposed('The notes now use the real limit.'), write(paths(forNotes).consumer, consumerAgainstReal(forNotes))),
+        submit(completionProposed('The notes now use the real limit.'), write(join(root, paths(forNotes).consumer), consumerAgainstReal(forNotes))),
       ],
       'contract-engineer:wi-001': [submit(established(forNotes), ...contractWrites(forNotes))],
 
@@ -221,7 +222,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
       ],
       'engineer:wi-002': [
         submit(contractNeeded(forTags)),
-        submit(completionProposed('The tags now use the real limit.'), write(paths(forTags).consumer, consumerAgainstReal(forTags))),
+        submit(completionProposed('The tags now use the real limit.'), write(join(root, paths(forTags).consumer), consumerAgainstReal(forTags))),
       ],
       'contract-engineer:wi-002': [submit(established(forTags), write(paths(forTags).consumer, consumerAgainstFake(forTags)))],
 
@@ -236,7 +237,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
       ],
       'engineer:wi-003': [
         submit(contractNeeded(forMarks)),
-        submit(completionProposed('The marks now use the revised real limit.'), write(paths(trimming).consumer, consumerAgainstReal(trimming))),
+        submit(completionProposed('The marks now use the revised real limit.'), write(join(root, paths(trimming).consumer), consumerAgainstReal(trimming))),
       ],
       'contract-engineer:wi-003': [
         submit(established(forMarks), write(paths(forMarks).consumer, consumerAgainstFake(forMarks))),
@@ -248,14 +249,14 @@ describe('P3: a contract revision reschedules current evidence without resetting
         submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit.' }))),
         submit(requestCompletion()),
       ],
-      'engineer:wi-004': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(forNotes))],
+      'engineer:wi-004': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(forNotes, root))],
 
       // wi-005, the provider follow-up of revision 2.
       'local-architect:wi-005': [
         submit(assign(limits, {}, outline({ changes: 'Implement the trimming the revised agreement states.' }))),
         submit(requestCompletion()),
       ],
-      'engineer:wi-005': [submit(completionProposed('The real limit trims before it measures.'), ...providerWrites(trimming))],
+      'engineer:wi-005': [submit(completionProposed('The real limit trims before it measures.'), ...providerWrites(trimming, root))],
 
       // wi-006 and wi-007, the consumer follow-ups of the two completed items.
       'local-architect:wi-006': [
@@ -264,7 +265,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
       ],
       'engineer:wi-006': [submit(
         completionProposed('The notes follow the revised limit.'),
-        write(paths(forNotes).consumer, consumerAgainstReal({ ...forNotes, trims: true })),
+        write(join(root, paths(forNotes).consumer), consumerAgainstReal({ ...forNotes, trims: true })),
       )],
       'local-architect:wi-007': [
         submit(assign(tags, { kind: 'verification', goal: 'Verify the tags against the revised limit.' }, outline({ changes: 'The revised limit trims first.' }))),
@@ -272,7 +273,7 @@ describe('P3: a contract revision reschedules current evidence without resetting
       ],
       'engineer:wi-007': [submit(
         completionProposed('The tags follow the revised limit.'),
-        write(paths(forTags).consumer, consumerAgainstReal({ ...forTags, trims: true })),
+        write(join(root, paths(forTags).consumer), consumerAgainstReal({ ...forTags, trims: true })),
       )],
     });
 

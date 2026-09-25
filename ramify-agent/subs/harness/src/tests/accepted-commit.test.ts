@@ -108,7 +108,7 @@ const moduleEntries = [
   { status: 'A', path: `${notesDirectory}/src/notes.ts` },
   { status: 'A', path: `${notesDirectory}/src/tests/notes.test.ts` },
 ];
-const storeWrite = write(storePath, 'export const store = new Map();\n');
+const storeWrite = write('store.ts', 'export const store = new Map();\n');
 const latePath = `${notesDirectory}/src/late.ts`;
 
 describe('a change to the working directory blocks nothing', () => {
@@ -364,10 +364,10 @@ describe('the accepted boundary after an audit infrastructure retry', () => {
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
         engineer: [submit(
           completionProposed('Created the notes module.'),
-          write(`${notesDirectory}/module.ramify`, 'ramify 1\nmodule notes\n'),
-          write(`${notesDirectory}/README.md`, '# notes\n\nHolds reviewer notes.\n'),
-          write(`${notesDirectory}/src/notes.ts`, 'export const noteLimit = 500;\n'),
-          write(`${notesDirectory}/src/tests/notes.test.ts`, firstTest),
+          write('../module.ramify', 'ramify 1\nmodule notes\n'),
+          write('../README.md', '# notes\n\nHolds reviewer notes.\n'),
+          write('notes.ts', 'export const noteLimit = 500;\n'),
+          write('tests/notes.test.ts', firstTest),
         )],
       }),
       inputs: treeInputs(),

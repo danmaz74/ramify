@@ -221,7 +221,7 @@ describe('§7: declaring, and the iteration gate', () => {
         // wi-002 needs no iteration: existing step definitions bind its scenario, which the request declares.
         submit({ ...requestCompletion(), scenarios: ['sc-002'] }),
       ],
-      engineer: [submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(noteSteps, stepFile))],
+      engineer: [submit(completionProposed('The note scenario is bound.', { scenarios: ['sc-001'] }), write(noteSteps.slice(`${notesDirectory}/src/`.length), stepFile))],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(noteSteps), ...modified(noteFeature)]),
       unchanged('wi-001'),
@@ -308,10 +308,10 @@ describe('§8: providers, fakes and bound scenarios', () => {
       ],
       engineer: [
         submit(contractNeeded(noteLimit)),
-        submit(completionProposed('The scenario runs against the fake.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
-        submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit)),
+        submit(completionProposed('The scenario runs against the fake.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile)),
+        submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit, root)),
         // A repeated declaration of a bound scenario changes nothing.
-        submit(completionProposed('The notes now use the real limit.', { scenarios: ['sc-001'] }), write(note.consumer, consumerAgainstReal(noteLimit))),
+        submit(completionProposed('The notes now use the real limit.', { scenarios: ['sc-001'] }), write('notes.ts', consumerAgainstReal(noteLimit))),
       ],
       'contract-engineer': [submit(established(noteLimit), ...contractWrites(noteLimit))],
     }, [
@@ -508,10 +508,10 @@ describe('§7: withdrawal', () => {
         submit(requestCompletion()),
       ],
       engineer: [
-        submit(completionProposed('Bound, I believe.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
+        submit(completionProposed('Bound, I believe.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile)),
         submit(completionProposed('Bound, I still believe.', { scenarios: ['sc-001'] })),
         submit(completionProposed('Bound, once more.', { scenarios: ['sc-001'] })),
-        submit(completionProposed('The last step is bound.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// bound\n`)),
+        submit(completionProposed('The last step is bound.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), `${stepFile}// bound\n`)),
       ],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
@@ -598,9 +598,9 @@ describe('§7: withdrawal', () => {
         }),
       }))],
       engineer: [
-        submit(completionProposed('Bound, I believe.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
+        submit(completionProposed('Bound, I believe.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile)),
         submit(partialReport(['the step file'], ['the last step needs a decision on where formatting belongs'])),
-        submit(completionProposed('The last step is bound.', { scenarios: ['sc-001'] }), write(steps, `${stepFile}// bound\n`)),
+        submit(completionProposed('The last step is bound.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), `${stepFile}// bound\n`)),
       ],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
@@ -648,11 +648,11 @@ describe('§7: withdrawal', () => {
       ],
       engineer: [
         submit(contractNeeded(noteLimit)),
-        submit(completionProposed('The scenario runs against the fake.', { scenarios: ['sc-001'] }), write(steps, stepFile)),
+        submit(completionProposed('The scenario runs against the fake.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile)),
         submit(partialReport(['the step file'], ['the last step'])),
-        submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit)),
+        submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit, root)),
         submit(completionProposed('The notes use the real limit, and the scenario is bound.', { scenarios: ['sc-001'] }),
-          write(note.consumer, consumerAgainstReal(noteLimit))),
+          write('notes.ts', consumerAgainstReal(noteLimit))),
       ],
       'contract-engineer': [submit(established(noteLimit), ...contractWrites(noteLimit))],
     }, [
@@ -737,7 +737,7 @@ describe('§9: work-item completion', () => {
         submit(requestCompletion()),
         submit(requestCompletion()),
       ],
-      engineer: [submit(completionProposed('Bound.', { scenarios: ['sc-001'] }), write(steps, stepFile))],
+      engineer: [submit(completionProposed('Bound.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile))],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
       unchanged('wi-001'),
@@ -810,7 +810,7 @@ describe('§12: a crash between the withdrawal commit and its record', () => {
     const { runId } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline()))],
-      engineer: [submit(completionProposed('Bound, I believe.', { scenarios: ['sc-001'] }), write(steps, stepFile))],
+      engineer: [submit(completionProposed('Bound, I believe.', { scenarios: ['sc-001'] }), write(steps.slice(`${notesDirectory}/src/`.length), stepFile))],
     }, [
       accepted('wi-001.i01', 'revision-01', [...added(steps), ...modified(feature)]),
       unchanged('wi-001.i01'),

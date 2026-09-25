@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -296,10 +297,10 @@ describe('P1: one consumer delegates, resumes after provider conformance and ver
       engineer: [
         submit(contractNeeded),
         submit(completionProposed('The real note limit is implemented.'),
-          write(`${providerDirectory}/src/note-limit.ts`, realProvider),
-          write(`${providerDirectory}/src/tests/note-limit.subjects.ts`, bothSubjects)),
+          write(join(root, providerDirectory, 'src/note-limit.ts'), realProvider),
+          write(join(root, providerDirectory, 'src/tests/note-limit.subjects.ts'), bothSubjects)),
         submit(completionProposed('The consumer uses the real note limit.'),
-          write(`${consumerDirectory}/src/notes.ts`, verified)),
+          write(join(root, consumerDirectory, 'src/notes.ts'), verified)),
       ],
       'contract-engineer': [submit(establishedContract, ...contractWrites)],
       // A retained real boundary: this scenario is about what the gate's

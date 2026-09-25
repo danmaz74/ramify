@@ -141,7 +141,7 @@ describe('C1: a run completes with no client, and a client attached afterwards r
 
     // The run is driven by the service with no server and no client. The
     // test watches the file system for the terminal event, and nothing else.
-    const opened = await openRuns(root, { script: protocolScript(), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
+    const opened = await openRuns(root, { script: protocolScript(root), inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot) });
     const receipt = await opened.service.execute(startRun(plan));
     const runId = receipt.jobId;
     await until(async () => {
@@ -206,7 +206,7 @@ describe('every query of a completed run, over HTTP', () => {
   test('answers what the records hold: analysis, decisions, work items, capabilities, gates and metrics', async () => {
     const target = await scriptedTarget();
     cleanups.push(target.remove);
-    const server = await serve(target.root, { agent: createScriptedAgent(protocolScript()) });
+    const server = await serve(target.root, { agent: createScriptedAgent(protocolScript(target.root)) });
     cleanups.push(() => server.close());
 
     const started = await post(server, startRun(plan));

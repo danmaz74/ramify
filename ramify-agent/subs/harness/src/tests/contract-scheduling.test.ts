@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { join } from 'node:path';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyFixture } from './helpers/fixture.js';
 import { localDecision, registryChange } from './helpers/placement.js';
@@ -133,10 +134,10 @@ describe('P5: a shared obligation runs its provider once and each consumer verif
       ],
       engineer: [
         submit(contractNeeded(noteLimit)),
-        submit(completionProposed('The real limit is implemented and the agreed suite runs against it.'), ...providerWrites(noteLimit)),
-        submit(completionProposed('The notes now use the real limit.'), write(paths(noteLimit).consumer, consumerAgainstReal(noteLimit))),
+        submit(completionProposed('The real limit is implemented and the agreed suite runs against it.'), ...providerWrites(noteLimit, root)),
+        submit(completionProposed('The notes now use the real limit.'), write(join(root, paths(noteLimit).consumer), consumerAgainstReal(noteLimit))),
         submit(contractNeeded(tagLimit)),
-        submit(completionProposed('The tags now use the real limit.'), write(paths(tagLimit).consumer, consumerAgainstReal(tagLimit))),
+        submit(completionProposed('The tags now use the real limit.'), write(join(root, paths(tagLimit).consumer), consumerAgainstReal(tagLimit))),
       ],
       'contract-engineer': [
         submit(established(noteLimit), ...contractWrites(noteLimit)),
@@ -242,11 +243,11 @@ describe('P5: a chain of changes back through a module that has yielded is not a
       engineer: [
         submit(contractNeeded(noteLimit)),
         submit(contractNeeded(noteFormat)),
-        submit(completionProposed('The real format is implemented.'), ...providerWrites(noteFormat)),
+        submit(completionProposed('The real format is implemented.'), ...providerWrites(noteFormat, root)),
         submit(completionProposed('The limit work uses the real format, and the real limit is implemented.'),
-          write(paths(noteFormat).consumer, consumerAgainstReal(noteFormat)),
-          ...providerWrites(noteLimit)),
-        submit(completionProposed('The notes use the real limit.'), write(paths(noteLimit).consumer, consumerAgainstReal(noteLimit))),
+          write(join(root, paths(noteFormat).consumer), consumerAgainstReal(noteFormat)),
+          ...providerWrites(noteLimit, root)),
+        submit(completionProposed('The notes use the real limit.'), write(join(root, paths(noteLimit).consumer), consumerAgainstReal(noteLimit))),
       ],
       'contract-engineer': [
         submit(established(noteLimit), ...contractWrites(noteLimit)),

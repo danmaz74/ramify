@@ -513,6 +513,8 @@ export interface IterationApiViews {
 export interface IterationBriefing {
   readonly assignment: IterationAssignment;
   readonly projectRoot: string;
+  /** The executable cwd of this invocation, usually the first base module's src. */
+  readonly workingDirectory?: string | undefined;
   /** The commit `git diff` compares against: the last accepted boundary. */
   readonly base: string;
   /** The API views of the modules this iteration writes, or why one has none. */
@@ -532,6 +534,7 @@ export interface IterationBriefing {
 /** The first user message of one engineer invocation. */
 export function iterationMessage(briefing: IterationBriefing): string {
   const { assignment } = briefing;
+  const startingModule = 'module' in assignment.scope.base ? assignment.scope.base.module : assignment.scope.base.modules[0]!;
   const paths = scopePaths(briefing.projectRoot, assignment.scope);
   const lines: string[] = [
     `# Iteration ${assignment.id} — ${describeBase(assignment)}`,
@@ -544,7 +547,9 @@ export function iterationMessage(briefing: IterationBriefing): string {
     '',
     assignment.approach,
     '',
-    '## What you may write',
+    `Your starting module is \`${startingModule}\`. Your working directory is \`${briefing.workingDirectory ?? briefing.projectRoot}\`. Relative tool paths and shell commands start there.`,
+    '',
+    '## What you may write (project-relative paths)',
     '',
     ...paths.roots.map(root => `- \`${root}/\` and everything beneath it`),
     ...paths.files.map(file => `- \`${file}\``),
@@ -562,7 +567,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
         continue;
       }
       for (const view of entry.views) {
-        lines.push(`- \`${entry.module}\` (${view.area}): \`${view.path}/\`; ${view.coverage === null
+        lines.push(`- \`${entry.module}\` (${view.area}): \`${view.path}/\` (project-relative; open \`${briefing.projectRoot}/${view.path}/\` from this cwd); ${view.coverage === null
           ? 'coverage complete, so a symbol it does not list is not importable'
           : `coverage limits: ${view.coverage}, so absence is not proof`}.`);
       }
@@ -571,7 +576,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
   }
 
   if (assignment.scope.bootstrap.length > 0) {
-    lines.push('This iteration creates a module. Its directory does not exist yet, and you may create it with its');
+    lines.push('This iteration creates a module. The harness prepared its source directory for your session; write its');
     lines.push('declaration, its README and its own source. Creating any other module is not authorized.', '');
   }
 

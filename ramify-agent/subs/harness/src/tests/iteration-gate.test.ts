@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
@@ -136,7 +137,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
         submit(completionProposed('I believe this is done.')),
         submit(completionProposed('I still believe this is done.')),
         submit(completionProposed('I believe this once more.')),
-        submit(completionProposed('Raised the limit to 500.'), edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500')),
+        submit(completionProposed('Raised the limit to 500.'), edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500')),
       ],
     }, {
       // The three attempts that repair nothing change nothing, so Git
@@ -198,7 +199,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
         // The first attempt passes the tests that exist, then writes a new
         // test that does not hold.
         submit(completionProposed('Stated a second rule about the limit.'),
-          write(`${notesDirectory}/src/tests/second.test.ts`, [
+          write('tests/second.test.ts', [
             'import { test, expect } from \'vitest\';',
             'import { noteLimit } from \'../notes.ts\';',
             '',
@@ -208,7 +209,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
             '',
           ].join('\n'))),
         submit(completionProposed('Corrected the second rule.'),
-          edit(`${notesDirectory}/src/tests/second.test.ts`, 'toBe(1)', 'toBe(500)')),
+          edit('tests/second.test.ts', 'toBe(1)', 'toBe(500)')),
       ],
     }, {
       commits: [
@@ -273,7 +274,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
         submit(completionProposed('I changed the source and wrote no test.')),
         // The first test of the owner, written by the iteration that needs it.
         submit(completionProposed('Added the first test of this module.'),
-          write(`${notesDirectory}/src/tests/notes.test.ts`, limitTest)),
+          write('tests/notes.test.ts', limitTest)),
       ],
     }, {
       commits: [
@@ -352,7 +353,7 @@ describe('K5b: an invalid session, a timeout and an exhausted limit keep distinc
         'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
         engineer: [
           submit(completionProposed('I believe this is done.')),
-          submit(completionProposed('Raised the limit.'), edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500')),
+          submit(completionProposed('Raised the limit.'), edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500')),
         ],
       }),
       inputs: treeInputs(),
@@ -497,8 +498,8 @@ describe('a file outside every module, assigned as outside-modules', () => {
       ],
       engineer: [
         submit(completionProposed('The report prints the limit, and its test says so.'),
-          write(report, 'export const reportLine = \'limit 500\';\n'),
-          write(reportTest, [
+          write(join(root, report), 'export const reportLine = \'limit 500\';\n'),
+          write(join(root, reportTest), [
             'import { test, expect } from \'vitest\';',
             'import { reportLine } from \'./notes-report.ts\';',
             '',

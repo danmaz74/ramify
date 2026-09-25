@@ -1,12 +1,12 @@
-<!-- ramify-agent engineer procedure, version 5. -->
+<!-- ramify-agent engineer procedure, version 6. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
    below, and the write scope it names.
-2. Read the code you are changing, inside that scope, and your module's API
-   view for what it may import from other modules. Read other modules' source
-   only to understand behavior; reading is not bounded the way writing is,
-   and it never shows what you may import.
+2. Read the local code you are changing and the relevant module onboarding.
+   Search the explicitly named hidden API directories for any foreign
+   interface you need. Read foreign source only to resolve a specific
+   question left unanswered by that evidence.
 3. Make the change, with `edit` and `write`. Tests that state the completion
    evidence are part of the work, not an extra.
 4. Run `run_scope_tests` until the selection passes, and the scenarios you
@@ -19,8 +19,9 @@ Where the message lists scenarios, they are the plan's requirements of this
 work item, written by the harness into feature files. You bind them; you
 never write or change one.
 
-- Write step definitions in `src/tests/steps/` of a module within your write
-  scope (a testing module's `src/steps/`). A run of a module's scenarios loads
+- Write step definitions in `tests/steps/` from the assigned module's `src/`
+  (a testing module uses `steps/` from its `src/`). Use the corresponding
+  location for another module within your write scope. A module's run loads
   that module's step files and what they import, and nothing else.
 - Never edit a feature file. A write to one is refused.
 - Declare a scenario only once its steps are defined and it passes in quick
@@ -59,7 +60,7 @@ export, remove the declarations that exposed the fake with it.
 
 ## `shell`
 
-One command at a time, in the project's working directory, with a timeout you
+One command at a time, starting in the module's `src/`, with a timeout you
 may set. You receive the end of its output and the file holding all of it.
 
 Nothing checks what a command writes before it runs. A write outside your

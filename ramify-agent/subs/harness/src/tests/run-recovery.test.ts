@@ -781,12 +781,12 @@ describe('the boundaries of an iteration', () => {
   }, 180_000);
 
   /** An engineer that writes through the unguarded shell before it submits. */
-  function oneShellIteration(marker: string): OpenRunsOptions['script'] {
+  function oneShellIteration(projectRoot: string, marker: string): OpenRunsOptions['script'] {
     return byRole({
       'initial-architect': [submitStep(analysis([entry('review-note', notes)]))],
       'local-architect': [submitStep(assign(notes, {}, outline())), submitStep(requestCompletion())],
       engineer: [[
-        shell(`printf 'export const store = new Map();\\n' > ${marker}`),
+        shell(`printf 'export const store = new Map();\\n' > '${join(projectRoot, marker)}'`),
         { kind: 'submit', input: completionProposed('Added the note store with a command.') },
       ]],
     });
@@ -795,15 +795,16 @@ describe('the boundaries of an iteration', () => {
   test('a crash after writer-released keeps what the shell wrote, closes the invocation and releases no second writer', async () => {
     const root = await iterationTarget();
     const written = `${notesDirectory}/src/store.ts`;
-    const command = `printf 'export const store = new Map();\\n' > ${written}`;
+    const command = `printf 'export const store = new Map();\\n' > '${join(root, written)}'`;
     const commands = statedCommands(root, [{
       argv: () => ['bash', '-c', command],
+      cwd: project => join(project, notesDirectory, 'src'),
       async leaves(project) {
         await writeFile(join(project, written), 'export const store = new Map();\n');
       },
     }]);
     const { runId } = await crashAfter(
-      root, 'writer-released', false, oneShellIteration(written), treeInputs(), undefined, undefined, undefined, commands,
+      root, 'writer-released', false, oneShellIteration(root, written), treeInputs(), undefined, undefined, undefined, commands,
     );
     commands.assertComplete();
 

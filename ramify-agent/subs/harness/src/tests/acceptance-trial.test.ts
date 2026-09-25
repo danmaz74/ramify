@@ -242,7 +242,7 @@ function course(log: readonly RunEvent[]): string[] {
 }
 
 /** The trial's agents, per work item. */
-const trialScript = {
+const trialScript = (root: string) => ({
   'initial-architect': [submit(integrationAnalysis())],
   // wi-001, the note: a contract for the limit, the sub-scenario bound
   // against its fake, a yield, and the verification that binds it for real.
@@ -255,10 +255,10 @@ const trialScript = {
   ],
   'engineer:wi-001': [
     submit(contractNeeded(noteLimit)),
-    submit(completionProposed('The sub-scenario runs against the fake.', { scenarios: ['sc-001'] }), write(noteSteps, noteStepFile)),
+    submit(completionProposed('The sub-scenario runs against the fake.', { scenarios: ['sc-001'] }), write('tests/steps/review-note.steps.ts', noteStepFile)),
     submit(partialReport(['the step file'], ['the last step'])),
     submit(completionProposed('The notes use the real limit, and the sub-scenario is bound.', { scenarios: ['sc-001'] }),
-      write(note.consumer, consumerAgainstReal(noteLimit))),
+      write('notes.ts', consumerAgainstReal(noteLimit))),
   ],
   'contract-engineer': [submit(established(noteLimit), ...contractWrites(noteLimit))],
   // wi-002, the tags: the first iteration spends its repair rounds and
@@ -269,18 +269,18 @@ const trialScript = {
     submit(requestCompletion()),
   ],
   'engineer:wi-002': [
-    submit(completionProposed('The tags\' sub-scenario is bound, I believe.', { scenarios: ['sc-002'] }), write(tagSteps, tagStepFile)),
+    submit(completionProposed('The tags\' sub-scenario is bound, I believe.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', tagStepFile)),
     submit(completionProposed('Bound, I still believe.', { scenarios: ['sc-002'] })),
     submit(completionProposed('Bound, once more.', { scenarios: ['sc-002'] })),
-    submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write(tagSteps, `${tagStepFile}// bound\n`)),
+    submit(completionProposed('The tags\' sub-scenario is bound.', { scenarios: ['sc-002'] }), write('tests/steps/review-tags.steps.ts', `${tagStepFile}// bound\n`)),
   ],
   // wi-003, the limit's provider.
   'local-architect:wi-003': [submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit.' }))), submit(requestCompletion())],
-  'engineer:wi-003': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit))],
+  'engineer:wi-003': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit, root))],
   // wi-004, the integration work item at the common ancestor.
   'local-architect:wi-004': [submit(bindAtAncestor), submit(requestCompletion())],
   'engineer:wi-004': [bindTurn],
-};
+});
 
 const trialCommits: CommitResponse[] = [
   accepted('wi-001.i02', 'revision-01', [...added(note.contract, note.fake, note.subjects, note.conformance), ...modified(note.consumer)]),
@@ -461,8 +461,8 @@ async function badgeRun(root: string): Promise<Trial> {
     ],
     'engineer:wi-001': [submit(
       completionProposed('The badge carries its tone, neutral by default, and both scenarios bind to its step file.', { scenarios: ['sc-001', 'sc-002'] }),
-      ...Object.entries(implementation).map(([path, content]) => write(path, content)),
-      write(badgeSteps, badgeStepFile),
+      ...Object.entries(implementation).map(([path, content]) => write(join(root, path), content)),
+      write(join(root, badgeSteps), badgeStepFile),
     )],
   }, [
     accepted('wi-001.i01', 'revision-01', [
@@ -507,7 +507,7 @@ describe('the scripted acceptance trial, with the scripted cucumber-js', () => {
 
   test('passes the review stop, readiness, materialization, a bound declaration, due, a withdrawal, an integration work item and the final gate in full mode', async () => {
     const root = await trialProject(toolchain);
-    await expectTrial(await reviewedRun(root, plan, trialScript, trialCommits, trialFailures), toolchain);
+    await expectTrial(await reviewedRun(root, plan, trialScript(root), trialCommits, trialFailures), toolchain);
   }, 120_000);
 
   test('status-badge-tone: the plan\'s two scenarios are bound in shared-ui and pass in full mode', async () => {
@@ -534,7 +534,7 @@ describe.runIf(installed)('the acceptance trial with the fixture\'s toolchain an
 
   test('the same trial: the final gate runs every module\'s scenarios for real, bound by the step files the engineers wrote', async () => {
     const root = await trialProject(toolchain);
-    await expectTrial(await reviewedRun(root, plan, trialScript, trialCommits, trialFailures), toolchain);
+    await expectTrial(await reviewedRun(root, plan, trialScript(root), trialCommits, trialFailures), toolchain);
   }, 300_000);
 
   test('status-badge-tone: the step file renders the badge without a World, and both scenarios pass in full mode', async () => {

@@ -75,7 +75,7 @@ async function composedRun() {
     'engineer:wi-003': [
       bindTurn,
       submit(completionProposed('The bridging Given now writes the note.', { scenarios: ['sc-003'] }),
-        write(tagSteps, tagStepFile.replace("Given('a note was written with review-note', () => {});", "Given('a note was written with review-note', () => { /* as review-note does */ });"))),
+        write('tests/steps/review-tags.steps.ts', tagStepFile.replace("Given('a note was written with review-note', () => {});", "Given('a note was written with review-note', () => { /* as review-note does */ });"))),
     ],
   }, [...entryCommits, bindCommit, accepted('wi-003.i01', 'revision-04', modified(tagSteps)), unchanged('wi-003'), unchanged(finalSubject)],
   failingOnce());

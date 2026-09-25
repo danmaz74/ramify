@@ -77,7 +77,7 @@ describe('G8: one small work item completes in one iteration', () => {
         ],
         engineer: [submit(
           completionProposed('Raised the note limit to the 500 characters the plan asks for.'),
-          edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
+          edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
           runScopeTests(),
         )],
       }),

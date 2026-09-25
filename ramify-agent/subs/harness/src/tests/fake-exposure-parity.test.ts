@@ -454,10 +454,10 @@ describe('the rule at a run\'s contract gate', () => {
       engineer: [
         submit({ kind: 'contract-needed', need, summary: 'The limit is owned elsewhere.' }),
         submit(completionProposed('The real limit is implemented, exposed as the agreement declares it.'),
-          write(seam.real, 'export function createNoteLimit() {\n  return { withinLimit: (note) => note.length <= 500 };\n}\n'),
-          write(seam.declaration, `${withFake.trimEnd()}\nexpose-src createNoteLimit from "note-limit.ts" to parent\n`)),
+          write(join(root, seam.real), 'export function createNoteLimit() {\n  return { withinLimit: (note) => note.length <= 500 };\n}\n'),
+          write(join(root, seam.declaration), `${withFake.trimEnd()}\nexpose-src createNoteLimit from "note-limit.ts" to parent\n`)),
         submit(completionProposed('The consumer uses the real note limit.'),
-          write(seam.consumer, "import { createNoteLimit } from '../../limits/src/note-limit.ts';\n\nconst limit = createNoteLimit();\n\nexport function addNote(note) {\n  return limit.withinLimit(note) ? note : '';\n}\n")),
+          write(join(root, seam.consumer), "import { createNoteLimit } from '../../limits/src/note-limit.ts';\n\nconst limit = createNoteLimit();\n\nexport function addNote(note) {\n  return limit.withinLimit(note) ? note : '';\n}\n")),
       ],
       'contract-engineer': [
         submit(establishedContract,

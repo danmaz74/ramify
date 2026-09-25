@@ -389,8 +389,8 @@ export function renderReconciliationPrompt(loaded: LoadedPackage, projectRoot: s
  * of its shell commands may run: the policy's, or what its assignment raised
  * it to. It is never stored either.
  */
-export function renderEngineerPrompt(loaded: LoadedPackage, projectRoot: string, commandTimeoutMs: number = shellMaxTimeoutMs): string {
-  return render(loaded, projectRoot, engineerToolName, { commandTimeoutMs: String(commandTimeoutMs) });
+export function renderEngineerPrompt(loaded: LoadedPackage, projectRoot: string, commandTimeoutMs: number = shellMaxTimeoutMs, workingDirectory: string = projectRoot): string {
+  return render(loaded, projectRoot, engineerToolName, { commandTimeoutMs: String(commandTimeoutMs), workingDirectory });
 }
 
 /** The rendered system prompt of one contract sub-session, with its command maximum. It is never stored either. */

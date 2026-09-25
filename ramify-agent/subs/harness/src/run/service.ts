@@ -116,6 +116,7 @@ import { creationAuthority } from '../work/assignment.js';
 import {
   engineerEquipment, type EngineerEquipment, type EngineerEquipmentInputs, type EquipContext, type Equipment, type ShellCallRecord,
 } from '../work/engineer-equipment.js';
+import { engineerWorkingDirectory } from '../work/engineer-directory.js';
 import {
   engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
@@ -2920,7 +2921,9 @@ export class RunService {
       scope: request.guarded,
     });
     const context = contextPolicyOf(run.record.policy, request.role);
-    const recorder = new PortEventRecorder({ projectRoot: this.projectRoot, observations, judge, excursions, context, transcript });
+    const recorder = new PortEventRecorder({
+      projectRoot: this.projectRoot, workingDirectory: request.workingDirectory, observations, judge, excursions, context, transcript,
+    });
     // Every port event is activity; `touch` is what the idle bound resets.
     // A command the equipment runs for the session holds it instead. An
     // engineer's own bounds replace the policy's; a reader's may only be
@@ -4825,6 +4828,7 @@ export class RunService {
    * commands and the bounds.
    */
   private implementationTools(run: Run, options: {
+    readonly workingDirectory?: string;
     readonly scopeRevision: number;
     readonly guarded: GuardedScope;
     readonly tests: TestSelectionPolicy;
@@ -4909,7 +4913,8 @@ export class RunService {
     // runs under the bounds its assignment raised, and its prompt states the
     // longest a command may run.
     const bounds = this.engineerBounds(run, assignment);
-    const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs);
+    const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index);
+    const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory);
     const measurementScope = {
       exactOwners: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules,
       subtrees: 'module' in assignment.scope.base ? assignment.scope.base.includedChildren : [],
@@ -4984,6 +4989,7 @@ export class RunService {
         ? { ...scopeProbePolicyOf(assignment.scope.base, assignment.scope.extra), extraSuites: [...assignment.gate.tests.extraSuites] }
         : assignment.gate.tests;
       const tools = this.implementationTools(run, {
+        workingDirectory,
         scopeRevision: assignment.scope.revision,
         guarded,
         tests: probed,
@@ -4993,6 +4999,7 @@ export class RunService {
 
       const result = await this.runInvocation<EngineerSubmission>(run, agent, {
         role: 'engineer',
+        workingDirectory,
         work: { workItem: item.id, iteration: assignment.id },
         attempt,
         loaded,
@@ -5000,6 +5007,7 @@ export class RunService {
         prompt: iterationMessage({
           assignment,
           projectRoot: this.projectRoot,
+          workingDirectory,
           base: this.accepted(run),
           views: await this.iterationViews(run, assignment),
           ...(failedGate === undefined ? {} : { failedGate }),

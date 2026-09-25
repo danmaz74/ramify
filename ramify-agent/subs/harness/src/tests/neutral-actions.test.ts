@@ -135,14 +135,14 @@ async function engineerRecord(naming: Naming) {
     engineer: [submit(
       completionProposed('Wrote the store and raised the limit; the badge is not mine to write.'),
       // Two reads of another module: one excursion, on first entry.
-      naming.read('subs/workspace/subs/reviews/src/router.ts'),
-      naming.read('subs/workspace/subs/reviews/src/session.ts'),
-      naming.read(`${notesDirectory}/src/notes.ts`),
-      naming.search('noteLimit', notesDirectory),
+      naming.read(join(root, 'subs/workspace/subs/reviews/src/router.ts')),
+      naming.read(join(root, 'subs/workspace/subs/reviews/src/session.ts')),
+      naming.read('notes.ts'),
+      naming.search('noteLimit', '.'),
       // Denied outside the scope, allowed inside it.
-      naming.write(outside, 'export const tampered = true;\n'),
-      naming.write(store, 'export const store = new Map();\n'),
-      naming.edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
+      naming.write(join(root, outside), 'export const tampered = true;\n'),
+      naming.write('store.ts', 'export const store = new Map();\n'),
+      naming.edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
     )],
   })), naming.options);
   const { service } = await openRuns(root, {
@@ -217,15 +217,15 @@ describe('ST05: an executor whose tools are named otherwise is recorded and guar
       'subs/workspace/subs/reviews/src/session.ts',
       `${notesDirectory}/src/notes.ts`,
     ]);
-    expect(recorded.filter(line => 'search' in line).map(line => line['search'])).toEqual([`noteLimit in ${notesDirectory}`]);
+    expect(recorded.filter(line => 'search' in line).map(line => line['search'])).toEqual([`noteLimit in ${notesDirectory}/src`]);
     expect(recorded.filter(line => 'excursion' in line).map(line => line['excursion'])).toEqual([
       { callId: 'call-1', module: 'collection-review/workspace/reviews', firstEntry: true },
     ]);
     expect(guarded.filter(line => 'guard' in line).map(line => (line['guard'] as { verdict: string; requested: string })))
       .toEqual([
-        expect.objectContaining({ verdict: 'blocked-scope', requested: outside }),
-        expect.objectContaining({ verdict: 'allowed', requested: store }),
-        expect.objectContaining({ verdict: 'allowed', requested: `${notesDirectory}/src/notes.ts` }),
+        expect.objectContaining({ verdict: 'blocked-scope', requested: `<root>/${outside}` }),
+        expect.objectContaining({ verdict: 'allowed', requested: 'store.ts' }),
+        expect.objectContaining({ verdict: 'allowed', requested: 'notes.ts' }),
       ]);
     for (const record of [pi, other]) {
       expect(record.badgeUnchanged).toBe(true);

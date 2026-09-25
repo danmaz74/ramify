@@ -69,12 +69,12 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
         engineer: [submit(
           completionProposed('Raised the note limit where the test asks for it.'),
           // A read into another module: permitted, recorded once.
-          read('subs/workspace/subs/reviews/src/router.ts'),
-          read('subs/workspace/subs/reviews/src/session.ts'),
+          read(join(root, 'subs/workspace/subs/reviews/src/router.ts')),
+          read(join(root, 'subs/workspace/subs/reviews/src/session.ts')),
           // The guarded write, inside the scope.
-          edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
+          edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
           // The unguarded write, outside it. Nothing refuses this.
-          shell(`printf 'export const outside = true;\\n' > ${outsidePath}`),
+          shell(`printf 'export const outside = true;\\n' > '${join(root, outsidePath)}'`),
         )],
       }),
     });
@@ -116,7 +116,7 @@ describe('X6: an unguarded shell mutation and an outside read make the MVP\'s li
     const commands = observations
       .filter(line => line.type === 'activity' && line.data.activity.kind === 'tool' && line.data.activity.tool === 'shell')
       .map(line => (line.type === 'activity' && line.data.activity.kind === 'tool' ? line.data.activity.command : undefined));
-    expect(commands).toEqual([`printf 'export const outside = true;\\n' > ${outsidePath}`]);
+    expect(commands).toEqual([`printf 'export const outside = true;\\n' > '${join(root, outsidePath)}'`]);
 
     // One excursion, on first entry, for two reads of the same module.
     const excursions = observations.filter(line => line.type === 'excursion');

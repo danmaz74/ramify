@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { write } from './iterations.js';
 import type { ScriptStep } from '../../../subs/agent/src/scripted.js';
 
@@ -209,11 +210,12 @@ function consumerSource(seam: Seam, factory: string, from: string): string {
 }
 
 /** The writes of the provider's own engineer: the real implementation, in the agreed suite's subjects. */
-export function providerWrites(seam: Seam): ScriptStep[] {
+export function providerWrites(seam: Seam, projectRoot?: string): ScriptStep[] {
   const path = paths(seam);
   const limit = limitOf(seam);
+  const toolPath = (projectPath: string) => projectRoot === undefined ? projectPath : join(projectRoot, projectPath);
   return [
-    write(path.real, lines(
+    write(toolPath(path.real), lines(
       `/** The real ${seam.capability}. */`,
       `export function create${seam.name}() {`,
       '  return {',
@@ -222,7 +224,7 @@ export function providerWrites(seam: Seam): ScriptStep[] {
       '  };',
       '}',
     )),
-    write(path.subjects, lines(
+    write(toolPath(path.subjects), lines(
       `import { create${seam.name}Fake } from '../fakes/${seam.capability}.fake.ts';`,
       `import { create${seam.name} } from '../${seam.capability}.ts';`,
       '',

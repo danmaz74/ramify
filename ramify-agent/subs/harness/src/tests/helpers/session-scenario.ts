@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { expect } from 'vitest';
 import type { AgentPort } from '../../../subs/agent/src/interfaces/port.js';
 import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptStep } from '../../../subs/agent/src/scripted.js';
@@ -213,9 +214,9 @@ export async function runSessionScenario(options: SessionScenarioOptions): Promi
     }))],
     engineer: [
       submit(contractNeeded),
-      submit(completionProposed('The real note limit is implemented.'), write(seam.real, realProvider), write(seam.subjects, bothSubjects)),
+      submit(completionProposed('The real note limit is implemented.'), write(join(root, seam.real), realProvider), write(join(root, seam.subjects), bothSubjects)),
       submit(completionProposed('The failing suite passes now; nothing else needed changing.')),
-      submit(completionProposed('The consumer now uses the real note limit.'), write(seam.consumer, verified)),
+      submit(completionProposed('The consumer now uses the real note limit.'), write(join(root, seam.consumer), verified)),
     ],
     'contract-engineer': [submit(establishedContract,
       write(seam.interface, contractFile), write(seam.fake, fakeFile), write(seam.subjects, subjectsFile),

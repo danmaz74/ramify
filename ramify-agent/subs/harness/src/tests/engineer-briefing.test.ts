@@ -27,9 +27,9 @@ describe('what an engineer is told about the Ramify project it works in', () => 
     expect(prompt).toContain('## This is a Ramify project');
     expect(prompt).toContain('only the symbols your module\n  *receives*');
     expect(prompt).toContain('`import type` is checked exactly as a value import is');
-    expect(prompt).toContain('`src/.ramify/`');
-    expect(prompt).toContain('`src/tests/.ramify/`');
-    expect(prompt).toContain('not by reading\nother modules\' source');
+    expect(prompt).toContain('`.ramify/external` and `.ramify/children`');
+    expect(prompt).toContain('`tests/.ramify/external` and `tests/.ramify/children`');
+    expect(prompt).toContain('Foreign source never establishes importability');
     expect(prompt).toContain('`RAMIFY MODULE VIOLATION`');
     expect(prompt).toContain('the harness\nchecks your whole write scope once more before it accepts');
     expect(prompt).toContain('submit `unsuitable` with reason `scope`');
@@ -48,7 +48,7 @@ describe('what an engineer is told about the Ramify project it works in', () => 
       views: [{ module: 'app/reviews', views: [{ area: 'ordinary', path: 'subs/reviews/src/.ramify', coverage: null }], unavailable: null }],
     });
     expect(text).toContain('## What you may import');
-    expect(text).toContain('- `app/reviews` (ordinary): `subs/reviews/src/.ramify/`; coverage complete, so a symbol it does not list is not importable.');
+    expect(text).toContain('- `app/reviews` (ordinary): `subs/reviews/src/.ramify/` (project-relative; open `/p/subs/reviews/src/.ramify/` from this cwd); coverage complete, so a symbol it does not list is not importable.');
     expect(text).toContain('reported with `unsuitable`, reason `scope`');
   });
 

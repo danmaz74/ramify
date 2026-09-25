@@ -54,11 +54,11 @@ const unchanged: GateCommit = { commit: null };
 
 /** The declaration, the prose and the first source of a module that did not exist. */
 const moduleWrites = [
-  write(`${notesDirectory}/module.ramify`, 'ramify 1\nmodule notes\n'),
-  write(`${notesDirectory}/README.md`, '# notes\n\nHolds a reviewer\'s note for one review run.\n'),
+  write('../module.ramify', 'ramify 1\nmodule notes\n'),
+  write('../README.md', '# notes\n\nHolds a reviewer\'s note for one review run.\n'),
   // A nested source directory that does not exist yet.
-  write(`${notesDirectory}/src/store/notes.ts`, 'export const noteLimit = 500;\n'),
-  write(`${notesDirectory}/src/tests/notes.test.ts`, [
+  write('store/notes.ts', 'export const noteLimit = 500;\n'),
+  write('tests/notes.test.ts', [
     'import { test, expect } from \'vitest\';',
     'import { noteLimit } from \'../store/notes.ts\';',
     '',
@@ -115,7 +115,7 @@ describe('G9: an accepted proposed entry owner reaches implementation', () => {
         engineer: [submit(
           completionProposed('I could not create the module I was told not to create.'),
           // A module the assignment does not authorize.
-          write(`${notesDirectory}/module.ramify`, 'ramify 1\nmodule notes\n'),
+          write(join(root, notesDirectory, 'module.ramify'), 'ramify 1\nmodule notes\n'),
         )],
       }),
       inputs: treeInputs(),

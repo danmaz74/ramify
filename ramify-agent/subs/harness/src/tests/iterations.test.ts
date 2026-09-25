@@ -134,7 +134,7 @@ describe('G8: a work item revised across several iterations keeps every obligati
           revisionReason: 'Every obligation the earlier revisions opened is discharged.',
         })),
       ],
-      engineer: [submit(completionProposed('Added the note store.'), write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n'))],
+      engineer: [submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map();\n'))],
     }, [
       { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] },
       unchanged,
@@ -314,9 +314,9 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
       engineer: [submit(
         completionProposed('Wrote the store; the badge is not mine to write.'),
-        write(outside, 'export const tampered = true;\n'),
-        write(outside, 'export const tamperedAgain = true;\n'),
-        write(`${notesDirectory}/src/store.ts`, 'export const store = new Map();\n'),
+        write(join(root, outside), 'export const tampered = true;\n'),
+        write(join(root, outside), 'export const tamperedAgain = true;\n'),
+        write('store.ts', 'export const store = new Map();\n'),
       )],
     }, [
       { commit: 'revision-01', changes: [{ status: 'A', path: `${notesDirectory}/src/store.ts` }] },
@@ -336,7 +336,7 @@ describe('X4: a denied call mutates nothing and stays deduplicated', () => {
     // new attempt and stays visible.
     expect(guards.map(guard => guard.data.verdict)).toEqual(['blocked-scope', 'blocked-scope', 'allowed']);
     expect(new Set(guards.map(guard => guard.data.callId)).size).toBe(3);
-    expect(guards[0]!.data.requested).toBe(outside);
+    expect(guards[0]!.data.requested).toBe(join(root, outside));
     // Nothing the guard denied was written, and the call it allowed was.
     expect(await readFile(join(root, outside), 'utf8')).toBe(before);
     expect(await readFile(join(root, notesDirectory, 'src', 'store.ts'), 'utf8')).toBe('export const store = new Map();\n');

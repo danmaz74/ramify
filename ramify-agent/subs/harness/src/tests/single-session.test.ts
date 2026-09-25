@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
 import type { RamifyCheckResult } from '../../subs/evidence/src/ramify-cli.js';
@@ -17,7 +17,7 @@ import type { TranscriptEntry } from '../interfaces/protocol/transcripts.js';
 import { readTranscript } from '../transcripts/writer.js';
 import { blobsIn } from './helpers/transcripts.js';
 import { copyFixture } from './helpers/fixture.js';
-import { addModule, completionProposed, edit, installMiniRunner, readDeclaredTree, shell, unsuitableScope, write } from './helpers/iterations.js';
+import { addModule, completionProposed, edit, installMiniRunner, read, readDeclaredTree, shell, unsuitableScope, write } from './helpers/iterations.js';
 import { testPolicy } from './helpers/runs.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { mockGit } from './helpers/mock-git.js';
@@ -176,11 +176,51 @@ async function exists(path: string): Promise<boolean> {
 }
 
 describe('a single engineer session', () => {
+  test('relative reads, writes, and shell start in module src while observations remain project-relative', async () => {
+    const root = await project();
+    const cwd = join(root, notesDirectory, 'src');
+    const sibling = 'subs/workspace/subs/reviews/src/stray.ts';
+    const commandExecution: CommandRunner = async request => {
+      expect(request.cwd).toBe(cwd);
+      return commandResult(request, { stdout: 'module shell\n' });
+    };
+    const { result, agent } = await session(root, [
+      read('notes.ts'),
+      edit('notes.ts', '400', '500'),
+      write('new.ts', 'export const added = true;\n'),
+      write(relative(cwd, join(root, sibling)), 'export const stray = true;\n'),
+      shell('pwd'),
+      { kind: 'submit', input: unsuitableScope('The sibling is outside this assignment.') },
+    ], {}, {
+      changed: [notesSource, `${notesDirectory}/src/new.ts`],
+      ramify: [checked('changed'), checked('changed'), checked('complete')],
+      commandExecution,
+    });
+    const summary = finished(result);
+    expect(agent.sessions[0]!.spec.scope.workingDirectory).toBe(cwd);
+    expect(await readFile(join(root, notesSource), 'utf8')).toContain('500');
+    expect(await readFile(join(cwd, 'new.ts'), 'utf8')).toContain('added');
+    expect(await exists(join(root, sibling))).toBe(false);
+    const observations = await observationsOf(summary.records);
+    const activities = observations.filter(line => line.type === 'activity').map(line => line.data.activity);
+    expect(activities).toEqual(expect.arrayContaining([{ kind: 'read', callId: 'call-1', path: notesSource }]));
+    const guards = observations.filter(line => line.type === 'guard');
+    expect(guards.map(line => line.data.resolved)).toEqual([
+      join(root, notesSource), join(cwd, 'new.ts'), join(root, sibling),
+    ]);
+    const mutations = observations.filter(line => line.type === 'mutation');
+    expect(mutations[0]?.data.paths).toEqual([notesSource]);
+    expect(mutations[1]?.data.paths).toEqual([`${notesDirectory}/src/new.ts`]);
+    const hooks = observations.filter(line => line.type === 'hook-check');
+    expect(hooks[0]?.data.paths).toEqual([notesSource]);
+    expect(hooks[1]?.data.paths).toEqual([`${notesDirectory}/src/new.ts`]);
+  }, 120_000);
+
   test('a completed change is in the tree, recorded as submitted, answered with what follows, and not committed', async () => {
     const root = await project();
 
     const { result, agent, events, git } = await session(root, [
-      edit(notesSource, 'noteLimit = 400', 'noteLimit = 500'),
+      edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
     ], {}, { changed: [notesSource], ramify: [checked('changed'), checked('changed')] });
 
@@ -217,8 +257,8 @@ describe('a single engineer session', () => {
     const outside = 'subs/workspace/subs/reviews/src/stray.ts';
 
     const { result, agent, events } = await session(root, [
-      write(outside, 'export const stray = 1;\n'),
-      write('docs/notes.md', '# Notes\n'),
+      write(join(root, outside), 'export const stray = 1;\n'),
+      write(join(root, 'docs/notes.md'), '# Notes\n'),
       { kind: 'submit', input: unsuitableScope('The limit lives outside this module.') },
     ], { write: ['docs/notes.md'] }, { changed: ['docs/notes.md'], ramify: [checked('changed')] });
 
@@ -229,8 +269,8 @@ describe('a single engineer session', () => {
 
     const guards = (await observationsOf(summary.records)).filter(line => line.type === 'guard');
     expect(guards.map(line => (line.type === 'guard' ? [line.data.requested, line.data.verdict] : null))).toEqual([
-      [outside, 'blocked-scope'],
-      ['docs/notes.md', 'allowed'],
+      [join(root, outside), 'blocked-scope'],
+      [join(root, 'docs/notes.md'), 'allowed'],
     ]);
     const refusal = events.find(event => event.type === 'harness-text' && event.kind === 'refusal');
     expect(refusal).toMatchObject({ tool: 'write' });
@@ -241,9 +281,9 @@ describe('a single engineer session', () => {
     const root = await project();
 
     const { result, agent, events } = await session(root, [
-      edit(notesSource, 'noteLimit = 400;', 'noteLimit = 500; // FORBIDDEN'),
+      edit('notes.ts', 'noteLimit = 400;', 'noteLimit = 500; // FORBIDDEN'),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
-      edit(notesSource, ' // FORBIDDEN', ''),
+      edit('notes.ts', ' // FORBIDDEN', ''),
       { kind: 'submit', input: completionProposed('The limit is 500, with the violation removed.') },
     ], {}, { changed: [notesSource], ramify: [
       { form: 'changed', outcome: 'findings' },
@@ -321,6 +361,15 @@ describe('a single engineer session', () => {
     expect(await exists(join(root, sessionsDirectory))).toBe(false);
   }, 120_000);
 
+  test('a declared module with missing src is refused before the agent starts', async () => {
+    const root = await project();
+    await rm(join(root, notesDirectory, 'src'), { recursive: true });
+    const { result, agent } = await session(root, [], {}, { starts: false });
+    expect(result).toMatchObject({ status: 'not-started', exitStatus: 2 });
+    expect(result.status === 'not-started' ? result.reason : '').toContain('has no src directory');
+    expect(agent.sessions).toHaveLength(0);
+  }, 120_000);
+
   test('a held project lock is refused before the agent starts, and the lock is left untouched', async () => {
     const root = await project();
     const lock = await acquireProjectLock(root);
@@ -342,7 +391,7 @@ describe('the gate option', () => {
     const root = await project();
 
     const { result, events, git } = await session(root, [
-      edit(notesSource, 'noteLimit = 400', 'noteLimit = 500'),
+      edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
     ], { gate: true }, {
       changed: [notesSource],
@@ -390,12 +439,12 @@ describe('the session\'s records', () => {
 
     const commandExecution: CommandRunner = request => {
       expect(request.argv).toEqual(['bash', '-c', 'echo checking']);
-      expect(request.cwd).toBe(root);
+      expect(request.cwd).toBe(join(root, notesDirectory, 'src'));
       return commandResult(request, { stdout: 'checking\n' });
     };
     const { result, git } = await session(root, [
       shell('echo checking'),
-      edit(notesSource, 'noteLimit = 400', 'noteLimit = 500'),
+      edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
     ], { gate: true }, {
       changed: [notesSource],
@@ -443,8 +492,8 @@ describe('the session\'s records', () => {
     const commandExecution: CommandRunner = request => commandResult(request, { stdout: 'checking\n' });
     const scripted = createScriptedAgent([
       shell('echo checking'),
-      write(outside, 'export const stray = 1;\n'),
-      edit(notesSource, 'noteLimit = 400', 'noteLimit = 500'),
+      write(join(root, outside), 'export const stray = 1;\n'),
+      edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
     ]);
     // What the transcript held when the session was started.
@@ -499,7 +548,7 @@ describe('the session\'s records', () => {
       callId: 'call-1', atCompletion: false,
       checks: [{ mode: 'changed', outcome: 'not-checked', log: null }, { mode: 'complete', log: { stored: 'file', path: 'hooks/001.json' } }],
     });
-    expect(decisions[1]).toMatchObject({ callId: 'call-2', tool: 'write', verdict: 'blocked-scope', requested: outside });
+    expect(decisions[1]).toMatchObject({ callId: 'call-2', tool: 'write', verdict: 'blocked-scope', requested: join(root, outside) });
     expect(decisions[3]).toMatchObject({ atCompletion: true, callId: null, checks: [{ mode: 'changed' }] });
     expect(decisions[4]).toMatchObject({
       callId: 'call-4', verdict: 'accepted', text: { stored: 'inline', text: sessionAcceptance('completion-proposed', false) },

@@ -76,9 +76,9 @@ describe('a standalone session process boundary', () => {
     const agent = createScriptedAgent([
       // The shell names no changed set, so the hook runs a complete check,
       // which this stub does not answer: nothing saw the violation.
-      shell(`printf '// FORBIDDEN\\n' >> ${notesSource}`),
+      shell(`printf '// FORBIDDEN\\n' >> notes.ts`),
       { kind: 'submit', input: completionProposed('The limit is 500.') },
-      shell(`sed -i '/FORBIDDEN/d' ${notesSource}`),
+      shell(`sed -i '/FORBIDDEN/d' notes.ts`),
       { kind: 'submit', input: completionProposed('The limit is 500, and the import is gone.') },
     ]);
     const events: SessionProgress[] = [];

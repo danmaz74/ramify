@@ -23,6 +23,8 @@ export interface UsageTotals {
 
 export interface PortEventRecorderOptions {
   readonly projectRoot: string;
+  /** Where the port resolves relative tool paths. Defaults to project root for readers. */
+  readonly workingDirectory?: string | undefined;
   readonly observations: ObservationLog;
   /** Counts an input the implementation rejected before the tool ran toward the submission bound. */
   readonly judge: { countImplementationRejection(callId: string, tool: string, reason: string): () => Promise<void> };
@@ -134,7 +136,7 @@ export class PortEventRecorder {
       // counts toward the same bound, and no message text is read.
       await recordRejection?.();
     }
-    const activity = activityOf(event, this.options.projectRoot, this.options.projectRoot);
+    const activity = activityOf(event, this.options.workingDirectory ?? this.options.projectRoot, this.options.projectRoot);
     if (activity) await observations.record({ type: 'activity', data: { activity } });
     if (activity?.kind === 'read') {
       const excursion = this.options.excursions.observe(activity.path);

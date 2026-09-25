@@ -98,14 +98,14 @@ async function target() {
 /** The engineer that raises the note limit, in the source and in the test that states it. */
 const raiseTheNoteLimit = submit(
   completionProposed('Raised the note limit to 500, in the source and in the test that states it.'),
-  edit(`${notesDirectory}/src/notes.ts`, 'notesLimit = 400', 'notesLimit = 500'),
-  edit(`${notesDirectory}/src/tests/notes.test.ts`, 'toBe(400)', 'toBe(500)'),
+  edit('notes.ts', 'notesLimit = 400', 'notesLimit = 500'),
+  edit('tests/notes.test.ts', 'toBe(400)', 'toBe(500)'),
 );
 
 /** The engineer that repairs the consumer the raised limit broke. */
 const repairTheAlert = submit(
   completionProposed('An alert now covers five hundred characters, as the note limit does.'),
-  edit(`${alertsDirectory}/src/alerts.ts`, 'alertsLimit = 4', 'alertsLimit = 5'),
+  edit('alerts.ts', 'alertsLimit = 4', 'alertsLimit = 5'),
 );
 
 /**
@@ -314,9 +314,9 @@ describe('adding work leaves every completed piece completed', () => {
         engineer: [
           // The first attempt changes the source and not the test that
           // states it, so the gate fails and one repair round follows.
-          submit(completionProposed('Raised the note limit.'), edit(`${notesDirectory}/src/notes.ts`, 'notesLimit = 400', 'notesLimit = 500')),
+          submit(completionProposed('Raised the note limit.'), edit('notes.ts', 'notesLimit = 400', 'notesLimit = 500')),
           submit(completionProposed('Stated the new limit in the test as well.'),
-            edit(`${notesDirectory}/src/tests/notes.test.ts`, 'toBe(400)', 'toBe(500)')),
+            edit('tests/notes.test.ts', 'toBe(400)', 'toBe(500)')),
           repairTheAlert,
         ],
       }),

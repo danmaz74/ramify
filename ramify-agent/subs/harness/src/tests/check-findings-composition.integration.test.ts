@@ -53,9 +53,9 @@ describe('the composed CheckFinding path over a real repository', () => {
     const design = concern(limit, 'The limit contradicts the notes principle of 500 characters', 'high', principles);
     const scripted = reviewScript({
       engineer: [
-        submit(completionProposed('Added the note store.'), write(store, 'export const store = new Map();\n')),
-        submit(completionProposed('Stated the note limit.'), write(limit, 'export const limit = (text: string) => text.length <= 50;\n')),
-        submit(completionProposed('Corrected the note limit.'), write(limit, 'export const limit = (text: string) => text.length <= 500;\n')),
+        submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map();\n')),
+        submit(completionProposed('Stated the note limit.'), write('limit.ts', 'export const limit = (text: string) => text.length <= 50;\n')),
+        submit(completionProposed('Corrected the note limit.'), write('limit.ts', 'export const limit = (text: string) => text.length <= 500;\n')),
       ],
       architect: [
         submit(assign(notes, { goal: 'Add the note store.' }, outline())),

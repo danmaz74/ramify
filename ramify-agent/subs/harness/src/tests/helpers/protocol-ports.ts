@@ -23,7 +23,7 @@ export function protocolPorts(root: string) {
     { subject: 'wi-002', commit: null, changes: [] },
     { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
   ] });
-  const script = protocolScript();
+  const script = protocolScript(root);
   return {
     git,
     script: (spec: SessionSpec) => {
@@ -36,8 +36,8 @@ export function protocolPorts(root: string) {
       context.checkpoint === 'final' && check.kind === 'tests'
         ? { stdout: 'x'.repeat(longOutputBytes - 12) + '\nall passed\n' } : {} }),
     commandExecution: async (request: CommandRequest) => {
-      expect(request.cwd).toBe(root);
-      expect(request.argv).toEqual(['bash', '-c', `printf 'export const outside = true;\\n' > ${outsidePath}`]);
+      expect(request.cwd).toBe(join(root, notesDirectory, 'src'));
+      expect(request.argv).toEqual(['bash', '-c', `printf 'export const outside = true;\\n' > '${join(root, outsidePath)}'`]);
       // Explicit fixture effect of this one external command, no shell interpretation.
       await writeFile(join(root, outsidePath), 'export const outside = true;\n');
       return commandResult(request, { outcome: { kind: 'completed', exitCode: 0 } });

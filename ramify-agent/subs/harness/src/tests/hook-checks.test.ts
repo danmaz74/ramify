@@ -220,8 +220,8 @@ describe('a mutation is observed even when the tool failed', () => {
           completionProposed('Raised the limit, after one edit that matched nothing.'),
           // The tool runs, fails and changes nothing. It is a mutation all
           // the same: the harness never learns what it did from its result.
-          edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 999', 'noteLimit = 500'),
-          edit(`${notesDirectory}/src/notes.ts`, 'noteLimit = 400', 'noteLimit = 500'),
+          edit('notes.ts', 'noteLimit = 999', 'noteLimit = 500'),
+          edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
         )],
       }),
     });

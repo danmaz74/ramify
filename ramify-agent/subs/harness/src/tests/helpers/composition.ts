@@ -191,7 +191,7 @@ export interface Scenario {
   /** The terminal state an uninterrupted run of it reaches. */
   readonly ends: 'completed' | 'failed' | 'stopped';
   target(): Promise<{ root: string; remove: () => Promise<void> }>;
-  script(): Script;
+  script(root: string): Script;
   inputs(): RunInputs;
   /** What Git answers this scenario, in the order its commits are made. */
   readonly git: GitResponses;
@@ -260,7 +260,7 @@ const scopeTestRun = (...files: string[]): StatedCommand => ({
 const scopeScenarioRun: StatedCommand = { argv: () => ['npm', 'run', 'acceptance:quick', '--'], scenarios: true };
 
 /** The command the iteration's engineer runs through the unguarded shell. */
-const shellCommand = `rm -r ${draftsDirectory} && printf "left by the shell\\n" > shell-note.txt`;
+const shellCommand = (root: string) => `rm -r '${join(root, draftsDirectory)}' && printf "left by the shell\\n" > '${join(root, 'shell-note.txt')}'`;
 
 const notesModule = { directory: notesDirectory, name: 'notes', files: { 'src/notes.ts': consumerStub, 'src/tests/notes.test.ts': consumerTest('notes.ts') } };
 const limitsModule = { directory: limitsDirectory, name: 'limits', files: {} };
@@ -285,7 +285,8 @@ const iteration: Scenario = {
     {
       // What the shell leaves: the child module gone, and a note outside
       // every module. It is stated here and written directly; no shell runs.
-      argv: () => ['bash', '-c', shellCommand],
+      argv: root => ['bash', '-c', shellCommand(root)],
+      cwd: root => join(root, notesDirectory, 'src'),
       async leaves(root) {
         await rm(join(root, draftsDirectory), { recursive: true });
         await writeFile(join(root, 'shell-note.txt'), 'left by the shell\n');
@@ -334,7 +335,7 @@ const iteration: Scenario = {
     // A child module nobody assigns, which the engineer's shell removes.
     { directory: draftsDirectory, name: 'drafts', files: {} },
   ]),
-  script: () => byRole({
+  script: root => byRole({
     'initial-architect': [submit(analysis(
       [entry('review-note', notes)],
       [
@@ -367,16 +368,16 @@ const iteration: Scenario = {
     engineer: [
       budgetTurn,
       [
-        read('subs/workspace/subs/shared-ui/src/status-badge.tsx'),
-        { kind: 'tool', tool: 'grep', input: { pattern: 'noteLimit', path: notesDirectory } },
+        read(join(root, 'subs/workspace/subs/shared-ui/src/status-badge.tsx')),
+        { kind: 'tool', tool: 'grep', input: { pattern: 'noteLimit', path: join(root, notesDirectory) } },
         runScopeTests(),
         { kind: 'submit', input: { kind: 'completion-proposed' } },
         // One write outside the scope, and one whose target cannot be resolved: both refused.
-        write('subs/workspace/subs/shared-ui/src/status-badge.tsx', 'export {};\n'),
-        write(`${notesDirectory}/src/notes.ts/inside-a-file.ts`, 'export {};\n'),
-        write(`${notesDirectory}/src/notes.ts`, 'export const noteLimit = 500;\n'),
+        write(join(root, 'subs/workspace/subs/shared-ui/src/status-badge.tsx'), 'export {};\n'),
+        write(join(root, notesDirectory, 'src/notes.ts/inside-a-file.ts'), 'export {};\n'),
+        write(join(root, notesDirectory, 'src/notes.ts'), 'export const noteLimit = 500;\n'),
         runScopeTests(),
-        shell(shellCommand),
+        shell(shellCommand(root)),
         { kind: 'submit', input: completionProposed('Raised the note limit to the 500 characters the plan asks for.') },
       ],
       submit({ kind: 'partial', done: ['Read the limit\'s wording.'], unfinished: ['The wording is the plan\'s, not this module\'s, to change.'], findings: [] }),
@@ -421,7 +422,7 @@ const delegation: Scenario = {
   exercises: 'a contract sub-session, registration, a yield, the provider, conformance, resumption and verification',
   ends: 'completed',
   target: () => fixtureWith([notesModule, limitsModule]),
-  script: () => byWork({
+  script: root => byWork({
     'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
     'local-architect:wi-001': [
       submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
@@ -431,14 +432,14 @@ const delegation: Scenario = {
     ],
     'engineer:wi-001': [
       submit(contractNeeded(noteLimit)),
-      submit(completionProposed('The notes now use the real limit.'), write(paths(noteLimit).consumer, consumerAgainstReal(noteLimit))),
+      submit(completionProposed('The notes now use the real limit.'), write(join(root, paths(noteLimit).consumer), consumerAgainstReal(noteLimit))),
     ],
     'contract-engineer:wi-001': [submit(established(noteLimit), ...contractWrites(noteLimit))],
     'local-architect:wi-002': [
       submit(assign(limits, {}, outline({ changes: 'Implement the agreed limit and run the conformance suite against it.' }))),
       submit(requestCompletion()),
     ],
-    'engineer:wi-002': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit))],
+    'engineer:wi-002': [submit(completionProposed('The real limit is implemented.'), ...providerWrites(noteLimit, root))],
   }),
   inputs: treeInputs,
 };
@@ -783,7 +784,7 @@ const revision: Scenario = {
   exercises: 'a provider that cannot conform, the revision its consumer assigns, and the evidence it reopens',
   ends: 'completed',
   target: () => fixtureWith([notesModule, limitsModule]),
-  script: () => byWork({
+  script: root => byWork({
     'initial-architect': [submit(analysis([entry('review-notes', notes)]))],
     'local-architect:wi-001': [
       submit({ ...assign(notes, {}, outline()), localDecisions: [place('note-limit', limits)] }),
@@ -801,7 +802,7 @@ const revision: Scenario = {
     ],
     'engineer:wi-001': [
       submit(contractNeeded(noteLimit)),
-      submit(completionProposed('The notes now use the revised real limit.'), write(paths(relaxed).consumer, consumerAgainstReal(relaxed))),
+      submit(completionProposed('The notes now use the revised real limit.'), write(join(root, paths(relaxed).consumer), consumerAgainstReal(relaxed))),
     ],
     'contract-engineer:wi-001': [
       submit(established(noteLimit), ...contractWrites(noteLimit)),
@@ -818,7 +819,7 @@ const revision: Scenario = {
         reason: 'provider-cannot-conform',
         detail: 'The agreed suite requires a note of 500 characters to be kept, and the store this module writes to indexes 300.',
       }),
-      submit(completionProposed('The real limit is implemented at the revised length.'), ...providerWrites(relaxed)),
+      submit(completionProposed('The real limit is implemented at the revised length.'), ...providerWrites(relaxed, root)),
     ],
   }),
   inputs: treeInputs,
@@ -931,7 +932,7 @@ export const scenarios: Readonly<Record<ScenarioName, Scenario>> = {
  */
 export async function runToEnd(scenario: Scenario, watch?: (service: RunService, runId: string) => Promise<void>) {
   const target = await scenario.target();
-  const agent = createScriptedAgent(declaringScenarios(scenario.script()));
+  const agent = createScriptedAgent(declaringScenarios(scenario.script(target.root)));
   const git = scenarioGit(target.root, scenario.git);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let runId = '';
@@ -993,7 +994,7 @@ export interface CrashPoint {
 /** A scenario run up to one boundary and abandoned there, as a crash leaves it. */
 export async function crashAt(scenario: Scenario, point: CrashPoint) {
   const target = await scenario.target();
-  const agent = createScriptedAgent(declaringScenarios(scenario.script()));
+  const agent = createScriptedAgent(declaringScenarios(scenario.script(target.root)));
   const git = scenarioGit(target.root, scenario.git);
   const commands = statedCommands(target.root, scenario.commands ?? []);
   let resolveFrozen: (runId: string) => void = () => undefined;

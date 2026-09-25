@@ -49,10 +49,10 @@ describe('a review snapshot over a real repository', () => {
         submit(requestCompletion()),
       ],
       engineer: [
-        submit(completionProposed('Added the note store.'), write(store, 'export const store = new Map(); // v1\n')),
+        submit(completionProposed('Added the note store.'), write('store.ts', 'export const store = new Map(); // v1\n')),
         submit(completionProposed('Revised the note store.'),
           { kind: 'await', until: () => waiting.opened },
-          write(store, 'export const store = new Map(); // v3\n'),
+          write('store.ts', 'export const store = new Map(); // v3\n'),
           { kind: 'await', until: async () => { wrote.open(); } }),
       ],
     }) as (spec: SessionSpec) => readonly ScriptStep[];
