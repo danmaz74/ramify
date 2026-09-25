@@ -12,6 +12,7 @@ import { analysis } from './helpers/analysis.js';
 import { submit, treeInputs, write } from './helpers/iterations.js';
 import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
+import { RunQueries } from '../projections/queries.js';
 import { emptyAnalysis, freeze, initRepository, installTestRunner, onlyRun, openRuns,
   runEventsOnDisk, staleCrashLock, startRun, until } from './helpers/runs.js';
 import type { RunWrite } from '../run/service.js';
@@ -160,15 +161,8 @@ for (const { boundary, ...variant } of repairCrashes) {
   }, 60_000);
 }
 
-test('round three exhausts and a late source change still refuses the final gate', async () => {
-  const fixture = await copyFixture();
-  cleanups.push(fixture.remove);
-  await installTestRunner(fixture.root);
-  const obligation = 'The review must retain an audit record.';
-  const plan = join(fixture.root, 'plans/review-notes/plan.md');
-  await writeFile(plan, `${await readFile(plan, 'utf8')}\n${obligation}\n`);
-  await initRepository(fixture.root);
-  const script = withPlan13Fixture(spec => {
+function exhaustedAgent(obligation: string) {
+  return createScriptedAgent(withPlan13Fixture(spec => {
     if (spec.role === 'initial-architect') {
       const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
       if (!captured) throw new Error('Captured plan is missing');
@@ -187,9 +181,19 @@ test('round three exhausts and a late source change still refuses the final gate
       nfr: 'nfr-001', proposedAlternative: null, uncertainty: 'No supported alternative is known',
     }] });
     return [];
-  });
+  }));
+}
+
+test('round three exhausts and a late source change still refuses the final gate', async () => {
+  const fixture = await copyFixture();
+  cleanups.push(fixture.remove);
+  await installTestRunner(fixture.root);
+  const obligation = 'The review must retain an audit record.';
+  const plan = join(fixture.root, 'plans/review-notes/plan.md');
+  await writeFile(plan, `${await readFile(plan, 'utf8')}\n${obligation}\n`);
+  await initRepository(fixture.root);
   const audit = createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(fixture.root) });
-  const { service } = await openRuns(fixture.root, { git: gitService, agent: createScriptedAgent(script), inputs: treeInputs(),
+  const { service } = await openRuns(fixture.root, { git: gitService, agent: exhaustedAgent(obligation), inputs: treeInputs(),
     checkExecution: { async run(checks, request) {
       const result = await audit.run(checks, request);
       if (request.context.checkpoint === 'final') {
@@ -206,4 +210,38 @@ test('round three exhausts and a late source change still refuses the final gate
   expect(events.filter(event => event.type === 'nonfunctional-round-closed').map(event => event.data.outcome)).toEqual(['continue', 'continue', 'exhausted']);
   expect(onlyRun(service, 'review-notes').failure?.reason).toBe('inputs-changed');
   expect(events.filter(event => event.type === 'job-completed')).toHaveLength(0);
+}, 60_000);
+
+test('an exhausted crash with changed source leaves merge readiness unavailable', async () => {
+  const fixture = await copyFixture();
+  cleanups.push(fixture.remove);
+  await installTestRunner(fixture.root);
+  const obligation = 'The review must retain an audit record.';
+  const plan = join(fixture.root, 'plans/review-notes/plan.md');
+  await writeFile(plan, `${await readFile(plan, 'utf8')}\n${obligation}\n`);
+  await initRepository(fixture.root);
+  let frozen = false;
+  const first = await openRuns(fixture.root, { git: gitService, agent: exhaustedAgent(obligation), inputs: treeInputs(),
+    afterWrite: async (write, id) => {
+      if (write !== 'gate-committing') return;
+      const closed = (await runEventsOnDisk(fixture.root, 'review-notes', id))
+        .filter(event => event.type === 'nonfunctional-round-closed');
+      if (closed.length === 3) { frozen = true; await freeze(); }
+    },
+  });
+  const receipt = await first.service.execute(startRun('review-notes'));
+  await until(() => frozen, 30_000);
+  await staleCrashLock(fixture.root);
+  await writeFile(join(fixture.root, 'changed-after-exhaustion.ts'), 'export const changed = true;\n');
+  const reopened = await openRuns(fixture.root, { git: gitService, agent: exhaustedAgent(obligation), inputs: treeInputs() });
+  cleanups.push(() => reopened.service.close());
+  await reopened.service.settled('review-notes', receipt.jobId);
+  expect(onlyRun(reopened.service, 'review-notes').failure?.reason).toBe('recovery-exhausted');
+  const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
+  expect(events.filter(event => event.type === 'nonfunctional-round-closed').map(event => event.data.outcome))
+    .toEqual(['continue', 'continue', 'exhausted']);
+  expect(events.filter(event => event.type === 'job-completed')).toHaveLength(0);
+  const version = reopened.service.getRun('review-notes', receipt.jobId)!.version;
+  expect((await new RunQueries(reopened.service).mergeReadiness('review-notes', receipt.jobId, version)).readiness.status)
+    .toBe('unavailable');
 }, 60_000);

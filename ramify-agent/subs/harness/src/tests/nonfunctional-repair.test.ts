@@ -12,6 +12,7 @@ import { analysis } from './helpers/analysis.js';
 import { submit, treeInputs, write } from './helpers/iterations.js';
 import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
 import { runLayout } from '../run/records.js';
+import { checkpointPolicies } from '../checks/checkpoint.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -104,6 +105,25 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   expect(candidates).toHaveLength(2);
   expect(candidates[0]!.data.tree).not.toBe(candidates[1]!.data.tree);
   expect(events.find(event => event.type === 'candidate-bound-to-gate')?.data.tree).toBe(candidates[1]!.data.tree);
+  const repaired = events.find(event => event.type === 'nonfunctional-repair-committed')!;
+  const finalAssessmentEvent = assessmentsOnDisk[1]!;
+  const closed = events.find(event => event.type === 'nonfunctional-round-closed')!;
+  const finalGate = events.find(event => event.type === 'gate-attempted' && event.data.checkpoint === 'final')!;
+  if (finalGate.type !== 'gate-attempted') throw new Error('Missing final gate');
+  const completed = events.find(event => event.type === 'job-completed')!;
+  expect(repaired.sequence).toBeLessThan(finalAssessmentEvent.sequence);
+  expect(finalAssessmentEvent.sequence).toBeLessThan(closed.sequence);
+  expect(closed.sequence).toBeLessThan(finalGate.sequence);
+  expect(finalGate.sequence).toBeLessThan(completed.sequence);
+  const gateRecord = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId,
+    runLayout.gate(finalGate.data.gate)), 'utf8')) as { checkpoint: string; commands: Array<{
+    kind: string; selection?: { policy: string }; scenarios?: { mode: string; selection: { kind: string } };
+  }> };
+  expect(gateRecord.checkpoint).toBe('final');
+  expect(checkpointPolicies[gateRecord.checkpoint as 'final'].selection).toBe('all-project');
+  expect(gateRecord.commands.find(command => command.kind === 'tests')).toBeDefined();
+  const scenarioCheck = gateRecord.commands.find(command => command.kind === 'scenarios');
+  if (scenarioCheck) expect(scenarioCheck.scenarios).toMatchObject({ mode: 'full', selection: { kind: 'all' } });
   const finalAssessment = await readFile(runPath(fixture.root, 'review-notes', receipt.jobId,
     runLayout.assessment('nfa-002')), 'utf8').then(JSON.parse);
   expect(finalAssessment.results.map((item: { nfr: string; result: string }) => [item.nfr, item.result])).toEqual([

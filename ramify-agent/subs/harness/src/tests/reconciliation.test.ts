@@ -15,7 +15,7 @@ import { assign, completionProposed, outline, submit, write } from './helpers/it
 import { concern as boundConcern, decision, dispose, report } from './helpers/check-findings.js';
 import { mockGit } from './helpers/mock-git.js';
 import {
-  candidates, eventsOf, gate, limit, notes, notesDirectory, plan, revisionGates, reviewRun, reviewTarget, store, tool, unchanged,
+  candidates, eventsOf, finalReviewTree, gate, limit, notes, notesDirectory, plan, revisionGates, reviewRun, reviewTarget, store, tool, unchanged,
 } from './helpers/reviews.js';
 import { onlyRun, openRuns, runEventsOnDisk, runPath, staleCrashLock, testPolicy, until } from './helpers/runs.js';
 
@@ -44,6 +44,7 @@ afterEach(async () => {
 });
 
 const index = `${notesDirectory}/src/index.ts`;
+const correctedTree = 'd'.repeat(40);
 const never = (): ScriptStep => ({ kind: 'await', until: () => new Promise(() => undefined) });
 
 /** The three engineers, and a fourth for a correction. */
@@ -82,7 +83,7 @@ function correctedCandidates(): Record<string, ScriptedCommit> {
   return {
     ...scripted,
     'revision-04': {
-      tree: 'tree-04', base: 'revision-03', changes: [{ status: 'M', path: limit }],
+      tree: correctedTree, base: 'revision-03', changes: [{ status: 'M', path: limit }],
       files: { ...scripted['revision-03']!.files, [limit]: 'export export const limit = (text: string) => text.length <= 500;\n' },
     },
   };
@@ -191,7 +192,7 @@ describe('CF02, CF03 and CF12: one routine assessment', () => {
     expect(eventsOf(events, 'reconciliation-started').map(event => event.data)).toEqual([{ workItem: 'wi-001', reconciliation: 'wi-001.rc01', round: 1 }]);
     const basis = await committed<ReconciliationBasis>(root, runId, reconciliationLayout.basis('wi-001.rc01'));
     expect(basis).toMatchObject({
-      round: 1, floor: 'any', source: { commit: 'revision-03', tree: 'tree-03' }, due: [],
+      round: 1, floor: 'any', source: { commit: 'revision-03', tree: finalReviewTree }, due: [],
       forkPoint: { kind: 'session', session: completion.data.architectRef!.session, ref: completion.data.architectRef!.ref },
       requests: [
         { request: 'rq-0001', attempt: 'rq-0001.a01', result: 'complete' },
@@ -227,7 +228,7 @@ describe('CF02, CF03 and CF12: one routine assessment', () => {
     const detail = service.checkFindings(plan, runId, { kind: 'detail', checkFinding: 'cf-0001' });
     expect(detail).toMatchObject({ ok: true, view: { decisions: { items: [{
       actor: { kind: 'agent', role: 'local-architect', invocation: assessed[0]!.data.invocation },
-      source: { kind: 'tree', id: 'tree-03' },
+      source: { kind: 'tree', id: finalReviewTree },
       evidence: [{ kind: 'reconciliation-submission', ref: runLayout.submission(assessed[0]!.data.invocation), hash: expect.stringMatching(/^sha256:/u) }],
     }] } } });
     const waiver = service.checkFindings(plan, runId, { kind: 'detail', checkFinding: 'cf-0002' });
@@ -294,7 +295,7 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
     // The architect's own session was continued to assign the correction,
     // with the brief in its history, and the assignment resolves the intent.
     const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
-    const correctionTurn = parentTurns[4]!;
+    const correctionTurn = parentTurns[5]!;
     expect(correctionTurn.spec.session.mode).toBe('continue');
     expect(correctionTurn.inherited.some(text => text.includes('Reconciliation wi-001.rc01 (round 1)'))).toBe(true);
     expect(correctionTurn.spec.prompt).toContain('## Reconciliation wi-001.rc01');
@@ -310,14 +311,14 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
     const closed = eventsOf(events, 'iteration-closed').find(event => event.data.iteration === 'wi-001.i04')!;
     expect(closed.data.checkFindings).toEqual([expect.objectContaining({
       type: 'check-finding-decided',
-      data: expect.objectContaining({ checkFinding: 'cf-0001', decision: expect.objectContaining({ decision: { action: 'claim-repair', candidate: { kind: 'tree', id: 'tree-04' }, change: 'wi-001.i04' } }) }),
+      data: expect.objectContaining({ checkFinding: 'cf-0001', decision: expect.objectContaining({ decision: { action: 'claim-repair', candidate: { kind: 'tree', id: correctedTree }, change: 'wi-001.i04' } }) }),
     })]);
     expect(eventsOf(events, 'review-request-recorded').map(event => event.data.iteration)).toEqual(['wi-001.i01', 'wi-001.i02', 'wi-001.i03', 'wi-001.i04']);
 
     // Round 2 has the later floor; its first submission was refused for a
     // correction below it, and the second left that signal open.
     const basis = await committed<ReconciliationBasis>(root, runId, reconciliationLayout.basis('wi-001.rc02'));
-    expect(basis).toMatchObject({ round: 2, floor: 'non-low', source: { commit: 'revision-04', tree: 'tree-04' } });
+    expect(basis).toMatchObject({ round: 2, floor: 'non-low', source: { commit: 'revision-04', tree: correctedTree } });
     expect(basis.checkFindings.map(entry => entry.checkFinding)).toEqual(['cf-0001', 'cf-0003']);
     const [, refork] = reconcilerSessions(agent!);
     expect(refork!.spec.session).toEqual({ mode: 'fork', from: eventsOf(events, 'outline-revised').filter(event => event.data.architectRef !== undefined)[1]!.data.architectRef!.ref });
@@ -360,7 +361,7 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
         if (write !== 'gate-committed' || raised) return;
         if (!(await runEventsOnDisk(root, plan, runId)).some(event => event.type === 'reconciliation-assessed')) return;
         raised = true;
-        await service.recordCheckFindings(plan, runId, { cause: { kind: 'producer', producer: 'review:code', attempt: 'late' }, commands: [report(boundConcern({ attempt: 'late', tree: 'tree-03' }))] });
+        await service.recordCheckFindings(plan, runId, { cause: { kind: 'producer', producer: 'review:code', attempt: 'late' }, commands: [report(boundConcern({ attempt: 'late', tree: finalReviewTree }))] });
       },
     });
     service = run.service;
@@ -475,7 +476,7 @@ describe('CF09 and CF16: a basis that no longer holds', () => {
       commits: {
         ...candidates(),
         // The work item's gate commits a change to the store, not a rendered feature file.
-        'revision-04': { tree: 'tree-04', base: 'revision-03', changes: [{ status: 'M', path: store }], files: candidates()['revision-03']!.files },
+        'revision-04': { tree: correctedTree, base: 'revision-03', changes: [{ status: 'M', path: store }], files: candidates()['revision-03']!.files },
       },
       gates: [...revisionGates, { commit: 'revision-04', changes: [{ status: 'M', path: store }] }, unchanged, unchanged, unchanged],
       engineer: engineers.slice(0, 3),
@@ -505,7 +506,7 @@ describe('CF09 and CF16: a basis that no longer holds', () => {
         raised = true;
         await service.recordCheckFindings(plan, id, {
           cause: { kind: 'producer', producer: 'review:code', attempt: 'late' },
-          commands: [report(boundConcern({ attempt: 'late', tree: 'tree-04', summary: 'The cart module reads the notes store' }))],
+          commands: [report(boundConcern({ attempt: 'late', tree: correctedTree, summary: 'The cart module reads the notes store' }))],
         });
       },
     });
@@ -591,9 +592,10 @@ describe('CF10: a missing fork point and a failed brief append', () => {
     expect(eventsOf(events, 'session-finished').some(event => event.data.session === appended[0]!.data.session && event.data.reason === 'lost')).toBe(true);
     // The next architect turn starts fresh, and its input carries the brief from the log.
     const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
-    expect(parentTurns[4]!.spec.session).toEqual({ mode: 'fresh' });
-    expect(parentTurns[4]!.spec.prompt).toContain('could not be appended to your session (session-lost');
-    expect(parentTurns[4]!.spec.prompt).toContain('> Reconciliation wi-001.rc01 (round 1)');
+    const correctionTurn = parentTurns[5]!;
+    expect(correctionTurn.spec.session).toEqual({ mode: 'fresh' });
+    expect(correctionTurn.spec.prompt).toContain('could not be appended to your session (session-lost');
+    expect(correctionTurn.spec.prompt).toContain('> Reconciliation wi-001.rc01 (round 1)');
     // The second round forks the new session's point, and its brief lands.
     expect(second!.start).toEqual({ mode: 'fork' });
     expect(appended[1]!.data).toMatchObject({ reconciliation: 'wi-001.rc02', outcome: 'appended' });
@@ -625,10 +627,11 @@ describe('CF10: the brief append outcomes that land nothing', () => {
     // continues it, and its input quotes the brief from the log.
     expect(eventsOf(events, 'session-finished').some(event => event.data.session === appended[0]!.data.session && event.data.reason === 'lost')).toBe(false);
     const parentTurns = agent!.sessions.filter(session => session.spec.role === 'local-architect' && !session.spec.prompt.startsWith('# Reconciliation'));
-    expect(parentTurns[4]!.spec.session.mode).toBe('continue');
-    expect(parentTurns[4]!.inherited.some(text => text.includes('Reconciliation wi-001.rc01'))).toBe(false);
-    expect(parentTurns[4]!.spec.prompt).toContain('could not be appended to your session (failed: the executor refused the append)');
-    expect(parentTurns[4]!.spec.prompt).toContain('> Reconciliation wi-001.rc01 (round 1)');
+    const correctionTurn = parentTurns[5]!;
+    expect(correctionTurn.spec.session.mode).toBe('continue');
+    expect(correctionTurn.inherited.some(text => text.includes('Reconciliation wi-001.rc01'))).toBe(false);
+    expect(correctionTurn.spec.prompt).toContain('could not be appended to your session (failed: the executor refused the append)');
+    expect(correctionTurn.spec.prompt).toContain('> Reconciliation wi-001.rc01 (round 1)');
     expect(listOf(service, runId)[0]).toMatchObject({ id: 'cf-0001', standing: 'closed', reason: 'fixed-by-assessment' });
   }, 60_000);
 
