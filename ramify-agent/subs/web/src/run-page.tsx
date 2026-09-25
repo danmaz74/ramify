@@ -299,7 +299,7 @@ function Loading<T>({ state, what, children }: {
   return <>{children(state.data)}</>;
 }
 
-function PlanAndEntries({ client, planId, runId, version, run, onApproved }: AreaProps & { readonly run: RunSnapshot | undefined; readonly onApproved: () => void }) {
+export function PlanAndEntries({ client, planId, runId, version, run, onApproved }: AreaProps & { readonly run: RunSnapshot | undefined; readonly onApproved: () => void }) {
   const state = useRunQuery(`analysis:${runId}`, version, () => client.getAnalysis(planId, runId));
   return (
     <div className="area" aria-label="Plan and entries">
@@ -326,6 +326,35 @@ function PlanAndEntries({ client, planId, runId, version, run, onApproved }: Are
                   </table>
                 )}
             </section>
+            {data.analysis.status === 'accepted' && (
+              <section className="panel" aria-labelledby="nonfunctional-review-heading">
+                <h2 id="nonfunctional-review-heading">Non-functional requirements</h2>
+                {!data.analysis.planEvidence || data.analysis.planEvidence.status === 'unavailable'
+                  ? <p role="status">Non-functional evidence is unavailable: {data.analysis.planEvidence?.reason ?? 'This older run has no accepted catalog'}.</p>
+                  : <>
+                    {data.analysis.planEvidence.catalog.filter(item => item.classification === 'non-functional-requirement').length === 0
+                      ? <p>The accepted catalog explicitly contains no non-functional requirements.</p>
+                      : <ul className="cards">{data.analysis.planEvidence.catalog.filter(item => item.classification === 'non-functional-requirement').map(item =>
+                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code> · bytes {item.start}–{item.end} · SHA-256 <code>{item.sha256.slice(0, 12)}…</code>
+                          <blockquote>{item.quote}</blockquote>
+                          {item.conditions.map((condition, index) => <p key={index}>{condition.source} condition: {condition.text}</p>)}
+                          {item.uncertainty && <p>Uncertainty: {item.uncertainty}</p>}
+                        </li>)}</ul>}
+                    {data.analysis.planEvidence.missing.filter(item => item.judgment === 'unclear').map(item =>
+                      <p role="alert" key={`${item.from}:${item.start}`}>Unclear missing reference: {item.target} from {item.fromPath} at bytes {item.start}–{item.end}. Source: <q>{item.excerpt}</q> {item.reason}</p>)}
+                    <details><summary>Advisory passages and document incorporation</summary>
+                      <ul>{data.analysis.planEvidence.catalog.filter(item => item.classification === 'advice').map(item =>
+                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code> · bytes {item.start}–{item.end} · SHA-256 <code>{item.sha256.slice(0, 12)}…</code><blockquote>{item.quote}</blockquote></li>)}</ul>
+                      <ul>{data.analysis.planEvidence.incorporation.map(item =>
+                        <li key={item.document}>{item.path}: {item.scenarios ? 'scenarios incorporated' : 'scenarios not incorporated'}{item.uncertainty && `; uncertainty: ${item.uncertainty}`}
+                          {item.governing.map((passage, index) => <blockquote key={index}>{passage.quote} <small>({passage.path}, bytes {passage.start}–{passage.end})</small></blockquote>)}
+                        </li>)}</ul>
+                      {data.analysis.planEvidence.missing.filter(item => item.judgment === 'advisory').map(item =>
+                        <p key={`${item.from}:${item.start}`}>Advisory missing reference: {item.target}. {item.reason}</p>)}
+                    </details>
+                  </>}
+              </section>
+            )}
             {data.analysis.status === 'accepted' && (
               <section className="panel" aria-labelledby="scenario-review-heading">
                 <h2 id="scenario-review-heading">Review of the scenarios</h2>

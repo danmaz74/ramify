@@ -5,9 +5,10 @@ import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
 import { moduleProposalSchema, planRefSchema } from '../run/records.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 import { hypothesisChangeSchema, slugSchema } from './records.js';
-import type { PlanScenario } from '../../subs/scenarios/src/extraction.js';
+import { extractDocumentScenarios, type PlanScenario } from '../../subs/scenarios/src/extraction.js';
 import { resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
-import type { DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { assignCatalog, resolvePassage, submittedCatalogItemSchema, type DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { incorporationSchema } from './evidence-contracts.js';
 import {
   integrationScenarioSubmissionSchema, scenarioSubmissionSchema, validateScenarioForm,
   type ScenarioFormResult, type ScenarioViewNames,
@@ -71,6 +72,9 @@ export const initialAnalysisSubmissionSchema = z.object({
   coverageLimits: z.array(z.string()),
   scenarios: z.array(scenarioSubmissionSchema),
   integrationScenarios: z.array(integrationScenarioSubmissionSchema),
+  /** Required for a captured document set; optional only for old pure callers. */
+  incorporation: incorporationSchema.omit({ schema: true }).optional(),
+  catalog: z.array(submittedCatalogItemSchema).optional(),
 }).strict();
 export type InitialAnalysisSubmission = z.infer<typeof initialAnalysisSubmissionSchema>;
 export type SubmittedEntry = InitialAnalysisSubmission['entries'][number];
@@ -121,6 +125,7 @@ export interface AnalysisEvidence {
   readonly plan?: CapturedPlanShape | null | undefined;
   /** New runs resolve every reference against its exact captured document. */
   readonly documents?: { readonly manifest: DocumentManifest; readonly bytes: ReadonlyMap<string, Uint8Array> } | undefined;
+  readonly manifestHash?: string | undefined;
   /** The plan scenarios captured with the plan; none when it has no `gherkin` block. */
   readonly planScenarios?: readonly PlanScenario[] | undefined;
 }
@@ -140,6 +145,7 @@ export function validateInitialAnalysis(input: unknown, evidence: AnalysisEviden
   const shape = validateAgainst(initialAnalysisSubmissionSchema, input);
   if (!shape.ok) return shape;
   const errors = beyondTheSchema(shape.value, evidence);
+  errors.push(...evidenceErrors(shape.value, evidence));
   if (errors.length > 0) return { ok: false, errors };
   const form = scenarioFormOf(shape.value, evidence);
   if (form.ok) return shape;
@@ -155,12 +161,56 @@ export function validateInitialAnalysis(input: unknown, evidence: AnalysisEviden
  * the validation accepted.
  */
 export function scenarioFormOf(submission: InitialAnalysisSubmission, evidence: AnalysisEvidence): ScenarioFormResult {
+  const selected = evidence.documents && submission.incorporation
+    ? extractDocumentScenarios(evidence.documents.manifest.documents
+      .filter(document => document.kind === 'plan' && submission.incorporation!.documents.some(choice => choice.document === document.id && choice.scenarios))
+      .map(document => ({ id: document.id, text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(evidence.documents!.bytes.get(document.id)!) }))).scenarios
+    : evidence.planScenarios ?? [];
   return validateScenarioForm(
     { scenarios: submission.scenarios, integrationScenarios: submission.integrationScenarios },
-    evidence.planScenarios ?? [],
+    selected,
     submission.entries.map(entry => ({ capability: entry.capability, acceptanceRefs: entry.acceptanceRefs })),
     viewNamesOf(evidence.index),
   );
+}
+
+function evidenceErrors(submission: InitialAnalysisSubmission, evidence: AnalysisEvidence): SubmissionError[] {
+  const captured = evidence.documents;
+  if (!captured) return [];
+  const errors: SubmissionError[] = [];
+  if (!submission.incorporation) errors.push({ path: 'incorporation', message: 'A document incorporation judgment is required', expected: 'one judgment over the captured set' });
+  if (!submission.catalog) errors.push({ path: 'catalog', message: 'An explicit catalog is required, even when empty', expected: 'an array of source passages' });
+  if (!submission.incorporation || !submission.catalog) return errors;
+  const { manifest, bytes } = captured;
+  const choices = new Set<string>();
+  submission.incorporation.documents.forEach((choice, index) => {
+    const document = manifest.documents.find(item => item.id === choice.document && item.kind === 'plan');
+    if (!document) errors.push({ path: `incorporation.documents.${index}.document`, message: `Unknown plan document ${choice.document}`, expected: 'a captured plan document' });
+    if (choices.has(choice.document)) errors.push({ path: `incorporation.documents.${index}.document`, message: 'Duplicate document judgment', expected: 'one judgment per plan document' });
+    choices.add(choice.document);
+    choice.governing.forEach((passage, position) => {
+      if (passage.document !== choice.document) errors.push({ path: `incorporation.documents.${index}.governing.${position}.document`,
+        message: 'A governing passage must come from the judged document', expected: choice.document });
+      const result = resolvePassage(manifest, passage, bytes.get(passage.document));
+      if (result.status === 'unavailable') errors.push({ path: `incorporation.documents.${index}.governing.${position}`, message: result.reason, expected: 'an exact captured passage' });
+    });
+  });
+  for (const document of manifest.documents.filter(item => item.kind === 'plan')) if (!choices.has(document.id)) {
+    errors.push({ path: 'incorporation.documents', message: `No judgment for ${document.path}`, expected: 'one judgment per captured plan document' });
+  }
+  const missing = new Map(manifest.missing.map(gap => [`${gap.from}:${gap.target}:${gap.source.start}:${gap.source.end}`, gap]));
+  const judged = new Set<string>();
+  submission.incorporation.missing.forEach((choice, index) => {
+    const key = `${choice.from}:${choice.target}:${choice.source.start}:${choice.source.end}`;
+    if (!missing.has(key)) errors.push({ path: `incorporation.missing.${index}`, message: `Missing reference ${choice.target} is unknown`, expected: 'an exact captured missing reference' });
+    if (judged.has(key)) errors.push({ path: `incorporation.missing.${index}`, message: 'Duplicate missing-reference judgment', expected: 'one judgment per missing reference' });
+    judged.add(key);
+    if (choice.judgment === 'required') errors.push({ path: `incorporation.missing.${index}`, message: `Required document ${choice.target} is unavailable`, expected: 'the source document before analysis acceptance' });
+  });
+  for (const [key, gap] of missing) if (!judged.has(key)) errors.push({ path: 'incorporation.missing', message: `No judgment for ${gap.target}`, expected: 'required, unclear or advisory judgment' });
+  const catalog = assignCatalog(evidence.manifestHash ?? manifest.documents[0]!.sha256, submission.catalog, manifest, bytes);
+  if (!catalog.ok) for (const message of catalog.errors) errors.push({ path: 'catalog', message, expected: 'exact captured passages' });
+  return errors;
 }
 
 /** The exported symbols and the files the architect view records, for the scenarios' first warning. */

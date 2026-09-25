@@ -26,6 +26,7 @@ import {
 } from './helpers/runs.js';
 import { unchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
+import { withPlan13Fixture } from './helpers/declarations.js';
 
 /*
  * The review stop, architecture §3. A run started with `reviewStop` waits
@@ -385,10 +386,10 @@ describe('the run budget', () => {
   async function budgeted(perSession: number, pause: number) {
     const root = await target();
     let current = new Date('2026-09-23T12:00:00.000Z');
-    const scripted = createScriptedAgent(byRole({
+    const scripted = createScriptedAgent(withPlan13Fixture(byRole({
       'initial-architect': [submit(analysis([entry('reviewer-note', reviews)]))],
       'local-architect': [[{ kind: 'wait', ms: 60_000 }]],
-    }));
+    })));
     const timed: AgentPort = {
       name: scripted.name,
       support: scripted.support,
@@ -445,7 +446,7 @@ describe('over HTTP', () => {
     return startServerWith({
       projectRoot: root, port: 0, assetsDirectory: join(root, 'no-such-build'),
       ramify: new FakeRamifyCli(),
-      agent: createScriptedAgent(script),
+      agent: createScriptedAgent(withPlan13Fixture(script)),
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
         git: unchangedGit(root, [finalVerification]), readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution(),

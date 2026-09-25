@@ -114,6 +114,10 @@ export const recoveryTable = {
     machines: ['SM2'], scenario: 'iteration', appended: interrupted,
     stated: 'Re-materializes the entries, hypotheses, registry and work items from the one line; no second analysis',
   },
+  'analysis-evidence-staged': {
+    machines: ['SM2'], scenario: 'iteration', appended: interrupted,
+    stated: 'Immutable catalog and incorporation files may be orphaned; no analysis was accepted and recovery interrupts the run',
+  },
   'readiness-attempted': {
     machines: ['SM1', 'SM7'], scenario: 'iteration', appended: interrupted,
     stated: 'Re-materializes the readiness attempt and its gate; readiness does not run again',
@@ -285,6 +289,7 @@ export const narrowedRows: ReadonlyArray<RecoveryRow & { readonly name: string; 
 const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   ...Object.fromEntries(Object.keys(recoveryTable).map(write => [write, write])) as Record<RunWrite, RunEvent['type']>,
   'job-created': 'job-started',
+  'analysis-evidence-staged': 'invocation-ended',
   'readiness-attempted': 'readiness-passed',
   'scenarios-committed': 'scenarios-materializing',
   'gate-attempted': 'gate-committing',

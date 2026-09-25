@@ -66,7 +66,7 @@ import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planS
 import { ensureStateDirectory } from '../store/state-directory.js';
 import { planPath, readPlan } from '../plans/discover.js';
 import { discoverDocuments } from '../../subs/plan-evidence/src/discovery.js';
-import { verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { assignCatalog, verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { headingAnchor, resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
 import { documentChanges, readCapturedDocuments } from './document-inputs.js';
 import {
@@ -220,6 +220,7 @@ export type RunWrite =
   | 'invocation-ended'
   | 'session-finished'
   | 'analysis-accepted'
+  | 'analysis-evidence-staged'
   | 'readiness-attempted'
   | 'scenarios-materializing'
   | 'scenarios-committed'
@@ -3152,14 +3153,14 @@ export class RunService {
     }
 
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    const documents = run.record.manifest.documentManifest ? await readCapturedDocuments(run.directory, run.record.manifest) : undefined;
     const systemPrompt = renderInitialArchitectPrompt(loaded, this.projectRoot);
-    const prompt = analysisMessage(run.record, plan);
+    const prompt = analysisMessage(run.record, plan, documents, run.directory);
     const scope = baselineScope(
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
       baseline.supplementary.map(entry => entry.path),
     );
     const shape = describePlan(plan);
-    const documents = run.record.manifest.documentManifest ? await readCapturedDocuments(run.directory, run.record.manifest) : undefined;
 
     const result = await this.runInvocation<InitialAnalysisSubmission>(run, agent, {
       role: 'initial-architect',
@@ -3173,7 +3174,8 @@ export class RunService {
       description: 'Submit the run\'s initial analysis. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
       inputSchema: initialAnalysisJsonSchema,
       submissionSchema: 'ramify-agent.initial-analysis/2',
-      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape, documents, planScenarios: run.record.planScenarios.scenarios }),
+      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape, documents,
+        manifestHash: run.record.manifest.documentManifest?.hash, planScenarios: run.record.planScenarios.scenarios }),
       // An accepted analysis session becomes the run's architect context:
       // briefs are appended to it and every placement request forks it.
       keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
@@ -3206,7 +3208,26 @@ export class RunService {
       planId: run.record.planId,
       planScenarios: run.record.planScenarios.scenarios,
       index: run.index,
+      documents,
     });
+    if (!documents || !run.record.manifest.documentManifest || !result.value.catalog || !result.value.incorporation) {
+      await this.fail(run, 'analysis-invalid', 'The accepted analysis has no captured catalog or incorporation judgment', []);
+      return false;
+    }
+    const numbered = assignCatalog(run.record.manifest.documentManifest.hash, result.value.catalog, documents.manifest, documents.bytes);
+    if (!numbered.ok) {
+      await this.fail(run, 'analysis-invalid', `The accepted catalog could not be resolved: ${numbered.errors.join('; ')}`, []);
+      return false;
+    }
+    const catalogText = `${JSON.stringify(numbered.catalog)}\n`;
+    const incorporationText = `${JSON.stringify({ schema: 'ramify-agent.document-incorporation/1', ...result.value.incorporation })}\n`;
+    const catalogHash = sha256(catalogText);
+    const incorporationHash = sha256(incorporationText);
+    const catalogPath = runLayout.catalogVersion(catalogHash);
+    const incorporationPath = runLayout.incorporationVersion(incorporationHash);
+    await writeOnce(run.path(catalogPath), catalogText);
+    await writeOnce(run.path(incorporationPath), incorporationText);
+    await this.afterWrite('analysis-evidence-staged', run.record.jobId);
     await this.write(run, {
       type: 'analysis-accepted',
       data: {
@@ -3217,6 +3238,10 @@ export class RunService {
         workItems: accepted.workItems.length,
         scenarios: accepted.scenarios.length,
         warnings: [...accepted.warnings],
+        catalog: { nfr: numbered.catalog.items.filter(item => item.classification === 'non-functional-requirement').length,
+          advice: numbered.catalog.items.filter(item => item.classification === 'advice').length },
+        evidence: { catalog: { path: catalogPath, hash: catalogHash },
+          incorporation: { path: incorporationPath, hash: incorporationHash } },
       },
     }, accepted.records);
     await this.afterWrite('analysis-accepted', run.record.jobId);
@@ -8349,7 +8374,8 @@ function stoppedOutcome(): Omit<InvocationOutcome, 'schema' | 'invocation'> {
   };
 }
 
-function analysisMessage(record: RunRecord, plan: string): string {
+function analysisMessage(record: RunRecord, plan: string,
+  documents?: Awaited<ReturnType<typeof readCapturedDocuments>>, directory?: string): string {
   const view = record.manifest.architectView;
   const source = record.manifest.source;
   return [
@@ -8361,7 +8387,26 @@ function analysisMessage(record: RunRecord, plan: string): string {
     plan.trim(),
     '</plan>',
     '',
-    ...planScenariosSection(record.planScenarios),
+    ...(documents ? [
+      '# Captured document index', '',
+      'Read relevant captured files using `read` at the absolute paths below. The byte files hold the exact source; use them for passage quotes and byte offsets. A link alone does not make scenarios binding. Judge each plan document and each missing reference explicitly.',
+      '',
+      ...documents.manifest.documents.map(document => `- ${document.id} (${document.kind}): ${document.path}; SHA-256 ${document.sha256}; captured file ${join(directory!, document.storedAt)}`),
+      ...(documents.manifest.missing.length ? ['', 'Missing references to judge:',
+        ...documents.manifest.missing.map(gap => `- From ${gap.from}, bytes ${gap.source.start}–${gap.source.end}: ${gap.target}; ${gap.reason}`)] : []),
+      '',
+      `Principles scan: ${documents.manifest.principlesScan.status}${documents.manifest.principlesScan.unreadable.length ? `; unreadable ${documents.manifest.principlesScan.unreadable.map(item => item.path).join(', ')}` : ''}.`,
+      'Inspect governing scope and status from each principle text; its filename alone does not establish applicability.', '',
+      'Candidate scenario blocks in captured plan documents (local IDs here; accepted ps-NN IDs are numbered across only the incorporated documents, in manifest order):',
+      ...documents.manifest.documents.filter(document => document.kind === 'plan').flatMap(document => {
+        const content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(documents.bytes.get(document.id)!);
+        const extraction = extractPlanScenarios(content, document.id);
+        return extraction.scenarios.length
+          ? extraction.scenarios.map(scenario => `- ${document.id} local ${scenario.id}: ${scenario.name}, lines ${scenario.lines[0]}–${scenario.lines[1]}`)
+          : [`- ${document.id}: no parseable scenario block`];
+      }), '',
+    ] : []),
+    ...planScenariosSection(record.planScenarios, documents !== undefined),
     '# This run\'s evidence',
     '',
     view.status === 'materialized'
@@ -8381,8 +8426,8 @@ function analysisMessage(record: RunRecord, plan: string): string {
  * lines, and every `gherkin` block that did not parse. A plan without
  * blocks is said to have none in one line.
  */
-function planScenariosSection(extraction: PlanScenarioExtraction): string[] {
-  const lines = ['# The plan\'s scenarios', ''];
+function planScenariosSection(extraction: PlanScenarioExtraction, candidates = false): string[] {
+  const lines = [candidates ? '# Root plan scenario candidates' : '# The plan\'s scenarios', ''];
   if (extraction.scenarios.length === 0 && extraction.limitations.length === 0) {
     return [...lines, 'The plan has no `gherkin` block, so it states no scenario: write every entry\'s scenarios yourself.', ''];
   }
@@ -8390,7 +8435,7 @@ function planScenariosSection(extraction: PlanScenarioExtraction): string[] {
     lines.push('The plan states no scenario that could be extracted: write every entry\'s scenarios yourself.', '');
   } else {
     lines.push(
-      `The harness extracted ${extraction.scenarios.length === 1 ? 'one scenario' : `${extraction.scenarios.length} scenarios`} from the plan's \`gherkin\` blocks. Each appears exactly once in your submission: as the origin of one entry scenario, restating its text as written here, or as an integration scenario with its sub-scenarios.`,
+      `The harness extracted ${extraction.scenarios.length === 1 ? 'one scenario' : `${extraction.scenarios.length} scenarios`} from the root plan's \`gherkin\` blocks. ${candidates ? 'If you incorporate the root, each must appear exactly once in your submission.' : 'Each appears exactly once in your submission.'} Use one as the origin of an entry scenario, restating its text as written here, or as an integration scenario with its sub-scenarios.`,
       '',
     );
     for (const scenario of extraction.scenarios) {

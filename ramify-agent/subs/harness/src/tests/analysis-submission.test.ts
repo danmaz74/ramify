@@ -123,7 +123,8 @@ describe('the schema', () => {
 
   test('has no field for an ID the harness already knows', () => {
     const properties = (initialAnalysisJsonSchema as { properties: Record<string, unknown> }).properties;
-    expect(Object.keys(properties).sort()).toEqual(['coverageLimits', 'entries', 'hypotheses', 'integrationScenarios', 'scenarios']);
+    expect(Object.keys(properties).sort()).toEqual(['catalog', 'coverageLimits', 'entries', 'hypotheses', 'incorporation', 'integrationScenarios', 'scenarios']);
+    expect(JSON.stringify(properties['catalog'])).not.toContain('"id"');
     const hypothesis = JSON.stringify(properties['hypotheses']);
     for (const assigned of ['workItem', 'invocation', 'revision', 'standing', 'cause', 'schema']) {
       expect(hypothesis).not.toContain(`"${assigned}"`);

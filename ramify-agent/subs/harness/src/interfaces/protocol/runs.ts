@@ -533,6 +533,22 @@ export const analysisResponseSchema = z.object({
       /** Entry scenarios in the order the analysis submitted them, then integration scenarios. */
       scenarios: z.array(analysisScenarioSchema).max(runQueryLimits.scenarios),
       warnings: z.array(scenarioWarningViewSchema),
+      /** Absent on old runs; an explicit empty catalog is an available result. */
+      planEvidence: z.discriminatedUnion('status', [
+        z.object({ status: z.literal('unavailable'), reason: z.string() }).strict(),
+        z.object({
+          status: z.literal('available'),
+          catalog: z.array(z.object({
+            id: text, classification: z.enum(['non-functional-requirement', 'advice']),
+            document: text, path: text, sha256: text, start: count, end: count, quote: text,
+            conditions: z.array(z.object({ text, source: z.enum(['stated', 'inferred']) }).strict()), uncertainty: z.string(),
+          }).strict()),
+          missing: z.array(z.object({ from: text, fromPath: text, excerpt: z.string(), target: text, start: count, end: count,
+            judgment: z.enum(['unclear', 'advisory']), reason: text }).strict()),
+          incorporation: z.array(z.object({ document: text, path: text, scenarios: z.boolean(), uncertainty: z.string(),
+            governing: z.array(z.object({ path: text, start: count, end: count, quote: text }).strict()) }).strict()),
+        }).strict(),
+      ]).optional(),
       total: z.object({ entries: count, hypotheses: count, scenarios: count }).strict(),
     }).strict(),
   ]),

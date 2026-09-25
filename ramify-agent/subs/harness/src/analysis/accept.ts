@@ -10,6 +10,7 @@ import {
   type Hypothesis, type RecordedScenarioWarning, type RegistryEntry,
 } from './records.js';
 import { scenarioFormOf, type InitialAnalysisSubmission } from './submission.js';
+import type { DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 
 /*
  * What one accepted initial analysis commits, in the single
@@ -48,6 +49,7 @@ export interface AnalysisAcceptanceContext {
   readonly planScenarios: readonly PlanScenario[];
   /** The architect view the submission was validated against, or null where the run has none. */
   readonly index: ArchitectIndex | null;
+  readonly documents?: { readonly manifest: DocumentManifest; readonly bytes: ReadonlyMap<string, Uint8Array> } | undefined;
 }
 
 /**
@@ -96,7 +98,7 @@ export function acceptAnalysis(submission: InitialAnalysisSubmission, context: A
 
   // The validation that accepted the submission applied the same rules, so
   // a rejection here is the harness disagreeing with itself.
-  const form = scenarioFormOf(submission, { index: context.index, planScenarios: context.planScenarios });
+  const form = scenarioFormOf(submission, { index: context.index, planScenarios: context.planScenarios, documents: context.documents });
   if (!form.ok) throw new Error(`An accepted analysis breaks a scenario form rule: ${form.message}`);
   const assigned = assignScenarioIds(form.form, {
     planId: context.planId,

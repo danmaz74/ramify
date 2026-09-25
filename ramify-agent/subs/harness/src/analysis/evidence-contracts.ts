@@ -12,5 +12,9 @@ export const incorporationSchema = z.object({
     governing: z.array(passageReferenceSchema).min(1),
     uncertainty: z.string(),
   }).strict()),
-  missing: z.array(z.object({ target: text, judgment: z.enum(['required', 'unclear', 'advisory']), reason: text }).strict()),
+  missing: z.array(z.object({
+    from: z.string().regex(/^doc-\d{3,}$/), target: text,
+    source: z.object({ start: z.int().nonnegative(), end: z.int().positive() }).strict(),
+    judgment: z.enum(['required', 'unclear', 'advisory']), reason: text,
+  }).strict()),
 }).strict();

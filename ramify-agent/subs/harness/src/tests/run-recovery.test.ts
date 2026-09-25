@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
@@ -183,6 +184,7 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'invocation-ended': return types.includes('invocation-ended');
     case 'session-finished': return types.includes('session-finished');
     case 'analysis-accepted': return types.includes('analysis-accepted');
+    case 'analysis-evidence-staged': return types.includes('invocation-ended') && !types.includes('analysis-accepted');
     case 'readiness-attempted': return types.includes('readiness-passed') || types.includes('readiness-failed');
     // The materialization's intent is in the log; its commit is made at the second.
     case 'scenarios-materializing': case 'scenarios-committed': return types.includes('scenarios-materializing');
@@ -349,6 +351,32 @@ describe('the recovery table', () => {
     const transcript = await readTranscript(runPath(root, 'review-notes', runId, runLayout.transcript('ses-0001')));
     expect(transcript.entries.filter(entry => entry.type === 'ended')).toHaveLength(1);
     expect(transcript.entries.at(-1)).toMatchObject({ type: 'point', point: { session: 'ses-0001', invocation: 'inv-0001' } });
+  }, 180_000);
+
+  test('a crash after immutable analysis evidence is staged leaves no accepted analysis and a fresh run can use changed evidence', async () => {
+    const root = await target();
+    const { runId } = await crashAfter(root, 'analysis-evidence-staged');
+    const directory = runPath(root, 'review-notes', runId);
+    const staged = await readdir(join(directory, 'analysis', 'catalog'));
+    expect(staged).toHaveLength(1);
+    expect((await runEventsOnDisk(root, 'review-notes', runId)).some(event => event.type === 'analysis-accepted')).toBe(false);
+    const resumed = await openRuns(root, { git: gitOf(root), readinessExecution: directReadinessExecution(),
+      script: () => {
+        const source = readFileSync(runPath(root, 'review-notes', runId, runLayout.capturedPlan));
+        const quote = '# Reviewer notes on a review run';
+        const analysis = emptyAnalysis();
+        return [{ kind: 'submit', input: { ...analysis, catalog: [{ classification: 'non-functional-requirement',
+          passage: { document: 'doc-001', sha256: createHash('sha256').update(source).digest('hex'),
+            start: 0, end: Buffer.byteLength(quote), quote }, conditions: [], uncertainty: '' }] } }];
+      } });
+    cleanups.push(() => resumed.service.close());
+    expect((await runEventsOnDisk(root, 'review-notes', runId)).map(event => event.type)).toContain('job-interrupted');
+    const next = await resumed.service.execute(startRun('review-notes'));
+    await until(async () => (await runEventsOnDisk(root, 'review-notes', next.jobId)).some(event => event.type === 'analysis-accepted'));
+    const accepted = (await runEventsOnDisk(root, 'review-notes', next.jobId)).filter(event => event.type === 'analysis-accepted');
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]?.type === 'analysis-accepted' && accepted[0].data.evidence?.catalog.path).not.toContain(staged[0]);
+    expect(accepted[0]?.type === 'analysis-accepted' && accepted[0].data.catalog).toEqual({ nfr: 1, advice: 0 });
   }, 180_000);
 
   test('a crash after analysis-accepted re-materializes the entries and accepts no second analysis', async () => {

@@ -1,7 +1,8 @@
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
-import { join, resolve } from 'node:path';
-import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
+import { dirname, join, resolve } from 'node:path';
+import type { AgentPort, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
 import { createPiAgent, piReadiness } from '../../subs/agent/subs/pi/src/pi-agent.js';
 import { privateRamify, type RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -12,6 +13,7 @@ import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { RunService, type RunRecoveryReport, type RunServiceOptions } from '../run/service.js';
 import { acquireProjectLock } from '../store/lock.js';
 import { createApp } from './app.js';
+import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 
 /**
  * The agent a run is started with. `pi` is pi with the person's own login.
@@ -112,18 +114,41 @@ export class ProjectRootError extends Error {
  * its own is beyond it: every plan scenario must appear in the analysis,
  * and this one names none.
  */
-export function demonstrationScript(): ScriptStep[] {
+export function demonstrationScript(spec?: SessionSpec): ScriptStep[] {
+  const incorporation = spec ? demonstrationIncorporation(spec) : { documents: [], missing: [] };
   const analysis: InitialAnalysisSubmission = {
     entries: [],
     hypotheses: [],
     coverageLimits: ['The scripted fake analyses nothing: this run exercises the lifecycle, readiness and the final gate only.'],
     scenarios: [],
     integrationScenarios: [],
+    catalog: [],
+    incorporation,
   };
   return [
     { kind: 'message', text: 'The scripted fake reads nothing and assigns no entry capability.' },
     { kind: 'submit', input: analysis },
   ];
+}
+
+function demonstrationIncorporation(spec: SessionSpec): NonNullable<InitialAnalysisSubmission['incorporation']> {
+  const capturedRoot = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
+  if (!capturedRoot) return { documents: [], missing: [] };
+  const directory = dirname(dirname(capturedRoot));
+  const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
+  const documents = manifest.documents.filter(document => document.kind === 'plan').map(document => {
+    const bytes = readFileSync(join(directory, document.storedAt));
+    let end = 1;
+    let quote = '';
+    while (end <= bytes.length) {
+      try { quote = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, end)); if (quote) break; }
+      catch { /* Continue to a complete UTF-8 character. */ }
+      end += 1;
+    }
+    return { document: document.id, scenarios: document.id === manifest.root,
+      governing: [{ document: document.id, sha256: createHash('sha256').update(bytes).digest('hex'), start: 0, end, quote }], uncertainty: '' };
+  });
+  return { documents, missing: [] };
 }
 
 /**
@@ -145,7 +170,7 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
     throw new ProjectRootError(`The project root ${projectRoot} has no module.ramify`);
   }
   const agent = options.agent === 'fake'
-    ? createScriptedAgent(demonstrationScript())
+    ? createScriptedAgent(spec => demonstrationScript(spec))
     : options.agent === 'pi' ? createPiAgent({ model: options.piModel }) : options.agent;
   // pi resolves the model it runs, and each session records it.
   const readiness = options.agent === 'pi' ? await piReadiness({ model: options.piModel }) : undefined;

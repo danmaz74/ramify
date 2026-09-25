@@ -4,6 +4,7 @@ import { runLayout } from '../run/records.js';
 import { capabilityOf } from '../work/frontier.js';
 import { readRunFile, type RunView } from './inputs.js';
 import { analysisScenariosOf } from './scenarios.js';
+import { readAcceptedEvidence } from '../analysis/evidence.js';
 
 /*
  * The plan and its entries with their scenarios, the hypotheses beside the
@@ -43,6 +44,7 @@ export async function analysisOf(view: RunView): Promise<AnalysisResponse> {
 
   const hypotheses = hypothesesOf(view);
   const { scenarios, warnings } = analysisScenariosOf(view);
+  const planEvidence = await evidenceOf(view);
   return {
     plan,
     analysis: {
@@ -52,9 +54,38 @@ export async function analysisOf(view: RunView): Promise<AnalysisResponse> {
       hypotheses: hypotheses.slice(0, runQueryLimits.analysis),
       scenarios: scenarios.slice(0, runQueryLimits.scenarios),
       warnings,
+      planEvidence,
       total: { entries: entries.length, hypotheses: hypotheses.length, scenarios: scenarios.length },
     },
   };
+}
+
+async function evidenceOf(view: RunView): Promise<NonNullable<Extract<AnalysisResponse['analysis'], { status: 'accepted' }>['planEvidence']>> {
+  const evidence = await readAcceptedEvidence(view.directory, view.record, view.events);
+  if (evidence.status === 'unavailable') return evidence;
+  try {
+    const paths = new Map(evidence.manifest.documents.map(document => [document.id, document.path]));
+    return {
+      status: 'available',
+      catalog: evidence.catalog.items.map(item => ({ id: item.id, classification: item.classification, document: item.passage.document,
+        path: paths.get(item.passage.document) ?? 'unknown', sha256: item.passage.sha256,
+        start: item.passage.start, end: item.passage.end, quote: item.passage.quote,
+        conditions: item.conditions, uncertainty: item.uncertainty })),
+      missing: evidence.incorporation.missing.filter(item => item.judgment !== 'required').map(item => ({
+        from: item.from, fromPath: paths.get(item.from) ?? 'unknown',
+        excerpt: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
+          evidence.bytes.get(item.from)?.subarray(item.source.start, item.source.end) ?? new Uint8Array()),
+        target: item.target, start: item.source.start, end: item.source.end,
+        judgment: item.judgment as 'unclear' | 'advisory', reason: item.reason,
+      })),
+      incorporation: evidence.incorporation.documents.map(item => ({ document: item.document, path: paths.get(item.document) ?? 'unknown',
+        scenarios: item.scenarios, uncertainty: item.uncertainty,
+        governing: item.governing.map(passage => ({ path: paths.get(passage.document) ?? 'unknown', start: passage.start,
+          end: passage.end, quote: passage.quote })) })),
+    };
+  } catch (error) {
+    return { status: 'unavailable', reason: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** Every hypothesis at its current revision, with its first forecast and the decisions that revised it. */

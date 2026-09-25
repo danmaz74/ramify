@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { catalogSchema, documentManifestSchema, resolvePassage, validateCatalog, verifyDocumentBytes } from '../interfaces/contracts.js';
+import { assignCatalog, catalogSchema, documentManifestSchema, resolvePassage, validateCatalog, verifyDocumentBytes } from '../interfaces/contracts.js';
 
 const bytes = new TextEncoder().encode('# Plan\n  Keep spacing.\n');
 const hash = createHash('sha256').update(bytes).digest('hex');
@@ -31,5 +31,20 @@ describe('captured document contracts', () => {
     ] });
     expect(validateCatalog(catalog, manifest, new Map([['doc-001', bytes]]))).toEqual([]);
     expect(validateCatalog({ ...catalog, items: [{ ...catalog.items[0]!, id: 'nfr-002' }] }, manifest, new Map([['doc-001', bytes]]))).toContain('nfr-002 must be nfr-001');
+  });
+
+  it('assigns separate stable IDs from captured document and byte order, and rejects changed quotes', () => {
+    const passage = (document: string, start: number, end: number, quote: string) => ({ document, sha256: hash, start, end, quote });
+    const items = [
+      { classification: 'advice' as const, passage: passage('doc-002', 7, 22, '  Keep spacing.'), conditions: [], uncertainty: '' },
+      { classification: 'non-functional-requirement' as const, passage: passage('doc-001', 7, 22, '  Keep spacing.'), conditions: [], uncertainty: '' },
+      { classification: 'advice' as const, passage: passage('doc-001', 2, 6, 'Plan'), conditions: [], uncertainty: '' },
+    ];
+    const sources = new Map([['doc-001', bytes], ['doc-002', bytes]]);
+    const assigned = assignCatalog(hash, items, manifest, sources);
+    expect(assigned.ok).toBe(true);
+    if (!assigned.ok) return;
+    expect(assigned.catalog.items.map(item => item.id)).toEqual(['adv-001', 'nfr-001', 'adv-002']);
+    expect(assignCatalog(hash, [{ ...items[0]!, passage: { ...items[0]!.passage, quote: 'Keep spacing.' } }], manifest, sources).ok).toBe(false);
   });
 });

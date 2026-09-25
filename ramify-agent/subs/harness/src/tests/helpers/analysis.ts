@@ -95,6 +95,10 @@ export function analysis(
     coverageLimits: [...coverageLimits],
     scenarios: [...scenarios],
     integrationScenarios: [...integrationScenarios],
+    // The scripted analysis explicitly asserts no NFR/advice passages. The
+    // fixture wrapper binds its document judgment to the run's captured bytes.
+    catalog: [],
+    incorporation: { documents: [], missing: [] },
   };
 }
 

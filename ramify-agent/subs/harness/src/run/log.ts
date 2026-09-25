@@ -143,6 +143,11 @@ export const runEventSchema = z.discriminatedUnion('type', [
     warnings: z.array(scenarioWarningSchema),
     /** Present when the same transaction also commits catalog and incorporation. */
     catalog: z.object({ nfr: z.int().nonnegative(), advice: z.int().nonnegative() }).strict().optional(),
+    /** Hashes bind external immutable evidence files without putting their bodies in a ledger line. */
+    evidence: z.object({
+      catalog: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
+      incorporation: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
+    }).strict().optional(),
   }).strict()),
   /** The manifest is committed only after every immutable document byte file is durable. */
   event('document-manifest-committed', z.object({ manifest: text, hash: z.string().regex(/^[0-9a-f]{64}$/), documents: z.int().positive() }).strict()),

@@ -142,7 +142,7 @@ describe('plan capture', () => {
     // The briefing lists each by ID, with its text and plan lines, and the limitation.
     const prompt = agent!.sessions.find(session => session.spec.role === 'initial-architect')!.spec.prompt;
     const [attach, panel] = record.planScenarios.scenarios;
-    expect(prompt).toContain('# The plan\'s scenarios');
+    expect(prompt).toContain('# Root plan scenario candidates');
     expect(prompt).toContain(`## ps-01: A reviewer attaches a note\n\nPlan lines ${attach!.lines[0]}–${attach!.lines[1]}.`);
     expect(prompt).toContain(`## ps-02: The panel shows an attached note\n\nPlan lines ${panel!.lines[0]}–${panel!.lines[1]}.`);
     expect(prompt).toContain(['```gherkin', ...attach!.source, '```'].join('\n'));
@@ -196,9 +196,9 @@ describe('acceptance', () => {
       ['sc-004', 'integration', null, 'collection-review/workspace', null, ['sc-002', 'sc-003'], `subs/workspace/${features}/integration.feature`],
     ]);
     // A plan scenario keeps the plan's lines and text, background folded in.
-    expect(records[0]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-01', ref: { lines: attach!.lines } });
+    expect(records[0]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-01', ref: { document: 'doc-001', lines: attach!.lines } });
     expect(records[0]!.source).toEqual(attach!.source);
-    expect(records[3]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-02', ref: { lines: panel!.lines } });
+    expect(records[3]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-02', ref: { document: 'doc-001', lines: panel!.lines } });
     expect(records[3]!.source).toEqual(panel!.source);
     expect(records[2]!.origin).toEqual({ kind: 'architect', refs: [{ anchor: 'Acceptance' }] });
     expect(records[2]!.name).toBe('The panel shows the attached note');

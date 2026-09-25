@@ -92,7 +92,10 @@ parser. Existing entry capabilities, `requirementRefs`, `acceptanceRefs`,
 scenario records and final Cucumber gate stay the functional path. The
 architect separately submits near-verbatim `non-functional-requirement` and
 `advice` passages with stated and inferred conditions distinguished.
-`analysis/nonfunctional-catalog.json` stores the accepted fixed catalog.
+The accepted event names immutable content-addressed files under
+`analysis/catalog/` and `analysis/incorporation/`, with their hashes; a
+partial pre-event write cannot bind a retry to stale content. The catalog
+is fixed when that event commits.
 Its IDs are `nfr-001` and `adv-001` separately, assigned in captured document
 order then passage byte order; duplicate, skipped or out-of-order IDs fail.
 Every quote must resolve against immutable bytes. Classification is a human

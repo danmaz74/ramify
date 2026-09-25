@@ -134,3 +134,71 @@ assignment authority must add every captured plan path to protected files;
 the current `deniedFiles` service path protects scenario files but does not
 yet include this manifest's plan set. No semantic classification or binding
 force was inferred by capture. No CheckFinding was opened.
+
+## Iteration 3 — fixed catalog, incorporation and analysis review
+
+**Starting provider revision:** `9eb4d46fe572998a380831474b4efd94ec6ec7ab`.
+The worktree was clean at release. Parallel preparation commits added later
+pure context-selection, candidate-tree and readiness code; iteration 3 did
+not edit those files.
+
+The initial architect now receives a compact index of captured plan and
+principle files, immutable read paths, missing-link locations and scenario
+candidates. It reads focused source passages and submits a judgment for every
+plan document and missing reference. Only incorporated documents feed the
+existing scenario form rules. Required missing text rejects analysis before
+acceptance; unclear gaps remain nonblocking and the review shows the exact
+referring excerpt, source path and byte range.
+
+The submission has an explicit catalog, including an explicit empty array.
+It contains near-verbatim passage references, separate classification,
+stated or inferred conditions and uncertainty, with no agent-assigned IDs.
+`plan-evidence` sorts by captured document and byte order, verifies every
+quote against immutable bytes and assigns separate `nfr-001` and `adv-001`
+sequences. The harness stages immutable content-addressed catalog and
+incorporation files, then the one `analysis-accepted` event binds their paths
+and hashes beside the functional records and counts. Rejection commits none
+of these. Old runs without accepted evidence project `unavailable`; an
+accepted empty catalog projects `available` with zero items.
+
+The existing analysis review now shows NFR passages, conditions, uncertainty,
+source hash and byte range. Advice and incorporation decisions are in a
+separate expandable section; advice has no review or satisfaction count.
+The browser witness uses an actual disk-backed harness analysis projection
+rendered through `PlanAndEntries` in Chromium. It passed 11 checks at desktop
+and mobile sizes, including NFR, unclear-source, separate-advice and
+empty-versus-unavailable states. This is a component-browser witness, not a
+live HTTP or agent-model acceptance run; the browser artifacts were refreshed
+while this iteration's source revision was dirty and should be rerun after
+the final integration revision.
+
+**Verification:** six focused Vitest files passed, 92 tests, covering exact
+catalog IDs, required and unclear missing references, incomplete and
+duplicate incorporation, companion scenario incorporation, rejected source
+quotes, review projection and prior review-stop behavior. A separate
+crash-prefix test passed: staging evidence before the accepted event leaves
+an interrupted run with no accepted analysis on recovery, and a fresh run
+can accept changed evidence without colliding with the orphaned file.
+`npm run type-check`, `npm run build:web` and `npm run check:self` passed; the
+self-check covered 12 owners and 497 source files with 0 errors, 0 warnings,
+0 denied accesses and 298 analysis limits. The exact focused commands were:
+
+```sh
+npx vitest run subs/harness/subs/plan-evidence/src/tests/contracts.test.ts subs/harness/src/tests/analysis-plan-evidence.test.ts subs/harness/src/tests/analysis-scenarios.test.ts subs/harness/src/tests/analysis-submission.test.ts subs/harness/src/tests/review-stop.test.ts subs/web/src/tests/run-page.test.tsx --maxWorkers=2 --testTimeout=15000
+npx vitest run subs/harness/src/tests/run-recovery.test.ts -t 'crash after immutable analysis evidence' --maxWorkers=1 --testTimeout=15000
+npx tsx scripts/browser-acceptance/plan13-review.ts
+```
+
+A broader seven-file command that included the entire recovery suite was
+stopped after 90 seconds without a result; no full post-edit suite pass is
+claimed. The later plan audit remains the executable whole-run gate.
+
+**Handoff to iteration 4:** `analysis/evidence.ts:readAcceptedEvidence` reads
+the authoritative accepted event and verifies both immutable files and the
+captured corpus. Use its explicit available/unavailable result for the
+one-time selector; do not infer an empty catalog from an absent record.
+`runLayout.catalogVersion` and `incorporationVersion` are the immutable paths.
+The accepted catalog is fixed; assignment delivery may cite its IDs but may
+not add or reclassify items. The current harness recovery policy interrupts
+an in-flight run after a crash; this iteration did not add same-run resume.
+No CheckFinding was opened.

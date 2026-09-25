@@ -83,13 +83,14 @@ export const passageReferenceSchema = z.object({
 export type PassageReference = z.infer<typeof passageReferenceSchema>;
 
 const conditionSchema = z.object({ text, source: z.enum(['stated', 'inferred']) }).strict();
-export const catalogItemSchema = z.object({
+const catalogItemBaseSchema = z.object({
   id: z.string().regex(/^(nfr|adv)-\d{3,}$/),
   classification: z.enum(['non-functional-requirement', 'advice']),
   passage: passageReferenceSchema,
   conditions: z.array(conditionSchema),
   uncertainty: z.string(),
-}).strict().superRefine((item, ctx) => {
+}).strict();
+export const catalogItemSchema = catalogItemBaseSchema.superRefine((item, ctx) => {
   const prefix = item.classification === 'advice' ? 'adv-' : 'nfr-';
   if (!item.id.startsWith(prefix)) ctx.addIssue({ code: 'custom', path: ['id'], message: 'ID prefix disagrees with classification' });
 });
@@ -99,6 +100,31 @@ export const catalogSchema = z.object({
   items: z.array(catalogItemSchema),
 }).strict();
 export type Catalog = z.infer<typeof catalogSchema>;
+
+/** Architect input has no durable ID; the owner assigns IDs after sorting. */
+export const submittedCatalogItemSchema = catalogItemBaseSchema.omit({ id: true });
+export type SubmittedCatalogItem = z.infer<typeof submittedCatalogItemSchema>;
+
+export function assignCatalog(
+  manifestHash: string,
+  items: readonly SubmittedCatalogItem[],
+  manifest: DocumentManifest,
+  bytes: ReadonlyMap<string, Uint8Array>,
+): { readonly ok: true; readonly catalog: Catalog } | { readonly ok: false; readonly errors: readonly string[] } {
+  const order = new Map(manifest.documents.map((document, index) => [document.id, index]));
+  const sorted = [...items].sort((a, b) =>
+    (order.get(a.passage.document) ?? Infinity) - (order.get(b.passage.document) ?? Infinity) ||
+    a.passage.start - b.passage.start || a.passage.end - b.passage.end);
+  const counters = { 'non-functional-requirement': 0, advice: 0 };
+  const catalog = catalogSchema.parse({
+    schema: 'ramify-agent.nonfunctional-catalog/1', manifestHash,
+    items: sorted.map(item => ({ ...item,
+      id: `${item.classification === 'advice' ? 'adv' : 'nfr'}-${String(++counters[item.classification]).padStart(3, '0')}`,
+    })),
+  });
+  const errors = validateCatalog(catalog, manifest, bytes);
+  return errors.length ? { ok: false, errors } : { ok: true, catalog };
+}
 
 /** Stable IDs follow captured document order, then byte position within each class. */
 export function validateCatalog(catalog: Catalog, manifest: DocumentManifest, bytes: ReadonlyMap<string, Uint8Array>): string[] {
