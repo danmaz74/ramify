@@ -879,7 +879,7 @@ function record(id: string, kind: 'entry' | 'integration', entryName: string | n
     kind,
     entry: entryName,
     owner: notes,
-    origin: kind === 'entry' ? { kind: 'architect', refs: [{ anchor: 'Acceptance' }] } : { kind: 'plan', planScenario: 'ps-01', ref: { lines: [1, 4] } },
+    origin: kind === 'entry' ? { kind: 'architect', refs: ['fr-002'] } : { kind: 'plan', planScenario: 'ps-01', ref: { lines: [1, 4] } },
     partOf: null,
     subScenarios: kind === 'entry' ? [] : ['sc-001', 'sc-002'],
     name: id,

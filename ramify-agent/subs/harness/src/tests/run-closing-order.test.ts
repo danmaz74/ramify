@@ -101,7 +101,12 @@ describe('closing is the last write', () => {
   test('the closing event of the run is last, and nothing follows it', async () => {
     const { events } = await recordedAt('');
     const order = events.map((event: RunEvent) => event.type);
-    expect(order.indexOf('analysis-accepted')).toBeGreaterThan(order.indexOf('invocation-ended'));
+    // The analysis's three invocations (intake, initial architect, checker)
+    // are all closed before it is accepted.
+    const beforeAcceptance = order.slice(0, order.indexOf('analysis-accepted'));
+    expect(beforeAcceptance.filter(type => type === 'invocation-started')).toHaveLength(3);
+    expect(beforeAcceptance.filter(type => type === 'invocation-ended')).toHaveLength(3);
+    expect(beforeAcceptance.at(-1)).toBe('invocation-ended');
     expect(order.indexOf('gate-attempted')).toBeGreaterThan(order.indexOf('gate-committing'));
     expect(order.indexOf('job-completed')).toBe(order.length - 1);
     // One transition per piece of work, never two.

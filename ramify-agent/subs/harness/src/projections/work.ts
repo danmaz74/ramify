@@ -5,6 +5,10 @@ import {
 import { digestLines } from '../work/failure.js';
 import { originKindOf, type WorkItem } from '../work/records.js';
 import type { IterationAssignment } from '../work/iterations.js';
+import { readAcceptedEvidence, type AcceptedEvidence } from '../analysis/evidence.js';
+import { deliverPackage } from '../context-selection/delivery.js';
+import { packageDeviation, planDeviationSchema } from '../deviations/records.js';
+import type { PackageDeviation } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { ProjectionError, type RunView } from './inputs.js';
 import { scenarioCheckViewOf } from './scenarios.js';
 
@@ -112,8 +116,33 @@ function scopeOf(assignment: IterationAssignment) {
   };
 }
 
+/** Every plan deviation the log committed, in recorded order, as packages render them. */
+function planDeviationsOf(view: RunView): PackageDeviation[] {
+  const deviations: PackageDeviation[] = [];
+  for (const line of view.entries) {
+    for (const record of line.transaction.records) {
+      if ((record.body as { schema?: unknown } | null)?.schema !== 'ramify-agent.plan-deviation/1') continue;
+      const parsed = planDeviationSchema.safeParse(record.body);
+      if (parsed.success) deviations.push(packageDeviation(parsed.data));
+    }
+  }
+  return deviations;
+}
+
+/** An assignment's package, rendered again from the frozen catalog and the IDs its record holds. */
+function packageOf(assignment: IterationAssignment, evidence: AcceptedEvidence, planDeviations: readonly PackageDeviation[]) {
+  const cited = assignment.source;
+  if (cited === undefined) return null;
+  const citation = { elements: [...cited.elements], deviations: [...cited.deviations], hash: cited.hash };
+  if (evidence.status === 'unavailable') return { ...citation, text: null, unavailable: evidence.reason };
+  const delivered = deliverPackage(evidence.catalog, planDeviations, cited);
+  return delivered.status === 'available'
+    ? { ...citation, text: delivered.text, unavailable: null }
+    : { ...citation, text: null, unavailable: delivered.reason };
+}
+
 /** One work item with its outlines, iterations, gates, requirements and placement requests. */
-export function workItemOf(view: RunView, id: string): WorkItemResponse {
+export async function workItemOf(view: RunView, id: string): Promise<WorkItemResponse> {
   const item = view.records.workItems.find(candidate => candidate.id === id);
   if (item === undefined) throw new ProjectionError('not-found', `Run ${view.record.jobId} has no work item ${id}`);
   const states = itemStates(view);
@@ -124,6 +153,10 @@ export function workItemOf(view: RunView, id: string): WorkItemResponse {
   const decisionOfRequest = new Map([...view.records.decisions.values()].filter(decision => decision.request !== null).map(decision => [decision.request!, decision.id]));
   const assignments = [...view.records.assignments.values()].filter(assignment => assignment.workItem === id);
   const iterationIds = new Set(assignments.map(assignment => assignment.id));
+  const evidence = assignments.some(assignment => assignment.source !== undefined)
+    ? await readAcceptedEvidence(view.directory, view.record, view.events)
+    : { status: 'unavailable' as const, reason: 'No assignment cites a package' };
+  const planDeviations = planDeviationsOf(view);
 
   return {
     workItem: summaryOf(view, item, states),
@@ -170,6 +203,7 @@ export function workItemOf(view: RunView, id: string): WorkItemResponse {
             const outcome = view.records.outcomes.get(invocation.id);
             return { id: invocation.id, role: invocation.role, ended: outcome?.ended ?? null, outsideScope: [...(outcome?.outsideScope ?? [])] };
           }),
+        package: packageOf(assignment, evidence, planDeviations),
       };
     }),
     gates: [...view.gates.keys()]

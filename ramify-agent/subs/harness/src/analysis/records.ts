@@ -4,6 +4,7 @@ import { citationSchema, modulePathSchema } from '../interfaces/protocol/evidenc
 import { moduleProposalSchema, recordRefSchema } from '../run/records.js';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
 import type { ScenarioWarningKind } from '../../subs/scenarios/src/form.js';
+import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 
 /*
  * The records the initial analysis commits beside its entry assignments: one
@@ -107,6 +108,23 @@ export const scenarioWarningSchema = z.object({
   message: text,
 }).strict();
 export type RecordedScenarioWarning = z.infer<typeof scenarioWarningSchema>;
+
+/**
+ * One correction a checker made to the catalog before it was frozen, with
+ * its reason: shown at the review stop beside the corrected catalog, and
+ * never a rejection.
+ */
+export const catalogFindingSchema = z.object({
+  /** The captured document whose reading was checked. */
+  document: z.string().regex(/^doc-\d{3,}$/),
+  invocation: text,
+  action: z.enum(['add', 'rewrite', 'replace']),
+  reason: text,
+  /** The elements the correction added, rewrote or put in place of the retired ones. */
+  elements: z.array(elementIdSchema),
+  retired: z.array(elementIdSchema),
+}).strict();
+export type CatalogFinding = z.infer<typeof catalogFindingSchema>;
 
 /** Where the analysis's records are materialized, relative to the run's directory. */
 export const analysisLayout = {

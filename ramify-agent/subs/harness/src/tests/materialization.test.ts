@@ -75,7 +75,7 @@ describe('materializing the feature files', () => {
       entry('note-in-panel', root, 'The review panel shows the note under the findings.'),
     ]);
     const { service, git } = await openUnchangedRuns(project, {
-      script: spec => [{ kind: 'submit', input: spec.role === 'initial-architect' ? submitted : requestCompletion() }],
+      script: spec => spec.role === 'catalog-extractor' ? [] : [{ kind: 'submit', input: spec.role === 'initial-architect' ? submitted : requestCompletion() }],
       unchangedCheckpoints: [
         scenariosCommit(plan, 'scenarios-revision', [rootFeature, reviewsFeature]),
         'wi-001', 'wi-002', `final verification of plan "${plan}"`,
@@ -153,7 +153,8 @@ describe('materializing the feature files', () => {
     expect(await readFile(join(project, rootFeature), 'utf8')).toContain('Feature: note-in-panel\n  The review panel shows the note under the findings.\n\n  @ramify-sc-002\n');
 
     // The commit is the accepted boundary the first local architect starts from.
-    const firstArchitect = JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.invocation('inv-0002')), 'utf8')) as { role: string; base: string };
+    // inv-0001 to inv-0003 are the intake, the initial architect and the plan's checker.
+    const firstArchitect = JSON.parse(await readFile(runPath(project, plan, receipt.jobId, runLayout.invocation('inv-0004')), 'utf8')) as { role: string; base: string };
     expect(firstArchitect).toMatchObject({ role: 'local-architect', base: 'scenarios-revision' });
 
     // Each work-item gate plans the scenario check over both owners with the
@@ -269,7 +270,7 @@ describe('re-rendering', () => {
     const replayed = trackedScenarios([
       { transaction: { event: { type: 'analysis-accepted' }, records: [
         { body: { schema: 'ramify-agent.entry-assignments/1', view: { status: 'placeholder' }, entries: [
-          { capability: 'shelve-book', description: 'A book can be shelved.', owner: 'shop/shelf', requirementRefs: [], acceptanceRefs: [], citations: [] },
+          { capability: 'shelve-book', description: 'A book can be shelved.', owner: 'shop/shelf', requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [] },
         ] } },
         { body: one }, { body: two },
       ] } },

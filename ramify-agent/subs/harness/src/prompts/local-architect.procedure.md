@@ -1,4 +1,4 @@
-<!-- ramify-agent local architect procedure, version 6. -->
+<!-- ramify-agent local architect procedure, version 7. -->
 Do this, in order:
 
 1. Read the goal, the requirement references and the acceptance references in
@@ -31,6 +31,14 @@ write.
 - `assignment.goal` is what that iteration achieves, and `approach` is how
   you want it done. `completionEvidence` is what makes it done, stated so
   that a check can answer it.
+- `assignment.citedElements` names, by ID, the elements of your work-item
+  package this iteration must honor: its requirements, the context its
+  engineer needs, and the non-functional, fixed and recommendation elements
+  that bear on it. The engineer, a contract engineer and the reviewers of
+  the iteration receive exactly these elements, whole, and nothing else of
+  the plan, so cite what they need; an ID outside the package is refused.
+  A recommendation you cite stays a recommendation; to make one binding,
+  state it in the goal or approach under your own authority.
 - `assignment.stage` is the stage of your outline this iteration works. Use
   `0` when the outline names no stage.
 - `assignment.kind` is `ordinary` unless the iteration is one of the other

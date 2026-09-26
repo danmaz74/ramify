@@ -11,19 +11,19 @@ import { chromium } from 'playwright-core';
 import { build } from 'vite';
 
 /*
- * Component-browser witness over a real harness analysis projection. The
- * focused fixture test creates the response; the actual PlanAndEntries web
- * component renders it in Chromium. This does not exercise an HTTP server
- * or a live agent workflow.
+ * Component-browser witness of the plan context catalog at the review stop,
+ * over a real harness analysis projection. The focused fixture test creates
+ * the response; the actual PlanAndEntries web component renders it in
+ * Chromium. This does not exercise an HTTP server or a live agent workflow.
  *
- *   npx tsx scripts/browser-acceptance/plan13-review.ts
+ *   npx tsx scripts/browser-acceptance/plan14-catalog-review.ts
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const agent = resolve(here, '../..');
-const artifacts = resolve(agent, 'docs/plans/13-plan-evidence-and-nonfunctional-work/evidence');
+const artifacts = resolve(agent, 'docs/plans/14-unified-evidence-packages/evidence');
 const browserPath = process.env.CHROMIUM_PATH ?? '/usr/bin/chromium';
-const temp = await mkdtemp(join(tmpdir(), 'plan13-review-'));
+const temp = await mkdtemp(join(tmpdir(), 'plan14-catalog-review-'));
 const fixture = join(temp, 'review-data.json');
 const output = join(temp, 'web');
 const checks: string[] = [];
@@ -38,18 +38,18 @@ try {
   await mkdir(artifacts, { recursive: true });
   await run(resolve(agent, 'node_modules/.bin/vitest'), [
     'run', 'subs/harness/src/tests/analysis-plan-evidence.test.ts',
-    '-t', 'accepts exact catalog', '--maxWorkers=1', '--testTimeout=10000',
-  ], { cwd: agent, env: { ...process.env, PLAN13_REVIEW_EXPORT: fixture }, timeout: 120_000 });
+    '-t', 'accepts the intake', '--maxWorkers=1', '--testTimeout=10000',
+  ], { cwd: agent, env: { ...process.env, CATALOG_REVIEW_EXPORT: fixture }, timeout: 120_000 });
   const projection = JSON.parse(await readFile(fixture, 'utf8')) as {
-    analysis: { status: string; planEvidence?: { status: string; catalog?: Array<{ id: string; quote: string }> } };
+    analysis: { status: string; planEvidence?: { status: string; elements?: Array<{ id: string; kind: string; text: string }> } };
   };
   check('the fixture came from an accepted harness analysis projection', projection.analysis.status === 'accepted' && projection.analysis.planEvidence?.status === 'available');
-  check('the fixture contains exact accepted NFR and advice passages', projection.analysis.planEvidence?.catalog?.some(item => item.id === 'nfr-001' && item.quote === 'The service must preserve a 30 second timeout.') &&
-    projection.analysis.planEvidence.catalog.some(item => item.id === 'adv-001' && item.quote === 'Use Redis if practical.'));
+  check('the fixture holds the intake\'s non-functional requirement and recommendation', projection.analysis.planEvidence?.elements?.some(item => item.id === 'nfr-001' && item.kind === 'non-functional') &&
+    projection.analysis.planEvidence.elements.some(item => item.id === 'rec-001' && item.text === 'Use Redis if practical.'));
 
   await build({
     configFile: false, root: here, base: '/', plugins: [react()], resolve: { dedupe: ['react', 'react-dom'] },
-    build: { outDir: output, emptyOutDir: true, rollupOptions: { input: resolve(here, 'plan13-review.html') } },
+    build: { outDir: output, emptyOutDir: true, rollupOptions: { input: resolve(here, 'plan14-catalog-review.html') } },
     logLevel: 'error',
   });
   await writeFile(join(output, 'review-data.json'), JSON.stringify(projection));
@@ -59,7 +59,7 @@ try {
     const file = resolve(output, `.${pathname}`);
     if (file !== output && !file.startsWith(output + sep)) { response.writeHead(403).end(); return; }
     try {
-      const target = (await stat(file)).isDirectory() ? join(file, 'plan13-review.html') : file;
+      const target = (await stat(file)).isDirectory() ? join(file, 'plan14-catalog-review.html') : file;
       const mime = extname(target) === '.js' ? 'text/javascript' : extname(target) === '.css' ? 'text/css' : extname(target) === '.json' ? 'application/json' : 'text/html';
       response.writeHead(200, { 'content-type': mime }).end(await readFile(target));
     } catch { response.writeHead(404).end(); }
@@ -73,30 +73,34 @@ try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`http://127.0.0.1:${address.port}/plan13-review.html`, { waitUntil: 'networkidle' });
-    const panel = page.getByRole('region', { name: 'Non-functional requirements' });
+    await page.goto(`http://127.0.0.1:${address.port}/plan14-catalog-review.html`, { waitUntil: 'networkidle' });
+    const panel = page.getByRole('region', { name: 'The plan context catalog' });
     await panel.getByText('nfr-001').waitFor();
     const text = await panel.innerText();
-    check('the real review component shows the original NFR quote and source path', text.includes('The service must preserve a 30 second timeout.') && text.includes('plans/review-notes/constraints.md'));
-    check('the inferred condition remains labeled', text.includes('inferred condition: for the service'));
+    check('the element shows its text and source path', text.includes('The service must preserve its 30 second timeout.') && text.includes('plans/review-notes/constraints.md'));
+    check('stated and inferred conditions stay labelled', text.includes('stated condition: The service') && text.includes('inferred condition: for the service'));
+    const recommendations = panel.getByRole('region', { name: 'Recommendations' });
+    check('the recommendation is shown under its own heading with its notice',
+      (await recommendations.innerText()).includes('Use Redis if practical.') && (await recommendations.innerText()).includes('nothing assesses them'));
+    check('no requirement heading holds the recommendation',
+      !(await panel.getByRole('region', { name: 'Non-functional requirements of the plan' }).innerText()).includes('Use Redis'));
+    check('the checkers\' findings are shown', (await panel.getByRole('region', { name: 'Checker findings' }).innerText()).includes('found every reading faithful'));
     check('unclear missing reference shows target, source path and exact excerpt', text.includes('plans/review-notes/later.md') && text.includes('plans/review-notes/plan.md') && text.includes('[Optional guide](later.md)'));
-    check('advice is separate from the NFR list', !(await panel.getByText('Use Redis if practical.').isVisible()));
-    await panel.getByText('Advisory passages and document incorporation').click();
-    check('the advisory details reveal the original advice and incorporation judgment',
-      await panel.getByText('Use Redis if practical.').count() === 1 && (await panel.innerText()).includes('scenarios not incorporated'));
-    await page.screenshot({ path: join(artifacts, 'plan13-review-1440x900.png'), fullPage: true });
-    screenshots.push('plan13-review-1440x900.png');
-    await page.evaluate(() => window.plan13Review.setMode('empty'));
-    await panel.getByText('The accepted catalog explicitly contains no non-functional requirements.').waitFor();
-    check('explicit empty catalog is distinct from unavailable', await panel.getByText(/Non-functional evidence is unavailable/u).count() === 0);
-    await page.evaluate(() => window.plan13Review.setMode('unavailable'));
+    await panel.getByText('Document incorporation').click();
+    check('the incorporation judgment is shown', (await panel.innerText()).includes('scenarios not incorporated'));
+    await page.screenshot({ path: join(artifacts, 'catalog-review-1440x900.png'), fullPage: true });
+    screenshots.push('catalog-review-1440x900.png');
+    await page.evaluate(() => window.catalogReview.setMode('empty'));
+    await panel.getByText('0 elements', { exact: false }).waitFor();
+    check('an empty catalog is distinct from an unavailable one', await panel.getByText(/element catalog is unavailable/u).count() === 0);
+    await page.evaluate(() => window.catalogReview.setMode('unavailable'));
     await panel.getByRole('status').getByText(/The accepted catalog file could not be verified/u).waitFor();
-    check('unavailable evidence carries its reason', await panel.getByText(/explicitly contains no non-functional requirements/u).count() === 0);
+    check('an unavailable catalog carries its reason', await panel.getByText('nfr-001').count() === 0);
     await page.setViewportSize({ width: 480, height: 800 });
-    await page.evaluate(() => window.plan13Review.setMode('accepted'));
+    await page.evaluate(() => window.catalogReview.setMode('accepted'));
     await panel.getByText('nfr-001').waitFor();
-    await page.screenshot({ path: join(artifacts, 'plan13-review-480x800.png'), fullPage: true });
-    screenshots.push('plan13-review-480x800.png');
+    await page.screenshot({ path: join(artifacts, 'catalog-review-480x800.png'), fullPage: true });
+    screenshots.push('catalog-review-480x800.png');
     check('the narrow review remains inside the viewport', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     check('Chromium reports no page exceptions', errors.length === 0);
   } finally {
@@ -107,7 +111,7 @@ try {
   failure = error;
 } finally {
   await mkdir(artifacts, { recursive: true });
-  await writeFile(join(artifacts, 'plan13-review-browser-results.json'), JSON.stringify({
+  await writeFile(join(artifacts, 'catalog-review-browser-results.json'), JSON.stringify({
     revision, dirtyAtStart,
     chromium: browserPath, fixture: 'RunQueries.analysis projection from analysis-plan-evidence.test.ts; actual PlanAndEntries component; local static Vite build',
     checks, screenshots, failure: failure instanceof Error ? failure.stack : failure ?? null,
@@ -115,4 +119,4 @@ try {
   await rm(temp, { recursive: true, force: true });
 }
 if (failure) throw failure;
-process.stdout.write(`Plan 13 review Chromium witness: ${checks.length} checks passed.\n`);
+process.stdout.write(`Plan 14 catalog review Chromium witness: ${checks.length} checks passed.\n`);

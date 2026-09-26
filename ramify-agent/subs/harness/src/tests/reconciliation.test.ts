@@ -386,14 +386,15 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
 });
 
 describe('CF12: a strong authority conflict asks the user, with exact references', () => {
-  test('the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it', async () => {
+  test('the conflict cites an element\'s exact text and the catalog\'s revision, the work item waits for the answer, and the next round assesses it', async () => {
     const root = await reviewTarget(cleanups);
-    const conflict = 'A note belongs to exactly one review run.';
+    // Part of fr-002, the entry's acceptance element as the frozen catalog holds it.
+    const conflict = 'asks for review-notes-acceptance';
     const options = [
       { id: 'one-note', summary: 'Keep one note per review run', consequence: 'The plan stands; the reviewer\'s request is declined.' },
       { id: 'many-notes', summary: 'Allow several notes', consequence: 'The plan\'s constraint changes, which a person must approve.' },
     ];
-    const ask = (text: string) => submission([disposition('cf-0001', { action: 'request-user-decision', conflicts: [{ document: 'plan', text }], options })], { kind: 'await-user' });
+    const ask = (text: string, document = 'fr-002') => submission([disposition('cf-0001', { action: 'request-user-decision', conflicts: [{ document, text }], options })], { kind: 'await-user' });
     const run = await reviewRun(root, cleanups, {
       detached: true,
       engineer: engineers.slice(0, 3),
@@ -403,8 +404,8 @@ describe('CF12: a strong authority conflict asks the user, with exact references
         'rq-0003': review(changed[3]),
       },
       reconcilers: {
-        // The first citation is not the plan's text, and is returned to the fork.
-        'wi-001.rc01': reconcile(ask('A note belongs to one run.'), ask(conflict)),
+        // The first citation is not the element's text, the second names the plan as the old document did; both are returned to the fork.
+        'wi-001.rc01': reconcile(ask('A note belongs to one run.'), ask(conflict, 'plan'), ask(conflict)),
         'wi-001.rc02': reconcile(submission([
           disposition('cf-0001', { action: 'waive', uncertainty: 'None: the user chose.' }),
         ], { kind: 'complete' })),
@@ -418,15 +419,17 @@ describe('CF12: a strong authority conflict asks the user, with exact references
     };
     await until(() => pending() !== undefined);
     const waiting = pending()!;
-    const planText = await readFile(runPath(root, plan, runId, runLayout.capturedPlan), 'utf8');
-    const { createHash } = await import('node:crypto');
+    const accepted = (await runEventsOnDisk(root, plan, runId)).find(event => event.type === 'analysis-accepted')!;
+    const catalogHash = (accepted.data as { evidence: { catalog: { hash: string } } }).evidence.catalog.hash;
     expect(waiting.decisions.items.at(-1)).toMatchObject({
       decision: {
         action: 'request-user-decision', authority: { kind: 'work-item-assessment', ref: 'wi-001.rc01' }, options,
-        conflicts: [{ text: conflict, document: 'plan', revision: `sha256:${createHash('sha256').update(planText).digest('hex')}` }],
+        conflicts: [{ text: conflict, document: 'fr-002', revision: `sha256:${catalogHash}` }],
       },
     });
-    expect(JSON.stringify(reconcilerSessions(run.agent!)[0]!.verdicts[0])).toContain('cite the conflicting text exactly');
+    const verdicts = reconcilerSessions(run.agent!)[0]!.verdicts;
+    expect(JSON.stringify(verdicts[0])).toContain('cite the conflicting text exactly');
+    expect(JSON.stringify(verdicts[1])).toContain('is neither an element of the run\'s catalog nor a file of the source this reconciliation assesses');
     // The work item waits: no gate has run since the assessment.
     await new Promise(resolve => setTimeout(resolve, 200));
     const before = await runEventsOnDisk(root, plan, runId);
@@ -659,7 +662,7 @@ describe('CF10: the brief append outcomes that land nothing', () => {
       },
       reconcilers: {
         'wi-001.rc01': reconcile(submission([
-          disposition('cf-0001', { action: 'request-user-decision', conflicts: [{ document: 'plan', text: 'A note belongs to exactly one review run.' }], options }),
+          disposition('cf-0001', { action: 'request-user-decision', conflicts: [{ document: 'fr-002', text: 'The plan asks for review-notes-acceptance.' }], options }),
         ], { kind: 'await-user' })),
         'wi-001.rc02': reconcile(submission([disposition('cf-0001', { action: 'waive', uncertainty: 'None: the user chose.' })], { kind: 'complete' })),
       },

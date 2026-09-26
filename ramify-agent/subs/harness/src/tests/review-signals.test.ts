@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptStep } from '../../subs/agent/src/scripted.js';
+import { acceptElements, createPackage, deviationNotice, openElementCatalog } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { reviewMessage } from '../reviews/message.js';
 import type { ReviewRequest } from '../reviews/records.js';
 import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
@@ -208,32 +210,36 @@ describe('the scope question\'s message', () => {
     const snapshot = await openCandidateSnapshot(source, '/project', { commit: 'c1', base: 'c0' });
     const request: ReviewRequest = {
       schema: 'ramify-agent.review-request/1', id: 'rq-0002', key: { iteration: 'wi-001.i01', candidate: 'c1', kind: 'scope', policy: 'review-policy/1' },
-      workItem: 'wi-001', assignment: 'a.json', base: 'c0', gate: 'ga-0001', tree: 't1', requirements: [], guidance: [], forkPoint: { kind: 'none' },
+      workItem: 'wi-001', assignment: 'a.json', base: 'c0', gate: 'ga-0001', tree: 't1', guidance: [], forkPoint: { kind: 'none' },
     };
-    const message = (planDocument: string | null) => reviewMessage({ request, snapshot, assignment: null, checkFindings: [], requirements: [], planDocument });
+    const message = (planDocument: string | null) => reviewMessage({ request, snapshot, assignment: null, checkFindings: [], planDocument });
     expect(message(`plans/${plan}/plan.md`)).toContain(`The candidate holds the plan as \`plans/${plan}/plan.md\`. To name it as a concern's ground, read it with \`snapshot_read\`.`);
     expect(message(null)).toContain('The candidate holds no copy of the plan');
   });
 
-  test('lists every plan deviation in force apart from the excerpts, to be judged as the plan amended', async () => {
+  test('renders the cited package with its deviations whole, to be judged as the elements amended, and says when there is none', async () => {
     const source = scriptedCandidates('/project', { c1: { tree: 't1', base: 'c0', changes: [], files: {} } });
     const snapshot = await openCandidateSnapshot(source, '/project', { commit: 'c1', base: 'c0' });
-    const request: ReviewRequest = {
-      schema: 'ramify-agent.review-request/1', id: 'rq-0002', key: { iteration: 'wi-001.i01', candidate: 'c1', kind: 'scope', policy: 'review-policy/1' },
-      workItem: 'wi-001', assignment: 'a.json', base: 'c0', gate: 'ga-0001', tree: 't1', requirements: [], guidance: [], forkPoint: { kind: 'none' },
-    };
-    const message = reviewMessage({
-      request, snapshot, assignment: null, checkFindings: [], planDocument: null,
-      requirements: [
-        { ref: 'plan#request', hash: 'a'.repeat(64), text: '## Request\n- Serve it over tRPC and MCP.' },
-        { ref: 'deviation:pd-001', hash: 'b'.repeat(64), text: 'Plan deviation pd-001 ... What the run does instead: tRPC only.' },
-      ],
+    const catalog = acceptElements(openElementCatalog('a'.repeat(64), documentManifestSchema.parse({
+      schema: 'ramify-agent.document-manifest/1', root: 'doc-001', missing: [], principlesScan: { status: 'empty', unreadable: [] },
+      documents: [{ id: 'doc-001', path: `plans/${plan}/plan.md`, kind: 'plan', sha256: 'a'.repeat(64), bytes: 1, storedAt: 'input/documents/doc-001.bin', revision: { commit: null, dirty: null } }],
+    })), [{ key: 'serve', kind: 'functional', document: 'doc-001', text: 'Serve it over tRPC and MCP.', conditions: [], uncertainty: '' }]);
+    if (!catalog.ok) throw new Error(catalog.errors.join('\n'));
+    const rendered = createPackage({ catalog: catalog.catalog, elements: ['fr-001'], deviations: ['pd-001'],
+      planDeviations: [{ id: 'pd-001', amends: ['fr-001'], authority: 'The global architect, for wi-001.', text: 'What the run does instead: tRPC only.' }] });
+    if ('unavailable' in rendered) throw new Error('fixture did not render');
+    const request = (kind: 'code' | 'scope'): ReviewRequest => ({
+      schema: 'ramify-agent.review-request/1', id: 'rq-0002', key: { iteration: 'wi-001.i01', candidate: 'c1', kind, policy: 'review-policy/1' },
+      workItem: 'wi-001', assignment: 'a.json', base: 'c0', gate: 'ga-0001', tree: 't1', guidance: [], forkPoint: { kind: 'none' },
+      source: { elements: ['fr-001'], deviations: ['pd-001'], hash: rendered.hash },
     });
-    const [excerpts, deviations] = message.split('## Plan deviations in force');
-    expect(excerpts).toContain('### plan#request');
-    expect(excerpts).not.toContain('deviation:pd-001');
-    expect(deviations).toContain('judge the candidate against that requirement as the deviation amends it');
-    expect(deviations).toContain('### deviation:pd-001 (sha256 bbbbbbbbbbbb)');
-    expect(deviations).toContain('What the run does instead: tRPC only.');
+    const scope = reviewMessage({ request: request('scope'), snapshot, assignment: null, checkFindings: [], planDocument: null, package: rendered.text });
+    expect(scope).toContain(`## What the plan asks of it\n\nThe elements the assignment cites, whole. ${deviationNotice} Where a deviation amends an element, judge the candidate against the element as the deviation amends it, and raise no concern for what the deviation leaves out.\n\n${rendered.text.trimEnd()}\n`);
+    expect(scope).toContain('### pd-001 amends fr-001');
+    expect(scope).not.toContain('## Plan deviations in force');
+    const code = reviewMessage({ request: request('code'), snapshot, assignment: null, checkFindings: [], package: rendered.text });
+    expect(code).toContain(`## What the plan asks of it\n\nThe elements the assignment cites, whole, as its engineer received them.\n\n${rendered.text.trimEnd()}\n`);
+    const none = reviewMessage({ request: request('scope'), snapshot, assignment: null, checkFindings: [], planDocument: null });
+    expect(none).toContain('The assignment cites no element of the plan; judge the candidate against the assignment\'s own goal.');
   });
 });

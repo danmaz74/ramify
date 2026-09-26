@@ -277,19 +277,19 @@ function CheckFindingCard({ client, planId, runId, version, summary, onOpenGate 
 }
 
 /**
- * A plan deviation: the requirement as the plan writes it, what the run does
+ * A plan deviation: the elements it amends, as the catalog holds them, what the run does
  * instead, why, the alternatives rejected and what is lost, with each
  * reworded scenario before and after. Accepting it is a waiver or the answer
  * `accept`; rejecting it is the answer `reject`, whose note is the
  * requirement a follow-up run must meet.
  */
 function DeviationBody({ deviation }: { readonly deviation: PlanDeviationView }) {
-  if ('passage' in deviation) return (
+  if ('element' in deviation) return (
     <div className="plan-deviation-body" role="group" aria-label={`Non-functional deviation ${deviation.id}`}>
       <p className="muted">Assessment {deviation.origin.assessment} of candidate tree <code>{deviation.origin.candidate.tree}</code> found that {deviation.origin.nfr} remains unsatisfied or undetermined. The source plan is unchanged.</p>
-      <p><strong>Initial architect's source excerpt</strong></p>
-      <blockquote>{deviation.passage.quote}</blockquote>
-      <p className="muted">Captured document {deviation.passage.document}{deviation.sourcePath && <> (<code>{deviation.sourcePath}</code>)</>}{deviation.passage.locator && `, ${deviation.passage.locator}`}</p>
+      <p><strong>The requirement, {deviation.element.id}</strong></p>
+      <blockquote>{deviation.element.text}</blockquote>
+      <p className="muted">Captured document {deviation.element.document}{deviation.sourcePath && <> (<code>{deviation.sourcePath}</code>)</>}</p>
       <p><strong>Assessment evidence:</strong> {deviation.evidence.length === 0 ? 'None recorded.' : deviation.evidence.join('; ')}</p>
       <p><strong>Proposed alternative:</strong> {deviation.proposedAlternative || 'None proposed.'}</p>
       <p><strong>Remaining uncertainty:</strong> {deviation.uncertainty || 'None stated.'}</p>
@@ -302,12 +302,12 @@ function DeviationBody({ deviation }: { readonly deviation: PlanDeviationView })
         The run departs from its plan here, and holds nothing for it{deviation.held ? ', except that it was recorded past the run\'s limit and the run waited for your decision' : ''}.
         {' '}It answers {deviation.request} of {deviation.workItems.join(', ')}. The plan file is unchanged.
       </p>
-      <p><strong>The requirement as written</strong></p>
-      <ul className="conflicts" aria-label="Requirement as written">
-        {deviation.requirements.map(requirement => (
-          <li key={`${requirement.startLine}-${requirement.endLine}`}>
-            <blockquote>{requirement.text}</blockquote>
-            <span className="muted"><code>{deviation.plan}</code>, lines {requirement.startLine}–{requirement.endLine}</span>
+      <p><strong>The elements it amends</strong></p>
+      <ul className="conflicts" aria-label="Elements it amends">
+        {deviation.amends.map(element => (
+          <li key={element.id}>
+            <blockquote>{element.text}</blockquote>
+            <span className="muted">{element.id}, from <code>{element.path}</code></span>
           </li>
         ))}
       </ul>

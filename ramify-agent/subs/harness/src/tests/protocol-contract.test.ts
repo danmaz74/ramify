@@ -302,7 +302,7 @@ describe('the acceptance scenarios a client reads', () => {
   test('the scenario list: a scenario with its origin, work item and gates, strictly', () => {
     const list = { scenarios: [scenario], total: 1 };
     expect(scenarioListResponseSchema.parse(list)).toEqual(list);
-    const architect = { ...scenario, kind: 'entry', entry: 'show-note', partOf: 'sc-005', subScenarios: [], origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }, { lines: [3, 4] }] } };
+    const architect = { ...scenario, kind: 'entry', entry: 'show-note', partOf: 'sc-005', subScenarios: [], origin: { kind: 'architect', refs: ['fr-002', 'fr-003'] } };
     expect(scenarioListResponseSchema.safeParse({ scenarios: [architect], total: 1 }).success).toBe(true);
     expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, state: 'failed' }], total: 1 }).success).toBe(false);
     expect(scenarioListResponseSchema.safeParse({ scenarios: [{ ...scenario, extra: 1 }], total: 1 }).success).toBe(false);

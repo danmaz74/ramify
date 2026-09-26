@@ -105,7 +105,7 @@ describe('the API view of a local architect\'s continued turns', () => {
     expect(first).toContain(`- Onboarding (\`${join(fixture.root, notesDirectory, 'README.md')}\`)`);
     expect(first).toContain(`- The architect view is at \`${fixture.root}/.ramify-architect/\``);
     expect(first).toContain(`- Working directory: \`${moduleSource}\``);
-    const activity = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0004')), 'utf8'))
+    const activity = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0006')), 'utf8'))
       .trim().split('\n').map(line => JSON.parse(line) as { type: string; data: { activity?: { kind: string; path?: string } } });
     expect(activity).toContainEqual(expect.objectContaining({ type: 'activity', data: { activity: expect.objectContaining({ kind: 'read', path: `${notesDirectory}/src/notes.ts` }) } }));
     // The architect's first turn, the engineer's briefing and the architect's second turn each materialized it.

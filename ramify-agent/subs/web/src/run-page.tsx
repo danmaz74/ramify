@@ -4,6 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
+import { CatalogReview } from './catalog-review.js';
 import { EnvironmentProblems, ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
 import { CapabilityModuleTree, type ModuleCapabilitySelection } from './capability-module-tree.js';
@@ -345,7 +346,7 @@ export function PlanAndEntries({ client, planId, runId, version, run, onApproved
                 ? <p className="muted">The initial analysis has not been accepted yet.</p>
                 : (
                   <table className="table">
-                    <thead><tr><th>Capability</th><th>Owner</th><th>Work item</th><th>Description</th></tr></thead>
+                    <thead><tr><th>Capability</th><th>Owner</th><th>Work item</th><th>Description</th><th>Elements</th></tr></thead>
                     <tbody>
                       {data.analysis.entries.map(entry => (
                         <tr key={entry.capability}>
@@ -353,6 +354,7 @@ export function PlanAndEntries({ client, planId, runId, version, run, onApproved
                           <td><code>{entry.owner}</code>{entry.proposed && <span className="proposed">proposed under {entry.proposed.parent}</span>}</td>
                           <td>{entry.workItem ?? '—'}</td>
                           <td>{entry.description}</td>
+                          <td>{[...entry.requirementRefs, ...entry.acceptanceRefs.filter(id => !entry.requirementRefs.includes(id)), ...entry.contextRefs].join(', ') || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -360,32 +362,10 @@ export function PlanAndEntries({ client, planId, runId, version, run, onApproved
                 )}
             </section>
             {data.analysis.status === 'accepted' && (
-              <section className="panel" aria-labelledby="nonfunctional-review-heading">
-                <h2 id="nonfunctional-review-heading">Non-functional requirements</h2>
-                {!data.analysis.planEvidence || data.analysis.planEvidence.status === 'unavailable'
-                  ? <p role="status">Non-functional evidence is unavailable: {data.analysis.planEvidence?.reason ?? 'This older run has no accepted catalog'}.</p>
-                  : <>
-                    {data.analysis.planEvidence.catalog.filter(item => item.classification === 'non-functional-requirement').length === 0
-                      ? <p>The accepted catalog explicitly contains no non-functional requirements.</p>
-                      : <ul className="cards">{data.analysis.planEvidence.catalog.filter(item => item.classification === 'non-functional-requirement').map(item =>
-                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code>{item.locator && ` · ${item.locator}`}
-                          <blockquote>{item.quote}</blockquote>
-                          {item.conditions.map((condition, index) => <p key={index}>{condition.source} condition: {condition.text}</p>)}
-                          {item.uncertainty && <p>Uncertainty: {item.uncertainty}</p>}
-                        </li>)}</ul>}
-                    {data.analysis.planEvidence.missing.filter(item => item.judgment === 'unclear').map(item =>
-                      <p role="alert" key={`${item.from}:${item.start}`}>Unclear missing reference: {item.target} from {item.fromPath} at bytes {item.start}–{item.end}. Source: <q>{item.excerpt}</q> {item.reason}</p>)}
-                    <details><summary>Advisory passages and document incorporation</summary>
-                      <ul>{data.analysis.planEvidence.catalog.filter(item => item.classification === 'advice').map(item =>
-                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code>{item.locator && ` · ${item.locator}`}<blockquote>{item.quote}</blockquote></li>)}</ul>
-                      <ul>{data.analysis.planEvidence.incorporation.map(item =>
-                        <li key={item.document}>{item.path}: {item.scenarios ? 'scenarios incorporated' : 'scenarios not incorporated'}{item.uncertainty && `; uncertainty: ${item.uncertainty}`}
-                          {item.governing.map((passage, index) => <blockquote key={index}>{passage.quote} <small>({passage.path}{passage.locator && `, ${passage.locator}`})</small></blockquote>)}
-                        </li>)}</ul>
-                      {data.analysis.planEvidence.missing.filter(item => item.judgment === 'advisory').map(item =>
-                        <p key={`${item.from}:${item.start}`}>Advisory missing reference: {item.target}. {item.reason}</p>)}
-                    </details>
-                  </>}
+              <section className="panel" aria-labelledby="catalog-review-heading">
+                <h2 id="catalog-review-heading">The plan context catalog</h2>
+                <p className="muted">What every later agent works from instead of the documents: the elements the intake, the principles extractions and the initial architect read, as the checkers corrected them. The catalog is frozen; an element is a reading, not a satisfied requirement.</p>
+                <CatalogReview evidence={data.analysis.planEvidence} />
               </section>
             )}
             {data.analysis.status === 'accepted' && (
@@ -577,6 +557,14 @@ function WorkItemDetail({ client, planId, runId, version, workItem, onOpenGate }
                     <p className="muted">Sessions: {iteration.invocations.map(invocation => `${invocation.id} ${invocation.role} ${invocation.ended ?? 'running'}`).join(', ')}</p>
                     {iteration.invocations.some(invocation => invocation.outsideScope.length > 0) && (
                       <p className="warn">Changed outside the write scope: {iteration.invocations.flatMap(invocation => invocation.outsideScope).join(', ')}</p>
+                    )}
+                    {iteration.package && (
+                      <details>
+                        <summary>Assignment package <code>{iteration.package.hash.slice(0, 12)}</code>: {iteration.package.elements.join(', ') || 'no element'}{iteration.package.deviations.length > 0 && `, with ${iteration.package.deviations.join(', ')}`}</summary>
+                        {iteration.package.text === null
+                          ? <p role="status">The package cannot be rendered: {iteration.package.unavailable}</p>
+                          : <pre className="package-text">{iteration.package.text}</pre>}
+                      </details>
                     )}
                   </li>
                 ))}

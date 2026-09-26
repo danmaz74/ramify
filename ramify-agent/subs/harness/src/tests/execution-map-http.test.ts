@@ -14,13 +14,13 @@ import { at, constructedRun, constructedRecord, item, registered, reviews, runId
 
 const source = ['Scenario: The full block', '  Given recorded state', '  When requested', '  Then the full block is returned'];
 const scenario = scenarioRecordSchema.parse({ schema: 'ramify-agent.scenario/1', id: 'sc-001', kind: 'entry',
-  entry: 'full-description', owner: reviews, origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }] },
+  entry: 'full-description', owner: reviews, origin: { kind: 'architect', refs: ['fr-002'] },
   partOf: null, subScenarios: [], name: 'The full block', source, hash: scenarioSourceHash(source),
   file: 'subs/reviews/src/tests/features/full.feature' });
 const description = `A complete capability description. ${'More detail. '.repeat(100)}`;
 const entries = entryAssignmentsSchema.parse({ schema: 'ramify-agent.entry-assignments/1',
   view: { status: 'placeholder' }, entries: [{ capability: 'full-description', description, owner: reviews,
-    requirementRefs: [], acceptanceRefs: [], citations: [] }] });
+    requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [] }] });
 const workItems = Array.from({ length: 105 }, (_, i) => {
   const id = `wi-${String(i).padStart(3, '0')}`;
   return { path: `work-items/${id}/item.json`, body: item(id, { entry: 'full-description' }) };

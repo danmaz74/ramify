@@ -1,19 +1,20 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { existsSync, statSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { AgentPort, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { createScriptedAgent, type ScriptStep } from '../../subs/agent/src/scripted.js';
 import { createPiAgent, piReadiness } from '../../subs/agent/subs/pi/src/pi-agent.js';
 import { privateRamify, type RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { InitialAnalysisSubmission } from '../analysis/submission.js';
+import {
+  checkToolName, intakeToolName, principleToolName, type CheckSubmission, type IntakeSubmission, type PrincipleSubmission,
+} from '../analysis/extraction.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
 import { createAuditWorkspaceOwnership } from '../run/audit-workspaces.js';
 import { RunService, type RunRecoveryReport, type RunServiceOptions } from '../run/service.js';
 import { acquireProjectLock } from '../store/lock.js';
 import { createApp } from './app.js';
-import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 
 /**
  * The agent a run is started with. `pi` is pi with the person's own login.
@@ -108,47 +109,41 @@ export class ProjectRootError extends Error {
 }
 
 /**
- * The scripted fake's turns: an analysis with no entry capability, and
- * nothing else. It is typed as the submission it is, so a change to the
- * analysis schema fails to compile here. A plan with a `gherkin` block of
- * its own is beyond it: every plan scenario must appear in the analysis,
- * and this one names none.
+ * The scripted fake's turns: an intake that reads no element and
+ * incorporates the root plan's scenarios, principles extractions and checks
+ * that find nothing, and an analysis with no entry capability. It is typed
+ * as the submissions it makes, so a change to their schemas fails to compile
+ * here. A plan with a `gherkin` block of its own is beyond it: every plan
+ * scenario must appear in the analysis, and this one names none.
  */
 export function demonstrationScript(spec?: SessionSpec): ScriptStep[] {
-  const incorporation = spec ? demonstrationIncorporation(spec) : { documents: [], missing: [] };
+  const submit = (input: unknown): ScriptStep[] => [{ kind: 'submit', input }];
+  switch (spec?.submission.name) {
+    case intakeToolName: {
+      const plans = [...spec.prompt.matchAll(/^- (doc-\d{3,}) \(plan\):/gmu)].map(match => match[1]!);
+      const intake: IntakeSubmission = {
+        goal: 'The scripted fake reads nothing of the plan.',
+        elements: [],
+        incorporation: { documents: plans.map((document, index) => ({ document, scenarios: index === 0, uncertainty: '' })), missing: [] },
+      };
+      return submit(intake);
+    }
+    case principleToolName: return submit({ elements: [] } satisfies PrincipleSubmission);
+    case checkToolName: return submit({ corrections: [], entries: [], scenarios: [] } satisfies CheckSubmission);
+    default: break;
+  }
   const analysis: InitialAnalysisSubmission = {
+    elements: [],
     entries: [],
     hypotheses: [],
     coverageLimits: ['The scripted fake analyses nothing: this run exercises the lifecycle, readiness and the final gate only.'],
     scenarios: [],
     integrationScenarios: [],
-    catalog: [],
-    incorporation,
   };
   return [
     { kind: 'message', text: 'The scripted fake reads nothing and assigns no entry capability.' },
-    { kind: 'submit', input: analysis },
+    ...submit(analysis),
   ];
-}
-
-function demonstrationIncorporation(spec: SessionSpec): NonNullable<InitialAnalysisSubmission['incorporation']> {
-  const capturedRoot = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-  if (!capturedRoot) return { documents: [], missing: [] };
-  const directory = dirname(dirname(capturedRoot));
-  const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
-  const documents = manifest.documents.filter(document => document.kind === 'plan').map(document => {
-    const bytes = readFileSync(join(directory, document.storedAt));
-    let end = 1;
-    let quote = '';
-    while (end <= bytes.length) {
-      try { quote = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, end)); if (quote) break; }
-      catch { /* Continue to a complete UTF-8 character. */ }
-      end += 1;
-    }
-    return { document: document.id, scenarios: document.id === manifest.root,
-      governing: [{ document: document.id, sha256: createHash('sha256').update(bytes).digest('hex'), start: 0, end, quote }], uncertainty: '' };
-  });
-  return { documents, missing: [] };
 }
 
 /**

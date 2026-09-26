@@ -64,7 +64,7 @@ export const planScenario = [
 export function integrationAnalysis() {
   return analysis([entry('review-note', notes), entry('review-tags', tags)], [], [], [
     {
-      key: 'note-for-tags', entry: 'review-note', origin: { kind: 'architect' }, partOf: 'ps-01', refs: [{ anchor: 'Acceptance' }],
+      key: 'note-for-tags', entry: 'review-note', origin: { kind: 'architect' }, partOf: 'ps-01', refs: ['review-note-acceptance'],
       gherkin: [
         'Scenario: A note is written for tagging',
         '  Given the project as the plan finds it',
@@ -73,7 +73,7 @@ export function integrationAnalysis() {
       ].join('\n'),
     },
     {
-      key: 'tags-on-note', entry: 'review-tags', origin: { kind: 'architect' }, partOf: 'ps-01', refs: [{ anchor: 'Acceptance' }],
+      key: 'tags-on-note', entry: 'review-tags', origin: { kind: 'architect' }, partOf: 'ps-01', refs: ['review-tags-acceptance'],
       gherkin: [
         'Scenario: A written note is tagged',
         '  Given a note was written with review-note',

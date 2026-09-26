@@ -428,7 +428,7 @@ describe('the records this iteration establishes', () => {
       const id = `wi-${String(index).padStart(3, '0')}`;
       const read = await store.roundTrip(workLayout.item(id), {
         schema: 'ramify-agent.work-item/1', id, module: 'shop/orders', origin,
-        goal: 'g', requirementRefs: [], acceptanceRefs: [], startedFor: index === 1 ? null : 'wi-001',
+        goal: 'g', requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: index === 1 ? null : 'wi-001',
         ...(index === 3 ? { follows: 'wi-001' } : {}),
       }, workSchemas.item);
       expect(read.origin).toEqual(origin);
@@ -509,7 +509,7 @@ describe('the records this iteration establishes', () => {
           rationale: 'r',
           resolved: { roots: ['/p/subs/orders/src'], files: ['/p/subs/orders/module.ramify'], view: { status: 'placeholder' } },
         },
-        requirementRefs: [{ anchor: 'Request' }],
+        source: { elements: ['fr-001', 'nfr-001'], deviations: ['pd-001'], hash: 'f'.repeat(64) },
         externalCapabilities: [{ capability: 'send-email', owner: 'shop', role: 'use' }],
         completionEvidence: 'e',
         evidenceObligations: [{ suite: ['subs/orders/src/tests/conformance.test.ts'], against: 'fake' }],
@@ -746,7 +746,7 @@ describe('the records this iteration establishes', () => {
       const read = await store.roundTrip(deviationLayout.deviation(held ? 'pd-002' : 'pd-001'), {
         schema: 'ramify-agent.plan-deviation/1', id: held ? 'pd-002' : 'pd-001', request: 'ur-001', workItem: 'wi-001', invocation: 'inv-0005',
         plan: { path: 'plans/p/plan.md', revision: `sha256:${'a'.repeat(64)}` },
-        requirements: [{ lines: [3, 4], text: '- Serve it over MCP.' }],
+        amends: [{ id: 'fr-001', path: 'plans/p/plan.md', text: 'Serve it over MCP.' }],
         instead: 'tRPC only', why: 'no MCP surface', rejected: [{ alternative: 'a new module', reason: 'out of scope' }], loss: 'no MCP tool',
         workItems: ['wi-001'], modules: ['shop/orders'],
         scenarios: [{ scenario: 'sc-001', file: 'src/tests/features/p/e.feature', before: ['Scenario: a'], after: ['Scenario: b'] }],
@@ -808,7 +808,7 @@ describe('the records this iteration establishes', () => {
       goal: 'g',
       approach: 'a',
       scope: { base: { module: 'shop/orders', includedChildren: [] }, extra: [], read: [], rationale: 'r' },
-      requirementRefs: [],
+      citedElements: [],
       externalCapabilities: [],
       completionEvidence: 'e',
     };
@@ -859,7 +859,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'catalog-extractor', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
   });
 
   test('every failure reason and every phase is named', () => {
@@ -971,7 +971,7 @@ describe('the run protocol a client reads', () => {
             revision: 1, base: { modules: ['shop', 'shop/web'], rationale: 'the guarantee changes in both' }, extra: [], read: [], bootstrap: [], rationale: 'r',
             resolved: { roots: ['/p/src'], files: [], view: { status: 'placeholder' } },
           },
-          requirementRefs: [], externalCapabilities: [], completionEvidence: 'e', evidenceObligations: [],
+          externalCapabilities: [], completionEvidence: 'e', evidenceObligations: [],
           gate: { checkpoint: 'breaking-iteration', tests: { policy: 'all-project', exactOwners: [], subtrees: [], extraSuites: [] } },
           guarded: [], authorizations: [{ path: 'package.json', rationale: 'the request supersedes it', by: outlineRef }],
         } }],

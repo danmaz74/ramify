@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -35,6 +34,7 @@ import type { RunEvent } from '../run/log.js';
 import { reduceSessions } from '../run/sessions.js';
 import { readTranscript } from '../transcripts/writer.js';
 import { statedCommands } from './helpers/composition.js';
+import { intakeToolName } from '../analysis/extraction.js';
 
 vi.mock('node:child_process', async original =>
   (await import('./helpers/process-guard.js')).guardedChildProcess(await original<typeof import('node:child_process')>()));
@@ -275,7 +275,9 @@ function oneWorkItem(): OpenRunsOptions['script'] {
       anticipatedConsumers: [], involvedModules: [], dependsOn: [], confidence: 'medium' as const,
       rationale: 'A note may already have somewhere to live.', assumptions: [], uncertainties: [], citations: [] }],
   );
-  return (spec: SessionSpec) => [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }];
+  // The catalog extractor's turns are the default ones.
+  return (spec: SessionSpec) => spec.role === 'catalog-extractor' ? []
+    : [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }];
 }
 
 /** Reopens the project after the crash and answers what recovery did. */
@@ -382,15 +384,14 @@ describe('the recovery table', () => {
     const staged = await readdir(join(directory, 'analysis', 'catalog'));
     expect(staged).toHaveLength(1);
     expect((await runEventsOnDisk(root, 'review-notes', runId)).some(event => event.type === 'analysis-accepted')).toBe(false);
+    // The fresh run's intake reads a non-functional requirement the crashed
+    // one did not, so its catalog, and the file it is staged in, differ.
     const resumed = await openRuns(root, { git: gitOf(root), readinessExecution: directReadinessExecution(),
-      script: () => {
-        const source = readFileSync(runPath(root, 'review-notes', runId, runLayout.capturedPlan));
-        const quote = '# Reviewer notes on a review run';
-        const analysis = emptyAnalysis();
-        return [{ kind: 'submit', input: { ...analysis, catalog: [{ classification: 'non-functional-requirement',
-          passage: { document: 'doc-001', sha256: createHash('sha256').update(source).digest('hex'),
-            start: 0, end: Buffer.byteLength(quote), quote }, conditions: [], uncertainty: '' }] } }];
-      } });
+      script: spec => spec.submission.name === intakeToolName
+        ? [{ kind: 'submit', input: { goal: 'Keep reviewer notes on a review run.', elements: [
+          { key: 'bounded', kind: 'non-functional', document: 'doc-001', text: 'Reviewer notes stay bounded.', conditions: [], uncertainty: '' },
+        ], incorporation: { documents: [{ document: 'doc-001', scenarios: true, uncertainty: '' }], missing: [] } } }]
+        : spec.role === 'catalog-extractor' ? [] : [{ kind: 'submit', input: emptyAnalysis() }] });
     cleanups.push(() => resumed.service.close());
     expect((await runEventsOnDisk(root, 'review-notes', runId)).map(event => event.type)).toContain('job-interrupted');
     const next = await resumed.service.execute(startRun('review-notes'));
@@ -398,7 +399,7 @@ describe('the recovery table', () => {
     const accepted = (await runEventsOnDisk(root, 'review-notes', next.jobId)).filter(event => event.type === 'analysis-accepted');
     expect(accepted).toHaveLength(1);
     expect(accepted[0]?.type === 'analysis-accepted' && accepted[0].data.evidence?.catalog.path).not.toContain(staged[0]);
-    expect(accepted[0]?.type === 'analysis-accepted' && accepted[0].data.catalog).toEqual({ nfr: 1, advice: 0 });
+    expect(accepted[0]?.type === 'analysis-accepted' && accepted[0].data.catalog).toEqual({ context: 0, functional: 0, nonFunctional: 1, fixed: 0, recommendation: 0 });
   }, 180_000);
 
   test('a crash after analysis-accepted re-materializes the entries and accepts no second analysis', async () => {

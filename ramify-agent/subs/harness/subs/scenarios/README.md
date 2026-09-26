@@ -46,8 +46,9 @@ rule, or the `AcceptedScenarioForm` with its `ScenarioWarning`s.
   trimming each line and collapsing runs of whitespace, and nothing else.
 - Rule 5 compares steps by kind and text: `And` and `But` take the kind of
   the step they continue, so a plan's `And` matches a sub-scenario's `When`.
-- Rule 6 counts a reference as cited by overlapping plan lines, or by a
-  heading anchor when the reference names no lines.
+- Rule 6 compares element citations as given: an entry's acceptance
+  element is cited when one of its scenarios names it in `refs`, whatever
+  the scenario's origin.
 - The warning for a step that names an exported symbol or a file path takes
   those names as `ScenarioViewNames`; the caller reads them from the view.
   A symbol that is also an ordinary word, such as `order` or `Email`, is not

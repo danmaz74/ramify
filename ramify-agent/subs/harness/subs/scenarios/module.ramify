@@ -14,7 +14,7 @@ expose-src PlanScenarioExtraction, planScenarioExtractionSchema from "extraction
 expose-src validateScenarioForm, scenarioFormRules, ScenarioFormRule, ScenarioFormResult from "form.ts" to parent
 expose-src ScenarioFormSubmission, scenarioFormSubmissionSchema, ScenarioSubmission, scenarioSubmissionSchema from "form.ts" to parent
 expose-src IntegrationScenarioSubmission, integrationScenarioSubmissionSchema, scenarioOriginSubmissionSchema from "form.ts" to parent
-expose-src ScenarioPlanRef, scenarioPlanRefSchema, ScenarioFormEntry, ScenarioViewNames from "form.ts" to parent
+expose-src ScenarioElementRef, scenarioElementRefSchema, ScenarioFormEntry, ScenarioViewNames from "form.ts" to parent
 expose-src ScenarioWarning, ScenarioWarningKind, AcceptedScenarioForm, FormScenario, FormIntegration from "form.ts" to parent
 
 expose-src assignScenarioIds, AssignedScenarios, ScenarioIdContext, ScenarioModule from "records.ts" to parent

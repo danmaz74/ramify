@@ -1,0 +1,23 @@
+[
+  {
+    "n": 1,
+    "at": "2026-09-26T12:18:52.058Z",
+    "type": "scope-tests",
+    "data": {
+      "callId": "call_IbgVX3Wxc5t9onpC9qIQUdqe|fc_0a4a9f4ab4b49b17016ab7b812a96887d2b3029f402b871eab",
+      "resolved": [
+        "subs/cli/src/tests/arguments.test.ts",
+        "subs/cli/src/tests/capabilities.test.ts",
+        "subs/cli/src/tests/changed-command.test.ts",
+        "subs/cli/src/tests/errors.test.ts",
+        "subs/cli/src/tests/explore-command.test.ts",
+        "subs/cli/src/tests/materialize-command.test.ts",
+        "subs/cli/src/tests/measure-command.test.ts"
+      ],
+      "outcome": "passed",
+      "notVerified": null,
+      "exitCode": 0,
+      "elapsedMs": 21205
+    }
+  }
+]

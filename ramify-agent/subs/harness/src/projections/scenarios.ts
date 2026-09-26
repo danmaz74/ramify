@@ -29,13 +29,7 @@ export function scenariosOf(view: RunView): TrackedScenarios {
 function originOf(record: ScenarioRecord): ScenarioOriginView {
   return record.origin.kind === 'plan'
     ? { kind: 'plan', planScenario: record.origin.planScenario, lines: [record.origin.ref.lines[0], record.origin.ref.lines[1]] }
-    : {
-        kind: 'architect',
-        refs: record.origin.refs.map(ref => ({
-          ...(ref.anchor === undefined ? {} : { anchor: ref.anchor }),
-          ...(ref.lines === undefined ? {} : { lines: [ref.lines[0], ref.lines[1]] as [number, number] }),
-        })),
-      };
+    : { kind: 'architect', refs: [...record.origin.refs] };
 }
 
 /** Every scenario as the accepted analysis froze it, with its text, and the warnings `analysis-accepted` recorded. */

@@ -200,15 +200,15 @@ export interface PlacementEvidence {
 /**
  * What the fork answers. A placement request is answered with a decision or
  * a partial return; an unresolved request may also be answered with a
- * deviation, judged against the captured plan, the run's work items and its
- * tracked scenarios, with `environment` or with `nothing-possible`.
+ * deviation, judged against the work item's package, the run's work items
+ * and its tracked scenarios, with `environment` or with `nothing-possible`.
  */
 export type ForkQuestion =
   | { readonly kind: 'placement' }
   | {
     readonly kind: 'unresolved';
-    /** The captured plan, whose lines a deviation cites. */
-    readonly plan: string;
+    /** The elements of the work item's package a deviation may amend: every one but context. */
+    readonly elements: ReadonlySet<string>;
     readonly workItems: ReadonlySet<string>;
     /** Every tracked scenario with its state. */
     readonly scenarios: ReadonlyMap<string, string>;
@@ -274,20 +274,18 @@ function unresolvedConstraintErrors(constraints: readonly string[], prefix: stri
   return errors;
 }
 
-/** Every rule a deviation must satisfy beyond its schema: its plan lines exist, its work items and scenarios too. */
+/** Every rule a deviation must satisfy beyond its schema: the elements it amends, its work items and scenarios exist. */
 function deviationErrors(body: DeviationBody, question: Extract<ForkQuestion, { kind: 'unresolved' }>, prefix: string): SubmissionError[] {
   const errors: SubmissionError[] = [];
-  const length = question.plan.split('\n').length;
-  body.requirements.forEach((requirement, index) => {
-    const [from, to] = requirement.lines;
-    if (to < from || to > length) {
-      errors.push({
-        path: `${prefix}.requirements.${index}.lines`,
-        message: `[${from}, ${to}] is not a range of the captured plan, which has ${length} lines`,
-        expected: `1 ≤ from ≤ to ≤ ${length}`,
-      });
-    }
+  body.amends.forEach((id, index) => {
+    if (question.elements.has(id)) return;
+    errors.push({
+      path: `${prefix}.amends.${index}`,
+      message: id.startsWith('ctx-') ? `${id} is context, which no deviation amends` : `${id} is no element of the work item's package`,
+      expected: 'a requirement or recommendation of the work item\'s package',
+    });
   });
+  if (new Set(body.amends).size !== body.amends.length) errors.push({ path: `${prefix}.amends`, message: 'An element is named twice', expected: 'each element once' });
   body.workItems.forEach((workItem, index) => {
     if (question.workItems.has(workItem)) return;
     errors.push({ path: `${prefix}.workItems.${index}`, message: `No work item "${workItem}" was committed by this run`, expected: 'a work item of this run' });

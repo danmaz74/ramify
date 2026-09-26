@@ -1,11 +1,8 @@
 import type { Script, ScriptStep } from '../../../subs/agent/src/scripted.js';
 import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 import { scenarioIdOf } from '../../../subs/scenarios/src/records.js';
-import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { dirname, join } from 'node:path';
-import { documentManifestSchema } from '../../../subs/plan-evidence/src/interfaces/contracts.js';
 import { contextSelectorToolName, workOrientationToolName } from '../../context-selection/submissions.js';
+import { checkToolName, intakeToolName, principleToolName } from '../../analysis/extraction.js';
 
 /*
  * Scripted local architects that declare their work item's scenarios.
@@ -33,8 +30,34 @@ import { contextSelectorToolName, workOrientationToolName } from '../../context-
 interface ScriptedAnalysis {
   readonly entries?: ReadonlyArray<{ readonly capability?: unknown }>;
   readonly scenarios?: ReadonlyArray<{ readonly entry?: unknown }>;
-  readonly catalog?: unknown;
-  readonly incorporation?: unknown;
+}
+
+/**
+ * The turns a test does not state, answered as a reader that finds
+ * nothing to add: an intake that reads no non-functional element or
+ * recommendation and incorporates the root plan's scenarios, principles
+ * extractions and checks that find nothing, an orientation, and a
+ * selection of no element. A test that states a turn of its own is
+ * answered by its script instead.
+ */
+export function defaultTurn(spec: SessionSpec): readonly ScriptStep[] | undefined {
+  switch (spec.submission.name) {
+    case intakeToolName: {
+      if (/^Missing references to judge:$/mu.test(spec.prompt)) throw new Error('A scripted fixture with missing references must state its intake explicitly');
+      const plans = [...spec.prompt.matchAll(/^- (doc-\d{3,}) \(plan\):/gmu)].map(match => match[1]!);
+      return [{ kind: 'submit', input: {
+        goal: 'The plan asks for the behavior its entries name.', elements: [],
+        incorporation: { documents: plans.map((document, index) => ({ document, scenarios: index === 0, uncertainty: '' })), missing: [] },
+      } }];
+    }
+    case principleToolName: return [{ kind: 'submit', input: { elements: [] } }];
+    case checkToolName: return [{ kind: 'submit', input: { corrections: [], entries: [], scenarios: [] } }];
+    case workOrientationToolName: return [{ kind: 'submit', input: {
+      focus: 'Understand this work item before assigning it.', currentUnderstanding: 'The captured work item briefing governs this orientation.', questions: [],
+    } }];
+    case contextSelectorToolName: return [{ kind: 'submit', input: { selected: [] } }];
+    default: return undefined;
+  }
 }
 
 /** The script, with each local architect's completion request declaring its entry's scenarios unless it states its own. */
@@ -42,14 +65,11 @@ export function declaringScenarios(script: Script): Script {
   let entries: string[] = [];
   let byEntry = new Map<string, string[]>();
   return (spec: SessionSpec): readonly ScriptStep[] => {
-    if (spec.submission.name === workOrientationToolName) return [{ kind: 'submit', input: {
-      focus: 'Understand this work item before assigning it.', currentUnderstanding: 'The captured work item briefing governs this orientation.', questions: [],
-    } }];
-    if (spec.submission.name === contextSelectorToolName) return [{ kind: 'submit', input: { examined: [], selected: [], unavailable: [] } }];
+    const fallback = scriptedOrDefault(script, spec);
+    if (fallback !== undefined) return fallback;
     const steps = typeof script === 'function' ? script(spec) : script;
     if (spec.role === 'initial-architect') {
-      const prepared = steps.map(step => step.kind === 'submit' && isAnalysis(step.input)
-        ? { ...step, input: bindFixtureEvidence(step.input, spec) } : step);
+      const prepared = steps;
       const analysis = prepared.flatMap(step => (step.kind === 'submit' && isAnalysis(step.input) ? [step.input] : [])).at(-1);
       if (analysis !== undefined) {
         entries = (analysis.entries ?? []).map(entry => String(entry.capability));
@@ -73,37 +93,23 @@ export function declaringScenarios(script: Script): Script {
   };
 }
 
-/** Explicit Plan 13 fixture evidence for scripted agents outside openRuns. */
-export function withPlan13Fixture(script: Script): Script {
-  return (spec: SessionSpec): readonly ScriptStep[] => {
-    const steps = typeof script === 'function' ? script(spec) : script;
-    if (spec.role !== 'initial-architect') return steps;
-    return steps.map(step => step.kind === 'submit' && isAnalysis(step.input)
-      ? { ...step, input: bindFixtureEvidence(step.input, spec) } : step);
-  };
+/** The default turns for a script run outside `openRuns`. */
+export function withDefaultTurns(script: Script): Script {
+  return (spec: SessionSpec): readonly ScriptStep[] => scriptedOrDefault(script, spec) ?? (typeof script === 'function' ? script(spec) : script);
 }
 
-/** Bind an explicitly empty fixture catalog to exact captured bytes. */
-function bindFixtureEvidence(input: ScriptedAnalysis, spec: SessionSpec): ScriptedAnalysis {
-  const fixture = input as ScriptedAnalysis & { catalog?: unknown; incorporation?: { documents?: readonly unknown[]; missing?: readonly unknown[] } };
-  if (!Array.isArray(fixture.catalog) || fixture.incorporation?.documents?.length !== 0 || fixture.incorporation.missing?.length !== 0) return input;
-  const capturedRoot = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-  if (!capturedRoot) return input;
-  const directory = dirname(dirname(capturedRoot));
-  const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
-  if (manifest.missing.length) throw new Error('A scripted fixture with missing references must state its judgments explicitly');
-  const documents = manifest.documents.filter(document => document.kind === 'plan').map(document => {
-    const bytes = readFileSync(join(directory, document.storedAt));
-    let end = 1;
-    while (end <= bytes.length) {
-      try { if (new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, end)).length) break; }
-      catch { end += 1; }
-    }
-    const quote = new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, end));
-    return { document: document.id, scenarios: document.id === manifest.root,
-      governing: [{ document: document.id, sha256: createHash('sha256').update(bytes).digest('hex'), start: 0, end, quote }], uncertainty: '' };
-  });
-  return { ...input, incorporation: { documents, missing: [] } };
+/**
+ * An orientation and a selection are always the default ones, so no local
+ * architect's scripted turn is spent on them. A catalog extractor's turn is
+ * the script's where it states one, and the default otherwise.
+ */
+function scriptedOrDefault(script: Script, spec: SessionSpec): readonly ScriptStep[] | undefined {
+  if (spec.submission.name === workOrientationToolName || spec.submission.name === contextSelectorToolName) return defaultTurn(spec);
+  if (spec.role !== 'catalog-extractor') return undefined;
+  // A static script answers every session alike, so it never states a catalog extractor's turn.
+  if (typeof script !== 'function') return defaultTurn(spec);
+  const steps = script(spec);
+  return steps.length === 0 || steps[0]?.kind === 'end' ? defaultTurn(spec) : steps;
 }
 
 function isAnalysis(input: unknown): input is ScriptedAnalysis {

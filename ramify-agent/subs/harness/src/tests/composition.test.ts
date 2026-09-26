@@ -16,6 +16,7 @@ import { reviewSchemas } from '../reviews/records.js';
 import { reconciliationSchemas } from '../reviews/reconciliation.js';
 import { deviationSchemas } from '../deviations/records.js';
 import { initialAnalysisSubmissionSchema } from '../analysis/submission.js';
+import { checkSubmissionSchema, intakeSubmissionSchema, principleSubmissionSchema } from '../analysis/extraction.js';
 import { localArchitectSubmissionSchema } from '../work/submission.js';
 import { engineerSubmissionSchema, scopeTestsInputSchema } from '../work/engineer.js';
 import { forkSubmissionSchema } from '../architecture/submission.js';
@@ -228,6 +229,9 @@ function unionRoots(): Record<string, unknown> {
     'observation log': observationSchema,
     ...Object.fromEntries(Object.values(registries).map(entry => [`record ${entry.schema}`, entry.body])),
     'submission initial-analysis': initialAnalysisSubmissionSchema,
+    'submission intake': intakeSubmissionSchema,
+    'submission principle-extraction': principleSubmissionSchema,
+    'submission catalog-check': checkSubmissionSchema,
     'submission local-architect': localArchitectSubmissionSchema,
     'submission engineer': engineerSubmissionSchema,
     'submission fork': forkSubmissionSchema,
@@ -252,7 +256,10 @@ function unionRoots(): Record<string, unknown> {
 }
 
 const submissionSchemas: Readonly<Record<string, unknown>> = {
-  'ramify-agent.initial-analysis/2': initialAnalysisSubmissionSchema,
+  'ramify-agent.initial-analysis/3': initialAnalysisSubmissionSchema,
+  'ramify-agent.intake/1': intakeSubmissionSchema,
+  'ramify-agent.principle-extraction/1': principleSubmissionSchema,
+  'ramify-agent.catalog-check/1': checkSubmissionSchema,
   'ramify-agent.local-architect-submission/1': localArchitectSubmissionSchema,
   'ramify-agent.engineer-submission/1': engineerSubmissionSchema,
   'ramify-agent.fork-submission/1': forkSubmissionSchema,
@@ -427,10 +434,10 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.reconciliation-assessment/1.next', values: ['correct', 'unresolved'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a repair is planned with its intent, the architect assigns the correction, its acceptance claims the repair, and the next round fixes it within its floor' },
   { union: 'run log[work-item-completed].data.unresolved[].reason', values: ['rounds-exhausted', 'raised-after-last-round'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'at the last round no correction is planned, what is open stays unresolved, and a signal raised after it does not block completion' },
   { union: 'record ramify-agent.reconciliation-basis/1.floor', values: ['none'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'at the last round no correction is planned, what is open stays unresolved, and a signal raised after it does not block completion' },
-  { union: 'run log[reconciliation-assessed].data.next', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
-  { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['request-user-decision'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
-  { union: 'record ramify-agent.reconciliation-assessment/1.submission.next.kind', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
-  { union: 'record ramify-agent.reconciliation-assessment/1.next', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites the plan\'s exact text and revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'run log[reconciliation-assessed].data.next', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites an element\'s exact text and the catalog\'s revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['request-user-decision'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites an element\'s exact text and the catalog\'s revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.submission.next.kind', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites an element\'s exact text and the catalog\'s revision, the work item waits for the answer, and the next round assesses it' },
+  { union: 'record ramify-agent.reconciliation-assessment/1.next', values: ['await-user'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'the conflict cites an element\'s exact text and the catalog\'s revision, the work item waits for the answer, and the next round assesses it' },
   { union: 'run log.type', values: ['reconciliation-refused'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
   { union: 'run log[reconciliation-refused].data.stage', values: ['assessment', 'completion'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
   { union: 'record ramify-agent.reconciliation-assessment/1.submission.dispositions[].action.action', values: ['defer'], file: 'subs/harness/src/tests/reconciliation.test.ts', test: 'a changed revision refuses the assessment, a changed source and a later signal refuse completion, and a waiver outside the module is refused' },
@@ -487,7 +494,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.infrastructure-recovery/1.outcome', values: ['recovered'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'missing nested dependencies consume a recovery attempt, and the run continues when it repairs them' },
   { union: 'record ramify-agent.infrastructure-recovery/1.outcome', values: ['failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a recovery that does not repair the failure ends the run at once, with the attempt it spent' },
   { union: 'record ramify-agent.invocation/1.scope.size.components[].state', values: ['unknown'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'a module that does not exist yet has an unknown size, not a zero one' },
-  { union: 'record ramify-agent.invocation/1.scope.size.coverage', values: ['complete'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'the one invocation records its snapshot reference and its S_s components' },
+  { union: 'record ramify-agent.invocation/1.scope.size.coverage', values: ['complete'], file: 'subs/harness/src/tests/measurement.test.ts', test: 'the initial architect\'s invocation records its snapshot reference and its S_s components' },
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['idle-timeout'], file: 'subs/harness/src/tests/run-bounds.test.ts', test: 'no port event for invocationIdleMs ends the invocation as failed, idle-timeout' },
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['absolute-timeout'], file: 'subs/harness/src/tests/run-bounds.test.ts', test: 'a session that keeps talking past invocationAbsoluteMs ends as failed, absolute-timeout' },
   { union: 'record ramify-agent.invocation-outcome/1.interruption', values: ['adapter-fault'], file: 'subs/harness/src/tests/run-bounds.test.ts', test: 'is an adapter fault: the invocation ends failed with that interruption, and the run fails agent-failed' },
@@ -579,24 +586,30 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[nonfunctional-deviation-recorded].data.checkFindings[][check-finding-decided].data.decision.decision.action', values: ['request-user-decision'], file: 'subs/harness/src/tests/nonfunctional-deviation-runtime.test.ts', test: 'an NFR-only exhausted run completes pending review with an exact source-bound CheckFinding' },
   { union: 'run log[session-opened].data.role', values: ['nonfunctional-coordinator'], file: 'subs/harness/src/tests/plan13-composed-functional.test.ts', test: 'functional work cites one NFR while the coordinator assesses the complete two-NFR catalog' },
   { union: 'run log[session-opened].data.role', values: ['nonfunctional-repair-engineer'], file: 'subs/harness/src/tests/nonfunctional-repair.test.ts', test: 'one authorized repair edits two modules from the chosen src, then reassesses every NFR' },
-  { union: 'run log[context-package-appended].data.outcome', values: ['session-lost'], file: 'subs/harness/src/tests/context-selection-runtime.test.ts', test: 'lost parent session reconstructs the exact package in a fresh organizing prompt without reselection' },
+  { union: 'run log[context-package-appended].data.outcome', values: ['session-lost'], file: 'subs/harness/src/tests/context-selection-runtime.test.ts', test: 'lost parent session reconstructs the exact package in a fresh organizing prompt from the record alone, without reselection' },
   { union: 'run log[nonfunctional-assessed].data.phase', values: ['after-repair'], file: 'subs/harness/src/tests/nonfunctional-repair.test.ts', test: 'one authorized repair edits two modules from the chosen src, then reassesses every NFR' },
   { union: 'run log[nonfunctional-round-closed].data.outcome', values: ['continue', 'exhausted'], file: 'subs/harness/src/tests/nonfunctional-recovery.test.ts', test: 'round three exhausts and a late source change still refuses the final gate' },
   { union: 'record ramify-agent.document-manifest/1.documents[].kind', values: ['principle'], file: 'subs/harness/subs/plan-evidence/src/tests/discovery.test.ts', test: 'records invalid text and excludes nested independent principles even under a foreign subs directory' },
   { union: 'record ramify-agent.document-manifest/1.missing[].judgment', values: ['unjudged'], file: 'subs/harness/subs/plan-evidence/src/tests/discovery.test.ts', test: 'reports missing local links with source offsets and refuses symlink escape' },
-  { union: 'record ramify-agent.document-manifest/1.principlesScan.status', values: ['complete'], file: 'subs/harness/src/tests/context-selection.test.ts', test: 'keeps exact source, classification, condition provenance, and stable bytes for reconstruction' },
+  { union: 'record ramify-agent.document-manifest/1.principlesScan.status', values: ['complete'], file: 'subs/harness/subs/plan-evidence/src/tests/discovery.test.ts', test: 'records invalid text and excludes nested independent principles even under a foreign subs directory' },
   { union: 'record ramify-agent.document-manifest/1.principlesScan.status', values: ['partial'], file: 'subs/harness/subs/plan-evidence/src/tests/discovery.test.ts', test: 'a root principles listing failure is partial coverage with an explicit root gap' },
-  { union: 'record ramify-agent.nonfunctional-catalog/1.items[].classification', values: ['non-functional-requirement', 'advice'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt' },
-  { union: 'record ramify-agent.nonfunctional-catalog/1.items[].conditions[].source', values: ['stated', 'inferred'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt' },
-  { union: 'record ramify-agent.document-incorporation/1.missing[].judgment', values: ['unclear'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt' },
+  // Plan 14's element catalog: the intake's and the principles extraction's elements, and the checkers' corrections.
+  { union: 'record ramify-agent.element-catalog/1.elements[].kind', values: ['non-functional', 'recommendation'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts the intake\'s elements and incorporation once, and projects them by kind with an unclear source excerpt' },
+  { union: 'record ramify-agent.element-catalog/1.elements[].kind', values: ['fixed'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'adds fixed requirements and recommendations of its own document, numbered past the intake\'s' },
+  { union: 'record ramify-agent.element-catalog/1.elements[].kind', values: ['context'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'findings name the IDs each correction produced, in correction order' },
+  { union: 'record ramify-agent.element-catalog/1.elements[].conditions[].source', values: ['stated', 'inferred'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts the intake\'s elements and incorporation once, and projects them by kind with an unclear source excerpt' },
+  { union: 'record ramify-agent.element-catalog/1.documents[].kind', values: ['principle'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'adds fixed requirements and recommendations of its own document, numbered past the intake\'s' },
+  { union: 'record ramify-agent.document-incorporation/2.missing[].judgment', values: ['unclear'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts the intake\'s elements and incorporation once, and projects them by kind with an unclear source excerpt' },
+  { union: 'submission catalog-check.corrections[].action', values: ['add'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'adds a constraint its document states and the reading omitted, with a finding naming the new ID' },
+  { union: 'submission catalog-check.corrections[].action', values: ['replace'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'splits a cited functional element, and the entry and its scenario are re-cited to the new IDs' },
+  { union: 'submission catalog-check.corrections[].action', values: ['rewrite'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'rewrites a reading in place, and corrects only elements of its own document' },
+  { union: 'run log[analysis-accepted].data.findings[].action', values: ['add', 'replace', 'rewrite'], file: 'subs/harness/src/tests/catalog-extraction.test.ts', test: 'findings name the IDs each correction produced, in correction order' },
   { union: 'record ramify-agent.nonfunctional-assessment/1.phase', values: ['after-repair'], file: 'subs/harness/src/tests/nonfunctional-repair.test.ts', test: 'one authorized repair edits two modules from the chosen src, then reassesses every NFR' },
   { union: 'record ramify-agent.nonfunctional-assessment/1.results[].result', values: ['satisfied'], file: 'subs/harness/src/tests/plan13-composed-functional.test.ts', test: 'functional work cites one NFR while the coordinator assesses the complete two-NFR catalog' },
   { union: 'record ramify-agent.nonfunctional-assessment/1.results[].result', values: ['not-satisfied'], file: 'subs/harness/src/tests/nonfunctional-repair.test.ts', test: 'one authorized repair edits two modules from the chosen src, then reassesses every NFR' },
   { union: 'record ramify-agent.nonfunctional-assessment/1.results[].result', values: ['undetermined'], file: 'subs/harness/src/tests/nonfunctional-phase.test.ts', test: 'reconstructs valid crash prefixes and the next permitted step' },
   { union: 'record ramify-agent.nonfunctional-round/1.outcome', values: ['continue', 'exhausted'], file: 'subs/harness/src/tests/nonfunctional-recovery.test.ts', test: 'round three exhausts and a late source change still refuses the final gate' },
-  { union: 'query analysis.analysis[accepted].planEvidence[available].catalog[].classification', values: ['non-functional-requirement', 'advice'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt' },
-  { union: 'query analysis.analysis[accepted].planEvidence[available].catalog[].conditions[].source', values: ['stated', 'inferred'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt' },
-  { union: 'query analysis.analysis[accepted].planEvidence[available].missing[].judgment', values: ['unclear'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt' },
+  { union: 'query analysis.analysis[accepted].planEvidence[available].missing[].judgment', values: ['unclear'], file: 'subs/harness/src/tests/analysis-plan-evidence.test.ts', test: 'accepts the intake\'s elements and incorporation once, and projects them by kind with an unclear source excerpt' },
 ];
 
 /**
@@ -617,6 +630,9 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
   ['query analysis.analysis[accepted].scenarios[].kind', 'record ramify-agent.scenario/1.kind'],
   ['query analysis.analysis[accepted].scenarios[].origin.kind', 'record ramify-agent.scenario/1.origin.kind'],
   ['query analysis.analysis[accepted].warnings[].kind', 'run log[analysis-accepted].data.warnings[].kind'],
+  ['query analysis.analysis[accepted].planEvidence[available].elements[].kind', 'record ramify-agent.element-catalog/1.elements[].kind'],
+  ['query analysis.analysis[accepted].planEvidence[available].elements[].conditions[].source', 'record ramify-agent.element-catalog/1.elements[].conditions[].source'],
+  ['query analysis.analysis[accepted].planEvidence[available].findings[].action', 'run log[analysis-accepted].data.findings[].action'],
   ['query scenarios.scenarios[].gates[].status', 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status'],
   ['query gate.gate.commands[].scenarios.selection.kind', 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind'],
 ];
@@ -647,14 +663,14 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   },
   {
     union: 'record ramify-agent.document-manifest/1.missing[].judgment', values: ['required', 'unclear', 'advisory'],
-    reason: 'Capture records missing links as unjudged. The architect submits later judgments in a separate incorporation record, leaving these manifest-schema values unused by the capture writer.',
+    reason: 'Capture records missing links as unjudged. The catalog intake submits the judgments in a separate incorporation record, leaving these manifest-schema values unused by the capture writer.',
   },
   {
-    union: 'record ramify-agent.document-incorporation/1.missing[].judgment', values: ['required'],
-    reason: 'A required missing reference fails analysis acceptance, so no accepted incorporation record contains this judgment.',
+    union: 'record ramify-agent.document-incorporation/2.missing[].judgment', values: ['required'],
+    reason: 'A required missing reference fails the intake\'s acceptance, so no accepted incorporation record contains this judgment.',
   },
   {
-    union: 'record ramify-agent.document-incorporation/1.missing[].judgment', values: ['advisory'],
+    union: 'record ramify-agent.document-incorporation/2.missing[].judgment', values: ['advisory'],
     reason: 'An advisory judgment is allowed for a missing reference, but the current accepted-incorporation runtime witness only exercises unclear.',
   },
   {

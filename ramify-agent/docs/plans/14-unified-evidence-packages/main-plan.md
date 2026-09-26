@@ -2,8 +2,12 @@
 
 **Date:** 2026-09-26, rewritten the same day to adhere to the
 [plan context catalog principles](../../architecture/plan-context-catalog.principles.md).
-**Status:** proposed; this document is a plan, not implementation or
-acceptance evidence. **Source inspected:** ramify-agent `0109c84c`. The
+**Status:** iterations 1–4 implemented on the `ramify-agent` branch; the
+[implementation record](#implementation-record) lists where the code departs
+from this text, and the [contract appendix](contract-appendix.md) holds the
+contracts as built. The real Pi trial of iteration 4 has not been run. This
+document remains a plan, not acceptance evidence. **Source inspected:**
+ramify-agent `0109c84c`. The
 trial it draws on is `20260926T052417Z-21d928` on harness `c4af2a4e` and
 target `d61f7c099`; its relevant durable records are copied into the
 [example evidence](evidence/self-explaining-denials-scope.json), and the
@@ -421,3 +425,68 @@ that one run produces.
     asks it to name an unrequested capability that would round the work
     off in `findings` instead of building it, and the scope review already
     reports a behavior nobody asked for.
+
+## Implementation record
+
+Implemented 2026-09-26 in two commits: iteration 1 as `e17ac1c5`, whose
+ramify-audit passed (run ref
+`refs/audited/runs/2026-09-26T11-19-36Z-e17ac1c50`), and iterations 2 to 4
+after it. Where the plan's text allowed a simpler reading, the code takes it;
+each departure is listed here and the appendix states the result.
+
+1. **The analysis is atomic.** Nothing of the intake, the principles
+   extractions, the architect or the checkers is durable before
+   `analysis-accepted`; a run started again before it repeats every turn, as
+   it already repeated the initial architect. So there are no
+   `catalog-extracted` or `catalog-checked` events and no
+   `analysis/checks/<document>.json`: the invocation events show each turn,
+   and `analysis-accepted` carries the checkers' findings and the counts by
+   kind beside the catalog's content-addressed file.
+2. **The catalog is frozen at `analysis-accepted`.** It is written at the
+   existing content-addressed path `analysis/catalog/<hash>.json`, not
+   `analysis/catalog.json`, before the review stop; approval changes
+   nothing in it, as the principles document's "frozen at analysis
+   acceptance" requires.
+3. **One role, three procedures.** Intake, principles extraction and checker
+   are the `catalog-extractor` role's three procedures and tools in one
+   prompt package. The intake also submits the plan's `goal`, which is the
+   goal each principles extraction reads.
+4. **The checker reads every captured document**, plan and principles, and
+   re-cites entries and scenarios by replacing their complete citation lists.
+   A `rewrite` keeps an element's ID, kind and document; a split, merge or
+   reclassification is a `replace` that retires IDs.
+5. **Scenario `refs` cite elements on every scenario**, plan scenarios
+   included, since an element has no lines for a plan scenario to overlap.
+6. **The selection event keeps its name.** `context-selection-recorded`
+   gains `supersedes` for a re-selection instead of a new
+   `work-selection-recorded`; the stored package file is gone. A decision
+   adds an owner when it names an owner that is neither the work item's
+   module nor the owner of an earlier decision for it; the new package is
+   carried by the local architect's next prompt once.
+7. **The orientation brief names the work item's element IDs only.** Their
+   text arrives with the work-item package after orientation, so the
+   session holds it once.
+8. **Later deviations reach the local architect in its brief.** A deviation
+   recorded after the work-item package is rendered by the creator in each
+   brief under its own heading, not appended to the session; the package
+   bytes never change.
+9. **Packages that are not cited by a record render every deviation
+   recorded so far**: the assessment package, investigation and repair
+   packages, and the unresolved fork's work-item package. The scope review
+   request cites the assignment's elements with the deviations recorded when
+   it is made; the code review cites the assignment package unchanged.
+10. **A plan deviation record keeps each amended element's path and text**,
+    so its CheckFinding can state the conflict without the catalog.
+11. **The non-functional phase assesses `nfr-` and `fix-` elements** under
+    the existing `nfr` field names.
+12. **Record schema literals were kept** where a record's shape changed
+    (work item, entry assignments, iteration assignment, plan deviation):
+    no old run is read, so no reader needs to tell the versions apart. The
+    catalog, incorporation and selection records, whose names changed
+    meaning, carry new versions.
+13. **The package view** is a field of each iteration in the work-item
+    query, rendered on that request from the assignment record and the
+    frozen catalog, and shown on the work-item page.
+14. **The Plan 13 context probe was deleted.** It witnessed the retired
+    selection contract with a real agent; the real trial of this plan is
+    its replacement.

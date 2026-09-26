@@ -318,8 +318,9 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     expect(step('acceptance-runner')).toMatchObject({ outcome: 'not-verified' });
     expect(attempt.steps.filter(entry => entry.step.startsWith('baseline-')).every(entry => entry.outcome === 'not-verified')).toBe(true);
     expect(attempt.verdict).toBe('failed');
-    // No code-repair assignment follows: the one invocation is the analysis.
-    expect(snapshot.counts.invocations).toBe(1);
+    // No code-repair assignment follows: the three invocations are the
+    // analysis's intake, initial architect and plan check.
+    expect(snapshot.counts.invocations).toBe(3);
     expect(git.branch()).toBeNull();
   }, 180_000);
 

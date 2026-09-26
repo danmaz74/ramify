@@ -46,7 +46,7 @@ const noteFailure = { step: 'Then the note is listed', message: 'expected one no
 
 function scenarioText(id: string, entry: string | null, owner: string, extra: Record<string, unknown> = {}) {
   return {
-    id, kind: 'entry', entry, owner, origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }] }, partOf: null, subScenarios: [],
+    id, kind: 'entry', entry, owner, origin: { kind: 'architect', refs: ['fr-002'] }, partOf: null, subScenarios: [],
     name: `Scenario ${id}`, source: [`Scenario: Scenario ${id}`, '  When it is used', '  Then it works'],
     file: `subs/${owner.split('/').at(-1)}/src/tests/features/review-notes/${entry ?? 'integration'}.feature`, ...extra,
   };
@@ -54,8 +54,40 @@ function scenarioText(id: string, entry: string | null, owner: string, extra: Re
 
 function scenarioView(id: string, entry: string | null, state: string, extra: Record<string, unknown> = {}) {
   return {
-    id, kind: 'entry', name: `Scenario ${id}`, state, origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }] }, entry, partOf: null, subScenarios: [],
+    id, kind: 'entry', name: `Scenario ${id}`, state, origin: { kind: 'architect', refs: ['fr-002'] }, entry, partOf: null, subScenarios: [],
     workItem: 'wi-001', owner: 'shop/notes', file: `subs/notes/src/tests/features/review-notes/${entry ?? 'integration'}.feature`, implementedBy: null, gates: [], ...extra,
+  };
+}
+
+const catalogHash = 'e'.repeat(64);
+
+/** One element of the frozen catalog, from the plan unless it says otherwise. */
+function element(id: string, kind: string, text: string, extra: Record<string, unknown> = {}) {
+  return { id, kind, document: 'doc-001', path: 'plans/review-notes/plan.md', text, locator: null, conditions: [], uncertainty: '', ...extra };
+}
+
+/** The frozen catalog of the stub run: one element of every kind, a checker's correction and the plan's incorporation. */
+function planEvidence() {
+  return {
+    status: 'available', catalogHash,
+    elements: [
+      element('ctx-001', 'context', 'Reviewers write notes while they read a collection.'),
+      element('fr-001', 'functional', 'A reviewer can attach a note to a review.'),
+      element('fr-002', 'functional', 'A written note is listed on its review.', { locator: 'Acceptance' }),
+      element('fr-003', 'functional', 'A note can be tagged.'),
+      element('nfr-001', 'non-functional', 'A note is saved within one second.', {
+        conditions: [{ text: 'on the reference machine', source: 'stated' }], uncertainty: 'The plan names no load.',
+      }),
+      element('fix-001', 'fixed', 'Every module owns its tests.', { document: 'doc-002', path: 'docs/testing.principles.md' }),
+      element('rec-001', 'recommendation', 'Prefer plain text for notes.', { document: 'doc-002', path: 'docs/testing.principles.md' }),
+    ],
+    retired: ['fr-009'],
+    findings: [
+      { document: 'doc-001', path: 'plans/review-notes/plan.md', action: 'replace', reason: 'The reading merged two requirements.', elements: ['fr-003'], retired: ['fr-009'] },
+      { document: 'doc-002', path: 'docs/testing.principles.md', action: 'add', reason: 'The rule on test ownership was missing.', elements: ['fix-001'], retired: [] },
+    ],
+    missing: [],
+    incorporation: [{ document: 'doc-001', path: 'plans/review-notes/plan.md', scenarios: true, uncertainty: '' }],
   };
 }
 
@@ -73,8 +105,8 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
       analysis: {
         status: 'accepted', view: { status: 'placeholder' },
         entries: [
-          { capability: 'review-note', description: 'd', owner: 'shop/notes', proposed: null, workItem: 'wi-001' },
-          { capability: 'note-tags', description: 't', owner: 'shop/tags', proposed: null, workItem: 'wi-002' },
+          { capability: 'review-note', description: 'd', owner: 'shop/notes', proposed: null, workItem: 'wi-001', requirementRefs: ['fr-001'], acceptanceRefs: ['fr-002'], contextRefs: ['ctx-001'] },
+          { capability: 'note-tags', description: 't', owner: 'shop/tags', proposed: null, workItem: 'wi-002', requirementRefs: ['fr-003'], acceptanceRefs: ['fr-003'], contextRefs: [] },
         ],
         hypotheses: [{
           id: 'note-search', capability: 'note-search', revision: 2, standing: 'superseded', change: 'reuse',
@@ -93,6 +125,7 @@ function stubRun(extra: Partial<RunSnapshot> = {}): StubRun {
           }),
         ],
         warnings: [{ kind: 'sub-scenario-shares-no-step', scenarios: ['sc-003'], message: 'sc-003 picks no step of sc-004 verbatim' }],
+        planEvidence: planEvidence(),
         total: { entries: 2, hypotheses: 1, scenarios: 4 },
       },
     }),
@@ -502,6 +535,7 @@ test('CM19: a failed run says failed at run level only; a capability keeps its l
           result: { outcome: 'exhausted', gate: 'ga-0005', commit: null, findings: [], changedAssumptions: [], recommendation: null, failure: null },
           gates: [{ id: 'ga-0005', checkpoint: 'iteration', verdict: 'failed', cause: 'in-scope', next: 'exhausted', repairRound: 3 }],
           invocations: [],
+          package: null,
         }],
         gates: [], requirements: [], requests: [],
       }),
@@ -554,6 +588,7 @@ test('an iteration whose engineer ended without a result shows the digest and th
           },
           gates: [],
           invocations: [{ id: 'inv-0003', role: 'engineer', ended: 'failed', outsideScope: [] }, { id: 'inv-0004', role: 'failure-analyst', ended: 'submitted', outsideScope: [] }],
+          package: null,
         }],
         gates: [], requirements: [], requests: [],
       }),
@@ -677,7 +712,7 @@ test('the review on the analysis page: each entry\'s scenarios with their origin
   expect(first.textContent).toContain('from the plan (ps-01, lines 10–14)');
   expect(first.querySelector('.badge')!.textContent).toBe('plan');
   const second = within(note).getByLabelText('Scenario sc-002');
-  expect(second.textContent).toContain('written by the architect, citing Acceptance; a sub-scenario of sc-004');
+  expect(second.textContent).toContain('written by the architect, citing fr-002; a sub-scenario of sc-004');
   expect(second.querySelector('pre')!.textContent).toBe('Scenario: Scenario sc-002\n  When it is used\n  Then it works');
 
   const integration = screen.getByLabelText('Integration scenario sc-004');
@@ -690,6 +725,106 @@ test('the review on the analysis page: each entry\'s scenarios with their origin
   expect(screen.getByLabelText('Warnings of the analysis').textContent).toContain('sub-scenario-shares-no-step on sc-003: sc-003 picks no step of sc-004 verbatim');
   expect(within(subs).getByLabelText('Scenario sc-003').querySelector('.warn')!.textContent).toBe('Warning (sub-scenario-shares-no-step): sc-003 picks no step of sc-004 verbatim');
   expect(within(note).queryByText(/Warning/)).toBeNull();
+});
+
+test('the plan and entries: each entry names the elements it cites, and the plan context catalog shows every kind, the checkers\' findings and what is no requirement', async () => {
+  render(<RunPage client={clientWith(stubRun())} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Plan and entries' }));
+  const assignments = (await screen.findByRole('heading', { name: 'Entry assignments' })).closest('section')!;
+  expect([...assignments.querySelectorAll('th')].map(cell => cell.textContent)).toEqual(['Capability', 'Owner', 'Work item', 'Description', 'Elements']);
+  const rows = [...assignments.querySelectorAll('tbody tr')].map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent));
+  // Requirement, then acceptance where it differs, then context.
+  expect(rows.map(row => [row[0], row[4]])).toEqual([['review-note', 'fr-001, fr-002, ctx-001'], ['note-tags', 'fr-003']]);
+
+  // The catalog replaced the Non-functional requirements panel.
+  expect(screen.queryByRole('heading', { name: 'Non-functional requirements' })).toBeNull();
+  const catalog = screen.getByRole('heading', { name: 'The plan context catalog' }).closest('section')!;
+  expect(catalog.textContent).toContain(`Catalog ${catalogHash.slice(0, 12)}: 7 elements; retired fr-009.`);
+  const kinds = within(catalog).getAllByRole('heading', { level: 3 }).map(heading => heading.textContent);
+  expect(kinds).toEqual([
+    'Context (1)', 'Functional requirements (3)', 'Non-functional requirements of the plan (1)', 'Fixed requirements (1)', 'Recommendations (1)', 'Checker findings',
+  ]);
+  const ids = (heading: string) => within(within(catalog).getByLabelText(heading)).queryAllByRole('listitem').map(item => item.getAttribute('aria-label'));
+  expect(ids('Context')).toEqual(['Element ctx-001']);
+  expect(ids('Functional requirements')).toEqual(['Element fr-001', 'Element fr-002', 'Element fr-003']);
+  expect(ids('Non-functional requirements of the plan')).toEqual(['Element nfr-001']);
+  expect(ids('Fixed requirements')).toEqual(['Element fix-001']);
+  expect(ids('Recommendations')).toEqual(['Element rec-001']);
+  // Context and recommendations say that nothing assesses them.
+  expect(within(catalog).getByLabelText('Context').textContent).toContain('Not a requirement; nothing assesses it.');
+  expect(within(catalog).getByLabelText('Recommendations').textContent).toContain('Not requirements; nothing assesses them.');
+  expect(within(catalog).getByLabelText('Functional requirements').textContent).not.toContain('nothing assesses');
+  // An element as the catalog holds it: its text, where it is from, its conditions and uncertainty.
+  const nfr = within(catalog).getByLabelText('Element nfr-001');
+  expect(nfr.querySelector('blockquote')!.textContent).toBe('A note is saved within one second.');
+  expect(nfr.textContent).toContain('plans/review-notes/plan.md');
+  expect(nfr.textContent).toContain('stated condition: on the reference machine');
+  expect(nfr.textContent).toContain('Uncertainty: The plan names no load.');
+  expect(within(catalog).getByLabelText('Element fr-002').textContent).toContain('plans/review-notes/plan.md · Acceptance');
+  expect(within(catalog).getByLabelText('Element fix-001').textContent).toContain('docs/testing.principles.md');
+  // Each checker's correction, with what it retired and why.
+  expect(within(within(catalog).getByLabelText('Checker findings')).getAllByRole('listitem').map(item => item.textContent)).toEqual([
+    'The checker of plans/review-notes/plan.md replaced fr-009 with fr-003: The reading merged two requirements.',
+    'The checker of docs/testing.principles.md added fix-001: The rule on test ownership was missing.',
+  ]);
+  expect(catalog.querySelector('details')!.textContent).toContain('plans/review-notes/plan.md: scenarios incorporated');
+});
+
+test('the plan context catalog of a run without one says it is unavailable, and one without findings says every reading was faithful', async () => {
+  const run = stubRun();
+  const withEvidence = (planEvidence: unknown): StubRun => ({
+    ...run, analysis: analysisResponseSchema.parse({ ...run.analysis!, analysis: { ...run.analysis!.analysis, planEvidence } }),
+  });
+  render(<RunPage client={clientWith(withEvidence({ status: 'unavailable', reason: 'the catalog file is missing' }))} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Plan and entries' }));
+  const catalog = (await screen.findByRole('heading', { name: 'The plan context catalog' })).closest('section')!;
+  expect(within(catalog).getByRole('status').textContent).toBe('The element catalog is unavailable: the catalog file is missing.');
+  cleanup();
+
+  const functional = planEvidence().elements.filter(one => one.kind === 'functional');
+  render(<RunPage client={clientWith(withEvidence({ ...planEvidence(), elements: functional, retired: [], findings: [] }))} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Plan and entries' }));
+  const faithful = (await screen.findByRole('heading', { name: 'The plan context catalog' })).closest('section')!;
+  expect(faithful.textContent).toContain(`Catalog ${catalogHash.slice(0, 12)}: 3 elements.`);
+  expect(within(faithful).getByLabelText('Context').textContent).toContain('None.');
+  expect(within(faithful).getByLabelText('Checker findings').textContent).toContain('The checkers found every reading faithful.');
+});
+
+test('an iteration shows the assignment package its engineer received, or why it cannot be rendered', async () => {
+  const text = '# Package\n\n## Functional requirements\n\n- fr-001: A reviewer can attach a note to a review.\n';
+  const iteration = (id: string, extra: Record<string, unknown>) => ({
+    id, kind: 'ordinary', stage: 0, goal: 'Send the note', approach: 'Change the source.',
+    scope: { modules: ['collection-review/workspace/reviews'], includedChildren: [], broad: false, rationale: 'The owner.', extra: [], read: [] },
+    checkpoint: 'iteration', completionEvidence: 'Its tests pass.', authorizations: [], result: null, gates: [], invocations: [], ...extra,
+  });
+  const run: StubRun = {
+    ...stubRun(),
+    workItems: workItemListResponseSchema.parse({ workItems: [workItemSummary], total: 1 }),
+    workItem: {
+      'wi-001': workItemResponseSchema.parse({
+        workItem: workItemSummary,
+        outlines: [],
+        iterations: [
+          iteration('wi-001.i01', { package: { elements: ['fr-001', 'nfr-001'], deviations: ['dv-001'], hash: 'f'.repeat(64), text, unavailable: null } }),
+          iteration('wi-001.i02', { package: { elements: ['fr-001'], deviations: [], hash: '1'.repeat(64), text: null, unavailable: 'the catalog file is missing' } }),
+          iteration('wi-001.i03', { package: null }),
+        ],
+        gates: [], requirements: [], requests: [],
+      }),
+    },
+  };
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Work items' }));
+  fireEvent.click(await screen.findByRole('button', { name: /wi-001/ }));
+  const history = await screen.findByLabelText('Work item wi-001');
+  await within(history).findAllByText(/Assignment package/);
+  const packages = [...history.querySelectorAll('details')].filter(details => details.querySelector('summary')!.textContent!.startsWith('Assignment package'));
+  expect(packages.map(details => details.querySelector('summary')!.textContent)).toEqual([
+    `Assignment package ${'f'.repeat(12)}: fr-001, nfr-001, with dv-001`,
+    `Assignment package ${'1'.repeat(12)}: fr-001`,
+  ]);
+  expect(packages[0]!.querySelector('pre')!.textContent).toBe(text);
+  expect(within(packages[1]!).getByRole('status').textContent).toBe('The package cannot be rendered: the catalog file is missing');
 });
 
 test('at the review stop the run says it waits, and Approve sends approve-analysis with the reviewer and the note', async () => {

@@ -1,11 +1,10 @@
-# Select captured context
+# Select the work item's elements
 
-Read the recorded orientation packet and every applicable catalog entry and
-principle index entry. Record which IDs you examined. Select plausibly
-relevant catalog items by their accepted ID; the harness supplies their
-initial architect excerpts. Select a principle passage from its listed
-captured file by its document ID and a near-verbatim excerpt; one
-principle may contribute several distinct passages. Name unavailable
-material with its reason. State selection reasons, conditions and uncertainty
-without turning advice into a requirement or your judgment into source text.
-Submit with `submit_context_selection`.
+Read every element in the message. Select, by its ID, each one that bears on
+the work this work item asks for in this module, with your reason, the
+conditions under which it applies and your uncertainty. A recommendation is
+selected when it is relevant, like a requirement, and stays a
+recommendation. Omitting an element never waives it: every non-functional
+and fixed element is assessed against the final candidate. You may read a
+captured document to settle a doubt, but answer with IDs only: no passage,
+heading or line range. Submit with `submit_context_selection`.

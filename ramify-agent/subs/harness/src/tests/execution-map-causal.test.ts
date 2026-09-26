@@ -28,7 +28,7 @@ const entries = entryAssignmentsSchema.parse({
   schema: 'ramify-agent.entry-assignments/1', view: { status: 'placeholder' },
   entries: [first, second].map(capability => ({
     capability, description: `The ${capability} entry.`, owner: reviews,
-    requirementRefs: [], acceptanceRefs: [], citations: [],
+    requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [],
   })),
 });
 

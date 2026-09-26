@@ -12,11 +12,11 @@ const description = `The full capability description.\n${'Retain this sentence. 
 const source = ['Scenario: A complete block', '  Given the state is recorded', '  When the work runs', '  Then the whole block remains available'];
 const scenario = scenarioRecordSchema.parse({
   schema: 'ramify-agent.scenario/1', id: 'sc-001', kind: 'entry', entry: 'full-description', owner: reviews,
-  origin: { kind: 'architect', refs: [{ anchor: 'Acceptance' }] }, partOf: null, subScenarios: [],
+  origin: { kind: 'architect', refs: ['fr-002'] }, partOf: null, subScenarios: [],
   name: 'A complete block', source, hash: scenarioSourceHash(source), file: 'subs/reviews/src/tests/features/full.feature',
 });
 const entries = entryAssignmentsSchema.parse({ schema: 'ramify-agent.entry-assignments/1', view: { status: 'placeholder' },
-  entries: [{ capability: 'full-description', description, owner: reviews, requirementRefs: [], acceptanceRefs: [], citations: [] }],
+  entries: [{ capability: 'full-description', description, owner: reviews, requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [] }],
 });
 
 function gate(id: string, status: 'passed' | 'failed', dryRun: boolean, checkpoint: 'iteration' | 'readiness' | 'final' = 'iteration', scenarioId = 'sc-001') {
@@ -60,7 +60,7 @@ function assignment(id: string, workItem: string, revision: number) {
     scope: { revision, base: { module: reviews, includedChildren: [] },
       extra: [{ path: `subs/reviews/src/${id}.ts`, purpose: 'contract' }], read: [], bootstrap: [], rationale: 'Recorded scope.',
       resolved: { roots: [], files: [], view: { status: 'placeholder' } } },
-    requirementRefs: [], externalCapabilities: [], completionEvidence: 'Check it.', evidenceObligations: [],
+    externalCapabilities: [], completionEvidence: 'Check it.', evidenceObligations: [],
     gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: [], subtrees: [], extraSuites: [] } },
     guarded: [], authorizations: [],
   });
@@ -167,7 +167,7 @@ describe('execution core from committed run records', () => {
     const secondEntries = entryAssignmentsSchema.parse({ ...entries, entries: [
       ...entries.entries,
       { capability: 'second-root', description: 'The second full description.', owner: reviews,
-        requirementRefs: [], acceptanceRefs: [], citations: [] },
+        requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [] },
     ] });
     const first = assignment('wi-001.i01', 'wi-001', 1);
     const second = assignment('wi-001.i02', 'wi-001', 2);

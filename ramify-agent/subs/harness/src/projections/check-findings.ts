@@ -377,8 +377,7 @@ function deviationView(basis: Basis, entry: CheckFindingEntry): PlanDeviationVie
   if ('origin' in deviation) return {
     id: deviation.id,
     origin: deviation.origin,
-    passage: { document: deviation.passage.document, quote: deviation.passage.quote,
-      locator: deviation.passage.locator ?? null },
+    element: { id: deviation.element.id, document: deviation.element.document, text: deviation.element.text },
     sourcePath: entry.reports[0]?.source.kind === 'document'
       ? entry.reports[0].source.id.replace(/@sha256:[0-9a-f]{64}$/u, '') : null,
     evidence: [...deviation.evidence],
@@ -393,7 +392,7 @@ function deviationView(basis: Basis, entry: CheckFindingEntry): PlanDeviationVie
     request: deviation.request,
     workItems: [...deviation.workItems],
     plan: deviation.plan.path,
-    requirements: deviation.requirements.map(requirement => ({ startLine: requirement.lines[0], endLine: requirement.lines[1], text: requirement.text })),
+    amends: deviation.amends.map(element => ({ id: element.id, path: element.path, text: element.text })),
     instead: deviation.instead,
     why: deviation.why,
     rejected: deviation.rejected.map(entry => ({ ...entry })),

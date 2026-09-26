@@ -2,7 +2,7 @@ import { architectViewDirectory } from '../../subs/evidence/src/views.js';
 import type { ViewIdentity } from '../interfaces/protocol/evidence.js';
 import type { Hypothesis, RegistryEntry } from '../analysis/records.js';
 import type { PlacementDecision, PlacementRequest } from './records.js';
-import { deviationText, type EnvironmentProblem, type PlanDeviation, type UnresolvedRequest } from '../deviations/records.js';
+import type { EnvironmentProblem, UnresolvedRequest } from '../deviations/records.js';
 
 /*
  * What one fork of the architect context is given: the focused request, the
@@ -85,12 +85,12 @@ export function forkMessage(briefing: ForkBriefing): string {
 /** What one fork of an unresolved request is given, beside the evidence a placement fork has. */
 export interface UnresolvedForkBriefing extends Omit<ForkBriefing, 'request'> {
   readonly request: UnresolvedRequest;
-  /** The work item's goal and the plan lines it was entered for. */
-  readonly workItem: { readonly goal: string; readonly requirements: readonly string[] };
-  /** The captured plan, which a deviation cites by line. */
-  readonly plan: { readonly path: string; readonly text: string };
-  /** Every plan deviation already recorded in this run. */
-  readonly deviations: readonly PlanDeviation[];
+  /** The work item's goal. */
+  readonly workItem: { readonly goal: string };
+  /** The work item's package, rendered with every plan deviation recorded so far; a deviation amends its elements by ID. */
+  readonly package: string;
+  /** How many plan deviations this run has recorded. */
+  readonly deviations: number;
   /** How many deviations the run records before the next one waits for the person. */
   readonly deviationLimit: number;
   /** Every environment problem already reported in this run, with the operator's note where they resumed it. */
@@ -117,24 +117,15 @@ export function unresolvedForkMessage(briefing: UnresolvedForkBriefing): string 
     '',
     `Goal: ${briefing.workItem.goal}`,
     '',
-    ...(briefing.workItem.requirements.length === 0 ? ['Its plan references: none.'] : [`Its plan references: ${briefing.workItem.requirements.join('; ')}.`]),
+    `## The package of ${request.workItem}`,
     '',
-    `## The plan, \`${briefing.plan.path}\`, as this run captured it`,
+    'The elements the work item works from and every plan deviation recorded so far. A deviation names the elements it amends by their IDs; context cannot be amended.',
     '',
-    'Each line carries its number. A deviation cites the lines it departs from by these numbers.',
-    '',
-    '```text',
-    ...briefing.plan.text.split('\n').map((line, index) => `${String(index + 1).padStart(4, ' ')}  ${line}`),
-    '```',
-    '',
-    '## Plan deviations already recorded',
-    '',
+    briefing.package.trimEnd(),
   );
-  if (briefing.deviations.length === 0) lines.push('None.');
-  else for (const deviation of briefing.deviations) lines.push(deviationText(deviation), '');
-  lines.push('', briefing.deviations.length >= briefing.deviationLimit
-    ? `This run has recorded ${briefing.deviations.length} deviations, its limit. A further one is recorded, and the run then waits for the person to accept or reject it before it goes on.`
-    : `This run records at most ${briefing.deviationLimit} deviations before the next one waits for the person; ${briefing.deviations.length} are recorded.`);
+  lines.push('', briefing.deviations >= briefing.deviationLimit
+    ? `This run has recorded ${briefing.deviations} deviations, its limit. A further one is recorded, and the run then waits for the person to accept or reject it before it goes on.`
+    : `This run records at most ${briefing.deviationLimit} deviations before the next one waits for the person; ${briefing.deviations} are recorded.`);
   const reported = briefing.environmentProblems ?? [];
   if (reported.length > 0) {
     lines.push('', '## Environment problems already reported', '');

@@ -433,10 +433,10 @@ describe('a rejected submission in a run', () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     await installTestRunner(fixture.root);
-      const submitted = analysis([entry('reviewer-note', reviews)]);
+    const submitted = analysis([entry('reviewer-note', reviews)]);
     const { service, agent } = await openRuns(fixture.root, {
       unchangedCheckpoints,
-      script: (spec: SessionSpec) => (spec.role === 'initial-architect'
+      script: (spec: SessionSpec) => (spec.role === 'catalog-extractor' ? [] : spec.role === 'initial-architect'
         ? [{ kind: 'submit' as const, input: submitted }]
         : inputs.map(input => ({ kind: 'submit' as const, input }))),
     });
@@ -470,6 +470,22 @@ describe('a rejected submission in a run', () => {
       .filter(line => line.type === 'rejection');
     expect(rejections).toHaveLength(1);
     expect(rejections[0]!.data.target).toBe(localArchitectToolName);
+  }, 300_000);
+
+  test('an assignment citing an ID outside its work-item package is rejected at submission, with the path of the ID', async () => {
+    // The trial's sentence-as-heading citation, and an element of the catalog outside this work item's package.
+    const outside = assign(reviews, { citedElements: ['fr-001', 'Every note is kept', 'nfr-009'] }, outline());
+    const { service, agent } = await run([outside, requestCompletion()],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"']);
+
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    expect(local.verdicts[0]).toMatchObject({ accepted: false });
+    const answer = JSON.parse((local.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string }> };
+    expect(answer.errors.map(error => error.path)).toEqual(['assignment.citedElements.1', 'assignment.citedElements.2']);
+    expect(answer.errors[0]!.message).toBe('"Every note is kept" is not an element of this work item\'s package');
+    expect(local.verdicts[1]).toEqual({ accepted: true });
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    expect(agent!.sessions.some(session => session.spec.role === 'engineer')).toBe(false);
   }, 300_000);
 
   test('a rule the schema cannot hold is answered the same way, and the bound ends the invocation', async () => {

@@ -1,13 +1,12 @@
-import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { copyFixture } from './helpers/fixture.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
-import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { coordinatorAssessmentToolName, coordinatorActionToolName, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
-import { withPlan13Fixture } from './helpers/declarations.js';
+import { intakeToolName } from '../analysis/extraction.js';
+import { withDefaultTurns } from './helpers/declarations.js';
 import { analysis } from './helpers/analysis.js';
 import { submit, treeInputs, write } from './helpers/iterations.js';
 import { createAuditCheckExecution } from '../../subs/audit/src/check-execution.js';
@@ -76,19 +75,17 @@ for (const boundary of ['gate-attempted', 'gate-committing', 'gate-committed'] a
   }, 60_000);
 }
 
+/** An intake that reads the obligation as the plan's one non-functional requirement. */
+function intake(obligation: string) {
+  return { goal: 'Keep an audit record of reviews.', elements: [
+    { key: 'audit', kind: 'non-functional', document: 'doc-001', text: obligation, conditions: [], uncertainty: '' },
+  ], incorporation: { documents: [{ document: 'doc-001', scenarios: true, uncertainty: '' }], missing: [] } };
+}
+
 function repairAgent(root: string, obligation: string) {
-  return createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') {
-      const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-      if (!captured) throw new Error('Captured plan is missing');
-      const directory = dirname(dirname(captured));
-      const document = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents[0]!;
-      const bytes = readFileSync(join(directory, document.storedAt));
-      const start = bytes.indexOf(Buffer.from(obligation));
-      return submit({ ...analysis([]), catalog: [{ classification: 'non-functional-requirement',
-        passage: { document: document.id, sha256: document.sha256, start, end: start + Buffer.byteLength(obligation), quote: obligation },
-        conditions: [], uncertainty: '' }] });
-    }
+  return createScriptedAgent(withDefaultTurns(spec => {
+    if (spec.submission.name === intakeToolName) return submit(intake(obligation));
+    if (spec.role === 'initial-architect') return submit(analysis([]));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [{
       nfr: 'nfr-001', result: spec.prompt.includes('(after-repair)') ? 'satisfied' : 'not-satisfied',
       inspectedScope: ['subs/workspace/subs/reviews/subs/core/src'], evidence: ['Current source inspected'], uncertainty: '',
@@ -162,18 +159,9 @@ for (const { boundary, ...variant } of repairCrashes) {
 }
 
 function exhaustedAgent(obligation: string) {
-  return createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') {
-      const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-      if (!captured) throw new Error('Captured plan is missing');
-      const directory = dirname(dirname(captured));
-      const document = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents[0]!;
-      const bytes = readFileSync(join(directory, document.storedAt));
-      const start = bytes.indexOf(Buffer.from(obligation));
-      return submit({ ...analysis([]), catalog: [{ classification: 'non-functional-requirement',
-        passage: { document: document.id, sha256: document.sha256, start, end: start + Buffer.byteLength(obligation), quote: obligation },
-        conditions: [], uncertainty: '' }] });
-    }
+  return createScriptedAgent(withDefaultTurns(spec => {
+    if (spec.submission.name === intakeToolName) return submit(intake(obligation));
+    if (spec.role === 'initial-architect') return submit(analysis([]));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [{
       nfr: 'nfr-001', result: 'not-satisfied', inspectedScope: ['src/'], evidence: ['Audit record absent'], uncertainty: '',
     }] });

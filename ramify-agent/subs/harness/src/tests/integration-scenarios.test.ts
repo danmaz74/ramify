@@ -99,10 +99,9 @@ describe('the integration work item', () => {
     expect(creating.map(line => [line.event.type, (line.event.data as { scenario?: string }).scenario])).toEqual([['scenario-implemented', 'sc-002']]);
     const tagIterationGate = attempts.find(attempt => attempt.subject.iteration === 'wi-002.i01')!;
     expect(creating[0]!.event.data).toEqual({ scenario: 'sc-002', gate: tagIterationGate.id });
-    // At the ancestor, with the scenario's ID in place of an entry and the plan's lines as its acceptance.
+    // At the ancestor, with the scenario's ID in place of an entry; its scenario is its acceptance, and it cites no element.
     const item = creating[0]!.records.find(record => record.path === 'work-items/wi-003/item.json')!.body as WorkItem;
-    expect(item).toMatchObject({ id: 'wi-003', module: reviews, origin: { integration: 'sc-003' }, requirementRefs: [], startedFor: null });
-    expect(item.acceptanceRefs).toHaveLength(1);
+    expect(item).toMatchObject({ id: 'wi-003', module: reviews, origin: { integration: 'sc-003' }, requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: null });
 
     // Queueing: the item that implemented the last sub-scenario completed
     // first; the integration work item started after it, with its origin.
@@ -268,7 +267,7 @@ describe('the rules, over literal records', () => {
     expect(dueIntegrations(records, states('declared'), [])).toEqual([]);
     expect(dueIntegrations(records, states('implemented'), []).map(record => record.id)).toEqual(['sc-004']);
     const item = integrationWorkItem(records[3]!, 3);
-    expect(item).toMatchObject({ id: 'wi-004', module: reviews, origin: { integration: 'sc-004' }, acceptanceRefs: [{ lines: [12, 17] }], startedFor: null });
+    expect(item).toMatchObject({ id: 'wi-004', module: reviews, origin: { integration: 'sc-004' }, requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: null });
     expect(dueIntegrations(records, states('implemented'), [item])).toEqual([]);
   });
 

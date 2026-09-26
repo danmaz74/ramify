@@ -87,7 +87,7 @@ export function forkDeviation(extra: Partial<Extract<ForkSubmission, { kind: 'de
   return {
     kind: 'deviation',
     deviation: {
-      requirements: [{ lines: [11, 12] }],
+      amends: ['fr-001'],
       instead: 'Serve the comparison through the tRPC query `catalog.compare` only; the MCP tool is not built.',
       why: 'No module of the project serves MCP, and adding a protocol surface is beyond this plan.',
       rejected: [{ alternative: 'Create an MCP module under the workspace', reason: 'It would be a new protocol surface no requirement of the plan describes.' }],

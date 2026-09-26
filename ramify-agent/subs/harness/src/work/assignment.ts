@@ -2,7 +2,6 @@ import { posix, sep } from 'node:path';
 import { z } from 'zod';
 import { findModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
-import { planRefSchema } from '../run/records.js';
 import type { SubmissionError } from '../run/submissions.js';
 import { slugSchema, type RegistryEntry } from '../analysis/records.js';
 import { assignedBoundsSchema, extraPurposeSchema, type AssignedBounds } from './iterations.js';
@@ -12,7 +11,6 @@ import { assignedScenarioErrors, type DeclarationContext } from './declarations.
 import type { IntegrationScope } from './integration.js';
 import type { OutlineBody } from './submission.js';
 import type { EngineerBounds } from '../run/policy.js';
-import type { ContextSelection } from '../context-selection/contracts.js';
 
 /*
  * The assignment a local architect submits, and the rules the schema cannot
@@ -108,9 +106,12 @@ export const assignmentBodySchema = z.object({
   goal: text,
   approach: text,
   scope: scopeBodySchema,
-  requirementRefs: z.array(planRefSchema),
-  /** Selected source IDs this iteration uses; the harness binds their passages separately. */
-  citedItems: z.array(text).optional(),
+  /**
+   * The elements of the work item's package this iteration must honor, by
+   * ID: its engineer, contract engineer and reviewers receive exactly these,
+   * with the plan deviations recorded so far.
+   */
+  citedElements: z.array(text),
   externalCapabilities: z.array(z.object({
     capability: slugSchema,
     owner: modulePathSchema,
@@ -171,8 +172,8 @@ export interface AssignmentEvidence {
   readonly scenarios?: DeclarationContext | undefined;
   /** The policy's engineer bounds and their ceilings, which `bounds` is judged against. */
   readonly bounds?: { readonly defaults: EngineerBounds; readonly ceilings: EngineerBounds } | undefined;
-  /** A verified selection for new runs; absent for legacy assignments. */
-  readonly selection?: ContextSelection | undefined;
+  /** The element IDs of the work item's package, which `citedElements` is judged against; absent where the run has none. */
+  readonly package?: ReadonlySet<string> | undefined;
 }
 
 /** The registry entry that authorizes creating `module`, or undefined when none does. */
@@ -192,25 +193,18 @@ export function creationAuthority(
  */
 export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvidence): SubmissionError[] {
   const errors: SubmissionError[] = [];
-  if (evidence.selection !== undefined) {
-    if (body.citedItems === undefined) errors.push({
-      path: 'assignment.citedItems', message: 'This assignment must explicitly cite selected source IDs, even when none applies',
-      expected: 'an explicit array of selected IDs',
+  const cited = new Set<string>();
+  body.citedElements.forEach((id, position) => {
+    if (evidence.package !== undefined && !evidence.package.has(id)) errors.push({
+      path: `assignment.citedElements.${position}`, message: `"${id}" is not an element of this work item's package`,
+      expected: 'an element ID of the work-item package',
     });
-    const selected = new Set(evidence.selection.selected.map(entry => entry.item));
-    const cited = new Set<string>();
-    body.citedItems?.forEach((id, position) => {
-      if (!selected.has(id)) errors.push({
-        path: `assignment.citedItems.${position}`, message: `"${id}" was not selected for this work item`,
-        expected: 'an ID in the accepted context selection',
-      });
-      if (cited.has(id)) errors.push({
-        path: `assignment.citedItems.${position}`, message: `"${id}" is cited more than once`,
-        expected: 'each selected ID at most once',
-      });
-      cited.add(id);
+    if (cited.has(id)) errors.push({
+      path: `assignment.citedElements.${position}`, message: `"${id}" is cited more than once`,
+      expected: 'each element at most once',
     });
-  }
+    cited.add(id);
+  });
   const index = evidence.index;
   const base = body.scope.base;
   const narrow = 'module' in base ? base : null;

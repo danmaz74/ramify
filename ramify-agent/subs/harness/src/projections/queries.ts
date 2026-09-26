@@ -121,7 +121,7 @@ export class RunQueries {
   }
 
   async workItem(planId: string, runId: string, workItem: string): Promise<WorkItemResponse> {
-    return workItemOf(await this.view(planId, runId), workItem);
+    return await workItemOf(await this.view(planId, runId), workItem);
   }
 
   async capabilities(planId: string, runId: string): Promise<CapabilityListResponse> {

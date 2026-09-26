@@ -84,7 +84,7 @@ export type ReconciliationBasis = z.infer<typeof reconciliationBasisSchema>;
 
 /** A document a user decision cites, and its exact conflicting text. The harness binds its revision. */
 const citedConflictSchema = z.object({
-  /** `plan` for the run's captured plan, or a path of a file in the basis source. */
+  /** An element ID of the run's catalog, such as `fr-002`, or a path of a file in the basis source. */
   document: reference,
   text: prose,
 }).strict();
@@ -402,7 +402,7 @@ export async function validateReconciliation(input: unknown, context: Reconcilia
       const document = await context.document(conflict.document);
       const where = `dispositions.${index}.action.conflicts.${position}`;
       if (document === null) {
-        errors.push({ path: `${where}.document`, message: `"${conflict.document}" is neither the plan nor a file of the source this reconciliation assesses`, expected: '"plan" or a path of the source' });
+        errors.push({ path: `${where}.document`, message: `"${conflict.document}" is neither an element of the run's catalog nor a file of the source this reconciliation assesses`, expected: 'an element ID or a path of the source' });
       } else if (!document.text.includes(conflict.text)) {
         errors.push({ path: `${where}.text`, message: `The text is not in "${conflict.document}" as it stands at ${document.revision}; cite the conflicting text exactly`, expected: 'text copied verbatim from the document' });
       } else {

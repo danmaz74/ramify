@@ -1,0 +1,8 @@
+=== tsconfig.json
+exit=0
+=== tsconfig.portable.json
+exit=0
+=== tsconfig.scripts.json
+exit=0
+=== scripts/reference-harness/tsconfig.json
+exit=0

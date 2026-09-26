@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { PlanScenario } from './extraction.js';
-import { anchorOf } from './extraction.js';
 import { comparableSteps, dedent, normalizedText, parseGherkin, scenariosOf, sourceLines, stepKey, stepsOfSource, type ComparableStep } from './gherkin.js';
 
 /*
@@ -12,13 +11,13 @@ import { comparableSteps, dedent, normalizedText, parseGherkin, scenariosOf, sou
  * names as an argument, since this module never reads the view.
  */
 
-/** A plan reference: a heading anchor, a line range, or both. The harness's own schema has the same shape. */
-export const scenarioPlanRefSchema = z.object({
-  document: z.string().regex(/^doc-\d{3,}$/).optional(),
-  anchor: z.string().min(1).optional(),
-  lines: z.tuple([z.int().nonnegative(), z.int().nonnegative()]).optional(),
-}).strict();
-export type ScenarioPlanRef = z.infer<typeof scenarioPlanRefSchema>;
+/**
+ * An element citation: a key of the citing submission, or an element ID
+ * once the harness accepted it. The rules compare citations as they are
+ * given, so an entry and its scenarios cite in the same terms.
+ */
+export const scenarioElementRefSchema = z.string().min(1);
+export type ScenarioElementRef = z.infer<typeof scenarioElementRefSchema>;
 
 const planScenarioIdSchema = z.string().regex(/^ps-\d{2,}$/, 'A plan scenario ID, such as "ps-01"');
 
@@ -37,8 +36,8 @@ export const scenarioSubmissionSchema = z.object({
   origin: scenarioOriginSubmissionSchema,
   /** The plan scenario this one was derived from, for a sub-scenario the architect wrote. */
   partOf: planScenarioIdSchema.optional(),
-  /** The plan references an architect scenario cites. */
-  refs: z.array(scenarioPlanRefSchema).optional(),
+  /** The acceptance elements this scenario verifies. */
+  refs: z.array(scenarioElementRefSchema).optional(),
   /** One `Scenario` or `Scenario Outline` block, without tags. */
   gherkin: z.string().min(1),
 }).strict();
@@ -62,7 +61,7 @@ export type ScenarioFormSubmission = z.infer<typeof scenarioFormSubmissionSchema
 /** What the rules read of a submitted entry. */
 export interface ScenarioFormEntry {
   readonly capability: string;
-  readonly acceptanceRefs: readonly ScenarioPlanRef[];
+  readonly acceptanceRefs: readonly ScenarioElementRef[];
 }
 
 /** The exported symbols and file paths the architect view records, for the first warning. */
@@ -81,7 +80,7 @@ export const scenarioFormRules: Readonly<Record<ScenarioFormRule, string>> = {
   3: 'every plan scenario exactly once',
   4: 'every entry has a scenario',
   5: 'integration steps verbatim',
-  6: 'every acceptance reference cited',
+  6: 'every acceptance element cited',
 };
 
 export type ScenarioWarningKind =
@@ -103,7 +102,7 @@ export interface FormScenario {
   readonly key: string;
   readonly entry: string;
   readonly origin: { readonly kind: 'plan'; readonly planScenario: string; readonly lines: readonly [number, number]; readonly document?: string }
-    | { readonly kind: 'architect'; readonly refs: readonly ScenarioPlanRef[] };
+    | { readonly kind: 'architect'; readonly refs: readonly ScenarioElementRef[] };
   /** The plan scenario of the integration scenario this one is a sub-scenario of, or `null`. */
   readonly partOf: string | null;
   readonly name: string;
@@ -250,12 +249,12 @@ export function validateScenarioForm(
     }
   }
 
-  // Rule 6: every acceptance reference of an entry is cited by one of its scenarios.
+  // Rule 6: every acceptance element of an entry is cited by one of its scenarios.
   for (const [position, entry] of entries.entries()) {
-    const citing = (byEntry.get(entry.capability) ?? []).flatMap((index) => citationsOf(submission.scenarios[index]!, subOf, plan));
+    const citing = new Set((byEntry.get(entry.capability) ?? []).flatMap((index) => submission.scenarios[index]!.refs ?? []));
     for (const [refIndex, ref] of entry.acceptanceRefs.entries()) {
-      if (!citing.some((location) => cites(location, ref))) {
-        return reject(6, `entries.${position}.acceptanceRefs.${refIndex}`, `the acceptance reference ${describeRef(ref)} of "${entry.capability}" is cited by none of its scenarios; cite it through a plan scenario or an architect scenario's refs`);
+      if (!citing.has(ref)) {
+        return reject(6, `entries.${position}.acceptanceRefs.${refIndex}`, `the acceptance element ${ref} of "${entry.capability}" is cited by none of its scenarios; cite it in the refs of one of them`);
       }
     }
   }
@@ -307,45 +306,6 @@ function parseOneScenario(gherkin: string): { ok: true; scenario: ParsedScenario
   const { scenarios } = scenariosOf(parsed.document);
   const source = sourceLines(lines, scenario.location.line, scenarios[0]!.nextStart, parsed.document).lines;
   return { ok: true, scenario: { name: scenario.name, source: dedent(source), steps: comparableSteps(scenario.steps) } };
-}
-
-/** A place a scenario cites: plan lines with the anchors they sit under, or an explicit reference. */
-interface CitedLocation {
-  readonly document?: string | undefined;
-  readonly lines?: readonly [number, number] | undefined;
-  readonly anchors: readonly string[];
-}
-
-function citationsOf(scenario: ScenarioSubmission, subOf: ReadonlyMap<string, string>, plan: ReadonlyMap<string, PlanScenario>): CitedLocation[] {
-  const locations: CitedLocation[] = [];
-  const planScenarios = [scenario.origin.kind === 'plan' ? scenario.origin.planScenario : undefined, subOf.get(scenario.key)];
-  for (const id of planScenarios) {
-    const extracted = id === undefined ? undefined : plan.get(id);
-    if (extracted) locations.push({ document: extracted.document, lines: extracted.lines, anchors: extracted.anchors });
-  }
-  for (const ref of scenario.refs ?? []) {
-    locations.push({ document: ref.document, lines: ref.lines, anchors: ref.anchor === undefined ? [] : [normalizedAnchor(ref.anchor)] });
-  }
-  return locations;
-}
-
-/** A reference with lines is cited by overlapping lines; one with only an anchor, by that anchor; an empty one, by any scenario. */
-function cites(location: CitedLocation, ref: ScenarioPlanRef): boolean {
-  if ((location.document ?? 'doc-001') !== (ref.document ?? 'doc-001')) return false;
-  if (ref.lines && location.lines) {
-    return location.lines[0] <= ref.lines[1] && ref.lines[0] <= location.lines[1];
-  }
-  if (ref.anchor !== undefined) return location.anchors.includes(normalizedAnchor(ref.anchor));
-  return ref.lines === undefined;
-}
-
-function normalizedAnchor(anchor: string): string {
-  return anchorOf(anchor.replace(/^#/, ''));
-}
-
-function describeRef(ref: ScenarioPlanRef): string {
-  const parts = [ref.document, ref.anchor === undefined ? null : `#${ref.anchor}`, ref.lines ? `lines ${ref.lines[0]}–${ref.lines[1]}` : null];
-  return parts.filter((part) => part !== null).join(', ') || '{}';
 }
 
 function warningsOf(

@@ -1,17 +1,21 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptedAgent, ScriptStep } from '../../subs/agent/src/scripted.js';
 import { reviewLayout, type ReviewRequest } from '../reviews/records.js';
 import { snapshotToolNames } from '../reviews/snapshot.js';
 import { runLayout, runRecordSchema } from '../run/records.js';
-import { readCapturedDocuments } from '../run/document-inputs.js';
-import { resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
+import type { RunEvent } from '../run/log.js';
+import { createPackage } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import { readAcceptedEvidence } from '../analysis/evidence.js';
+import { iterationAssignmentSchema, iterationLayout } from '../work/iterations.js';
 import type { ScriptedCommit } from './helpers/candidates.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
-import { completionProposed, submit, write } from './helpers/iterations.js';
+import { assign, completionProposed, outline, submit, write } from './helpers/iterations.js';
+import { requestCompletion } from './helpers/analysis.js';
 import {
-  attemptRecord, candidates, eventsOf, limit, notesDirectory, plan, reviewRun, reviewTarget, store, tool,
+  attemptRecord, candidates, eventsOf, limit, notes, notesDirectory, plan, reviewRun, reviewTarget, store, tool,
 } from './helpers/reviews.js';
 import { onlyRun, runPath } from './helpers/runs.js';
 
@@ -84,6 +88,27 @@ function cleanReviewers(): Record<string, readonly ScriptStep[]> {
 }
 const orient = (read: readonly string[]): ScriptStep[] => [{ kind: 'submit', input: { read: [...read], summary: 'Stores stay in memory, and a module keeps to its README\'s responsibility.' } }];
 
+/** The three assignments, each citing elements of the work-item package, and the completion request. */
+const citingArchitect: ReadonlyArray<readonly ScriptStep[]> = [
+  submit(assign(notes, { goal: 'Add the note store.', citedElements: ['fr-001', 'fr-002'] }, outline())),
+  submit(assign(notes, { goal: 'State the note limit.', citedElements: ['fr-001'] })),
+  submit(assign(notes, { goal: 'Export the store.', citedElements: ['fr-002'] })),
+  submit(requestCompletion()),
+];
+
+/** Iteration `n`'s assignment and its package, rendered again from the record and the frozen catalog alone. */
+async function assignmentPackage(root: string, runId: string, events: readonly RunEvent[], n: number) {
+  const directory = runPath(root, plan, runId, '');
+  const run = runRecordSchema.parse(JSON.parse(await readFile(runPath(root, plan, runId, runLayout.record), 'utf8')));
+  const evidence = await readAcceptedEvidence(directory, run, events);
+  if (evidence.status !== 'available') throw new Error(evidence.reason);
+  const assignment = iterationAssignmentSchema.parse(JSON.parse(await readFile(join(directory, iterationLayout.assignment('wi-001', n)), 'utf8')));
+  const rendered = createPackage({ catalog: evidence.catalog, planDeviations: [], elements: assignment.source!.elements, deviations: assignment.source!.deviations });
+  if ('unavailable' in rendered) throw new Error('The assignment package does not render');
+  expect(rendered.hash).toBe(assignment.source!.hash);
+  return { source: assignment.source!, text: rendered.text };
+}
+
 async function requestRecord(root: string, runId: string, id: string): Promise<ReviewRequest> {
   return JSON.parse(await readFile(runPath(root, plan, runId, reviewLayout.request(id)), 'utf8')) as ReviewRequest;
 }
@@ -105,6 +130,7 @@ describe('three questions over one candidate', () => {
       commits: guidedCommits(),
       policy: { kinds: ['code', 'scope', 'design'], concurrency: 2 },
       agentReady: scripted => { agent = scripted; },
+      architect: citingArchitect,
       engineer: engineers(laterTurn),
       reviewers: {
         ...cleanReviewers(),
@@ -130,21 +156,16 @@ describe('three questions over one candidate', () => {
         expect({ ...other.key, kind: 'code' }).toEqual(code.key);
         expect([other.tree, other.gate, other.base, other.assignment]).toEqual([code.tree, code.gate, code.base, code.assignment]);
       }
-      // Distinct questions with their own inputs and starting points.
-      expect(code).toMatchObject({ requirements: [], guidance: [], forkPoint: { kind: 'none' } });
-      expect(scope.guidance).toEqual([]);
-      expect(design.requirements).toEqual([]);
+      // Distinct questions with their own inputs and starting points: code and scope cite the
+      // assignment's package, scope with the deviations recorded when it was requested (none here).
+      const assignment = await assignmentPackage(root, runId, events, iteration + 1);
+      expect(code).toMatchObject({ source: assignment.source, guidance: [], forkPoint: { kind: 'none' } });
+      expect(scope).toMatchObject({ source: assignment.source, guidance: [] });
+      expect(design.source).toBeUndefined();
+      for (const record of [code, scope, design]) expect(record).not.toHaveProperty('requirements');
     }
-
-    // Scope binds the plan section its assignment cites, by the hash of its text.
-    const runRecord = runRecordSchema.parse(JSON.parse(await readFile(runPath(root, plan, runId, runLayout.record), 'utf8')));
-    const captured = await readCapturedDocuments(runPath(root, plan, runId, ''), runRecord.manifest);
-    const section = resolvePlanReference(captured.manifest, captured.bytes, { anchor: 'Request' });
-    expect(section.status).toBe('available');
-    if (section.status !== 'available') return;
-    expect(records[1]!.requirements[0]).toEqual({ ref: 'plan#request', hash: hash(section.text) });
-    expect(records[1]!.requirements[1]).toMatchObject({ ref: 'assignment-source:wi-001.i01', hash: expect.stringMatching(/^[0-9a-f]{64}$/u) });
-    expect(records[1]!.source).toMatchObject({ packageHash: expect.stringMatching(/^[0-9a-f]{64}$/u), deliveryHash: records[1]!.requirements[1]!.hash });
+    expect(records[1]!.source).toMatchObject({ elements: ['fr-001', 'fr-002'], deviations: [] });
+    expect(records[4]!.source).toMatchObject({ elements: ['fr-001'], deviations: [] });
 
     // Scope forks the architect's point captured atomically with its assignment.
     const assigned = eventsOf(events, 'iteration-assigned');
@@ -183,12 +204,28 @@ describe('three questions over one candidate', () => {
     }
     // The second scope review started after the architect's later turn, and
     // sees the assignment point without it; the third assignment came after it.
-    expect(sessionOf('rq-0005').inherited).toHaveLength(1);
-    expect(sessionOf('rq-0005').inherited[0]).toContain('# Captured context for work item wi-001');
-    expect(sessionOf('rq-0008').inherited).toContain('LATER ARCHITECT TURN');
-    // The scope reviewer is given the question's procedure and the plan's text either way.
+    // The architect's point holds the work-item package once, as its append.
+    const selection = eventsOf(events, 'context-selection-recorded')[0]!;
+    const whole = await assignmentPackage(root, runId, events, 1);
+    expect(whole.source.hash).toBe(selection.data.packageHash);
+    expect(sessionOf('rq-0005').inherited).toEqual([whole.text]);
+    expect(sessionOf('rq-0008').inherited).toEqual([whole.text, 'LATER ARCHITECT TURN']);
+    // The scope reviewer is given the question's procedure and the assignment's package either way.
     expect(sessionOf('rq-0005').spec.systemPrompt).toContain('Ask of the candidate as a whole: does it do what the assignment asked');
-    expect(sessionOf('rq-0005').spec.prompt).toContain('A reviewer can attach one note of at most 500 characters');
+
+    // EP09: engineer, code reviewer and scope reviewer receive the identical assignment package, byte for byte.
+    const engineerSessions = agent.sessions.filter(session => session.spec.role === 'engineer');
+    expect(engineerSessions).toHaveLength(3);
+    for (const [iteration, code, scope] of [[1, 'rq-0001', 'rq-0002'], [2, 'rq-0004', 'rq-0005'], [3, 'rq-0007', 'rq-0008']] as const) {
+      const { text } = await assignmentPackage(root, runId, events, iteration);
+      expect(engineerSessions[iteration - 1]!.spec.prompt).toContain(`\n\n${text.trimEnd()}\n`);
+      expect(sessionOf(code).spec.prompt).toContain(`## What the plan asks of it\n\nThe elements the assignment cites, whole, as its engineer received them.\n\n${text.trimEnd()}\n`);
+      expect(sessionOf(scope).spec.prompt).toContain(`## What the plan asks of it\n\nThe elements the assignment cites, whole.`);
+      expect(sessionOf(scope).spec.prompt).toContain(`\n\n${text.trimEnd()}\n`);
+      expect(sessionOf(iteration === 1 ? 'rq-0003' : iteration === 2 ? 'rq-0006' : 'rq-0009').spec.prompt).not.toContain(text.trimEnd());
+    }
+    expect(sessionOf('rq-0005').spec.prompt).toContain('> The plan asks for review-notes-request.');
+    expect(sessionOf('rq-0005').spec.prompt).not.toContain('review-notes-acceptance');
 
     // Design binds its guidance from the candidate; the first two candidates
     // share a selection and so an orientation, and the rewritten README is
@@ -246,6 +283,7 @@ describe('a missing or degraded fork starts fresh', () => {
       policy: { kinds: ['scope', 'design'], concurrency: 1 },
       agentOptions: { support: { fork: { available: false, reason: 'This executor cannot fork' } } },
       agentReady: scripted => { agent = scripted; },
+      architect: citingArchitect,
       engineer: engineers(),
       reviewers: {
         // A fresh design reviewer reads its guidance through the snapshot.
@@ -279,9 +317,10 @@ describe('a missing or degraded fork starts fresh', () => {
     const degraded = eventsOf(events, 'invocation-ended').filter(event => event.data.degraded !== undefined && reviewerInvocations.has(event.data.invocation));
     expect(degraded).toHaveLength(6);
     expect(degraded.every(event => event.data.degraded!.requested === 'fork' && event.data.degraded!.actual === 'fresh')).toBe(true);
-    // The fresh scope reviewer still has the whole question: the assignment and the plan's text.
+    // The fresh scope reviewer still has the whole question, with the package alone: the assignment and its elements.
     const scope = reviewers.find(session => session.spec.prompt.startsWith('Scope review rq-0001 '))!;
-    expect(scope.spec.prompt).toContain('A reviewer can attach one note of at most 500 characters');
+    expect(scope.spec.prompt).toContain((await assignmentPackage(root, runId, events, 1)).text.trimEnd());
+    expect(scope.spec.prompt).not.toContain('input/documents');
     expect(scope.spec.prompt).toContain('Goal: Add the note store.');
     // The fresh design reviewer read the guidance from the candidate itself.
     const design = reviewers.find(session => session.spec.prompt.startsWith('Design review rq-0002 '))!;

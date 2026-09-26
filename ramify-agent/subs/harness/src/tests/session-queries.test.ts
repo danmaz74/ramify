@@ -161,13 +161,16 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
       });
       expect(views.get(session.id)!.invocations.map(invocation => invocation.invocation)).toEqual(session.invocations);
     }
-    expect(views.get('ses-0001')!.reaches).toEqual({ kind: 'run' });
+    // The analysis's intake and the initial architect both reach the run;
+    // the architect context is the initial architect's session.
+    expect(views.get('ses-0001')).toMatchObject({ role: 'catalog-extractor', reaches: { kind: 'run' } });
+    expect(views.get('ses-0002')).toMatchObject({ role: 'initial-architect', reaches: { kind: 'run' } });
     const fork = [...views.values()].find(view => view.role === 'global-fork')!;
     expect(fork.reaches).toEqual({ kind: 'request', request: fork.work.request, workItem: 'wi-001', capability: 'review-notes' });
-    expect(views.get('ses-0001')!.lineage.forks).toEqual([fork.session]);
+    expect(views.get('ses-0002')!.lineage.forks).toEqual([fork.session]);
     // The brief appended back to the architect context is a mark with its point.
     const appended = events.find(event => event.type === 'brief-appended')!;
-    expect(views.get('ses-0001')!.appends).toEqual([expect.objectContaining({ appended: { sequence: appended.sequence, at: appended.at }, point: { session: 'ses-0001', append: appended.sequence } })]);
+    expect(views.get('ses-0002')!.appends).toEqual([expect.objectContaining({ appended: { sequence: appended.sequence, at: appended.at }, point: { session: 'ses-0002', append: appended.sequence } })]);
     const architect = [...views.values()].find(view => view.role === 'local-architect')!;
     expect(architect.reaches).toEqual({ kind: 'work-item', workItem: 'wi-001', capability: 'review-notes', module: notes });
     // A continued architect was suspended between its invocations, each gap
@@ -210,7 +213,7 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
     expect(await refused(origin, `${protocolPaths.runSessionTranscript(plan, runId, 'ses-0001', 0).replace('after=0', 'after=-1')}`)).toEqual([400, 'invalid-request']);
 
     // A stored body by its hash: the system prompt every architect shares.
-    const started = (await readTranscript(scenario.path(runLayout.transcript('ses-0001')))).entries[0]!;
+    const started = (await readTranscript(scenario.path(runLayout.transcript('ses-0002')))).entries[0]!;
     expect(started.type).toBe('started');
     const prompt = (started as Extract<TranscriptEntry, { type: 'started' }>).systemPrompt;
     expect(prompt.stored).toBe('blob');

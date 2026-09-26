@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { passageReferenceSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { candidateSchema } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 
 const text = z.string().min(1);
 
 export const deviationOriginSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('work-item-conflict'), request: text, workItem: text, architectInvocation: text }).strict(),
-  z.object({ kind: z.literal('nonfunctional-assessment'), nfr: z.string().regex(/^nfr-\d{3,}$/), assessment: text, candidate: candidateSchema, coordinatorInvocation: text }).strict(),
+  z.object({ kind: z.literal('nonfunctional-assessment'), nfr: z.string().regex(/^(nfr|fix)-\d{3,}$/), assessment: text, candidate: candidateSchema, coordinatorInvocation: text }).strict(),
 ]);
 
 export const preparedCandidateSchema = z.object({
@@ -20,7 +20,7 @@ export const preparedCandidateSchema = z.object({
 export const nonfunctionalRepairAssignmentSchema = z.object({
   schema: z.literal('ramify-agent.nonfunctional-repair-assignment/1'),
   id: text, round: z.int().positive().max(3), assessment: text, candidate: text,
-  nfrs: z.array(z.string().regex(/^nfr-\d{3,}$/)).min(1),
+  nfrs: z.array(z.string().regex(/^(nfr|fix)-\d{3,}$/)).min(1),
   startingModule: text, task: text, evidence: z.array(text), uncertainty: z.string(),
 }).strict();
 export type NonfunctionalRepairAssignment = z.infer<typeof nonfunctionalRepairAssignmentSchema>;
@@ -40,7 +40,8 @@ export const nonfunctionalDeviationSchema = z.object({
   schema: z.literal('ramify-agent.nonfunctional-deviation/1'),
   id: text,
   origin: z.object({ kind: z.literal('nonfunctional-assessment'), nfr: text, assessment: text, candidate: candidateSchema, coordinatorInvocation: text }).strict(),
-  passage: passageReferenceSchema,
+  /** The requirement as the frozen catalog holds it. */
+  element: z.object({ id: elementIdSchema, document: text, text }).strict(),
   evidence: z.array(text),
   uncertainty: z.string(),
   proposedAlternative: z.string(),

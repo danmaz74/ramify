@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { checkFindingIdSchema, checkFindingLocationSchema, checkFindingRiskSchema } from '../../subs/check-findings/src/interfaces/check-findings.js';
 import { sha256Schema } from '../interfaces/protocol/evidence.js';
 import { reviewKindSchema, reviewPolicyVersion, sessionIdSchema } from '../run/records.js';
+import { packageCitationSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 
 /*
  * The durable records of iteration reviews (Plan 12 appendix §3). A request
@@ -68,11 +69,14 @@ export const reviewRequestSchema = z.object({
   gate: text,
   /** The candidate's tree, as Git names it. */
   tree: text,
-  requirements: z.array(hashedRefSchema),
-  /** A source read that failed while the request was recorded is never an empty requirement set. */
+  /** An input that failed while the request was recorded is never an empty package. */
   inputsUnavailable: text.optional(),
-  /** The full recorded selection and the assignment-cited briefing hashes. */
-  source: z.object({ selection: text, packageHash: sha256Schema, deliveryHash: sha256Schema }).strict().optional(),
+  /**
+   * Code and scope: the package the reviewer receives, the assignment's
+   * elements with, for scope, the plan deviations recorded when the request
+   * was; absent where the assignment cites none.
+   */
+  source: packageCitationSchema.optional(),
   guidance: z.array(hashedRefSchema),
   forkPoint: forkPointSchema,
 }).strict();

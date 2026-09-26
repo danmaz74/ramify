@@ -1,10 +1,9 @@
 ramify 1
 module plan-evidence
 
-// Captured source identity, the element catalog and its package creator,
-// and the passage rules belong to this child. The harness receives these
-// contracts and remains the only durable writer.
+// Captured source identity, the element catalog and its package creator
+// belong to this child. The harness receives these contracts and remains
+// the only durable writer.
 expose-src * from "interfaces/contracts.ts" to parent
 expose-src * from "interfaces/catalog.ts" to parent
 expose-src discoverDocuments, nodeDocumentReader, DocumentReader, DiscoveredDocuments from "discovery.ts" to parent
-expose-src resolvePlanReference, headingAnchor, PlanReference, ResolvedPlanReference from "references.ts" to parent

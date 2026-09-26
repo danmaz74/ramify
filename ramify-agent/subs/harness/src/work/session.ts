@@ -5,7 +5,7 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ApiViewEvidence } from '../interfaces/protocol/jobs.js';
 import type { RegistryEntry, Hypothesis } from '../analysis/records.js';
 import type { PlacementDecision } from '../architecture/records.js';
-import { deviationText, type EnvironmentProblem, type PlanDeviation } from '../deviations/records.js';
+import type { EnvironmentProblem } from '../deviations/records.js';
 import type { IterationApiViews } from './engineer.js';
 import type { IntegrationBriefing } from './integration.js';
 import { architectScenarioSection, type BriefedScenario } from './scenario-briefing.js';
@@ -107,7 +107,11 @@ export async function iterationApiViews(
 
 export interface WorkItemBriefing {
   readonly item: WorkItem;
-  readonly plan: string;
+  /**
+   * The work item's package once it is selected: its hash and its element
+   * IDs. Its text is appended to the session once and never repeated here.
+   */
+  readonly package?: { readonly hash: string; readonly elements: readonly string[] } | undefined;
   /** Runtime location for resolving paths in this reader's briefing. Durable paths stay project-relative. */
   readonly projectRoot?: string | undefined;
   readonly workingDirectory?: string | undefined;
@@ -125,10 +129,11 @@ export interface WorkItemBriefing {
     readonly gaps: readonly string[];
   } | undefined;
   /**
-   * Every plan deviation the run recorded. Each amends the plan for the rest
-   * of the run: the requirement it names is met as the deviation says.
+   * The plan deviations recorded after the work-item package, rendered by the
+   * package creator; the package holds the ones recorded before it. Each
+   * amends the elements it names for the rest of the run.
    */
-  readonly deviations?: readonly PlanDeviation[] | undefined;
+  readonly deviations?: string | undefined;
   /** The deviation that just answered this architect's unresolved request. */
   readonly deviationRecorded?: string | undefined;
   /**
@@ -239,12 +244,17 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
     '',
     '## What the plan asks',
     '',
-    `- Requirement: ${refs(briefing.plan, item.requirementRefs)}`,
-    `- Acceptance: ${refs(briefing.plan, item.acceptanceRefs)}`,
+    `- Requirement: ${ids(item.requirementRefs)}`,
+    `- Acceptance: ${ids(item.acceptanceRefs)}`,
+    `- Context: ${ids(item.contextRefs)}`,
+    '',
+    briefing.package === undefined
+      ? 'Their text arrives in your work-item package once you have oriented.'
+      : `Your work-item package \`${briefing.package.hash}\`, already in your session, holds these elements whole with the non-functional, fixed and recommendation elements selected for this work item: ${ids(briefing.package.elements)}. An assignment names, in \`citedElements\`, the elements of this package its iteration must honor; its engineer and reviewers receive exactly those.`,
     '',
     'Tests that state the acceptance are part of the work.',
     '',
-    ...deviationSection(briefing.deviations ?? [], briefing.deviationRecorded),
+    ...deviationSection(briefing.deviations, briefing.deviationRecorded),
     ...(briefing.integration === undefined ? [] : integrationSection(briefing.integration)),
     ...architectScenarioSection(briefing.scenarios ?? []),
     '## Your module',
@@ -470,20 +480,19 @@ function failureSection(failure: NonNullable<IterationResult['failure']>, ceilin
 }
 
 /**
- * The plan deviations in force, each with the requirement it changes, and
- * the one that answered this architect's unresolved request.
+ * The plan deviations recorded after the work-item package, and the one
+ * that answered this architect's unresolved request.
  */
-function deviationSection(deviations: readonly PlanDeviation[], recorded: string | undefined): string[] {
-  if (deviations.length === 0) return [];
+function deviationSection(deviations: string | undefined, recorded: string | undefined): string[] {
   const lines: string[] = [];
-  const answered = deviations.find(deviation => deviation.id === recorded);
-  if (answered !== undefined) {
+  if (recorded !== undefined) {
     lines.push('## Your unresolved request was answered with a plan deviation', '');
-    lines.push(`The global architect answered \`${answered.request}\` with plan deviation \`${answered.id}\`, below. Go on with the work item under it: meet the rest of the plan as written and this requirement as the deviation states it. Do not answer \`unresolved\` again for the same conflict; the person reviews the deviation.`, '');
+    lines.push(`The global architect answered with plan deviation \`${recorded}\`, below. Go on with the work item under it: meet the rest of the plan as written and the elements it amends as the deviation states them. Do not answer \`unresolved\` again for the same conflict; the person reviews the deviation.`, '');
   }
-  lines.push('## Plan deviations in force', '');
-  lines.push('The plan file is unchanged. Each deviation below amends it for the rest of this run, and your work and its reviews are judged against the plan as amended.', '');
-  for (const deviation of deviations) lines.push(deviationText(deviation), '');
+  if (deviations === undefined) return lines;
+  lines.push('## Plan deviations recorded after your package', '');
+  lines.push('The plan file and the catalog are unchanged. Each deviation amends the elements it names for the rest of this run, and your work and its reviews are judged against them as amended.', '');
+  lines.push(deviations.trimEnd(), '');
   return lines;
 }
 
@@ -574,15 +583,8 @@ function integrationSection(integration: IntegrationBriefing): string[] {
   return lines;
 }
 
-function refs(plan: string, list: ReadonlyArray<{ anchor?: string | undefined; lines?: readonly [number, number] | undefined }>): string {
-  if (list.length === 0) return 'the plan names none.';
-  const planLines = plan.split('\n');
-  return list.map(ref => {
-    if (ref.anchor !== undefined) return `“${ref.anchor}”`;
-    const [from, to] = ref.lines!;
-    const excerpt = planLines.slice(from - 1, to).join(' ').replace(/\s+/g, ' ').trim();
-    return `lines ${from}–${to} (${excerpt.slice(0, 160)}${excerpt.length > 160 ? '…' : ''})`;
-  }).join(', ');
+function ids(values: readonly string[]): string {
+  return values.length === 0 ? 'none' : values.join(', ');
 }
 
 function list(values: readonly string[]): string {

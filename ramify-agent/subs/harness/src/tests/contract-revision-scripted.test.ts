@@ -361,11 +361,11 @@ describe('P3: a contract revision reschedules current evidence without resetting
     }
 
     // The follow-ups are work items of their own, following the items that
-    // completed, and they carry those items' plan references.
+    // completed, and they carry those items' plan elements.
     const followUp = await readJson<WorkItem>(root, runId, workLayout.item('wi-006'));
     expect(followUp).toMatchObject({ module: notes, follows: 'wi-001', startedFor: 'wi-003' });
     expect(followUp.origin).toEqual({ verification: { id: 'rq-001', revision: 2, hash: expect.any(String) } });
-    expect(followUp.requirementRefs).toEqual([{ anchor: 'Request' }]);
+    expect(followUp).toMatchObject({ requirementRefs: ['fr-001'], acceptanceRefs: ['fr-002'], contextRefs: [] });
     const providerFollowUp = await readJson<WorkItem>(root, runId, workLayout.item('wi-005'));
     expect(providerFollowUp).toMatchObject({ module: limits, follows: 'wi-004' });
 

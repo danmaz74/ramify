@@ -1,15 +1,19 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
+import type { Script, ScriptStep, ScriptedAgent } from '../../subs/agent/src/scripted.js';
+import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
-import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { createPackage, type SubmittedElement } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import { readAcceptedEvidence } from '../analysis/evidence.js';
+import { intakeToolName } from '../analysis/extraction.js';
 import { contextSelectorToolName, workOrientationToolName } from '../context-selection/submissions.js';
 import { coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
-import { runLayout } from '../run/records.js';
-import { iterationLayout } from '../work/iterations.js';
+import type { RunEvent } from '../run/log.js';
+import { runLayout, runRecordSchema } from '../run/records.js';
+import { iterationAssignmentSchema, iterationLayout } from '../work/iterations.js';
 import { copyFixture } from './helpers/fixture.js';
-import { withPlan13Fixture } from './helpers/declarations.js';
+import { defaultTurn, withDefaultTurns } from './helpers/declarations.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { addModule, assign, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
 import { localDecision, registryChange } from './helpers/placement.js';
@@ -28,46 +32,57 @@ afterEach(async () => {
   finally { forgetExternalTools(); }
 });
 
-test('an assigned NFR reaches the engineer with its exact classification while uncited advice stays in the catalog', async () => {
+/** The default intake over the captured plan, reading the given elements of the root plan. */
+function intake(spec: SessionSpec, elements: ReadonlyArray<Omit<SubmittedElement, 'document'>>): readonly ScriptStep[] {
+  const input = (defaultTurn(spec)![0] as { readonly input: Record<string, unknown> }).input;
+  return submit({ ...input, elements: elements.map(element => ({ ...element, document: 'doc-001' })) });
+}
+
+/**
+ * The script with the default turns, except a selector that forgets its
+ * parent's session, so the first organizing prompt carries the package,
+ * and selects the given IDs.
+ */
+function selectingAfterLoss(agent: () => ScriptedAgent, ids: readonly string[], script: Script): Script {
+  const rest = withDefaultTurns(script);
+  return spec => {
+    if (spec.submission.name !== contextSelectorToolName) return typeof rest === 'function' ? rest(spec) : rest;
+    const parent = agent().sessions.find(session => session.spec.submission.name === workOrientationToolName);
+    if (!parent || !agent().forget(parent.ref)) throw new Error('Expected a retained orientation point');
+    return submit({ selected: ids.map(id => ({ id, reason: `Applies to the work: ${id}`, conditions: [], uncertainty: '' })) });
+  };
+}
+
+/** An assignment's package, rendered again from its record and the frozen catalog alone. */
+async function assignmentPackage(root: string, jobId: string, events: readonly RunEvent[], workItem: string, sequence: number) {
+  const directory = runPath(root, 'revision-diff', jobId, '');
+  const run = runRecordSchema.parse(JSON.parse(await readFile(runPath(root, 'revision-diff', jobId, runLayout.record), 'utf8')));
+  const evidence = await readAcceptedEvidence(directory, run, events);
+  if (evidence.status !== 'available') throw new Error(evidence.reason);
+  const assignment = iterationAssignmentSchema.parse(JSON.parse(await readFile(join(directory, iterationLayout.assignment(workItem, sequence)), 'utf8')));
+  const rendered = createPackage({ catalog: evidence.catalog, planDeviations: [], elements: assignment.source!.elements, deviations: assignment.source!.deviations });
+  if ('unavailable' in rendered) throw new Error('The assignment package does not render');
+  expect(rendered.hash).toBe(assignment.source!.hash);
+  return { assignment, text: rendered.text };
+}
+
+const quote = 'The service must preserve a 30 second timeout.';
+
+test('an assigned non-functional element reaches the engineer once per session, byte for byte, while an unselected recommendation stays in the catalog', async () => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
-  const quote = 'The service must preserve a 30 second timeout.';
   const advice = 'Use Redis if practical.';
   await writeFile(join(fixture.root, 'plans/revision-diff/plan.md'), `# Request\n\n${quote}\n${advice}\n\n# Acceptance\n\nThe scenario passes.\n`);
-  let passages: Array<{ document: string; sha256: string; start: number; end: number; quote: string }> = [];
   let localTurn = 0;
-  const agent = createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') {
-      const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-      if (!captured) throw new Error('Missing captured plan');
-      const directory = dirname(dirname(captured));
-      const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
-      const root = manifest.documents[0]!;
-      const bytes = readFileSync(join(directory, root.storedAt));
-      passages = [quote, advice].map(text => {
-        const start = bytes.indexOf(Buffer.from(text));
-        return { document: root.id, sha256: root.sha256, start, end: start + Buffer.byteLength(text), quote: text };
-      });
-      return submit({ ...analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]),
-        catalog: [
-          { classification: 'non-functional-requirement', passage: passages[0], conditions: [{ text: 'for the service', source: 'stated' }], uncertainty: '' },
-          { classification: 'advice', passage: passages[1], conditions: [], uncertainty: 'Optional.' },
-        ] });
-    }
-    if (spec.submission.name === workOrientationToolName) return [
-      ...submit({ focus: 'Honor the service timeout', currentUnderstanding: quote, questions: [] }),
-      ...submit(assign('collection-review/workspace/reviews/core', { citedItems: ['nfr-001'] }, outline())),
-      ...submit({ ...requestCompletion(), scenarios: ['sc-001'] }),
-    ];
-    if (spec.submission.name === contextSelectorToolName) {
-      const parent = agent.sessions.find(session => session.spec.submission.name === workOrientationToolName);
-      if (!parent || !agent.forget(parent.ref)) throw new Error('Expected a retained orientation point');
-      return submit({ examined: ['nfr-001', 'adv-001'],
-        selected: [{ item: 'nfr-001', passage: passages[0], reason: 'Applies to the service work', conditions: [], uncertainty: '' }], unavailable: [] });
-    }
+  const agent: ScriptedAgent = createScriptedAgent(selectingAfterLoss(() => agent, ['nfr-001'], spec => {
+    if (spec.submission.name === intakeToolName) return intake(spec, [
+      { key: 'timeout', kind: 'non-functional', text: quote, conditions: [{ text: 'for the service', source: 'stated' }], uncertainty: '' },
+      { key: 'redis', kind: 'recommendation', text: advice, conditions: [], uncertainty: 'Optional.' },
+    ]);
+    if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]));
     if (spec.submission.name === 'submit_work_item_result') return localTurn++ === 0
-      ? submit(assign('collection-review/workspace/reviews/core', { citedItems: ['nfr-001'] }, outline()))
+      ? submit(assign('collection-review/workspace/reviews/core', { citedElements: ['fr-001', 'fr-002', 'nfr-001'] }, outline()))
       : submit({ ...requestCompletion(), scenarios: ['sc-001'] });
     if (spec.role === 'engineer') return submit(completionProposed('The existing behavior satisfies the assignment.', { scenarios: ['sc-001'] }));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [
@@ -90,52 +105,34 @@ test('an assigned NFR reaches the engineer with its exact classification while u
   await opened.service.settled('revision-diff', receipt.jobId);
   const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
   expect(onlyRun(opened.service, 'revision-diff').state, JSON.stringify({ failures: events.filter(event => event.type === 'job-failed'), sessions: agent.sessions.map(session => [session.spec.role, session.spec.submission.name, session.start, session.verdicts, session.outcome]) })).toBe('completed');
+  const { assignment, text } = await assignmentPackage(fixture.root, receipt.jobId, events, 'wi-001', 1);
+  expect(assignment.source).toMatchObject({ elements: ['fr-001', 'fr-002', 'nfr-001'], deviations: [] });
+  expect(assignment).not.toHaveProperty('citedItems');
+  expect(assignment).not.toHaveProperty('requirementRefs');
+  expect(text).toContain(quote);
+  expect(text).toContain('### nfr-001: non-functional requirement of the plan from plans/revision-diff/plan.md');
+  expect(text).toContain('stated: for the service');
+  expect(text).not.toContain(advice);
+  // The assignment cites its whole work-item package, so the local architect's package and the engineer's are the same bytes.
+  expect(events.find(event => event.type === 'context-selection-recorded')?.data.packageHash).toBe(assignment.source!.hash);
+  const organizing = agent.sessions.filter(session => session.spec.submission.name === 'submit_work_item_result');
+  expect(organizing.map(session => session.start.mode)).toEqual(['fresh', 'continue']);
+  expect(organizing[0]!.spec.prompt).toContain(`# Your work-item package\n\n${text}`);
+  // A continued turn names the package by hash and never repeats its body.
+  expect(organizing[1]!.spec.prompt).not.toContain(quote);
+  expect(organizing[1]!.spec.prompt).not.toContain('# Your work-item package');
+  expect(organizing[1]!.spec.prompt).toContain(`Your work-item package \`${assignment.source!.hash}\`, already in your session`);
   const engineers = agent.sessions.filter(session => session.spec.role === 'engineer');
-  expect(engineers).toHaveLength(2);
   expect(engineers.map(session => session.start.mode)).toEqual(['fresh', 'continue']);
-  for (const engineer of engineers) {
-    expect(engineer.spec.prompt).toContain(quote);
-    expect(engineer.spec.prompt).toContain('nfr-001: non-functional-requirement');
-    expect(engineer.spec.prompt).toContain('stated: for the service');
-    expect(engineer.spec.prompt).not.toContain(advice);
-  }
-  const directory = runPath(fixture.root, 'revision-diff', receipt.jobId, '');
-  const context = JSON.parse(await readFile(join(directory, runLayout.assignmentContext('wi-001.i01')), 'utf8'));
-  expect(context.citedItems).toEqual(['nfr-001']);
-  const assignment = JSON.parse(await readFile(join(directory, iterationLayout.assignment('wi-001', 1)), 'utf8'));
-  expect(assignment.citedItems).toEqual(['nfr-001']);
+  expect(engineers[0]!.spec.prompt).toContain(`## What the plan asks of this iteration\n\nThe elements your assignment cites`);
+  expect(engineers[0]!.spec.prompt).toContain(text.trimEnd());
+  expect(engineers[1]!.spec.prompt).not.toContain(quote);
+  for (const engineer of engineers) expect(engineer.spec.prompt).not.toContain(advice);
+  await expect(readFile(runPath(fixture.root, 'revision-diff', receipt.jobId, 'assignments/wi-001.i01-context.json'))).rejects.toThrow();
   expect(events.filter(event => event.type === 'context-selection-recorded')).toHaveLength(1);
 }, 120_000);
 
-test('a changed captured source is refused before an assignment can be delivered', async () => {
-  const fixture = await copyFixture();
-  cleanups.push(fixture.remove);
-  await installTestRunner(fixture.root);
-  const agent = createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core')]));
-    if (spec.submission.name === workOrientationToolName) return submit({ focus: 'Read the plan', currentUnderstanding: 'The plan governs the work.', questions: [] });
-    if (spec.submission.name === contextSelectorToolName) {
-      const parent = agent.sessions.find(session => session.spec.submission.name === workOrientationToolName);
-      if (!parent || !agent.forget(parent.ref)) throw new Error('Expected retained orientation point');
-      return submit({ examined: [], selected: [], unavailable: [] });
-    }
-    if (spec.submission.name === 'submit_work_item_result') {
-      writeFileSync(join(fixture.root, 'plans/revision-diff/plan.md'), '# Request\n\nChanged after selection.\n');
-      return submit(assign('collection-review/workspace/reviews/core', { citedItems: [] }, outline()));
-    }
-    return [];
-  }));
-  const opened = await openUnchangedRuns(fixture.root, { agent, inputs: treeInputs(), unchangedCheckpoints: [scenariosCommit('revision-diff')] });
-  cleanups.push(() => opened.service.close());
-  const receipt = await opened.service.execute(startRun('revision-diff'));
-  await opened.service.settled('revision-diff', receipt.jobId);
-  const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
-  expect(events.find(event => event.type === 'job-failed')?.data.reason).toBe('inputs-changed');
-  expect(events.filter(event => event.type === 'iteration-assigned')).toHaveLength(0);
-  expect(agent.sessions.filter(session => session.spec.role === 'engineer')).toHaveLength(0);
-}, 120_000);
-
-test('a contract requested by an engineer inherits the same cited passage', async () => {
+test('a contract requested by an engineer inherits the requester\'s assignment package, byte for byte', async () => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   const notes = 'collection-review/workspace/reviews/notes';
@@ -148,30 +145,12 @@ test('a contract requested by an engineer inherits the same cited passage', asyn
   await addModule(fixture.root, seam.consumerDirectory, 'notes', { 'src/notes.ts': 'export const note = true;\n' });
   await addModule(fixture.root, seam.providerDirectory, 'limits', {});
   await installTestRunner(fixture.root);
-  const quote = 'The service must preserve a 30 second timeout.';
   await writeFile(join(fixture.root, 'plans/revision-diff/plan.md'), `# Request\n\n${quote}\n\n# Acceptance\n\nThe behavior is tested.\n`);
-  let passage: { document: string; sha256: string; start: number; end: number; quote: string };
-  const agent = createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') {
-      const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-      if (!captured) throw new Error('Missing captured plan');
-      const directory = dirname(dirname(captured));
-      const root = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents[0]!;
-      const bytes = readFileSync(join(directory, root.storedAt));
-      const start = bytes.indexOf(Buffer.from(quote));
-      passage = { document: root.id, sha256: root.sha256, start, end: start + Buffer.byteLength(quote), quote };
-      return submit({ ...analysis([entry('review-note', notes)]), catalog: [{
-        classification: 'non-functional-requirement', passage, conditions: [], uncertainty: '',
-      }] });
-    }
-    if (spec.submission.name === workOrientationToolName) return submit({ focus: 'Honor the timeout', currentUnderstanding: quote, questions: [] });
-    if (spec.submission.name === contextSelectorToolName) {
-      const parent = agent.sessions.find(session => session.spec.submission.name === workOrientationToolName);
-      if (!parent || !agent.forget(parent.ref)) throw new Error('Expected retained orientation point');
-      return submit({ examined: ['nfr-001'], selected: [{ item: 'nfr-001', passage, reason: 'Relevant to the seam', conditions: [], uncertainty: '' }], unavailable: [] });
-    }
+  const agent: ScriptedAgent = createScriptedAgent(selectingAfterLoss(() => agent, ['nfr-001'], spec => {
+    if (spec.submission.name === intakeToolName) return intake(spec, [{ key: 'timeout', kind: 'non-functional', text: quote, conditions: [], uncertainty: '' }]);
+    if (spec.role === 'initial-architect') return submit(analysis([entry('review-note', notes)]));
     if (spec.submission.name === 'submit_work_item_result') return submit({
-      ...assign(notes, { citedItems: ['nfr-001'] }, outline()),
+      ...assign(notes, { citedElements: ['fr-001', 'nfr-001'] }, outline()),
       localDecisions: [localDecision({ question: 'Where is note-limit?', outcome: 'reuse', capability: 'note-limit', owner: limits,
         rationale: 'The limit is owned by its own module.' }, [registryChange({ capability: 'note-limit', owner: limits })])],
     });
@@ -183,10 +162,16 @@ test('a contract requested by an engineer inherits the same cited passage', asyn
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('revision-diff'));
   await opened.service.settled('revision-diff', receipt.jobId);
-  const contract = agent.sessions.find(session => session.spec.role === 'contract-engineer');
-  expect(contract?.spec.prompt).toContain(quote);
-  expect(contract?.spec.prompt).toContain('nfr-001: non-functional-requirement');
-  const context = JSON.parse(await readFile(runPath(fixture.root, 'revision-diff', receipt.jobId, runLayout.assignmentContext('wi-001.i02')), 'utf8'));
-  expect(context.citedItems).toEqual(['nfr-001']);
-  expect(context.assignment).toBe('wi-001.i02');
+  const events = await runEventsOnDisk(fixture.root, 'revision-diff', receipt.jobId);
+  const requester = await assignmentPackage(fixture.root, receipt.jobId, events, 'wi-001', 1);
+  expect(requester.assignment.source).toMatchObject({ elements: ['fr-001', 'nfr-001'], deviations: [] });
+  expect(requester.text).toContain(quote);
+  expect(requester.text).not.toContain('The plan asks for review-note-acceptance.');
+  const contract = await assignmentPackage(fixture.root, receipt.jobId, events, 'wi-001', 2);
+  expect(contract.assignment.kind).toBe('contract');
+  expect(contract.assignment.source).toEqual(requester.assignment.source);
+  const engineer = agent.sessions.find(session => session.spec.role === 'engineer');
+  expect(engineer?.spec.prompt).toContain(requester.text.trimEnd());
+  const contractSession = agent.sessions.find(session => session.spec.role === 'contract-engineer');
+  expect(contractSession?.spec.prompt).toContain(`## What the plan asks of the requesting iteration\n\nThe elements its assignment cites, whole, with the plan deviations in force when it was assigned.\n\n${requester.text.trimEnd()}`);
 }, 120_000);

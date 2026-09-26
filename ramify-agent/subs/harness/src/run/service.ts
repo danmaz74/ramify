@@ -46,7 +46,7 @@ import {
   type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
   type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
 } from '../reviews/records.js';
-import { orientationKey, planExcerpts, readGuidance, type CapturedInput } from '../reviews/inputs.js';
+import { orientationKey, readGuidance, type CapturedInput } from '../reviews/inputs.js';
 import { orientationMessage, reviewMessage } from '../reviews/message.js';
 import { ReviewQueue } from '../reviews/scheduler.js';
 import { candidateModuleIndex, concernModules, groundCredibility } from '../reviews/signals.js';
@@ -66,14 +66,23 @@ import { declaredSchemaOf, jobSchemaVersion, listJobDirectories, newJobId, planS
 import { ensureStateDirectory } from '../store/state-directory.js';
 import { planPath, readPlan } from '../plans/discover.js';
 import { discoverDocuments } from '../../subs/plan-evidence/src/discovery.js';
-import { assignCatalog, verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
-import type { Catalog } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { verifyDocumentBytes } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import {
+  elementIdSchema, openElementCatalog, serializeElementCatalog, type ElementCatalog, type ElementKind, type PackageCitation, type PackageDeviation,
+} from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import {
+  acceptIntake, acceptPrinciples, applyCheck, asValidation, checkJsonSchema, checkMessage, checkSubmissionSchema, checkToolName,
+  intakeJsonSchema, intakeMessage, intakeSubmissionSchema, intakeToolName, principleJsonSchema, principleMessage,
+  principleSubmissionSchema, principleToolName,
+  type CheckState, type CheckSubmission, type ExtractionInputs, type IntakeSubmission, type PrincipleSubmission,
+} from '../analysis/extraction.js';
+import type { CatalogFinding } from '../analysis/records.js';
 import { readAcceptedEvidence } from '../analysis/evidence.js';
 import { assessmentSchema, roundSchema, type Assessment, type Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import { decideNonfunctionalRound, type RoundDecision } from '../../subs/nonfunctional/src/rounds.js';
 import { replayNonfunctionalPhase } from './nonfunctional-phase.js';
 import { preparedCandidateSchema, nonfunctionalDeviationSchema, nonfunctionalRepairAssignmentSchema } from './nonfunctional-records.js';
-import { bindCoordinatorAssessment, coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName,
+import { assessedElements, bindCoordinatorAssessment, coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName,
   coordinatorActionJsonSchema, coordinatorActionToolName, coordinatorInvestigationJsonSchema, coordinatorInvestigationToolName,
   coordinatorActionSchema,
   nonfunctionalRepairJsonSchema, nonfunctionalRepairToolName, validateCoordinatorAction, validateCoordinatorInvestigation,
@@ -83,18 +92,17 @@ import { coordinatorAssessmentPrompt, coordinatorActionPrompt, repairPrompt } fr
 import { contextSelectorMessage, workOrientationMessage } from '../context-selection/prompts.js';
 import { contextSelectionSchema } from '../context-selection/contracts.js';
 import { readRecordedContextSelection } from '../context-selection/recorded.js';
-import { assignmentDelivery, makeAssignmentContext } from '../context-selection/delivery.js';
+import { citePackage, deliverPackage } from '../context-selection/delivery.js';
 import { contextSelectorJsonSchema, contextSelectorSubmissionSchema, contextSelectorToolName,
   orientationPacket, prepareContextSelection, workOrientationJsonSchema, workOrientationSubmissionSchema,
-  workOrientationToolName, type ContextSelectorSubmission, type WorkOrientationSubmission } from '../context-selection/submissions.js';
-import { headingAnchor, resolvePlanReference } from '../../subs/plan-evidence/src/references.js';
+  workOrientationToolName, type ContextSelectorSubmission, type SelectionSource, type WorkOrientationSubmission } from '../context-selection/submissions.js';
 import { documentChanges, readCapturedDocuments } from './document-inputs.js';
 import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
   renderContextSelectorPrompt, renderWorkOrientationPrompt, renderNonfunctionalCoordinatorPrompt,
-  renderNonfunctionalRepairPrompt,
-  type LoadedPackage,
+  renderNonfunctionalRepairPrompt, renderExtractionPrompt,
+  type ExtractionTurn, type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
 import { lineEvents, takeLineSnapshot, type LineSnapshot } from '../kpi/lines.js';
@@ -109,8 +117,8 @@ import {
 } from '../architecture/records.js';
 import { forkMessage, unresolvedForkMessage } from '../architecture/session.js';
 import {
-  defaultMaxPlanDeviations, deviationLayout, deviationText, environmentProblemId, environmentProblemSchema,
-  planDeviationId, planDeviationSchema, planLines, unresolvedRequestId, unresolvedRequestSchema,
+  defaultMaxPlanDeviations, deviationLayout, environmentProblemId, environmentProblemSchema, packageDeviation,
+  planDeviationId, planDeviationSchema, unresolvedRequestId, unresolvedRequestSchema,
   type DeviationBody, type EnvironmentBody, type EnvironmentProblem, type PlanDeviation, type UnresolvedRequest,
 } from '../deviations/records.js';
 import { deviationCommands, isPlanDeviation, nextCheckFinding } from '../deviations/finding.js';
@@ -120,7 +128,10 @@ import {
   forkJsonSchema, forkToolName, validateFork,
   type ForkSubmission, type PlacementEvidence, type PlacementRequestBody,
 } from '../architecture/submission.js';
-import { describePlan, initialAnalysisJsonSchema, initialAnalysisToolName, validateInitialAnalysis, type InitialAnalysisSubmission } from '../analysis/submission.js';
+import {
+  acceptArchitectElements, incorporatedExtraction, initialAnalysisJsonSchema, initialAnalysisToolName, validateInitialAnalysis,
+  type AnalysisEvidence, type InitialAnalysisSubmission,
+} from '../analysis/submission.js';
 import { registerContract, registrationNeeded, type AttachedConsumer } from '../contracts/accept.js';
 import { cycleClosedBy, cycleIdentity, type DependencyCycle, type DependencyEdge } from '../contracts/graph.js';
 import { fakeNamingViolations, type NamedFile } from '../contracts/naming.js';
@@ -158,7 +169,7 @@ import {
 import {
   digestLines, failureAnalysisJsonSchema, failureAnalysisMessage, failureAnalysisSubmissionDescription, failureAnalysisToolName,
   failureDigest, renderTranscript, validateFailureAnalysis,
-  type AnalysisEvidence, type DigestShellCall, type FailureAnalysisSubmission,
+  type AnalysisEvidence as FailureEvidence, type DigestShellCall, type FailureAnalysisSubmission,
 } from '../work/failure.js';
 import { resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
@@ -168,7 +179,7 @@ import {
 import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
-import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type ReconciliationBriefing } from '../work/session.js';
+import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
 import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
@@ -929,24 +940,25 @@ export class RunService {
     kind: ReviewKind,
     closed: { readonly workItem: string; readonly iteration: string; readonly commit: string; readonly assignment: string; readonly base: string },
   ): Promise<ReviewInputs> {
-    const none: ReviewInputs = { requirements: [], guidance: [], forkPoint: { kind: 'none' } };
-    if (kind === 'code') return none;
-    if (kind === 'scope') {
+    const none: ReviewInputs = { guidance: [], forkPoint: { kind: 'none' } };
+    if (kind === 'code' || kind === 'scope') {
+      // Both read the assignment package from its record; scope review adds
+      // the plan deviations recorded by the time it is requested.
+      let source: PackageCitation | undefined;
+      try {
+        const assignment = iterationAssignmentSchema.parse(this.committedBody(run, closed.assignment));
+        source = assignment.source === undefined || kind === 'code' ? assignment.source
+          : await this.citeCurrentDeviations(run, assignment.source.elements);
+      } catch (error) {
+        return { ...none, inputsUnavailable: `The ${kind} review's assignment package could not be cited: ${message(error)}` };
+      }
+      if (kind === 'code') return { ...none, ...(source === undefined ? {} : { source }) };
       const assigned = run.log.all('iteration-assigned').find(event => event.data.iteration === closed.iteration);
       const pinned = assigned?.data.architectRef;
       const forkPoint: ForkPoint = pinned === undefined || pinned === null
         ? { kind: 'unavailable', reason: pinned === null ? 'The local architect\'s session was not kept after the assignment' : 'The assignment recorded no pinned point of the local architect' }
         : { kind: 'session', session: pinned.session, ref: pinned.ref };
-      try {
-        const requirements = await this.scopeRequirements(run, closed.assignment);
-        const assignment = iterationAssignmentSchema.parse(this.committedBody(run, closed.assignment));
-        const source = await this.assignmentSource(run, assignment);
-        return { requirements: requirements.map(({ ref, hash }) => ({ ref, hash })), guidance: [], forkPoint,
-          ...(source === null ? {} : { source: { selection: source.selection, packageHash: source.packageHash, deliveryHash: source.hash } }) };
-      } catch (error) {
-        return { requirements: [], guidance: [], forkPoint,
-          inputsUnavailable: `The scope review's captured inputs could not be read: ${message(error)}` };
-      }
+      return { guidance: [], forkPoint, ...(source === undefined ? {} : { source }) };
     }
     try {
       const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: closed.commit, base: closed.base });
@@ -959,70 +971,68 @@ export class RunService {
         model: this.options.model ?? null,
         context: run.record.policy.context.reviewer,
       });
-      return { requirements: [], guidance, forkPoint: { kind: 'orientation', key } };
+      return { guidance, forkPoint: { kind: 'orientation', key } };
     } catch (error) {
       return { ...none, forkPoint: { kind: 'unavailable', reason: `The candidate's guidance could not be read: ${message(error)}` } };
     }
   }
 
   /**
-   * The plan excerpts an iteration's assignment cites, from the captured
-   * plan, and every plan deviation that amends the plan, each an input of
-   * its own: a scope review judges the candidate against the plan as its
-   * deviations amend it. A request binds the deviations recorded when it
-   * was made; a later one is not part of its question.
+   * A package with every plan deviation recorded so far: by default the
+   * assessment package, every non-functional and fixed element; otherwise
+   * the elements an investigation, a repair or an unresolved fork reads.
    */
-  private async scopeRequirements(run: Run, assignmentPath: string): Promise<CapturedInput[]> {
-    const changes = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
-    if (changes.length > 0) throw new EvidenceUnavailableError(changes.join('; '));
-    const assignment = iterationAssignmentSchema.parse(this.committedBody(run, assignmentPath));
-    if (run.record.manifest.documentManifest) {
-      const captured = await readCapturedDocuments(run.directory, run.record.manifest);
-      const inputs: CapturedInput[] = [];
-      for (const reference of assignment.requirementRefs) {
-        const resolved = resolvePlanReference(captured.manifest, captured.bytes, reference);
-        if (resolved.status === 'unavailable') throw new EvidenceUnavailableError(resolved.reason);
-        const name = resolved.path === planPath(run.record.planId) ? 'plan' : resolved.path;
-        const ref = `${name}${reference.anchor === undefined ? `:${reference.lines?.[0]}-${reference.lines?.[1]}` : `#${headingAnchor(reference.anchor)}`}`;
-        if (!inputs.some(input => input.ref === ref)) inputs.push({ ref, hash: sha256(resolved.text), text: resolved.text });
-      }
-      const source = await this.assignmentSource(run, assignment);
-      if (source === null) throw new EvidenceUnavailableError(`No recorded source context for ${assignment.id}`);
-      inputs.push({ ref: `assignment-source:${assignment.id}`, hash: source.hash, text: source.text });
-      return [...inputs, ...deviationInputs(this.deviationsOf(run))];
-    }
-    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
-    return [...planExcerpts(plan, assignment.requirementRefs), ...deviationInputs(this.deviationsOf(run))];
+  private planPackage(run: Run, catalog: ElementCatalog, elements: readonly string[] = assessedElements(catalog)): string {
+    const planDeviations = this.planDeviationsOf(run);
+    const cited = citePackage(catalog, planDeviations, elements, planDeviations.map(deviation => deviation.id));
+    if ('missing' in cited) throw new EvidenceUnavailableError(`The non-functional package cites IDs the run does not hold: ${cited.missing.join(', ')}`);
+    return cited.text;
   }
 
-  /** A new run's selection is read from its event-bound immutable files. */
-  private async selectedSource(run: Run, workItem: string) {
-    if (!run.record.manifest.documentManifest) return null;
-    const changes = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
-    if (changes.length > 0) throw new EvidenceUnavailableError(changes.join('; '));
+  /** The plan deviations recorded after a package, rendered by the package creator for a local architect's brief. */
+  private laterDeviations(run: Run, catalog: ElementCatalog, pinned: readonly string[]): { readonly deviations?: string } {
+    const planDeviations = this.planDeviationsOf(run);
+    const later = planDeviations.filter(deviation => !pinned.includes(deviation.id)).map(deviation => deviation.id);
+    if (later.length === 0) return {};
+    const cited = citePackage(catalog, planDeviations, [], later);
+    if ('missing' in cited) throw new EvidenceUnavailableError(`A plan deviation amends IDs the run does not hold: ${cited.missing.join(', ')}`);
+    return { deviations: cited.text };
+  }
+
+  /** The frozen catalog of an accepted analysis; its absence is an input the caller lacks. */
+  private async frozenCatalog(run: Run): Promise<ElementCatalog> {
     const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
     if (evidence.status === 'unavailable') throw new EvidenceUnavailableError(evidence.reason);
-    const event = run.log.all('context-selection-recorded').find(entry => entry.data.workItem === workItem);
-    if (!event) throw new EvidenceUnavailableError(`No context selection was recorded for ${workItem}`);
-    const recorded = await readRecordedContextSelection(run.directory, event, evidence.catalog, evidence.manifest, evidence.bytes);
-    if (recorded.status === 'unavailable') throw new EvidenceUnavailableError(recorded.reason);
-    return { event, recorded, evidence };
+    return evidence.catalog;
   }
 
-  /** Rebuild the assignment-cited brief before every delivery or review read. */
-  private async assignmentSource(run: Run, assignment: IterationAssignment) {
-    const source = await this.selectedSource(run, assignment.workItem);
-    if (source === null) return null;
-    const context = this.committedBody(run, runLayout.assignmentContext(assignment.id));
-    const delivered = assignmentDelivery(context, {
-      assignment: assignment.id, workItem: assignment.workItem, selectionRef: source.event.data.selection,
-    }, source.recorded, source.evidence.catalog, source.evidence.manifest, source.evidence.bytes);
-    if (delivered.status === 'unavailable') throw new EvidenceUnavailableError(delivered.reasons.join('; '));
-    if (assignment.citedItems === undefined || JSON.stringify(assignment.citedItems) !== JSON.stringify(
-      (context as { citedItems?: unknown } | undefined)?.citedItems)) {
-      throw new EvidenceUnavailableError(`Assignment ${assignment.id} differs from its recorded source citations`);
-    }
-    return { ...delivered, selection: source.event.data.selection, packageHash: source.recorded.selection.packageHash };
+  /** The run's plan deviations as every package renders them, in recorded order. */
+  private planDeviationsOf(run: Run): PackageDeviation[] {
+    return this.deviationsOf(run).map(packageDeviation);
+  }
+
+  /** Cite elements with every plan deviation recorded so far. */
+  private async citeCurrentDeviations(run: Run, elements: readonly string[]): Promise<PackageCitation> {
+    const planDeviations = this.planDeviationsOf(run);
+    const cited = citePackage(await this.frozenCatalog(run), planDeviations, elements, planDeviations.map(deviation => deviation.id));
+    if ('missing' in cited) throw new EvidenceUnavailableError(`The package cites IDs the run does not hold: ${cited.missing.join(', ')}`);
+    return cited.citation;
+  }
+
+  /** Render a cited package again from the frozen catalog and the record's IDs alone. */
+  private async packageText(run: Run, cited: PackageCitation): Promise<string> {
+    const delivered = deliverPackage(await this.frozenCatalog(run), this.planDeviationsOf(run), cited);
+    if (delivered.status === 'unavailable') throw new EvidenceUnavailableError(delivered.reason);
+    return delivered.text;
+  }
+
+  /** A work item's current selection: the latest one recorded, which supersedes any earlier. */
+  private async currentSelection(run: Run, workItem: string) {
+    const event = run.log.all('context-selection-recorded').filter(entry => entry.data.workItem === workItem).at(-1);
+    if (event === undefined) return null;
+    const recorded = await readRecordedContextSelection(run.directory, event, await this.frozenCatalog(run), this.planDeviationsOf(run));
+    if (recorded.status === 'unavailable') throw new EvidenceUnavailableError(recorded.reason);
+    return { event, ...recorded };
   }
 
   /** A record body as the log committed it, never the materialized file. */
@@ -1062,7 +1072,7 @@ export class RunService {
       return await unavailable(request.forkPoint.kind === 'unavailable' ? request.forkPoint.reason : 'No design guidance was selected') === 'committed';
     }
     let snapshot: CandidateSnapshot;
-    let requirements: CapturedInput[] = [];
+    let assignmentPackage: string | undefined;
     let guidance: CapturedInput[] = [];
     try {
       snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot, { commit: request.key.candidate, base: request.base });
@@ -1072,15 +1082,7 @@ export class RunService {
     try {
       // The question's inputs are read again and must be the bytes the
       // request bound; anything else is not the question it asked.
-      if (kind === 'scope') {
-        requirements = boundInputs(await this.scopeRequirements(run, request.assignment), request.requirements);
-        const assignment = iterationAssignmentSchema.parse(this.committedBody(run, request.assignment));
-        const source = await this.assignmentSource(run, assignment);
-        if (request.source === undefined ? source !== null : source === null ||
-          source.selection !== request.source.selection || source.packageHash !== request.source.packageHash || source.hash !== request.source.deliveryHash) {
-          throw new EvidenceUnavailableError('The review request source binding differs from the recorded assignment source');
-        }
-      }
+      if (request.source !== undefined) assignmentPackage = await this.packageText(run, request.source);
       if (kind === 'design') {
         const texts = await Promise.all(request.guidance.map(entry => this.candidates.readBlob(this.projectRoot, request.key.candidate, entry.ref)));
         guidance = boundInputs(request.guidance.map((entry, index) => ({ ref: entry.ref, hash: sha256(texts[index]!), text: texts[index]! })), request.guidance);
@@ -1114,7 +1116,7 @@ export class RunService {
         snapshot,
         assignment: assignment.success ? assignment.data : null,
         checkFindings: held.ok && 'items' in held.view ? held.view.items.map(item => ({ id: item.id, standing: item.standing, title: item.title })) : [],
-        requirements,
+        ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
         planDocument: snapshot.entries.get(planPath(run.record.planId))?.kind === 'file' ? planPath(run.record.planId) : null,
       }),
       start: start.start,
@@ -1842,7 +1844,7 @@ export class RunService {
     const start = this.reconciliationStart(run, basis, completion);
     const state = checkFindingStateOf(run.log.ledger);
     const held = new Map(this.ownerCheckFindings(state, item.id, 'all').map(summary => [summary.id, summary.revision]));
-    const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    const evidence = await readAcceptedEvidence(run.directory, run.record, run.log.events);
     let invocation: string | undefined;
     let bound: BoundReconciliation | undefined;
     const result = await this.runInvocation<ReconciliationSubmission>(run, agent, {
@@ -1876,7 +1878,11 @@ export class RunService {
             hash: `sha256:${sha256(canonicalJson(submission))}`,
           }],
           document: async path => {
-            if (path === 'plan') return { text: plan, revision: `sha256:${sha256(plan)}` };
+            // An element of the frozen catalog is cited by its ID, at the catalog's hash.
+            if (elementIdSchema.safeParse(path).success) {
+              const element = evidence.status === 'available' ? evidence.catalog.elements.find(candidate => candidate.id === path) : undefined;
+              return element === undefined || evidence.status !== 'available' ? null : { text: element.text, revision: `sha256:${evidence.catalogHash}` };
+            }
             try {
               return { text: await this.candidates.readBlob(this.projectRoot, basis.source.commit, path), revision: basis.source.commit };
             } catch {
@@ -2274,7 +2280,7 @@ export class RunService {
     }
     const source = run.log.find('analysis-accepted')?.data.evidence?.catalog.hash;
     if (source !== marker.data.catalogHash) return 'phase marker names another catalog';
-    const nfrIds = accepted.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+    const nfrIds = assessedElements(accepted.catalog);
     const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, marker.data.maxRounds);
     if (!replay.ok) return `phase ledger prefix is invalid: ${replay.reason}`;
     if (replay.value.final !== null) {
@@ -2333,7 +2339,7 @@ export class RunService {
           this.warn(`Run ${run.record.jobId}: context append ${pending.key} lacks its agent or verified selection`);
           continue;
         }
-        const recorded = await readRecordedContextSelection(run.directory, selected, evidence.catalog, evidence.manifest, evidence.bytes);
+        const recorded = await readRecordedContextSelection(run.directory, selected, evidence.catalog, this.planDeviationsOf(run));
         if (recorded.status === 'unavailable') {
           this.warn(`Run ${run.record.jobId}: context append ${pending.key} is unavailable: ${recorded.reason}`);
           continue;
@@ -3020,7 +3026,7 @@ export class RunService {
       await this.write(run, { type: 'nonfunctional-phase-started', data: { catalogHash, maxRounds } });
       await this.afterWrite('nonfunctional-phase-started', run.record.jobId);
     }
-    const nfrIds = evidence.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+    const nfrIds = assessedElements(evidence.catalog);
     for (;;) {
       if (this.ignoring(run)) return null;
       const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, maxRounds);
@@ -3105,7 +3111,7 @@ export class RunService {
         [runLayout.documentManifest]);
       return false;
     }
-    const nfrIds = evidence.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+    const nfrIds = assessedElements(evidence.catalog);
     const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, run.record.policy.limits.nonfunctionalRoundsPerPlan ?? 3);
     if (!replay.ok) return unavailable(replay.reason);
     const decision = decideNonfunctionalRound(replay.value.input);
@@ -3156,7 +3162,7 @@ export class RunService {
       return false;
     }
     for (const result of unresolved) {
-      const item = evidence.catalog.items.find(candidate => candidate.id === result.nfr);
+      const item = evidence.catalog.elements.find(candidate => candidate.id === result.nfr);
       const choice = choices.get(result.nfr);
       if (!item || !choice) return unavailable(`Fixed NFR ${result.nfr} has no accepted source or close choice`);
       const previous = run.log.all('nonfunctional-deviation-recorded').filter(event => event.data.nfr === result.nfr);
@@ -3167,7 +3173,7 @@ export class RunService {
         const event = previous[0]!;
         const recorded = nonfunctionalDeviationSchema.safeParse(this.committedBody(run, runLayout.nonfunctionalDeviation(event.data.deviation)));
         const expected = prepareNonfunctionalDeviation({ id: event.data.deviation, checkFinding: event.data.checkFinding,
-          item, manifest: evidence.manifest, bytes: evidence.bytes, assessment: binding.assessment, result,
+          item, assessment: binding.assessment, result,
           candidate: binding.assessment.candidate, coordinatorInvocation: binding.assessment.coordinatorInvocation,
           proposedAlternative: choice.proposedAlternative ?? '', uncertainty: choice.uncertainty });
         const finding = checkFindingStateOf(run.log.ledger).findings.get(event.data.checkFinding);
@@ -3187,13 +3193,13 @@ export class RunService {
           return { stale: `NFR ${result.nfr} was already recorded` };
         }
         const prepared = prepareNonfunctionalDeviation({ id, checkFinding: nextCheckFinding(state), item,
-          manifest: evidence.manifest, bytes: evidence.bytes, assessment: binding.assessment, result,
+          assessment: binding.assessment, result,
           candidate: binding.assessment.candidate, coordinatorInvocation: binding.assessment.coordinatorInvocation,
           proposedAlternative: choice.proposedAlternative ?? '', uncertainty: choice.uncertainty });
         if (!prepared.ok) throw new Error(prepared.errors.join('; '));
         const record = prepared.record;
         const path = runLayout.nonfunctionalDeviation(id);
-        const commands = nonfunctionalDeviationCommands(state, record, evidence.manifest, evidence.bytes, path);
+        const commands = nonfunctionalDeviationCommands(state, record, evidence.manifest, path);
         if (!commands.ok) throw new Error(commands.errors.join('; '));
         return { commands: commands.commands, compose: decided => ({
           event: { type: 'nonfunctional-deviation-recorded', data: { deviation: id, nfr: result.nfr,
@@ -3226,7 +3232,7 @@ export class RunService {
   }
 
   private async nonfunctionalAction(
-    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: Catalog,
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: ElementCatalog,
     candidate: Candidate, assessment: Assessment, decision: RoundDecision,
     investigatedNfrs: readonly string[],
   ): Promise<{ value: CoordinatorAction; invocation: string } | null> {
@@ -3247,7 +3253,7 @@ export class RunService {
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
       loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot, coordinatorActionToolName),
       prompt: [coordinatorActionPrompt(candidate, unresolved, investigatedNfrs,
-        { assessment, allowedAction: decision.action, investigationPaths }), JSON.stringify(catalog, null, 2)].join('\n\n'),
+        { assessment, allowedAction: decision.action, investigationPaths }), this.planPackage(run, catalog)].join('\n\n'),
       start: { mode: 'fresh' }, toolName: coordinatorActionToolName,
       description: 'Choose a bounded non-functional investigation, repair, or closure.',
       inputSchema: coordinatorActionJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-action/1',
@@ -3277,9 +3283,10 @@ export class RunService {
       role: 'nonfunctional-coordinator', work: {},
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
       loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot, coordinatorInvestigationToolName),
-      prompt: [`Investigate NFR IDs ${action.nfrs.join(', ')} for assessment ${assessment.id} of tree ${assessment.candidate.tree}.`,
+      prompt: [`Investigate element IDs ${action.nfrs.join(', ')} for assessment ${assessment.id} of tree ${assessment.candidate.tree}.`,
         `Question: ${action.question}`, `Scope: ${action.scope.join(', ')}`,
-        'Read source and report observed evidence and uncertainty. Do not edit source.'].join('\n'),
+        'Read source and report observed evidence and uncertainty. Do not edit source.', '',
+        this.planPackage(run, await this.frozenCatalog(run), action.nfrs)].join('\n'),
       start: { mode: 'fresh' }, toolName: coordinatorInvestigationToolName,
       description: 'Report read-only investigation evidence for every named NFR.',
       inputSchema: coordinatorInvestigationJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-investigation/1',
@@ -3303,7 +3310,7 @@ export class RunService {
   }
 
   private async nonfunctionalRepair(
-    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: Catalog,
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: ElementCatalog,
     assessment: Assessment, candidateId: string, action: Extract<CoordinatorAction, { kind: 'repair' }>,
   ): Promise<boolean> {
     const id = `nfr-repair-${String(run.log.count('nonfunctional-repair-assigned') + 1).padStart(3, '0')}`;
@@ -3322,7 +3329,7 @@ export class RunService {
   }
 
   private async performNonfunctionalRepair(
-    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: Catalog,
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: ElementCatalog,
     assignment: import('./nonfunctional-records.js').NonfunctionalRepairAssignment,
   ): Promise<boolean> {
     const loaded = packages.get('nonfunctional-repair-engineer');
@@ -3340,7 +3347,7 @@ export class RunService {
       attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-repair-engineer').length + 1,
       loaded, systemPrompt: renderNonfunctionalRepairPrompt(loaded, this.projectRoot),
       prompt: repairPrompt(assignment.task, (await this.readPreparedCandidate(run, assignment.candidate)).candidate,
-        catalog, assignment.nfrs, assignment.startingModule,
+        this.planPackage(run, catalog, assignment.nfrs), assignment.startingModule,
         { evidence: assignment.evidence, uncertainty: assignment.uncertainty }),
       start: { mode: 'fresh' }, toolName: nonfunctionalRepairToolName,
       description: 'Report the authorized non-functional repair batch and remaining work.',
@@ -3368,7 +3375,7 @@ export class RunService {
 
   /** A durable assignment may precede the child; a settled submitted child may precede its repair event. */
   private async resumeNonfunctionalRepair(
-    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: Catalog,
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, catalog: ElementCatalog,
     assignment: import('./nonfunctional-records.js').NonfunctionalRepairAssignment,
   ): Promise<boolean> {
     const started = run.log.all('invocation-started').filter(event =>
@@ -3435,7 +3442,7 @@ export class RunService {
     catalog: Awaited<ReturnType<typeof readAcceptedEvidence>> & { status: 'available' },
     prepared: { id: string; candidate: Candidate }, round: number, phase: Assessment['phase'],
   ): Promise<Assessment | null> {
-    const nfrIds = catalog.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+    const nfrIds = assessedElements(catalog.catalog);
     const id = `nfa-${String(run.log.count('nonfunctional-assessed') + 1).padStart(3, '0')}`;
     let assessment: Assessment;
     if (nfrIds.length === 0) {
@@ -3452,9 +3459,9 @@ export class RunService {
         role: 'nonfunctional-coordinator', work: {},
         attempt: run.log.all('invocation-started').filter(event => event.data.role === 'nonfunctional-coordinator').length + 1,
         loaded, systemPrompt: renderNonfunctionalCoordinatorPrompt(loaded, this.projectRoot),
-        prompt: coordinatorAssessmentPrompt(catalog.catalog, prepared.candidate, round, phase),
+        prompt: coordinatorAssessmentPrompt(this.planPackage(run, catalog.catalog), prepared.candidate, round, phase),
         start: { mode: 'fresh' }, toolName: coordinatorAssessmentToolName,
-        description: 'Submit one evidence-grounded result for every fixed non-functional requirement.',
+        description: 'Submit one evidence-grounded result for every non-functional and fixed requirement.',
         inputSchema: coordinatorAssessmentJsonSchema, submissionSchema: 'ramify-agent.nonfunctional-assessment-submission/1',
         validate: input => {
           const checked = bindCoordinatorAssessment(input, { catalog: catalog.catalog, candidate: prepared.candidate,
@@ -3848,24 +3855,66 @@ export class RunService {
 
   // The initial analysis
 
-  /** The initial architect's one invocation, and the records its submission commits. */
+  /**
+   * The initial analysis: the intake, one extraction per principles
+   * document, the initial architect and one checker per captured document,
+   * each a fresh bounded session, and the records the accepted analysis
+   * commits. Nothing is durable before `analysis-accepted`, so a run started
+   * again before it repeats every turn.
+   */
   private async analyse(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, baseline: MeasurementSnapshot): Promise<boolean> {
     if (run.log.find('analysis-accepted')) return true;
     const loaded = packages.get('initial-architect');
-    if (loaded === undefined) {
-      await this.fail(run, 'internal', 'No prompt package is loaded for the initial architect');
+    const extractor = packages.get('catalog-extractor');
+    if (loaded === undefined || extractor === undefined) {
+      await this.fail(run, 'internal', 'No prompt package is loaded for the initial architect or the catalog extractor');
       return false;
+    }
+    const manifestRef = run.record.manifest.documentManifest;
+    if (manifestRef === undefined) {
+      await this.fail(run, 'analysis-invalid', 'This run has no captured documents to extract a catalog from', []);
+      return false;
+    }
+    const documents = await readCapturedDocuments(run.directory, run.record.manifest);
+    const inputs: ExtractionInputs = { planId: run.record.planId, manifest: documents.manifest, bytes: documents.bytes, runDirectory: run.directory };
+    let catalog = openElementCatalog(manifestRef.hash, documents.manifest);
+
+    const intake = await this.extract<IntakeSubmission>(run, agent, extractor, 'intake', {
+      prompt: intakeMessage(inputs), toolName: intakeToolName, inputSchema: intakeJsonSchema, submissionSchema: 'ramify-agent.intake/1',
+      validate: input => {
+        const shape = validateAgainst(intakeSubmissionSchema, input);
+        return shape.ok ? asValidation(shape.value, acceptIntake(catalog, documents.manifest, shape.value)) : shape;
+      },
+    });
+    if (intake === undefined) return false;
+    const intakeAccepted = acceptIntake(catalog, documents.manifest, intake.value);
+    if (!intakeAccepted.ok) throw new Error('An accepted intake no longer validates');
+    catalog = intakeAccepted.catalog;
+    const { incorporation } = intakeAccepted;
+
+    for (const document of documents.manifest.documents.filter(item => item.kind === 'principle')) {
+      const extracted = await this.extract<PrincipleSubmission>(run, agent, extractor, 'principles', {
+        prompt: principleMessage(inputs, document.id, intake.value.goal), toolName: principleToolName, inputSchema: principleJsonSchema,
+        submissionSchema: 'ramify-agent.principle-extraction/1',
+        validate: input => {
+          const shape = validateAgainst(principleSubmissionSchema, input);
+          return shape.ok ? asValidation(shape.value, acceptPrinciples(catalog, document.id, shape.value)) : shape;
+        },
+      });
+      if (extracted === undefined) return false;
+      const accepted = acceptPrinciples(catalog, document.id, extracted.value);
+      if (!accepted.ok) throw new Error('An accepted principles extraction no longer validates');
+      catalog = accepted.catalog;
     }
 
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
-    const documents = run.record.manifest.documentManifest ? await readCapturedDocuments(run.directory, run.record.manifest) : undefined;
+    const evidence: AnalysisEvidence = { index: run.index, catalog, incorporation, documents, planScenarios: run.record.planScenarios.scenarios };
     const systemPrompt = renderInitialArchitectPrompt(loaded, this.projectRoot);
-    const prompt = analysisMessage(run.record, plan, documents, run.directory);
+    const prompt = analysisMessage(run.record, plan, inputs, incorporatedExtraction(evidence));
     const scope = baselineScope(
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
       baseline.supplementary.map(entry => entry.path),
     );
-    const shape = describePlan(plan);
 
     const result = await this.runInvocation<InitialAnalysisSubmission>(run, agent, {
       role: 'initial-architect',
@@ -3878,9 +3927,8 @@ export class RunService {
       toolName: initialAnalysisToolName,
       description: 'Submit the run\'s initial analysis. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
       inputSchema: initialAnalysisJsonSchema,
-      submissionSchema: 'ramify-agent.initial-analysis/2',
-      validate: input => validateInitialAnalysis(input, { index: run.index, plan: shape, documents,
-        manifestHash: run.record.manifest.documentManifest?.hash, planScenarios: run.record.planScenarios.scenarios }),
+      submissionSchema: 'ramify-agent.initial-analysis/3',
+      validate: input => validateInitialAnalysis(input, evidence),
       // An accepted analysis session becomes the run's architect context:
       // briefs are appended to it and every placement request forks it.
       keep: ended => (ended === 'submitted' ? kept : finished('not-kept')),
@@ -3902,30 +3950,43 @@ export class RunService {
       return false;
     }
 
+    // Each checker reads one document once every element of it exists, and
+    // corrects the catalog and the citations before any ID is final.
+    let state: CheckState = acceptArchitectElements(catalog, result.value);
+    const findings: CatalogFinding[] = [];
+    for (const document of documents.manifest.documents) {
+      const checked = await this.extract<CheckSubmission>(run, agent, extractor, 'check', {
+        prompt: checkMessage(inputs, document.id, state), toolName: checkToolName, inputSchema: checkJsonSchema,
+        submissionSchema: 'ramify-agent.catalog-check/1',
+        validate: input => {
+          const shape = validateAgainst(checkSubmissionSchema, input);
+          return shape.ok ? asValidation(shape.value, applyCheck(state, document.id, 'candidate', shape.value, evidence)) : shape;
+        },
+      });
+      if (checked === undefined) return false;
+      const applied = applyCheck(state, document.id, checked.id, checked.value, evidence);
+      if (!applied.ok) throw new Error('An accepted catalog check no longer validates');
+      state = { catalog: applied.catalog, analysis: applied.analysis };
+      findings.push(...applied.findings);
+    }
+
     const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
     if (sourceChanges.length > 0) {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed before analysis acceptance: ${sourceChanges.join('; ')}`, [runLayout.documentManifest]);
       return false;
     }
-    const accepted = acceptAnalysis(result.value, {
+    const accepted = acceptAnalysis(state.analysis, {
       invocation: result.id,
       view: run.record.manifest.architectView,
       planId: run.record.planId,
       planScenarios: run.record.planScenarios.scenarios,
       index: run.index,
+      catalog: state.catalog,
+      incorporation,
       documents,
     });
-    if (!documents || !run.record.manifest.documentManifest || !result.value.catalog || !result.value.incorporation) {
-      await this.fail(run, 'analysis-invalid', 'The accepted analysis has no captured catalog or incorporation judgment', []);
-      return false;
-    }
-    const numbered = assignCatalog(run.record.manifest.documentManifest.hash, result.value.catalog, documents.manifest, documents.bytes);
-    if (!numbered.ok) {
-      await this.fail(run, 'analysis-invalid', `The accepted catalog could not be resolved: ${numbered.errors.join('; ')}`, []);
-      return false;
-    }
-    const catalogText = `${JSON.stringify(numbered.catalog)}\n`;
-    const incorporationText = `${JSON.stringify({ schema: 'ramify-agent.document-incorporation/1', ...result.value.incorporation })}\n`;
+    const catalogText = serializeElementCatalog(state.catalog);
+    const incorporationText = `${JSON.stringify(incorporation)}\n`;
     const catalogHash = sha256(catalogText);
     const incorporationHash = sha256(incorporationText);
     const catalogPath = runLayout.catalogVersion(catalogHash);
@@ -3933,6 +3994,7 @@ export class RunService {
     await writeOnce(run.path(catalogPath), catalogText);
     await writeOnce(run.path(incorporationPath), incorporationText);
     await this.afterWrite('analysis-evidence-staged', run.record.jobId);
+    const count = (kind: ElementKind) => state.catalog.elements.filter(element => element.kind === kind).length;
     await this.write(run, {
       type: 'analysis-accepted',
       data: {
@@ -3943,14 +4005,44 @@ export class RunService {
         workItems: accepted.workItems.length,
         scenarios: accepted.scenarios.length,
         warnings: [...accepted.warnings],
-        catalog: { nfr: numbered.catalog.items.filter(item => item.classification === 'non-functional-requirement').length,
-          advice: numbered.catalog.items.filter(item => item.classification === 'advice').length },
+        catalog: { context: count('context'), functional: count('functional'), nonFunctional: count('non-functional'),
+          fixed: count('fixed'), recommendation: count('recommendation') },
+        findings,
         evidence: { catalog: { path: catalogPath, hash: catalogHash },
           incorporation: { path: incorporationPath, hash: incorporationHash } },
       },
     }, accepted.records);
     await this.afterWrite('analysis-accepted', run.record.jobId);
     return true;
+  }
+
+  /**
+   * One catalog extractor turn: a fresh read-only session given captured
+   * files and nothing else, whose one accepted submission is its answer. A
+   * turn that ends without one fails the analysis, as the architect's does.
+   */
+  private async extract<T>(run: Run, agent: AgentPort, loaded: LoadedPackage, turn: ExtractionTurn, request: {
+    readonly prompt: string; readonly toolName: string; readonly inputSchema: JsonSchema; readonly submissionSchema: string;
+    readonly validate: (input: unknown) => SubmissionValidation<T>;
+  }): Promise<{ readonly id: string; readonly value: T } | undefined> {
+    const attempt = run.log.all('invocation-started').filter(event => event.data.role === 'catalog-extractor').length + 1;
+    const result = await this.runInvocation<T>(run, agent, {
+      role: 'catalog-extractor', work: {}, attempt, loaded,
+      systemPrompt: renderExtractionPrompt(loaded, this.projectRoot, turn),
+      prompt: request.prompt, start: { mode: 'fresh' },
+      toolName: request.toolName, description: `Submit this ${turn} turn's reading of the captured documents. The harness checks its shape, documents and citations and answers every error with its path.`,
+      inputSchema: request.inputSchema, submissionSchema: request.submissionSchema, validate: request.validate,
+      keep: () => finished('not-kept'),
+      scope: { write: null, measurement: null, size: null },
+      equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
+    });
+    if (this.ignoring(run)) return undefined;
+    if (result.ended !== 'submitted' || result.value === undefined) {
+      await this.fail(run, result.ended === 'invalid-submission' ? 'invalid-submission' : result.outcomeKind === 'failed' ? 'agent-failed' : 'analysis-invalid',
+        `The catalog extractor's ${turn} turn ended without an accepted submission (${result.ended}, ${result.outcomeKind})`, []);
+      return undefined;
+    }
+    return { id: result.id, value: result.value };
   }
 
   /**
@@ -4048,7 +4140,7 @@ export class RunService {
   private async orientAndSelectWorkContext(
     run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
     item: WorkItem, local: LoadedPackage, briefing: string, workingDirectory: string,
-  ): Promise<{ readonly kind: 'skip' | 'failed' } | { readonly kind: 'ready'; readonly text: string; readonly selection: string; readonly packageHash: string; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
+  ): Promise<{ readonly kind: 'skip' | 'failed' } | { readonly kind: 'ready'; readonly package: WorkPackage; readonly session: SessionId | undefined; readonly ref: string | undefined }> {
     const accepted = run.log.find('analysis-accepted');
     if (!accepted?.data.evidence && !run.record.manifest.documentManifest) return { kind: 'skip' }; // old single-plan run
     const sourceChanges = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
@@ -4135,68 +4227,23 @@ export class RunService {
       return { kind: 'failed' };
     }
     const packet = packetBytes.toString('utf8');
+    const source: SelectionSource = { catalog: evidence.catalog, planDeviations: this.planDeviationsOf(run),
+      workItemElements: [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs] };
     const parentStarted = run.log.all('invocation-started').find(event => event.data.invocation === orientation!.data.invocation);
     const parentSession = parentStarted?.data.session;
     let selectionEvent = run.log.all('context-selection-recorded').find(event => event.data.workItem === item.id);
     if (selectionEvent === undefined) {
-      const count = run.record.policy.limits.forkRetriesPerRequest + 1;
-      for (let attempt = 1; attempt <= count && !this.ignoring(run); attempt++) {
-        const forked = orientation.data.point !== null && parentSession !== undefined;
-        const workspace = run.path(join('work', item.id, 'selector-workspace'));
-        await mkdir(workspace, { recursive: true });
-        const result = await this.runInvocation<ContextSelectorSubmission>(run, agent, {
-          role: 'context-selector', work: { workItem: item.id }, attempt, loaded: selector,
-          systemPrompt: renderContextSelectorPrompt(selector, this.projectRoot),
-          prompt: contextSelectorMessage(packet, evidence.catalog, evidence.manifest, run.directory),
-          start: forked ? { mode: 'fork', from: orientation.data.point! } : { mode: 'fresh' },
-          ...(forked ? { fork: { from: { session: parentSession, invocation: orientation.data.invocation }, reason: 'context-selection' as const, briefs: [] } } : {}),
-          ...(forked ? {} : { degraded: { requested: 'fork' as const, reason: 'the recorded orientation has no retained session point' } }),
-          toolName: contextSelectorToolName, description: 'Select exact captured context for this work item.',
-          inputSchema: contextSelectorJsonSchema, submissionSchema: 'ramify-agent.context-selector-submission/1',
-          validate: input => {
-            const parsed = validateAgainst(contextSelectorSubmissionSchema, input);
-            if (!parsed.ok) return parsed;
-            const checked = prepareContextSelection(parsed.value, {
-              workItem: item.id, orientationInvocation: orientation!.data.invocation,
-              orientationPoint: orientation!.data.point, selectorInvocation: 'candidate', degraded: !forked,
-            }, evidence.catalog, evidence.manifest, evidence.bytes);
-            return checked.status === 'available' ? parsed : { ok: false, errors: checked.errors.map(message => ({ path: 'selected', message })) };
-          },
-          scope: { write: null, measurement: null, size: null }, workingDirectory: workspace,
-          equip: () => ({ builtinTools: ['read', 'grep', 'ls'] }), keep: () => finished('not-kept'),
-        });
-        if (result.ended !== 'submitted' || result.value === undefined) continue;
-        const prepared = prepareContextSelection(result.value, {
-          workItem: item.id, orientationInvocation: orientation.data.invocation,
-          orientationPoint: orientation.data.point, selectorInvocation: result.id,
-          degraded: !forked || result.actual !== 'fork',
-        }, evidence.catalog, evidence.manifest, evidence.bytes);
-        if (prepared.status === 'unavailable') continue;
-        const changed = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
-        if (changed.length > 0) {
-          await this.fail(run, 'inputs-changed', `The captured plan evidence changed during context selection: ${changed.join('; ')}`, [runLayout.documentManifest]);
-          return { kind: 'failed' };
-        }
-        const selectionText = `${JSON.stringify(prepared.selection)}\n`;
-        const selectionHash = sha256(selectionText);
-        const selectionPath = runLayout.selectionVersion(item.id, selectionHash);
-        const packagePath = runLayout.contextPackage(item.id, prepared.package.hash);
-        await writeOnce(run.path(selectionPath), selectionText);
-        await writeOnce(run.path(packagePath), prepared.package.text);
-        await this.write(run, { type: 'context-selection-recorded', data: {
-          workItem: item.id, selection: selectionPath, selectionHash,
-          packageHash: prepared.package.hash, package: packagePath,
-        } });
-        await this.afterWrite('context-selection-recorded', run.record.jobId);
-        selectionEvent = run.log.all('context-selection-recorded').find(event => event.data.workItem === item.id);
-        break;
-      }
+      const selected = await this.selectElements(run, agent, selector, item, source, {
+        packet, orientationInvocation: orientation.data.invocation, point: orientation.data.point, session: parentSession,
+      });
+      if (selected === 'failed') return { kind: 'failed' };
+      selectionEvent = selected;
     }
     if (selectionEvent === undefined) {
       await this.fail(run, 'invalid-submission', `No valid context selection was obtained for ${item.id} within the captured retry bound`);
       return { kind: 'failed' };
     }
-    const recorded = await readRecordedContextSelection(run.directory, selectionEvent, evidence.catalog, evidence.manifest, evidence.bytes);
+    const recorded = await readRecordedContextSelection(run.directory, selectionEvent, evidence.catalog, this.planDeviationsOf(run));
     if (recorded.status === 'unavailable') {
       await this.fail(run, 'inputs-changed', `The recorded context selection of ${item.id} is unavailable: ${recorded.reason}`, [selectionEvent.data.selection]);
       return { kind: 'failed' };
@@ -4244,8 +4291,114 @@ export class RunService {
       session = undefined;
       ref = undefined;
     }
-    return { kind: 'ready', text: recorded.packageText, selection: selectionEvent.data.selection,
-      packageHash: selectionEvent.data.packageHash, session, ref };
+    return { kind: 'ready', package: { text: recorded.packageText, selection: selectionEvent.data.selection, citation: recorded.selection.package }, session, ref };
+  }
+
+  /** Whether a placement decision made for this work item names an owner none of its earlier decisions or its own module did. */
+  private addsOwner(run: Run, item: WorkItem, decision: PlacementDecision): boolean {
+    if (decision.owner === null || decision.owner === item.module) return false;
+    const earlier = [...committedRecords(run.log.ledger.replay()).decisions.values()]
+      .filter(entry => entry.workItem === item.id && entry.id !== decision.id);
+    return !earlier.some(entry => entry.owner === decision.owner);
+  }
+
+  /** Select a work item's elements again after a decision added an owner, forking its architect's current session point. */
+  private async reselectWorkContext(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, item: WorkItem, current: WorkPackage,
+    from: { readonly invocation: string; readonly point: string | null; readonly session: SessionId | undefined }, decision: PlacementDecision,
+  ): Promise<WorkPackage | null> {
+    const selector = packages.get('context-selector');
+    if (selector === undefined) {
+      await this.fail(run, 'internal', 'The run has no context selector package');
+      return null;
+    }
+    try {
+      const catalog = await this.frozenCatalog(run);
+      const packet = [
+        `# Selection again for ${item.id}`, '',
+        `Placement decision \`${decision.id}\` placed \`${decision.capability}\` in \`${decision.owner}\`, an owner this work item did not have. Select the elements for the work as it now stands; the package it replaces held ${current.citation.elements.join(', ') || 'no element'}.`,
+      ].join('\n');
+      const selected = await this.selectElements(run, agent, selector, item,
+        { catalog, planDeviations: this.planDeviationsOf(run), workItemElements: [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs] },
+        { packet, orientationInvocation: from.invocation, point: from.point, session: from.session });
+      if (selected === 'failed') return null;
+      if (selected === undefined) {
+        await this.fail(run, 'invalid-submission', `No valid context selection was obtained for ${item.id} within the captured retry bound`);
+        return null;
+      }
+      const recorded = await readRecordedContextSelection(run.directory, selected, catalog, this.planDeviationsOf(run));
+      if (recorded.status === 'unavailable') throw new EvidenceUnavailableError(recorded.reason);
+      return { selection: selected.data.selection, citation: recorded.selection.package, text: recorded.packageText };
+    } catch (error) {
+      await this.fail(run, 'inputs-changed', `The work-item package of ${item.id} cannot be selected again: ${message(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * One selection of a work item's elements by a read-only fork of its local
+   * architect at `from.point`, or a fresh selector from the recorded
+   * orientation where no point is retained, which marks it degraded. It
+   * records the selection and the package it cites, superseding the work
+   * item's earlier selection where there is one.
+   */
+  private async selectElements(
+    run: Run, agent: AgentPort, selector: LoadedPackage, item: WorkItem, source: SelectionSource,
+    from: { readonly packet: string; readonly orientationInvocation: string; readonly point: string | null; readonly session: SessionId | undefined },
+  ): Promise<RunEventOf<'context-selection-recorded'> | undefined | 'failed'> {
+    const supersedes = run.log.all('context-selection-recorded').filter(event => event.data.workItem === item.id).at(-1)?.data.selection;
+    let selectionEvent: RunEventOf<'context-selection-recorded'> | undefined;
+    const count = run.record.policy.limits.forkRetriesPerRequest + 1;
+    for (let attempt = 1; attempt <= count && !this.ignoring(run); attempt++) {
+      const forked = from.point !== null && from.session !== undefined;
+      const workspace = run.path(join('work', item.id, 'selector-workspace'));
+      await mkdir(workspace, { recursive: true });
+      const result = await this.runInvocation<ContextSelectorSubmission>(run, agent, {
+        role: 'context-selector', work: { workItem: item.id }, attempt, loaded: selector,
+        systemPrompt: renderContextSelectorPrompt(selector, this.projectRoot),
+        prompt: contextSelectorMessage(from.packet, source.catalog),
+        start: forked ? { mode: 'fork', from: from.point! } : { mode: 'fresh' },
+        ...(forked ? { fork: { from: { session: from.session!, invocation: from.orientationInvocation }, reason: 'context-selection' as const, briefs: [] } } : {}),
+        ...(forked ? {} : { degraded: { requested: 'fork' as const, reason: 'the recorded orientation has no retained session point' } }),
+        toolName: contextSelectorToolName, description: 'Select, by ID, the elements an engineer working this work item must keep in view.',
+        inputSchema: contextSelectorJsonSchema, submissionSchema: 'ramify-agent.context-selector-submission/1',
+        validate: input => {
+          const parsed = validateAgainst(contextSelectorSubmissionSchema, input);
+          if (!parsed.ok) return parsed;
+          const checked = prepareContextSelection(parsed.value, {
+            workItem: item.id, orientationInvocation: from.orientationInvocation,
+            orientationPoint: from.point, selectorInvocation: 'candidate', degraded: !forked,
+          }, source);
+          return checked.status === 'available' ? parsed : { ok: false, errors: checked.errors };
+        },
+        scope: { write: null, measurement: null, size: null }, workingDirectory: workspace,
+        equip: () => ({ builtinTools: ['read', 'grep', 'ls'] }), keep: () => finished('not-kept'),
+      });
+      if (result.ended !== 'submitted' || result.value === undefined) continue;
+      const prepared = prepareContextSelection(result.value, {
+        workItem: item.id, orientationInvocation: from.orientationInvocation,
+        orientationPoint: from.point, selectorInvocation: result.id,
+        degraded: !forked || result.actual !== 'fork',
+      }, source);
+      if (prepared.status === 'unavailable') continue;
+      const changed = await documentChanges(this.projectRoot, run.record.planId, run.directory, run.record.manifest);
+      if (changed.length > 0) {
+        await this.fail(run, 'inputs-changed', `The captured plan evidence changed during context selection: ${changed.join('; ')}`, [runLayout.documentManifest]);
+        return 'failed';
+      }
+      const selectionText = `${JSON.stringify(prepared.selection)}\n`;
+      const selectionHash = sha256(selectionText);
+      const selectionPath = runLayout.selectionVersion(item.id, selectionHash);
+      await writeOnce(run.path(selectionPath), selectionText);
+      await this.write(run, { type: 'context-selection-recorded', data: {
+        workItem: item.id, selection: selectionPath, selectionHash, packageHash: prepared.selection.package.hash,
+        ...(supersedes === undefined ? {} : { supersedes }),
+      } });
+      await this.afterWrite('context-selection-recorded', run.record.jobId);
+      selectionEvent = run.log.all('context-selection-recorded').filter(event => event.data.workItem === item.id).at(-1);
+      break;
+    }
+    return selectionEvent;
   }
 
   /**
@@ -4411,7 +4564,10 @@ export class RunService {
     let sessionRef: string | undefined;
     /** The session this architect's turns share, while the harness keeps it; `sessionRef` is its executor's point. */
     let session: SessionId | undefined;
-    let contextPackage: { readonly text: string; readonly selection: string; readonly packageHash: string } | undefined;
+    /** The work item's current package: the selection that cites it and its text. */
+    let contextPackage: WorkPackage | undefined;
+    /** A re-selection's package, which the next prompt carries once. */
+    let packageUndelivered = false;
     /** Why its next turn continues that session: what happened since its last turn. */
     let continuing: ContinueReason | undefined;
     let attempt = 0;
@@ -4489,9 +4645,8 @@ export class RunService {
       const scenarioLedger = trackedScenarios(run.log.ledger.replay());
       const scenarios = entryScenariosOf(scenarioLedger.records, scenarioLedger.states, 'entry' in item.origin ? item.origin.entry : null);
       const lastScenarios = lastResult === undefined ? [] : await this.passedScenarioLines(run, lastResult);
-      let prompt = workItemMessage({
+      const briefing: WorkItemBriefing = {
         item,
-        plan,
         onboarding,
         views,
         hypotheses,
@@ -4518,9 +4673,8 @@ export class RunService {
           ...(revisionReports === undefined || revisionReports.length === 0 ? {} : { revisionsNeeded: revisionReports }),
         },
         ...(unresolvedRequest === undefined ? {} : { unresolvedRequest }),
-        // The plan as the run's deviations amend it: every one in force, and
-        // the one that just answered this architect's unresolved request.
-        deviations: this.deviationsOf(run),
+        // The deviation that just answered this architect's unresolved
+        // request; every deviation after its package is rendered below.
         ...(deviationRecorded === undefined ? {} : { deviationRecorded: deviationRecorded.id }),
         ...(environmentResumed === undefined ? {} : { environmentResumed }),
         ...(returned === undefined ? {} : { reconciliation: this.reconciliationBriefing(run, returned, undelivered) }),
@@ -4546,24 +4700,33 @@ export class RunService {
         projectRoot: this.projectRoot,
         workingDirectory,
         ...(moduleEntry !== undefined || proposal !== undefined ? { moduleDirectory: moduleEntry?.dir ?? proposal!.directory } : {}),
-      });
+      };
       if (attempt === 1) {
-        const context = await this.orientAndSelectWorkContext(run, agent, packages, item, loaded, prompt, workingDirectory);
+        const context = await this.orientAndSelectWorkContext(run, agent, packages, item, loaded, workItemMessage(briefing), workingDirectory);
         if (context.kind === 'failed') return null;
         if (context.kind === 'ready') {
-          contextPackage = { text: context.text, selection: context.selection, packageHash: context.packageHash };
+          contextPackage = context.package;
           session = resumes === null ? context.session : undefined;
           sessionRef = resumes === null ? context.ref : undefined;
           continuing = sessionRef === undefined ? undefined : 'context-selected';
         }
       }
-      if (contextPackage !== undefined) prompt = `${prompt}\n\n# Recorded context selection\n\n${contextPackage.text}`;
-      let selectedContext: Awaited<ReturnType<typeof this.selectedSource>>;
-      try { selectedContext = await this.selectedSource(run, item.id); }
-      catch (error) {
-        await this.fail(run, 'inputs-changed', `The source selection for ${item.id} cannot be used: ${message(error)}`);
+      // The package is in the session once: appended after the orientation,
+      // or carried by the first prompt of a session that lacks it, such as a
+      // reconstruction. Every other turn names it by its hash.
+      const packageInPrompt = contextPackage !== undefined && (sessionRef === undefined || packageUndelivered);
+      let prompt: string;
+      try {
+        prompt = workItemMessage({ ...briefing, ...(contextPackage === undefined ? {} : {
+          package: { hash: contextPackage.citation.hash, elements: contextPackage.citation.elements },
+          ...this.laterDeviations(run, await this.frozenCatalog(run), contextPackage.citation.deviations),
+        }) });
+      } catch (error) {
+        await this.fail(run, 'inputs-changed', `The work-item package of ${item.id} cannot be rendered: ${message(error)}`);
         return null;
       }
+      if (packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${contextPackage!.text}`;
+      packageUndelivered = false;
       // A finding is delivered once: the next turn of this same architect
       // has it in its own history, and repeating it would read as a second
       // detection.
@@ -4598,9 +4761,9 @@ export class RunService {
         description: 'End this turn with the work item\'s result. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
         inputSchema: localArchitectJsonSchema,
         submissionSchema: 'ramify-agent.local-architect-submission/1',
-        ...(contextPackage === undefined ? {} : { onStarted: async (invocation: string, destination: SessionId) => {
+        ...(!packageInPrompt ? {} : { onStarted: async (invocation: string, destination: SessionId) => {
           await this.write(run, { type: 'context-package-prompt-bound', data: {
-            workItem: item.id, selection: contextPackage!.selection, packageHash: contextPackage!.packageHash,
+            workItem: item.id, selection: contextPackage!.selection, packageHash: contextPackage!.citation.hash,
             invocation, session: destination,
           } });
         } }),
@@ -4618,7 +4781,7 @@ export class RunService {
           scenarios: this.declarationContext(run, item),
           ...(integration === undefined ? {} : { integration: integration.scope }),
           bounds: engineerBoundsOf(run.record.policy.limits),
-          ...(selectedContext === null ? {} : { selection: selectedContext.recorded.selection }),
+          ...(contextPackage === undefined ? {} : { package: new Set(contextPackage.citation.elements) }),
         }),
         scope: {
           write: null,
@@ -4674,6 +4837,17 @@ export class RunService {
         unresolvedRequest = resolution.kind === 'unresolved'
           ? { id: resolution.request, findings: resolution.findings, gaps: resolution.gaps }
           : undefined;
+        // A decision that adds an owner to the work item may bring other
+        // fixed requirements into play, so the work item selects again from
+        // its architect's current point; later assignments cite the new
+        // package, which the next prompt carries once.
+        if (resolution.kind === 'decided' && contextPackage !== undefined && this.addsOwner(run, item, resolution.decision)) {
+          const reselected = await this.reselectWorkContext(run, agent, packages, item, contextPackage,
+            { invocation: result.id, point: sessionRef ?? null, session }, resolution.decision);
+          if (reselected === null) return null;
+          contextPackage = reselected;
+          packageUndelivered = true;
+        }
         continuing = 'placement-answered';
         continue;
       }
@@ -5216,6 +5390,18 @@ export class RunService {
 
     const plan = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
     const planFile = planPath(run.record.planId);
+    // The fork reads the work item's package, with every deviation recorded
+    // so far, and a deviation amends its elements by ID.
+    let catalog: ElementCatalog;
+    let workElements: readonly string[];
+    try {
+      catalog = await this.frozenCatalog(run);
+      workElements = (await this.currentSelection(run, item.id))?.selection.package.elements
+        ?? [...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs];
+    } catch (error) {
+      await this.fail(run, 'inputs-changed', `The package of ${item.id} cannot be read for its unresolved request: ${message(error)}`);
+      return null;
+    }
     const unresolvable = (detail: string, evidence: readonly string[]) => this.fail(run, 'unresolvable-requirement',
       `The local architect of ${item.id} reports the request cannot be met as stated (${answer.conflict}), and ${detail}`,
       [deviationLayout.request(id), runLayout.submission(answer.invocation), ...answer.evidence, ...evidence]);
@@ -5253,9 +5439,9 @@ export class RunService {
         systemPrompt,
         prompt: unresolvedForkMessage({
           request,
-          workItem: { goal: item.goal, requirements: item.requirementRefs.map(ref => (ref.anchor !== undefined ? `“${ref.anchor}”` : `lines ${ref.lines![0]}–${ref.lines![1]}`)) },
-          plan: { path: planFile, text: plan },
-          deviations: this.deviationsOf(run),
+          workItem: { goal: item.goal },
+          package: this.planPackage(run, catalog, workElements),
+          deviations: this.deviationsOf(run).length,
           deviationLimit: this.deviationLimit(run),
           environmentProblems: this.environmentProblemsOf(run),
           view,
@@ -5283,7 +5469,7 @@ export class RunService {
         submissionSchema: 'ramify-agent.fork-submission/1',
         validate: input => validateFork(input, placementEvidenceOf(current, index), {
           kind: 'unresolved',
-          plan,
+          elements: new Set(workElements.filter(element => !element.startsWith('ctx-'))),
           workItems: new Set(current.workItems.map(entry => entry.id)),
           scenarios: new Map(tracked.records.map(record => [record.id, tracked.states.get(record.id) ?? 'pending'])),
         }),
@@ -5323,7 +5509,7 @@ export class RunService {
         return null;
       }
       if (value.kind === 'deviation') {
-        return this.recordDeviation(run, item, id, result.id, value.deviation, { path: planFile, text: plan });
+        return this.recordDeviation(run, item, id, result.id, value.deviation, { path: planFile, text: plan }, catalog);
       }
       if (value.kind === 'environment') {
         return this.reportEnvironment(run, item, request, result.id, value);
@@ -5360,6 +5546,7 @@ export class RunService {
     invocation: string,
     body: DeviationBody,
     plan: { readonly path: string; readonly text: string },
+    catalog: ElementCatalog,
   ): Promise<UnresolvedResolution | null> {
     const recorded = run.log.count('plan-deviation-recorded');
     const held = recorded >= this.deviationLimit(run);
@@ -5386,7 +5573,10 @@ export class RunService {
         workItem: item.id,
         invocation,
         plan: { path: plan.path, revision: `sha256:${sha256(plan.text)}` },
-        requirements: body.requirements.map(requirement => ({ lines: requirement.lines, text: planLines(plan.text, requirement.lines) })),
+        amends: body.amends.map(element => {
+          const found = catalog.elements.find(candidate => candidate.id === element)!;
+          return { id: element, path: catalog.documents.find(document => document.id === found.document)!.path, text: found.text };
+        }),
         instead: body.instead,
         why: body.why,
         rejected: body.rejected.map(entry => ({ ...entry })),
@@ -5904,20 +6094,19 @@ export class RunService {
       }));
 
     const id = iterationId(item.id, number);
-    let selected: Awaited<ReturnType<typeof this.selectedSource>>;
-    try { selected = await this.selectedSource(run, item.id); }
-    catch (error) {
-      await this.fail(run, 'inputs-changed', `The assignment source for ${id} cannot be used: ${message(error)}`);
-      return null;
-    }
-    if (selected !== null && body.citedItems === undefined) {
-      await this.fail(run, 'invalid-submission', `The assignment ${id} omitted its source citations`);
-      return null;
-    }
-    const assignmentContext = selected === null ? null : makeAssignmentContext(
-      id, selected.event.data.selection, selected.recorded.selection, body.citedItems ?? []);
-    if (assignmentContext !== null && 'errors' in assignmentContext) {
-      await this.fail(run, 'invalid-submission', `The assignment ${id} has invalid source citations: ${assignmentContext.errors.join('; ')}`);
+    // The assignment package is cited before `iteration-assigned`: the
+    // elements the architect names, with every plan deviation recorded
+    // now, so no later reader can fail to render it.
+    let source: PackageCitation | undefined;
+    try {
+      const selected = await this.currentSelection(run, item.id);
+      if (selected !== null) {
+        const outside = body.citedElements.filter(element => !selected.selection.package.elements.includes(element));
+        if (outside.length > 0) throw new EvidenceUnavailableError(`It cites ${outside.join(', ')}, which the work-item package does not hold`);
+        source = await this.citeCurrentDeviations(run, body.citedElements);
+      }
+    } catch (error) {
+      await this.fail(run, 'inputs-changed', `The assignment package of ${id} cannot be cited: ${message(error)}`);
       return null;
     }
     const assignment = iterationAssignmentSchema.parse({
@@ -5930,8 +6119,7 @@ export class RunService {
       goal: body.goal,
       approach: body.approach,
       scope,
-      requirementRefs: body.requirementRefs,
-      ...(body.citedItems === undefined ? {} : { citedItems: body.citedItems }),
+      ...(source === undefined ? {} : { source }),
       externalCapabilities: revised === undefined
         ? body.externalCapabilities
         : [{ capability: revised.capability.id, owner: revised.provider, role: 'request' }],
@@ -5973,7 +6161,6 @@ export class RunService {
         },
       }, [
       { path: iterationLayout.assignment(item.id, number), id, revision: 1, body: assignment },
-      ...(assignmentContext === null ? [] : [{ path: runLayout.assignmentContext(id), id, revision: 1, body: assignmentContext }]),
       ...localRecords,
     ]);
     await this.afterWrite(revised === undefined ? 'iteration-assigned' : 'contract-requested', run.record.jobId);
@@ -6140,10 +6327,13 @@ export class RunService {
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
       const briefedScenarios = await this.engineerScenarios(run, item);
-      let source: Awaited<ReturnType<typeof this.assignmentSource>>;
-      try { source = await this.assignmentSource(run, assignment); }
-      catch (error) {
-        await this.fail(run, 'inputs-changed', `The source evidence for ${assignment.id} cannot be delivered: ${message(error)}`);
+      // The assignment package reaches a session once: a continued session
+      // holds it from its first prompt.
+      let assignmentPackage: string | undefined;
+      try {
+        if (assignment.source !== undefined && start.mode === 'fresh') assignmentPackage = await this.packageText(run, assignment.source);
+      } catch (error) {
+        await this.fail(run, 'inputs-changed', `The assignment package of ${assignment.id} cannot be delivered: ${message(error)}`);
         return null;
       }
       // The engineer's own test run is a diagnosis over the modules it was
@@ -6177,7 +6367,7 @@ export class RunService {
           ...(failedGate === undefined ? {} : { failedGate }),
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
-          ...(source === null ? {} : { sourceEvidence: source.text }),
+          ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
         }),
         start,
         session,
@@ -6598,22 +6788,8 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `The requesting assignment ${request.requestedBy} cannot be read`);
       return null;
     }
-    let inherited: Awaited<ReturnType<typeof this.assignmentSource>>;
-    let selected: Awaited<ReturnType<typeof this.selectedSource>>;
-    try {
-      inherited = await this.assignmentSource(run, parentAssignment.data);
-      selected = inherited === null ? null : await this.selectedSource(run, item.id);
-    }
-    catch (error) {
-      await this.fail(run, 'inputs-changed', `The requesting assignment source for ${id} cannot be used: ${message(error)}`);
-      return null;
-    }
-    const assignmentContext = selected === null ? null : makeAssignmentContext(
-      id, selected.event.data.selection, selected.recorded.selection, parentAssignment.data.citedItems ?? []);
-    if (assignmentContext !== null && 'errors' in assignmentContext) {
-      await this.fail(run, 'inputs-changed', `The inherited source citations for ${id} are invalid: ${assignmentContext.errors.join('; ')}`);
-      return null;
-    }
+    // A contract iteration inherits its requester's assignment package by
+    // record: the same elements, deviations and hash.
     const assignment = iterationAssignmentSchema.parse({
       schema: 'ramify-agent.iteration-assignment/1',
       id,
@@ -6624,8 +6800,7 @@ export class RunService {
       goal: `Establish the agreement that gives ${item.module} the behavior of "${entry.capability}", which ${entry.owner} owns, and integrate it in ${item.module} against a fake.`,
       approach: `${item.module} stated the need as behavior. Design the interface, write the conformance suite and the fake, integrate the fake at the seam where ${entry.owner}'s real export will act, exposed exactly as that export will be, and leave ${entry.owner} to implement the provider.`,
       scope,
-      requirementRefs: [],
-      ...(parentAssignment.data.citedItems === undefined ? {} : { citedItems: [...parentAssignment.data.citedItems] }),
+      ...(parentAssignment.data.source === undefined ? {} : { source: parentAssignment.data.source }),
       externalCapabilities: [{ capability: entry.capability, owner: entry.owner, role: 'request' }],
       completionEvidence: `${item.module}'s own tests pass against the fake, and the fake passes the conformance suite.`,
       evidenceObligations: [],
@@ -6654,7 +6829,6 @@ export class RunService {
       },
     }, [
       { path: iterationLayout.assignment(item.id, number), id, revision: 1, body: assignment },
-      ...(assignmentContext === null ? [] : [{ path: runLayout.assignmentContext(id), id, revision: 1, body: assignmentContext }]),
     ]);
     await this.afterWrite('contract-requested', run.record.jobId);
     if (this.ignoring(run)) return null;
@@ -6762,10 +6936,12 @@ export class RunService {
       });
       const index = await this.refreshIndex(run);
 
-      let source: Awaited<ReturnType<typeof this.assignmentSource>>;
-      try { source = await this.assignmentSource(run, assignment); }
-      catch (error) {
-        await this.fail(run, 'inputs-changed', `The source evidence for contract ${assignment.id} cannot be delivered: ${message(error)}`);
+      // The requester's assignment package reaches the session once.
+      let assignmentPackage: string | undefined;
+      try {
+        if (assignment.source !== undefined && sessionRef === undefined) assignmentPackage = await this.packageText(run, assignment.source);
+      } catch (error) {
+        await this.fail(run, 'inputs-changed', `The assignment package of contract ${assignment.id} cannot be delivered: ${message(error)}`);
         return null;
       }
 
@@ -6785,7 +6961,7 @@ export class RunService {
           provider: subject.provider,
           existingConsumers: this.consumersOf(run, subject.capability, item.module),
           ...(failedGate === undefined ? {} : { failedGate }),
-          ...(source === null ? {} : { sourceEvidence: source.text }),
+          ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
         }),
         start: sessionRef === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: sessionRef },
         session,
@@ -7904,7 +8080,7 @@ export class RunService {
    * transcript as text, the complete outputs of its shell calls and the
    * patch of the uncommitted work. What cannot be written is named instead.
    */
-  private async failureEvidence(run: Run, workspace: string, result: InvocationResult<unknown>, digest: FailureDigest): Promise<AnalysisEvidence> {
+  private async failureEvidence(run: Run, workspace: string, result: InvocationResult<unknown>, digest: FailureDigest): Promise<FailureEvidence> {
     const files: Array<{ path: string; holds: string }> = [];
     const missing: string[] = [];
     await mkdir(join(workspace, 'outputs'), { recursive: true });
@@ -9073,6 +9249,13 @@ type UnresolvedResolution =
   | { readonly kind: 'environment'; readonly problem: EnvironmentProblem; readonly note: string };
 
 /** What one placement request resolved to, for the local architect that made it. */
+/** A work item's package as its local architect holds it: the selection that cites it, the citation and its text. */
+interface WorkPackage {
+  readonly selection: string;
+  readonly citation: PackageCitation;
+  readonly text: string;
+}
+
 type PlacementResolution =
   | { readonly kind: 'decided'; readonly decision: PlacementDecision }
   | { readonly kind: 'unresolved'; readonly request: string; readonly findings: readonly string[]; readonly gaps: readonly string[] };
@@ -9297,7 +9480,7 @@ function rootModuleOf(index: ArchitectIndex | null): string | undefined {
  * outcome, which is written once the session has started.
  */
 /** What a review request binds besides its candidate: its question's captured inputs and its fork point. */
-type ReviewInputs = Pick<ReviewRequest, 'requirements' | 'guidance' | 'forkPoint'> & Partial<Pick<ReviewRequest, 'inputsUnavailable' | 'source'>>;
+type ReviewInputs = Pick<ReviewRequest, 'guidance' | 'forkPoint'> & Partial<Pick<ReviewRequest, 'inputsUnavailable' | 'source'>>;
 
 /** What the harness binds to one concern of a valid submission. */
 interface ConcernBinding {
@@ -9315,14 +9498,6 @@ function requestedStartOf(request: ReviewRequest): 'fresh' | 'fork' {
  * The inputs a request bound, as read again now: each must be there with
  * the hash the request recorded, or the question is not the one it asked.
  */
-/** Each plan deviation as a scope review's captured input: `deviation:pd-001`, with the hash of its text. */
-function deviationInputs(deviations: readonly PlanDeviation[]): CapturedInput[] {
-  return deviations.map(deviation => {
-    const text = deviationText(deviation);
-    return { ref: `deviation:${deviation.id}`, hash: sha256(text), text };
-  });
-}
-
 function boundInputs(read: readonly CapturedInput[], bound: ReadonlyArray<{ readonly ref: string; readonly hash: string }>): CapturedInput[] {
   return bound.map(entry => {
     const found = read.find(input => input.ref === entry.ref);
@@ -9432,39 +9607,25 @@ function stoppedOutcome(): Omit<InvocationOutcome, 'schema' | 'invocation'> {
   };
 }
 
-function analysisMessage(record: RunRecord, plan: string,
-  documents?: Awaited<ReturnType<typeof readCapturedDocuments>>, directory?: string): string {
+function analysisMessage(record: RunRecord, plan: string, inputs: ExtractionInputs, planScenarios: PlanScenarioExtraction): string {
   const view = record.manifest.architectView;
   const source = record.manifest.source;
+  const accompanying = inputs.manifest.documents.filter(document => document.kind === 'plan' && document.id !== inputs.manifest.root);
   return [
     `# Plan "${record.planId}"`,
     '',
-    `The plan, as \`plans/${record.planId}/plan.md\` read when this run started:`,
+    `The plan, as \`plans/${record.planId}/plan.md\` read when this run started (${inputs.manifest.root}):`,
     '',
     '<plan>',
     plan.trim(),
     '</plan>',
     '',
-    ...(documents ? [
-      '# Captured document index', '',
-      'Read relevant captured files using `read` at the absolute paths below. Use near-verbatim source excerpts and document IDs in your analysis; byte offsets are not required. A link alone does not make scenarios binding. Judge each plan document and each missing reference explicitly.',
-      '',
-      ...documents.manifest.documents.map(document => `- ${document.id} (${document.kind}): ${document.path}; SHA-256 ${document.sha256}; captured file ${join(directory!, document.storedAt)}`),
-      ...(documents.manifest.missing.length ? ['', 'Missing references to judge:',
-        ...documents.manifest.missing.map(gap => `- From ${gap.from}, bytes ${gap.source.start}–${gap.source.end}: ${gap.target}; ${gap.reason}`)] : []),
-      '',
-      `Principles scan: ${documents.manifest.principlesScan.status}${documents.manifest.principlesScan.unreadable.length ? `; unreadable ${documents.manifest.principlesScan.unreadable.map(item => item.path).join(', ')}` : ''}.`,
-      'Inspect governing scope and status from each principle text; its filename alone does not establish applicability.', '',
-      'Candidate scenario blocks in captured plan documents (local IDs here; accepted ps-NN IDs are numbered across only the incorporated documents, in manifest order):',
-      ...documents.manifest.documents.filter(document => document.kind === 'plan').flatMap(document => {
-        const content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(documents.bytes.get(document.id)!);
-        const extraction = extractPlanScenarios(content, document.id);
-        return extraction.scenarios.length
-          ? extraction.scenarios.map(scenario => `- ${document.id} local ${scenario.id}: ${scenario.name}, lines ${scenario.lines[0]}–${scenario.lines[1]}`)
-          : [`- ${document.id}: no parseable scenario block`];
-      }), '',
-    ] : []),
-    ...planScenariosSection(record.planScenarios, documents !== undefined),
+    ...(accompanying.length === 0 ? [] : [
+      '# Accompanying plan documents', '',
+      'Read each in full at its captured file; its functional and context elements are yours to submit as well:', '',
+      ...accompanying.map(document => `- ${document.id}: ${document.path}; captured file ${join(inputs.runDirectory, document.storedAt)}`), '',
+    ]),
+    ...planScenariosSection(planScenarios),
     '# This run\'s evidence',
     '',
     view.status === 'materialized'
@@ -9484,8 +9645,8 @@ function analysisMessage(record: RunRecord, plan: string,
  * lines, and every `gherkin` block that did not parse. A plan without
  * blocks is said to have none in one line.
  */
-function planScenariosSection(extraction: PlanScenarioExtraction, candidates = false): string[] {
-  const lines = [candidates ? '# Root plan scenario candidates' : '# The plan\'s scenarios', ''];
+function planScenariosSection(extraction: PlanScenarioExtraction): string[] {
+  const lines = ['# The plan\'s scenarios', ''];
   if (extraction.scenarios.length === 0 && extraction.limitations.length === 0) {
     return [...lines, 'The plan has no `gherkin` block, so it states no scenario: write every entry\'s scenarios yourself.', ''];
   }
@@ -9493,14 +9654,14 @@ function planScenariosSection(extraction: PlanScenarioExtraction, candidates = f
     lines.push('The plan states no scenario that could be extracted: write every entry\'s scenarios yourself.', '');
   } else {
     lines.push(
-      `The harness extracted ${extraction.scenarios.length === 1 ? 'one scenario' : `${extraction.scenarios.length} scenarios`} from the root plan's \`gherkin\` blocks. ${candidates ? 'If you incorporate the root, each must appear exactly once in your submission.' : 'Each appears exactly once in your submission.'} Use one as the origin of an entry scenario, restating its text as written here, or as an integration scenario with its sub-scenarios.`,
+      `The harness extracted ${extraction.scenarios.length === 1 ? 'one scenario' : `${extraction.scenarios.length} scenarios`} from the \`gherkin\` blocks of the plan documents the intake incorporated. Each appears exactly once in your submission. Use one as the origin of an entry scenario, restating its text as written here, or as an integration scenario with its sub-scenarios.`,
       '',
     );
     for (const scenario of extraction.scenarios) {
       lines.push(
         `## ${scenario.id}: ${scenario.name}`,
         '',
-        `Plan lines ${scenario.lines[0]}–${scenario.lines[1]}${scenario.outline ? ', a Scenario Outline with its examples' : ''}.`,
+        `Lines ${scenario.lines[0]}–${scenario.lines[1]} of ${scenario.document ?? "the plan"}${scenario.outline ? ', a Scenario Outline with its examples' : ''}.`,
         '',
         '```gherkin',
         ...scenario.source,

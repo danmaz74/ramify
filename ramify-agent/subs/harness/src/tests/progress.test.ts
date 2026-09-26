@@ -215,7 +215,7 @@ describe('M2: provider waits, verified reuse, reopened evidence and superseded h
       path: 'analysis/entries.json',
       body: entryAssignmentsSchema.parse({
         schema: 'ramify-agent.entry-assignments/1', view: { status: 'placeholder' },
-        entries: [{ capability: 'send-button', description: 'A send button.', owner: reviews, requirementRefs: [], acceptanceRefs: [], citations: [] }],
+        entries: [{ capability: 'send-button', description: 'A send button.', owner: reviews, requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [] }],
       }),
     };
     const completed: Line[] = [
@@ -285,7 +285,8 @@ describe('over a real run', () => {
     ] });
     const { service } = await openRunsWithoutProcesses(fixture.root, git, {
       candidates: finalCandidate(fixture.root, 'scenarios-of-review-notes').candidates,
-      script: (spec: SessionSpec) => [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }],
+      script: (spec: SessionSpec) => spec.role === 'catalog-extractor' ? []
+        : [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? submitted : requestCompletion() }],
     });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
@@ -374,7 +375,7 @@ describe('the module-capability comparison', () => {
       entries: list.map(entry => ({
         capability: entry.capability, description: `The run delivers ${entry.capability}.`, owner: entry.owner,
         ...(entry.proposed === undefined ? {} : { proposed: entry.proposed }),
-        requirementRefs: [], acceptanceRefs: [], citations: [],
+        requirementRefs: [], acceptanceRefs: [], contextRefs: [], citations: [],
       })),
     });
   }

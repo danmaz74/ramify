@@ -246,6 +246,18 @@ describe('G2, G3: two sequential placement forks, and the brief between them', (
     expect(request.requester).toBe(core);
     expect(request.hypotheses[0]).toMatchObject({ stance: 'supports' });
     expect(request.hypotheses[0]!.ref).toMatchObject({ id: 'field-diff', revision: 1 });
+
+    // EP08: gd-001 places field-diff in wi-001's own module, and selects nothing again; gd-002 adds the
+    // core to wi-002, whose selection is made again from its architect's point and supersedes the first.
+    const selections = events.flatMap(event => (event.type === 'context-selection-recorded' ? [event.data] : []));
+    expect(selections.map(selection => [selection.workItem, selection.supersedes ?? null])).toEqual([
+      ['wi-001', null], ['wi-002', null], ['wi-002', selections[1]!.selection],
+    ]);
+    expect(selections[2]!.selection).not.toBe(selections[1]!.selection);
+    expect(types(events).indexOf('context-selection-recorded', types(events).lastIndexOf('decision-accepted'))).toBeGreaterThan(types(events).lastIndexOf('decision-accepted'));
+    const selectors = agent.sessions.filter(session => session.spec.role === 'context-selector');
+    expect(selectors).toHaveLength(3);
+    expect(selectors[2]!.spec.prompt).toContain('Placement decision `gd-002` placed `field-diff`');
   }, 120_000);
 });
 
@@ -434,7 +446,7 @@ describe('a start the executor could not honor', () => {
     // names its source point, and the continuation its session's last one.
     const sessions = reduceSessions(events);
     const placementFork = [...sessions.values()].find(entry => entry.fork?.reason === 'placement-request');
-    expect(placementFork?.fork).toMatchObject({ from: { session: 'ses-0001', invocation: 'inv-0001' } });
+    expect(placementFork?.fork).toMatchObject({ from: { session: 'ses-0002', invocation: 'inv-0002' } });
     const continued = events.find(event => event.type === 'invocation-started' && event.data.continues?.reason === 'placement-answered')!;
     expect(continued.data).toMatchObject({ start: 'continued', continues: { reason: 'placement-answered' } });
     // Only a start that degraded says so.
@@ -467,7 +479,7 @@ describe('a parent context that can no longer be read', () => {
         // brief is not appended yet.
         if (write === 'decision-accepted' && !lost) {
           lost = true;
-          expect(agent.forget(agent.sessions[0]!.ref)).toBe(true);
+          expect(agent.forget(agent.sessions.find(session => session.spec.role === 'initial-architect')!.ref)).toBe(true);
         }
       },
     });
@@ -516,8 +528,8 @@ describe('a parent context that can no longer be read', () => {
     // second brief is appended to it, and run end finishes it.
     const sessions = reduceSessions(events);
     const context = (started[0]!.data as { session: string }).session;
-    expect(context).not.toBe('ses-0001');
-    expect(sessions.get('ses-0001')).toMatchObject({ role: 'initial-architect', state: 'finished', finished: 'lost', appends: [] });
+    expect(context).not.toBe('ses-0002');
+    expect(sessions.get('ses-0002')).toMatchObject({ role: 'initial-architect', state: 'finished', finished: 'lost', appends: [] });
     const rebuiltContext = (started[1]!.data as { session: string }).session;
     expect(sessions.get(rebuiltContext)).toMatchObject({ role: 'global-fork', state: 'finished', finished: 'run-ended' });
     expect(sessions.get(rebuiltContext)!.appends).toHaveLength(1);
@@ -525,8 +537,8 @@ describe('a parent context that can no longer be read', () => {
     // ST03: the first fork forked the architect context of generation 1 at
     // the initial architect's end; the fork that rebuilt the context names
     // the session it took the place of, and forks from nothing.
-    expect(sessions.get(context)!.fork).toEqual({ from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'placement-request', generation: 1, briefs: [] });
-    expect(sessions.get(rebuiltContext)).toMatchObject({ fork: null, replaces: { session: 'ses-0001', reason: 'context-rebuilt' } });
+    expect(sessions.get(context)!.fork).toEqual({ from: { session: 'ses-0002', invocation: 'inv-0002' }, reason: 'placement-request', generation: 1, briefs: [] });
+    expect(sessions.get(rebuiltContext)).toMatchObject({ fork: null, replaces: { session: 'ses-0002', reason: 'context-rebuilt' } });
   }, 120_000);
 });
 

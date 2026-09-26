@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   acceptElements, contextNotice, createPackage, deviationNotice, elementCatalogHash, elementCatalogSchema, openElementCatalog,
-  recommendationNotice, resolveCitations, serializeElementCatalog, submittedElementSchema,
+  recommendationNotice, resolveCitations, reviseCatalog, serializeElementCatalog, submittedElementSchema,
   type ElementCatalog, type PackageDeviation, type SubmittedElement,
 } from '../interfaces/catalog.js';
 import { documentManifestSchema } from '../interfaces/contracts.js';
@@ -77,6 +77,27 @@ describe('element catalog', () => {
     const accepted = acceptElements(corrected, [element('split', 'functional', 'doc-001', 'Refuse a partial package.')]);
     expect(accepted.ok && accepted.ids.get('split')).toBe('fr-003');
     expect(elementCatalogSchema.safeParse({ ...catalog, retired: ['fr-002'] }).success).toBe(false);
+  });
+
+  it('revises a catalog: a rewrite keeps its ID, kind and document, a split retires the old ID and numbers past it', () => {
+    const catalog = sampleCatalog();
+    const revised = reviseCatalog(catalog, {
+      rewrite: [{ id: 'nfr-001', text: 'Keep every package under 1 MiB.', conditions: [], uncertainty: '' }],
+      retire: ['fr-002'],
+      add: [element('refuse-missing', 'functional', 'doc-001', 'Refuse a package with a missing ID.'),
+        element('refuse-partial', 'functional', 'doc-001', 'Never deliver a partial package.')],
+    });
+    if (!revised.ok) throw new Error(revised.errors.join('\n'));
+    expect(revised.catalog.elements.find(item => item.id === 'nfr-001')).toMatchObject({ kind: 'non-functional', document: 'doc-001', text: 'Keep every package under 1 MiB.' });
+    expect(revised.catalog.retired).toEqual(['fr-002']);
+    expect([...revised.ids]).toEqual([['refuse-missing', 'fr-003'], ['refuse-partial', 'fr-004']]);
+    const refused = reviseCatalog(catalog, {
+      rewrite: [{ id: 'fr-009', text: 'x', conditions: [], uncertainty: '' }], retire: ['nfr-001', 'nfr-001'],
+      add: [element('bad', 'fixed', 'doc-001', 'A fixed requirement from a plan.')],
+    });
+    expect(refused.ok ? [] : refused.errors).toEqual(['rewrite.0.id: unknown element fr-009', 'retire.1: nfr-001 is corrected twice']);
+    const badAdd = reviseCatalog(catalog, { rewrite: [], retire: [], add: [element('bad', 'fixed', 'doc-001', 'A fixed requirement from a plan.')] });
+    expect(badAdd.ok ? [] : badAdd.errors).toEqual(['add.0.document: a fixed element cannot be read from a plan document']);
   });
 
   it('rejects an element whose document is not captured or cannot supply its kind, with its path', () => {

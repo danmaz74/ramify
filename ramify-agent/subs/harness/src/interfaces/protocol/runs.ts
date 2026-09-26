@@ -35,6 +35,7 @@ export type RunId = z.infer<typeof runIdSchema>;
  */
 export const roleSchema = z.enum([
   'initial-architect',
+  'catalog-extractor',
   'global-fork',
   'local-architect',
   'engineer',
@@ -426,6 +427,10 @@ export const entryViewSchema = z.object({
   proposed: moduleProposalView.nullable(),
   /** The work item the entry created. */
   workItem: text.nullable(),
+  /** The elements the entry cites: its requirement, its acceptance and the context its reader needs. */
+  requirementRefs: z.array(text),
+  acceptanceRefs: z.array(text),
+  contextRefs: z.array(text),
 }).strict();
 export type EntryView = z.infer<typeof entryViewSchema>;
 
@@ -467,14 +472,11 @@ export type ScenarioKind = z.infer<typeof scenarioKindSchema>;
 /**
  * Where a tracked scenario comes from: the plan, whose text is the
  * requirement, with the plan's lines; or the initial architect, with the
- * parts of the plan it cites.
+ * acceptance elements it cites.
  */
 export const scenarioOriginViewSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('plan'), planScenario: text, lines: z.tuple([z.int().positive(), z.int().positive()]) }).strict(),
-  z.object({
-    kind: z.literal('architect'),
-    refs: z.array(z.object({ anchor: text.optional(), lines: z.tuple([count, count]).optional() }).strict()),
-  }).strict(),
+  z.object({ kind: z.literal('architect'), refs: z.array(text) }).strict(),
 ]);
 export type ScenarioOriginView = z.infer<typeof scenarioOriginViewSchema>;
 
@@ -536,6 +538,30 @@ export type AnalysisScenario = z.infer<typeof analysisScenarioSchema>;
  * and revision, and the tracked scenarios with the warnings the acceptance
  * recorded on them. `pending` until the analysis is accepted.
  */
+/** One element of the frozen catalog, as a person reads it. */
+export const elementViewSchema = z.object({
+  id: text,
+  kind: z.enum(['context', 'functional', 'non-functional', 'fixed', 'recommendation']),
+  document: text,
+  path: text,
+  text,
+  locator: text.nullable(),
+  conditions: z.array(z.object({ text, source: z.enum(['stated', 'inferred']) }).strict()),
+  uncertainty: z.string(),
+}).strict();
+export type ElementView = z.infer<typeof elementViewSchema>;
+
+/** One correction a checker made to the catalog before it was frozen, with its reason. */
+export const catalogFindingViewSchema = z.object({
+  document: text,
+  path: text,
+  action: z.enum(['add', 'rewrite', 'replace']),
+  reason: text,
+  elements: z.array(text),
+  retired: z.array(text),
+}).strict();
+export type CatalogFindingView = z.infer<typeof catalogFindingViewSchema>;
+
 export const analysisResponseSchema = z.object({
   plan: z.object({ markdown: z.string(), hash: text }).strict(),
   analysis: z.discriminatedUnion('status', [
@@ -548,20 +574,21 @@ export const analysisResponseSchema = z.object({
       /** Entry scenarios in the order the analysis submitted them, then integration scenarios. */
       scenarios: z.array(analysisScenarioSchema).max(runQueryLimits.scenarios),
       warnings: z.array(scenarioWarningViewSchema),
-      /** Absent on old runs; an explicit empty catalog is an available result. */
+      /** The frozen element catalog, the checkers' findings and the incorporation; an empty catalog is an available result. */
       planEvidence: z.discriminatedUnion('status', [
         z.object({ status: z.literal('unavailable'), reason: z.string() }).strict(),
         z.object({
           status: z.literal('available'),
-          catalog: z.array(z.object({
-            id: text, classification: z.enum(['non-functional-requirement', 'advice']),
-            document: text, path: text, quote: text, locator: text.nullable(),
-            conditions: z.array(z.object({ text, source: z.enum(['stated', 'inferred']) }).strict()), uncertainty: z.string(),
-          }).strict()),
+          /** The catalog's hash, which identifies it for the run. */
+          catalogHash: z.string().regex(/^[0-9a-f]{64}$/),
+          /** Every element, grouped by kind in package order and in catalog order within a kind. */
+          elements: z.array(elementViewSchema),
+          /** IDs a checker's correction retired. */
+          retired: z.array(text),
+          findings: z.array(catalogFindingViewSchema),
           missing: z.array(z.object({ from: text, fromPath: text, excerpt: z.string(), target: text, start: count, end: count,
             judgment: z.enum(['unclear', 'advisory']), reason: text }).strict()),
-          incorporation: z.array(z.object({ document: text, path: text, scenarios: z.boolean(), uncertainty: z.string(),
-            governing: z.array(z.object({ path: text, quote: text, locator: text.nullable() }).strict()) }).strict()),
+          incorporation: z.array(z.object({ document: text, path: text, scenarios: z.boolean(), uncertainty: z.string() }).strict()),
         }).strict(),
       ]).optional(),
       total: z.object({ entries: count, hypotheses: count, scenarios: count }).strict(),
@@ -789,6 +816,18 @@ export const workItemResponseSchema = z.object({
     }).strict().nullable(),
     gates: z.array(gateSummary),
     invocations: z.array(z.object({ id: text, role: roleSchema, ended: text.nullable(), outsideScope: z.array(text) }).strict()),
+    /**
+     * The assignment package its engineer and reviewers received: the IDs
+     * the assignment cites and the text rendered again from them on this
+     * request, or why it cannot be; null where the assignment cites none.
+     */
+    package: z.object({
+      elements: z.array(text),
+      deviations: z.array(text),
+      hash: z.string().regex(/^[0-9a-f]{64}$/),
+      text: z.string().nullable(),
+      unavailable: z.string().nullable(),
+    }).strict().nullable(),
   }).strict()),
   /** The gates of the work item itself, beside its iterations' own. */
   gates: z.array(gateSummary),

@@ -71,7 +71,7 @@ function request(id: string, workItem: string, iteration: string, kind: 'code' |
     records: [{ path: `reviews/${id}/request.json`, body: {
       schema: 'ramify-agent.review-request/1', id, key: { iteration, candidate, kind, policy: reviewPolicyVersion }, workItem,
       assignment: `work-items/${workItem}/iterations/${iteration}.json`, base: `base-of-${candidate}`, gate: `ga-${id.slice(3)}`,
-      tree: `tree-of-${candidate}`, requirements: [], guidance: [], forkPoint: { kind: 'none' },
+      tree: `tree-of-${candidate}`, guidance: [], forkPoint: { kind: 'none' },
     } }],
   };
 }

@@ -39,11 +39,13 @@ export async function badgePlanText(): Promise<string> {
  */
 export async function badgeAnalysis(): Promise<InitialAnalysisSubmission> {
   const { scenarios } = extractPlanScenarios(await badgePlanText());
-  return analysis([entry(badgePlan, sharedUi, 'The status badge takes a tone and carries it in its markup.')], [], [],
+  const badge = entry(badgePlan, sharedUi, 'The status badge takes a tone and carries it in its markup.');
+  return analysis([badge], [], [],
     scenarios.map((scenario, index) => ({
       key: `badge-tone-${index + 1}`,
       entry: badgePlan,
       origin: { kind: 'plan' as const, planScenario: scenario.id },
+      refs: [...badge.acceptanceRefs],
       gherkin: scenario.source.join('\n'),
     })));
 }

@@ -5,10 +5,12 @@ import type { LocalArchitectSubmission } from '../../work/submission.js';
  * The two submissions a run of this iteration accepts, as a test writes
  * them. Nothing here simulates a transition: each one goes through the same
  * judge, the same schema and the same rules an agent's would.
+ *
+ * An entry cites its elements by submission-local key, `<capability>-request`
+ * and `<capability>-acceptance`; `analysis` submits one functional element of
+ * the root plan for every key its entries cite, in entry order, so the first
+ * entry's become `fr-001` and `fr-002`.
  */
-
-/** A plan reference as an entry or an architect scenario states it. */
-type PlanRef = { anchor?: string; lines?: [number, number] };
 
 /** A module an entry capability proposes, where its owner does not exist yet. */
 export interface ProposedModule {
@@ -24,8 +26,9 @@ export function entry(capability: string, owner: string, description = `The modu
     capability,
     description,
     owner,
-    requirementRefs: [{ anchor: 'Request' }] as PlanRef[],
-    acceptanceRefs: [{ anchor: 'Acceptance' }] as PlanRef[],
+    requirementRefs: [`${capability}-request`] as string[],
+    acceptanceRefs: [`${capability}-acceptance`] as string[],
+    contextRefs: [] as string[],
     citations: [] as Array<{ module: string; file?: string; symbol?: string; note?: string }>,
     ...(proposed === undefined ? {} : { proposed: { ...proposed, tags: [...proposed.tags] } }),
   };
@@ -58,17 +61,14 @@ export function hypothesis(id: string, extra: Partial<InitialAnalysisSubmission[
  * rules 4 and 6 require.
  */
 export function architectScenario(
-  subject: { readonly capability: string; readonly acceptanceRefs: ReadonlyArray<{ anchor?: string; lines?: readonly [number, number] }> },
+  subject: { readonly capability: string; readonly acceptanceRefs: readonly string[] },
   key = `${subject.capability}-is-used`,
 ): InitialAnalysisSubmission['scenarios'][number] {
   return {
     key,
     entry: subject.capability,
     origin: { kind: 'architect' },
-    refs: subject.acceptanceRefs.map(ref => ({
-      ...(ref.anchor === undefined ? {} : { anchor: ref.anchor }),
-      ...(ref.lines === undefined ? {} : { lines: [ref.lines[0], ref.lines[1]] as [number, number] }),
-    })),
+    refs: [...subject.acceptanceRefs],
     gherkin: [
       `Scenario: A person uses ${subject.capability}`,
       '  Given the project as the plan finds it',
@@ -90,16 +90,27 @@ export function analysis(
   integrationScenarios: InitialAnalysisSubmission['integrationScenarios'] = [],
 ): InitialAnalysisSubmission {
   return {
+    elements: elementsOf(entries),
     entries: [...entries],
     hypotheses: [...hypotheses],
     coverageLimits: [...coverageLimits],
     scenarios: [...scenarios],
     integrationScenarios: [...integrationScenarios],
-    // The scripted analysis explicitly asserts no NFR/advice passages. The
-    // fixture wrapper binds its document judgment to the run's captured bytes.
-    catalog: [],
-    incorporation: { documents: [], missing: [] },
   };
+}
+
+/** One element of the root plan for every key the entries cite: functional, or context for `contextRefs`. */
+export function elementsOf(entries: ReadonlyArray<{ readonly requirementRefs: readonly string[]; readonly acceptanceRefs: readonly string[]; readonly contextRefs: readonly string[] }>): InitialAnalysisSubmission['elements'] {
+  const elements = new Map<string, InitialAnalysisSubmission['elements'][number]>();
+  for (const entry of entries) {
+    for (const key of [...entry.requirementRefs, ...entry.acceptanceRefs]) {
+      if (!elements.has(key)) elements.set(key, { key, kind: 'functional', document: 'doc-001', text: `The plan asks for ${key}.`, conditions: [], uncertainty: '' });
+    }
+    for (const key of entry.contextRefs) {
+      if (!elements.has(key)) elements.set(key, { key, kind: 'context', document: 'doc-001', text: `The plan explains ${key}.`, conditions: [], uncertainty: '' });
+    }
+  }
+  return [...elements.values()];
 }
 
 /** A local architect asking for completion with the smallest honest outline. */

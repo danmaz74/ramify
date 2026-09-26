@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { CheckFindingCommand, CheckFindingState } from '../../subs/check-findings/src/interfaces/check-findings.js';
-import {
-  resolvePassage, type Catalog, type DocumentManifest,
-} from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import type { DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import type { CatalogElement } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import {
   type Assessment, type Candidate,
 } from '../../subs/nonfunctional/src/interfaces/contracts.js';
@@ -11,16 +10,13 @@ import { canonicalJson } from '../jobs/commands.js';
 import { nonfunctionalDeviationSchema } from '../run/nonfunctional-records.js';
 import { nextCheckFinding, planDeviationOptions, planDeviationProducer } from './finding.js';
 
-type NfrItem = Catalog['items'][number];
 type AssessmentResult = Assessment['results'][number];
 export type NonfunctionalDeviation = ReturnType<typeof nonfunctionalDeviationSchema.parse>;
 
 export interface NonfunctionalDeviationInput {
   readonly id: string;
   readonly checkFinding: string;
-  readonly item: NfrItem;
-  readonly manifest: DocumentManifest;
-  readonly bytes: ReadonlyMap<string, Uint8Array>;
+  readonly item: CatalogElement;
   readonly assessment: Assessment;
   readonly result: AssessmentResult;
   readonly candidate: Candidate;
@@ -29,17 +25,13 @@ export interface NonfunctionalDeviationInput {
   readonly uncertainty: string;
 }
 
-/** Preserve an exhausted assessment's accepted architect wording. */
+/** Preserve the requirement an exhausted assessment left, as the frozen catalog holds it. */
 export function prepareNonfunctionalDeviation(input: NonfunctionalDeviationInput):
   { readonly ok: true; readonly record: NonfunctionalDeviation } |
   { readonly ok: false; readonly errors: readonly string[] } {
   const errors: string[] = [];
-  const { item, assessment, result, candidate, manifest } = input;
-  if (item.classification !== 'non-functional-requirement' || !item.id.startsWith('nfr-')) errors.push('The item is not a fixed NFR');
-  const document = manifest.documents.find(candidate => candidate.id === item.passage.document);
-  if (document === undefined || document.kind !== 'plan') errors.push('The NFR passage is not from a captured plan document');
-  const passage = resolvePassage(manifest, item.passage, input.bytes.get(item.passage.document));
-  if (passage.status === 'unavailable') errors.push(passage.reason);
+  const { item, assessment, result, candidate } = input;
+  if (item.kind !== 'non-functional' && item.kind !== 'fixed') errors.push('The element is not an assessed requirement');
   if (result.nfr !== item.id || result.result === 'satisfied') errors.push('The NFR was not assessed as exhausted');
   const matches = assessment.results.filter(candidate => candidate.nfr === item.id);
   if (matches.length !== 1 || canonicalJson(matches[0]) !== canonicalJson(result)) errors.push('The result is not the unique recorded assessment result');
@@ -52,7 +44,7 @@ export function prepareNonfunctionalDeviation(input: NonfunctionalDeviationInput
     schema: 'ramify-agent.nonfunctional-deviation/1', id: input.id,
     origin: { kind: 'nonfunctional-assessment', nfr: item.id, assessment: assessment.id,
       candidate, coordinatorInvocation: input.coordinatorInvocation },
-    passage: item.passage, evidence: [...result.evidence],
+    element: { id: item.id, document: item.document, text: item.text }, evidence: [...result.evidence],
     uncertainty: input.uncertainty, proposedAlternative: input.proposedAlternative,
     checkFinding: input.checkFinding,
   });
@@ -74,16 +66,12 @@ function bounded(text: string, recordRef: string, limit = 4000): string {
 /** A run-owned plan-deviation signal with the same post-terminal user options. */
 export function nonfunctionalDeviationCommands(
   state: CheckFindingState, record: NonfunctionalDeviation,
-  manifest: DocumentManifest, bytes: ReadonlyMap<string, Uint8Array>, recordRef: string,
+  manifest: DocumentManifest, recordRef: string,
 ): { readonly ok: true; readonly commands: readonly CheckFindingCommand[] } |
   { readonly ok: false; readonly errors: readonly string[] } {
   if (record.checkFinding !== nextCheckFinding(state)) return { ok: false, errors: ['The CheckFinding ID is not next in replayed state'] };
-  const document = manifest.documents.find(item => item.id === record.passage.document);
-  const content = bytes.get(record.passage.document);
-  const passage = resolvePassage(manifest, record.passage, content);
-  if (document === undefined || content === undefined || passage.status === 'unavailable') {
-    return { ok: false, errors: [passage.status === 'unavailable' ? passage.reason : 'Captured source unavailable'] };
-  }
+  const document = manifest.documents.find(item => item.id === record.element.document);
+  if (document === undefined) return { ok: false, errors: [`${record.element.document} is not a captured document`] };
   const hash = nonfunctionalDeviationHash(record);
   const source = { kind: 'document' as const, id: `${document.path}@sha256:${document.sha256}` };
   const ground = { ref: recordRef, hash };
@@ -93,7 +81,7 @@ export function nonfunctionalDeviationCommands(
     reportKey: record.id, owner: { kind: 'run' }, source, issueKey: null,
     verification: { kind: 'assessment' }, observation: {
       kind: 'plan-deviation',
-      summary: bounded(`Non-functional deviation ${record.id} from ${record.origin.nfr}: ${record.passage.quote}`, recordRef, 600),
+      summary: bounded(`Non-functional deviation ${record.id} from ${record.origin.nfr}: ${record.element.text}`, recordRef, 600),
       evidence: [citation], locations: [],
     },
     judgment: {
@@ -113,7 +101,7 @@ export function nonfunctionalDeviationCommands(
       evidence: [citation], communication: { mode: 'quiet' },
       decision: {
         action: 'request-user-decision', authority: { kind: 'governing-record', ref: recordRef },
-        conflicts: [{ text: bounded(record.passage.quote, recordRef), document: document.path,
+        conflicts: [{ text: bounded(record.element.text, recordRef), document: document.path,
           revision: `sha256:${document.sha256}` }],
         options: [
           { id: planDeviationOptions.accept, summary: 'Accept the deviation',

@@ -1,4 +1,4 @@
-<!-- ramify-agent global fork procedure, version 3. -->
+<!-- ramify-agent global fork procedure, version 4. -->
 For a placement request, do this, in order:
 
 1. Read the request: the behavior it requires, what the local architect
@@ -116,16 +116,16 @@ characters.
 
 ### `deviation`
 
-A plan deviation amends the plan for the rest of this run. The plan file is
-never changed; the deviation is recorded beside it, local architects receive
-it with the requirement it changes, and reviews judge the work against the
-plan as it amends it. The person reviews it afterwards and may reject it. It
+A plan deviation amends elements of the plan for the rest of this run. The
+plan file and the catalog are never changed; the deviation is recorded
+beside them, every later package renders it after the elements, and reviews
+judge the work against the elements as it amends them. The person reviews it afterwards and may reject it. It
 holds no work item and no gate, and the work item that asked goes on under
 it.
 
-- `deviation.requirements` are the requirements as written that you depart
-  from, as line ranges of the plan in the message. Cite exactly the lines
-  you change, not their section.
+- `deviation.amends` names, by ID, the elements of the work item's package
+  in the message that you depart from: requirements or recommendations,
+  never context. Name exactly the elements you change.
 - `deviation.instead` is what the run does instead: the part of each
   requirement it still meets, and the replacement for the part it cannot.
 - `deviation.why` is why the requirement cannot be met as written, on the

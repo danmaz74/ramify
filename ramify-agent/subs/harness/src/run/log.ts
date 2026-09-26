@@ -9,7 +9,7 @@ import {
   replaceRelationSchema, requestRelationSchema, sessionFinishReasonSchema, sessionIdSchema,
 } from './records.js';
 import { moduleNoticeSchema } from '../work/iterations.js';
-import { scenarioWarningSchema } from '../analysis/records.js';
+import { catalogFindingSchema, scenarioWarningSchema } from '../analysis/records.js';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
 import {
   scenarioDeclaredDataSchema, scenarioDueDataSchema, scenarioImplementedDataSchema, scenarioWithdrawnDataSchema,
@@ -141,8 +141,13 @@ export const runEventSchema = z.discriminatedUnion('type', [
     workItems: z.int().nonnegative(),
     scenarios: z.int().nonnegative(),
     warnings: z.array(scenarioWarningSchema),
-    /** Present when the same transaction also commits catalog and incorporation. */
-    catalog: z.object({ nfr: z.int().nonnegative(), advice: z.int().nonnegative() }).strict().optional(),
+    /** The frozen catalog's elements by kind, when the same transaction also commits catalog and incorporation. */
+    catalog: z.object({
+      context: z.int().nonnegative(), functional: z.int().nonnegative(), nonFunctional: z.int().nonnegative(),
+      fixed: z.int().nonnegative(), recommendation: z.int().nonnegative(),
+    }).strict().optional(),
+    /** The checkers' corrections, shown at the review stop beside the corrected catalog. */
+    findings: z.array(catalogFindingSchema).optional(),
     /** Hashes bind external immutable evidence files without putting their bodies in a ledger line. */
     evidence: z.object({
       catalog: z.object({ path: text, hash: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
@@ -152,8 +157,15 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** The manifest is committed only after every immutable document byte file is durable. */
   event('document-manifest-committed', z.object({ manifest: text, hash: z.string().regex(/^[0-9a-f]{64}$/), documents: z.int().positive() }).strict()),
   event('work-orientation-recorded', z.object({ workItem: text, invocation: text, packetHash: z.string().regex(/^[0-9a-f]{64}$/), packet: text.optional(), point: text.nullable() }).strict()),
-  /** A work item's one read-only selection and exact continuation package. */
-  event('context-selection-recorded', z.object({ workItem: text, selection: text, selectionHash: z.string().regex(/^[0-9a-f]{64}$/).optional(), packageHash: z.string().regex(/^[0-9a-f]{64}$/), package: text.optional() }).strict()),
+  /**
+   * A work item's read-only selection, which cites its work-item package.
+   * A placement decision that adds an owner selects again, and the new
+   * selection supersedes the earlier one for later assignments.
+   */
+  event('context-selection-recorded', z.object({
+    workItem: text, selection: text, selectionHash: z.string().regex(/^[0-9a-f]{64}$/), packageHash: z.string().regex(/^[0-9a-f]{64}$/),
+    supersedes: text.optional(),
+  }).strict()),
   event('context-package-append-requested', z.object({ workItem: text, selection: text, session: sessionIdSchema.nullable(), appendKey: text }).strict()),
   event('context-package-appended', z.object({
     workItem: text, selection: text, session: sessionIdSchema.nullable(), appendKey: text,

@@ -361,8 +361,9 @@ describe('the reopening is derived, and it supersedes what the previous revision
     module,
     origin: { entry: 'review-notes' },
     goal: 'do the work',
-    requirementRefs: [{ anchor: 'Request' }],
-    acceptanceRefs: [{ anchor: 'Acceptance' }],
+    requirementRefs: ['fr-001'],
+    acceptanceRefs: ['fr-002'],
+    contextRefs: ['ctx-001'],
     startedFor,
   });
 
@@ -384,7 +385,6 @@ describe('the reopening is derived, and it supersedes what the previous revision
       rationale: 'r',
       resolved: { roots: [], files: [], view: { status: 'placeholder' } },
     },
-    requirementRefs: [],
     externalCapabilities: [],
     completionEvidence: 'e',
     evidenceObligations: [],
@@ -433,7 +433,9 @@ describe('the reopening is derived, and it supersedes what the previous revision
       module: notes,
       follows: 'wi-001',
       startedFor: 'wi-002',
-      requirementRefs: [{ anchor: 'Request' }],
+      requirementRefs: ['fr-001'],
+      acceptanceRefs: ['fr-002'],
+      contextRefs: ['ctx-001'],
     });
 
     // Only an assignment of a reused item closes: the completed item's own

@@ -291,7 +291,7 @@ test('the run\'s modules show their unsettled counts, which do not sum to the ru
   expect(stub.calls).toContain(`getCheckFindings:${runId}:|project/checkout|reported`);
 });
 
-test('a plan deviation reads as a departure from the plan: its requirement as written, what the run does instead, and a reworded scenario before and after', async () => {
+test('a plan deviation reads as a departure from the plan: the elements it amends, what the run does instead, and a reworded scenario before and after', async () => {
   const deviation = summary('cf-0004', {
     workItem: null, revision: 2, reason: 'awaiting-user-decision', awaiting: 'user-decision', risk: 'high', credibility: 'agent-generated',
     producers: ['plan:deviation'], title: 'Plan deviation pd-001: tRPC only', userCommands: ['respond', 'waive'],
@@ -302,7 +302,7 @@ test('a plan deviation reads as a departure from the plan: its requirement as wr
     },
     planDeviation: {
       id: 'pd-001', request: 'ur-001', workItems: ['wi-001'], plan: 'plans/review-notes/plan.md',
-      requirements: [{ startLine: 11, endLine: 12, text: 'Serve it over MCP too.' }],
+      amends: [{ id: 'fr-003', path: 'plans/review-notes/plan.md', text: 'Serve it over MCP too.' }],
       instead: 'Serve it over tRPC only.', why: 'No module serves MCP.', rejected: [{ alternative: 'A new MCP module', reason: 'beyond the plan' }], loss: 'No MCP tool.',
       scenarios: [{ scenario: 'sc-002', file: 'src/tests/features/p/e.feature', before: ['Scenario: over MCP'], after: ['Scenario: over tRPC'] }],
       held: false, followUp: null,
@@ -315,7 +315,9 @@ test('a plan deviation reads as a departure from the plan: its requirement as wr
   expect(screen.queryByRole('listitem', { name: 'CheckFinding cf-0001' })).toBeNull();
   expect(within(card).getByText('Plan deviation')).toBeTruthy();
   const body = within(card).getByRole('group', { name: 'Plan deviation pd-001' });
-  expect(within(body).getByRole('list', { name: 'Requirement as written' }).textContent).toMatch(/Serve it over MCP too\.plans\/review-notes\/plan\.md, lines 11–12/);
+  const amended = within(body).getByRole('list', { name: 'Elements it amends' });
+  expect(within(amended).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Serve it over MCP too.fr-003, from plans/review-notes/plan.md']);
+  expect(amended.querySelector('blockquote')!.textContent).toBe('Serve it over MCP too.');
   expect(body.textContent).toMatch(/Instead: Serve it over tRPC only\./);
   expect(body.textContent).toMatch(/What you lose: No MCP tool\./);
   const reworded = within(body).getByLabelText('Rewording of sc-002');
@@ -332,8 +334,7 @@ test('a non-functional deviation shows the exact captured requirement and assess
     planDeviation: {
       id: 'nfd-001', origin: { kind: 'nonfunctional-assessment', nfr: 'nfr-001', assessment: 'nfa-001',
         candidate: { tree: 'a'.repeat(40), head: null, preparedAt: at }, coordinatorInvocation: 'inv-0012' },
-      passage: { document: 'doc-001', locator: null,
-        quote: 'The service must answer within 50 milliseconds.' },
+      element: { id: 'nfr-001', document: 'doc-001', text: 'The service must answer within 50 milliseconds.' },
       sourcePath: 'plans/review-notes/constraints.md',
       evidence: ['Measured 87 milliseconds'], proposedAlternative: 'Use a cached read',
       uncertainty: 'The production load is unknown', followUp: null,
@@ -344,7 +345,8 @@ test('a non-functional deviation shows the exact captured requirement and assess
   render(<PlanDeviations client={stub} planId={planId} runId={runId} version={version} />);
   const card = await screen.findByRole('listitem', { name: 'CheckFinding cf-0007' });
   const body = within(card).getByRole('group', { name: 'Non-functional deviation nfd-001' });
-  expect(body.textContent).toContain('The service must answer within 50 milliseconds.');
+  expect(body.textContent).toContain('The requirement, nfr-001');
+  expect(body.querySelector('blockquote')!.textContent).toBe('The service must answer within 50 milliseconds.');
   expect(body.textContent).toContain('doc-001');
   expect(body.textContent).toContain('plans/review-notes/constraints.md');
   expect(body.textContent).toContain('Measured 87 milliseconds');

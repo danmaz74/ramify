@@ -61,9 +61,7 @@ export function deviationCommands(state: CheckFindingState, deviation: PlanDevia
         { kind: 'plan-deviation', ref: record, hash },
         { kind: 'unresolved-request', ref: deviationLayout.request(deviation.request), hash: null },
       ],
-      locations: deviation.requirements.map(requirement => ({
-        path: deviation.plan.path, startLine: requirement.lines[0], endLine: requirement.lines[1],
-      })),
+      locations: deviation.amends.map(element => ({ path: element.path, startLine: null, endLine: null })),
     },
     judgment: {
       actor: { kind: 'agent', role: 'global-architect', invocation: deviation.invocation },
@@ -92,9 +90,9 @@ export function deviationCommands(state: CheckFindingState, deviation: PlanDevia
       decision: {
         action: 'request-user-decision',
         authority: { kind: 'governing-record', ref: record },
-        conflicts: deviation.requirements.map(requirement => ({
-          text: bounded(requirement.text.trim() === '' ? `(lines ${requirement.lines[0]}–${requirement.lines[1]} are empty)` : requirement.text),
-          document: deviation.plan.path,
+        conflicts: deviation.amends.map(element => ({
+          text: bounded(`${element.id}: ${element.text}`),
+          document: element.path,
           revision: deviation.plan.revision,
         })),
         options: [

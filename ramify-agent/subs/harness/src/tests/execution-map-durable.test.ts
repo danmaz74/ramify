@@ -73,7 +73,8 @@ describe('execution projection over a persisted run', () => {
       .toEqual(['capability:first-root', 'capability:second-root']);
     expect(beforeStop.index.nodes.filter(node => node.kind === 'scenario')).toHaveLength(2);
     expect(beforeStop.index.nodes.filter(node => node.kind === 'work-item')).toHaveLength(2);
-    expect(beforeStop.index.nodes.filter(node => node.kind === 'session')).toHaveLength(1);
+    // The catalog intake's, the initial architect's and the plan checker's.
+    expect(beforeStop.index.nodes.filter(node => node.kind === 'session')).toHaveLength(3);
     expect(executionCapabilityDetailOf(beforeStop.view, 'first-root').detail).toMatchObject({
       state: 'available', description: 'The first complete capability description.',
     });

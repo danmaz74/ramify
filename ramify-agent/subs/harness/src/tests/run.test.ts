@@ -13,7 +13,8 @@ import { runLayout } from '../run/records.js';
 
 /*
  * The smallest coherent run: one with no entry capabilities. It starts,
- * invokes the initial architect, passes readiness, passes its final gate and
+ * extracts its catalog beside the initial architect (the intake, the
+ * architect, and the one plan document's checker), passes readiness, passes its final gate and
  * completes, with no client connected: the file system alone is watched.
  */
 
@@ -61,6 +62,12 @@ describe('an implementation run with no entry capabilities', () => {
       'session-opened',
       'invocation-started',
       'invocation-ended',
+      'session-opened',
+      'invocation-started',
+      'invocation-ended',
+      'session-opened',
+      'invocation-started',
+      'invocation-ended',
       'analysis-accepted',
       'gate-started',
       'readiness-passed',
@@ -79,14 +86,17 @@ describe('an implementation run with no entry capabilities', () => {
     expect(snapshot.state).toBe('completed');
     expect(snapshot.phase).toBe('ended');
     expect(snapshot.failure).toBeNull();
-    expect(snapshot.counts.invocations).toBe(1);
+    expect(snapshot.counts.invocations).toBe(3);
     expect(snapshot.counts.readinessAttempts).toBe(1);
 
-    // The one invocation was the initial architect's, and it submitted.
-    expect(agent!.sessions).toHaveLength(1);
-    expect(agent!.sessions[0]!.spec.role).toBe('initial-architect');
-    expect(agent!.sessions[0]!.spec.context.compaction).toBe('allowed');
-    expect(agent!.sessions[0]!.spec.context.budgetFraction).toBe(0.75);
+    // The intake, the initial architect and the plan document's checker,
+    // each a fresh session, and each submitted.
+    expect(agent!.sessions.map(session => [session.spec.role, session.spec.submission.name])).toEqual([
+      ['catalog-extractor', 'submit_intake'], ['initial-architect', 'submit_initial_analysis'], ['catalog-extractor', 'submit_catalog_check'],
+    ]);
+    expect(agent!.sessions.every(session => session.verdicts.some(verdict => (verdict as { accepted?: unknown }).accepted === true))).toBe(true);
+    expect(agent!.sessions[1]!.spec.context.compaction).toBe('allowed');
+    expect(agent!.sessions[1]!.spec.context.budgetFraction).toBe(0.75);
 
     // Every record of the run is a file beneath it.
     const record = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.record), 'utf8')) as Record<string, unknown>;
@@ -150,7 +160,8 @@ describe('an implementation run with no entry capabilities', () => {
     expect(snapshot.failure?.message).toContain(refusal);
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
+      'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-failed', 'session-finished', 'job-failed',
     ]);
     expect(events.find(event => event.type === 'readiness-failed')?.data).toMatchObject({ step: 'run-branch', recovery: null, final: true });
@@ -181,7 +192,8 @@ describe('an implementation run with no entry capabilities', () => {
 
     const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
+      'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-passed', 'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-failed',
     ]);
@@ -200,7 +212,9 @@ describe('an implementation run with no entry capabilities', () => {
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));
-    await until(() => agent!.sessions.length === 1);
+    // The intake is the default turn; the initial architect's is the one that stalls.
+    const architect = () => agent!.sessions.find(session => session.spec.role === 'initial-architect');
+    await until(() => architect() !== undefined);
     await service.execute(stopRun('review-notes', receipt.jobId, service.getRun('review-notes', receipt.jobId)!.version));
     await service.settled('review-notes', receipt.jobId);
 
@@ -212,8 +226,9 @@ describe('an implementation run with no entry capabilities', () => {
 
     // The submission the session made afterwards was refused, and nothing
     // of it was written.
-    await until(() => agent!.sessions[0]!.verdicts.length === 1);
-    expect(agent!.sessions[0]!.verdicts[0]).toMatchObject({ accepted: false, final: true });
+    await until(() => architect()!.verdicts.length === 1);
+    expect(architect()!.verdicts[0]).toMatchObject({ accepted: false, final: true });
+    expect(agent!.sessions.map(session => session.spec.role)).toEqual(['catalog-extractor', 'initial-architect']);
     await expect(readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.entries), 'utf8')).rejects.toThrow();
   }, 120_000);
 });

@@ -114,6 +114,8 @@ export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context
   // short account; it is never compacted either.
   'failure-analyst': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
   'context-selector': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
+  // An extraction or check reads one bounded set of documents and submits.
+  'catalog-extractor': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 16_000 },
   'nonfunctional-coordinator': { compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 },
   'nonfunctional-repair-engineer': { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
 };

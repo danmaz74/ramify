@@ -52,7 +52,7 @@ const oneWorkItemCheckpoints = [scenariosCommit('review-notes'), 'wi-001', 'fina
 
 /** The scripted fake, answering each role with its own submission. */
 function script(initial: unknown, local: (spec: SessionSpec) => unknown) {
-  return (spec: SessionSpec) => [{
+  return (spec: SessionSpec) => spec.role === 'catalog-extractor' ? [] : [{
     kind: 'submit' as const,
     input: spec.role === 'initial-architect' ? initial : local(spec),
   }];
@@ -94,17 +94,21 @@ describe('a run whose work items need no change', () => {
 
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
+      // The intake, the initial architect and the plan's checker, each a fresh session.
+      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
+      'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
       'gate-started', 'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
       // Each completion request declares its entry's scenario, and the
       // work item's gate implements it.
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
       'work-orientation-recorded', 'session-opened', 'invocation-started', 'invocation-ended', 'context-selection-recorded',
-      'context-package-append-requested', 'context-package-appended', 'invocation-started', 'context-package-prompt-bound', 'invocation-ended',
+      // The package is appended to the session once; the organizing turn names it by hash.
+      'context-package-append-requested', 'context-package-appended', 'invocation-started', 'invocation-ended',
       'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',
       'work-orientation-recorded', 'session-opened', 'invocation-started', 'invocation-ended', 'context-selection-recorded',
-      'context-package-append-requested', 'context-package-appended', 'invocation-started', 'context-package-prompt-bound', 'invocation-ended',
+      // The package is appended to the session once; the organizing turn names it by hash.
+      'context-package-append-requested', 'context-package-appended', 'invocation-started', 'invocation-ended',
       'scenario-declared', 'outline-revised', 'gate-committing', 'gate-attempted', 'scenario-implemented', 'work-item-completed', 'session-finished',
       'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-completed',
@@ -157,7 +161,7 @@ describe('a run whose work items need no change', () => {
     for (const id of ['note-storage', 'note-validation', 'note-transport', 'note-rendering']) {
       const body = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, analysisLayout.hypothesis(id, 1)), 'utf8')) as Record<string, unknown>;
       expect(body).toMatchObject({ schema: 'ramify-agent.hypothesis/1', id, revision: 1, standing: 'tentative' });
-      expect(body['cause']).toMatchObject({ initial: 'inv-0001' });
+      expect(body['cause']).toMatchObject({ initial: 'inv-0002' });
       expect(existsSync(runPath(project, 'review-notes', receipt.jobId, analysisLayout.hypothesis(id, 2)))).toBe(false);
     }
 
@@ -269,6 +273,7 @@ describe('a work-item gate that does not pass', () => {
         : {},
       unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'wi-001', 'wi-001', 'wi-001'],
       script: (spec: SessionSpec) => {
+        if (spec.role === 'catalog-extractor') return [];
         if (spec.role === 'initial-architect') return [{ kind: 'submit' as const, input: submitted }];
         turn += 1;
         return [{ kind: 'submit' as const, input: requestCompletion({ revisionReason: turn === 1 ? '' : `Revision ${turn}` }) }];
@@ -341,7 +346,7 @@ describe('a local architect that cannot meet the request', () => {
     expect(events.filter(event => event.type === 'gate-attempted')).toHaveLength(0);
     expect(events.some(event => event.type === 'work-item-completed')).toBe(false);
     // The submission is stored verbatim before anything is derived from it.
-    const stored = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.submission('inv-0004')), 'utf8')) as Record<string, unknown>;
+    const stored = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.submission('inv-0006')), 'utf8')) as Record<string, unknown>;
     expect(stored).toMatchObject({ schema: 'ramify-agent.local-architect-submission/1', kind: 'unresolved' });
   }, 300_000);
 });

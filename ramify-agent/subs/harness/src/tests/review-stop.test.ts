@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScriptedAgent, type Script } from '../../subs/agent/src/scripted.js';
-import type { AgentPort } from '../../subs/agent/src/interfaces/port.js';
+import type { AgentPort, SessionSpec } from '../../subs/agent/src/interfaces/port.js';
 import { errorResponseSchema } from '../interfaces/protocol/errors.js';
 import { commandResponseSchema } from '../interfaces/protocol/jobs.js';
 import { protocolPaths } from '../interfaces/protocol/paths.js';
@@ -27,7 +27,8 @@ import {
 } from './helpers/runs.js';
 import { unchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
-import { withPlan13Fixture } from './helpers/declarations.js';
+import { withDefaultTurns } from './helpers/declarations.js';
+import { checkToolName, type CheckSubmission } from '../analysis/extraction.js';
 
 /*
  * The review stop, architecture §3. A run started with `reviewStop` waits
@@ -69,6 +70,9 @@ function version(service: RunService, runId: string): number {
 function phaseOf(service: RunService, runId: string) {
   return service.getRun(plan, runId)?.phase;
 }
+
+/** The initial analysis's turns: the catalog intake, the initial architect and the plan's checker, each its own session. */
+const analysed = ['session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended'];
 
 async function types(root: string, runId: string): Promise<string[]> {
   return (await runEventsOnDisk(root, plan, runId)).map(event => event.type);
@@ -178,7 +182,7 @@ describe('a run started with the review stop', () => {
     expect(done).toMatchObject({ state: 'completed', phase: 'ended', review: { reviewer: 'dana@example.com', at: approved.acceptedAt, duringRun: false } });
     const events = await runEventsOnDisk(root, plan, receipt.jobId);
     expect(events.map(event => event.type)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'analysis-approved',
+      'job-started', 'document-manifest-committed', ...analysed, 'analysis-accepted', 'review-requested', 'analysis-approved',
       'gate-started', 'readiness-passed', 'nonfunctional-phase-started', 'candidate-prepared', 'nonfunctional-assessed', 'nonfunctional-round-closed',
       'gate-committing', 'gate-attempted', 'candidate-bound-to-gate', 'session-finished', 'job-completed',
     ]);
@@ -200,12 +204,12 @@ describe('a run started with the review stop', () => {
 
     expect(onlyRun(service, plan)).toMatchObject({ state: 'stopped', phase: 'ended', review: 'not-reviewed' });
     expect(await types(root, receipt.jobId)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested', 'stop-requested',
+      'job-started', 'document-manifest-committed', ...analysed, 'analysis-accepted', 'review-requested', 'stop-requested',
       'session-finished', 'job-stopped',
     ]);
-    // The architect's session, kept through the stop, is finished as the run ends.
+    // The architect's session, kept through the stop, is finished as the run ends; the extractor's two were never kept.
     expect([...reduceSessions(await runEventsOnDisk(root, plan, receipt.jobId)).values()].map(one => [one.id, one.state, one.finished]))
-      .toEqual([['ses-0001', 'finished', 'run-ended']]);
+      .toEqual([['ses-0001', 'finished', 'not-kept'], ['ses-0002', 'finished', 'run-ended'], ['ses-0003', 'finished', 'not-kept']]);
     const stopped = (await runEventsOnDisk(root, plan, receipt.jobId)).at(-1)!;
     expect(stopped).toMatchObject({ type: 'job-stopped', data: { settled: true } });
     // The scripted Git was asked for no branch and no commit, and made none.
@@ -219,6 +223,47 @@ describe('a run started with the review stop', () => {
       .rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('stopped') });
   }, 120_000);
 
+  test('at the stop, the analysis a reviewer reads carries the catalog by kind and each checker correction with its reason', async () => {
+    const root = await target();
+    // The plan's checker rewrites the architect's reading of the request and adds a requirement the readings omitted.
+    const correction: CheckSubmission = {
+      corrections: [
+        { action: 'rewrite', reason: 'The reading made the request stronger than the plan states it.',
+          element: { id: 'fr-001', text: 'A reviewer can attach a note to a completed review run.', conditions: [{ text: 'a completed review run', source: 'stated' }], uncertainty: '' } },
+        { action: 'add', reason: 'The plan bounds a note, and no reading kept it.',
+          elements: [{ key: 'note-bound', kind: 'non-functional', document: 'doc-001', text: 'A note holds at most 500 characters.', conditions: [], uncertainty: '' }] },
+      ],
+      entries: [], scenarios: [],
+    };
+    const { service } = await openRuns(root, {
+      script: spec => spec.submission.name === checkToolName ? [{ kind: 'submit', input: correction }]
+        : spec.role === 'initial-architect' ? submit(analysis([entry('reviewer-note', reviews)])) : [],
+    });
+    cleanups.push(() => service.close());
+    const receipt = await service.execute(startRun(plan, 'scripted', undefined, true));
+    await until(() => phaseOf(service, receipt.jobId) === 'awaiting-review');
+
+    const accepted = (await runEventsOnDisk(root, plan, receipt.jobId)).find(event => event.type === 'analysis-accepted')!;
+    if (accepted.type !== 'analysis-accepted') throw new Error('unreachable');
+    expect(accepted.data.catalog).toEqual({ context: 0, functional: 2, nonFunctional: 1, fixed: 0, recommendation: 0 });
+    // inv-0003 is the plan's checker, after the intake and the initial architect.
+    expect(accepted.data.findings?.map(finding => [finding.invocation, finding.action, finding.elements])).toEqual([
+      ['inv-0003', 'rewrite', ['fr-001']], ['inv-0003', 'add', ['nfr-001']],
+    ]);
+    const projection = await new RunQueries(service).analysis(plan, receipt.jobId);
+    if (projection.analysis.status !== 'accepted' || projection.analysis.planEvidence?.status !== 'available') throw new Error('no accepted plan evidence');
+    const evidence = projection.analysis.planEvidence;
+    expect(evidence.elements.map(element => [element.id, element.kind])).toEqual([['fr-001', 'functional'], ['fr-002', 'functional'], ['nfr-001', 'non-functional']]);
+    expect(evidence.elements[0]).toMatchObject({ text: 'A reviewer can attach a note to a completed review run.', conditions: [{ text: 'a completed review run', source: 'stated' }] });
+    expect(evidence.findings).toEqual([
+      { document: 'doc-001', path: `plans/${plan}/plan.md`, action: 'rewrite', reason: 'The reading made the request stronger than the plan states it.', elements: ['fr-001'], retired: [] },
+      { document: 'doc-001', path: `plans/${plan}/plan.md`, action: 'add', reason: 'The plan bounds a note, and no reading kept it.', elements: ['nfr-001'], retired: [] },
+    ]);
+    expect(evidence.retired).toEqual([]);
+    await service.execute(stopRun(plan, receipt.jobId, version(service, receipt.jobId)));
+    await service.settled(plan, receipt.jobId);
+  }, 120_000);
+
   test('closing the service while a run waits at the stop leaves it to be interrupted, as any other phase', async () => {
     const root = await target();
     const first = await openRuns(root, { script: [{ kind: 'submit', input: emptyAnalysis() }] });
@@ -226,10 +271,10 @@ describe('a run started with the review stop', () => {
     await until(() => phaseOf(first.service, receipt.jobId) === 'awaiting-review');
     // The waiting driver is woken by close, so the service quiesces at once.
     await first.service.close();
-    expect(await types(root, receipt.jobId)).toEqual(['job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested']);
-    // At the stop the architect's session is kept: suspended, to be continued after the approval.
+    expect(await types(root, receipt.jobId)).toEqual(['job-started', 'document-manifest-committed', ...analysed, 'analysis-accepted', 'review-requested']);
+    // At the stop the architect's session is kept: suspended, to be continued after the approval. The intake's and the checker's are finished.
     expect([...reduceSessions(await runEventsOnDisk(root, plan, receipt.jobId)).values()].map(one => [one.id, one.state]))
-      .toEqual([['ses-0001', 'suspended']]);
+      .toEqual([['ses-0001', 'finished'], ['ses-0002', 'suspended'], ['ses-0003', 'finished']]);
 
     const second = await openRuns(root, { script: [] });
     cleanups.push(() => second.service.close());
@@ -252,7 +297,7 @@ describe('a run started with the review stop', () => {
     expect(restarted.recovery.interrupted).toEqual([`${plan}/${receipt.jobId}`]);
     expect(restarted.recovery.invocations).toEqual([]);
     expect(await types(root, receipt.jobId)).toEqual([
-      'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted', 'review-requested',
+      'job-started', 'document-manifest-committed', ...analysed, 'analysis-accepted', 'review-requested',
       'session-finished', 'job-interrupted',
     ]);
     expect(restarted.agent!.sessions).toHaveLength(0);
@@ -341,9 +386,10 @@ describe('approve-analysis in a run without the stop', () => {
     const held = new Promise<void>(resolve => { release = resolve; });
     const { service, agent } = await openRuns(root, {
       // The first run's architect submits after a moment; the second one's ends without an analysis.
+      // The catalog extractor's turns are the default ones.
       script: (() => {
         let sessions = 0;
-        return () => (sessions++ === 0
+        return (spec: SessionSpec) => (spec.role === 'catalog-extractor' ? [] : sessions++ === 0
           ? [{ kind: 'wait', ms: 400 }, { kind: 'submit', input: emptyAnalysis() }] as const
           : [{ kind: 'end', message: 'no analysis' }] as const);
       })(),
@@ -355,7 +401,7 @@ describe('approve-analysis in a run without the stop', () => {
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun(plan));
-    await until(() => agent!.sessions.length === 1);
+    await until(() => agent!.sessions.some(session => session.spec.role === 'initial-architect'));
     await expect(service.execute(approveRun(plan, receipt.jobId, version(service, receipt.jobId))))
       .rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('no accepted analysis') });
 
@@ -382,13 +428,14 @@ describe('approve-analysis in a run without the stop', () => {
 describe('the run budget', () => {
   /**
    * A run with the stop whose clock the test holds. Each session start moves
-   * the clock by `perSession`; the test moves it by `pause` while the run
-   * waits at its stop, and then approves.
+   * the clock by `perSession`, the analysis's three included (the intake, the
+   * initial architect and the plan's checker); the test moves it by `pause`
+   * while the run waits at its stop, and then approves.
    */
   async function budgeted(perSession: number, pause: number) {
     const root = await target();
     let current = new Date('2026-09-23T12:00:00.000Z');
-    const scripted = createScriptedAgent(withPlan13Fixture(byRole({
+    const scripted = createScriptedAgent(withDefaultTurns(byRole({
       'initial-architect': [submit(analysis([entry('reviewer-note', reviews)]))],
       'local-architect': [[{ kind: 'wait', ms: 60_000 }]],
     })));
@@ -421,9 +468,9 @@ describe('the run budget', () => {
   }
 
   test('the time between review-requested and analysis-approved is not counted against runAbsoluteMs', async () => {
-    const { root, runId, service, scripted } = await budgeted(600, 10_000);
-    // The run's clock has moved 10,600 ms, of which 10,000 were the stop.
-    await until(() => scripted.sessions.length === 2);
+    const { root, runId, service, scripted } = await budgeted(150, 10_000);
+    // The run's clock has moved 10,450 ms by the approval, of which 10,000 were the stop, and moves on with each session after it.
+    await until(() => scripted.sessions.some(session => session.spec.submission.name === 'submit_work_item_result'));
     expect(service.getRun(plan, runId)).toMatchObject({ state: 'running', phase: 'working' });
     const events = await runEventsOnDisk(root, plan, runId);
     const requested = events.find(event => event.type === 'review-requested')!;
@@ -435,11 +482,12 @@ describe('the run budget', () => {
   }, 120_000);
 
   test('the time outside the stop still is: the age reported excludes exactly the pause', async () => {
-    const { root, runId, service, scripted } = await budgeted(1100, 10_000);
+    // The analysis's three sessions reach the stop within the budget, 1,200 ms in all, and the first turn after the approval finds it spent.
+    const { root, runId, service, scripted } = await budgeted(400, 10_000);
     await service.settled(plan, runId);
-    expect(onlyRun(service, plan).failure).toMatchObject({ reason: 'limit-exceeded', message: 'The run has run for 1100 ms; the policy allows 1000' });
-    expect(scripted.sessions).toHaveLength(1);
-    expect((await types(root, runId)).filter(type => type === 'invocation-started')).toHaveLength(1);
+    expect(onlyRun(service, plan).failure).toMatchObject({ reason: 'limit-exceeded', message: 'The run has run for 1200 ms; the policy allows 1000' });
+    expect(scripted.sessions).toHaveLength(3);
+    expect((await types(root, runId)).filter(type => type === 'invocation-started')).toHaveLength(3);
   }, 120_000);
 });
 
@@ -448,7 +496,7 @@ describe('over HTTP', () => {
     return startServerWith({
       projectRoot: root, port: 0, assetsDirectory: join(root, 'no-such-build'),
       ramify: new FakeRamifyCli(),
-      agent: createScriptedAgent(withPlan13Fixture(script)),
+      agent: createScriptedAgent(withDefaultTurns(script)),
       runs: {
         inputs: treeInputs(), policy: projectRoot => testPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
         git: unchangedGit(root, [finalVerification], 4), candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution(),

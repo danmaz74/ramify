@@ -5,6 +5,7 @@ import { capabilityOf } from '../work/frontier.js';
 import { readRunFile, type RunView } from './inputs.js';
 import { analysisScenariosOf } from './scenarios.js';
 import { readAcceptedEvidence } from '../analysis/evidence.js';
+import { elementKinds } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 
 /*
  * The plan and its entries with their scenarios, the hypotheses beside the
@@ -40,6 +41,9 @@ export async function analysisOf(view: RunView): Promise<AnalysisResponse> {
       ? null
       : { parent: entry.proposed.parent, directory: entry.proposed.directory, purpose: entry.proposed.purpose, tags: [...entry.proposed.tags] },
     workItem: workItemOf.get(entry.capability) ?? null,
+    requirementRefs: [...entry.requirementRefs],
+    acceptanceRefs: [...entry.acceptanceRefs],
+    contextRefs: [...entry.contextRefs],
   }));
 
   const hypotheses = hypothesesOf(view);
@@ -65,11 +69,19 @@ async function evidenceOf(view: RunView): Promise<NonNullable<Extract<AnalysisRe
   if (evidence.status === 'unavailable') return evidence;
   try {
     const paths = new Map(evidence.manifest.documents.map(document => [document.id, document.path]));
+    const accepted = view.events.find(event => event.type === 'analysis-accepted');
+    const findings = accepted?.type === 'analysis-accepted' ? accepted.data.findings ?? [] : [];
     return {
       status: 'available',
-      catalog: evidence.catalog.items.map(item => ({ id: item.id, classification: item.classification, document: item.passage.document,
-        path: paths.get(item.passage.document) ?? 'unknown', quote: item.passage.quote, locator: item.passage.locator ?? null,
-        conditions: item.conditions, uncertainty: item.uncertainty })),
+      catalogHash: evidence.catalogHash,
+      elements: elementKinds.flatMap(kind => evidence.catalog.elements.filter(element => element.kind === kind)).map(element => ({
+        id: element.id, kind: element.kind, document: element.document, path: paths.get(element.document) ?? 'unknown',
+        text: element.text, locator: element.locator ?? null, conditions: element.conditions.map(condition => ({ ...condition })),
+        uncertainty: element.uncertainty,
+      })),
+      retired: [...evidence.catalog.retired],
+      findings: findings.map(finding => ({ document: finding.document, path: paths.get(finding.document) ?? 'unknown', action: finding.action,
+        reason: finding.reason, elements: [...finding.elements], retired: [...finding.retired] })),
       missing: evidence.incorporation.missing.filter(item => item.judgment !== 'required').map(item => ({
         from: item.from, fromPath: paths.get(item.from) ?? 'unknown',
         excerpt: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
@@ -78,9 +90,7 @@ async function evidenceOf(view: RunView): Promise<NonNullable<Extract<AnalysisRe
         judgment: item.judgment as 'unclear' | 'advisory', reason: item.reason,
       })),
       incorporation: evidence.incorporation.documents.map(item => ({ document: item.document, path: paths.get(item.document) ?? 'unknown',
-        scenarios: item.scenarios, uncertainty: item.uncertainty,
-        governing: item.governing.map(passage => ({ path: paths.get(passage.document) ?? 'unknown',
-          quote: passage.quote, locator: passage.locator ?? null })) })),
+        scenarios: item.scenarios, uncertainty: item.uncertainty })),
     };
   } catch (error) {
     return { status: 'unavailable', reason: error instanceof Error ? error.message : String(error) };

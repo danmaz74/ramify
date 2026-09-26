@@ -1,10 +1,17 @@
-<!-- ramify-agent initial analysis procedure, version 3. -->
-The analysis has two separate parts, and they never merge.
+<!-- ramify-agent initial analysis procedure, version 4. -->
+The analysis has four parts. Entry assignments and hypotheses never merge.
+
+**Elements** are the plan's functional requirements and its context, as you
+read them. Every later agent of the run works from elements instead of the
+plan: the work item of an entry receives exactly the elements the entry
+cites, whole, and nothing else of the plan. Other readers extract the plan's
+non-functional requirements and recommendations and the principles
+documents' rules; you extract neither.
 
 **Entry assignments** name the entry capabilities the plan asks for directly,
-each with the module that owns it, the plan references that state its
-requirements and its acceptance, and its acceptance scenarios. They become
-executable work.
+each with the module that owns it, the functional elements that state its
+requirements and its acceptance, the context elements a reader needs to
+understand it, and its acceptance scenarios. They become executable work.
 
 **Acceptance scenarios** are Gherkin scenarios that state, at the outside,
 what each entry capability must do for the plan to be finished. Every entry
@@ -29,32 +36,25 @@ in one module get two work items.
 
 Do this, in order:
 
-1. Read the plan in the message below, in full.
-   Use the captured document index to read relevant companion and principle
-   text at its immutable captured path. Do not infer a document's contents
-   from a link, filename or summary.
-2. Judge every captured plan document for scenario incorporation. Supply the
-   governing source wording as closely as practical and note
-   uncertainty. A linked example can remain unincorporated. Judge every
-   missing reference `required`, `unclear` or `advisory` from surrounding
-   source text. A required missing document cannot be accepted; report it
-   so the run stops before implementation.
-3. Extract only non-functional requirements and advice into `catalog`. Keep
-   each excerpt as close to the source wording as practical and name its
-   captured document. An optional section locator can help later readers. Keep mandatory
-   implementation constraints as `non-functional-requirement`, and tentative
-   technology suggestions as `advice`. Preserve the source's force; record
-   any stated condition as `stated`, your inferred condition as `inferred`,
-   and uncertainty separately. Submit an explicit empty array when there are
-   no such passages. Do not assign catalog IDs or duplicate functional entry
-   requirements in this catalog. A later architect choice to adopt advice is
-   a separate decision.
-4. Read the scenarios in the documents you incorporate. The root scenario
-   list in the message is a candidate list until you incorporate that root.
-   Number accepted plan scenarios `ps-01`, `ps-02`, … across only the
-   incorporated documents in captured document order. Their
-   `When` steps name what the outside does, which is where entry capabilities
-   are found.
+1. Read the plan in the message below, in full, and every accompanying plan
+   document the message lists, at its captured path.
+2. Submit the plan's `functional` elements: what the plan delivers, its
+   acceptance statements included. The unit is a requirement, not a
+   sentence: an element is as long as its source needs to state one
+   requirement so that it can be understood and honored on its own, a
+   bullet, a paragraph, a table with its heading or a whole section with its
+   example and qualifications. Keep the text as close to the plan's wording
+   as practical, name the captured plan document it comes from, record each
+   condition as `stated` or `inferred`, and state your uncertainty. Give
+   each a `key` unique in the submission; the harness assigns its ID.
+3. Submit the plan's `context` elements: the passages that explain the
+   situation the plan starts from or why it exists, which a reader of an
+   entry needs to understand it. One element is one whole explanation. A
+   statement that only says what the plan does not deliver is no element.
+4. Read the plan scenarios the message lists: the harness numbered them
+   `ps-01`, `ps-02`, … across the plan documents the intake incorporated.
+   Their `When` steps name what the outside does, which is where entry
+   capabilities are found.
 5. Orient yourself on the architect view with the skill: the module map, each
    module's purpose and its headline symbols.
 6. Name the plan's entry capabilities. An entry capability is one the plan
@@ -62,11 +62,12 @@ Do this, in order:
    system, or by a part of the project the plan does not change. It is always
    new, since otherwise the plan would already be satisfied, and no other
    capability of the plan depends on it. Give each one a kebab-case slug, the
-   owner's declared-name path, the plan references that state its requirement
-   and the ones that state its acceptance, and the citations that show where
-   it belongs. A plan reference names a heading of the plan or a range of its
-   lines, and the captured plan must have it. The slug `integration` is
-   reserved for the file integration scenarios are written to.
+   owner's declared-name path, the keys of the functional elements that
+   state its requirement (`requirementRefs`) and its acceptance
+   (`acceptanceRefs`), the keys of the context elements its reader needs
+   (`contextRefs`), and the citations that show where it belongs. The slug
+   `integration` is reserved for the file integration scenarios are written
+   to.
 7. An owner that does not exist yet needs a `proposed` module: its parent as
    the view names it, its directory as a direct child under that parent's
    `subs/`, its purpose and its tags. The owner, the directory and the
@@ -92,9 +93,10 @@ Do this, in order:
    interaction and the concrete data the plan states or implies. Name no
    module, file, symbol or deeper capability: a scenario states behavior at
    the outside, not how the tree implements it. Give it `origin`
-   `{ "kind": "architect" }`, and in `refs` the plan references it verifies.
-   Together, an entry's scenarios cite every one of its `acceptanceRefs`,
-   through a plan scenario's lines or an architect scenario's `refs`.
+   `{ "kind": "architect" }`.
+   In every scenario's `refs`, plan scenarios included, name the keys of the
+   acceptance elements it verifies. Together, an entry's scenarios cite every
+   one of its `acceptanceRefs`.
 11. For each need the plan implies below its entry points, search the view for
    behavior that already exists. Record a need existing behavior already
    covers as a hypothesis with `change: "reuse"`, its suggested owner, the
@@ -133,8 +135,8 @@ this order, and answers with the first one broken:
 4. Every entry has at least one scenario.
 5. Every step of an integration scenario appears verbatim in one of its
    sub-scenarios.
-6. Every `acceptanceRefs` entry of every entry is cited by at least one of
-   its scenarios.
+6. Every acceptance element of every entry is cited in the `refs` of at
+   least one of its scenarios.
 
 It also records warnings, which never reject and are shown to the person who
 reviews the analysis: a step that names an exported symbol or a file the

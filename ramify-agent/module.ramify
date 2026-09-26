@@ -97,6 +97,7 @@ expose-sub ProjectedRunEvent, runEventPageSchema, RunEventPage, entryViewSchema 
 expose-sub EntryView, hypothesisStandingSchema, HypothesisStanding from harness to descendants
 expose-sub hypothesisViewSchema, HypothesisView, analysisResponseSchema from harness to descendants
 expose-sub AnalysisResponse, placementOutcomeViewSchema, decisionViewSchema from harness to descendants
+expose-sub ElementView, elementViewSchema, CatalogFindingView, catalogFindingViewSchema from harness to descendants
 expose-sub DecisionView, DecisionKind, decisionListResponseSchema from harness to descendants
 expose-sub DecisionListResponse, workItemStateSchema, WorkItemState from harness to descendants
 expose-sub workItemSummarySchema, WorkItemSummary, workItemListResponseSchema from harness to descendants

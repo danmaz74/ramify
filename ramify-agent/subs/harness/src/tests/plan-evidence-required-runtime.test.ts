@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { copyFixture } from './helpers/fixture.js';
-import { analysis } from './helpers/analysis.js';
+import { intakeToolName } from '../analysis/extraction.js';
 import { submit } from './helpers/iterations.js';
 import { installTestRunner, onlyRun, openRuns, runEventsOnDisk, startRun } from './helpers/runs.js';
 import { unchangedGit } from './helpers/unchanged-run.js';
@@ -18,16 +18,15 @@ test('a required missing companion cannot produce accepted analysis', async () =
   await installTestRunner(fixture.root);
   await writeFile(join(fixture.root, 'plans/review-notes/plan.md'), '# Request\n\n[Required guide](must-exist.md)\n');
   const opened = await openRuns(fixture.root, { git: unchangedGit(fixture.root, []), script: spec => {
-    if (spec.role !== 'initial-architect') return [];
+    if (spec.submission.name !== intakeToolName) return [];
     const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
     if (!captured) throw new Error('Captured plan missing');
     const directory = dirname(dirname(captured));
     const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
     const root = manifest.documents.find(item => item.id === manifest.root)!;
     const gap = manifest.missing.find(item => item.target.endsWith('must-exist.md'))!;
-    return submit({ ...analysis([]), incorporation: {
-      documents: [{ document: root.id, scenarios: true, governing: [{ document: root.id, sha256: root.sha256,
-        start: 0, end: Buffer.byteLength('# Request'), quote: '# Request' }], uncertainty: '' }],
+    return submit({ goal: 'The request follows its required guide.', elements: [], incorporation: {
+      documents: [{ document: root.id, scenarios: true, uncertainty: '' }],
       missing: [{ from: gap.from, target: gap.target, source: gap.source, judgment: 'required',
         reason: 'This guide is required by the request.' }],
     } });
@@ -38,6 +37,7 @@ test('a required missing companion cannot produce accepted analysis', async () =
   const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
   expect(events.filter(event => event.type === 'analysis-accepted')).toHaveLength(0);
   expect(onlyRun(opened.service, 'review-notes').state).toBe('failed');
-  expect(opened.agent?.sessions.some(session => session.verdicts.some(verdict =>
+  expect(opened.agent?.sessions.some(session => session.spec.submission.name === intakeToolName && session.verdicts.some(verdict =>
     JSON.stringify(verdict).includes('Required document')))).toBe(true);
+  expect(opened.agent?.sessions.some(session => session.spec.role === 'initial-architect')).toBe(false);
 }, 30_000);

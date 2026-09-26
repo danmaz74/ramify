@@ -12,6 +12,9 @@ import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToo
 import { reconciliationJsonSchema, reconciliationToolName } from '../reviews/reconciliation.js';
 import { failureAnalysisJsonSchema, failureAnalysisToolName } from '../work/failure.js';
 import { contextSelectorJsonSchema, contextSelectorToolName, workOrientationJsonSchema, workOrientationToolName } from '../context-selection/submissions.js';
+import {
+  checkJsonSchema, checkToolName, intakeJsonSchema, intakeToolName, principleJsonSchema, principleToolName,
+} from '../analysis/extraction.js';
 import { coordinatorAssessmentJsonSchema, coordinatorAssessmentToolName, nonfunctionalRepairJsonSchema, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
 import { promptPackageManifestSchema, type PromptPackageManifest, type ReviewKind } from '../run/records.js';
 import { shellMaxTimeoutMs } from '../tools/shell.js';
@@ -52,6 +55,10 @@ const failureAnalysisProcedureFile = fileURLToPath(new URL('./failure-analysis.p
 const workOrientationProcedureFile = fileURLToPath(new URL('../context-selection/orientation.procedure.md', import.meta.url));
 const selectorSystemFile = fileURLToPath(new URL('../context-selection/selector.system.md', import.meta.url));
 const selectorProcedureFile = fileURLToPath(new URL('../context-selection/selector.procedure.md', import.meta.url));
+const catalogExtractorSystemFile = fileURLToPath(new URL('../analysis/catalog-extractor.system.md', import.meta.url));
+const intakeProcedureFile = fileURLToPath(new URL('../analysis/intake.procedure.md', import.meta.url));
+const principlesProcedureFile = fileURLToPath(new URL('../analysis/principles.procedure.md', import.meta.url));
+const checkProcedureFile = fileURLToPath(new URL('../analysis/check.procedure.md', import.meta.url));
 const nonfunctionalCoordinatorSystemFile = fileURLToPath(new URL('../nonfunctional/coordinator.system.md', import.meta.url));
 const nonfunctionalAssessmentProcedureFile = fileURLToPath(new URL('../nonfunctional/assessment.procedure.md', import.meta.url));
 const nonfunctionalRepairSystemFile = fileURLToPath(new URL('../nonfunctional/repair.system.md', import.meta.url));
@@ -66,6 +73,7 @@ export const defaultSkillDirectory = fileURLToPath(new URL('../../../../skills/m
 /** The one generated file of a package: the schema the agent's tool is given. */
 const submissionSchemaNames = {
   'initial-architect': 'initial-analysis.schema.json',
+  'catalog-extractor': 'intake.schema.json',
   'global-fork': 'global-fork.schema.json',
   'local-architect': 'local-architect.schema.json',
   engineer: 'engineer.schema.json',
@@ -116,22 +124,31 @@ export interface LoadedPackage {
    */
   readonly reconciliation?: { readonly procedure: string; readonly submissionSchema: string } | undefined;
   readonly workOrientation?: { readonly procedure: string; readonly submissionSchema: string } | undefined;
+  /**
+   * The catalog extractor's three turns, each with its procedure and its
+   * submission. Only the catalog extractor's package has them.
+   */
+  readonly extraction?: Readonly<Record<ExtractionTurn, { readonly procedure: string; readonly submissionSchema: string }>> | undefined;
 }
+
+/** The catalog extractor's bounded turns. */
+export type ExtractionTurn = 'intake' | 'principles' | 'check';
 
 export interface PromptPackageOptions {
   readonly skillDirectory?: string | undefined;
 }
 
 /** The versions of the packages this iteration ships. */
-export const initialArchitectPackage = 'initial-architect/2';
-export const globalForkPackage = 'global-fork/3';
-export const localArchitectPackage = 'local-architect/7';
-export const contextSelectorPackage = 'context-selector/1';
-export const engineerPackage = 'engineer/3';
+export const initialArchitectPackage = 'initial-architect/3';
+export const catalogExtractorPackage = 'catalog-extractor/1';
+export const globalForkPackage = 'global-fork/4';
+export const localArchitectPackage = 'local-architect/8';
+export const contextSelectorPackage = 'context-selector/2';
+export const engineerPackage = 'engineer/4';
 export const contractEngineerPackage = 'contract-engineer/2';
-export const reviewerPackage = 'reviewer/3';
+export const reviewerPackage = 'reviewer/4';
 export const failureAnalystPackage = 'failure-analyst/1';
-export const nonfunctionalCoordinatorPackage = 'nonfunctional-coordinator/1';
+export const nonfunctionalCoordinatorPackage = 'nonfunctional-coordinator/2';
 
 /**
  * Loads every package a run offers. A role with no package yet has no entry:
@@ -143,6 +160,7 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
 }> {
   const packages = new Map<Role, LoadedPackage>([
     ['initial-architect', await loadInitialArchitect(options)],
+    ['catalog-extractor', await loadCatalogExtractor(options)],
     ['global-fork', await loadGlobalFork(options)],
     ['local-architect', await loadLocalArchitect(options)],
     ['context-selector', await loadContextSelector(options)],
@@ -151,7 +169,7 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['reviewer', await loadReviewer(options)],
     ['failure-analyst', await loadFailureAnalyst(options)],
     ['nonfunctional-coordinator', await loadNonfunctionalCoordinator(options)],
-    ['nonfunctional-repair-engineer', await loadPackage({ role: 'nonfunctional-repair-engineer', name: 'nonfunctional-repair-engineer/1',
+    ['nonfunctional-repair-engineer', await loadPackage({ role: 'nonfunctional-repair-engineer', name: 'nonfunctional-repair-engineer/2',
       systemFile: nonfunctionalRepairSystemFile, procedureFile: nonfunctionalRepairProcedureFile,
       schema: nonfunctionalRepairJsonSchema, submissionKinds: ['completed', 'partial'], options })],
   ]);
@@ -165,6 +183,36 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     }])),
   });
   return { manifest, packages };
+}
+
+/**
+ * The catalog extractor's package: the intake, the extraction of one
+ * principles document and the check of one document's reading, each a
+ * procedure and a submission of its own, all part of the hash. The intake's
+ * is the package's main procedure.
+ */
+async function loadCatalogExtractor(options: PromptPackageOptions): Promise<LoadedPackage> {
+  const [principles, check] = await Promise.all([readFile(principlesProcedureFile, 'utf8'), readFile(checkProcedureFile, 'utf8')]);
+  const schema = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+  const principleSchema = schema(principleJsonSchema);
+  const checkSchema = schema(checkJsonSchema);
+  const loaded = await loadPackage({
+    role: 'catalog-extractor', name: catalogExtractorPackage,
+    systemFile: catalogExtractorSystemFile, procedureFile: intakeProcedureFile,
+    schema: intakeJsonSchema, submissionKinds: ['intake', 'principle-extraction', 'catalog-check'],
+    extraFiles: [
+      describe(principlesProcedureFile, principles, 'procedure'),
+      { path: 'principle-extraction.schema.json', hash: sha256(principleSchema), kind: 'submission-schema', bytes: Buffer.byteLength(principleSchema) },
+      describe(checkProcedureFile, check, 'procedure'),
+      { path: 'catalog-check.schema.json', hash: sha256(checkSchema), kind: 'submission-schema', bytes: Buffer.byteLength(checkSchema) },
+    ],
+    options,
+  });
+  return { ...loaded, extraction: {
+    intake: { procedure: loaded.procedure, submissionSchema: loaded.submissionSchema },
+    principles: { procedure: withoutVersionComment(principles).trim(), submissionSchema: principleSchema },
+    check: { procedure: withoutVersionComment(check).trim(), submissionSchema: checkSchema },
+  } };
 }
 
 function loadNonfunctionalCoordinator(options: PromptPackageOptions): Promise<LoadedPackage> {
@@ -399,6 +447,14 @@ function withoutVersionComment(text: string): string {
 /** The rendered system prompt of the initial architect. It is never stored: it holds file contents. */
 export function renderInitialArchitectPrompt(loaded: LoadedPackage, projectRoot: string): string {
   return render(loaded, projectRoot, initialAnalysisToolName);
+}
+
+/** The rendered system prompt of one catalog extractor turn. It is never stored either. */
+export function renderExtractionPrompt(loaded: LoadedPackage, projectRoot: string, turn: ExtractionTurn): string {
+  const extraction = loaded.extraction?.[turn];
+  if (extraction === undefined) throw new Error(`The ${loaded.package} package has no ${turn} procedure`);
+  const tool = { intake: intakeToolName, principles: principleToolName, check: checkToolName }[turn];
+  return render({ ...loaded, procedure: extraction.procedure, submissionSchema: extraction.submissionSchema }, projectRoot, tool);
 }
 
 /** The rendered system prompt of one placement fork. It is never stored either. */

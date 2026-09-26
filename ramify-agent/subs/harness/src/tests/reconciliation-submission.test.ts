@@ -32,7 +32,9 @@ function context(extra: Partial<ReconciliationContext> = {}): ReconciliationCont
     actor: { kind: 'agent', role: 'local-architect', invocation: 'inv-0009' },
     source: { kind: 'tree', id: 'tree-04' },
     evidence: () => [{ kind: 'reconciliation-submission', ref: 'invocations/inv-0009/submission.json', hash: null }],
-    document: async path => (path === 'plan' ? { text: 'A note belongs to exactly one review run.', revision: 'sha256:plan' } : null),
+    // An element of the frozen catalog, bound at the catalog's hash, and a file of the basis source at its tree.
+    document: async path => (path === 'fr-002' ? { text: 'A note belongs to exactly one review run.', revision: `sha256:${'c'.repeat(64)}` }
+      : path === 'docs/notes.md' ? { text: 'Notes are kept per run.', revision: 'tree-04' } : null),
     decide: command => { decided.push(command); return null; },
     ...extra,
   };
@@ -148,14 +150,20 @@ describe('validating a submission', () => {
       disposition('cf-0001', { action: 'request-user-decision', conflicts: [{ document, text }], options }),
       disposition('cf-0002', { action: 'leave' }),
     ], { kind: 'await-user' });
-    expect(messages(await validateReconciliation(ask('plan', 'A note belongs to one run.'), context()))).toEqual([
-      'dispositions.0.action.conflicts.0.text: The text is not in "plan" as it stands at sha256:plan; cite the conflicting text exactly',
+    expect(messages(await validateReconciliation(ask('fr-002', 'A note belongs to one run.'), context()))).toEqual([
+      `dispositions.0.action.conflicts.0.text: The text is not in "fr-002" as it stands at sha256:${'c'.repeat(64)}; cite the conflicting text exactly`,
     ]);
-    expect(messages(await validateReconciliation(ask('docs/other.md', 'x'), context()))).toEqual([
-      'dispositions.0.action.conflicts.0.document: "docs/other.md" is neither the plan nor a file of the source this reconciliation assesses',
-    ]);
-    const accepted = await validateReconciliation(ask('plan', 'A note belongs to exactly one review run.'), context());
-    expect(accepted.ok && accepted.value.conflicts).toEqual([{ checkFinding: 'cf-0001', conflicts: [{ text: 'A note belongs to exactly one review run.', document: 'plan', revision: 'sha256:plan' }] }]);
+    for (const unknown of ['docs/other.md', 'plan', 'fr-009']) {
+      const refused = await validateReconciliation(ask(unknown, 'x'), context());
+      expect(messages(refused)).toEqual([
+        `dispositions.0.action.conflicts.0.document: "${unknown}" is neither an element of the run's catalog nor a file of the source this reconciliation assesses`,
+      ]);
+      expect(refused.ok ? [] : refused.errors.map(error => error.expected)).toEqual(['an element ID or a path of the source']);
+    }
+    const accepted = await validateReconciliation(ask('fr-002', 'exactly one review run'), context());
+    expect(accepted.ok && accepted.value.conflicts).toEqual([{ checkFinding: 'cf-0001', conflicts: [{ text: 'exactly one review run', document: 'fr-002', revision: `sha256:${'c'.repeat(64)}` }] }]);
+    const sourced = await validateReconciliation(ask('docs/notes.md', 'Notes are kept per run.'), context());
+    expect(sourced.ok && sourced.value.conflicts).toEqual([{ checkFinding: 'cf-0001', conflicts: [{ text: 'Notes are kept per run.', document: 'docs/notes.md', revision: 'tree-04' }] }]);
   });
 
   test('a refusal of the child is returned at the disposition it names', async () => {

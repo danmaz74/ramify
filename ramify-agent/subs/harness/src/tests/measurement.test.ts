@@ -83,14 +83,14 @@ describe('the frozen baseline', () => {
     expect(metrics.baseline, JSON.stringify(metrics.baseline)).toMatchObject({ state: 'measured' });
   }, 180_000);
 
-  test('the one invocation records its snapshot reference and its S_s components', async () => {
+  test('the initial architect\'s invocation records its snapshot reference and its S_s components', async () => {
     const root = await target();
     const { service } = await openRuns(root, { git: gitService, script: [{ kind: 'submit', input: emptyAnalysis() }], ramify: ramify.ramify });
     cleanups.push(() => service.close());
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
 
-    const invocation = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.invocation('inv-0001')), 'utf8')) as Invocation;
+    const invocation = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.invocation('inv-0002')), 'utf8')) as Invocation;
     expect(invocation.role).toBe('initial-architect');
     expect(invocation.scope.measurement).toMatchObject({ id: 'ms-0001', revision: 1 });
     const size = invocation.scope.size!;
@@ -162,7 +162,7 @@ describe('a component the producer cannot supply', () => {
     if (!('unavailable' in record.baseline)) throw new Error('available');
     expect(record.baseline.unavailable).toContain('ramify measure');
 
-    const invocation = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.invocation('inv-0001')), 'utf8')) as Invocation;
+    const invocation = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.invocation('inv-0002')), 'utf8')) as Invocation;
     expect(invocation.scope.measurement).toBeNull();
     expect(invocation.scope.size!.bytes).toBeNull();
 

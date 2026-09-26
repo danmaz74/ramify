@@ -28,8 +28,8 @@ export interface ContractBriefing {
   readonly existingConsumers: readonly string[];
   /** Diagnostics of an attempt that did not pass, where this invocation is a repair. */
   readonly failedGate?: { readonly id: string; readonly cause: string | null; readonly summary: readonly string[] } | undefined;
-  /** Exact assignment-cited source passages, assembled from the recorded selection. */
-  readonly sourceEvidence?: string | undefined;
+  /** The requesting assignment's package, rendered by the package creator; given to a session once. */
+  readonly package?: string | undefined;
 }
 
 /** The agreement in force, as a revising session receives it. */
@@ -60,7 +60,9 @@ export function contractMessage(briefing: ContractBriefing): string {
     '',
     assignment.goal,
     '',
-    ...(briefing.sourceEvidence === undefined ? [] : ['## Source evidence for this agreement', '', briefing.sourceEvidence, '']),
+    ...(briefing.package === undefined ? [] : ['## What the plan asks of the requesting iteration', '',
+      'The elements its assignment cites, whole, with the plan deviations in force when it was assigned.', '',
+      briefing.package.trimEnd(), '']),
   ];
 
   if (revision !== undefined) {

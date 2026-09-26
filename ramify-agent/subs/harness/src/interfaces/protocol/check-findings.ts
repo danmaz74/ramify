@@ -169,7 +169,8 @@ const workItemDeviationViewSchema = z.object({
   workItems: z.array(text).min(1),
   /** The plan it departs from, which stays exactly as written. */
   plan: text,
-  requirements: z.array(z.object({ startLine: z.int().positive(), endLine: z.int().positive(), text: z.string() }).strict()).min(1),
+  /** The elements it amends, as the frozen catalog holds them. */
+  amends: z.array(z.object({ id: text, path: text, text }).strict()).min(1),
   instead: text,
   why: text,
   rejected: z.array(z.object({ alternative: text, reason: text }).strict()),
@@ -185,7 +186,8 @@ const nonfunctionalDeviationViewSchema = z.object({
     candidate: z.object({ tree: text, head: text.nullable(), preparedAt: text }).strict(),
     coordinatorInvocation: text }).strict(),
   id: text,
-  passage: z.object({ document: text, quote: text, locator: text.nullable() }).strict(),
+  /** The requirement it departs from, as the frozen catalog holds it. */
+  element: z.object({ id: text, document: text, text }).strict(),
   sourcePath: text.nullable(),
   evidence: z.array(text),
   proposedAlternative: z.string(),

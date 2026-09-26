@@ -59,9 +59,10 @@ describe('a stop between the invocation and its session', () => {
     // The run was ending when the invocation ended, so its session ended with it.
     expect(events.find(event => event.type === 'invocation-ended')!.data).toMatchObject({ kept: false, finished: 'run-ended' });
 
-    // The invocation is a record, and it says what became of it.
+    // The invocation is a record, and it says what became of it. The first
+    // invocation of an analysis is its intake.
     const invocation = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.invocation('inv-0001')), 'utf8')) as { id: string; role: string };
-    expect(invocation).toMatchObject({ id: 'inv-0001', role: 'initial-architect' });
+    expect(invocation).toMatchObject({ id: 'inv-0001', role: 'catalog-extractor' });
     const outcome = JSON.parse(await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ invocation: 'inv-0001', ended: 'stopped', disposition: 'incomplete', submission: null });
 

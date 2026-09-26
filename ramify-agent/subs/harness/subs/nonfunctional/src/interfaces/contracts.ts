@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 const text = z.string().min(1);
 const gitTree = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
-const nfrId = z.string().regex(/^nfr-\d{3,}$/);
+/** A non-functional requirement of the plan or a fixed requirement: both are assessed. */
+const nfrId = z.string().regex(/^(nfr|fix)-\d{3,}$/);
 
 /** A Git tree OID identifies all source bytes, including dirty changes; HEAD is context only. */
 export const candidateSchema = z.object({

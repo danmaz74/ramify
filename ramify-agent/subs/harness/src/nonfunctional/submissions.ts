@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { assessmentCoverage, assessmentResultSchema, assessmentSchema, type Assessment, type Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import type { RoundDecision } from '../../subs/nonfunctional/src/rounds.js';
-import type { Catalog } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import type { ElementCatalog } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 
 const text = z.string().min(1);
-const nfrId = z.string().regex(/^nfr-\d{3,}$/);
+const nfrId = z.string().regex(/^(nfr|fix)-\d{3,}$/);
 
 /** The agent supplies judgments; the harness assigns every identity and provenance field. */
 export const coordinatorAssessmentSubmissionSchema = z.object({
@@ -18,7 +18,7 @@ export const coordinatorAssessmentJsonSchema = z.toJSONSchema(coordinatorAssessm
 export const coordinatorAssessmentToolName = 'submit_nonfunctional_assessment';
 
 export interface AssessmentBinding {
-  readonly catalog: Catalog;
+  readonly catalog: ElementCatalog;
   readonly candidate: Candidate;
   /** A fresh preview after the coordinator invocation, before record commit. */
   readonly observedTree: string;
@@ -28,8 +28,9 @@ export interface AssessmentBinding {
   readonly coordinatorInvocation: string;
 }
 
-function catalogNfrs(catalog: Catalog): string[] {
-  return catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+/** The elements assessment covers: every non-functional requirement of the plan and every fixed requirement, never a recommendation. */
+export function assessedElements(catalog: ElementCatalog): string[] {
+  return catalog.elements.filter(element => element.kind === 'non-functional' || element.kind === 'fixed').map(element => element.id);
 }
 
 /** Validate complete coverage and bind it to a freshly observed prepared tree. */
@@ -49,7 +50,7 @@ export function bindCoordinatorAssessment(input: unknown, binding: AssessmentBin
     errors.push(...record.error.issues.map(issue => ({ path: issue.path.map(String).join('.') || '(root)', message: issue.message })));
   }
   if (record.success) {
-    errors.push(...assessmentCoverage(record.data, catalogNfrs(binding.catalog)).map(message => ({ path: 'results', message })));
+    errors.push(...assessmentCoverage(record.data, assessedElements(binding.catalog)).map(message => ({ path: 'results', message })));
   }
   return errors.length > 0 ? { ok: false, errors } : { ok: true, value: record.data! };
 }

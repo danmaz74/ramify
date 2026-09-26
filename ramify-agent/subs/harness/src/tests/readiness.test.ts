@@ -209,8 +209,9 @@ describe('the three causes a readiness failure can have', () => {
     expect(attempts[0]!.steps.find(step => step.step === 'baseline-tests')).toMatchObject({ outcome: 'failed' });
     expect(attempts[0]!.steps.find(step => step.step === 'baseline-tests')!.detail).toContain('exited with 1');
     // The project's own failing test is not a code-repair assignment: no
-    // invocation follows, and the run ends.
-    expect(snapshot.counts.invocations).toBe(1);
+    // invocation follows the analysis's three (intake, initial architect,
+    // the one plan document's checker), and the run ends.
+    expect(snapshot.counts.invocations).toBe(3);
   }, 180_000);
 
   test('a timed-out baseline is recoverable, and the rerun passes', async () => {

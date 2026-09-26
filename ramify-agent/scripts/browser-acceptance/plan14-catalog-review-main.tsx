@@ -19,16 +19,16 @@ function projection(mode: EvidenceMode): AnalysisResponse {
   };
   const evidence = response.analysis.planEvidence;
   if (evidence?.status !== 'available') return response;
-  return { ...response, analysis: { ...response.analysis, planEvidence: { ...evidence, catalog: [] } } };
+  return { ...response, analysis: { ...response.analysis, planEvidence: { ...evidence, elements: [], findings: [] } } };
 }
 
 function Witness() {
   const [mode, setMode] = useState<EvidenceMode>('accepted');
-  window.plan13Review = { setMode };
+  window.catalogReview = { setMode };
   const client = { getAnalysis: async () => projection(mode) } as unknown as ProtocolClient;
   return <main className="page"><PlanAndEntries key={mode} client={client} planId="review-notes" runId="fixture-run" version={1} run={undefined} onApproved={() => undefined} /></main>;
 }
 
-declare global { interface Window { plan13Review: { setMode: (mode: EvidenceMode) => void } } }
+declare global { interface Window { catalogReview: { setMode: (mode: EvidenceMode) => void } } }
 
 createRoot(document.getElementById('root')!).render(<Witness />);

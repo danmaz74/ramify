@@ -455,13 +455,15 @@ describe('commands over HTTP', () => {
 
       resume();
       await closing;
-      const observations = await readFile(runPath(root, plan, receipt.jobId, runLayout.observations('inv-0001')), 'utf8');
+      // The static script leaves the intake (inv-0001) to its default turn;
+      // the initial architect's session, inv-0002, observes its context.
+      const observations = await readFile(runPath(root, plan, receipt.jobId, runLayout.observations('inv-0002')), 'utf8');
       await new Promise<void>(resolve => setImmediate(resolve));
 
       expect(resolvedBeforeObservation).toBe(false);
       expect(heldBeforeObservation).toBe(true);
       expect(observations).toContain('"type":"context"');
-      expect(await readFile(runPath(root, plan, receipt.jobId, runLayout.observations('inv-0001')), 'utf8')).toBe(observations);
+      expect(await readFile(runPath(root, plan, receipt.jobId, runLayout.observations('inv-0002')), 'utf8')).toBe(observations);
       expect(await opened.lock.held()).toBe(false);
     } finally {
       resume();

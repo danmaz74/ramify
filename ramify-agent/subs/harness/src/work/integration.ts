@@ -32,7 +32,6 @@ export function dueIntegrations(
 
 /** The work item one due integration scenario gets, numbered after the `count` already committed. */
 export function integrationWorkItem(record: ScenarioRecord, count: number): WorkItem {
-  const lines = record.origin.kind === 'plan' ? record.origin.ref.lines : null;
   return workItemSchema.parse({
     schema: 'ramify-agent.work-item/1',
     id: workItemId(count + 1),
@@ -40,7 +39,8 @@ export function integrationWorkItem(record: ScenarioRecord, count: number): Work
     origin: { integration: record.id },
     goal: `Bind the integration scenario ${record.id}, "${record.name}": a step file here imports, by name, the step definitions its sub-scenarios' owners wrote, exposed with expose-test along each path, and the scenario passes.`,
     requirementRefs: [],
-    acceptanceRefs: lines === null ? [] : [{ lines: [lines[0], lines[1]] }],
+    acceptanceRefs: [],
+    contextRefs: [],
     startedFor: null,
   } satisfies WorkItem);
 }

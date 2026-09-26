@@ -108,7 +108,12 @@ describe('CF05: readers beside the writer, confined to the audited candidate', (
     }
     const request = JSON.parse(await readFile(runPath(root, plan, runId, reviewLayout.request('rq-0002')), 'utf8'));
     expect(request).toMatchObject({ schema: 'ramify-agent.review-request/1', key: { iteration: 'wi-001.i02', candidate: 'revision-02', kind: 'code', policy: 'review-policy/1' },
-      workItem: 'wi-001', base: 'revision-01', tree: 'tree-02', forkPoint: { kind: 'none' }, requirements: [], guidance: [] });
+      workItem: 'wi-001', base: 'revision-01', tree: 'tree-02', forkPoint: { kind: 'none' }, guidance: [] });
+    // A code request cites its assignment's own package: here no element, and no deviation.
+    const assignment = JSON.parse(await readFile(runPath(root, plan, runId, request.assignment), 'utf8'));
+    expect(request.source).toEqual(assignment.source);
+    expect(request.source).toMatchObject({ elements: [], deviations: [] });
+    expect(request).not.toHaveProperty('requirements');
 
     // The overlap: both readers started before the writer of wi-001.i03
     // ended, and ended after it started.

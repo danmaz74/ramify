@@ -144,7 +144,7 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
     const placementFork = [...sessions.values()].find(session => session.role === 'global-fork');
     if (!placementFork) throw new Error('Missing placement fork session');
     expect(transcripts.get(placementFork.id)![0]).toMatchObject({
-      requested: 'fork', fork: { from: { session: 'ses-0001', invocation: 'inv-0001' }, reason: 'placement-request', generation: 1 },
+      requested: 'fork', fork: { from: { session: 'ses-0002', invocation: 'inv-0002' }, reason: 'placement-request', generation: 1 },
     });
 
     for (const event of events) {
@@ -183,7 +183,7 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
     }
 
     // The initial architect's thinking, retry and compaction are there.
-    const architect = transcripts.get('ses-0001')!;
+    const architect = transcripts.get('ses-0002')!;
     expect(architect.map(entry => (entry.type === 'message' ? `${entry.type} ${entry.role}` : entry.type)).slice(0, 10)).toEqual([
       'started', 'message user', 'message assistant', 'message assistant', 'retry', 'retry', 'compaction', 'compaction',
       'message assistant', 'message tool-result',
@@ -199,21 +199,24 @@ describe('ST07, ST08: the transcripts of a scripted run', () => {
     if (!repairSession) throw new Error('Missing provider repair session');
     const repair = transcripts.get(repairSession.id)!;
     const note = repair.findIndex(entry => entry.type === 'harness' && entry.decision.kind === 'note-appended');
-    expect(repair[note + 1]).toMatchObject({ type: 'started', invocation: 'inv-0014', start: 'continued' });
+    expect(repair[note + 1]).toMatchObject({ type: 'started', invocation: 'inv-0016', start: 'continued' });
     expect(repair[note]).toMatchObject({ invocation: null, decision: { text: { stored: 'inline', text: 'Continuing iteration wi-002.i01.' } } });
 
     // Engineer and local-architect prompts name their module cwd, so two
-    // base modules render two prompts for each of those roles.
+    // base modules render two prompts for each of those roles. A catalog
+    // extractor's procedure is its phase's, so the intake and the check
+    // render two.
     const prompts = new Map<string, Set<string>>();
     for (const entry of [...transcripts.values()].flat()) {
       if (entry.type !== 'started' || entry.systemPrompt.stored !== 'blob') continue;
       prompts.set(entry.role, (prompts.get(entry.role) ?? new Set()).add(entry.systemPrompt.hash));
     }
-    expect(prompts.size).toBe(6);
+    expect(prompts.size).toBe(7);
+    expect(prompts.get('catalog-extractor')?.size).toBe(2);
     expect(prompts.get('context-selector')?.size).toBe(1);
     expect(prompts.get('engineer')?.size).toBe(2);
     expect(prompts.get('local-architect')?.size).toBe(4);
-    expect([...prompts].filter(([role]) => role !== 'engineer' && role !== 'local-architect').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1, 1]);
+    expect([...prompts].filter(([role]) => role !== 'engineer' && role !== 'local-architect' && role !== 'catalog-extractor').map(([, hashes]) => hashes.size)).toEqual([1, 1, 1, 1]);
     expect((await blobsIn(scenario.path(runLayout.blobs))).length).toBeGreaterThanOrEqual(prompts.size);
 
     // No record, event or observation quotes a body. An assistant's text is

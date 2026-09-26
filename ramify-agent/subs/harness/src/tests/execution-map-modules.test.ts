@@ -90,7 +90,7 @@ describe('execution module relations and captured writer changes', () => {
       scope: { revision: 1, base: { module: reviews, includedChildren: [] },
         extra: [{ path: 'subs/workspace/subs/other/src/allowed.ts', purpose: 'contract' }], read: [], bootstrap: [], rationale: 'Allowed.',
         resolved: { roots: [], files: [], view: { status: 'placeholder' } } },
-      requirementRefs: [], externalCapabilities: [], completionEvidence: 'Check.', evidenceObligations: [],
+      externalCapabilities: [], completionEvidence: 'Check.', evidenceObligations: [],
       gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: [], subtrees: [], extraSuites: [] } },
       guarded: [], authorizations: [] });
     const view = await setup([

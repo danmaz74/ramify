@@ -64,11 +64,13 @@ describe('the session fixture over HTTP', () => {
     expect(runs.lineage.state).toBe('completed');
     const sessions = await sessionsOf(runs.lineage);
     expect(sessions.every(session => session.state === 'finished')).toBe(true);
-    const architect = sessions.find(session => session.session === 'ses-0001')!;
+    // The intake is ses-0001; the architect context is the initial architect's.
+    const architect = sessions.find(session => session.session === 'ses-0002')!;
+    expect(architect.role).toBe('initial-architect');
     expect(architect.reaches).toEqual({ kind: 'run' });
     expect(architect.appends.length).toBeGreaterThan(0);
     expect(architect.lineage.forks.length).toBeGreaterThan(0);
-    expect(byRole(sessions, 'global-fork')[0]!.lineage.fork).toMatchObject({ from: { session: 'ses-0001' }, reason: 'placement-request' });
+    expect(byRole(sessions, 'global-fork')[0]!.lineage.fork).toMatchObject({ from: { session: 'ses-0002' }, reason: 'placement-request' });
     expect(sessions.flatMap(session => session.invocations).some(invocation => invocation.continues?.reason === 'iteration-closed')).toBe(true);
     expect(byRole(sessions, 'contract-engineer')[0]!.lineage.requestedBy).toMatchObject({ reason: 'contract-needed' });
     const reconstruction = sessions.find(session => session.lineage.replaces !== null)!;
@@ -88,20 +90,23 @@ describe('the session fixture over HTTP', () => {
 
   test('interrupted: a stopped run whose architect its log leaves live', async () => {
     expect(runs.interrupted.state).toBe('stopped');
-    const [architect] = await sessionsOf(runs.interrupted);
-    expect(architect).toMatchObject({ session: 'ses-0001', role: 'initial-architect', state: 'interrupted', awaiting: 'inv-0001', reaches: { kind: 'run' } });
+    const [intake, architect] = await sessionsOf(runs.interrupted);
+    expect(intake).toMatchObject({ session: 'ses-0001', role: 'catalog-extractor', state: 'finished', awaiting: null });
+    expect(architect).toMatchObject({ session: 'ses-0002', role: 'initial-architect', state: 'interrupted', awaiting: 'inv-0002', reaches: { kind: 'run' } });
   });
 
   test('live: the served run\'s engineer is live, its local architect and the architect context suspended, the fork finished', async () => {
     const sessions = await sessionsOf(live);
     expect(sessions.map(session => [session.session, session.role, session.state])).toEqual([
-      ['ses-0001', 'initial-architect', 'suspended'],
-      ['ses-0002', 'local-architect', 'suspended'],
-      ['ses-0003', 'context-selector', 'finished'],
-      ['ses-0004', 'global-fork', 'finished'],
-      ['ses-0005', 'engineer', 'live'],
+      ['ses-0001', 'catalog-extractor', 'finished'],
+      ['ses-0002', 'initial-architect', 'suspended'],
+      ['ses-0003', 'catalog-extractor', 'finished'],
+      ['ses-0004', 'local-architect', 'suspended'],
+      ['ses-0005', 'context-selector', 'finished'],
+      ['ses-0006', 'global-fork', 'finished'],
+      ['ses-0007', 'engineer', 'live'],
     ]);
-    expect(live.engineer).toBe('ses-0005');
+    expect(live.engineer).toBe('ses-0007');
     expect(byRole(sessions, 'engineer')[0]!.reaches).toEqual({ kind: 'work-item', workItem: 'wi-001', capability: 'badge-tone', module: 'collection-review/workspace/shared-ui' });
     expect(byRole(sessions, 'global-fork')[0]!.reaches).toMatchObject({ kind: 'request', capability: 'badge-tone' });
     // The project's list: live and suspended first, across the runs.
@@ -128,7 +133,7 @@ describe('the session fixture over HTTP', () => {
     await until(async () => runResponseSchema.parse(await (await fetch(`${server.url}${protocolPaths.run(planId, runId)}`)).json()).run.state === 'completed', 60_000);
     const ended = await get(protocolPaths.runSessionUpdates(planId, runId, version, [{ session: engineer, after: cursor }]), sessionUpdatesResponseSchema);
     expect(ended.sessions.map(session => [session.session, session.state]).sort()).toEqual([
-      ['ses-0001', 'finished'], ['ses-0002', 'finished'], ['ses-0005', 'finished'],
+      ['ses-0002', 'finished'], ['ses-0004', 'finished'], ['ses-0007', 'finished'],
     ]);
     settings.git.assertComplete();
   }, 90_000);

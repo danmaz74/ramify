@@ -151,6 +151,57 @@ export function acceptElements(catalog: ElementCatalog, submission: readonly unk
   return { ok: true, catalog: elementCatalogSchema.parse({ ...catalog, elements: [...catalog.elements, ...accepted] }), ids };
 }
 
+/** A corrected reading of one element: its ID, kind and document stay. */
+export const elementRewriteSchema = elementBodySchema.omit({ kind: true, document: true }).extend({ id: elementIdSchema }).strict();
+export type ElementRewrite = z.infer<typeof elementRewriteSchema>;
+
+export interface CatalogRevision {
+  readonly rewrite: readonly ElementRewrite[];
+  /** Elements a split or merge replaces: removed, retired and never issued again. */
+  readonly retire: readonly string[];
+  /** New elements, keyed like any submission, numbered past the retired IDs. */
+  readonly add: readonly unknown[];
+}
+
+/**
+ * Correct a catalog before it is frozen: rewrite readings in place, retire
+ * the elements a split or merge replaces, and add elements. Errors carry the
+ * revision's paths (`rewrite.<i>`, `retire.<i>`, `add.<i>`), and nothing
+ * changes on an error.
+ */
+export function reviseCatalog(catalog: ElementCatalog, revision: CatalogRevision): ElementAcceptance {
+  const errors: string[] = [];
+  const active = new Map(catalog.elements.map(element => [element.id, element]));
+  const touched = new Set<string>();
+  const rewritten = new Map<string, CatalogElement>();
+  revision.rewrite.forEach((candidate, index) => {
+    const parsed = elementRewriteSchema.safeParse(candidate);
+    if (!parsed.success) {
+      errors.push(...parsed.error.issues.map(issue => `${['rewrite', index, ...issue.path].join('.')}: ${issue.message}`));
+      return;
+    }
+    const element = active.get(parsed.data.id);
+    if (element === undefined) errors.push(`rewrite.${index}.id: unknown element ${parsed.data.id}`);
+    else if (touched.has(element.id)) errors.push(`rewrite.${index}.id: ${element.id} is corrected twice`);
+    else rewritten.set(element.id, { ...parsed.data, kind: element.kind, document: element.document });
+    touched.add(parsed.data.id);
+  });
+  revision.retire.forEach((id, index) => {
+    if (!active.has(id)) errors.push(`retire.${index}: unknown element ${id}`);
+    else if (touched.has(id)) errors.push(`retire.${index}: ${id} is corrected twice`);
+    touched.add(id);
+  });
+  if (errors.length > 0) return { ok: false, errors };
+  const retired = new Set(revision.retire);
+  const corrected = elementCatalogSchema.parse({
+    ...catalog,
+    elements: catalog.elements.filter(element => !retired.has(element.id)).map(element => rewritten.get(element.id) ?? element),
+    retired: [...catalog.retired, ...revision.retire],
+  });
+  const added = acceptElements(corrected, revision.add);
+  return added.ok ? added : { ok: false, errors: added.errors.map(error => `add.${error}`) };
+}
+
 function highestNumber(catalog: ElementCatalog, kind: ElementKind): number {
   const prefix = `${elementPrefixes[kind]}-`;
   return [...catalog.elements.map(element => element.id), ...catalog.retired]
@@ -211,6 +262,18 @@ export const packageDeviationSchema = z.object({
   text,
 }).strict();
 export type PackageDeviation = z.infer<typeof packageDeviationSchema>;
+
+/**
+ * What a record that cites a package holds: the element and deviation IDs it
+ * renders from and the hash of the text they rendered to when it was
+ * written. There is no package store; every delivery renders again.
+ */
+export const packageCitationSchema = z.object({
+  elements: z.array(elementIdSchema),
+  deviations: z.array(planDeviationIdSchema),
+  hash: sha256,
+}).strict();
+export type PackageCitation = z.infer<typeof packageCitationSchema>;
 
 export interface PackageRequest {
   readonly catalog: ElementCatalog;

@@ -90,6 +90,7 @@ function workItem(origin: WorkItem['origin']): WorkItem {
     goal: 'Shelve books.',
     requirementRefs: [],
     acceptanceRefs: [],
+    contextRefs: [],
     startedFor: null,
   } as WorkItem;
 }
@@ -97,7 +98,6 @@ function workItem(origin: WorkItem['origin']): WorkItem {
 function architectBriefing(item: WorkItem, extra: Partial<WorkItemBriefing> = {}): WorkItemBriefing {
   return {
     item,
-    plan: '# Plan\n',
     onboarding: { path: 'subs/shelf/README.md', purpose: 'Shelves books.' },
     views: { evidence: null, unavailable: 'this run has no architect view, so no API view was materialized' },
     hypotheses: [],

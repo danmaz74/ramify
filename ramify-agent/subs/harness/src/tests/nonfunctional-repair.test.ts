@@ -1,13 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
-import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { coordinatorAssessmentToolName, coordinatorActionToolName, coordinatorInvestigationToolName, nonfunctionalRepairToolName } from '../nonfunctional/submissions.js';
+import { intakeToolName, principleToolName } from '../analysis/extraction.js';
 import { copyFixture } from './helpers/fixture.js';
-import { withPlan13Fixture } from './helpers/declarations.js';
+import { withDefaultTurns } from './helpers/declarations.js';
 import { analysis } from './helpers/analysis.js';
 import { submit, treeInputs, write } from './helpers/iterations.js';
 import { initRepository, installTestRunner, onlyRun, openRuns, runEventsOnDisk, runPath, startRun } from './helpers/runs.js';
@@ -24,31 +23,27 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   const plan = join(fixture.root, 'plans/review-notes/plan.md');
   const obligation = 'The review must retain an audit record.';
   const otherObligation = 'The catalog must expose the audit record.';
+  const advice = 'Prefer a compact audit record.';
+  const fixed = 'Every audit record names its author.';
   const original = await readFile(plan, 'utf8');
-  await writeFile(plan, `${original}\n${obligation}\n${otherObligation}\n`);
+  await writeFile(plan, `${original}\n${obligation}\n${otherObligation}\n${advice}\n`);
+  await writeFile(join(fixture.root, 'audit.principles.md'), `# Audit\n\n${fixed}\n`);
   await initRepository(fixture.root);
   const firstModule = 'collection-review/workspace/reviews/core';
   const firstSrc = join(fixture.root, 'subs/workspace/subs/reviews/subs/core/src');
   const otherFile = join(fixture.root, 'subs/workspace/subs/catalog/src/nonfunctional-repair.ts');
   let assessments = 0;
   let actions = 0;
-  const agent = createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') {
-      const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-      if (!captured) throw new Error('Captured plan was not supplied');
-      const directory = dirname(dirname(captured));
-      const root = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents[0]!;
-      const bytes = readFileSync(join(directory, root.storedAt));
-      const passage = (quote: string) => {
-        const start = bytes.indexOf(Buffer.from(quote));
-        if (start < 0) throw new Error('NFR passage was not captured');
-        return { document: root.id, sha256: root.sha256, start, end: start + Buffer.byteLength(quote), quote };
-      };
-      return submit({ ...analysis([]), catalog: [
-        { classification: 'non-functional-requirement', passage: passage(obligation), conditions: [], uncertainty: '' },
-        { classification: 'non-functional-requirement', passage: passage(otherObligation), conditions: [], uncertainty: '' },
-      ] });
-    }
+  const agent = createScriptedAgent(withDefaultTurns(spec => {
+    if (spec.submission.name === intakeToolName) return submit({ goal: 'Keep an audit record of reviews.', elements: [
+      { key: 'audit', kind: 'non-functional', document: 'doc-001', text: obligation, conditions: [], uncertainty: '' },
+      { key: 'catalog-audit', kind: 'non-functional', document: 'doc-001', text: otherObligation, conditions: [], uncertainty: '' },
+      { key: 'compact', kind: 'recommendation', document: 'doc-001', text: advice, conditions: [], uncertainty: '' },
+    ], incorporation: { documents: [{ document: 'doc-001', scenarios: true, uncertainty: '' }], missing: [] } });
+    if (spec.submission.name === principleToolName) return submit({ elements: [
+      { key: 'author', kind: 'fixed', document: 'doc-002', text: fixed, conditions: [{ text: 'for every audit record', source: 'stated' }], uncertainty: '' },
+    ] });
+    if (spec.role === 'initial-architect') return submit(analysis([]));
     if (spec.submission.name === coordinatorAssessmentToolName) {
       assessments += 1;
       return submit({ kind: 'assessment', results: [{ nfr: 'nfr-001',
@@ -57,7 +52,9 @@ test('one authorized repair edits two modules from the chosen src, then reassess
         evidence: [assessments === 1 ? 'Intermediate trace unavailable' : 'Audit record source present'],
         uncertainty: assessments === 1 ? 'Need an intermediate trace' : '' },
       { nfr: 'nfr-002', result: assessments === 1 ? 'not-satisfied' : 'satisfied',
-        inspectedScope: ['subs/workspace/subs/catalog/src'], evidence: ['Catalog source inspected'], uncertainty: '' }] });
+        inspectedScope: ['subs/workspace/subs/catalog/src'], evidence: ['Catalog source inspected'], uncertainty: '' },
+      { nfr: 'fix-001', result: 'satisfied', inspectedScope: ['subs/workspace/subs/reviews/subs/core/src'],
+        evidence: ['Author is recorded'], uncertainty: '' }] });
     }
     if (spec.submission.name === coordinatorActionToolName) return ++actions === 1
       ? submit({ kind: 'investigate', nfrs: ['nfr-001'], question: 'Inspect the intermediate audit trace', scope: ['src/'] })
@@ -81,6 +78,23 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
   expect(run.failure).toBeNull();
   expect(run.state).toBe('completed');
+  const coordinator = agent.sessions.filter(session => session.spec.submission.name === coordinatorAssessmentToolName);
+  expect(coordinator).toHaveLength(2);
+  for (const session of coordinator) {
+    expect(session.spec.prompt).toMatch(/^Elements: nfr-001, nfr-002, fix-001$/mu);
+    for (const text of [obligation, otherObligation, fixed]) expect(session.spec.prompt).toContain(`> ${text}`);
+    expect(session.spec.prompt).toContain('### fix-001: fixed requirement from audit.principles.md');
+    expect(session.spec.prompt).toContain('- stated: for every audit record');
+    expect(session.spec.prompt).not.toContain('rec-001');
+    expect(session.spec.prompt).not.toContain(advice);
+  }
+  const investigator = agent.sessions.find(session => session.spec.submission.name === coordinatorInvestigationToolName)!;
+  expect(investigator.spec.prompt).toMatch(/^Elements: nfr-001$/mu);
+  expect(investigator.spec.prompt).toContain(`### nfr-001: non-functional requirement of the plan from plans/review-notes/plan.md\n\n> ${obligation}`);
+  expect(investigator.spec.prompt).not.toContain(otherObligation);
+  expect(investigator.spec.prompt).not.toContain(fixed);
+  expect(events.find(event => event.type === 'analysis-accepted')?.data).toMatchObject({
+    catalog: { context: 0, functional: 0, nonFunctional: 2, fixed: 1, recommendation: 1 } });
   const assessmentsOnDisk = events.filter(event => event.type === 'nonfunctional-assessed');
   expect(assessmentsOnDisk).toHaveLength(2);
   expect(events.filter(event => event.type === 'nonfunctional-investigated')).toMatchObject([{ data: { nfrs: ['nfr-001'] } }]);
@@ -97,8 +111,11 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   expect(events.filter(event => event.type === 'nonfunctional-round-closed')).toMatchObject([{ data: { outcome: 'satisfied' } }]);
   const repair = agent.sessions.find(session => session.spec.role === 'nonfunctional-repair-engineer');
   expect(repair?.spec.scope.workingDirectory).toBe(firstSrc);
+  expect(repair?.spec.prompt).toMatch(/^Elements: nfr-001$/mu);
+  expect(repair?.spec.prompt).toContain(`> ${obligation}`);
+  for (const text of [otherObligation, fixed, advice]) expect(repair?.spec.prompt).not.toContain(text);
   expect(repair?.denied.length).toBe(1);
-  expect(await readFile(plan, 'utf8')).toBe(`${original}\n${obligation}\n${otherObligation}\n`);
+  expect(await readFile(plan, 'utf8')).toBe(`${original}\n${obligation}\n${otherObligation}\n${advice}\n`);
   expect(await readFile(join(firstSrc, 'nonfunctional-repair.ts'), 'utf8')).toContain('auditRecord');
   expect(await readFile(otherFile, 'utf8')).toContain('catalogAuditRecord');
   const candidates = events.filter(event => event.type === 'candidate-prepared');
@@ -127,6 +144,6 @@ test('one authorized repair edits two modules from the chosen src, then reassess
   const finalAssessment = await readFile(runPath(fixture.root, 'review-notes', receipt.jobId,
     runLayout.assessment('nfa-002')), 'utf8').then(JSON.parse);
   expect(finalAssessment.results.map((item: { nfr: string; result: string }) => [item.nfr, item.result])).toEqual([
-    ['nfr-001', 'satisfied'], ['nfr-002', 'satisfied'],
+    ['nfr-001', 'satisfied'], ['nfr-002', 'satisfied'], ['fix-001', 'satisfied'],
   ]);
 }, 60_000);

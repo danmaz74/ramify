@@ -103,7 +103,7 @@ describe('what a run observes', () => {
     await service.settled('review-notes', receipt.jobId);
     git.assertComplete();
 
-    const lines = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0001')), 'utf8'))
+    const lines = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0002')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: { kind?: string; detail?: string } });
     const gaps = lines.filter(line => line.type === 'coverage-gap');
     expect(gaps.map(gap => gap.data.kind).sort()).toEqual(['context-unavailable', 'usage-unavailable']);
@@ -131,7 +131,7 @@ describe('what a run observes', () => {
     await service.settled('review-notes', receipt.jobId);
     git.assertComplete();
 
-    const lines = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0001')), 'utf8'))
+    const lines = (await readFile(runPath(fixture.root, 'review-notes', receipt.jobId, runLayout.observations('inv-0002')), 'utf8'))
       .split('\n').filter(Boolean).map(line => JSON.parse(line) as { type: string; data: Record<string, unknown> });
     const contexts = lines.filter(line => line.type === 'context');
     expect(contexts).toHaveLength(2);

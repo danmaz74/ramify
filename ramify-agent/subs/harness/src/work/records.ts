@@ -1,7 +1,8 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import { citationSchema, modulePathSchema } from '../interfaces/protocol/evidence.js';
-import { planRefSchema, recordRefSchema } from '../run/records.js';
+import { recordRefSchema } from '../run/records.js';
+import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { slugSchema } from '../analysis/records.js';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
 
@@ -43,8 +44,12 @@ export const workItemSchema = z.object({
   /** A completed item's follow-up preserves that item's historical completion. */
   follows: text.optional(),
   goal: text,
-  requirementRefs: z.array(planRefSchema),
-  acceptanceRefs: z.array(planRefSchema),
+  /** The functional elements that state the work item's requirement. */
+  requirementRefs: z.array(elementIdSchema),
+  /** The functional elements that state its acceptance. */
+  acceptanceRefs: z.array(elementIdSchema),
+  /** The context elements a reader needs to understand it. */
+  contextRefs: z.array(elementIdSchema),
   /** The work item whose yield started this one; the depth-first stack. */
   startedFor: text.nullable(),
 }).strict();

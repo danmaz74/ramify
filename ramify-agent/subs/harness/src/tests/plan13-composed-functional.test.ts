@@ -1,17 +1,19 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createScriptedAgent } from '../../subs/agent/src/scripted.js';
-import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { createPackage, elementCatalogSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import { intakeToolName } from '../analysis/extraction.js';
 import { contextSelectorToolName, workOrientationToolName } from '../context-selection/submissions.js';
 import { coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
 import { runLayout } from '../run/records.js';
+import { iterationAssignmentSchema, iterationLayout } from '../work/iterations.js';
 import { RunQueries } from '../projections/queries.js';
 import { copyFixture } from './helpers/fixture.js';
-import { withPlan13Fixture } from './helpers/declarations.js';
+import { defaultTurn, withDefaultTurns } from './helpers/declarations.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { assign, completionProposed, outline, submit, treeInputs } from './helpers/iterations.js';
 import { openRunsWithoutProcesses, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -53,41 +55,22 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   const advice = 'Use Redis if practical.';
   writeFileSync(plan, `# Request\n\n${selectedQuote}\n${advice}\nSee [audit requirements](audit.md).\n\n# Acceptance\n\nThe scenario passes.\n`);
   writeFileSync(join(dirname(plan), 'audit.md'), `# Audit requirements\n\n${uncitedQuote}\n`);
-  let documents: Array<{ id: string; path: string; sha256: string }> = [];
-  let passages: Array<{ document: string; sha256: string; start: number; end: number; quote: string }> = [];
+  let documents: Array<{ id: string; path: string }> = [];
   let localTurn = 0;
-  const agent = createScriptedAgent(withPlan13Fixture(spec => {
-    if (spec.role === 'initial-architect') {
-      const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-      if (!captured) throw new Error('Missing captured plan');
-      const directory = dirname(dirname(captured));
-      const capturedDocuments = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8'))).documents;
-      documents = capturedDocuments.map(({ id, path, sha256 }) => ({ id, path, sha256 }));
-      passages = [selectedQuote, uncitedQuote, advice].map(quote => {
-        for (const document of capturedDocuments) {
-          const bytes = readFileSync(join(directory, document.storedAt));
-          const start = bytes.indexOf(Buffer.from(quote));
-          if (start >= 0) return { document: document.id, sha256: document.sha256, start, end: start + Buffer.byteLength(quote), quote };
-        }
-        throw new Error(`Missing captured passage: ${quote}`);
-      });
-      return submit({ ...analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]),
-        catalog: [
-          { classification: 'non-functional-requirement', passage: passages[0], conditions: [], uncertainty: '' },
-          { classification: 'non-functional-requirement', passage: passages[1], conditions: [], uncertainty: '' },
-          { classification: 'advice', passage: passages[2], conditions: [], uncertainty: 'Optional.' },
-        ] });
+  const script = withDefaultTurns(spec => {
+    if (spec.submission.name === intakeToolName) {
+      documents = [...spec.prompt.matchAll(/^- (doc-\d{3,}) \(plan\): ([^;]+);/gmu)].map(match => ({ id: match[1]!, path: match[2]! }));
+      const audit = documents.find(document => document.path === 'plans/revision-diff/audit.md')!.id;
+      const input = (defaultTurn(spec)![0] as { readonly input: Record<string, unknown> }).input;
+      return submit({ ...input, elements: [
+        { key: 'timeout', kind: 'non-functional', document: 'doc-001', text: selectedQuote, conditions: [], uncertainty: '' },
+        { key: 'audit', kind: 'non-functional', document: audit, text: uncitedQuote, conditions: [], uncertainty: '' },
+        { key: 'redis', kind: 'recommendation', document: 'doc-001', text: advice, conditions: [], uncertainty: 'Optional.' },
+      ] });
     }
-    if (spec.submission.name === workOrientationToolName) return submit({ focus: 'Preserve the timeout', currentUnderstanding: selectedQuote, questions: [] });
-    if (spec.submission.name === contextSelectorToolName) {
-      const parent = agent.sessions.find(session => session.spec.submission.name === workOrientationToolName);
-      if (!parent || !agent.forget(parent.ref)) throw new Error('Expected retained orientation point');
-      return submit({ examined: ['nfr-001', 'nfr-002', 'adv-001'], selected: [
-        { item: 'nfr-001', passage: passages[0], reason: 'Needed by this assignment', conditions: [], uncertainty: '' },
-      ], unavailable: [] });
-    }
+    if (spec.role === 'initial-architect') return submit(analysis([entry('review-summary', 'collection-review/workspace/reviews/core', 'Summarizes a review.')]));
     if (spec.submission.name === 'submit_work_item_result') return localTurn++ === 0
-      ? submit(assign('collection-review/workspace/reviews/core', { citedItems: ['nfr-001'] }, outline()))
+      ? submit(assign('collection-review/workspace/reviews/core', { citedElements: ['fr-001', 'nfr-001'] }, outline()))
       : submit({ ...requestCompletion(), scenarios: ['sc-001'] });
     if (spec.role === 'engineer') return submit(completionProposed('The behavior satisfies the assignment.', { scenarios: ['sc-001'] }));
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [
@@ -95,7 +78,13 @@ test('functional work cites one NFR while the coordinator assesses the complete 
       { nfr: 'nfr-002', result: 'satisfied', inspectedScope: ['subs/workspace/subs/reviews/subs/core/src'], evidence: ['Audit record source inspected.'], uncertainty: '' },
     ] });
     return [];
-  }));
+  });
+  const agent = createScriptedAgent(spec => {
+    if (spec.submission.name !== contextSelectorToolName) return typeof script === 'function' ? script(spec) : script;
+    const parent = agent.sessions.find(session => session.spec.submission.name === workOrientationToolName);
+    if (!parent || !agent.forget(parent.ref)) throw new Error('Expected retained orientation point');
+    return submit({ selected: [{ id: 'nfr-001', reason: 'Needed by this assignment', conditions: [], uncertainty: '' }] });
+  });
   const scenario = scenariosCommit('revision-diff');
   const tree = 'a'.repeat(40);
   const git = scriptedGit(fixture.root, {
@@ -121,24 +110,25 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   const directory = runPath(fixture.root, 'revision-diff', receipt.jobId, '');
   const accepted = events.find(event => event.type === 'analysis-accepted');
   expect(accepted?.data.evidence).toBeDefined();
-  expect(accepted?.data.catalog).toEqual({ nfr: 2, advice: 1 });
-  const catalog = JSON.parse(await readFile(join(directory, accepted!.data.evidence!.catalog.path), 'utf8'));
-  expect(catalog.items.map((item: { id: string; classification: string }) => [item.id, item.classification])).toEqual([
-    ['nfr-001', 'non-functional-requirement'], ['nfr-002', 'non-functional-requirement'], ['adv-001', 'advice'],
+  expect(accepted?.data.catalog).toEqual({ context: 0, functional: 2, nonFunctional: 2, fixed: 0, recommendation: 1 });
+  const catalog = elementCatalogSchema.parse(JSON.parse(await readFile(join(directory, accepted!.data.evidence!.catalog.path), 'utf8')));
+  expect(catalog.elements.map(element => [element.id, element.kind])).toEqual([
+    ['nfr-001', 'non-functional'], ['nfr-002', 'non-functional'], ['rec-001', 'recommendation'], ['fr-001', 'functional'], ['fr-002', 'functional'],
   ]);
   const engineers = agent.sessions.filter(session => session.spec.role === 'engineer');
   expect(engineers).toHaveLength(1);
   expect(engineers[0]!.spec.prompt).toContain(selectedQuote);
   expect(engineers[0]!.spec.prompt).not.toContain(uncitedQuote);
   expect(engineers[0]!.spec.prompt).not.toContain(advice);
-  expect(passages[0]!.document).not.toBe(passages[1]!.document);
+  expect(catalog.elements.find(element => element.id === 'nfr-001')!.document).not.toBe(catalog.elements.find(element => element.id === 'nfr-002')!.document);
   expect(documents.some(document => document.path === 'plans/revision-diff/audit.md')).toBe(true);
   const coordinator = agent.sessions.filter(session => session.spec.role === 'nonfunctional-coordinator');
   expect(coordinator).toHaveLength(1);
   expect(coordinator[0]!.spec.prompt).toContain(selectedQuote);
   expect(coordinator[0]!.spec.prompt).toContain(uncitedQuote);
-  expect(coordinator[0]!.spec.prompt).toContain('nfr-002');
-  expect(coordinator[0]!.spec.prompt).toContain(advice);
+  expect(coordinator[0]!.spec.prompt).toContain('### nfr-002');
+  expect(coordinator[0]!.spec.prompt).not.toContain(advice);
+  expect(coordinator[0]!.spec.prompt).not.toContain('rec-001');
   const assessment = JSON.parse(await readFile(join(directory, runLayout.assessment('nfa-001')), 'utf8'));
   expect(assessment.results.map((item: { nfr: string }) => item.nfr)).toEqual(['nfr-001', 'nfr-002']);
   expect(assessment.candidate.tree).toBe(tree);
@@ -159,14 +149,16 @@ test('functional work cites one NFR while the coordinator assesses the complete 
     const selectionPath = runLayout.selectionVersion('wi-001', selected!.data.selectionHash!);
     const selectionBytes = await readFile(join(directory, selectionPath));
     const selection = JSON.parse(selectionBytes.toString('utf8'));
-    const assignmentBytes = await readFile(join(directory, runLayout.assignmentContext('wi-001.i01')));
-    const assignment = JSON.parse(assignmentBytes.toString('utf8'));
+    const assignmentBytes = await readFile(join(directory, iterationLayout.assignment('wi-001', 1)));
+    const assignment = iterationAssignmentSchema.parse(JSON.parse(assignmentBytes.toString('utf8')));
     const catalogBytes = await readFile(join(directory, accepted!.data.evidence!.catalog.path));
     const assessmentBytes = await readFile(join(directory, runLayout.assessment('nfa-001')));
-    const packageBytes = await readFile(join(directory, runLayout.contextPackage('wi-001', selection.packageHash)));
+    const rendered = createPackage({ catalog, planDeviations: [], elements: assignment.source!.elements, deviations: assignment.source!.deviations });
+    if ('unavailable' in rendered) throw new Error('The assignment package does not render');
+    const packageBytes = Buffer.from(rendered.text);
     expect(hash(catalogBytes)).toBe(accepted!.data.evidence!.catalog.hash);
     expect(hash(selectionBytes)).toBe(selected!.data.selectionHash);
-    expect(hash(packageBytes)).toBe(selection.packageHash);
+    expect(hash(packageBytes)).toBe(assignment.source!.hash);
     expect(packageBytes.toString('utf8')).toContain(selectedQuote);
     const first = events[0];
     const last = events.at(-1);
@@ -176,17 +168,17 @@ test('functional work cites one NFR while the coordinator assesses the complete 
       run: { id: receipt.jobId, state: last?.type, durationMs: first && last ? Date.parse(last.at) - Date.parse(first.at) : null,
         eventCount: events.length, finalGate: [...events].reverse().find(event => event.type === 'gate-attempted' && event.data.checkpoint === 'final')?.data ?? null },
       source: { documents, manifestHash: catalog.manifestHash, catalogHash: hash(catalogBytes),
-        selectionHash: hash(selectionBytes), assignmentContextHash: hash(assignmentBytes), packageHash: hash(packageBytes),
-        catalogCounts: accepted!.data.catalog, catalogItems: catalog.items.map((item: { id: string; classification: string }) => ({ id: item.id, classification: item.classification })),
-        selectedIds: selection.selected.map((item: { item: string }) => item.item), citedIds: assignment.citedItems,
+        selectionHash: hash(selectionBytes), assignmentHash: hash(assignmentBytes), packageHash: hash(packageBytes),
+        catalogCounts: accepted!.data.catalog, catalogItems: catalog.elements.map(element => ({ id: element.id, kind: element.kind })),
+        selectedIds: selection.selected.map((item: { id: string }) => item.id), citedIds: assignment.source!.elements,
         packageBytes: packageBytes.length, citedQuoteBytes: Buffer.byteLength(selectedQuote),
         citedQuoteInPackage: packageBytes.toString('utf8').includes(selectedQuote) },
       assessment: { id: assessment.id, hash: hash(assessmentBytes), candidateTree: assessment.candidate.tree,
         resultIds: assessment.results.map((item: { nfr: string; result: string }) => ({ nfr: item.nfr, result: item.result })),
         rounds: events.filter(event => event.type === 'nonfunctional-round-closed').map(event => event.data),
-        denominator: accepted!.data.catalog?.nfr ?? null, assessed: assessment.results.length,
-        adviceCount: accepted!.data.catalog?.advice ?? null },
-      humanReview: { reviewedNfrs: 0, denominator: accepted!.data.catalog?.nfr ?? null,
+        denominator: accepted!.data.catalog?.nonFunctional ?? null, assessed: assessment.results.length,
+        recommendationCount: accepted!.data.catalog?.recommendation ?? null },
+      humanReview: { reviewedNfrs: 0, denominator: accepted!.data.catalog?.nonFunctional ?? null,
         analysisApprovalEvents: events.filter(event => event.type === 'analysis-approved').length,
         reason: 'scripted unattended run received no person review of catalog semantics' },
       execution: { modelTokens: null, modelTokensReason: 'scripted agent has no model usage', treePreviews: git.operations().previewCandidateTree,

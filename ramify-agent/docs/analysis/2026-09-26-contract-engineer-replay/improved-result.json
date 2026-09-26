@@ -1,0 +1,60 @@
+{
+  "arm": "improved",
+  "elapsedMs": 125741,
+  "outcome": {
+    "kind": "submitted",
+    "input": {
+      "kind": "incomplete",
+      "done": [
+        "Read CLI full/hook rendering and forwarding (subs/cli/src/format.ts, changed-command.ts, command-support.ts), Analysis production and report paths (subs/analysis/src/evaluate-accesses.ts, report-data.ts, report.ts, session-engine.ts), model evidence, exposure declarations, reference harness, and cross-project diagnostic uses. No files changed.",
+        "Designed a compatible producer-owned extension: retain existing diagnostic identity, code, location, original, and related locations; add ordered bounded detail lines, a nullable single-existing-statement proposal explicitly marked as not an existing permission, and role-labelled related evidence without replacing the existing related location array. Have Analysis populate the new fields in both batch and retained reports, with empty details and null proposal for other findings; CLI only renders supplied evidence. Preserve the existing wire schema identifiers and exit/status behavior.",
+        "Baseline run_scope_tests passed 7 CLI test files; these do not run the pending feature scenarios or any new conformance suite. Separately ran all four type-check projects (tsconfig.json, tsconfig.portable.json, tsconfig.scripts.json, scripts/reference-harness/tsconfig.json): all exit 0 on the unchanged tree."
+      ],
+      "unfinished": [
+        "The provider-side fake injection must be in subs/analysis/src/evaluate-accesses.ts, which constructs the shared full/hook import denial and is outside this iteration's write scope. The consumer engineer must name this file as a fake injection site in the next contract-needed request; do not expose a provider-internal fake to CLI as a workaround.",
+        "Write the provider-owned interface, fake and conformance suite with positive and negative coverage for visibility, one-hop proposals versus multi-hop, both tag kinds and type-only behavior, deduplicated testing origins, missing versus unverifiable export, role labels and 400/300/8/20 bounds; integrate at evaluate-accesses.ts and exercise the feature scenarios and conformance tests. The same structured defaults also need integration at subs/analysis/src/report-data.ts and other non-denial construction/publication sites outside scope, or a production report boundary such as subs/analysis/src/report.ts, also outside scope."
+      ],
+      "findings": [
+        "The needed behavior is producer-owned: only Analysis has the ImportDecision, original, exposures, checked/blocking origins and known export descriptions. CLI cannot infer one-statement eligibility from its report. A standalone replacement of related: SourceLocation[] with role-bearing objects would break existing readers and typed fixtures; parallel role-labelled evidence is a compatible extension. Required new TypeScript fields would break typed fixtures in other owners; optional declarations plus producer-normalized report output preserve source compatibility without weakening the requested JSON output guarantee. The precise representation and defaults must be settled and tested when the blocked production seam is writable.",
+        "Analysis producers/transformers: subs/analysis/src/evaluate-accesses.ts constructs denial IDs/messages/related from model and is used by batch and retained sessions; subs/analysis/src/report-data.ts, inventory.ts, validation.ts, run-analysis.ts, session-revision.ts, companion-findings.ts and report.ts create or carry non-denial diagnostics; subs/analysis/src/session-facts.ts computes position-insensitive surfaces; session-engine.ts produces deltas; report-copy.ts detaches the JSON tree. Existing Analysis fixtures include subs/analysis/src/tests/evaluate-accesses.test.ts, report-copy.test.ts, companion-findings.test.ts and retained-session.test.ts. New evidence must not inadvertently change position-only identity or original decision semantics.",
+        "CLI consumers/fixtures: subs/cli/src/format.ts prints internal owner/file#binding keys and unlabelled locations, so both human renderers need the same block logic; JSON forwarders are subs/cli/src/command-support.ts and changed-command.ts, with CheckDocument in subs/cli/src/interfaces/cli.ts. CLI also constructs non-denial diagnostics in command-support.ts and format.ts. The CLI tests under subs/cli/src/tests and pending feature subs/cli/src/tests/features/self-explaining-denials/explain-import-denials.feature need actual evidence, not CLI reconstruction.",
+        "Other owners and typed fixtures: subs/daemon/subs/contexts/src/interfaces/contexts.ts and tests/session-driver.test.ts, api-view.test.ts and history.test.ts carry/create diagnostic findings; src/tests/batch-cli.test.ts constructs a typed AnalysisDiagnostic; scripts/reference-harness/cli-cases.ts compares real session/CLI JSON and checks denial evidence, and self-cases.ts and relocation.ts inspect related locations. None may be edited here; preserving existing related locations and optional new TypeScript members avoids breaking them. Type-check baselines are complete but do not prove compatibility of an unimplemented proposal.",
+        "Existing visibility path is subs/analysis/module.ramify expose-src * from interfaces/analysis.ts to parent, then module.ramify expose-sub AnalysisDiagnostic from analysis to descendants; newly introduced signature companions would need corresponding root re-exposure. A provider-internal formatter fake needs no CLI-facing import or exposure. Uncertainty remains about exact proposal eligibility for aliases/wildcards and role labels across all model cases; conformance should derive them from real exposure evidence."
+      ]
+    }
+  },
+  "actualStart": {
+    "mode": "fresh"
+  },
+  "ref": "/tmp/ramify-contract-replay-20260926/improved/records/session/2026-09-26T12-17-55-288Z_01a0dda6-8e57-7306-a139-debce5869aed.jsonl#6cac3210",
+  "submitted": {
+    "kind": "incomplete",
+    "done": [
+      "Read CLI full/hook rendering and forwarding (subs/cli/src/format.ts, changed-command.ts, command-support.ts), Analysis production and report paths (subs/analysis/src/evaluate-accesses.ts, report-data.ts, report.ts, session-engine.ts), model evidence, exposure declarations, reference harness, and cross-project diagnostic uses. No files changed.",
+      "Designed a compatible producer-owned extension: retain existing diagnostic identity, code, location, original, and related locations; add ordered bounded detail lines, a nullable single-existing-statement proposal explicitly marked as not an existing permission, and role-labelled related evidence without replacing the existing related location array. Have Analysis populate the new fields in both batch and retained reports, with empty details and null proposal for other findings; CLI only renders supplied evidence. Preserve the existing wire schema identifiers and exit/status behavior.",
+      "Baseline run_scope_tests passed 7 CLI test files; these do not run the pending feature scenarios or any new conformance suite. Separately ran all four type-check projects (tsconfig.json, tsconfig.portable.json, tsconfig.scripts.json, scripts/reference-harness/tsconfig.json): all exit 0 on the unchanged tree."
+    ],
+    "unfinished": [
+      "The provider-side fake injection must be in subs/analysis/src/evaluate-accesses.ts, which constructs the shared full/hook import denial and is outside this iteration's write scope. The consumer engineer must name this file as a fake injection site in the next contract-needed request; do not expose a provider-internal fake to CLI as a workaround.",
+      "Write the provider-owned interface, fake and conformance suite with positive and negative coverage for visibility, one-hop proposals versus multi-hop, both tag kinds and type-only behavior, deduplicated testing origins, missing versus unverifiable export, role labels and 400/300/8/20 bounds; integrate at evaluate-accesses.ts and exercise the feature scenarios and conformance tests. The same structured defaults also need integration at subs/analysis/src/report-data.ts and other non-denial construction/publication sites outside scope, or a production report boundary such as subs/analysis/src/report.ts, also outside scope."
+    ],
+    "findings": [
+      "The needed behavior is producer-owned: only Analysis has the ImportDecision, original, exposures, checked/blocking origins and known export descriptions. CLI cannot infer one-statement eligibility from its report. A standalone replacement of related: SourceLocation[] with role-bearing objects would break existing readers and typed fixtures; parallel role-labelled evidence is a compatible extension. Required new TypeScript fields would break typed fixtures in other owners; optional declarations plus producer-normalized report output preserve source compatibility without weakening the requested JSON output guarantee. The precise representation and defaults must be settled and tested when the blocked production seam is writable.",
+      "Analysis producers/transformers: subs/analysis/src/evaluate-accesses.ts constructs denial IDs/messages/related from model and is used by batch and retained sessions; subs/analysis/src/report-data.ts, inventory.ts, validation.ts, run-analysis.ts, session-revision.ts, companion-findings.ts and report.ts create or carry non-denial diagnostics; subs/analysis/src/session-facts.ts computes position-insensitive surfaces; session-engine.ts produces deltas; report-copy.ts detaches the JSON tree. Existing Analysis fixtures include subs/analysis/src/tests/evaluate-accesses.test.ts, report-copy.test.ts, companion-findings.test.ts and retained-session.test.ts. New evidence must not inadvertently change position-only identity or original decision semantics.",
+      "CLI consumers/fixtures: subs/cli/src/format.ts prints internal owner/file#binding keys and unlabelled locations, so both human renderers need the same block logic; JSON forwarders are subs/cli/src/command-support.ts and changed-command.ts, with CheckDocument in subs/cli/src/interfaces/cli.ts. CLI also constructs non-denial diagnostics in command-support.ts and format.ts. The CLI tests under subs/cli/src/tests and pending feature subs/cli/src/tests/features/self-explaining-denials/explain-import-denials.feature need actual evidence, not CLI reconstruction.",
+      "Other owners and typed fixtures: subs/daemon/subs/contexts/src/interfaces/contexts.ts and tests/session-driver.test.ts, api-view.test.ts and history.test.ts carry/create diagnostic findings; src/tests/batch-cli.test.ts constructs a typed AnalysisDiagnostic; scripts/reference-harness/cli-cases.ts compares real session/CLI JSON and checks denial evidence, and self-cases.ts and relocation.ts inspect related locations. None may be edited here; preserving existing related locations and optional new TypeScript members avoids breaking them. Type-check baselines are complete but do not prove compatibility of an unimplemented proposal.",
+      "Existing visibility path is subs/analysis/module.ramify expose-src * from interfaces/analysis.ts to parent, then module.ramify expose-sub AnalysisDiagnostic from analysis to descendants; newly introduced signature companions would need corresponding root re-exposure. A provider-internal formatter fake needs no CLI-facing import or exposure. Uncertainty remains about exact proposal eligibility for aliases/wildcards and role labels across all model cases; conformance should derive them from real exposure evidence."
+    ]
+  },
+  "rejected": 0,
+  "timedOut": false,
+  "turns": 9,
+  "usage": {
+    "input": 47599,
+    "output": 2831,
+    "cacheRead": 252032,
+    "cacheWrite": 0,
+    "total": 302462
+  },
+  "status": ""
+}

@@ -44,7 +44,7 @@ describe('compaction during a run', () => {
 
     const { service } = await openRuns(fixture.root, {
       unchangedCheckpoints: [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'],
-      script: (spec: SessionSpec) => (spec.role === 'initial-architect'
+      script: (spec: SessionSpec) => (spec.role === 'catalog-extractor' ? [] : spec.role === 'initial-architect'
         ? [
           { kind: 'context' as const, tokens: 90_000, window: 200_000 },
           { kind: 'compaction' as const, reason: 'threshold' as const, tokensBefore: 90_000, tokensAfter: 21_000 },
@@ -63,7 +63,7 @@ describe('compaction during a run', () => {
     expect(onlyRun(service, 'review-notes').state).toBe('completed');
 
     // The initial architect: the trigger, the success and both sizes.
-    const initial = await observations(fixture.root, receipt.jobId, 'inv-0001');
+    const initial = await observations(fixture.root, receipt.jobId, 'inv-0002');
     const compacted = initial.filter(line => line.type === 'compaction');
     expect(compacted).toHaveLength(1);
     expect(compacted[0]!.data).toEqual({ trigger: 'threshold', succeeded: true, before: 90_000, after: 21_000 });
@@ -75,7 +75,7 @@ describe('compaction during a run', () => {
 
     // The local architect: the same record, with the size the implementation
     // could not report left null rather than filled in.
-    const local = await observations(fixture.root, receipt.jobId, 'inv-0004');
+    const local = await observations(fixture.root, receipt.jobId, 'inv-0006');
     const localCompaction = local.filter(line => line.type === 'compaction');
     expect(localCompaction).toHaveLength(1);
     expect(localCompaction[0]!.data).toEqual({ trigger: 'overflow', succeeded: true, before: 140_000, after: null });
@@ -101,6 +101,7 @@ describe('compaction during a run', () => {
         // The run's own policy for this role is what decides; the harness
         // never says so in the prompt.
         expect(spec.systemPrompt).not.toContain('compact');
+        if (spec.role === 'catalog-extractor') return [];
         return [{ kind: 'compaction' as const, reason: 'threshold' as const }, { kind: 'submit' as const, input: submitted }];
       },
     });
@@ -109,8 +110,8 @@ describe('compaction during a run', () => {
     await service.settled('review-notes', receipt.jobId);
 
     // The initial architect may compact, so this one did.
-    expect(agent!.sessions[0]!.suppressedCompactions).toBe(0);
-    const recorded = (await observations(fixture.root, receipt.jobId, 'inv-0001')).filter(line => line.type === 'compaction');
+    expect(agent!.sessions.find(session => session.spec.role === 'initial-architect')!.suppressedCompactions).toBe(0);
+    const recorded = (await observations(fixture.root, receipt.jobId, 'inv-0002')).filter(line => line.type === 'compaction');
     expect(recorded).toHaveLength(1);
     expect(recorded[0]!.data).toMatchObject({ trigger: 'threshold', succeeded: true, before: null, after: null });
   }, 300_000);

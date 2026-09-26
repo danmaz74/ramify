@@ -10,6 +10,7 @@ import type { AssignmentBody } from '../../work/assignment.js';
 import type { z } from 'zod';
 import type { engineerSubmissionSchema } from '../../work/engineer.js';
 import type { LocalArchitectSubmission } from '../../work/submission.js';
+import { defaultTurn } from './declarations.js';
 import type { FailureCause } from '../../interfaces/protocol/runs.js';
 import type { FailureAnalysisSubmission } from '../../work/failure.js';
 import { installScriptedCucumber } from './project-config.js';
@@ -49,8 +50,7 @@ export function assign(
       kind: 'ordinary',
       goal: `Carry out the work in ${module}.`,
       approach: 'Change the source, then the tests that state it.',
-      requirementRefs: [{ anchor: 'Request' }],
-      citedItems: [],
+      citedElements: [],
       externalCapabilities: [],
       completionEvidence: 'The tests this scope owns pass.',
       ...extra,
@@ -120,7 +120,7 @@ export function byRole(plan: Readonly<Record<string, readonly Turn[]>>): Script 
     const seen = counts.get(spec.role) ?? 0;
     counts.set(spec.role, seen + 1);
     const turns = plan[spec.role] ?? (spec.role === 'failure-analyst' ? [failureAnalystFake()] : []);
-    if (turns.length === 0) return [{ kind: 'end', message: `no turn scripted for ${spec.role}` }];
+    if (turns.length === 0) return defaultTurn(spec) ?? [{ kind: 'end', message: `no turn scripted for ${spec.role}` }];
     return turns[Math.min(seen, turns.length - 1)]!;
   };
 }

@@ -1,6 +1,7 @@
 import { openUnchangedRuns as openRuns, assertUnchangedGit } from './helpers/unchanged-run.js';
 import { scenariosCommit } from './helpers/scripted-git.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -9,7 +10,9 @@ import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import { extractPlanScenarios } from '../../subs/scenarios/src/extraction.js';
 import { scenarioSourceHash, type ScenarioRecord } from '../../subs/scenarios/src/records.js';
 import { acceptAnalysis } from '../analysis/accept.js';
-import { describePlan, validateInitialAnalysis, type InitialAnalysisSubmission } from '../analysis/submission.js';
+import { acceptArchitectElements, validateInitialAnalysis, type InitialAnalysisSubmission } from '../analysis/submission.js';
+import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { openElementCatalog } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { runLayout, runRecordSchema, type InvocationOutcome } from '../run/records.js';
 import { runSnapshot } from '../run/snapshot.js';
 import { constructedRecord } from './helpers/constructed.js';
@@ -34,6 +37,14 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
   try { assertUnchangedGit(); expectNoProcesses(); } finally { forgetExternalTools(); }
 });
+
+/** The catalog before the architect's elements, over one captured plan. */
+const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+const catalog = openElementCatalog(hash('manifest'), documentManifestSchema.parse({
+  schema: 'ramify-agent.document-manifest/1', root: 'doc-001',
+  documents: [{ id: 'doc-001', path: 'plans/p/plan.md', kind: 'plan', sha256: hash('plan'), bytes: 4, storedAt: 'input/plan.md', revision: { commit: null, dirty: null } }],
+  missing: [], principlesScan: { status: 'empty', unreadable: [] },
+}));
 
 const reviews = 'collection-review/workspace/reviews';
 const sharedUi = 'collection-review/workspace/shared-ui';
@@ -80,10 +91,10 @@ async function planWithScenarios(root: string): Promise<string> {
  */
 function scenarioAnalysis(plan: string): InitialAnalysisSubmission {
   const [attach, panel] = extractPlanScenarios(plan).scenarios;
-  const note = { ...entry('reviewer-note', reviews, 'A reviewer can attach one note to a completed review run.'), acceptanceRefs: [{ lines: [attach!.lines[0], attach!.lines[1]] as [number, number] }] };
+  const note = entry('reviewer-note', reviews, 'A reviewer can attach one note to a completed review run.');
   const inPanel = entry('note-in-panel', sharedUi, 'The review panel shows the note under the findings.');
   return analysis([note, inPanel], [], [], [
-    { key: 'attach-note', entry: 'reviewer-note', origin: { kind: 'plan', planScenario: attach!.id }, gherkin: attach!.source.join('\n') },
+    { key: 'attach-note', entry: 'reviewer-note', origin: { kind: 'plan', planScenario: attach!.id }, refs: [...note.acceptanceRefs], gherkin: attach!.source.join('\n') },
     {
       key: 'attach-for-panel', entry: 'reviewer-note', origin: { kind: 'architect' }, partOf: panel!.id,
       gherkin: [
@@ -94,7 +105,7 @@ function scenarioAnalysis(plan: string): InitialAnalysisSubmission {
       ].join('\n'),
     },
     {
-      key: 'panel-shows-note', entry: 'note-in-panel', origin: { kind: 'architect' }, partOf: panel!.id, refs: [{ anchor: 'Acceptance' }],
+      key: 'panel-shows-note', entry: 'note-in-panel', origin: { kind: 'architect' }, partOf: panel!.id, refs: [...inPanel.acceptanceRefs],
       gherkin: [
         'Scenario: The panel shows the attached note',
         '  Given the note "Checked" was attached to the review run',
@@ -105,9 +116,10 @@ function scenarioAnalysis(plan: string): InitialAnalysisSubmission {
   ], [{ planScenario: panel!.id, subScenarios: ['attach-for-panel', 'panel-shows-note'] }]);
 }
 
-/** The scripted fake: the analysis, then a local architect that asks for completion. */
+/** The scripted fake: the default catalog extraction, the analysis, then a local architect that asks for completion. */
 function script(initial: unknown) {
-  return (spec: SessionSpec) => [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? initial : requestCompletion() }];
+  return (spec: SessionSpec) => spec.role === 'catalog-extractor' ? []
+    : [{ kind: 'submit' as const, input: spec.role === 'initial-architect' ? initial : requestCompletion() }];
 }
 
 async function target(): Promise<string> {
@@ -142,9 +154,10 @@ describe('plan capture', () => {
     // The briefing lists each by ID, with its text and plan lines, and the limitation.
     const prompt = agent!.sessions.find(session => session.spec.role === 'initial-architect')!.spec.prompt;
     const [attach, panel] = record.planScenarios.scenarios;
-    expect(prompt).toContain('# Root plan scenario candidates');
-    expect(prompt).toContain(`## ps-01: A reviewer attaches a note\n\nPlan lines ${attach!.lines[0]}–${attach!.lines[1]}.`);
-    expect(prompt).toContain(`## ps-02: The panel shows an attached note\n\nPlan lines ${panel!.lines[0]}–${panel!.lines[1]}.`);
+    // The intake incorporated the root plan's scenarios, so they are the plan's, not candidates.
+    expect(prompt).toContain('# The plan\'s scenarios');
+    expect(prompt).toContain(`## ps-01: A reviewer attaches a note\n\nLines ${attach!.lines[0]}–${attach!.lines[1]} of doc-001.`);
+    expect(prompt).toContain(`## ps-02: The panel shows an attached note\n\nLines ${panel!.lines[0]}–${panel!.lines[1]} of doc-001.`);
     expect(prompt).toContain(['```gherkin', ...attach!.source, '```'].join('\n'));
     expect(prompt).toContain('  Given a completed review run of the record "rec-1"');
     expect(prompt).toContain(`- Plan lines ${limitation!.lines[0]}–${limitation!.lines[1]}: `);
@@ -200,7 +213,8 @@ describe('acceptance', () => {
     expect(records[0]!.source).toEqual(attach!.source);
     expect(records[3]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-02', ref: { document: 'doc-001', lines: panel!.lines } });
     expect(records[3]!.source).toEqual(panel!.source);
-    expect(records[2]!.origin).toEqual({ kind: 'architect', refs: [{ anchor: 'Acceptance' }] });
+    // The architect's keys became element IDs: the second entry's acceptance element is fr-004.
+    expect(records[2]!.origin).toEqual({ kind: 'architect', refs: ['fr-004'] });
     expect(records[2]!.name).toBe('The panel shows the attached note');
     for (const record of records) expect(record.hash).toBe(scenarioSourceHash(record.source));
 
@@ -225,10 +239,11 @@ describe('acceptance', () => {
       { workItem: 'wi-003', module: 'collection-review/workspace', origin: 'integration', scenario: 'sc-004' },
     ]);
     // The submission is recorded under the analysis's version.
-    const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
+    // inv-0001 is the intake; the architect's is the second invocation.
+    const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.outcome('inv-0002')), 'utf8')) as InvocationOutcome;
     expect(outcome.ended).toBe('submitted');
-    const submission = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.submission('inv-0001')), 'utf8')) as { schema: string };
-    expect(submission.schema).toBe('ramify-agent.initial-analysis/2');
+    const submission = JSON.parse(await readFile(runPath(project, 'review-notes', runId, runLayout.submission('inv-0002')), 'utf8')) as { schema: string };
+    expect(submission.schema).toBe('ramify-agent.initial-analysis/3');
   }, 180_000);
 
   test('with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID', async () => {
@@ -248,13 +263,13 @@ describe('acceptance', () => {
     const step = (text: string) => `Scenario: ${text}\n  When the reviewer attaches the note "Checked"\n  Then the review run shows the note "Checked"`;
     const submitted = analysis([note, checks], [], [], [
       {
-        key: 'attach-note', entry: 'reviewer-note', origin: { kind: 'architect' }, refs: [{ anchor: 'Acceptance' }],
+        key: 'attach-note', entry: 'reviewer-note', origin: { kind: 'architect' }, refs: [...note.acceptanceRefs],
         gherkin: 'Scenario: The note is stored\n  When the reviewer calls attachReviewNote with "Checked"\n  Then notes.ts holds the note "Checked"',
       },
       { key: 'attach-again', entry: 'reviewer-note', origin: { kind: 'architect' }, gherkin: step('The note is attached once') },
       { key: 'attach-twice', entry: 'reviewer-note', origin: { kind: 'architect' }, gherkin: step('The note is attached twice') },
       {
-        key: 'panel-all', entry: 'note-checks', origin: { kind: 'architect' }, partOf: panel!.id, refs: [{ anchor: 'Acceptance' }],
+        key: 'panel-all', entry: 'note-checks', origin: { kind: 'architect' }, partOf: panel!.id, refs: [...checks.acceptanceRefs],
         gherkin: ['Scenario: The whole panel', ...panel!.source.slice(1)].join('\n'),
       },
       {
@@ -296,11 +311,11 @@ describe('acceptance', () => {
   }, 180_000);
 
   test('without a view, a proposed owner is placed where its proposal puts it', () => {
-    const plan = describePlan('# Plan\n\n## Request\n\nDo it.\n\n## Acceptance\n\nDone.\n');
     const proposed = entry('note-archive', 'collection-review/archive', 'Keeps notes.', { parent: 'collection-review', directory: 'subs/archive/', purpose: 'Keeps notes.', tags: ['testing'] });
     const submitted = analysis([proposed, entry('reviewer-note', reviews)]);
-    expect(validateInitialAnalysis(submitted, { index: null, plan, planScenarios: [] }).ok).toBe(true);
-    const accepted = acceptAnalysis(submitted, { invocation: 'inv-0001', view: { status: 'placeholder' }, planId: 'p', planScenarios: [], index: null });
+    expect(validateInitialAnalysis(submitted, { index: null, catalog, planScenarios: [] }).ok).toBe(true);
+    const resolved = acceptArchitectElements(catalog, submitted);
+    const accepted = acceptAnalysis(resolved.analysis, { invocation: 'inv-0002', view: { status: 'placeholder' }, planId: 'p', planScenarios: [], index: null, catalog: resolved.catalog });
     expect(accepted.scenarios.map(record => [record.id, record.owner, record.file])).toEqual([
       ['sc-001', 'collection-review/archive', 'subs/archive/src/features/p/note-archive.feature'],
       ['sc-002', reviews, 'subs/workspace/subs/reviews/src/tests/features/p/reviewer-note.feature'],
@@ -310,19 +325,18 @@ describe('acceptance', () => {
 });
 
 describe('the form rules, through the real validation path', () => {
-  const plan = describePlan(['# A plan', '', '## Request', '', 'Do the thing.', '', '## Acceptance', '', 'It is done.', '', '## Scenarios', '', '```gherkin', 'Scenario: It works', '  When it is used', '  Then it works', '```'].join('\n'));
   const planScenarios = extractPlanScenarios(['# A plan', '', '## Request', '', 'Do the thing.', '', '## Acceptance', '', 'It is done.', '', '## Scenarios', '', '```gherkin', 'Scenario: It works', '  When it is used', '  Then it works', '```'].join('\n')).scenarios;
   const one = entry('reviewer-note', reviews);
   const own = { key: 'plan-one', entry: 'reviewer-note', origin: { kind: 'plan' as const, planScenario: 'ps-01' }, gherkin: 'Scenario: It works\n  When it is used\n  Then it works' };
   const valid = analysis([one], [], [], [own, architectScenario(one)]);
   const rejected = (submission: InitialAnalysisSubmission) => {
-    const result = validateInitialAnalysis(submission, { index: null, plan, planScenarios });
+    const result = validateInitialAnalysis(submission, { index: null, catalog, planScenarios });
     if (result.ok) throw new Error('the submission was accepted');
     return result.errors;
   };
 
   test('the valid analysis is accepted', () => {
-    expect(validateInitialAnalysis(valid, { index: null, plan, planScenarios }).ok).toBe(true);
+    expect(validateInitialAnalysis(valid, { index: null, catalog, planScenarios }).ok).toBe(true);
   });
 
   test('rule 1: a gherkin value that is not one untagged scenario with a step', () => {
@@ -352,24 +366,24 @@ describe('the form rules, through the real validation path', () => {
 
   test('rule 5: an integration step no sub-scenario picks', () => {
     const two = entry('note-in-panel', sharedUi);
-    const sub = { key: 'use-it', entry: 'note-in-panel', origin: { kind: 'architect' as const }, partOf: 'ps-01', refs: [{ anchor: 'Acceptance' }], gherkin: 'Scenario: Used\n  When it is used\n  Then it is used' };
+    const sub = { key: 'use-it', entry: 'note-in-panel', origin: { kind: 'architect' as const }, partOf: 'ps-01', refs: [...two.acceptanceRefs], gherkin: 'Scenario: Used\n  When it is used\n  Then it is used' };
     const errors = rejected(analysis([one, two], [], [], [architectScenario(one), sub], [{ planScenario: 'ps-01', subScenarios: ['use-it'] }]));
     expect([errors[0]!.path, errors[0]!.message]).toEqual(['integrationScenarios.0.subScenarios', expect.stringMatching(/^Scenario form rule 5 .*"Then it works"/)]);
   });
 
-  test('rule 6: an acceptance reference no scenario cites', () => {
+  test('rule 6: an acceptance element no scenario cites', () => {
     const errors = rejected({ ...valid, scenarios: [own, { ...architectScenario(one), refs: [] }] });
     expect([errors[0]!.path, errors[0]!.message]).toEqual(['entries.0.acceptanceRefs.0', expect.stringMatching(/^Scenario form rule 6 /)]);
   });
 
   test('the form rules follow every other rule: an analysis with other errors answers those alone', () => {
-    const errors = rejected({ ...valid, entries: [{ ...one, requirementRefs: [{ anchor: 'Nowhere' }] }], scenarios: [] });
-    expect(errors.map(error => error.path)).toEqual(['entries.0.requirementRefs.0.anchor']);
+    const errors = rejected({ ...valid, entries: [{ ...one, requirementRefs: ['nowhere'] }], scenarios: [] });
+    expect(errors.map(error => error.path)).toEqual(['entries.0.requirementRefs.0']);
   });
 
-  test('an architect scenario\'s refs lie inside the captured plan', () => {
-    const errors = rejected({ ...valid, scenarios: [own, { ...architectScenario(one), refs: [{ anchor: 'Acceptance' }, { lines: [1, 400] }] }] });
-    expect(errors.map(error => error.path)).toEqual(['scenarios.1.refs.1.lines']);
+  test('an architect scenario\'s refs name functional elements of the submission', () => {
+    const errors = rejected({ ...valid, scenarios: [own, { ...architectScenario(one), refs: [...one.acceptanceRefs, 'nowhere'] }] });
+    expect(errors.map(error => error.path)).toEqual(['scenarios.1.refs.1']);
   });
 
   test('the capability slug "integration" is reserved for the integration scenarios\' file', () => {
@@ -381,7 +395,7 @@ describe('the form rules, through the real validation path', () => {
 
   test('an initial-architect/1 analysis, without scenarios, is not accepted', () => {
     const errors = rejected({ entries: [], hypotheses: [], coverageLimits: [] } as unknown as InitialAnalysisSubmission);
-    expect(errors.map(error => error.path).sort()).toEqual(['integrationScenarios', 'scenarios']);
+    expect(errors.map(error => error.path).sort()).toEqual(['elements', 'integrationScenarios', 'scenarios']);
   });
 });
 
@@ -396,7 +410,8 @@ describe('a form rule broken in a run', () => {
     const receipt = await service.execute(startRun('review-notes'));
     await service.settled('review-notes', receipt.jobId);
 
-    const verdicts = agent!.sessions[0]!.verdicts;
+    // The intake's session is the first; the architect's the second.
+    const verdicts = agent!.sessions[1]!.verdicts;
     expect(verdicts).toHaveLength(3);
     const first = JSON.parse((verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as { errors: Array<{ path: string; message: string }>; remainingAttempts: number };
     expect(first.errors).toEqual([expect.objectContaining({ path: 'entries.0', message: expect.stringMatching(/^Scenario form rule 4 /) })]);
@@ -406,7 +421,7 @@ describe('a form rule broken in a run', () => {
     const snapshot = onlyRun(service, 'review-notes');
     expect([snapshot.state, snapshot.failure?.reason]).toEqual(['failed', 'invalid-submission']);
     expect(snapshot.counts.scenarios).toEqual({ pending: 0, bound: 0, declared: 0, implemented: 0 });
-    const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.outcome('inv-0001')), 'utf8')) as InvocationOutcome;
+    const outcome = JSON.parse(await readFile(runPath(project, 'review-notes', receipt.jobId, runLayout.outcome('inv-0002')), 'utf8')) as InvocationOutcome;
     expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3 });
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     expect(events.some(event => event.type === 'analysis-accepted')).toBe(false);

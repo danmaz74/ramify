@@ -99,7 +99,7 @@ describe('over a scripted run with an integration scenario', () => {
       ['sc-002', 'entry', 'implemented', 'review-tags', 'sc-003', [], 'wi-002', tags, tagFeature],
       ['sc-003', 'integration', 'implemented', null, null, ['sc-001', 'sc-002'], 'wi-003', reviews, integrationFeature],
     ]);
-    expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: [{ anchor: 'Acceptance' }] });
+    expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: ['fr-002'] });
     const [first, , integration] = list.scenarios;
     expect(integration!.origin).toMatchObject({ kind: 'plan', planScenario: 'ps-01' });
     expect(integration!.name).toBe('A written note is shown with its tag');
@@ -187,7 +187,7 @@ describe('over constructed records', () => {
     kind: entry === null ? 'integration' : 'entry',
     entry,
     owner: reviews,
-    origin: entry === null ? { kind: 'plan', planScenario: 'ps-01', ref: { lines: [12, 16] } } : { kind: 'architect', refs: [{ lines: [3, 4] }] },
+    origin: entry === null ? { kind: 'plan', planScenario: 'ps-01', ref: { lines: [12, 16] } } : { kind: 'architect', refs: ['fr-002'] },
     partOf: null,
     subScenarios: [],
     name: id,
@@ -231,7 +231,7 @@ describe('over constructed records', () => {
       ['sc-004', 'pending', 'wi-002', null, []],
       ['sc-005', 'pending', null, null, []],
     ]);
-    expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: [{ lines: [3, 4] }] });
+    expect(list.scenarios[0]!.origin).toEqual({ kind: 'architect', refs: ['fr-002'] });
     expect(list.scenarios[4]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-01', lines: [12, 16] });
     // Before the analysis is accepted there is nothing to list.
     expect(scenarioListOf(runView(constructedRun(lines.slice(0, 1))))).toEqual({ scenarios: [], total: 0 });

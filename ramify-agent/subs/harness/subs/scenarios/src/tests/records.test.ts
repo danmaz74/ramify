@@ -6,7 +6,7 @@ import { assignScenarioIds, lowestCommonAncestor, scenarioIdOf, scenarioRecordSc
 const form: AcceptedScenarioForm = {
   scenarios: [
     { key: 'send-email', entry: 'send-customer-email', origin: { kind: 'plan', planScenario: 'ps-01', lines: [4, 7] }, partOf: 'ps-02', name: 'A customer receives the email', source: ['Scenario: A customer receives the email', '  Given a customer'] },
-    { key: 'history', entry: 'email-history', origin: { kind: 'architect', refs: [{ anchor: 'history' }] }, partOf: 'ps-02', name: 'Sent emails appear', source: ['Scenario: Sent emails appear', '  When the user opens the history'] },
+    { key: 'history', entry: 'email-history', origin: { kind: 'architect', refs: ['fr-003'] }, partOf: 'ps-02', name: 'Sent emails appear', source: ['Scenario: Sent emails appear', '  When the user opens the history'] },
     { key: 'audit', entry: 'audit-trail', origin: { kind: 'architect', refs: [] }, partOf: null, name: 'Audited', source: ['Scenario: Audited', '  Then an audit line is written'] },
   ],
   integrations: [
@@ -68,7 +68,7 @@ describe('assigning scenario IDs', () => {
 
   test('origins, sources and their hashes', () => {
     expect(assigned.records[0]!.origin).toEqual({ kind: 'plan', planScenario: 'ps-01', ref: { lines: [4, 7] } });
-    expect(assigned.records[1]!.origin).toEqual({ kind: 'architect', refs: [{ anchor: 'history' }] });
+    expect(assigned.records[1]!.origin).toEqual({ kind: 'architect', refs: ['fr-003'] });
     const expected = createHash('sha256').update('Scenario: Audited\n  Then an audit line is written').digest('hex');
     expect(assigned.records[2]!.hash).toBe(`sha256:${expected}`);
     expect(scenarioSourceHash(assigned.records[2]!.source)).toBe(assigned.records[2]!.hash);

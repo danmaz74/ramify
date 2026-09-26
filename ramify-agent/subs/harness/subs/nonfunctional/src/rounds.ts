@@ -54,7 +54,7 @@ export function decideNonfunctionalRound(input: RoundDecisionInput): RoundDecisi
   if (!Number.isInteger(maxRounds) || maxRounds < 1 || maxRounds > 3) {
     throw new Error('maximum rounds must be an integer from one to three');
   }
-  if (new Set(nfrIds).size !== nfrIds.length || nfrIds.some((id) => !/^nfr-\d{3,}$/.test(id))) {
+  if (new Set(nfrIds).size !== nfrIds.length || nfrIds.some((id) => !/^(nfr|fix)-\d{3,}$/.test(id))) {
     throw new Error('fixed NFR IDs must be unique and valid');
   }
   closedRounds.forEach((record, index) => {

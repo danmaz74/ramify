@@ -238,7 +238,7 @@ describe('an unresolved request answered with an environment problem', () => {
 
 describe('the environment answer\'s validation', () => {
   const evidence = { index: null, registry: new Map(), hypotheses: new Map(), decisions: new Map(), workItems: new Set<string>() };
-  const question = { kind: 'unresolved' as const, plan: 'one\ntwo', workItems: new Set(['wi-001']), scenarios: new Map<string, string>() };
+  const question = { kind: 'unresolved' as const, elements: new Set(['fr-001', 'fr-002']), workItems: new Set(['wi-001']), scenarios: new Map<string, string>() };
 
   test('an environment answer without a diagnosis, or past its bounds, is refused, and a placement request is never answered with one', () => {
     expect(validateFork(forkEnvironment(), evidence, question)).toMatchObject({ ok: true });

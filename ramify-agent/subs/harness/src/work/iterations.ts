@@ -2,7 +2,8 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { modulePathSchema, viewIdentitySchema } from '../interfaces/protocol/evidence.js';
 import { failureAnalysisSchema, roleSchema } from '../interfaces/protocol/runs.js';
-import { invocationOutcomeSchema, planRefSchema, recordRefSchema } from '../run/records.js';
+import { invocationOutcomeSchema, recordRefSchema } from '../run/records.js';
+import { packageCitationSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { slugSchema } from '../analysis/records.js';
 import type { WorkItemId } from './records.js';
 
@@ -131,9 +132,13 @@ export const iterationAssignmentSchema = z.object({
   goal: text,
   approach: text,
   scope: writeScopeSchema,
-  requirementRefs: z.array(planRefSchema),
-  /** IDs cited from the work item's recorded selection; absent on legacy assignments. */
-  citedItems: z.array(text).optional(),
+  /**
+   * The assignment package: the elements it cites from its work item's
+   * package, the plan deviations recorded when it was assigned, and the hash
+   * of their rendering. Absent only for a single engineer session, which has
+   * no catalog.
+   */
+  source: packageCitationSchema.optional(),
   externalCapabilities: z.array(z.object({
     capability: slugSchema,
     owner: modulePathSchema,

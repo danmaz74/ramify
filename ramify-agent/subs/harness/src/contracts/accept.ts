@@ -162,6 +162,7 @@ export function registerContract(request: RegistrationRequest): Registration {
       goal: request.provider.goal,
       requirementRefs: [],
       acceptanceRefs: [],
+      contextRefs: [],
       startedFor: request.provider.startedFor,
     } satisfies WorkItem);
     records.push({ path: workLayout.item(providerWorkItem.id), id: providerWorkItem.id, revision: 1, body: providerWorkItem });

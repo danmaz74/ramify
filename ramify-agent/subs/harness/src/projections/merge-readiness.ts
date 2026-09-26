@@ -7,6 +7,7 @@ import { nonfunctionalDeviationHash } from '../deviations/nonfunctional.js';
 import { replayCheckFindingState } from '../check-findings/state.js';
 import { replayNonfunctionalPhase } from '../run/nonfunctional-phase.js';
 import { decideNonfunctionalRound } from '../../subs/nonfunctional/src/rounds.js';
+import { assessedElements } from '../nonfunctional/submissions.js';
 import { projectMergeReadiness, type ReadinessDeviation } from '../run/merge-readiness.js';
 import {
   legacyNonfunctionalCoverage, nonfunctionalDeviationSchema,
@@ -83,7 +84,7 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
     || (audit !== undefined && (audit.overall !== 'pass' || audit.audited !== bound.data.commit))) {
     return unavailable('The final gate, audit and candidate binding disagree');
   }
-  const nfrIds = evidence.catalog.items.filter(item => item.classification === 'non-functional-requirement').map(item => item.id);
+  const nfrIds = assessedElements(evidence.catalog);
   const phase = replayNonfunctionalPhase(view.entries, nfrIds, view.record.policy.limits.nonfunctionalRoundsPerPlan ?? 0);
   if (!phase.ok) return unavailable(`The committed assessment phase is inconsistent: ${phase.reason}`);
   const next = decideNonfunctionalRound(phase.value.input);
@@ -137,13 +138,13 @@ export function mergeReadinessOf(view: RunView, evidence: AcceptedEvidence): Mer
     }
     if (nfr) {
       const detail = record as Extract<typeof record, { origin: unknown }>;
-      const document = paths.get(detail.passage.document);
-      const catalogItem = evidence.catalog.items.find(item => item.id === detail.origin.nfr);
+      const document = paths.get(detail.element.document);
+      const element = evidence.catalog.elements.find(item => item.id === detail.origin.nfr);
       if (!document || entry.reports[0].source.kind !== 'document'
         || entry.reports[0].source.id !== `${document.path}@sha256:${document.sha256}`
         || detail.origin.nfr !== event.data.nfr || detail.origin.assessment !== event.data.assessment
-        || catalogItem?.classification !== 'non-functional-requirement'
-        || JSON.stringify(catalogItem.passage) !== JSON.stringify(detail.passage)) {
+        || (element?.kind !== 'non-functional' && element?.kind !== 'fixed')
+        || element.id !== detail.element.id || element.text !== detail.element.text || element.document !== detail.element.document) {
         return unavailable(`Deviation ${record.id} has mismatched NFR source or assessment`);
       }
     } else if (event.type === 'plan-deviation-recorded') {

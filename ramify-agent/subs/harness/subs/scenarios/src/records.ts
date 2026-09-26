@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { scenarioPlanRefSchema, type AcceptedScenarioForm } from './form.js';
+import { scenarioElementRefSchema, type AcceptedScenarioForm } from './form.js';
 
 /*
  * The scenario record, `ramify-agent.scenario/1`, and the numbering that
@@ -26,7 +26,7 @@ export const scenarioRecordSchema = z.object({
   owner: z.string().min(1),
   origin: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('plan'), planScenario: z.string().regex(/^ps-\d{2,}$/), ref: z.object({ document: z.string().regex(/^doc-\d{3,}$/).optional(), lines: lineRangeSchema }).strict() }).strict(),
-    z.object({ kind: z.literal('architect'), refs: z.array(scenarioPlanRefSchema) }).strict(),
+    z.object({ kind: z.literal('architect'), refs: z.array(scenarioElementRefSchema) }).strict(),
   ]),
   /** The integration scenario this one is a sub-scenario of. */
   partOf: scenarioIdSchema.nullable(),
@@ -132,7 +132,7 @@ export function assignScenarioIds(form: AcceptedScenarioForm, context: ScenarioI
       owner,
       origin: scenario.origin.kind === 'plan'
         ? { kind: 'plan', planScenario: scenario.origin.planScenario, ref: { ...(scenario.origin.document === undefined ? {} : { document: scenario.origin.document }), lines: [scenario.origin.lines[0], scenario.origin.lines[1]] } }
-        : { kind: 'architect', refs: scenario.origin.refs.map((ref) => ({ ...ref })) },
+        : { kind: 'architect', refs: [...scenario.origin.refs] },
       partOf: scenario.partOf === null ? null : idsByPlanScenario.get(scenario.partOf)!,
       subScenarios: [],
       name: scenario.name,

@@ -100,8 +100,7 @@ export function ReviewPanel({ client, run, onApproved }: { readonly client: Prot
 /** Where a scenario comes from, in words. */
 export function originText(origin: ScenarioOriginView): string {
   if (origin.kind === 'plan') return `from the plan (${origin.planScenario}, lines ${origin.lines[0]}–${origin.lines[1]})`;
-  const refs = origin.refs.map(ref => [ref.anchor, ref.lines && `lines ${ref.lines[0]}–${ref.lines[1]}`].filter(Boolean).join(', ')).filter(Boolean);
-  return `written by the architect${refs.length > 0 ? `, citing ${refs.join('; ')}` : ''}`;
+  return `written by the architect${origin.refs.length > 0 ? `, citing ${origin.refs.join(', ')}` : ''}`;
 }
 
 function ScenarioText({ scenario, warnings }: { readonly scenario: AnalysisScenario; readonly warnings: readonly ScenarioWarningView[] }) {

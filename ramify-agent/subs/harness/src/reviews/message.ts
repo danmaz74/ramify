@@ -1,3 +1,4 @@
+import { deviationNotice } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import type { CapturedInput } from './inputs.js';
 import type { ReviewRequest } from './records.js';
@@ -23,8 +24,8 @@ export interface ReviewBriefing {
   readonly assignment: IterationAssignment | null;
   /** The CheckFindings of the work item, open or not, each with its title. */
   readonly checkFindings: ReadonlyArray<{ readonly id: string; readonly standing: string; readonly title: string }>;
-  /** Scope: the plan excerpts the assignment cites, as the request binds them. */
-  readonly requirements?: readonly CapturedInput[] | undefined;
+  /** Code and scope: the assignment package the request cites, rendered by the package creator. */
+  readonly package?: string | undefined;
   /** Scope: the run's plan document as the candidate holds it, which a concern can name as its ground; null when it holds none. */
   readonly planDocument?: string | null | undefined;
 }
@@ -51,18 +52,16 @@ export function reviewMessage(briefing: ReviewBriefing): string {
       ]),
     '',
   ];
-  if (kind === 'scope') {
+  if (kind === 'code' || kind === 'scope') {
     lines.push('## What the plan asks of it', '');
-    const requirements = briefing.requirements ?? [];
-    const excerpts = requirements.filter(requirement => !requirement.ref.startsWith('deviation:'));
-    const deviations = requirements.filter(requirement => requirement.ref.startsWith('deviation:'));
-    if (excerpts.length === 0) lines.push('The assignment cites no part of the plan; judge the candidate against the assignment\'s own goal.', '');
-    for (const requirement of excerpts) lines.push(`### ${requirement.ref} (sha256 ${requirement.hash.slice(0, 12)})`, '', requirement.text, '');
-    if (deviations.length > 0) {
-      lines.push('## Plan deviations in force', '',
-        'Each amends the plan for this run; the plan file is unchanged. Where one names a requirement above, judge the candidate against that requirement as the deviation amends it, and raise no concern for what the deviation leaves out.', '');
-      for (const deviation of deviations) lines.push(`### ${deviation.ref} (sha256 ${deviation.hash.slice(0, 12)})`, '', deviation.text, '');
+    if (briefing.package === undefined) lines.push('The assignment cites no element of the plan; judge the candidate against the assignment\'s own goal.', '');
+    else {
+      lines.push(kind === 'scope'
+        ? `The elements the assignment cites, whole. ${deviationNotice} Where a deviation amends an element, judge the candidate against the element as the deviation amends it, and raise no concern for what the deviation leaves out.`
+        : 'The elements the assignment cites, whole, as its engineer received them.', '', briefing.package.trimEnd(), '');
     }
+  }
+  if (kind === 'scope') {
     lines.push(briefing.planDocument === undefined || briefing.planDocument === null
       ? 'The candidate holds no copy of the plan, so the plan itself cannot be a concern\'s ground here.'
       : `The candidate holds the plan as \`${briefing.planDocument}\`. To name it as a concern's ground, read it with \`snapshot_read\`.`, '');

@@ -119,12 +119,13 @@ async function interruptedRun(root: string): Promise<FinishedSessionRuns['interr
   });
   try {
     const runId = (await service.execute(startRun(planId))).jobId;
-    await until(async () => agent!.sessions.length === 1
-      && (await readTranscript(runPath(root, planId, runId, runLayout.transcript('ses-0001')))).entries.length >= 3);
+    // The intake is the first session and the initial architect the second.
+    await until(async () => agent!.sessions.length === 2
+      && (await readTranscript(runPath(root, planId, runId, runLayout.transcript('ses-0002')))).entries.length >= 3);
     await service.execute(stopRun(planId, runId, service.getRun(planId, runId)!.version));
     await service.settled(planId, runId);
     // The session keeps going past the stop and submits late; its output is discarded.
-    await until(() => agent!.sessions[0]!.outcome !== undefined);
+    await until(() => agent!.sessions[1]!.outcome !== undefined);
     return { planId, runId, state: service.getRun(planId, runId)?.state ?? 'unknown' };
   } finally {
     await service.close();
@@ -229,6 +230,7 @@ function liveScript(root: string, pacer: Pacer) {
         key: `badge-tone-${index + 1}`,
         entry: tone,
         origin: { kind: 'plan' as const, planScenario: scenario.id },
+        refs: [`${tone}-acceptance`],
         gherkin: scenario.source.join('\n'),
       })),
     ))],

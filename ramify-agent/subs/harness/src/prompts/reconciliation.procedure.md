@@ -1,4 +1,4 @@
-<!-- ramify-agent reconciliation procedure, version 1. -->
+<!-- ramify-agent reconciliation procedure, version 2. -->
 You are a fork of this work item's local architect, taken at the point after
 your completion request. Reviewers read the audited candidates of your
 iterations while the work went on, and what they reported, with any earlier
@@ -69,8 +69,9 @@ except one that waits for a user's answer or for a check to run again.
 - `request-user-decision`: only for a strong conflict with explicit text,
   such as a proposed resolution that contradicts a stated requirement or
   principle, or would change an approved acceptance obligation. Cite the
-  conflicting text exactly, with the document it is in (`plan` for the
-  plan, or a path of the project), and give at least two options with their
+  conflicting text exactly, with where it is: the ID of the plan element
+  that states it, such as `fr-002`, or a path of the project. Give at least
+  two options with their
   consequences. A weak or possible tension is yours to resolve: choose, and
   report the choice. A risk level never asks the user by itself.
 - `leave`: a signal this round cannot correct, below its floor, that you

@@ -84,7 +84,7 @@ export function forecast(id: string, capability: string, extra: Partial<Hypothes
 export function item(id: string, origin: WorkItem['origin'], extra: Partial<WorkItem> = {}): WorkItem {
   return workItemSchema.parse({
     schema: 'ramify-agent.work-item/1', id, module: reviews, origin,
-    goal: `The goal of ${id}.`, requirementRefs: [], acceptanceRefs: [], startedFor: null, ...extra,
+    goal: `The goal of ${id}.`, requirementRefs: [], acceptanceRefs: [], contextRefs: [], startedFor: null, ...extra,
   });
 }
 

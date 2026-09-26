@@ -9,8 +9,10 @@ import {
   analysisLayout, hypothesisSchema, registryEntrySchema, scenarioWarningSchema,
   type Hypothesis, type RecordedScenarioWarning, type RegistryEntry,
 } from './records.js';
-import { scenarioFormOf, type InitialAnalysisSubmission } from './submission.js';
+import { scenarioFormOf, type ResolvedAnalysis } from './submission.js';
 import type { DocumentManifest } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import type { ElementCatalog } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import type { Incorporation } from './evidence-contracts.js';
 
 /*
  * What one accepted initial analysis commits, in the single
@@ -49,6 +51,9 @@ export interface AnalysisAcceptanceContext {
   readonly planScenarios: readonly PlanScenario[];
   /** The architect view the submission was validated against, or null where the run has none. */
   readonly index: ArchitectIndex | null;
+  /** The corrected catalog the analysis's citations name. */
+  readonly catalog: ElementCatalog;
+  readonly incorporation?: Incorporation | undefined;
   readonly documents?: { readonly manifest: DocumentManifest; readonly bytes: ReadonlyMap<string, Uint8Array> } | undefined;
 }
 
@@ -58,7 +63,7 @@ export interface AnalysisAcceptanceContext {
  * scenarios and the invocation that produced it, so a repeat after a crash
  * derives the same records with the same IDs.
  */
-export function acceptAnalysis(submission: InitialAnalysisSubmission, context: AnalysisAcceptanceContext): AcceptedAnalysis {
+export function acceptAnalysis(submission: ResolvedAnalysis, context: AnalysisAcceptanceContext): AcceptedAnalysis {
   const entries = entryAssignmentsSchema.parse({
     schema: 'ramify-agent.entry-assignments/1',
     view: context.view,
@@ -93,12 +98,15 @@ export function acceptAnalysis(submission: InitialAnalysisSubmission, context: A
     goal: entry.description,
     requirementRefs: entry.requirementRefs,
     acceptanceRefs: entry.acceptanceRefs,
+    contextRefs: entry.contextRefs,
     startedFor: null,
   } satisfies WorkItem));
 
   // The validation that accepted the submission applied the same rules, so
   // a rejection here is the harness disagreeing with itself.
-  const form = scenarioFormOf(submission, { index: context.index, planScenarios: context.planScenarios, documents: context.documents });
+  const form = scenarioFormOf(submission, {
+    index: context.index, catalog: context.catalog, incorporation: context.incorporation, planScenarios: context.planScenarios, documents: context.documents,
+  });
   if (!form.ok) throw new Error(`An accepted analysis breaks a scenario form rule: ${form.message}`);
   const assigned = assignScenarioIds(form.form, {
     planId: context.planId,
@@ -133,7 +141,7 @@ export function acceptAnalysis(submission: InitialAnalysisSubmission, context: A
  * each owner and its ancestors are placed by Ramify's layout, a child of
  * `a` declared `b` in `subs/b`, and none is a testing module.
  */
-function scenarioModulesOf(submission: InitialAnalysisSubmission, index: ArchitectIndex | null): ScenarioModule[] {
+function scenarioModulesOf(submission: ResolvedAnalysis, index: ArchitectIndex | null): ScenarioModule[] {
   const modules = new Map<string, ScenarioModule>();
   for (const entry of index?.modules.values() ?? []) {
     modules.set(entry.module, { module: entry.module, dir: entry.dir, testing: isTestingModule(entry) });

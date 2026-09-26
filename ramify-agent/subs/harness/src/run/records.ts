@@ -10,10 +10,11 @@ import { planScenarioExtractionSchema } from '../../subs/scenarios/src/extractio
 import { scenarioRecordSchema } from '../../subs/scenarios/src/records.js';
 import { scenarioModeSchema, scenarioSelectionSchema } from '../../subs/scenarios/src/profiles.js';
 import { scenarioRunResultSchema, untrackedScenarioCountsSchema } from '../../subs/scenarios/src/messages.js';
-import { documentManifestSchema, catalogSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { elementCatalogSchema, elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { assessmentSchema, roundSchema } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import { incorporationSchema } from '../analysis/evidence-contracts.js';
-import { contextSelectionSchema, assignmentContextSchema } from '../context-selection/contracts.js';
+import { contextSelectionSchema } from '../context-selection/contracts.js';
 import { preparedCandidateSchema, nonfunctionalDeviationSchema, nonfunctionalRepairAssignmentSchema } from './nonfunctional-records.js';
 
 /*
@@ -196,6 +197,8 @@ export const runPolicySchema = z.object({
     'failure-analyst': contextPolicySchema.optional(),
     /** Absent before Plan 13. */
     'context-selector': contextPolicySchema.optional(),
+    /** Absent before Plan 14. */
+    'catalog-extractor': contextPolicySchema.optional(),
     'nonfunctional-coordinator': contextPolicySchema.optional(),
     'nonfunctional-repair-engineer': contextPolicySchema.optional(),
   }).strict() satisfies z.ZodType<Partial<Record<Role, z.infer<typeof contextPolicySchema>>>>,
@@ -424,8 +427,9 @@ export const entryAssignmentsSchema = z.object({
     description: text,
     owner: modulePathSchema,
     proposed: moduleProposalSchema.optional(),
-    requirementRefs: z.array(planRefSchema),
-    acceptanceRefs: z.array(planRefSchema),
+    requirementRefs: z.array(elementIdSchema),
+    acceptanceRefs: z.array(elementIdSchema),
+    contextRefs: z.array(elementIdSchema),
     citations: z.array(citationSchema),
   }).strict()),
 }).strict();
@@ -942,9 +946,7 @@ export const runLayout = {
   incorporationVersion: (hash: string): string => join('analysis', 'incorporation', `${hash}.json`),
   orientationPacket: (workItem: string, hash: string): string => join('work', workItem, 'orientation', `${hash}.txt`),
   selectionVersion: (workItem: string, hash: string): string => join('work', workItem, 'selection', `${hash}.json`),
-  contextPackage: (workItem: string, hash: string): string => join('work', workItem, 'context', `${hash}.txt`),
   selection: (workItem: string): string => join('work', workItem, 'context-selection.json'),
-  assignmentContext: (assignment: string): string => join('assignments', `${assignment}-context.json`),
   candidate: (id: string): string => join('nonfunctional', 'candidates', `${id}.json`),
   assessment: (id: string): string => join('nonfunctional', 'assessments', `${id}.json`),
   nonfunctionalRound: (number: number): string => join('nonfunctional', 'rounds', `${number}.json`),
@@ -986,10 +988,9 @@ export const runLayout = {
 export const runSchemas = {
   run: { schema: jobSchemaVersion, body: runRecordSchema },
   documents: { schema: 'ramify-agent.document-manifest/1', body: documentManifestSchema },
-  catalog: { schema: 'ramify-agent.nonfunctional-catalog/1', body: catalogSchema },
-  incorporation: { schema: 'ramify-agent.document-incorporation/1', body: incorporationSchema },
-  selection: { schema: 'ramify-agent.context-selection/1', body: contextSelectionSchema },
-  assignmentContext: { schema: 'ramify-agent.assignment-context/1', body: assignmentContextSchema },
+  catalog: { schema: 'ramify-agent.element-catalog/1', body: elementCatalogSchema },
+  incorporation: { schema: 'ramify-agent.document-incorporation/2', body: incorporationSchema },
+  selection: { schema: 'ramify-agent.context-selection/2', body: contextSelectionSchema },
   preparedCandidate: { schema: 'ramify-agent.prepared-candidate/1', body: preparedCandidateSchema },
   assessment: { schema: 'ramify-agent.nonfunctional-assessment/1', body: assessmentSchema },
   nonfunctionalRound: { schema: 'ramify-agent.nonfunctional-round/1', body: roundSchema },

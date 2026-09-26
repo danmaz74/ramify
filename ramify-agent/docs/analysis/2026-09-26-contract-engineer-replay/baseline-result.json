@@ -1,0 +1,46 @@
+{
+  "arm": "baseline",
+  "elapsedMs": 33408,
+  "outcome": {
+    "kind": "submitted",
+    "input": {
+      "kind": "incomplete",
+      "done": [
+        "Read the CLI full and hook paths and Analysis report interface and diagnostic producer; identified the provider-side injection seam."
+      ],
+      "unfinished": [
+        "The fake must replace denial-evidence construction in subs/analysis/src/evaluate-accesses.ts, which is outside this iteration's write scope. Name that file as an injection site in the next contract-needed before establishing the interface, conformance suite, fake and CLI integration."
+      ],
+      "findings": [
+        "Analysis creates import and missing-export diagnostics in evaluateSteps in subs/analysis/src/evaluate-accesses.ts; CLI receives them through AnalysisReport and hook deltas. Injecting the fake into CLI would create evidence after the provider's data path and would not be replaceable at the real provider seam."
+      ]
+    }
+  },
+  "actualStart": {
+    "mode": "fresh"
+  },
+  "ref": "/tmp/ramify-contract-replay-20260926/baseline/records/session/2026-09-26T12-16-05-167Z_01a0dda4-e02e-7152-8048-cbe515944f6a.jsonl#6f418335",
+  "submitted": {
+    "kind": "incomplete",
+    "done": [
+      "Read the CLI full and hook paths and Analysis report interface and diagnostic producer; identified the provider-side injection seam."
+    ],
+    "unfinished": [
+      "The fake must replace denial-evidence construction in subs/analysis/src/evaluate-accesses.ts, which is outside this iteration's write scope. Name that file as an injection site in the next contract-needed before establishing the interface, conformance suite, fake and CLI integration."
+    ],
+    "findings": [
+      "Analysis creates import and missing-export diagnostics in evaluateSteps in subs/analysis/src/evaluate-accesses.ts; CLI receives them through AnalysisReport and hook deltas. Injecting the fake into CLI would create evidence after the provider's data path and would not be replaceable at the real provider seam."
+    ]
+  },
+  "rejected": 0,
+  "timedOut": false,
+  "turns": 5,
+  "usage": {
+    "input": 31187,
+    "output": 867,
+    "cacheRead": 79104,
+    "cacheWrite": 0,
+    "total": 111158
+  },
+  "status": ""
+}

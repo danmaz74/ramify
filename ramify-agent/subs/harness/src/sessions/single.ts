@@ -296,7 +296,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     goal: options.prompt.trim(),
     approach: 'Not stated.',
     scope,
-    requirementRefs: [],
     externalCapabilities: [],
     completionEvidence: 'Not stated.',
     evidenceObligations: [],

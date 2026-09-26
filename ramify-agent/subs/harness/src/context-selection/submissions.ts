@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { JsonSchema } from '../../subs/agent/src/interfaces/port.js';
-import {
-  passageReferenceSchema, type Catalog, type DocumentManifest,
-} from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import type { ElementCatalog, PackageDeviation } from '../../subs/plan-evidence/src/interfaces/catalog.js';
+import type { SubmissionError } from '../run/submissions.js';
 import { contextSelectionSchema, type ContextSelection } from './contracts.js';
-import { assembleContextPackage, type SelectionPackage } from './selection.js';
+import { citePackage } from './delivery.js';
+import { selectableKinds } from './prompts.js';
 
 const text = z.string().min(1);
 
@@ -19,17 +19,14 @@ export type WorkOrientationSubmission = z.infer<typeof workOrientationSubmission
 export const workOrientationToolName = 'submit_work_orientation';
 export const workOrientationJsonSchema = z.toJSONSchema(workOrientationSubmissionSchema) as JsonSchema;
 
-/** Selector judgments only; invocation identity and package hash belong to the harness. */
+/** Selector judgments only: the elements it selects by ID. Invocation identity and the package belong to the harness. */
 export const contextSelectorSubmissionSchema = z.object({
-  examined: z.array(text),
   selected: z.array(z.object({
-    item: text,
-    passage: passageReferenceSchema.optional(),
+    id: text,
     reason: text,
     conditions: z.array(text),
     uncertainty: z.string(),
   }).strict()),
-  unavailable: z.array(z.object({ item: text, reason: text }).strict()),
 }).strict();
 export type ContextSelectorSubmission = z.infer<typeof contextSelectorSubmissionSchema>;
 export const contextSelectorToolName = 'submit_context_selection';
@@ -65,27 +62,38 @@ export interface SelectionIdentity {
   readonly degraded: boolean;
 }
 
-export type PreparedSelection = { readonly status: 'available'; readonly selection: ContextSelection; readonly package: Extract<SelectionPackage, { status: 'available' }> } |
-  { readonly status: 'unavailable'; readonly errors: readonly string[] };
+export type PreparedSelection = { readonly status: 'available'; readonly selection: ContextSelection; readonly text: string } |
+  { readonly status: 'unavailable'; readonly errors: readonly SubmissionError[] };
 
-/** The harness supplies IDs and records a hash of the assembled context text. */
-export function prepareContextSelection(
-  submitted: unknown,
-  identity: SelectionIdentity,
-  catalog: Catalog,
-  manifest: DocumentManifest,
-  bytes: ReadonlyMap<string, Uint8Array>,
-): PreparedSelection {
-  const parsed = contextSelectorSubmissionSchema.safeParse(submitted);
-  if (!parsed.success) return { status: 'unavailable', errors: ['Invalid selector submission'] };
-  const catalogIds = new Set(catalog.items.map(item => item.id));
-  const candidate = { schema: 'ramify-agent.context-selection/1' as const, ...identity, ...parsed.data,
-    selected: parsed.data.selected.map(entry => catalogIds.has(entry.item)
-      ? { item: entry.item, reason: entry.reason, conditions: entry.conditions, uncertainty: entry.uncertainty }
-      : entry),
-  };
-  const assembled = assembleContextPackage(candidate, catalog, manifest, bytes);
-  if (assembled.status === 'unavailable') return assembled;
-  const selection = contextSelectionSchema.parse({ ...candidate, packageHash: assembled.hash });
-  return { status: 'available', selection, package: assembled };
+/** What a selection is made over: the frozen catalog, the work item's own elements and the run's plan deviations. */
+export interface SelectionSource {
+  readonly catalog: ElementCatalog;
+  /** The entry's functional and context elements, which every work-item package carries. */
+  readonly workItemElements: readonly string[];
+  readonly planDeviations: readonly PackageDeviation[];
+}
+
+/**
+ * Validate a selector's IDs, each once and each a non-functional, fixed or
+ * recommendation element of the catalog, and cite the work-item package
+ * with every plan deviation recorded so far.
+ */
+export function prepareContextSelection(submitted: ContextSelectorSubmission, identity: SelectionIdentity, source: SelectionSource): PreparedSelection {
+  const kinds = new Map(source.catalog.elements.map(element => [element.id, element.kind]));
+  const errors: SubmissionError[] = [];
+  const seen = new Set<string>();
+  submitted.selected.forEach((entry, index) => {
+    const kind = kinds.get(entry.id);
+    if (kind === undefined) errors.push({ path: `selected.${index}.id`, message: `Unknown element ${entry.id}`, expected: 'an element ID of the message' });
+    else if (!(selectableKinds as readonly string[]).includes(kind)) errors.push({ path: `selected.${index}.id`, message: `${entry.id} is a ${kind} element, which the work item carries already`, expected: 'a non-functional, fixed or recommendation element' });
+    if (seen.has(entry.id)) errors.push({ path: `selected.${index}.id`, message: `${entry.id} is selected twice`, expected: 'each element once' });
+    seen.add(entry.id);
+  });
+  if (errors.length > 0) return { status: 'unavailable', errors };
+  const cited = citePackage(source.catalog, source.planDeviations,
+    [...source.workItemElements, ...submitted.selected.map(entry => entry.id)], source.planDeviations.map(deviation => deviation.id));
+  if ('missing' in cited) return { status: 'unavailable', errors: [{ path: 'selected', message: `The work-item package cites IDs the run does not hold: ${cited.missing.join(', ')}` }] };
+  const selection = contextSelectionSchema.parse({ schema: 'ramify-agent.context-selection/2', ...identity,
+    selected: submitted.selected.map(entry => ({ ...entry })), package: cited.citation });
+  return { status: 'available', selection, text: cited.text };
 }

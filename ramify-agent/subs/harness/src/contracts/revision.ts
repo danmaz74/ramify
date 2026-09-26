@@ -96,10 +96,11 @@ export function reopenEvidence(request: ReopenRequest): Reopening {
       origin,
       ...(priorItem === undefined ? {} : { follows: priorItem.id }),
       goal,
-      // The follow-up carries the prior item's plan references, so the work
-      // it continues is stated where the plan states it.
+      // The follow-up carries the prior item's elements, so the work it
+      // continues is stated where the plan states it.
       requirementRefs: priorItem === undefined ? [] : priorItem.requirementRefs,
       acceptanceRefs: priorItem === undefined ? [] : priorItem.acceptanceRefs,
+      contextRefs: priorItem === undefined ? [] : priorItem.contextRefs,
       startedFor: request.requestedBy,
     } satisfies WorkItem);
     followUps.push(item);

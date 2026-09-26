@@ -27,8 +27,8 @@ const plan = [
 const { scenarios: planScenarios } = extractPlanScenarios(plan);
 
 const entries: ScenarioFormEntry[] = [
-  { capability: 'send-customer-email', acceptanceRefs: [{ lines: [4, 7] }] },
-  { capability: 'email-history', acceptanceRefs: [{ anchor: 'acceptance' }] },
+  { capability: 'send-customer-email', acceptanceRefs: ['send-accepted'] },
+  { capability: 'email-history', acceptanceRefs: ['history-accepted'] },
 ];
 
 function valid(): ScenarioFormSubmission {
@@ -38,6 +38,7 @@ function valid(): ScenarioFormSubmission {
         key: 'send-email',
         entry: 'send-customer-email',
         origin: { kind: 'plan', planScenario: 'ps-01' },
+        refs: ['send-accepted'],
         gherkin: [
           'Scenario: A customer receives the email',
           '  Given a customer with the address ada@example.com',
@@ -51,6 +52,7 @@ function valid(): ScenarioFormSubmission {
         entry: 'email-history',
         origin: { kind: 'architect' },
         partOf: 'ps-02',
+        refs: ['history-accepted'],
         gherkin: [
           'Scenario: Sent emails appear in the history',
           '  Given an email to ada@example.com was sent',
@@ -80,19 +82,19 @@ describe('an accepted form', () => {
     ]);
     const submission: ScenarioFormSubmission = {
       scenarios: [
-        { key: 'one', entry: 'first', origin: { kind: 'plan', planScenario: 'ps-01' }, gherkin: extracted.scenarios[0]!.source.join('\n') },
-        { key: 'two', entry: 'second', origin: { kind: 'plan', planScenario: 'ps-02' }, gherkin: extracted.scenarios[1]!.source.join('\n') },
+        { key: 'one', entry: 'first', origin: { kind: 'plan', planScenario: 'ps-01' }, refs: ['first-accepted'], gherkin: extracted.scenarios[0]!.source.join('\n') },
+        { key: 'two', entry: 'second', origin: { kind: 'plan', planScenario: 'ps-02' }, refs: ['second-accepted'], gherkin: extracted.scenarios[1]!.source.join('\n') },
       ], integrationScenarios: [],
     };
     const correct = [
-      { capability: 'first', acceptanceRefs: [{ document: 'doc-001', lines: [3, 5] as [number, number] }] },
-      { capability: 'second', acceptanceRefs: [{ document: 'doc-002', lines: [3, 5] as [number, number] }] },
+      { capability: 'first', acceptanceRefs: ['first-accepted'] },
+      { capability: 'second', acceptanceRefs: ['second-accepted'] },
     ];
     const accepted = validateScenarioForm(submission, extracted.scenarios, correct);
     expect(accepted.ok).toBe(true);
     if (accepted.ok) expect(accepted.form.scenarios[1]!.origin).toMatchObject({ document: 'doc-002' });
     expect(rejected(validateScenarioForm(submission, extracted.scenarios, [
-      correct[0]!, { capability: 'second', acceptanceRefs: [{ document: 'doc-001', lines: [3, 5] }] },
+      correct[0]!, { capability: 'second', acceptanceRefs: ['first-accepted'] },
     ]), 6, 'entries.1.acceptanceRefs.0')).toContain('cited by none');
   });
   test('carries the plan\'s text for a plan scenario, the submitted text for an architect scenario, and sub-scenarios by integration', () => {
@@ -116,7 +118,7 @@ describe('an accepted form', () => {
 
   test('a plan without scenarios needs only architect scenarios', () => {
     const submission: ScenarioFormSubmission = {
-      scenarios: [{ key: 'only', entry: 'send-customer-email', origin: { kind: 'architect' }, refs: [{ lines: [5, 5] }], gherkin: 'Scenario: Only\n  Given a step' }],
+      scenarios: [{ key: 'only', entry: 'send-customer-email', origin: { kind: 'architect' }, refs: ['send-accepted'], gherkin: 'Scenario: Only\n  Given a step' }],
       integrationScenarios: [],
     };
     const result = validateScenarioForm(submission, [], [entries[0]!]);
@@ -265,18 +267,21 @@ describe('rule 5: integration steps verbatim', () => {
   });
 });
 
-describe('rule 6: every acceptance reference cited', () => {
-  test('a reference by lines no scenario of the entry overlaps', () => {
-    const cited: ScenarioFormEntry[] = [{ ...entries[0]!, acceptanceRefs: [{ lines: [15, 16] }] }, entries[1]!];
-    expect(rejected(validateScenarioForm(valid(), planScenarios, cited), 6, 'entries.0.acceptanceRefs.0')).toContain('lines 15–16');
+describe('rule 6: every acceptance element cited', () => {
+  test('an acceptance element none of the entry\'s scenarios cites', () => {
+    const cited: ScenarioFormEntry[] = [{ ...entries[0]!, acceptanceRefs: ['send-accepted', 'send-bounced'] }, entries[1]!];
+    expect(rejected(validateScenarioForm(valid(), planScenarios, cited), 6, 'entries.0.acceptanceRefs.1')).toContain('send-bounced');
   });
 
-  test('a reference by anchor, cited through the plan scenario a sub-scenario is part of, or through explicit refs', () => {
-    const byAnchor: ScenarioFormEntry[] = [entries[0]!, { capability: 'email-history', acceptanceRefs: [{ anchor: 'history' }] }];
-    rejected(validateScenarioForm(valid(), planScenarios, byAnchor), 6, 'entries.1.acceptanceRefs.0');
+  test('only the refs of the entry\'s own scenarios cite: neither another entry\'s scenario nor the plan scenario a sub-scenario is part of', () => {
+    const shared: ScenarioFormEntry[] = [entries[0]!, { capability: 'email-history', acceptanceRefs: ['send-accepted'] }];
+    rejected(validateScenarioForm(valid(), planScenarios, shared), 6, 'entries.1.acceptanceRefs.0');
+    const unreferenced = valid();
+    delete unreferenced.scenarios[1]!.refs;
+    rejected(validateScenarioForm(unreferenced, planScenarios, entries), 6, 'entries.1.acceptanceRefs.0');
     const submission = valid();
-    submission.scenarios[1]!.refs = [{ anchor: '#History' }];
-    expect(validateScenarioForm(submission, planScenarios, byAnchor).ok).toBe(true);
+    submission.scenarios[1]!.refs = ['history-accepted', 'send-accepted'];
+    expect(validateScenarioForm(submission, planScenarios, shared).ok).toBe(true);
   });
 });
 

@@ -31,8 +31,15 @@ async function target() {
   return fixture.root;
 }
 
-/** A run that waits, so a command can reach it while it is still active. */
+/**
+ * A run that waits, so a command can reach it while it is still active. A
+ * static script leaves the intake to its default turn, so the initial
+ * architect's session is the one that waits, and nothing is written while
+ * it does.
+ */
 const waiting = [{ kind: 'stall', ms: 3000 } as const];
+const architectWaits = (agent: { readonly sessions: ReadonlyArray<{ readonly spec: { readonly role: string } }> }) =>
+  agent.sessions.some(session => session.spec.role === 'initial-architect');
 
 describe('start-run', () => {
   test('an identical retry returns the original receipt and starts no second run', async () => {
@@ -74,7 +81,7 @@ describe('start-run', () => {
     cleanups.push(() => service.close());
 
     const receipt = await service.execute(startRun('review-notes'));
-    await until(() => agent!.sessions.length === 1);
+    await until(() => architectWaits(agent!));
     const version = service.getRun('review-notes', receipt.jobId)!.version;
     expect(version).toBeGreaterThan(0);
 
@@ -91,7 +98,7 @@ describe('start-run', () => {
     cleanups.push(() => service.close());
 
     await service.execute(startRun('review-notes'));
-    await until(() => agent!.sessions.length === 1);
+    await until(() => architectWaits(agent!));
     await expect(service.execute(startRun('revision-diff'))).rejects.toMatchObject({ code: 'busy' });
     expect(service.listRuns('revision-diff')).toHaveLength(0);
   }, 120_000);
@@ -126,7 +133,7 @@ describe('stop-job', () => {
     cleanups.push(() => service.close());
 
     const started = await service.execute(startRun('review-notes'));
-    await until(() => agent!.sessions.length === 1);
+    await until(() => architectWaits(agent!));
     const version = service.getRun('review-notes', started.jobId)!.version;
     const stop = stopRun('review-notes', started.jobId, version, 'stop-once');
 

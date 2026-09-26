@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
+import { elementIdSchema, type PackageDeviation } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 
 /*
  * Plan deviations. A local architect that finds its request cannot be met
@@ -10,10 +11,11 @@ import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
  * remains worth doing.
  *
  * A plan deviation is the global architect's decision that the run does
- * something other than a requirement of its plan states: the requirement as
- * written, at its plan lines, what is done instead, why, the alternatives it
- * rejected and what the person loses. The plan file is never changed; the
- * deviation is a durable record beside it, which binds the rest of the run.
+ * something other than an element of its catalog states: the elements it
+ * amends, by ID, what is done instead, why, the alternatives it rejected and
+ * what the person loses. The plan file and the catalog are never changed;
+ * the deviation is a durable record beside them, which binds the rest of the
+ * run and is rendered after the elements it amends.
  * Its CheckFinding asks the person to accept or reject it and holds nothing.
  *
  * An environment problem is the global architect's answer that the conflict
@@ -23,7 +25,6 @@ import { scenarioIdSchema } from '../../subs/scenarios/src/records.js';
  */
 
 const text = z.string().min(1);
-const lineRange = z.tuple([z.int().positive(), z.int().positive()]);
 
 /** `ur-003`, the count of committed unresolved requests. */
 export const unresolvedRequestId = (count: number): string => `ur-${String(count).padStart(3, '0')}`;
@@ -41,13 +42,13 @@ export const environmentLimits = { diagnosis: 2000, suggestion: 1000 } as const;
 export const defaultMaxPlanDeviations = 5;
 
 /**
- * What the global architect submits as a plan deviation. The requirements
- * are line ranges of the captured plan; the harness quotes their text. A
- * deviation keeps as much of each requirement as the conflict allows.
+ * What the global architect submits as a plan deviation. It names the
+ * elements of the work item's package it amends; the harness records their
+ * text. A deviation keeps as much of each element as the conflict allows.
  */
 export const deviationBodySchema = z.object({
-  /** The requirements as written that this deviation departs from, as line ranges of the captured plan. */
-  requirements: z.array(z.object({ lines: lineRange }).strict()).min(1).max(20),
+  /** The requirements and recommendations this deviation departs from, by element ID; never context. */
+  amends: z.array(elementIdSchema).min(1).max(20),
   /** What the run does instead: the part of each requirement it keeps, and the replacement for the part it cannot. */
   instead: text,
   /** Why the requirement cannot be met as written. */
@@ -80,9 +81,9 @@ export const unresolvedRequestSchema = z.object({
 }).strict();
 export type UnresolvedRequest = z.infer<typeof unresolvedRequestSchema>;
 
-/** One requirement a deviation departs from: its plan lines and their text as written. */
-export const deviatedRequirementSchema = z.object({ lines: lineRange, text: z.string() }).strict();
-export type DeviatedRequirement = z.infer<typeof deviatedRequirementSchema>;
+/** One element a deviation amends, with its source path and its text as the frozen catalog holds it. */
+export const amendedElementSchema = z.object({ id: elementIdSchema, path: text, text }).strict();
+export type AmendedElement = z.infer<typeof amendedElementSchema>;
 
 /** A pending scenario a deviation rewords: its source before and after, and its feature file. */
 export const rewordedScenarioSchema = z.object({
@@ -104,7 +105,7 @@ export const planDeviationSchema = z.object({
   invocation: text,
   /** The plan it departs from, which stays exactly as written. */
   plan: z.object({ path: text, revision: text }).strict(),
-  requirements: z.array(deviatedRequirementSchema).min(1),
+  amends: z.array(amendedElementSchema).min(1),
   instead: text,
   why: text,
   rejected: z.array(z.object({ alternative: text, reason: text }).strict()).min(1),
@@ -171,30 +172,21 @@ export const deviationSchemas = {
   environmentProblem: { schema: 'ramify-agent.environment-problem/1', body: environmentProblemSchema },
 } as const;
 
-/** The text of a plan's lines `[from, to]`, as written. */
-export function planLines(plan: string, [from, to]: readonly [number, number]): string {
-  return plan.split('\n').slice(from - 1, to).join('\n');
-}
-
 /**
- * A deviation as an agent bound by it reads it: the requirement as written,
- * what the run does instead, and the rewording of any scenario. It is the
- * text local architects and scope reviewers receive beside the plan.
+ * A deviation as a package renders it, after the elements: the elements it
+ * amends, the global architect's authority, and what the run does instead,
+ * why, what is lost and any reworded scenario. Its bytes depend on the
+ * record alone.
  */
-export function deviationText(deviation: PlanDeviation): string {
-  const lines = [
-    `Plan deviation ${deviation.id}, recorded by the global architect for ${deviation.workItem}. It amends the plan for the rest of this run; the plan file is unchanged.`,
-    '',
-    'The requirement as written:',
-    '',
-  ];
-  for (const requirement of deviation.requirements) {
-    lines.push(`${deviation.plan.path}, lines ${requirement.lines[0]}–${requirement.lines[1]}:`, '');
-    lines.push(...requirement.text.split('\n').map(line => `> ${line}`), '');
-  }
-  lines.push(`What the run does instead: ${deviation.instead}`, '', `Why: ${deviation.why}`, '', `What is lost: ${deviation.loss}`);
+export function packageDeviation(deviation: PlanDeviation): PackageDeviation {
+  const lines = [`What the run does instead: ${deviation.instead}`, '', `Why: ${deviation.why}`, '', `What is lost: ${deviation.loss}`];
   for (const scenario of deviation.scenarios) {
     lines.push('', `Scenario ${scenario.scenario} is reworded in \`${scenario.file}\`. It now reads:`, '', '```gherkin', ...scenario.after, '```');
   }
-  return lines.join('\n');
+  return {
+    id: deviation.id,
+    amends: deviation.amends.map(element => element.id),
+    authority: `Recorded by the global architect for ${deviation.workItem}, answering ${deviation.request}. The plan file and the catalog are unchanged.`,
+    text: lines.join('\n'),
+  };
 }

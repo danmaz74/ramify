@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalogSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
+import { createPackage, elementCatalogSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import type { Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
 import { coordinatorActionPrompt, coordinatorAssessmentPrompt, repairPrompt } from '../nonfunctional/prompts.js';
 import {
@@ -8,21 +8,28 @@ import {
 } from '../nonfunctional/submissions.js';
 
 const candidate: Candidate = { tree: 'a'.repeat(40), head: 'b'.repeat(40), preparedAt: '2026-09-25T00:00:00.000Z' };
-const passage = { document: 'doc-001', sha256: 'c'.repeat(64), start: 0, end: 19, quote: 'Latency stays low.\n' };
-const catalog = catalogSchema.parse({
-  schema: 'ramify-agent.nonfunctional-catalog/1', manifestHash: 'd'.repeat(64),
-  items: [
-    { id: 'nfr-001', classification: 'non-functional-requirement', passage,
+const quote = 'Latency stays low.';
+const catalog = elementCatalogSchema.parse({
+  schema: 'ramify-agent.element-catalog/1', manifestHash: 'd'.repeat(64),
+  documents: [{ id: 'doc-001', path: 'plans/plan.md', kind: 'plan' }, { id: 'doc-002', path: 'docs/a.principles.md', kind: 'principle' }],
+  elements: [
+    { id: 'nfr-001', kind: 'non-functional', document: 'doc-001', text: quote,
       conditions: [{ text: 'At every intermediate load step', source: 'stated' }], uncertainty: '' },
-    { id: 'nfr-002', classification: 'non-functional-requirement', passage: { ...passage, start: 20, end: 39 },
+    { id: 'rec-001', kind: 'recommendation', document: 'doc-001', text: 'Prefer small retries.', conditions: [], uncertainty: '' },
+    { id: 'fix-001', kind: 'fixed', document: 'doc-002', text: 'Retries are bounded.',
       conditions: [{ text: 'The system may need a retry bound', source: 'inferred' }], uncertainty: 'May be advice' },
-    { id: 'adv-001', classification: 'advice', passage: { ...passage, start: 40, end: 59 }, conditions: [], uncertainty: '' },
   ],
+  retired: [],
 });
+const packageText = (elements: readonly string[]): string => {
+  const rendered = createPackage({ catalog, planDeviations: [], elements, deviations: [] });
+  if (!('text' in rendered)) throw new Error('The package is unavailable');
+  return rendered.text;
+};
 
 const results = [
   { nfr: 'nfr-001', result: 'undetermined' as const, inspectedScope: ['src/'], evidence: [], uncertainty: 'No intermediate load measurements' },
-  { nfr: 'nfr-002', result: 'not-satisfied' as const, inspectedScope: ['src/'], evidence: ['src/retry.ts'], uncertainty: '' },
+  { nfr: 'fix-001', result: 'not-satisfied' as const, inspectedScope: ['src/'], evidence: ['src/retry.ts'], uncertainty: '' },
 ];
 
 const binding = {
@@ -32,7 +39,7 @@ const binding = {
 
 function actionContext(overrides: Partial<ActionContext> = {}): ActionContext {
   return {
-    decision: { action: 'repair-or-close', round: 1, unresolved: ['nfr-001', 'nfr-002'], closeOutcome: 'continue' },
+    decision: { action: 'repair-or-close', round: 1, unresolved: ['nfr-001', 'fix-001'], closeOutcome: 'continue' },
     results, investigatedNfrs: [], moduleNames: ['app/api'], ...overrides,
   };
 }
@@ -46,28 +53,29 @@ describe('non-functional coordinator submissions', () => {
     });
   });
 
-  it('refuses missing, duplicate and advice IDs; an explicit empty catalog accepts []', () => {
-    for (const invalid of [results.slice(0, 1), [...results, results[0]!], [...results, { ...results[0]!, nfr: 'adv-001' }]]) {
+  it('refuses missing, duplicate and recommendation IDs; an explicit empty catalog accepts []', () => {
+    for (const invalid of [results.slice(0, 1), results.slice(1), [...results, results[0]!], [...results, { ...results[0]!, nfr: 'rec-001' }]]) {
       expect(bindCoordinatorAssessment({ kind: 'assessment', results: invalid }, binding).ok).toBe(false);
     }
-    const empty = catalogSchema.parse({ ...catalog, items: catalog.items.filter(item => item.classification === 'advice') });
+    const empty = elementCatalogSchema.parse({ ...catalog, elements: catalog.elements.filter(element => element.kind === 'recommendation') });
     expect(bindCoordinatorAssessment({ kind: 'assessment', results: [] }, { ...binding, catalog: empty }).ok).toBe(true);
   });
 
   it('permits sequential investigation of unresolved IDs after the first investigation', () => {
-    const investigate = { kind: 'investigate', nfrs: ['nfr-002'], question: 'Inspect the retry path', scope: ['src/retry.ts'] };
+    const investigate = { kind: 'investigate', nfrs: ['fix-001'], question: 'Inspect the retry path', scope: ['src/retry.ts'] };
     expect(validateCoordinatorAction(investigate, actionContext({ investigatedNfrs: ['nfr-001'] })).ok).toBe(true);
     expect(validateCoordinatorAction({ ...investigate, nfrs: ['nfr-001'] }, actionContext({ investigatedNfrs: ['nfr-001'] })).ok).toBe(false);
     expect(validateCoordinatorAction({ ...investigate, nfrs: ['nfr-001'] }, actionContext({ decision: { action: 'investigate', round: 1, undetermined: ['nfr-001'] } })).ok).toBe(true);
     expect(validateCoordinatorAction(investigate, actionContext({ decision: { action: 'investigate', round: 1, undetermined: ['nfr-001'] } })).ok).toBe(false);
     expect(validateCoordinatorAction({ ...investigate, nfrs: ['nfr-999'] }, actionContext()).ok).toBe(false);
+    expect(validateCoordinatorAction({ ...investigate, nfrs: ['rec-001'] }, actionContext()).ok).toBe(false);
   });
 
   it('requires investigation of the specific undetermined NFR before repair', () => {
     const repair = { kind: 'repair', nfrs: ['nfr-001'], startingModule: 'app/api', task: 'Measure and bound load time', evidence: [], uncertainty: '' };
     expect(validateCoordinatorAction(repair, actionContext()).ok).toBe(false);
     expect(validateCoordinatorAction(repair, actionContext({ investigatedNfrs: ['nfr-001'] })).ok).toBe(true);
-    expect(validateCoordinatorAction({ ...repair, nfrs: ['nfr-002'] }, actionContext()).ok).toBe(true);
+    expect(validateCoordinatorAction({ ...repair, nfrs: ['fix-001'] }, actionContext()).ok).toBe(true);
     expect(validateCoordinatorAction({ ...repair, startingModule: 'unknown' }, actionContext()).ok).toBe(false);
     expect(validateCoordinatorAction(repair, actionContext({ decision: { action: 'assess', round: 1, phase: 'initial' } })).ok).toBe(false);
   });
@@ -75,7 +83,7 @@ describe('non-functional coordinator submissions', () => {
   it('closes only with every unresolved NFR and an alternative or explicit uncertainty', () => {
     const close = { kind: 'close', deviations: [
       { nfr: 'nfr-001', proposedAlternative: null, uncertainty: 'No intermediate evidence can be obtained' },
-      { nfr: 'nfr-002', proposedAlternative: 'Revise the retry bound', uncertainty: '' },
+      { nfr: 'fix-001', proposedAlternative: 'Revise the retry bound', uncertainty: '' },
     ] };
     expect(validateCoordinatorAction(close, actionContext()).ok).toBe(true);
     expect(validateCoordinatorAction({ ...close, deviations: close.deviations.slice(0, 1) }, actionContext()).ok).toBe(false);
@@ -87,7 +95,7 @@ describe('non-functional coordinator submissions', () => {
       { nfr: 'nfr-001', inspectedScope: ['src/'], evidence: ['trace-1'], uncertainty: 'No intermediate trace' },
     ] };
     expect(validateCoordinatorInvestigation(result, ['nfr-001']).ok).toBe(true);
-    expect(validateCoordinatorInvestigation(result, ['nfr-002']).ok).toBe(false);
+    expect(validateCoordinatorInvestigation(result, ['fix-001']).ok).toBe(false);
     expect(validateCoordinatorInvestigation({ ...result, findings: [result.findings[0]!, result.findings[0]!] }, ['nfr-001']).ok).toBe(false);
   });
 
@@ -97,14 +105,19 @@ describe('non-functional coordinator submissions', () => {
     expect(nonfunctionalRepairSubmissionSchema.safeParse({ kind: 'completed', summary: 'Changed source', evidence: [], remaining: [], satisfied: true }).success).toBe(false);
   });
 
-  it('preserves original quoted passages and stated/inferred conditions in the prompt', () => {
-    const assessment = coordinatorAssessmentPrompt(catalog, candidate, 1, 'initial');
-    expect(assessment).toContain(JSON.stringify(passage.quote));
-    expect(assessment).toContain('At every intermediate load step');
-    expect(assessment).toContain('"source": "inferred"');
+  it('carries the package, whole, with its stated/inferred conditions in the prompt', () => {
+    const assessed = packageText(['nfr-001', 'fix-001']);
+    const assessment = coordinatorAssessmentPrompt(assessed, candidate, 1, 'initial');
+    expect(assessment).toContain(assessed.trimEnd());
+    expect(assessment).toContain(`> ${quote}`);
+    expect(assessment).toContain('- stated: At every intermediate load step');
+    expect(assessment).toContain('- inferred: The system may need a retry bound');
+    expect(assessment).not.toContain('rec-001');
     expect(assessment).toContain('temporal condition lacks observed intermediate evidence');
     expect(assessment).not.toContain('capability progress as evidence');
     expect(coordinatorActionPrompt(candidate, ['nfr-001'], ['nfr-001'])).toContain('one repair batch');
-    expect(repairPrompt('Bound retries', candidate, catalog, ['nfr-001'], 'app/api')).toContain(JSON.stringify(passage.quote));
+    const repair = repairPrompt('Bound retries', candidate, packageText(['nfr-001']), 'app/api');
+    expect(repair).toContain(`### nfr-001: non-functional requirement of the plan from plans/plan.md\n\n> ${quote}`);
+    expect(repair).not.toContain('fix-001');
   });
 });

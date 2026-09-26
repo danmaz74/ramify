@@ -69,11 +69,14 @@ async function outcome(root: string, runId: string, invocation: string): Promise
 
 describe('the bounds on one invocation', () => {
   test('no port event for invocationIdleMs ends the invocation as failed, idle-timeout', async () => {
+    // A static script leaves the intake to its default turn: the initial
+    // architect's, inv-0002, is the one that waits.
     const { root, runId, service } = await run([{ kind: 'wait', ms: 60_000 }], { invocationIdleMs: 300 });
     const snapshot = onlyRun(service, plan);
     expect(snapshot.state).toBe('failed');
     expect(snapshot.failure?.reason).toBe('agent-failed');
-    const ended = await outcome(root, runId, 'inv-0001');
+    expect((await outcome(root, runId, 'inv-0001')).ended).toBe('submitted');
+    const ended = await outcome(root, runId, 'inv-0002');
     expect(ended).toMatchObject({ ended: 'failed', interruption: 'idle-timeout', disposition: 'incomplete' });
     expect(ended.error).toContain('300 ms');
     // The session was asked to stop and did, well before its own minute.
@@ -88,7 +91,7 @@ describe('the bounds on one invocation', () => {
     ]).flat();
     const { root, runId, service } = await run(talking, { invocationIdleMs: 2_000, invocationAbsoluteMs: 600 });
     expect(onlyRun(service, plan).failure?.reason).toBe('agent-failed');
-    const ended = await outcome(root, runId, 'inv-0001');
+    const ended = await outcome(root, runId, 'inv-0002');
     expect(ended).toMatchObject({ ended: 'failed', interruption: 'absolute-timeout' });
     expect(ended.elapsedMs).toBeLessThan(5_000);
   }, 120_000);
@@ -100,7 +103,7 @@ describe('the bounds on one invocation', () => {
       ['final verification of plan "review-notes"'],
     );
     expect(onlyRun(service, plan).state).toBe('completed');
-    expect((await outcome(root, runId, 'inv-0001')).interruption).toBeUndefined();
+    for (const invocation of ['inv-0001', 'inv-0002', 'inv-0003']) expect((await outcome(root, runId, invocation)).interruption).toBeUndefined();
   }, 120_000);
 });
 
@@ -131,15 +134,18 @@ describe('an implementation that cannot start a session', () => {
 
 describe('the bounds on the whole run', () => {
   test('a run that has made maxInvocationsPerRun invocations starts no further one and fails limit-exceeded', async () => {
+    // The analysis's three invocations (intake, initial architect, checker)
+    // reach the bound; the local architect's would pass it.
     const { root, runId, service } = await run(byRole({
       'initial-architect': [submit(analysis([entry('reviewer-note', reviews)]))],
       'local-architect': [submit(requestCompletion())],
-    }), { maxInvocationsPerRun: 1 }, [scenariosCommit(plan)]);
+    }), { maxInvocationsPerRun: 3 }, [scenariosCommit(plan)]);
     const snapshot = onlyRun(service, plan);
     expect(snapshot.failure?.reason).toBe('limit-exceeded');
-    expect(snapshot.failure?.message).toBe('The run has made 1 invocations; the policy allows 1');
+    expect(snapshot.failure?.message).toBe('The run has made 3 invocations; the policy allows 3');
     const events = await runEventsOnDisk(root, plan, runId);
-    expect(events.filter(event => event.type === 'invocation-started')).toHaveLength(1);
+    expect(events.filter(event => event.type === 'invocation-started').map(event => event.data.role))
+      .toEqual(['catalog-extractor', 'initial-architect', 'catalog-extractor']);
     expect(events.at(-1)?.type).toBe('job-failed');
   }, 120_000);
 
@@ -156,9 +162,11 @@ describe('the bounds on the whole run', () => {
       name: scripted.name,
       support: scripted.support,
       appendContext: (ref, key, text) => scripted.appendContext(ref, key, text),
+      // The analysis's three sessions (intake, initial architect, checker)
+      // together pass the bound, at the boundary before the local architect's.
       startSession: spec => {
         const session = scripted.startSession(spec);
-        current = new Date(current.getTime() + 201);
+        current = new Date(current.getTime() + 67);
         return session;
       },
     };
@@ -179,7 +187,8 @@ describe('the bounds on the whole run', () => {
     expect(snapshot.failure?.reason).toBe('limit-exceeded');
     expect(snapshot.failure?.message).toBe('The run has run for 201 ms; the policy allows 200');
     const events = await runEventsOnDisk(fixture.root, plan, receipt.jobId);
-    expect(events.filter(event => event.type === 'invocation-started')).toHaveLength(1);
+    expect(events.filter(event => event.type === 'invocation-started')).toHaveLength(3);
+    expect(events.some(event => event.type === 'invocation-started' && event.data.role === 'local-architect')).toBe(false);
   }, 120_000);
 });
 

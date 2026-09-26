@@ -1,16 +1,15 @@
 import type { Assessment, Candidate } from '../../subs/nonfunctional/src/interfaces/contracts.js';
-import type { Catalog } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 
-/** Render the fixed catalog without paraphrasing its passages or conditions. */
-export function coordinatorAssessmentPrompt(catalog: Catalog, candidate: Candidate, round: number, phase: 'initial' | 'after-repair'): string {
+/** The assessment package: every non-functional and fixed element, whole, rendered by the package creator. */
+export function coordinatorAssessmentPrompt(assessmentPackage: string, candidate: Candidate, round: number, phase: 'initial' | 'after-repair'): string {
   return [
     `Assess the prepared source tree ${candidate.tree} in round ${round} (${phase}).`,
-    'The catalog below is the initial architect\'s accepted reading. Carry its near-verbatim excerpts and stated/inferred conditions forward unchanged.',
-    'Submit exactly one result for every non-functional-requirement ID. Advice is context, not another required result.',
+    'The package below holds every non-functional requirement of the plan and every fixed requirement, with the plan deviations recorded in this run. Carry their wording and stated/inferred conditions forward unchanged.',
+    'Submit exactly one result for every element ID of the package.',
     'For each result, name inspected scope, evidence, and uncertainty. If a temporal condition lacks observed intermediate evidence, choose undetermined.',
     'Do not use capability progress or scenario coverage as a substitute for this assessment. Do not edit source.',
     '',
-    JSON.stringify(catalog, null, 2),
+    assessmentPackage.trimEnd(),
   ].join('\n');
 }
 
@@ -38,14 +37,14 @@ export function coordinatorActionPrompt(candidate: Candidate, unresolved: readon
   ].join('\n');
 }
 
-export function repairPrompt(task: string, candidate: Candidate, catalog: Catalog, nfrs: readonly string[], startingModule: string,
+/** A repair engineer's task with the package of the requirements the coordinator cites. */
+export function repairPrompt(task: string, candidate: Candidate, repairPackage: string, startingModule: string,
   context?: { evidence: readonly string[]; uncertainty: string }): string {
-  const selected = catalog.items.filter(item => item.classification === 'non-functional-requirement' && nfrs.includes(item.id));
   return [
     `Start in module ${startingModule} and carry out this authorized repair task against tree ${candidate.tree}:`,
     task,
-    'The initial architect\'s requirement excerpts and conditions are below. Carry their wording and stated/inferred distinction forward unchanged.',
-    JSON.stringify(selected, null, 2),
+    'The requirements this repair concerns are below, whole. Carry their wording and stated/inferred distinction forward unchanged.',
+    repairPackage.trimEnd(),
     ...(context === undefined ? [] : [
       `Coordinator evidence for this repair: ${JSON.stringify(context.evidence)}`,
       `Coordinator uncertainty: ${context.uncertainty}`,

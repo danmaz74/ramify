@@ -1,11 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterAll, afterEach, expect, test } from 'vitest';
-import type { SessionSpec } from '../../subs/agent/src/interfaces/port.js';
-import { documentManifestSchema } from '../../subs/plan-evidence/src/interfaces/contracts.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { coordinatorActionToolName, coordinatorAssessmentToolName } from '../nonfunctional/submissions.js';
+import { intakeToolName } from '../analysis/extraction.js';
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import { RunQueries } from '../projections/queries.js';
 import { copyFixture } from './helpers/fixture.js';
@@ -36,23 +34,11 @@ async function captureBrowserCase(name: string, queries: RunQueries, runId: stri
     findings, details };
 }
 
-function analysis(spec: SessionSpec) {
-  const captured = /captured file (.+\/input\/plan\.md)/u.exec(spec.prompt)?.[1];
-  if (!captured) throw new Error('Missing captured plan in architect prompt');
-  const directory = dirname(dirname(captured));
-  const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
-  const root = manifest.documents.find(item => item.id === manifest.root)!;
-  const bytes = readFileSync(join(directory, root.storedAt));
-  const passage = (text: string) => {
-    const start = bytes.indexOf(Buffer.from(text));
-    if (start < 0) throw new Error(`Missing captured passage ${text}`);
-    return { document: root.id, sha256: root.sha256, start, end: start + Buffer.byteLength(text), quote: text };
-  };
-  return { entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [],
-    incorporation: { documents: [{ document: root.id, scenarios: true, governing: [passage('# Review notes')], uncertainty: '' }], missing: [] },
-    catalog: [{ classification: 'non-functional-requirement', passage: passage(quote), conditions: [], uncertainty: '' }],
-  };
-}
+/** The intake reads the one non-functional requirement; the architect finds nothing functional to place. */
+const intake = { goal: 'Answer review notes quickly.', elements: [
+  { key: 'latency', kind: 'non-functional', document: 'doc-001', text: quote, conditions: [], uncertainty: '' },
+], incorporation: { documents: [{ document: 'doc-001', scenarios: true, uncertainty: '' }], missing: [] } };
+const analysis = { elements: [], entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [] };
 
 async function startExhaustedRun(options: { finalGateFails?: boolean } = {}) {
   const fixture = await copyFixture();
@@ -66,7 +52,8 @@ async function startExhaustedRun(options: { finalGateFails?: boolean } = {}) {
       context.checkpoint === 'final' && check.kind === 'tests'
         ? { outcome: { kind: 'completed' as const, exitCode: 1 } } : {} } : {}),
     script: spec => {
-      if (spec.role === 'initial-architect') return [{ kind: 'submit', input: analysis(spec) }];
+      if (spec.submission.name === intakeToolName) return [{ kind: 'submit', input: intake }];
+      if (spec.role === 'initial-architect') return [{ kind: 'submit', input: analysis }];
       if (spec.submission.name === coordinatorAssessmentToolName) return [{ kind: 'submit', input: {
         kind: 'assessment', results: [{ nfr: 'nfr-001', result: 'not-satisfied',
           inspectedScope: ['subs/workspace'], evidence: ['Observed 87 milliseconds'], uncertainty: 'Load varies' }],
@@ -108,7 +95,7 @@ test('an NFR-only exhausted run completes pending review with an exact source-bo
   const findings = await queries.checkFindings(plan, receipt.jobId,
     { workItem: null, module: null, select: 'all', order: 'attention', after: null, limit: 20 }, version);
   expect(findings.items[0]?.planDeviation).toMatchObject({ origin: { kind: 'nonfunctional-assessment', nfr: 'nfr-001' },
-    passage: { quote }, sourcePath: `plans/${plan}/plan.md`, proposedAlternative: 'Use a cached read' });
+    element: { id: 'nfr-001', document: 'doc-001', text: quote }, sourcePath: `plans/${plan}/plan.md`, proposedAlternative: 'Use a cached read' });
   const finding = findings.items[0]!;
   const request = finding.pendingUserDecision?.request;
   if (!request) throw new Error('Exhausted NFR has no user decision request');
