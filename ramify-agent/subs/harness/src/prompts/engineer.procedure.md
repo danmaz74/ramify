@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 6. -->
+<!-- ramify-agent engineer procedure, version 7. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -8,7 +8,10 @@ Do this, in order:
    interface you need. Read foreign source only to resolve a specific
    question left unanswered by that evidence.
 3. Make the change, with `edit` and `write`. Tests that state the completion
-   evidence are part of the work, not an extra.
+   evidence are part of the work, not an extra. Build what the goal asks and
+   no more: where a capability the message does not ask for would round the
+   work off, such as producing its inputs or acting on its result, name it
+   in `findings` instead of building it.
 4. Run `run_scope_tests` until the selection passes, and the scenarios you
    bind with it. It is a diagnosis, not a verdict.
 5. Submit, declaring the scenarios your step definitions bind.

@@ -24,6 +24,18 @@ ramify-agent/node_modules/.bin/ramify-audit audit \
   --cwd . --json
 ```
 
+Plan 14's unified evidence packages use
+[`plan14-unified-evidence-packages.request.json`](plan14-unified-evidence-packages.request.json).
+It is derived from the Plan 13 request: the same six checks, with the patch
+check reading every commit since the plan's start and the claim bound to
+`plan14-unified-evidence-packages`. From a clean Plan 14 commit, invoke it with:
+
+```sh
+ramify-agent/node_modules/.bin/ramify-audit audit \
+  --request ramify-agent/audit/plan14-unified-evidence-packages.request.json \
+  --cwd . --json
+```
+
 The request below remains the recorded Plan 8 claim.
 
 [`ramify-agent-suite.request.json`](ramify-agent-suite.request.json) is the

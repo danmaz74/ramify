@@ -14,8 +14,8 @@ The catalog was created to deliver the relevant context to each agent in an effi
 in the sense of the
 [bounded context principle](../harness.principles.md#bounded-context-is-what-makes-agents-efficient):
 an agent that receives its elements has what it needs and never has to read
-the original documents. Each element is one requirement as its source
-states it, with a stable run-local ID, its text, its classification, its
+the original documents. Each element is one requirement, or one passage
+of plan context, as its source states it, with a stable run-local ID, its text, its classification, its
 stated and inferred conditions and the extracting agent's uncertainty.
 Assignments, reviews and assessments cite elements by ID, and every
 downstream prompt receives the cited elements in full and unchanged.
@@ -33,10 +33,10 @@ the others. Extraction places the cuts so that no element needs another to
 be read correctly, and a long element is the ordinary case, not an
 exception.
 
-## Four kinds of element
+## Five kinds of element
 
 The catalog holds every requirement that is relevant to the plan, of three
-kinds, and a fourth kind that is not a requirement:
+kinds, and two kinds that are not requirements:
 
 - **A functional requirement** comes from the plan. It states what the plan
   delivers, including the plan's acceptance statements. Work is organized
@@ -44,8 +44,9 @@ kinds, and a fourth kind that is not a requirement:
   state its requirement and its acceptance, and its scenarios verify them.
 - **A non-functional requirement of the plan** comes from the plan's own
   constraints: size limits, determinism, tests kept in step with changed
-  text, and the like. It constrains how the functional work is done and is
-  assessed against the final candidate.
+  text, what the candidate must not change, and the like. It constrains how
+  the functional work is done and is assessed against the final candidate.
+  A statement that only says what the plan does not deliver is no element.
 - **A fixed requirement** comes from a principles document. It is a rule
   every plan of the project must adhere to, and it enters the catalog only
   where it bears on this plan. In the catalog it is a non-functional
@@ -63,13 +64,22 @@ kinds, and a fourth kind that is not a requirement:
   the source's; an engineer that departs from one says so in its result
   and owes nothing more.
 
-Plan 13 called the fourth kind advice. The name changes because advice
+- **Context** comes from the plan and explains the situation the plan
+  starts from or why it exists, such as what a reader gets today. An
+  element is one whole explanation. Each entry capability cites the context
+  a reader needs to understand it, and that context travels with the entry's
+  functional requirements, rendered first under its own label. Nothing
+  assesses context and no deviation amends it. The reasoning of a principles
+  document is not context: its rules are what a plan keeps.
+
+Plan 13 called recommendations advice. The name changes because advice
 reads as a quality of the text, while a recommendation is one element that
 can be cited, selected and declined.
 
 Work proceeds in that order: the functional requirements first, through
 work items, then the non-functional requirements, through assessment of the
-candidate they produced. Recommendations accompany both and gate neither.
+candidate they produced. Recommendations accompany both and gate neither;
+context accompanies the functional work and gates nothing.
 
 ## How much fidelity it promises
 
@@ -124,8 +134,8 @@ compares itself, never to a reading:
 ## How a non-functional package is generated, and when
 
 A package is the rendering of a set of elements chosen from the catalog for
-one consumer. Its functional part is fixed: the elements the work item's
-entry cites. Its non-functional part is always a selection. When a
+one consumer. Its functional part is fixed: the functional and context
+elements the work item's entry cites. Its non-functional part is always a selection. When a
 functional requirement is implemented, some non-functional requirements
 bear on it and most do not, and which ones is a judgement about this work
 in this module. These rules govern that judgement:

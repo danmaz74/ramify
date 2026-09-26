@@ -1,0 +1,275 @@
+{
+  "schema": "ramify-agent.plan14-example/1",
+  "run": "20260926T052417Z-21d928",
+  "document": {
+    "id": "doc-004",
+    "path": "docs/model/module-description.principles.md",
+    "sha256": "8c1208c475a90d76c26f1b6dd9e2ea2a9e0312b241282f3be13a5705b8c6f5b9",
+    "bytes": 52722,
+    "revision": {
+      "commit": "d61f7c09924d9cbef6f992ba665dd01bede982bc",
+      "dirty": false
+    }
+  },
+  "selection": {
+    "packageHash": "f12aa6c5f323ffb827f2cf4fcabc1c99eb629969556e81fc7bced1ed78eb3874",
+    "selectedPassages": [
+      {
+        "item": "doc-004",
+        "passage": {
+          "document": "doc-004",
+          "sha256": "8c1208c475a90d76c26f1b6dd9e2ea2a9e0312b241282f3be13a5705b8c6f5b9",
+          "start": 24091,
+          "end": 25444,
+          "quote": "An exposure statement has this interpretation:\n\n```ramify\nramify 1\nmodule orders\n\nexpose-src placeOrder from \"place-order.ts\" to parent\nexpose-src Order from \"interfaces/order.ts\" to parent, descendants\nexpose-test makeOrder from \"helpers/make-order.ts\" to descendants\nexpose-sub calculateTotal from pricing to parent\nexpose-sub * from pricing to descendants\n```\n\nEach named selection identifies an exact source export or child-exposed name\nand, optionally, an exposed name introduced by `as`. Without `as`, the exposed\nname equals the selected name. The source and any tag clause apply to every\nselection in the statement. Every selected symbol receives every listed\ndestination. Wildcard selection is defined separately below.\n\nThe destinations are exactly the existing two channels: `parent` means the\ndirect parent; `descendants` means all proper descendants. Listing both is\nequivalent to two exposure statements. Exposure statement order has no semantic\neffect; the version and module headers retain their required positions.\n\nThere is no declaration for a consumed import. There is also no requirement\nto enumerate source exports that are not exposed. Unlisted exports remain\nowned and unexposed, with the default symbol tags required by their original\nsource classification.\nVersion 1 has no separate statement for tagging an unexposed export.\n\n"
+        },
+        "reason": "Defines expose-src statement selection, destinations, and owned-but-unexposed exports, grounding the proposal's existing-statement constraint.",
+        "conditions": [
+          "Only parent and descendants are exposure destinations; destination order has no semantic effect.",
+          "Unlisted exported names are not exposed merely because another name from the file is exposed."
+        ],
+        "uncertainty": "A statement for the same file alone does not establish that adding a name suffices across the whole visibility chain."
+      },
+      {
+        "item": "doc-004",
+        "passage": {
+          "document": "doc-004",
+          "sha256": "8c1208c475a90d76c26f1b6dd9e2ea2a9e0312b241282f3be13a5705b8c6f5b9",
+          "start": 29378,
+          "end": 31724,
+          "quote": "expose-src * from \"interfaces/order.ts\" to parent, descendants\n```\n\nThis statement selects every export name of the exact file\n`<orders>/src/interfaces/order.ts`, including types, schemas, enums, constants,\nand `default` if present. It expands the file's complete effective export\ndescription; it does not filter by symbol kind. The directory curates module\nvocabulary, but the selector does not impose a separate ban on function exports.\nIt neither discovers other files nor exposes types merely referenced by a\nselected binding's signature. Those types are the binding's signature\ncompanions, and the\n[companion rule](cross-module-importability.principles.md#exposure-requires-available-signature-companions)\nrequires the owner to expose them by their own statements.\n\nEligibility is checked after the ordinary path normalization and ownership\nchecks. The resolved file must be beneath `<module>/src/interfaces/`, including\nits ordinary subdirectories. A file under `src/tests/interfaces/` or\n`src/helpers/interfaces/` does not qualify. Nor does a path such as\n`\"interfaces/../implementation.ts\"` whose normalized target is outside the\ninterface directory. `expose-test *` is invalid. A module tagged `testing`\ncan use `expose-src *` for its own `src/interfaces/`; its source classification\nand original symbol tags still apply. Directory targets, path globs, excluded\nfiles, and symlink traversal remain invalid source references.\n\nExpansion produces the pairs `(exported name, original symbol)` that named\nselections of all the file's exports would produce, with names unchanged.\nEvery selected original must belong to the declaring module. A same-owner\nforwarding alias is valid and preserves the original binding and its tags,\neven if that binding is defined outside `src/interfaces/`. A foreign-owned\nforwarding export makes the declaration invalid; expansion must not silently\nskip it or assign ownership. Resource exports follow the same effective export\ndescription and resource-identity rules as named selections. An incomplete or\nambiguous export description cannot yield a valid partial expansion.\n\nEach selected original receives every listed destination. An optional `tagged`\nclause is an ordinary assignment to every selected original, using its defining\nsource area's required tags; all explicit assignments for an original must\n"
+        },
+        "reason": "Wildcards and aliases can affect exposure and tag evidence; do not propose adding a named selection to a wildcard or misstate an alias's origin.",
+        "conditions": [
+          "expose-src wildcard is valid only for an eligible exact interface file and includes the complete effective export description.",
+          "An explicit tag assignment on selections follows the original binding rules."
+        ],
+        "uncertainty": "These passages do not establish whether every candidate proposal is syntactically editable or uniquely sufficient."
+      }
+    ]
+  },
+  "assignments": [
+    {
+      "id": "wi-001.i08",
+      "requirementRefs": [
+        {
+          "document": "doc-003",
+          "anchor": "Visibility Comes From Ownership And Exposure"
+        },
+        {
+          "document": "doc-004",
+          "anchor": "An exposure statement has this interpretation"
+        },
+        {
+          "document": "doc-005",
+          "anchor": "Explicit Bindings Are Classified Individually"
+        }
+      ],
+      "citedItems": [
+        "doc-002",
+        "doc-003",
+        "doc-004",
+        "doc-005"
+      ]
+    },
+    {
+      "id": "wi-001.i09",
+      "requirementRefs": [
+        {
+          "document": "doc-002",
+          "anchor": "Contracts Follow Responsibility"
+        },
+        {
+          "document": "doc-003",
+          "anchor": "Visibility Comes From Ownership And Exposure"
+        },
+        {
+          "document": "doc-005",
+          "anchor": "Explicit Bindings Are Classified Individually"
+        }
+      ],
+      "citedItems": [
+        "doc-002",
+        "doc-003",
+        "doc-004",
+        "doc-005"
+      ]
+    },
+    {
+      "id": "wi-001.i10",
+      "requirementRefs": [
+        {
+          "document": "doc-003",
+          "anchor": "Visibility Comes From Ownership And Exposure"
+        },
+        {
+          "document": "doc-003",
+          "anchor": "Tags Restrict Availability Without Changing Visibility"
+        },
+        {
+          "document": "doc-004",
+          "anchor": "An exposure statement has this interpretation"
+        },
+        {
+          "document": "doc-005",
+          "anchor": "Explicit Bindings Are Classified Individually"
+        }
+      ],
+      "citedItems": [
+        "doc-002",
+        "doc-003",
+        "doc-004",
+        "doc-005"
+      ]
+    },
+    {
+      "id": "wi-001.i11",
+      "requirementRefs": [
+        {
+          "document": "doc-003",
+          "anchor": "Visibility Comes From Ownership And Exposure"
+        },
+        {
+          "document": "doc-003",
+          "anchor": "Tags Restrict Availability Without Changing Visibility"
+        },
+        {
+          "document": "doc-004",
+          "anchor": "An exposure statement has this interpretation"
+        },
+        {
+          "document": "doc-005",
+          "anchor": "Explicit Bindings Are Classified Individually"
+        }
+      ],
+      "citedItems": [
+        "doc-002",
+        "doc-003",
+        "doc-004",
+        "doc-005"
+      ]
+    }
+  ],
+  "scopeRequests": [
+    {
+      "id": "rq-0002",
+      "key": {
+        "iteration": "wi-001.i08",
+        "candidate": "3db24739c51c1fa0d28ea1e18ced2984e47fd63a",
+        "kind": "scope",
+        "policy": "review-policy/1"
+      },
+      "requirements": [],
+      "source": null,
+      "inputsUnavailable": "The scope review's captured inputs could not be read: No heading An exposure statement has this interpretation in docs/model/module-description.principles.md"
+    },
+    {
+      "id": "rq-0005",
+      "key": {
+        "iteration": "wi-001.i09",
+        "candidate": "6e07e2787871a4b29245d3f2e82706ce3df08686",
+        "kind": "scope",
+        "policy": "review-policy/1"
+      },
+      "requirements": [
+        {
+          "ref": "docs/agents/module-architect.principles.md#contracts-follow-responsibility",
+          "hash": "1af5afc4588c7f4c9f22542610e8f63d7ceb22fc2aaa36642b40a3b6ae28deb9"
+        },
+        {
+          "ref": "docs/model/cross-module-importability.principles.md#visibility-comes-from-ownership-and-exposure",
+          "hash": "3e1e0777a9a6b2190c25ea6cf10bafd2eb881f9ad3a8f8d1658b9621b10a1a5c"
+        },
+        {
+          "ref": "docs/model/typescript-source-interpretation.principles.md#explicit-bindings-are-classified-individually",
+          "hash": "c0dac307f247be2fb8c4fe6347ec6ee5efd88508b54fcf6954a96a893a499426"
+        },
+        {
+          "ref": "assignment-source:wi-001.i09",
+          "hash": "05eac5184929e3003f3f6ec571f1b98d7248481b5d7222f66053307efe07e2c7"
+        }
+      ],
+      "source": {
+        "selection": "work/wi-001/selection/cf08e32f2d8c741761d94ad476122360d42dc1fe3eba0b8e1b105245f1034995.json",
+        "packageHash": "f12aa6c5f323ffb827f2cf4fcabc1c99eb629969556e81fc7bced1ed78eb3874",
+        "deliveryHash": "05eac5184929e3003f3f6ec571f1b98d7248481b5d7222f66053307efe07e2c7"
+      },
+      "inputsUnavailable": null
+    },
+    {
+      "id": "rq-0008",
+      "key": {
+        "iteration": "wi-001.i10",
+        "candidate": "432f1a535873433539c5acd3b8e134d76de449b7",
+        "kind": "scope",
+        "policy": "review-policy/1"
+      },
+      "requirements": [],
+      "source": null,
+      "inputsUnavailable": "The scope review's captured inputs could not be read: No heading An exposure statement has this interpretation in docs/model/module-description.principles.md"
+    },
+    {
+      "id": "rq-0011",
+      "key": {
+        "iteration": "wi-001.i11",
+        "candidate": "e7e2299d62b4cd3b65b6160e37a37131eb908c1d",
+        "kind": "scope",
+        "policy": "review-policy/1"
+      },
+      "requirements": [],
+      "source": null,
+      "inputsUnavailable": "The scope review's captured inputs could not be read: No heading An exposure statement has this interpretation in docs/model/module-description.principles.md"
+    }
+  ],
+  "scopeAttempts": [
+    {
+      "id": "rq-0002.a01",
+      "startedAt": null,
+      "result": {
+        "result": "not-verified",
+        "reason": "unavailable",
+        "detail": "The scope review's captured inputs could not be read: No heading An exposure statement has this interpretation in docs/model/module-description.principles.md"
+      }
+    },
+    {
+      "id": "rq-0005.a01",
+      "startedAt": "2026-09-26T06:06:06.360Z",
+      "result": {
+        "result": "complete",
+        "inspected": [
+          {
+            "path": "scripts/reference-harness/report.ts"
+          },
+          {
+            "path": "subs/cli/src/format.ts"
+          },
+          {
+            "path": "subs/cli/src/tests/features/self-explaining-denials/explain-import-denials.feature"
+          },
+          {
+            "path": "subs/cli/src/tests/steps/explain-import-denials.steps.ts"
+          }
+        ],
+        "concerns": 3
+      }
+    },
+    {
+      "id": "rq-0008.a01",
+      "startedAt": null,
+      "result": {
+        "result": "not-verified",
+        "reason": "unavailable",
+        "detail": "The scope review's captured inputs could not be read: No heading An exposure statement has this interpretation in docs/model/module-description.principles.md"
+      }
+    },
+    {
+      "id": "rq-0011.a01",
+      "startedAt": null,
+      "result": {
+        "result": "not-verified",
+        "reason": "unavailable",
+        "detail": "The scope review's captured inputs could not be read: No heading An exposure statement has this interpretation in docs/model/module-description.principles.md"
+      }
+    }
+  ]
+}

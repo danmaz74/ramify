@@ -25,7 +25,7 @@ complete a reading.
 captured documents
   -> intake turn (plan documents)             -> non-functional, recommendation elements; incorporation
   -> extraction turn per principles document  -> fixed-requirement, recommendation elements
-  -> initial architect (plan documents)       -> functional elements; entries cite them
+  -> initial architect (plan documents)       -> functional and context elements; entries cite them
   -> checker turn per source document         -> corrected elements; findings shown at the review stop
   -> analysis accepted, person's review       -> IDs final, catalog frozen
 
@@ -77,7 +77,7 @@ architect's context, not the selection itself, which ran once in 54 seconds.
 ## What binds this plan
 
 The [plan context catalog principles](../../architecture/plan-context-catalog.principles.md)
-decide the catalog's purpose, its four kinds of element, the granularity of
+decide the catalog's purpose, its five kinds of element, the granularity of
 an element, the fidelity it promises, what stays exact, how a package is
 selected and when, and what a consumer may rely on. This plan implements
 them and adds nothing they exclude.
@@ -100,19 +100,19 @@ record holds:
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Assigned by the harness when it accepts the submission that introduces the element: `fr-NNN` functional requirement, `nfr-NNN` non-functional requirement of the plan, `fix-NNN` fixed requirement from a principles document, `rec-NNN` recommendation; numbered in acceptance order within each kind and final at analysis acceptance |
-| `kind` | One of the four kinds of the principles document |
+| `id` | Assigned by the harness when it accepts the submission that introduces the element: `fr-NNN` functional requirement, `nfr-NNN` non-functional requirement of the plan, `fix-NNN` fixed requirement from a principles document, `rec-NNN` recommendation, `ctx-NNN` context; numbered in acceptance order within each kind and final at analysis acceptance |
+| `kind` | One of the five kinds of the principles document |
 | `document` | The captured document ID the element was read from |
-| `text` | The requirement as its source states it, as close to the source wording as the extracting agent found practical, of whatever length one requirement needs |
+| `text` | The requirement, recommendation or explanation as its source states it, as close to the source wording as the extracting agent found practical, of whatever length one of them needs |
 | `conditions` | Each with `text` and `source: stated | inferred` |
 | `uncertainty` | The extracting agent's, free text, may be empty |
 | `locator` | Optional, written for a person, never resolved |
 
 There is no byte offset, no span, no per-element hash and no flag that
 distinguishes an exact quote from a near-verbatim one. The harness checks
-shape, that `document` names a captured document, and that a functional
-element comes from a plan document and a fixed requirement from a
-principles document. It does not compare `text` with the captured bytes and
+shape, that `document` names a captured document, that functional,
+non-functional and context elements come from a plan document, and that a
+fixed requirement comes from a principles document. It does not compare `text` with the captured bytes and
 has no size bound on an element.
 
 The catalog is frozen when the analysis is accepted, and its hash, a byte
@@ -132,7 +132,9 @@ smallest input that serves it:
 
 - **Intake.** One turn reads the captured plan documents and submits the
   plan's non-functional and recommendation elements, the incorporation
-  judgment and the missing-reference judgments. It has no architect view
+  judgment and the missing-reference judgments. A statement that only says
+  what the plan does not deliver becomes no element; one that forbids the
+  candidate a change is a non-functional element. It has no architect view
   and no skill.
 - **Principle extraction.** One turn per captured principles document
   reads that document and the plan's goal, and submits the fixed
@@ -143,14 +145,16 @@ smallest input that serves it:
 - **Initial architect.** It reads the captured plan and its accompanying
   documents in full, as today, with the plan scenarios and the architect
   view, and nothing rendered from the catalog. Its submission carries the
-  functional elements it read from the plan documents together with its
-  entries, hypotheses and scenarios, except that `requirementRefs` and
-  `acceptanceRefs` cite those functional elements, and scenario form rule 6
+  functional and context elements it read from the plan documents together
+  with its entries, hypotheses and scenarios, except that `requirementRefs`
+  and `acceptanceRefs` cite those functional elements, a new `contextRefs`
+  cites the context a reader needs to understand the entry, and scenario form rule 6
   reads "every acceptance element of an entry is cited by one of its
   scenarios". The architect is the functional reading: the elements work
   is organized around are the ones it cut, so no second reader's cuts can
-  disagree with its entries. The manifest and the byte-offset rules leave
-  its brief.
+  disagree with its entries. Context is cut by the same reader for the same
+  reason: the architect knows which explanation each capability needs.
+  The manifest and the byte-offset rules leave its brief.
 - **Checker.** One turn per source document, once every element of that
   document exists, given the document, its elements and, for a plan
   document, the entries that cite them. It corrects the catalog directly
@@ -187,7 +191,9 @@ createPackage({ catalog, elements: ID[], deviations: ID[] })
 - It renders the requested elements grouped by kind, in catalog order
   within a kind, each with its ID, its kind, its source document path, its
   full text, its conditions labelled stated or inferred, and its
-  uncertainty. Recommendations are rendered last under their own heading
+  uncertainty. Context is rendered first under its own heading with a fixed
+  sentence stating that it is not a requirement and nothing assesses it.
+  Recommendations are rendered last under their own heading
   with a fixed sentence stating that they are not requirements and that a
   departure is reported, not justified.
 - It renders the named plan deviations after the elements, each naming
@@ -225,8 +231,8 @@ Selection follows the principles document's rules exactly:
   its submission carries no passage, locator or range. Validation is that
   every ID exists. A lost fork point starts a fresh selector from the
   recorded orientation and marks the selection degraded, as today.
-- The work-item package is the entry's functional elements plus the
-  selected IDs, rendered once, recorded on the selection as its element
+- The work-item package is the entry's functional and context elements
+  plus the selected IDs, rendered once, recorded on the selection as its element
   and deviation IDs and hash, and appended to the local architect's
   session once. The continued brief names the package by hash and never
   repeats its body; the double delivery of the first turn ends.
@@ -248,7 +254,7 @@ Selection follows the principles document's rules exactly:
 | Consumer | Package | Replaces |
 | --- | --- | --- |
 | Intake, principle extraction, checker | None; they read captured documents | The initial architect's document index and byte-offset rules |
-| Initial architect | None; it reads the captured plan and accompanying documents in full and submits the functional elements it cites | `planRefSchema` line references, the manifest and the byte-offset rules in its brief |
+| Initial architect | None; it reads the captured plan and accompanying documents in full and submits the functional and context elements it cites | `planRefSchema` line references, the manifest and the byte-offset rules in its brief |
 | Context selector fork | All non-functional, fixed and recommendation elements | `JSON.stringify(catalog)` and the principle index at `src/context-selection/prompts.ts:10-20` |
 | Local architect | The work-item package, once, then by hash | The per-turn append at `service.ts:4560`, the session append at `:4225`, and `refs()` in `src/work/session.ts:240-243` |
 | Global fork, placement | None; it inherits the initial session, which holds the plan as today | Nothing |
@@ -324,6 +330,7 @@ transcript already holds what each session received.
 | A partial or summarised package delivered as complete | A missing ID makes the result unavailable; the creator has no truncation path |
 | A consumer completing a reading from the source | Engineers, reviewers and the coordinator receive no captured document paths in their briefs; the selector may read, and its output is IDs; the initial architect reads the plan because it is the functional reading, not a consumer |
 | Two elements of one document conflated | Each is one ID; a package may hold any subset |
+| A consumer needs background no requirement carries | The initial architect cuts it as context and the entry cites it; it arrives in the work-item package |
 
 ## Implementation order and evidence
 
@@ -335,8 +342,8 @@ implementation commit.
 
 | Iteration | Change | Exit evidence |
 | --- | --- | --- |
-| 1. Catalog and creator | `plan-evidence`: element and catalog schemas, submission-local keys and ID assignment, `createPackage`; contract appendix written from the real schemas | Pure fixtures: four kinds rendered in order, recommendations last with the fixed sentence, a 1,400-character element rendered whole, the same element and deviation IDs give the same bytes, a missing ID is unavailable with its IDs named, only the named deviations are rendered and after the elements |
-| 2. Extraction and acceptance | Intake, principle extraction and checker roles with prompts and schemas; initial architect reads the plan documents and submits functional elements; entries and scenario rule 6 cite them; checker corrections with ID retirement and re-citation; incorporation without passages; review stop projection shows kinds, findings and corrections; catalog frozen at acceptance | Scripted run: a plan with a Constraints section and two principles documents yields the expected element kinds; a scripted checker adds an omitted constraint and splits a cited functional element, the entry's citations follow, and both findings reach the review projection; an entry citing an unknown key is rejected with its path; `analysis-accepted` carries the catalog hash |
+| 1. Catalog and creator | `plan-evidence`: element and catalog schemas, submission-local keys and ID assignment, `createPackage`; contract appendix written from the real schemas | Pure fixtures: five kinds rendered in order, context first and recommendations last with their fixed sentences, a 1,400-character element rendered whole, the same element and deviation IDs give the same bytes, a missing ID is unavailable with its IDs named, only the named deviations are rendered and after the elements |
+| 2. Extraction and acceptance | Intake, principle extraction and checker roles with prompts and schemas; initial architect reads the plan documents and submits functional elements; entries and scenario rule 6 cite them; checker corrections with ID retirement and re-citation; incorporation without passages; review stop projection shows kinds, findings and corrections; catalog frozen at acceptance | Scripted run: a plan with a Constraints section and two principles documents yields the expected element kinds, including context cited by an entry's `contextRefs`; a scripted checker adds an omitted constraint and splits a cited functional element, the entry's citations follow, and both findings reach the review projection; an entry citing an unknown key is rejected with its path; `analysis-accepted` carries the catalog hash |
 | 3. Selection and delivery | Selector fork over the element package; work-item package once, by hash afterwards; re-selection on an owner-adding placement; `citedElements` validated at submission; element, deviation IDs and hash on the assignment before `iteration-assigned`; engineer, contract, scope and code review, unresolved fork, and the three non-functional prompts render from the citing record; deviations and reconciliation conflicts cite elements; old routes and the stored package text deleted | Scripted run through the real ledger: byte-identical package text in the local architect's session, the engineer's brief, the contract session, the scope and code review messages, and after a session reconstruction rendered from the record alone; a deviation recorded after an assignment leaves that assignment's package unchanged; the trial's sentence-as-heading assignment cannot be submitted; a scope review runs with the package alone; the coordinator receives every `nfr-` and `fix-` element and no `rec-`; a placement decision adding an owner records a superseding selection |
 | 4. Composition | Projections and web pages for the catalog and checker findings, and a package view rendered on demand from a citing record; run fixture; final audit | The scripted run exercises every consumer in the delivery table; `npm run check:self` and focused tests pass; the ramify-audit run on the final commit passes. A real Pi trial on a toolkit plan is reported separately and never inferred from scripted tests |
 
@@ -352,7 +359,7 @@ that one run produces.
 
 | Case | Required observable result | Iteration |
 | --- | --- | --- |
-| EP01 | The catalog holds the four kinds with IDs, source document, text, conditions and uncertainty, and nothing byte-exact | 1–2 |
+| EP01 | The catalog holds the five kinds with IDs, source document, text, conditions and uncertainty, and nothing byte-exact | 1–2 |
 | EP02 | A whole-section element renders as one element, and five constraint bullets as five | 1–2 |
 | EP03 | The same element and deviation IDs render to the same bytes for every consumer and after reconstruction, from the citing record and no stored package | 1, 3 |
 | EP04 | No submission field carries a heading, line range, offset or passage for the harness to resolve | 2–3 |
@@ -364,8 +371,10 @@ that one run produces.
 | EP10 | The coordinator receives every non-functional and fixed element and no recommendation; investigation and repair receive the cited subset with text | 3 |
 | EP11 | Recommendations render last under their own heading with the fixed sentence | 1, 3 |
 | EP12 | A missing element makes a package unavailable and never partial | 1, 3 |
-| EP13 | The initial architect's brief carries the plan documents and nothing rendered from the catalog, and its submission carries the functional elements its entries cite | 2 |
+| EP13 | The initial architect's brief carries the plan documents and nothing rendered from the catalog, and its submission carries the functional and context elements its entries cite | 2 |
 | EP14 | A deviation recorded after a package was delivered leaves that package's bytes unchanged and reaches the session as a separate append | 3 |
+| EP15 | Context renders first under its own heading with the fixed sentence, reaches the local architect through its entry's `contextRefs`, is never in an assessment package and cannot be amended by a deviation | 1–3 |
+| EP16 | A plan statement that only says what the plan does not deliver yields no element | 2 |
 
 ## Decisions to confirm before coding
 
@@ -399,3 +408,16 @@ that one run produces.
    elements stay with the intake turn, because the trial showed the
    architect submitting an empty non-functional catalog when asked for
    both.
+9. **Context is a fifth kind**, with `ctx-` IDs, read from plan documents
+   only by the initial architect and cited by entries in `contextRefs`. It
+   travels in the work-item package, reaches engineers and reviewers only
+   when an assignment cites it, never reaches assessment and is never
+   amended. Decided 2026-09-26, after the catalog trial on three past plans
+   found background the elements could not carry.
+10. **Out-of-scope statements are not extracted.** A statement that only
+    says what the plan does not deliver is no element; a prohibition on the
+    candidate is a non-functional element. Decided 2026-09-26. An engineer
+    then never sees an exclusion, so the engineer procedure (version 7)
+    asks it to name an unrequested capability that would round the work
+    off in `findings` instead of building it, and the scope review already
+    reports a behavior nobody asked for.
