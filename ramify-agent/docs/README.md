@@ -17,6 +17,8 @@ Design documents for the separate agent harness:
 - [Harness architecture](architecture.md), early draft
 - [Implementation loop](implementation-loop.md), task state machine proposal
 - [The work loop as a state machine](work-loop.md), proposed
+- [State machine architecture with XState](analysis/2026-09-26-state-machine-architecture.md),
+  analysis of owner-local workflow machines with the run ledger as authority
 - [What the plan-to-brief spike taught us](analysis/2026-09-19-plan-to-brief-spike.md),
   analysis of the [spike](../spikes/briefs/README.md) that mapped three toolkit
   plans and assembled their briefs
@@ -93,6 +95,12 @@ Design documents for the separate agent harness:
   review points in the current run loop and their minimal CheckFinding integration
 - [Sealed-file edit hooks and justified saves](analysis/2026-09-24-sealed-file-edit-hooks.md),
   analysis for a follow-up plan with immediate edit feedback and linked CheckFindings
+- [File authority and provenance](analysis/2026-09-24-file-authority-and-provenance.md),
+  the authority mechanisms and today's provenance changes, their contradictions and a
+  three-class model to resolve them
+- [Estimating file authority](analysis/2026-09-24-file-authority-estimation.md),
+  proposed four-level estimate from source authority, interpretation and recorded
+  human review, with revision-specific evidence and an explicit unknown state
 - [Plan 3: the autonomous implementation loop MVP](plans/03-autonomous-implementation-loop/main-plan.md),
   in implementation; its thirteen-iteration
   [index](plans/03-autonomous-implementation-loop/iterations/README.md) records
@@ -138,6 +146,18 @@ Design documents for the separate agent harness:
 - [Plan 13: plan evidence, context selection and non-functional work](plans/13-plan-evidence-and-nonfunctional-work/main-plan.md),
   proposed capture and delivery of plan and principles evidence, with bounded
   non-functional assessment and repair
+- [Plan 14: unified evidence packages](plans/14-unified-evidence-packages/main-plan.md),
+  proposed: the four-kind element catalog extracted in bounded turns and
+  checked by an agent, and one package creator that every prompt carrying
+  plan or principle material uses; rewritten 2026-09-26 to adhere to the
+  catalog principles
+- [The plan context catalog: purpose and fidelity](architecture/plan-context-catalog.principles.md),
+  Dan's decisions of 2026-09-26: the catalog is the bounded view an agent works
+  from, with four kinds of element, kept as faithful as the technology allows
+  and not more; a fork of the warmed-up local architect selects the
+  non-functional elements once per work item, and one package creator renders
+  every package; exactness belongs to byte facts the harness owns, never to a
+  reading
 - [Module architect skill design](architect-skill-design/README.md)
 - [Metrics](metrics/README.md), glossary, measurement principles and the initial
   delivered-change token-efficiency policy; its glossary names concepts and
