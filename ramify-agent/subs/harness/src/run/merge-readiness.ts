@@ -97,5 +97,5 @@ export function projectMergeReadiness(input: MergeReadinessInput): MergeReadines
   if (input.deviations.some(item => item.decision === null)) {
     return result('pending-review', 'A plan deviation awaits user review');
   }
-  return result('ready', 'The final gate passed and every fixed obligation is satisfied or accepted at this revision');
+  return result('ready', 'The final gate passed and every cataloged obligation is satisfied or accepted at this revision');
 }

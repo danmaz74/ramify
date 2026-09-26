@@ -47,11 +47,8 @@ async function git(root: string, ...args: string[]): Promise<string> {
 }
 
 function passage(document: string, source: string, quote: string): PassageReference {
-  const all = Buffer.from(source, 'utf8');
-  const selected = Buffer.from(quote, 'utf8');
-  const start = all.indexOf(selected);
-  if (start < 0) throw new Error(`The ${document} passage is absent from captured bytes`);
-  return { document, sha256: sha256(all), start, end: start + selected.length, quote };
+  if (!source) throw new Error(`The ${document} source is empty`);
+  return { document, quote };
 }
 
 function usage(events: readonly AgentEvent[]) {
@@ -205,7 +202,7 @@ async function main(): Promise<number> {
     const packet = orientationPacket({ workItem: 'wi-001', briefing, submission: orientation });
     const selectorEvents: AgentEvent[] = [];
     const selectorPrompt = contextSelectorMessage(packet.text, catalog, manifest, runDirectory)
-      + '\n\nFor this bounded probe, examine and select nfr-001, adv-001, and captured principle doc-002. Read the immutable principle file and quote its complete principle sentence with exact UTF-8 byte offsets. Submit all three exact passages.';
+      + '\n\nFor this bounded probe, examine and select nfr-001, adv-001, and captured principle doc-002. Select catalog IDs without copying their excerpts. Read the captured principle file and quote its principle sentence as closely as practical.';
     let selected: PreparedSelection | null = null;
     let rejectedSubmissions = 0;
     const selectorDirectory = join(scratch, 'selector-workspace');
@@ -251,9 +248,9 @@ async function main(): Promise<number> {
     const packageCheck = validateContextSelection(selectedPackage.selection, catalog, manifest, capturedBytes);
     const selectedIds = new Set(selectedPackage.selection.selected.map(entry => entry.item));
     const selectedAll = ['nfr-001', 'adv-001', 'doc-002'].every(id => selectedIds.has(id));
-    if (packageCheck.status !== 'available' || !selectedAll || !selectedPackage.package.complete) {
+    if (packageCheck.status !== 'available' || !selectedAll || !selectedPackage.package.noReportedUnavailable) {
       await report({ probe: 'plan13-context', ran: true, requestedModel, readinessModel: readiness.model,
-        gap: 'Package did not contain all exact required probe passages', selectedIds: [...selectedIds],
+        gap: 'Package did not carry all selected probe excerpts', selectedIds: [...selectedIds],
         validation: packageCheck.status, implementation: await implementationWitness() });
       return 2;
     }
@@ -269,7 +266,7 @@ async function main(): Promise<number> {
     let quoted: { quote: string; classification: string } | null = null;
     const continueSpec: SessionSpec = {
       ...parentSpec,
-      prompt: 'From the context package just appended to this session, submit the exact captured source passage for nfr-001 and its accepted classification. Do not paraphrase.',
+      prompt: 'From the context package just appended to this session, submit the initial architect\'s excerpt for nfr-001 and its accepted classification. Do not paraphrase.',
       session: { mode: 'continue', ref: firstAppend.ref },
       sessionDirectory: join(scratch, 'continued-parent'),
       submission: { name: 'submit_context_quote', description: 'Report the source passage observed in appended context.',
@@ -307,8 +304,7 @@ async function main(): Promise<number> {
       parent: { requested: 'fresh', actual: parent.start, ...parentResult, usage: usage(parentEvents), orientationHash: packet.hash },
       selector: { requested: 'fork', actual: selector.start, ...selectorResult, usage: usage(selectorEvents), rejectedSubmissions,
         selectionHash: selectedPackage.selection.packageHash, selected: selectedPackage.selection.selected.map(entry => ({
-          item: entry.item, document: entry.passage.document, start: entry.passage.start, end: entry.passage.end,
-          sha256: entry.passage.sha256,
+          item: entry.item, document: entry.passage?.document ?? null, locator: entry.passage?.locator ?? null,
         })) },
       append: { key: appendKey, first: firstAppend.outcome, repeated: repeatedAppend.outcome },
       continuedParent: { requested: 'continue', actual: continued.start, ...continuedResult, usage: usage(continuationEvents),

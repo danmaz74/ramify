@@ -1,6 +1,6 @@
 # Plan 13: plan evidence, context selection and non-functional work
 
-**Date:** 2026-09-25. **Status:** implemented through iteration 9 in the isolated
+**Date:** 2026-09-25; excerpt contract revised 2026-09-26. **Status:** implemented through iteration 9 in the isolated
 `feat/plan13-evidence-nonfunctional` worktree. See [implementation results](results.md)
 and the revision-bound final audit published in the delivery commit's Git audit note.
 **Design starting source:** `d3cd73f1b14ff575dd16159242e2e52d7f6d0f34`.
@@ -73,9 +73,9 @@ claim to prove semantic extraction, applicability or satisfaction.
 
 | Owner | Responsibility and boundary | Independent verification |
 | --- | --- | --- |
-| New `harness/plan-evidence` | Document discovery policy, manifests, document identity, exact passage resolution, catalog validation and stable numbering. Keep filesystem reads behind a narrow read-only adapter; return captured values and gaps to the harness for persistence. Capture does not decide incorporation or binding force. | Pure document fixtures for passages, IDs and catalog rules; temporary filesystem cases for discovery, encoding, cycles and escapes. |
+| New `harness/plan-evidence` | Document discovery policy, manifests, document identity, architect excerpts, catalog shape validation and stable numbering. Keep filesystem reads behind a narrow read-only adapter; return captured values and gaps to the harness for persistence. Capture does not decide incorporation or binding force. | Pure document fixtures for excerpts, IDs and catalog rules; temporary filesystem cases for discovery, encoding, cycles and escapes. |
 | Existing harness, `src/context-selection/` | Pure selection validation, assignment-reference validation and reproducible package assembly from resolved passages. Local workflow code owns orientation, selector invocation and delivery. | In-memory cases for omitted or unavailable passages, classifications and identical continuation packages. |
-| New `harness/nonfunctional` | Pure assessment validation and round-state transitions: complete NFR coverage, candidate identity, investigation before speculative repair, reassessment and exhaustion. Returns proposed transitions; has no filesystem, agent, Git, ledger, HTTP or scheduler dependencies. | Table-driven transitions over explicit catalog IDs, candidate identities, results and counters. |
+| New `harness/nonfunctional` | Pure assessment validation and round-state transitions: one result per accepted catalog NFR, candidate identity, investigation before speculative repair, reassessment and exhaustion. Returns proposed transitions; has no filesystem, agent, Git, ledger, HTTP or scheduler dependencies. | Table-driven transitions over explicit catalog IDs, candidate identities, results and counters. |
 | Existing harness application code | Agent execution, assignment authority, writer settlement, candidate preparation, durable effects and recovery. Derives merge readiness with a pure function over gate evidence, assessment coverage and current user decisions. | Scripted-agent integration through the real ledger, focused recovery and readiness tests. |
 | Existing children and web | `scenarios` owns Gherkin and functional acceptance; `check-findings` owns dispositions; `evidence`, `agent`, `audit` and `ledger` retain their existing responsibilities. Web displays harness projections and forwards commands. | Extend owner tests where contracts change; retain focused real-boundary and browser witnesses. |
 
@@ -126,16 +126,16 @@ child is deferred unless implementation demonstrates a stronger boundary.
 
 | Contract | Decision |
 | --- | --- |
-| Captured plan evidence | `plan.md` remains the root. Capture local text documents in its plan directory and local text documents referenced by the captured set, following each canonical file once. A link by itself is not incorporation or binding force. Store exact bytes, project-relative path and SHA-256 for each file, plus missing-reference records; reject path escape and symlink escape. A source reference always names a captured document and passage. No author-maintained manifest or arbitrary corpus-size cutoff is required. |
+| Captured plan evidence | `plan.md` remains the root. Capture local text documents in its plan directory and local text documents referenced by the captured set, following each canonical file once. A link by itself is not incorporation or binding force. Store exact bytes, project-relative path and SHA-256 for each file, plus missing-reference records; reject path escape and symlink escape. A source excerpt names a captured document and may include a reader-friendly locator. No author-maintained manifest or arbitrary corpus-size cutoff is required. |
 | Missing references | An initial architect judges a missing document from the available surrounding plan text. A document identified there as required stops analysis acceptance before implementation. An unclear reference is **not** a requirement; it is highlighted with its source location at the existing analysis review and does not block. A merely advisory missing reference is a recorded gap. Missing text is never interpreted as if it had been read. |
 | Principles evidence | For v1, inspect project-owned `*.principles.md` files under the target root, excluding generated/dependency directories and nested independent project roots. A nested directory with its own root `module.ramify` and `package.json` outside the target's `subs/` module tree is an independent project; for example, a toolkit run excludes `ramify-agent/`. Capture exact text, path and revision; record unreadable candidates explicitly. The selector judges governing scope and status from the text. A matching filename alone does not establish applicability. Empty coverage is reported as empty, not as a discovered rule. |
-| Catalog | Initial analysis submits near-verbatim passages with captured source references and a separate classification of `non-functional requirement` or `advice`. The harness assigns stable run-local IDs (`nfr-001`, `adv-001`, ... in document and passage order), verifies spans and exact quoted text, and stores stated versus inferred conditions distinctly. An uncertain reading retains the original passage and its uncertainty; no keyword or filename heuristic promotes advice to a requirement. The accepted catalog is immutable for the run. |
+| Catalog | Trust the initial architect's analysis. It submits excerpts as close to source wording as practical, the captured document ID, an optional locator, and a separate classification of `non-functional requirement` or `advice`. The harness assigns stable run-local IDs (`nfr-001`, `adv-001`, ... in submission order) and checks shape and document availability; it does not compare excerpt wording with source bytes or verify semantic completeness. Stated and inferred conditions stay distinct. No keyword or filename heuristic promotes advice to a requirement. The accepted catalog is immutable for the run so later handoffs carry the architect's wording unchanged. |
 | Functional path | Initial-analysis entries, `requirementRefs`, `acceptanceRefs`, scenario records and their gates remain the only functional representation. Multi-document references extend those existing fields. Neither the catalog nor coordinator duplicates an entry capability or constructs a functional requirement-to-scenario map. |
-| Document incorporation | Initial analysis records the architect's judgment of which captured documents supply binding plan scenarios, with the governing source passages and uncertainty. The harness validates these references and composes the selected documents with the existing scenario parser and form rules. Capture alone never incorporates a document. The accepted decision is fixed with the analysis; an example remains distinguishable from incorporated text. |
-| One-time selection | Before a local architect first organizes a work item, it makes an orientation submission and yields a durable session point. One read-only fork sees that orientation and the complete applicable catalog/index, then identifies plausibly relevant passages. The harness validates references, retrieves captured source text, assembles one package, records it and appends it to the parent. A lost append is retried by key or delivered from the record to a reconstructed session; selection is not rerun. A new work item gets its own first selection. |
+| Document incorporation | Initial analysis records the architect's judgment of which captured documents supply binding plan scenarios, with near-verbatim governing excerpts and uncertainty. The harness checks document availability and composes the selected documents with the existing scenario parser and form rules. It does not validate the judgment's meaning against the source text. Capture alone never incorporates a document. The accepted decision is fixed with the analysis; an example remains distinguishable from incorporated text. |
+| One-time selection | Before a local architect first organizes a work item, it makes an orientation submission and yields a durable session point. One read-only fork sees that orientation and the applicable catalog/index, then identifies plausibly relevant catalog IDs and principle excerpts. The selector does not copy catalog wording: the harness carries it from the initial architect into one recorded package and appends it to the parent. A lost append is retried by key or delivered from the record to a reconstructed session; selection is not rerun. A new work item gets its own first selection. |
 | Selection limits | A selector's omitted item is not a waiver. It records the examined set, selected IDs, reasons, conditions, uncertainty and unavailable source passages. A missing fork point may start a fresh selector with the recorded orientation packet and is marked degraded; a failed or invalid selector result within the captured retry bound leaves selection unavailable and prevents that work item from silently proceeding as fully briefed. No selection refresh occurs after later scope or approach changes. |
 | Assignment delivery | The local architect cites selected IDs on each assignment. The harness delivers the original, qualified passages to engineer and contract sessions, including fresh continuations, while labeling source requirements, source suggestions and architect choices separately. The recorded selection and assignment references are review inputs; brief summaries alone never replace mandatory source wording. |
-| Non-functional assessment | After ordinary functional work, or immediately for a plan with no entry capability, one coordinator receives the **complete** non-functional catalog regardless of work-item selection. For every `nfr` it records `satisfied`, `not satisfied` or `undetermined`, the candidate commit/tree, inspected scope, evidence, and remaining uncertainty. A dirty tree needs its own content identity; HEAD alone does not name it. Only an assessment of the exact final-gate tree can count toward merge readiness. The coordinator may request sequential investigations or repairs. Satisfied items need no repair. An undetermined item prompts investigation before speculative edits. |
+| Non-functional assessment | After ordinary functional work, or immediately for a plan with no entry capability, one coordinator receives every item in the accepted non-functional catalog regardless of work-item selection. For every cataloged `nfr` it records `satisfied`, `not satisfied` or `undetermined`, the candidate commit/tree, inspected scope, evidence, and remaining uncertainty. A dirty tree needs its own content identity; HEAD alone does not name it. Only an assessment of the exact final-gate tree can count toward merge readiness. The coordinator may request sequential investigations or repairs. Satisfied items need no repair. An undetermined item prompts investigation before speculative edits. |
 | Candidate finalization | Settle writers and complete source-mutating preparation, including scenario rendering, before identifying the tree for assessment. Repeat preparation after each repair before reassessment. The final gate audits a commit with exactly that assessed tree; record the binding between assessment identity and audited commit. A changed tree invalidates prior results and refuses finalization. Recovery stays within captured bounds and never resets the three-round counter; if no matching assessment is obtained within those bounds, end as not verified with readiness `unavailable`, including after round three. |
 | Repair authority | Only a task explicitly created by the non-functional coordinator may open a project-wide repair engineer session. Its chosen starting module supplies the actual `src/` working directory and local context; the session may edit other modules within the project. The guard still denies protected plan/scenario files, paths outside the project and writes lacking the repair assignment. Ordinary functional and contract engineers keep their current scopes. The coordinator and its children use the existing session, ledger, writer and execution bounds. |
 | Bounded loop | The captured policy allows at most **three** assessment and repair rounds for the plan. A round assesses the current candidate, may make at most one sequential repair batch, and reassesses every `nfr` after that batch before the round closes. No edit may remain without an assessment of its resulting candidate. A result from an earlier commit cannot satisfy the new candidate without fresh assessment. A temporal invariant needs its intermediate evidence, otherwise its final result is undetermined. The existing final project and Cucumber gates run on the resulting candidate. Their failure follows the existing gate outcome and cannot be waived through non-functional assessment. |
@@ -186,7 +186,7 @@ after terminal completion revise review standing, never the recorded final
 gate.
 
 **Exit:** schema and replay tests accept a multi-document manifest, reject a
-changed hash or invalid passage, retain an old single-file run, and derive
+changed captured-document hash or unknown excerpt document, retain an old single-file run, and derive
 `unavailable` for its non-functional coverage. Document links and
 `npm run type-check` pass. No runtime capability is claimed by the appendix.
 
@@ -211,9 +211,9 @@ bytes, nested independent projects and multi-file Gherkin each have a focused
 case. A run whose required companion is unavailable stops before accepted
 analysis; an unclear link is visible at review and nonblocking. A changed
 companion is detected before later publication or approval. Pure cases retain
-exact whitespace and report unresolved passages explicitly. Two documents
+the architect's excerpt wording and report unavailable documents explicitly. Two documents
 with identical headings and line ranges neither collide in scenario IDs nor
-satisfy each other's citations. Acceptance-dependent cases complete in
+satisfy each other's plan references. Acceptance-dependent cases complete in
 iteration 3.
 
 ### 3. Extract and present the fixed catalog
@@ -222,7 +222,7 @@ iteration 3.
 projections; web analysis page.
 Give the initial architect all captured plan evidence through focused reading
 and extend its submission with near-verbatim `nfr` and `adv` passages,
-classifications, conditions and uncertainty. Validate exact quoted spans and
+classifications, conditions and uncertainty. Validate document availability and
 stable IDs without using keyword classification. Include non-functional
 requirements and their evidence in the existing review; make advisory evidence
 available separately. Accept the catalog once with the analysis; no mid-run
@@ -265,7 +265,7 @@ unavailable selection remain visible and do not claim complete delivery.
 **Owner:** harness context selection, work assignments, engineer/contract
 prompts and review inputs; `plan-evidence` passage resolution.
 Carry selected evidence IDs through assignment creation. Render exact
-source passages with their force, path, revision, stated/inferred conditions
+architect excerpts unchanged with their force, path, revision, stated/inferred conditions
 and uncertainty in engineer and contract-session briefs. Preserve selected
 input hashes in review requests and make the package available after session
 restart. Do not recast advice as an instruction in the `approach` field.
@@ -338,7 +338,7 @@ original requirement, alternative and accepted user revision distinguishable.
 Complete an automated run with passing gates while deviations await review;
 show that state prominently. Derive merge readiness from the final gate,
 current candidate, result set and post-terminal user decisions. Surface the
-reason and exact source passage in the run page. A rejected decision directs a
+reason and initial architect excerpt in the run page. A rejected decision directs a
 follow-up run rather than reopening the completed run's implementation.
 Introduce explicit deviation-origin variants and adapt legacy records on
 read. Reuse existing CheckFinding disposition behavior. Keep readiness a pure
@@ -401,8 +401,8 @@ prove handling of the supplied classifications, not semantic extraction quality.
 | PE13 | User acceptance of a revised `nfr` is revision-bound and cannot waive a failed required gate or scenario | Harness readiness/commands and existing CheckFindings: focused rule and integration tests | 8–9 |
 | PE14 | Old single-plan runs remain readable and show non-functional coverage as unavailable | `plan-evidence`: legacy reference fixtures; harness: replay and projection | 1, 8 |
 | PE15 | Crash recovery, stale commands and final-candidate audit preserve exactly one durable result and truthful review status | Harness: real-ledger recovery; real Git/audit witness | 4, 6–9 |
-| PE16 | Identical headings and line ranges in different documents cannot satisfy each other's citations; extracted scenario IDs are unique across the set | `scenarios`: pure | 2–3 |
-| PE17 | Passage resolution retains exact whitespace and reports unavailable references explicitly for analysis, assignments and reviews | `plan-evidence`: pure; harness consumers: focused integration | 2–3, 5 |
+| PE16 | Identical headings and line ranges in different documents cannot satisfy each other's plan references; extracted scenario IDs are unique across the set | `scenarios`: pure | 2–3 |
+| PE17 | Excerpt delivery retains the architect's wording and reports unavailable captured documents explicitly for analysis, assignments and reviews | `plan-evidence`: pure; harness consumers: focused integration | 2–3, 5 |
 | PE18 | Candidate preparation precedes assessment; a different audited tree cannot finalize the run, including at round three; exhausted recovery leaves readiness unavailable | `nonfunctional`: pure identity/round rules; harness: real Git/audit witness | 6–7, 9 |
 | PE19 | NFR-only deviations name the actual assessment and coordinator without an invented work item; legacy deviation decisions retain their behavior | Harness deviation adapter: pure; commands/projections: integration | 8 |
 

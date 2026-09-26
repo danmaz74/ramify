@@ -1,5 +1,9 @@
 # Plan 13 implementation results
 
+This report records the original iteration results. The 2026-09-26 excerpt
+contract revision removed byte-exact citations; the current contract is in
+[the appendix](contract-appendix.md).
+
 ## Iteration 1 — contract alignment and exact capture records
 
 **Starting revision:** `4adc79f4d22319801ed383760b7fab14d09a632d` on

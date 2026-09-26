@@ -14,9 +14,10 @@ export const contextSelectionSchema = z.object({
   /** Accepted catalog IDs or captured principle document IDs. */
   examined: z.array(text),
   selected: z.array(z.object({
-    /** A catalog ID, or a principle document ID with an exact passage below. */
+    /** A catalog ID, or a principle document ID with an agent excerpt below. */
     item: text,
-    passage: passageReferenceSchema,
+    /** Only principle selections need an excerpt; catalog wording comes from initial analysis. */
+    passage: passageReferenceSchema.optional(),
     reason: text,
     conditions: z.array(text),
     uncertainty: z.string(),

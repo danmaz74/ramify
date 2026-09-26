@@ -65,11 +65,11 @@ test('one oriented local context selects once, appends by key, and binds the exa
   if (evidence.status !== 'available') return;
   const recorded = await readRecordedContextSelection(runDirectory, selections[0]!, evidence.catalog, evidence.manifest, evidence.bytes);
   expect(recorded.status).toBe('available');
-  if (recorded.status === 'available') expect(recorded.packageText).toContain('Selection coverage');
+  if (recorded.status === 'available') expect(recorded.packageText).toContain('Selection report');
   expect(selections[0]!.data.selection).toBe(runLayout.selectionVersion('wi-001', selections[0]!.data.selectionHash!));
 }, 120_000);
 
-test('a selected NFR and advice retain their exact captured passages through the runtime package', async () => {
+test('a selected NFR and advice retain the initial architect excerpts through the runtime package', async () => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
@@ -97,8 +97,8 @@ test('a selected NFR and advice retain their exact captured passages through the
     }
     if (spec.submission.name === workOrientationToolName) return submit({ focus: 'Preserve the service limit', currentUnderstanding: 'The plan names a timeout and tentative storage advice.', questions: [] });
     if (spec.submission.name === contextSelectorToolName) return submit({ examined: ['nfr-001', 'adv-001'], selected: [
-      { item: 'nfr-001', passage: passages[0], reason: 'Service timing applies to this work item.', conditions: ['for the service'], uncertainty: '' },
-      { item: 'adv-001', passage: passages[1], reason: 'The plan suggests an optional storage choice.', conditions: [], uncertainty: 'Tentative suggestion.' },
+      { item: 'nfr-001', reason: 'Service timing applies to this work item.', conditions: ['for the service'], uncertainty: '' },
+      { item: 'adv-001', reason: 'The plan suggests an optional storage choice.', conditions: [], uncertainty: 'Tentative suggestion.' },
     ], unavailable: [] });
     if (spec.submission.name === coordinatorAssessmentToolName) return submit({ kind: 'assessment', results: [{ nfr: 'nfr-001', result: 'satisfied', inspectedScope: ['src/'], evidence: ['Fixture timeout inspected'], uncertainty: '' }] });
     if (spec.role === 'local-architect') return submit({ ...requestCompletion(), scenarios: ['sc-001'] });

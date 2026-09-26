@@ -10,8 +10,7 @@ import { nonfunctionalDeviationCommands, prepareNonfunctionalDeviation } from '.
 const source = Buffer.from('# Request\n\nThe service must preserve a 30 second timeout.\n');
 const sha256 = createHash('sha256').update(source).digest('hex');
 const quote = 'The service must preserve a 30 second timeout.';
-const start = source.indexOf(quote);
-const passage = { document: 'doc-001', sha256, start, end: start + Buffer.byteLength(quote), quote };
+const passage = { document: 'doc-001', quote };
 const manifest: DocumentManifest = { schema: 'ramify-agent.document-manifest/1', root: 'doc-001', documents: [{
   id: 'doc-001', path: 'plans/example/plan.md', kind: 'plan', sha256, bytes: source.length,
   storedAt: 'input/plan.md', revision: { commit: null, dirty: null },
@@ -29,7 +28,7 @@ const input = { id: 'pd-001', checkFinding: 'cf-0001', item, manifest,
   coordinatorInvocation: 'inv-0100', proposedAlternative: 'A 45 second timeout remains.', uncertainty: 'No repair was safe.' };
 
 describe('non-functional deviation builder', () => {
-  test('keeps exact source passage, assessment evidence, and NFR-only origin', () => {
+  test('keeps the architect excerpt, assessment evidence, and NFR-only origin', () => {
     const prepared = prepareNonfunctionalDeviation(input);
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) return;
@@ -60,7 +59,7 @@ describe('non-functional deviation builder', () => {
     if (report?.type !== 'report' || request?.type !== 'dispose') throw new Error('Wrong command shape');
     expect(report.report).toMatchObject({ owner: { kind: 'run' },
       source: { kind: 'document', id: `plans/example/plan.md@sha256:${sha256}` },
-      observation: { kind: 'plan-deviation', locations: [{ path: 'plans/example/plan.md', startLine: 3, endLine: 3 }],
+      observation: { kind: 'plan-deviation', locations: [],
         evidence: [{ kind: 'plan-deviation', ref }] }, judgment: { ground: { ref } } });
     expect(request.decision.decision).toMatchObject({ action: 'request-user-decision',
       conflicts: [{ text: quote, document: 'plans/example/plan.md', revision: `sha256:${sha256}` }],
@@ -82,13 +81,12 @@ describe('non-functional deviation builder', () => {
     expect(nonfunctionalDeviationCommands(state, prepared.record, manifest, input.bytes, ref).ok).toBe(false);
   });
 
-  test('a long exact quote remains in the record while bounded report text names its canonical source', () => {
+  test('a long architect excerpt remains in the record while bounded report text names its canonical source', () => {
     const longQuote = 'Keep a bounded response. '.repeat(210);
     const longBytes = Buffer.from(`# Request\n${longQuote}\n`);
     const longHash = createHash('sha256').update(longBytes).digest('hex');
     const longManifest: DocumentManifest = { ...manifest, documents: [{ ...manifest.documents[0]!, sha256: longHash, bytes: longBytes.length }] };
-    const longItem = { ...item, passage: { document: 'doc-001', sha256: longHash, start: 10,
-      end: 10 + Buffer.byteLength(longQuote), quote: longQuote } };
+    const longItem = { ...item, passage: { document: 'doc-001', quote: longQuote } };
     const prepared = prepareNonfunctionalDeviation({ ...input, item: longItem, manifest: longManifest,
       bytes: new Map([['doc-001', longBytes]]) });
     expect(prepared.ok).toBe(true);

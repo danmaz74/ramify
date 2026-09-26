@@ -192,7 +192,7 @@ function evidenceErrors(submission: InitialAnalysisSubmission, evidence: Analysi
       if (passage.document !== choice.document) errors.push({ path: `incorporation.documents.${index}.governing.${position}.document`,
         message: 'A governing passage must come from the judged document', expected: choice.document });
       const result = resolvePassage(manifest, passage, bytes.get(passage.document));
-      if (result.status === 'unavailable') errors.push({ path: `incorporation.documents.${index}.governing.${position}`, message: result.reason, expected: 'an exact captured passage' });
+      if (result.status === 'unavailable') errors.push({ path: `incorporation.documents.${index}.governing.${position}`, message: result.reason, expected: 'an excerpt attributed to an available captured document' });
     });
   });
   for (const document of manifest.documents.filter(item => item.kind === 'plan')) if (!choices.has(document.id)) {
@@ -209,7 +209,7 @@ function evidenceErrors(submission: InitialAnalysisSubmission, evidence: Analysi
   });
   for (const [key, gap] of missing) if (!judged.has(key)) errors.push({ path: 'incorporation.missing', message: `No judgment for ${gap.target}`, expected: 'required, unclear or advisory judgment' });
   const catalog = assignCatalog(evidence.manifestHash ?? manifest.documents[0]!.sha256, submission.catalog, manifest, bytes);
-  if (!catalog.ok) for (const message of catalog.errors) errors.push({ path: 'catalog', message, expected: 'exact captured passages' });
+  if (!catalog.ok) for (const message of catalog.errors) errors.push({ path: 'catalog', message, expected: 'excerpts attributed to available captured documents' });
   return errors;
 }
 

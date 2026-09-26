@@ -72,14 +72,12 @@ export const documentManifestSchema = z.object({
 });
 export type DocumentManifest = z.infer<typeof documentManifestSchema>;
 
-/** Byte offsets are half-open, over the exact captured UTF-8 source. */
+/** The architect's source-grounded wording. A locator helps a reader find context. */
 export const passageReferenceSchema = z.object({
   document: documentId,
-  sha256,
-  start: z.int().nonnegative(),
-  end: z.int().positive(),
   quote: text,
-}).strict().refine(value => value.end > value.start, 'end must follow start');
+  locator: text.optional(),
+});
 export type PassageReference = z.infer<typeof passageReferenceSchema>;
 
 const conditionSchema = z.object({ text, source: z.enum(['stated', 'inferred']) }).strict();
@@ -101,7 +99,7 @@ export const catalogSchema = z.object({
 }).strict();
 export type Catalog = z.infer<typeof catalogSchema>;
 
-/** Architect input has no durable ID; the owner assigns IDs after sorting. */
+/** Architect input has no durable ID; the owner assigns IDs in submission order. */
 export const submittedCatalogItemSchema = catalogItemBaseSchema.omit({ id: true });
 export type SubmittedCatalogItem = z.infer<typeof submittedCatalogItemSchema>;
 
@@ -111,14 +109,10 @@ export function assignCatalog(
   manifest: DocumentManifest,
   bytes: ReadonlyMap<string, Uint8Array>,
 ): { readonly ok: true; readonly catalog: Catalog } | { readonly ok: false; readonly errors: readonly string[] } {
-  const order = new Map(manifest.documents.map((document, index) => [document.id, index]));
-  const sorted = [...items].sort((a, b) =>
-    (order.get(a.passage.document) ?? Infinity) - (order.get(b.passage.document) ?? Infinity) ||
-    a.passage.start - b.passage.start || a.passage.end - b.passage.end);
   const counters = { 'non-functional-requirement': 0, advice: 0 };
   const catalog = catalogSchema.parse({
     schema: 'ramify-agent.nonfunctional-catalog/1', manifestHash,
-    items: sorted.map(item => ({ ...item,
+    items: items.map(item => ({ ...item,
       id: `${item.classification === 'advice' ? 'adv' : 'nfr'}-${String(++counters[item.classification]).padStart(3, '0')}`,
     })),
   });
@@ -126,14 +120,9 @@ export function assignCatalog(
   return errors.length ? { ok: false, errors } : { ok: true, catalog };
 }
 
-/** Stable IDs follow captured document order, then byte position within each class. */
+/** IDs preserve the architect's submitted order within each class. */
 export function validateCatalog(catalog: Catalog, manifest: DocumentManifest, bytes: ReadonlyMap<string, Uint8Array>): string[] {
   const errors: string[] = [];
-  const order = new Map(manifest.documents.map((document, index) => [document.id, index]));
-  const sorted = [...catalog.items].sort((a, b) =>
-    (order.get(a.passage.document) ?? Infinity) - (order.get(b.passage.document) ?? Infinity) ||
-    a.passage.start - b.passage.start || a.passage.end - b.passage.end);
-  if (sorted.some((item, index) => item !== catalog.items[index])) errors.push('catalog items are not in document and passage order');
   const counters = { 'non-functional-requirement': 0, advice: 0 };
   for (const item of catalog.items) {
     const next = ++counters[item.classification];
@@ -145,7 +134,7 @@ export function validateCatalog(catalog: Catalog, manifest: DocumentManifest, by
   return errors;
 }
 
-/** Verify a manifest against the immutable bytes before accepting any citation. */
+/** Verify the captured document bytes independently of any agent excerpt. */
 export function verifyDocumentBytes(document: CapturedDocument, bytes: Uint8Array): boolean {
   return bytes.length === document.bytes && createHash('sha256').update(bytes).digest('hex') === document.sha256;
 }
@@ -153,20 +142,10 @@ export function verifyDocumentBytes(document: CapturedDocument, bytes: Uint8Arra
 export type PassageResult = { readonly status: 'available'; readonly text: string } |
   { readonly status: 'unavailable'; readonly reason: string };
 
-/** Preserve whitespace and report every absence or hash mismatch. */
+/** Preserve agent wording and require only an available captured document. */
 export function resolvePassage(manifest: DocumentManifest, reference: PassageReference, bytes: Uint8Array | undefined): PassageResult {
-  if (reference.start < 0 || reference.end <= reference.start) return { status: 'unavailable', reason: 'Invalid passage offsets' };
   const document = manifest.documents.find(item => item.id === reference.document);
   if (document === undefined) return { status: 'unavailable', reason: `Unknown document ${reference.document}` };
-  if (document.sha256 !== reference.sha256) return { status: 'unavailable', reason: `Changed hash for ${document.path}` };
   if (bytes === undefined || !verifyDocumentBytes(document, bytes)) return { status: 'unavailable', reason: `Unavailable or changed bytes for ${document.path}` };
-  if (reference.end > bytes.length) return { status: 'unavailable', reason: `Passage exceeds ${document.path}` };
-  let quoted: string;
-  try {
-    quoted = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(reference.start, reference.end));
-  } catch {
-    return { status: 'unavailable', reason: `Passage cuts a UTF-8 sequence in ${document.path}` };
-  }
-  return quoted === reference.quote ? { status: 'available', text: quoted } :
-    { status: 'unavailable', reason: `Passage quote differs from ${document.path}` };
+  return { status: 'available', text: reference.quote };
 }

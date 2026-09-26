@@ -29,7 +29,7 @@ export interface NonfunctionalDeviationInput {
   readonly uncertainty: string;
 }
 
-/** Preserve an exhausted assessment's fixed requirement and exact captured passage. */
+/** Preserve an exhausted assessment's accepted architect wording. */
 export function prepareNonfunctionalDeviation(input: NonfunctionalDeviationInput):
   { readonly ok: true; readonly record: NonfunctionalDeviation } |
   { readonly ok: false; readonly errors: readonly string[] } {
@@ -71,12 +71,6 @@ function bounded(text: string, recordRef: string, limit = 4000): string {
   return `${text.slice(0, Math.max(1, limit - suffix.length))}${suffix}`;
 }
 
-function lineAt(bytes: Uint8Array, offset: number): number {
-  let line = 1;
-  for (let index = 0; index < offset; index++) if (bytes[index] === 10) line++;
-  return line;
-}
-
 /** A run-owned plan-deviation signal with the same post-terminal user options. */
 export function nonfunctionalDeviationCommands(
   state: CheckFindingState, record: NonfunctionalDeviation,
@@ -94,15 +88,13 @@ export function nonfunctionalDeviationCommands(
   const source = { kind: 'document' as const, id: `${document.path}@sha256:${document.sha256}` };
   const ground = { ref: recordRef, hash };
   const citation = { kind: 'plan-deviation', ref: recordRef, hash };
-  const location = { path: document.path, startLine: lineAt(content, record.passage.start),
-    endLine: lineAt(content, record.passage.end - 1) };
   const report = reportCommand({
     producer: planDeviationProducer, attempt: record.origin.coordinatorInvocation,
     reportKey: record.id, owner: { kind: 'run' }, source, issueKey: null,
     verification: { kind: 'assessment' }, observation: {
       kind: 'plan-deviation',
       summary: bounded(`Non-functional deviation ${record.id} from ${record.origin.nfr}: ${record.passage.quote}`, recordRef, 600),
-      evidence: [citation], locations: [location],
+      evidence: [citation], locations: [],
     },
     judgment: {
       actor: { kind: 'agent', role: 'nonfunctional-coordinator', invocation: record.origin.coordinatorInvocation },

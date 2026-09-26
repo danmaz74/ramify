@@ -377,10 +377,10 @@ function deviationView(basis: Basis, entry: CheckFindingEntry): PlanDeviationVie
   if ('origin' in deviation) return {
     id: deviation.id,
     origin: deviation.origin,
-    passage: { ...deviation.passage },
+    passage: { document: deviation.passage.document, quote: deviation.passage.quote,
+      locator: deviation.passage.locator ?? null },
     sourcePath: entry.reports[0]?.source.kind === 'document'
-      && entry.reports[0].source.id.endsWith(`@sha256:${deviation.passage.sha256}`)
-      ? entry.reports[0].source.id.slice(0, -`@sha256:${deviation.passage.sha256}`.length) : null,
+      ? entry.reports[0].source.id.replace(/@sha256:[0-9a-f]{64}$/u, '') : null,
     evidence: [...deviation.evidence],
     proposedAlternative: deviation.proposedAlternative,
     uncertainty: deviation.uncertainty,

@@ -287,9 +287,9 @@ function DeviationBody({ deviation }: { readonly deviation: PlanDeviationView })
   if ('passage' in deviation) return (
     <div className="plan-deviation-body" role="group" aria-label={`Non-functional deviation ${deviation.id}`}>
       <p className="muted">Assessment {deviation.origin.assessment} of candidate tree <code>{deviation.origin.candidate.tree}</code> found that {deviation.origin.nfr} remains unsatisfied or undetermined. The source plan is unchanged.</p>
-      <p><strong>Original requirement</strong></p>
+      <p><strong>Initial architect's source excerpt</strong></p>
       <blockquote>{deviation.passage.quote}</blockquote>
-      <p className="muted">Captured document {deviation.passage.document}{deviation.sourcePath && <> (<code>{deviation.sourcePath}</code>)</>}, SHA-256 <code>{deviation.passage.sha256}</code>, bytes {deviation.passage.start}–{deviation.passage.end}</p>
+      <p className="muted">Captured document {deviation.passage.document}{deviation.sourcePath && <> (<code>{deviation.sourcePath}</code>)</>}{deviation.passage.locator && `, ${deviation.passage.locator}`}</p>
       <p><strong>Assessment evidence:</strong> {deviation.evidence.length === 0 ? 'None recorded.' : deviation.evidence.join('; ')}</p>
       <p><strong>Proposed alternative:</strong> {deviation.proposedAlternative || 'None proposed.'}</p>
       <p><strong>Remaining uncertainty:</strong> {deviation.uncertainty || 'None stated.'}</p>

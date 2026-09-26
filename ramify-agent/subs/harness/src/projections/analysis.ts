@@ -68,8 +68,7 @@ async function evidenceOf(view: RunView): Promise<NonNullable<Extract<AnalysisRe
     return {
       status: 'available',
       catalog: evidence.catalog.items.map(item => ({ id: item.id, classification: item.classification, document: item.passage.document,
-        path: paths.get(item.passage.document) ?? 'unknown', sha256: item.passage.sha256,
-        start: item.passage.start, end: item.passage.end, quote: item.passage.quote,
+        path: paths.get(item.passage.document) ?? 'unknown', quote: item.passage.quote, locator: item.passage.locator ?? null,
         conditions: item.conditions, uncertainty: item.uncertainty })),
       missing: evidence.incorporation.missing.filter(item => item.judgment !== 'required').map(item => ({
         from: item.from, fromPath: paths.get(item.from) ?? 'unknown',
@@ -80,8 +79,8 @@ async function evidenceOf(view: RunView): Promise<NonNullable<Extract<AnalysisRe
       })),
       incorporation: evidence.incorporation.documents.map(item => ({ document: item.document, path: paths.get(item.document) ?? 'unknown',
         scenarios: item.scenarios, uncertainty: item.uncertainty,
-        governing: item.governing.map(passage => ({ path: paths.get(passage.document) ?? 'unknown', start: passage.start,
-          end: passage.end, quote: passage.quote })) })),
+        governing: item.governing.map(passage => ({ path: paths.get(passage.document) ?? 'unknown',
+          quote: passage.quote, locator: passage.locator ?? null })) })),
     };
   } catch (error) {
     return { status: 'unavailable', reason: error instanceof Error ? error.message : String(error) };

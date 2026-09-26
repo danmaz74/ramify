@@ -6,7 +6,7 @@ import { assembleContextPackage, validateAssignmentContext } from './selection.j
 export type AssignmentContext = ReturnType<typeof assignmentContextSchema.parse>;
 
 export type AssignmentDelivery =
-  | { readonly status: 'available'; readonly text: string; readonly hash: string; readonly complete: boolean }
+  | { readonly status: 'available'; readonly text: string; readonly hash: string; readonly noReportedUnavailable: boolean }
   | { readonly status: 'unavailable'; readonly reasons: readonly string[] };
 
 /** Bind an assignment's citations to the immutable selection package, never to agent-authored prose. */
@@ -60,5 +60,6 @@ export function assignmentDelivery(
     '',
     assembled.text,
   ].join('\n');
-  return { status: 'available', text, hash: createHash('sha256').update(text, 'utf8').digest('hex'), complete: assembled.complete };
+  return { status: 'available', text, hash: createHash('sha256').update(text, 'utf8').digest('hex'),
+    noReportedUnavailable: assembled.noReportedUnavailable };
 }

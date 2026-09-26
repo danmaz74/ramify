@@ -10,7 +10,7 @@ const selection = {
   schema: 'ramify-agent.context-selection/1', workItem: 'wi-001', orientationInvocation: 'orient-1',
   orientationPoint: null, selectorInvocation: 'select-1', degraded: true,
   examined: ['nfr-001', 'adv-001'], selected: [{ item: 'nfr-001', passage: {
-    document: 'doc-001', sha256: 'a'.repeat(64), start: 0, end: 8, quote: 'Keep fast',
+    document: 'doc-001', quote: 'Keep fast',
   }, reason: 'This module owns the warm path', conditions: [], uncertainty: '' }],
   unavailable: [], packageHash: 'b'.repeat(64),
 } satisfies ContextSelection;
@@ -23,7 +23,7 @@ const assignment = {
   gate: { checkpoint: 'iteration', tests: { policy: 'owned-by-scope', exactOwners: ['app/reviews'], subtrees: [], extraSuites: [] } },
   externalCapabilities: [],
 } as unknown as IterationAssignment;
-const sourceEvidence = '## nfr-001: non-functional-requirement\nSource: plans/sample/plan.md\nExact captured source passage:\nKeep fast';
+const sourceEvidence = '## nfr-001: non-functional-requirement\nSource: plans/sample/plan.md\nArchitect source excerpt:\nKeep fast';
 
 describe('assignment source citations', () => {
   test('new selection requires an explicit array and only selected, unique IDs', () => {

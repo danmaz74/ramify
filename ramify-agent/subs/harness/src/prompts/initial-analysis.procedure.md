@@ -34,14 +34,14 @@ Do this, in order:
    text at its immutable captured path. Do not infer a document's contents
    from a link, filename or summary.
 2. Judge every captured plan document for scenario incorporation. Supply the
-   exact governing passage, its source hash and byte offsets, and note
+   governing source wording as closely as practical and note
    uncertainty. A linked example can remain unincorporated. Judge every
    missing reference `required`, `unclear` or `advisory` from surrounding
    source text. A required missing document cannot be accepted; report it
    so the run stops before implementation.
-3. Extract only non-functional requirements and advice into `catalog`. Quote
-   each source passage exactly, including whitespace, and cite its captured
-   document, SHA-256 and half-open UTF-8 byte offsets. Keep mandatory
+3. Extract only non-functional requirements and advice into `catalog`. Keep
+   each excerpt as close to the source wording as practical and name its
+   captured document. An optional section locator can help later readers. Keep mandatory
    implementation constraints as `non-functional-requirement`, and tentative
    technology suggestions as `advice`. Preserve the source's force; record
    any stated condition as `stated`, your inferred condition as `inferred`,

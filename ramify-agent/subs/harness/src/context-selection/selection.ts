@@ -9,8 +9,8 @@ export type SelectionPackage = {
   readonly status: 'available';
   readonly text: string;
   readonly hash: string;
-  /** Unavailable references remain visible even when other passages resolve. */
-  readonly complete: boolean;
+  /** Describes the selector report, not semantic coverage. */
+  readonly noReportedUnavailable: boolean;
 } | { readonly status: 'unavailable'; readonly errors: readonly string[] };
 
 type SelectionWithoutHash = Omit<ContextSelection, 'packageHash'>;
@@ -54,29 +54,28 @@ export function assembleContextPackage(
     `Selection start: ${selection.degraded ? 'degraded fresh start' : 'forked from recorded orientation'}`,
     `Catalog manifest: ${catalog.manifestHash}`,
     '',
-    'Source classifications and stated conditions below come from the accepted catalog. Selection reasons are the selector\'s judgments.',
+    'Classifications and stated conditions below are the initial architect\'s accepted reading. Selection reasons are the selector\'s judgments.',
   ];
   for (const entry of selection.selected) {
-    const identity = `${entry.item}\u0000${entry.passage.document}\u0000${entry.passage.start}\u0000${entry.passage.end}`;
+    const item = byId.get(entry.item);
+    const principle = principles.get(entry.item);
+    const identity = item === undefined
+      ? `${entry.item}\u0000${entry.passage?.document ?? ''}\u0000${entry.passage?.locator ?? ''}\u0000${entry.passage?.quote ?? ''}`
+      : entry.item;
     if (selected.has(identity)) errors.push(`Selected passage for ${entry.item} occurs twice`);
     selected.add(identity);
     if (!examined.has(entry.item)) errors.push(`Selected item ${entry.item} was not examined`);
     if (unavailable.has(entry.item)) errors.push(`Selected item ${entry.item} is also unavailable`);
-    const item = byId.get(entry.item);
-    const principle = principles.get(entry.item);
     if (item === undefined && principle === undefined) continue;
-    if (item !== undefined) {
-      if (entry.passage.document !== item.passage.document || entry.passage.sha256 !== item.passage.sha256
-        || entry.passage.start !== item.passage.start || entry.passage.end !== item.passage.end
-        || entry.passage.quote !== item.passage.quote) {
-        errors.push(`Selected passage for ${entry.item} differs from the accepted catalog`);
-        continue;
-      }
-    } else if (entry.passage.document !== entry.item) {
+    if (item === undefined && entry.passage === undefined) {
+      errors.push(`Selected principle ${entry.item} needs an excerpt`);
+      continue;
+    }
+    if (item === undefined && entry.passage?.document !== entry.item) {
       errors.push(`Selected principle passage for ${entry.item} names another document`);
       continue;
     }
-    const reference = item?.passage ?? entry.passage;
+    const reference = item?.passage ?? entry.passage!;
     const document = manifest.documents.find(source => source.id === reference.document);
     const passage = resolvePassage(manifest, reference, bytes.get(reference.document));
     if (document === undefined || passage.status === 'unavailable') {
@@ -86,37 +85,40 @@ export function assembleContextPackage(
     if (item === undefined) {
       sections.push(
         '', `## ${entry.item}: captured principle evidence`,
-        `Source: ${document.path} (${document.id}, SHA-256 ${document.sha256}, bytes ${reference.start}-${reference.end})`,
+        `Source: ${document.path} (${document.id}, captured SHA-256 ${document.sha256})`,
+        ...(reference.locator ? [`Selector locator: ${reference.locator}`] : []),
         `Captured revision: ${document.revision.commit ?? 'unknown'}; dirty: ${String(document.revision.dirty)}`,
         `Selector scope judgment: ${entry.reason}`,
         `Selector conditions: ${entry.conditions.length === 0 ? 'none' : entry.conditions.join('; ')}`,
         `Selector uncertainty: ${entry.uncertainty || 'none recorded'}`,
-        'Exact captured source passage:', passage.text,
+        'Selector source excerpt:', passage.text,
       );
       continue;
     }
     sections.push(
       '', `## ${item.id}: ${item.classification}`,
-      `Source: ${document.path} (${document.id}, SHA-256 ${document.sha256}, bytes ${reference.start}-${reference.end})`,
+      `Source: ${document.path} (${document.id}, captured SHA-256 ${document.sha256})`,
+      ...(reference.locator ? [`Architect locator: ${reference.locator}`] : []),
       `Captured revision: ${document.revision.commit ?? 'unknown'}; dirty: ${String(document.revision.dirty)}`,
       `Catalog conditions: ${item.conditions.length === 0 ? 'none' : item.conditions.map(condition => `${condition.source}: ${condition.text}`).join('; ')}`,
       `Catalog uncertainty: ${item.uncertainty || 'none recorded'}`,
       `Selection reason: ${entry.reason}`,
       `Selection conditions: ${entry.conditions.length === 0 ? 'none' : entry.conditions.join('; ')}`,
       `Selection uncertainty: ${entry.uncertainty || 'none recorded'}`,
-      'Exact captured source passage:',
+      'Architect source excerpt:',
       passage.text,
     );
   }
   if (errors.length) return { status: 'unavailable', errors };
-  sections.push('', '## Selection coverage', '',
+  sections.push('', '## Selection report', '',
     `Examined: ${selection.examined.join(', ') || 'none'}`,
     `Selected: ${selection.selected.map(entry => entry.item).join(', ') || 'none'}`,
     `Unavailable: ${selection.unavailable.length === 0 ? 'none' : selection.unavailable.map(entry => `${entry.item}: ${entry.reason}`).join('; ')}`,
     'An omitted item is not a waiver of its source requirement.',
   );
   const text = sections.join('\n');
-  return { status: 'available', text, hash: createHash('sha256').update(text, 'utf8').digest('hex'), complete: selection.unavailable.length === 0 };
+  return { status: 'available', text, hash: createHash('sha256').update(text, 'utf8').digest('hex'),
+    noReportedUnavailable: selection.unavailable.length === 0 };
 }
 
 /** Refuse a submitted hash that does not name the exact reproducible package. */

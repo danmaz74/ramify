@@ -124,7 +124,7 @@ test('functional work cites one NFR while the coordinator assesses the complete 
   expect(accepted?.data.catalog).toEqual({ nfr: 2, advice: 1 });
   const catalog = JSON.parse(await readFile(join(directory, accepted!.data.evidence!.catalog.path), 'utf8'));
   expect(catalog.items.map((item: { id: string; classification: string }) => [item.id, item.classification])).toEqual([
-    ['nfr-001', 'non-functional-requirement'], ['adv-001', 'advice'], ['nfr-002', 'non-functional-requirement'],
+    ['nfr-001', 'non-functional-requirement'], ['nfr-002', 'non-functional-requirement'], ['adv-001', 'advice'],
   ]);
   const engineers = agent.sessions.filter(session => session.spec.role === 'engineer');
   expect(engineers).toHaveLength(1);

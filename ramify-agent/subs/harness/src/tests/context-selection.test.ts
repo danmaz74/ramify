@@ -14,8 +14,8 @@ const manifest: DocumentManifest = {
   ],
   missing: [], principlesScan: { status: 'empty', unreadable: [] },
 };
-const first: PassageReference = { document: 'doc-001', sha256, start: 0, end: 34, quote: 'Keep latency under 10ms when warm.' };
-const second: PassageReference = { document: 'doc-001', sha256, start: 35, end: 54, quote: 'A cache could help.' };
+const first: PassageReference = { document: 'doc-001', quote: 'Keep latency under 10ms when warm.' };
+const second: PassageReference = { document: 'doc-001', quote: 'A cache could help.' };
 const catalog: Catalog = {
   schema: 'ramify-agent.nonfunctional-catalog/1', manifestHash: planHash,
   items: [
@@ -40,7 +40,7 @@ const base: Omit<ContextSelection, 'packageHash'> = {
   schema: 'ramify-agent.context-selection/1', workItem: 'wi-001',
   orientationInvocation: 'inv-orient', orientationPoint: 'point-1', selectorInvocation: 'inv-select', degraded: false,
   examined: ['nfr-001', 'adv-001'],
-  selected: [{ item: 'nfr-001', passage: first, reason: 'The assigned service has a warm path', conditions: ['warm path'], uncertainty: '' }],
+  selected: [{ item: 'nfr-001', reason: 'The assigned service has a warm path', conditions: ['warm path'], uncertainty: '' }],
   unavailable: [],
 };
 
@@ -71,13 +71,13 @@ describe('context selection package', () => {
     }
   });
 
-  test('selects distinct exact passages from one captured principle with explicit scope judgment', () => {
+  test('selects distinct principle excerpts with explicit scope judgment', () => {
     const selected = {
       ...base, examined: ['nfr-001', 'adv-001', 'doc-002'],
       selected: [
         ...base.selected,
-        { item: 'doc-002', passage: { document: 'doc-002', sha256: principleHash, start: 0, end: 17, quote: 'Use bounded work.' }, reason: 'Applies to this work item', conditions: ['during preparation'], uncertainty: 'Scope inferred' },
-        { item: 'doc-002', passage: { document: 'doc-002', sha256: principleHash, start: 18, end: 37, quote: 'Review each source.' }, reason: 'Applies to source review', conditions: [], uncertainty: '' },
+        { item: 'doc-002', passage: { document: 'doc-002', quote: 'Use bounded work.' }, reason: 'Applies to this work item', conditions: ['during preparation'], uncertainty: 'Scope inferred' },
+        { item: 'doc-002', passage: { document: 'doc-002', quote: 'Review each source.' }, reason: 'Applies to source review', conditions: [], uncertainty: '' },
       ],
     };
     const result = assembleContextPackage(selected, catalog, principleManifest, principleBytesMap);
@@ -93,16 +93,21 @@ describe('context selection package', () => {
     expect(assembleContextPackage({ ...selected, selected: [{ ...selected.selected[1]!, passage: first }] }, catalog, principleManifest, principleBytesMap)).toMatchObject({ status: 'unavailable' });
   });
 
-  test('rejects a selected item outside the examined set or with a changed passage', () => {
+  test('rejects a selected item outside the examined set and carries catalog wording unchanged', () => {
     expect(assembleContextPackage({ ...base, examined: ['adv-001'] }, catalog, manifest, bytes)).toMatchObject({ status: 'unavailable' });
-    expect(assembleContextPackage({ ...base, selected: [{ ...base.selected[0]!, passage: second }] }, catalog, manifest, bytes)).toMatchObject({ status: 'unavailable' });
+    const paraphrased = assembleContextPackage({ ...base, selected: [{ ...base.selected[0]!, passage: second }] }, catalog, manifest, bytes);
+    expect(paraphrased.status).toBe('available');
+    if (paraphrased.status === 'available') {
+      expect(paraphrased.text).toContain(first.quote);
+      expect(paraphrased.text).not.toContain(second.quote);
+    }
     expect(assembleContextPackage({ ...base, examined: ['nfr-001', 'nfr-001'] }, catalog, manifest, bytes)).toMatchObject({ status: 'unavailable' });
   });
 
   test('missing source is unavailable, while a named unavailable item makes coverage incomplete', () => {
     expect(assembleContextPackage(base, catalog, manifest, new Map())).toMatchObject({ status: 'unavailable' });
     const partial = assembleContextPackage({ ...base, unavailable: [{ item: 'adv-001', reason: 'Captured file could not be read' }] }, catalog, manifest, bytes);
-    expect(partial).toMatchObject({ status: 'available', complete: false });
+    expect(partial).toMatchObject({ status: 'available', noReportedUnavailable: false });
     if (partial.status === 'available') expect(partial.text).toContain('adv-001: Captured file could not be read');
   });
 

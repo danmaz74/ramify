@@ -9447,7 +9447,7 @@ function analysisMessage(record: RunRecord, plan: string,
     '',
     ...(documents ? [
       '# Captured document index', '',
-      'Read relevant captured files using `read` at the absolute paths below. The byte files hold the exact source; use them for passage quotes and byte offsets. A link alone does not make scenarios binding. Judge each plan document and each missing reference explicitly.',
+      'Read relevant captured files using `read` at the absolute paths below. Use near-verbatim source excerpts and document IDs in your analysis; byte offsets are not required. A link alone does not make scenarios binding. Judge each plan document and each missing reference explicitly.',
       '',
       ...documents.manifest.documents.map(document => `- ${document.id} (${document.kind}): ${document.path}; SHA-256 ${document.sha256}; captured file ${join(directory!, document.storedAt)}`),
       ...(documents.manifest.missing.length ? ['', 'Missing references to judge:',

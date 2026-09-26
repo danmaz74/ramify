@@ -185,7 +185,7 @@ const nonfunctionalDeviationViewSchema = z.object({
     candidate: z.object({ tree: text, head: text.nullable(), preparedAt: text }).strict(),
     coordinatorInvocation: text }).strict(),
   id: text,
-  passage: z.object({ document: text, sha256: text, start: z.int().nonnegative(), end: z.int().positive(), quote: text }).strict(),
+  passage: z.object({ document: text, quote: text, locator: text.nullable() }).strict(),
   sourcePath: text.nullable(),
   evidence: z.array(text),
   proposedAlternative: z.string(),

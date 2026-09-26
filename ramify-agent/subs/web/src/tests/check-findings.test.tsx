@@ -332,7 +332,7 @@ test('a non-functional deviation shows the exact captured requirement and assess
     planDeviation: {
       id: 'nfd-001', origin: { kind: 'nonfunctional-assessment', nfr: 'nfr-001', assessment: 'nfa-001',
         candidate: { tree: 'a'.repeat(40), head: null, preparedAt: at }, coordinatorInvocation: 'inv-0012' },
-      passage: { document: 'doc-001', sha256: 'b'.repeat(64), start: 10, end: 53,
+      passage: { document: 'doc-001', locator: null,
         quote: 'The service must answer within 50 milliseconds.' },
       sourcePath: 'plans/review-notes/constraints.md',
       evidence: ['Measured 87 milliseconds'], proposedAlternative: 'Use a cached read',

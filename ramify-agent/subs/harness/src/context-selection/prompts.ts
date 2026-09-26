@@ -6,7 +6,7 @@ export function workOrientationMessage(localBriefing: string): string {
   return `${localBriefing}\n\nBefore organizing this work item, submit only your orientation. State what work you think it asks for, the focus you would use, and open questions. Do not assign an iteration or decide that a source suggestion is binding.`;
 }
 
-/** A read-only fork sees the parent's exact packet and the complete catalog/index. */
+/** A read-only fork sees the parent's recorded packet and accepted catalog/index. */
 export function contextSelectorMessage(packet: string, catalog: Catalog, manifest: DocumentManifest, runDirectory: string): string {
   const principles = manifest.documents.filter(document => document.kind === 'principle')
     .map(document => ({ id: document.id, path: document.path, storedAt: document.storedAt,
@@ -18,7 +18,7 @@ export function contextSelectorMessage(packet: string, catalog: Catalog, manifes
     '', '# Captured principle index', '',
     JSON.stringify({ scan: manifest.principlesScan, documents: principles }, null, 2),
     '', 'Examine the catalog IDs and any principle document IDs plausibly relevant to this work item.',
-    'Read principle passages from the listed immutable captured files, not the current project files. Select exact captured passages with reasons, conditions and uncertainty. A catalog item retains its accepted classification and passage; a principle selection names its document ID and an exact passage from that document.',
+    'Select relevant catalog IDs without copying their excerpts. Read principle passages from the listed captured files, not the current project files; for a principle selection, provide a near-verbatim excerpt with its document ID. Give reasons, conditions and uncertainty. The harness carries catalog wording from the initial architect.',
     'Name unavailable passages or coverage explicitly. Omission never waives a requirement. Do not change source wording or assign binding force from a filename alone.',
   ].join('\n');
 }

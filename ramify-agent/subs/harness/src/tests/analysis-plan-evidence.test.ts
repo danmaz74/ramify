@@ -28,12 +28,7 @@ function submitted(spec: SessionSpec) {
   const manifest = documentManifestSchema.parse(JSON.parse(readFileSync(join(directory, 'input/documents.json'), 'utf8')));
   const root = manifest.documents.find(item => item.id === manifest.root)!;
   const companion = manifest.documents.find(item => item.path.endsWith('constraints.md'))!;
-  const cited = (document: typeof root, quote: string) => {
-    const bytes = readFileSync(join(directory, document.storedAt));
-    const start = bytes.indexOf(Buffer.from(quote));
-    if (start < 0) throw new Error(`Missing quote: ${quote}`);
-    return { document: document.id, sha256: document.sha256, start, end: start + Buffer.byteLength(quote), quote };
-  };
+  const cited = (document: typeof root, quote: string) => ({ document: document.id, quote });
   const gap = manifest.missing.find(item => item.target.endsWith('later.md'))!;
   return {
     entries: [], hypotheses: [], coverageLimits: [], scenarios: [], integrationScenarios: [],
@@ -44,13 +39,13 @@ function submitted(spec: SessionSpec) {
       reason: 'The root calls this guide optional and does not establish its binding force.' }] },
     catalog: [
       { classification: 'advice' as const, passage: cited(companion, 'Use Redis if practical.'), conditions: [], uncertainty: 'Tentative suggestion.' },
-      { classification: 'non-functional-requirement' as const, passage: cited(companion, 'The service must preserve a 30 second timeout.'),
+      { classification: 'non-functional-requirement' as const, passage: cited(companion, 'The service must preserve its 30 second timeout.'),
         conditions: [{ text: 'The service', source: 'stated' as const }, { text: 'for the service', source: 'inferred' as const }], uncertainty: '' },
     ],
   };
 }
 
-test('accepts exact catalog and incorporation once, and projects NFRs plus an unclear source excerpt', async () => {
+test('accepts architect excerpts and incorporation once, and projects NFRs plus an unclear source excerpt', async () => {
   const fixture = await copyFixture();
   cleanups.push(fixture.remove);
   await installTestRunner(fixture.root);
@@ -77,8 +72,11 @@ test('accepts exact catalog and incorporation once, and projects NFRs plus an un
   expect(projection.analysis.planEvidence?.status).toBe('available');
   if (projection.analysis.planEvidence?.status !== 'available') return;
   expect(projection.analysis.planEvidence.catalog.map(item => [item.id, item.classification])).toEqual([
-    ['nfr-001', 'non-functional-requirement'], ['adv-001', 'advice'],
+    ['adv-001', 'advice'], ['nfr-001', 'non-functional-requirement'],
   ]);
+  expect(projection.analysis.planEvidence.catalog.every(item => !('start' in item || 'sha256' in item))).toBe(true);
+  expect(projection.analysis.planEvidence.catalog.find(item => item.id === 'nfr-001')?.quote)
+    .toBe('The service must preserve its 30 second timeout.');
   expect(projection.analysis.planEvidence.missing[0]).toMatchObject({ judgment: 'unclear', excerpt: '[Optional guide](later.md)' });
   const record = runRecordSchema.parse(JSON.parse(await readFile(runPath(fixture.root, planId, receipt.jobId, 'job.json'), 'utf8')));
   const captured = await readCapturedDocuments(runPath(fixture.root, planId, receipt.jobId), record.manifest);

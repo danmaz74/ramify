@@ -368,7 +368,7 @@ export function PlanAndEntries({ client, planId, runId, version, run, onApproved
                     {data.analysis.planEvidence.catalog.filter(item => item.classification === 'non-functional-requirement').length === 0
                       ? <p>The accepted catalog explicitly contains no non-functional requirements.</p>
                       : <ul className="cards">{data.analysis.planEvidence.catalog.filter(item => item.classification === 'non-functional-requirement').map(item =>
-                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code> · bytes {item.start}–{item.end} · SHA-256 <code>{item.sha256.slice(0, 12)}…</code>
+                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code>{item.locator && ` · ${item.locator}`}
                           <blockquote>{item.quote}</blockquote>
                           {item.conditions.map((condition, index) => <p key={index}>{condition.source} condition: {condition.text}</p>)}
                           {item.uncertainty && <p>Uncertainty: {item.uncertainty}</p>}
@@ -377,10 +377,10 @@ export function PlanAndEntries({ client, planId, runId, version, run, onApproved
                       <p role="alert" key={`${item.from}:${item.start}`}>Unclear missing reference: {item.target} from {item.fromPath} at bytes {item.start}–{item.end}. Source: <q>{item.excerpt}</q> {item.reason}</p>)}
                     <details><summary>Advisory passages and document incorporation</summary>
                       <ul>{data.analysis.planEvidence.catalog.filter(item => item.classification === 'advice').map(item =>
-                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code> · bytes {item.start}–{item.end} · SHA-256 <code>{item.sha256.slice(0, 12)}…</code><blockquote>{item.quote}</blockquote></li>)}</ul>
+                        <li key={item.id}><strong>{item.id}</strong> · <code>{item.path}</code>{item.locator && ` · ${item.locator}`}<blockquote>{item.quote}</blockquote></li>)}</ul>
                       <ul>{data.analysis.planEvidence.incorporation.map(item =>
                         <li key={item.document}>{item.path}: {item.scenarios ? 'scenarios incorporated' : 'scenarios not incorporated'}{item.uncertainty && `; uncertainty: ${item.uncertainty}`}
-                          {item.governing.map((passage, index) => <blockquote key={index}>{passage.quote} <small>({passage.path}, bytes {passage.start}–{passage.end})</small></blockquote>)}
+                          {item.governing.map((passage, index) => <blockquote key={index}>{passage.quote} <small>({passage.path}{passage.locator && `, ${passage.locator}`})</small></blockquote>)}
                         </li>)}</ul>
                       {data.analysis.planEvidence.missing.filter(item => item.judgment === 'advisory').map(item =>
                         <p key={`${item.from}:${item.start}`}>Advisory missing reference: {item.target}. {item.reason}</p>)}

@@ -37,7 +37,7 @@ export async function readRecordedContextSelection(
     const rebuilt = validateContextSelection(selection, catalog, manifest, bytes);
     if (rebuilt.status === 'unavailable') throw new Error(rebuilt.errors.join('; '));
     const packageText = new TextDecoder('utf-8', { fatal: true }).decode(packageBytes);
-    if (packageText !== rebuilt.text) throw new Error('Context package differs from the exact captured source reconstruction');
+    if (packageText !== rebuilt.text) throw new Error('Context package differs from the recorded excerpt reconstruction');
     return { status: 'available', selection, packageText };
   } catch (error) {
     return { status: 'unavailable', reason: error instanceof Error ? error.message : String(error) };

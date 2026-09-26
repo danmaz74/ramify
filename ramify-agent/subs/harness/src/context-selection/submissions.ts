@@ -24,7 +24,7 @@ export const contextSelectorSubmissionSchema = z.object({
   examined: z.array(text),
   selected: z.array(z.object({
     item: text,
-    passage: passageReferenceSchema,
+    passage: passageReferenceSchema.optional(),
     reason: text,
     conditions: z.array(text),
     uncertainty: z.string(),
@@ -68,7 +68,7 @@ export interface SelectionIdentity {
 export type PreparedSelection = { readonly status: 'available'; readonly selection: ContextSelection; readonly package: Extract<SelectionPackage, { status: 'available' }> } |
   { readonly status: 'unavailable'; readonly errors: readonly string[] };
 
-/** The harness supplies IDs and records a package hash computed from captured bytes. */
+/** The harness supplies IDs and records a hash of the assembled context text. */
 export function prepareContextSelection(
   submitted: unknown,
   identity: SelectionIdentity,
@@ -78,7 +78,12 @@ export function prepareContextSelection(
 ): PreparedSelection {
   const parsed = contextSelectorSubmissionSchema.safeParse(submitted);
   if (!parsed.success) return { status: 'unavailable', errors: ['Invalid selector submission'] };
-  const candidate = { schema: 'ramify-agent.context-selection/1' as const, ...identity, ...parsed.data };
+  const catalogIds = new Set(catalog.items.map(item => item.id));
+  const candidate = { schema: 'ramify-agent.context-selection/1' as const, ...identity, ...parsed.data,
+    selected: parsed.data.selected.map(entry => catalogIds.has(entry.item)
+      ? { item: entry.item, reason: entry.reason, conditions: entry.conditions, uncertainty: entry.uncertainty }
+      : entry),
+  };
   const assembled = assembleContextPackage(candidate, catalog, manifest, bytes);
   if (assembled.status === 'unavailable') return assembled;
   const selection = contextSelectionSchema.parse({ ...candidate, packageHash: assembled.hash });

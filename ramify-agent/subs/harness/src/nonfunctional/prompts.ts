@@ -5,7 +5,7 @@ import type { Catalog } from '../../subs/plan-evidence/src/interfaces/contracts.
 export function coordinatorAssessmentPrompt(catalog: Catalog, candidate: Candidate, round: number, phase: 'initial' | 'after-repair'): string {
   return [
     `Assess the prepared source tree ${candidate.tree} in round ${round} (${phase}).`,
-    'The catalog below is the accepted, fixed source. Its passage quotes and stated/inferred conditions must retain their original meaning.',
+    'The catalog below is the initial architect\'s accepted reading. Carry its near-verbatim excerpts and stated/inferred conditions forward unchanged.',
     'Submit exactly one result for every non-functional-requirement ID. Advice is context, not another required result.',
     'For each result, name inspected scope, evidence, and uncertainty. If a temporal condition lacks observed intermediate evidence, choose undetermined.',
     'Do not use capability progress or scenario coverage as a substitute for this assessment. Do not edit source.',
@@ -44,7 +44,7 @@ export function repairPrompt(task: string, candidate: Candidate, catalog: Catalo
   return [
     `Start in module ${startingModule} and carry out this authorized repair task against tree ${candidate.tree}:`,
     task,
-    'The original requirements and conditions are below. Keep their source wording and stated/inferred distinction intact.',
+    'The initial architect\'s requirement excerpts and conditions are below. Carry their wording and stated/inferred distinction forward unchanged.',
     JSON.stringify(selected, null, 2),
     ...(context === undefined ? [] : [
       `Coordinator evidence for this repair: ${JSON.stringify(context.evidence)}`,

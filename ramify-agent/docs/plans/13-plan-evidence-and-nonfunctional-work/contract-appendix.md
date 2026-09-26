@@ -76,12 +76,12 @@ An old `job.json` without `documentManifest` is a single-file run:
 source hash. An old plan reference without `document` resolves to that root.
 No old record or ledger line is rewritten. Non-functional coverage for such a
 run is `unavailable`, even if its gate and run completed. New plan references
-name a captured document plus anchor or line range; new exact citations use
-`passageReferenceSchema` (`document`, source SHA-256, half-open UTF-8 byte
-offsets and exact `quote`). Resolution verifies captured bytes and hash,
-decodes UTF-8 strictly and retains whitespace. Unknown documents, stale
-hashes, malformed offsets and changed quotes return `unavailable` with a
-reason, never an empty passage.
+name a captured document plus anchor or line range. Architect excerpts use
+`passageReferenceSchema` (`document`, near-verbatim `quote`, optional `locator`).
+The harness verifies that the named captured document remains available, then
+carries the architect's wording unchanged. It does not compare an excerpt to
+source bytes. Unknown or unavailable documents return `unavailable` with a
+reason. Legacy byte-offset fields in older stored excerpts are ignored on read.
 
 ## Accepted analysis and selection
 
@@ -96,10 +96,10 @@ The accepted event names immutable content-addressed files under
 `analysis/catalog/` and `analysis/incorporation/`, with their hashes; a
 partial pre-event write cannot bind a retry to stale content. The catalog
 is fixed when that event commits.
-Its IDs are `nfr-001` and `adv-001` separately, assigned in captured document
-order then passage byte order; duplicate, skipped or out-of-order IDs fail.
-Every quote must resolve against immutable bytes. Classification is a human
-agent judgment and is never promoted by a keyword or filename. A rejected analysis
+Its IDs are `nfr-001` and `adv-001` separately, assigned in the architect's
+submission order within each class; duplicate or skipped IDs fail on read.
+Excerpt wording and classification are the initial architect's judgments, never
+graded by source matching, a keyword or a filename. A rejected analysis
 commits none of the catalog, incorporation or functional records. The single
 `analysis-accepted` transaction commits all three; its optional catalog counts
 preserve old event reads. Required missing documents stop before this event;
@@ -108,20 +108,21 @@ unclear missing references remain visible in the existing analysis review.
 For each work item, `work-orientation-recorded` fixes the local architect's
 invocation, session point if present, and exact orientation packet hash before
 the first organizing step. One read-only selector fork receives that packet
-and the complete applicable catalog/index, and records one
+and the accepted catalog/index, and records one
 `contextSelectionSchema` record. A missing point permits a fresh selector with
 the same packet and `degraded: true`. A valid selection records the examined
-set, selected IDs, source passages, reasons, conditions, uncertainty and
+set, selected IDs, principle excerpts, reasons, conditions, uncertainty and
 unavailable passages. Failure or invalid output consumes the captured retry
 bound and leaves selection unavailable; omission never waives an NFR. The
-continuation package contains the original qualified passages, not summaries.
+continuation package carries the initial architect's catalog excerpts unchanged
+and the selector's principle excerpts.
 The `context-selection-recorded` event fixes its hash and forbids rerunning
 selection for that work item. Its selection and package paths are immutable,
 content-addressed files. The event hashes and accepted catalog are verified
 before a recorded package is read. `examined` and `unavailable` name catalog
 `nfr-NNN`/`adv-NNN` IDs or captured principle `doc-NNN` IDs. A selected
-principle uses its `doc-NNN` ID and an exact passage from that captured
-principle document; multiple distinct passages from one document may be
+principle uses its `doc-NNN` ID and a near-verbatim excerpt attributed to that
+captured principle document; multiple distinct excerpts from one document may be
 selected. The principle index names the immutable stored path and byte hash.
 Selector scope judgments and conditions remain separate from source text.
 
@@ -196,14 +197,14 @@ The existing work-item deviation has origin `work-item-conflict`, naming its
 actual unresolved request, work item and architect invocation. New NFR-only
 deviations have origin `nonfunctional-assessment`, naming NFR, assessment,
 assessed candidate and actual coordinator invocation; they invent no request
-or work item. The record retains the exact original passage, evidence and
+or work item. The record retains the initial architect's excerpt, evidence and
 limits, proposed alternative or explicit uncertainty, and CheckFinding ID.
 Old deviation records without an origin read as work-item conflicts at the
 boundary; old decisions remain authoritative for those findings.
 
 `mergeReadinessSchema` is a derived projection over one candidate, final gate,
 complete assessment and current user decisions. `ready` requires a completed
-run, passing final gate on the exact assessment tree, and every NFR either
+run, passing final gate on the exact assessment tree, and every cataloged NFR either
 `satisfied` there or changed by an accepted user decision for that candidate.
 An unanswered deviation yields `pending-review`; rejection yields `rejected`;
 a failed gate yields `gate-failed`; absent, stale or interrupted evidence yields
@@ -226,8 +227,8 @@ of the deterministic counters; each cited record is committed with its event.
 7. If the process dies after the repair but before `nfa-002`, replay sees no round closure and no matching assessment; it reconstructs the prepared tree, reuses or creates a bounded coordinator invocation, and never regards `nfa-001` as covering `T2`.
 8. The final commit effect verifies the working tree is `T2`, commits it, and audits commit `C2` whose tree is `T2`. `candidate-bound-to-gate` binds `cand-002`, `nfa-002`, gate and `C2`; a passing final gate permits `job-completed`. If the tree differs, no binding or completion is committed; bounded recovery prepares and assesses again.
 
-The focused iteration 1 tests prove multi-document schema acceptance, exact
-passage and hash rejection, stable catalog numbering, and old single-file
+The focused iteration 1 tests prove multi-document schema acceptance, captured
+document hash rejection, stable catalog numbering, and old single-file
 record/event replay with unavailable coverage. Discovery, agent judgment,
 source preparation, audit binding and browser presentation are executed in
 their assigned later iterations.

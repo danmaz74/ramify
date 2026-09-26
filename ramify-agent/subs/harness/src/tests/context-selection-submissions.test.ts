@@ -14,7 +14,7 @@ const manifest: DocumentManifest = {
   documents: [{ id: 'doc-001', path: 'plans/sample/plan.md', kind: 'plan', sha256: digest, bytes: source.length, storedAt: 'input/plan.md', revision: { commit: null, dirty: null } }],
   missing: [], principlesScan: { status: 'empty', unreadable: [] },
 };
-const passage = { document: 'doc-001', sha256: digest, start: 0, end: 17, quote: 'Keep the timeout.' };
+const passage = { document: 'doc-001', quote: 'Keep the timeout.' };
 const catalog: Catalog = {
   schema: 'ramify-agent.nonfunctional-catalog/1', manifestHash: 'a'.repeat(64),
   items: [{ id: 'nfr-001', classification: 'non-functional-requirement', passage, conditions: [], uncertainty: '' }],
@@ -37,7 +37,7 @@ describe('context selection submissions', () => {
   test('selector submits judgments only; the harness adds identity and package hash', () => {
     const submitted = {
       examined: ['nfr-001'],
-      selected: [{ item: 'nfr-001', passage, reason: 'The assigned service has a timeout', conditions: [], uncertainty: '' }],
+      selected: [{ item: 'nfr-001', reason: 'The assigned service has a timeout', conditions: [], uncertainty: '' }],
       unavailable: [],
     };
     expect(contextSelectorSubmissionSchema.safeParse(submitted).success).toBe(true);
@@ -46,6 +46,7 @@ describe('context selection submissions', () => {
     expect(prepared.status).toBe('available');
     if (prepared.status !== 'available') return;
     expect(prepared.selection).toMatchObject({ ...identity, packageHash: prepared.package.hash });
+    expect(prepared.selection.selected[0]).not.toHaveProperty('passage');
     expect(prepared.package.text).toContain('Keep the timeout.');
     expect(contextSelectorMessage('The parent packet', catalog, manifest, '/run')).toContain('The parent packet');
     expect(contextSelectorMessage('The parent packet', catalog, manifest, '/run')).toContain('nfr-001');
@@ -58,9 +59,9 @@ describe('context selection submissions', () => {
     expect(selectorPrompt).toContain(digest);
   });
 
-  test('invalid citation and unavailable bytes cannot become a complete package', () => {
-    const selected = { examined: ['nfr-001'], selected: [{ item: 'nfr-001', passage, reason: 'Relevant', conditions: [], uncertainty: '' }], unavailable: [] };
+  test('unavailable captured bytes cannot become a package', () => {
+    const selected = { examined: ['nfr-001'], selected: [{ item: 'nfr-001', reason: 'Relevant', conditions: [], uncertainty: '' }], unavailable: [] };
     expect(prepareContextSelection(selected, identity, catalog, manifest, new Map())).toMatchObject({ status: 'unavailable' });
-    expect(prepareContextSelection({ ...selected, selected: [{ ...selected.selected[0]!, passage: { ...passage, quote: 'Other quote' } }] }, identity, catalog, manifest, new Map([['doc-001', source]])).status).toBe('unavailable');
+    expect(prepareContextSelection(selected, identity, catalog, manifest, new Map([['doc-001', source]])).status).toBe('available');
   });
 });
