@@ -153,6 +153,8 @@ export const runPolicySchema = z.object({
     invocationIdleMs: z.int().positive(),
     invocationAbsoluteMs: z.int().positive(),
     maxIterationsPerWorkItem: z.int().positive(),
+    /** Captured for capability workflow runs; absent on historical policies. */
+    maxIterationsPerCapabilityTask: z.int().positive().optional(),
     maxWorkItems: z.int().positive(),
     maxPlacementRequests: z.int().positive(),
     maxInvocationsPerRun: z.int().positive(),
@@ -574,6 +576,7 @@ export const usageSchema = z.object({
 
 /** The work one invocation, and the session it belongs to, is for: none for the initial architect. */
 export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional(),
+  capabilityTask: text.optional(), capabilityAssignment: text.optional(),
   nonfunctionalRepair: text.optional(),
 }).strict();
 export type InvocationWork = z.infer<typeof invocationWorkSchema>;

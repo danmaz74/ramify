@@ -314,6 +314,30 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Non-functional deviation ${event.data.deviation} recorded for ${event.data.nfr}`, []];
     case 'candidate-bound-to-gate':
       return [`Candidate ${event.data.candidate} bound to gate ${event.data.gate}`, ref('gate', event.data.gate)];
+    case 'capability-requested':
+      return [`Capability request ${event.data.request} recorded`, ref('invocation', event.data.invocation)];
+    case 'capability-delegated':
+      return [`Capability task ${event.data.task} delegated`, ref('invocation', event.data.invocation)];
+    case 'capability-plan-revised':
+      return [`Capability task ${event.data.task} plan revised to ${event.data.revision}`, ref('invocation', event.data.invocation)];
+    case 'capability-coordinator-resumed':
+      return [`Capability task ${event.data.task} coordinator resumed`, ref('invocation', event.data.invocation)];
+    case 'capability-exchange-opened':
+      return [`Capability task ${event.data.task} opened exchange ${event.data.exchange}`, ref('invocation', event.data.invocation)];
+    case 'capability-exchange-answered':
+      return [`Capability task ${event.data.task} received exchange ${event.data.exchange}`, ref('invocation', event.data.invocation)];
+    case 'capability-assigned':
+      return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, ref('invocation', event.data.invocation)];
+    case 'capability-assignment-settled':
+      return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, []];
+    case 'capability-verification-started':
+      return [`Capability task ${event.data.task} verification started`, ref('invocation', event.data.invocation)];
+    case 'capability-verification-failed':
+      return [`Capability task ${event.data.task} verification failed`, []];
+    case 'capability-handed-back':
+      return [`Capability task ${event.data.task} handed back`, ref('invocation', event.data.invocation)];
+    case 'capability-stopped':
+      return [`Capability task ${event.data.task} stopped`, []];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':

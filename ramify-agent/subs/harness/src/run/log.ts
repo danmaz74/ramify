@@ -197,6 +197,20 @@ export const runEventSchema = z.discriminatedUnion('type', [
     checkFindings: checkFindingEventsField,
   }).strict()),
   event('candidate-bound-to-gate', z.object({ candidate: text, assessment: text, gate: text, commit: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),
+  /** Plan 16 coordination records are committed with these events. The
+   * original request and each revision remain separate immutable records. */
+  event('capability-requested', z.object({ request: text, parent: text, assignment: text, invocation: text }).strict()),
+  event('capability-delegated', z.object({ task: text, request: text, parent: text, invocation: text, planRevision: z.literal(1) }).strict()),
+  event('capability-plan-revised', z.object({ task: text, revision: z.int().positive(), basedOn: z.int().positive(), invocation: text }).strict()),
+  event('capability-coordinator-resumed', z.object({ task: text, invocation: text, session: sessionIdSchema }).strict()),
+  event('capability-exchange-opened', z.object({ task: text, exchange: text, invocation: text }).strict()),
+  event('capability-exchange-answered', z.object({ task: text, exchange: text, invocation: text }).strict()),
+  event('capability-assigned', z.object({ task: text, assignment: text, sequence: z.int().positive(), invocation: text }).strict()),
+  event('capability-assignment-settled', z.object({ task: text, assignment: text, outcome: z.enum(['accepted', 'partial', 'failed', 'interrupted']) }).strict()),
+  event('capability-verification-started', z.object({ task: text, invocation: text }).strict()),
+  event('capability-verification-failed', z.object({ task: text, finding: text }).strict()),
+  event('capability-handed-back', z.object({ task: text, handback: text, invocation: text }).strict()),
+  event('capability-stopped', z.object({ task: text, reason: text }).strict()),
   /**
    * The run was started with its review stop: after the analysis is
    * accepted it waits, holding the project, for `analysis-approved` or a

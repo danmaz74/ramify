@@ -148,9 +148,30 @@ Proposed record schemas use `ramify-agent.capability-request/1`,
 `ramify-agent.capability-task/1`, `ramify-agent.capability-plan/1`,
 `ramify-agent.capability-exchange/1` and `ramify-agent.capability-handback/1`.
 Store them under `capabilities/<task-id>/` with immutable plan revisions and
-exchanges. The existing ledger owns writes and materialization. Assignments,
-invocations, command evidence and reviews retain their existing record types
-with a versioned capability-task association where needed.
+exchanges. The existing ledger owns writes and materialization. Capability
+assignments use a distinct task-owned record; invocations gain explicit task
+links, while command evidence and reviews retain their existing record types.
+
+Iteration 1's concrete harness contracts are in `subs/harness/src/capability/`:
+`capabilityRequestSchema`, `capabilityTaskSchema`, `capabilityPlanSchema`,
+`capabilityExchangeSchema`, `capabilityAssignmentSchema` and
+`capabilityHandbackSchema` in `records.ts`; `capabilityActionSchema`,
+`qualificationActionSchema`, `capabilityPlanUpdateSchema` and the shared
+`validateCapabilityAction` / `validateCapabilityPlanUpdate` functions in
+`submission.ts`; `transitionCapabilityState`, `replayCapabilityState` and
+`capabilityHandbackReadiness` in `state.ts`; and
+`commitCapabilityTransition` in `ledger.ts`. These are internal preparation
+contracts. They do not enable the new production workflow before iteration 7.
+The request is materialized at `capabilities/requests/<request-id>.json` while
+qualification may still satisfy it without creating a task. A delegated task's
+other records are under `capabilities/<task-id>/`. A task assignment has its own
+`capability-assignment/1` record and task-owned sequence; the historical
+`iteration-assignment/1` record remains unchanged. Invocation work may name
+`capabilityTask` and `capabilityAssignment` explicitly. A `run-policy/5`
+factory captures `maxIterationsPerCapabilityTask`, initially equal to the
+ordinary per-work-item limit, while production still captures its prior policy.
+The [reviewed amendment wording](iterations/01-model-wording.md) is staged for
+iteration 7 to apply with the full rollout.
 
 ## Capability architect tools and turn results
 
