@@ -230,14 +230,15 @@ class SessionHost implements RetainedSession {
       return control.signal?.aborted ? { status: 'cancelled' } : result;
     }
     catch (error) {
-      // A disposed session is an invalid revision, as for measurements. The
-      // affected reasons have no analysis failure: a failed worker disposes
-      // the session, so its failure is reported as the same invalid revision.
+      // A disposed session is an invalid revision, as for measurements, and so
+      // is a failed worker, which disposes its session. An operation error the
+      // worker reports while the session stays alive is an analysis failure.
       const disposed = error instanceof Error && 'code' in error
         && (error as { code?: unknown }).code === 'session-disposed';
       if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed', unknownModules: [] };
+      const failed = this.#failed !== null;
       const reported = await this.#reportedFailure(error as Error);
-      return { status: 'unavailable', reason: 'invalid-revision',
+      return { status: 'unavailable', reason: failed ? 'invalid-revision' : 'analysis-failed',
         message: reported.report.diagnostics[0]?.message ?? String(error), unknownModules: [] };
     }
   }

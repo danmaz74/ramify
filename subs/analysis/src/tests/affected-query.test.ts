@@ -137,6 +137,16 @@ describe('affected-module projection: forwarding and shims', () => {
     expect(ids(select(shimGraph(), ['styles']).affectedModules)).toEqual([]);
     expect(ids(select(shimGraph(), ['other']).affectedModules)).toEqual([]);
   });
+
+  it('A7-03:owned-tests-import-edge: a file in x\'s src/tests/ area importing y makes x a dependent of y', () => {
+    const test = 'subs/x/src/tests/x.test.ts';
+    const facts = graphFacts({ modules: { x: 'subs/x', y: 'subs/y' }, files: [inventoryFile(test, 'x', 'tests')],
+      accesses: [access(origin(test, 'x', 'tests'), { kind: 'application', origin: origin('subs/y/src/y.ts', 'y') },
+        [selection({ owner: 'y', file: 'subs/y/src/y.ts' })])] });
+    expect(select(facts, ['y'])).toMatchObject({ changedModules: [sub('y')], affectedModules: [sub('x')],
+      testModules: [sub('x'), sub('y')], selection: 'dependency-closure', widening: [] });
+    expect(select(facts, ['x']).affectedModules).toEqual([]);
+  });
 });
 
 describe('affected-module projection: path seeds (A7-02)', () => {
@@ -189,6 +199,21 @@ describe('affected-module projection: path seeds (A7-02)', () => {
       { path: 'subs/b/src/tests/fixtures/input.json', module: 'r/b', basis: 'area' },
     ]);
     expect(result.changedModules).toEqual([root, b]);
+  });
+
+  it('A7-02:area-fixture boundary: an area root matches whole path segments only', () => {
+    // a's area is subs/a/src and ab's is subs/ab/src.
+    const result = select(graphFacts({ modules: { a: 'subs/a', ab: 'subs/ab' } }), [], ['subs/ab/src/new.ts', 'subs/abc/x.ts', 'subs/a']);
+    expect(result.paths).toEqual([
+      { path: 'subs/a', module: null, basis: 'none' },
+      { path: 'subs/ab/src/new.ts', module: 'ab', basis: 'area' },
+      { path: 'subs/abc/x.ts', module: null, basis: 'none' },
+    ]);
+    expect(result.changedModules).toEqual([sub('ab')]);
+    expect(result.affectedModules).toEqual([]);
+    expect(result.testModules).toEqual([sub('a'), sub('ab')]);
+    expect(result.selection).toBe('all-modules');
+    expect(result.widening).toEqual(['unowned-path']);
   });
 
   it('A7-02:deleted-file: a missing, non-inventoried path in an area seeds that module and keeps the closure', () => {
@@ -286,5 +311,21 @@ describe('affected-module projection: cancellation', () => {
   it('A7-05:worker-cancel (projector): an aborted signal answers cancelled', () => {
     const controller = new AbortController(); controller.abort();
     expect(projectAffected(chain(), seeds(['c']), affectedLimits, { signal: controller.signal })).toEqual({ status: 'cancelled' });
+  });
+
+  it('A7-05:worker-cancel stride: a signal aborted after the entry check cancels inside the access loop', () => {
+    // 1,099 self accesses add no edge; the last access adds a -> b, which exceeds
+    // maxEdges 0. Only a check inside the loop can answer before that edge.
+    const own = origin('subs/a/src/a.ts', 'a');
+    const accesses = Array.from({ length: 1099 }, () => access(own, { kind: 'application', origin: origin('subs/a/src/other.ts', 'a') }));
+    accesses.push(access(own, { kind: 'application', origin: origin('subs/b/src/b.ts', 'b') }));
+    const facts = graphFacts({ modules: { a: 'subs/a', b: 'subs/b' }, accesses });
+    const limits = { maxModules: 2, maxEdges: 0 };
+    expect(projectAffected(facts, seeds(['b']), limits)).toMatchObject({ status: 'unavailable', reason: 'resource-limit' });
+    let reads = 0;
+    const signal = { get aborted() { return reads++ > 0; } } as unknown as AbortSignal;
+    expect(projectAffected(facts, seeds(['b']), limits, { signal })).toEqual({ status: 'cancelled' });
+    // The entry check and the check at the 1,024th access.
+    expect(reads).toBe(2);
   });
 });

@@ -137,11 +137,14 @@ suite was not run.
    only change outside `subs/analysis/`. Iteration 2 must not add it again.
    The daemon relays of `AffectedRequest` and `ContextAffectedOutcome` remain
    for iteration 2.
-3. **A worker failure is `invalid-revision`.** `AffectedUnavailableReason` has
-   no `analysis-failed`. A failed worker disposes its session, so the host
+3. **A worker failure is `invalid-revision`; an operation error is
+   `analysis-failed`.** A failed worker disposes its session, so the host
    reports the failure with the disposed-session reason `invalid-revision` and
-   the failure's message. Iteration 2 should treat such an outcome like the
-   existing session-loss handling of `measure`.
+   the failure's message. An operation error the worker reports as `kind:
+   'error'` leaves the session alive; the review added `analysis-failed` to
+   `AffectedUnavailableReason` for it, and the host reports it with that
+   reason and the error's message. Originally both answered
+   `invalid-revision`.
 4. **Coverage assembly and order.** `assembleAffectedFacts` keeps the
    contract's four parameters and assembles coverage from the facts, rather
    than from the published `revision.coverage`, which a bounded publication

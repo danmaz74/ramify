@@ -52,7 +52,7 @@ export interface AffectedSelection {
 }
 export type AffectedUnavailableReason =
   | 'invalid-query' | 'invalid-revision' | 'invalid-current' | 'missing-facts'
-  | 'unknown-module' | 'resource-limit';
+  | 'unknown-module' | 'resource-limit' | 'analysis-failed';
 export type SessionAffectedOutcome =
   | { readonly status: 'answered'; readonly sequence: number; readonly result: AffectedSelection }
   | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason;
@@ -82,7 +82,9 @@ checks; it still reports coverage and widening.
 ### Readiness
 
 Mirror `measurements`: disposed session or a sequence other than the current
-one is `invalid-revision`; `facts.invalid`, a null inventory or area issues is
+one is `invalid-revision`, as is a failed worker, which disposes its session;
+an operation error the worker reports while the session stays alive is
+`analysis-failed`. `facts.invalid`, a null inventory or area issues is
 `invalid-current`. A current revision whose retained facts lack access
 interpretation, because the session's capabilities never requested it or a
 prerequisite stage is blocked, is `missing-facts`. Iteration 1 identifies the
@@ -280,7 +282,7 @@ affected and test module lists and the count of coverage notes.
 | --- | --- |
 | Answered, `dependency-closure` or `all-modules` | 0 |
 | Invalid project, unknown module ID or invalid seeds | 1 |
-| Unavailable, pending, cold, superseded, deadline exceeded | 2 |
+| Unavailable, including `analysis-failed`, pending, cold, superseded, deadline exceeded | 2 |
 | Cancelled | 130 |
 
 An `all-modules` answer exits 0 because it is a complete conservative answer;

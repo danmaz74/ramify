@@ -45,7 +45,7 @@ export interface AffectedSelection {
 }
 export type AffectedUnavailableReason =
   | 'invalid-query' | 'invalid-revision' | 'invalid-current' | 'missing-facts'
-  | 'unknown-module' | 'resource-limit';
+  | 'unknown-module' | 'resource-limit' | 'analysis-failed';
 export type SessionAffectedOutcome =
   | { readonly status: 'answered'; readonly sequence: number; readonly result: AffectedSelection }
   | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason;

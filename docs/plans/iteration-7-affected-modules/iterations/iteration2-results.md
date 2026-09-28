@@ -181,10 +181,13 @@ written. The whole Vitest suite was not run.
 2. **Session reasons pass through unchanged.** `apiView` folds session refusals
    into `analysis-failed` or `resource-unavailable`; the affected union admits
    `AffectedUnavailableReason`, so `invalid-query`, `unknown-module`,
-   `missing-facts`, `invalid-current`, `resource-limit` and `invalid-revision`
-   reach the client as the session gave them. A worker failure therefore answers
-   `unavailable/invalid-revision` with the failure's message and the revision,
-   unless the live session has moved past the sequence, which is `superseded`.
+   `missing-facts`, `invalid-current`, `resource-limit`, `invalid-revision`
+   and `analysis-failed` reach the client as the session gave them. A worker
+   failure therefore answers `unavailable/invalid-revision` with the failure's
+   message and the revision, unless the live session has moved past the
+   sequence, which is `superseded`. An operation error on a live session
+   answers `unavailable/analysis-failed`, a reason the iteration 1 review
+   fixes added.
 3. **Published freshness details the contract left open.** A named
    `freshness.revision` other than the published one answers `superseded`,
    because the session answers only its current revision. A published request
