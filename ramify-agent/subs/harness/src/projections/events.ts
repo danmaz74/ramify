@@ -315,37 +315,37 @@ function describe(event: RunEvent): [string, Ref[]] {
     case 'candidate-bound-to-gate':
       return [`Candidate ${event.data.candidate} bound to gate ${event.data.gate}`, ref('gate', event.data.gate)];
     case 'capability-requested':
-      return [`Capability request ${event.data.request} recorded`, ref('invocation', event.data.invocation)];
+      return [`Capability request ${event.data.request} recorded`, [...ref('capability-request', event.data.request), ...ref('invocation', event.data.invocation)]];
     case 'capability-qualified':
-      return [`Capability request ${event.data.request} qualified: ${event.data.outcome}`, ref('invocation', event.data.invocation)];
+      return [`Capability request ${event.data.request} qualified: ${event.data.outcome}`, [...ref('capability-request', event.data.request), ...ref('invocation', event.data.invocation)]];
     case 'capability-delegated':
-      return [`Capability task ${event.data.task} delegated`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} delegated`, [...ref('capability-task', event.data.task), ...ref('capability-request', event.data.request), ...ref('invocation', event.data.invocation)]];
     case 'capability-plan-revised':
-      return [`Capability task ${event.data.task} plan revised to ${event.data.revision}`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} plan revised to ${event.data.revision}`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-coordinator-resumed':
-      return [`Capability task ${event.data.task} coordinator resumed`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} coordinator resumed`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-exchange-opened':
-      return [`Capability task ${event.data.task} opened exchange ${event.data.exchange}`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} opened exchange ${event.data.exchange}`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-exchange-answered':
-      return [`Capability task ${event.data.task} received exchange ${event.data.exchange}`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} received exchange ${event.data.exchange}`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-assigned':
-      return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment), ...ref('invocation', event.data.invocation)]];
     case 'capability-assignment-interrupted':
-      return [`Capability assignment ${event.data.assignment} remains unfinished: ${event.data.cause}`, ref('invocation', event.data.invocation)];
+      return [`Capability assignment ${event.data.assignment} remains unfinished: ${event.data.cause}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment), ...ref('invocation', event.data.invocation)]];
     case 'capability-assignment-settled':
-      return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, []];
+      return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, [...ref('capability-task', event.data.task), ...ref('capability-assignment', event.data.assignment)]];
     case 'capability-review-recorded':
-      return [`Capability task ${event.data.task} review ${event.data.outcome} at ${event.data.tree}`, ref('gate', event.data.gate)];
+      return [`Capability task ${event.data.task} review ${event.data.outcome} at ${event.data.tree}`, [...ref('capability-task', event.data.task), ...ref('gate', event.data.gate)]];
     case 'capability-candidate-accepted':
-      return [`Capability task ${event.data.task} accepted candidate ${event.data.tree}`, ref('gate', event.data.gate)];
+      return [`Capability task ${event.data.task} accepted candidate ${event.data.tree}`, [...ref('capability-task', event.data.task), ...ref('gate', event.data.gate)]];
     case 'capability-verification-started':
-      return [`Capability task ${event.data.task} verification started`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} verification started`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-verification-failed':
-      return [`Capability task ${event.data.task} verification failed`, []];
+      return [`Capability task ${event.data.task} verification failed`, ref('capability-task', event.data.task)];
     case 'capability-handed-back':
-      return [`Capability task ${event.data.task} handed back`, ref('invocation', event.data.invocation)];
+      return [`Capability task ${event.data.task} handed back`, [...ref('capability-task', event.data.task), ...ref('invocation', event.data.invocation)]];
     case 'capability-stopped':
-      return [`Capability task ${event.data.task} stopped`, []];
+      return [`Capability task ${event.data.task} stopped`, ref('capability-task', event.data.task)];
     case 'stop-requested':
       return ['A stop was requested', []];
     case 'job-completed':
@@ -368,7 +368,9 @@ const counted = (count: number, one: string, many: string): string => `${count} 
 
 /** The records a session's work names. */
 const workRefs = (work: RunEventOf<'session-opened'>['data']['work']): Ref[] => [
-  ...ref('work-item', work.workItem), ...ref('iteration', work.iteration), ...ref('request', work.request),
+  ...ref('work-item', work.workItem), ...ref('iteration', work.iteration),
+  ...ref(work.capabilityTask === undefined ? 'request' : 'capability-request', work.request),
+  ...ref('capability-task', work.capabilityTask), ...ref('capability-assignment', work.capabilityAssignment),
 ];
 
 /** The invocation a point names, where it names one. */

@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { capabilityTasksResponseSchema, type CapabilityTasksResponse } from '../../harness/src/interfaces/protocol/capability-tasks.js';
 import {
   checkFindingDetailSchema, checkFindingListResponseSchema, checkFindingModuleCountsSchema, reviewListResponseSchema,
   type CheckFindingDetail, type CheckFindingListResponse, type CheckFindingModuleCounts, type ReviewListResponse,
@@ -75,6 +76,7 @@ export interface ProtocolClient {
   getWorkItems(planId: string, runId: string): Promise<WorkItemListResponse>;
   getWorkItem(planId: string, runId: string, workItem: string): Promise<WorkItemResponse>;
   getCapabilities(planId: string, runId: string): Promise<CapabilityListResponse>;
+  getCapabilityTasks(planId: string, runId: string, version: number): Promise<CapabilityTasksResponse>;
   /** The initial analysis's module associations beside the capabilities verified at their current owners. */
   getModuleCapabilities(planId: string, runId: string): Promise<ModuleCapabilityComparisonResponse>;
   /** Every tracked acceptance scenario with its state and the gates that ran it. */
@@ -180,6 +182,11 @@ export function createProtocolClient(origin = '', fetchImpl: typeof fetch = (...
     getWorkItems: (planId, runId) => get(protocolPaths.runWorkItems(planId, runId), workItemListResponseSchema),
     getWorkItem: (planId, runId, workItem) => get(protocolPaths.runWorkItem(planId, runId, workItem), workItemResponseSchema),
     getCapabilities: (planId, runId) => get(protocolPaths.runCapabilities(planId, runId), capabilityListResponseSchema),
+    getCapabilityTasks: async (planId, runId, version) => {
+      const answer = await get(protocolPaths.runCapabilityTasks(planId, runId, version), capabilityTasksResponseSchema);
+      if (answer.version !== version) throw new ClientError('invalid-response', `Capability task response version ${answer.version} differs from requested ${version}`);
+      return answer;
+    },
     getModuleCapabilities: (planId, runId) => get(protocolPaths.runModuleCapabilities(planId, runId), moduleCapabilityComparisonResponseSchema),
     getScenarios: (planId, runId) => get(protocolPaths.runScenarios(planId, runId), scenarioListResponseSchema),
     getExecutionMap: async (planId, runId) => {

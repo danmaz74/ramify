@@ -78,6 +78,11 @@ expose-sub executionCurrentActivitySchema, executionMapQuerySchema, executionMap
 expose-sub executionCapabilityDetailSchema, ExecutionCapabilityDetail from harness to descendants
 expose-sub executionScenarioDetailSchema, ExecutionScenarioDetail from harness to descendants
 
+// protocol/capability-tasks.ts
+expose-sub capabilityTasksResponseSchema, CapabilityTasksResponse from harness to descendants
+expose-sub capabilityTaskViewSchema, CapabilityTaskView from harness to descendants
+expose-sub capabilityRequestViewSchema, CapabilityRequestView from harness to descendants
+
 // protocol/runs.ts
 expose-sub runIdSchema, RunId, roleSchema, Role, runAgentSchema, RunAgent from harness to descendants
 expose-sub startRunCommandSchema, StartRunCommand, runCommandSchema, RunCommand from harness to descendants

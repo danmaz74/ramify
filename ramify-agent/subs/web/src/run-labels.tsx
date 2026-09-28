@@ -48,6 +48,7 @@ export function reachText(reach: SessionReach): string {
     case 'run': return 'the run itself';
     case 'work-item': return `work item ${reach.workItem}${reach.capability ? `, capability ${reach.capability}` : ''}${reach.module ? `, module ${reach.module}` : ''}`;
     case 'request': return `request ${reach.request}${reach.capability ? `, capability ${reach.capability}` : ''}${reach.workItem ? `, work item ${reach.workItem}` : ''}`;
+    case 'capability-task': return `capability task ${reach.task}${reach.assignment ? `, assignment ${reach.assignment}` : ''}${reach.request ? `, request ${reach.request}` : ''}${reach.module ? `, module ${reach.module}` : ''}`;
     case 'module': return `module ${reach.module}`;
   }
 }

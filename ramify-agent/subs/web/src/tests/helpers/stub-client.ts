@@ -2,6 +2,7 @@ import type {
   CheckFindingDetail, CheckFindingListResponse, CheckFindingModuleCounts, ReviewListResponse,
 } from '../../../../harness/src/interfaces/protocol/check-findings.js';
 import type { ModuleTree } from '../../../../harness/src/interfaces/protocol/evidence.js';
+import type { CapabilityTasksResponse } from '../../../../harness/src/interfaces/protocol/capability-tasks.js';
 import type { CheckFindingPathQuery } from '../../../../harness/src/interfaces/protocol/paths.js';
 import type { ExecutionCapabilityDetail, ExecutionScenarioDetail } from '../../../../harness/src/interfaces/protocol/execution-map.js';
 import type { Receipt } from '../../../../harness/src/interfaces/protocol/jobs.js';
@@ -29,6 +30,7 @@ export interface StubRun {
   workItems?: WorkItemListResponse;
   workItem?: Record<string, WorkItemResponse>;
   capabilities?: CapabilityListResponse;
+  capabilityTasks?: CapabilityTasksResponse;
   moduleCapabilities?: ModuleCapabilityComparisonResponse;
   gates?: Record<string, GateView>;
   scenarios?: ScenarioListResponse;
@@ -144,6 +146,12 @@ export class StubClient implements ProtocolClient {
   async getWorkItems(_planId: string, runId: string) { this.calls.push(`getWorkItems:${runId}`); return this.answer(runId, run => run.workItems, 'work items'); }
   async getWorkItem(_planId: string, runId: string, workItem: string) { this.calls.push(`getWorkItem:${runId}:${workItem}`); return this.answer(runId, run => run.workItem?.[workItem], `work item ${workItem}`); }
   async getCapabilities(_planId: string, runId: string) { this.calls.push(`getCapabilities:${runId}`); return this.answer(runId, run => run.capabilities, 'capabilities'); }
+  async getCapabilityTasks(_planId: string, runId: string, version: number) {
+    this.calls.push(`getCapabilityTasks:${runId}:${version}`);
+    const answer = this.answer(runId, run => run.capabilityTasks, 'capability tasks');
+    if (answer.version !== version) throw new ClientError('protocol', 'Capability task response is stale', 'stale-version', answer.version);
+    return answer;
+  }
   async getModuleCapabilities(_planId: string, runId: string) { this.calls.push(`getModuleCapabilities:${runId}`); return this.answer(runId, run => run.moduleCapabilities, 'module capabilities'); }
   async getScenarios(_planId: string, runId: string) { this.calls.push(`getScenarios:${runId}`); return this.answer(runId, run => run.scenarios, 'scenarios'); }
   async getExecutionMap(_planId: string, runId: string) { this.calls.push(`getExecutionMap:${runId}`); return this.answer(runId, run => run.executionMap, 'execution map'); }

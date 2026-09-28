@@ -385,6 +385,7 @@ export const runEventRefKindSchema = z.enum([
   'work-item', 'iteration', 'invocation', 'gate', 'decision', 'request',
   'contract', 'obligation', 'requirement', 'capability', 'commit', 'scenario',
   'session',
+  'capability-request', 'capability-task', 'capability-assignment',
 ]);
 export type RunEventRefKind = z.infer<typeof runEventRefKindSchema>;
 

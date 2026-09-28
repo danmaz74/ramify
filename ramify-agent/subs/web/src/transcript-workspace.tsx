@@ -93,7 +93,7 @@ export function TranscriptWorkspace({ client, planId, runId, nodes, windows, onO
       const accent = role ? tokens.light.role[role] : '#475569';
       const state = detailed?.state ?? node?.state ?? 'unavailable';
       const reach = detailed?.reaches ?? node?.reach;
-      const module = reach?.kind === 'work-item' || reach?.kind === 'module' ? reach.module ?? 'module unavailable'
+      const module = reach?.kind === 'work-item' || reach?.kind === 'module' || reach?.kind === 'capability-task' ? reach.module ?? 'module unavailable'
         : node?.modules.map(relation => relation.module).join(', ') || 'run-wide';
       const body = <div className="transcript-window-body" hidden={!compact && item.minimized} onClickCapture={event => navigate(event, item.id)}>
         <SessionReading client={client} session={ref} anchor={item.anchor} anchorNonce={item.anchorNonce} reading={reading} compact />

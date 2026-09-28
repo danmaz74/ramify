@@ -7,6 +7,7 @@ import {
   checkFindingSelectSchema, checkFindingWireIdSchema, checkFindingWireLimits, reviewListResponseSchema,
 } from '../interfaces/protocol/check-findings.js';
 import { errorHttpStatus, errorResponseSchema, type ErrorCode } from '../interfaces/protocol/errors.js';
+import { capabilityTasksResponseSchema } from '../interfaces/protocol/capability-tasks.js';
 import { moduleTreeResponseSchema } from '../interfaces/protocol/evidence.js';
 import { executionCapabilityDetailSchema, executionMapPageSchema, executionScenarioDetailSchema } from '../interfaces/protocol/execution-map.js';
 import { commandResponseSchema } from '../interfaces/protocol/jobs.js';
@@ -157,6 +158,12 @@ export function createApp(options: AppOptions): express.Express {
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/capabilities`, async (request: RunRequest, response) => {
     send(response, capabilityListResponseSchema, await projected(() => queries.capabilities(request.params.planId, request.params.runId)));
+  });
+
+  app.get(`${apiPrefix}/plans/:planId/runs/:runId/capability-tasks`, async (request: RunRequest, response) => {
+    const raw = request.query['version'];
+    if (typeof raw !== 'string' || !/^\d{1,15}$/.test(raw)) throw new ProtocolFailure('invalid-request', '"version" must be a run version');
+    send(response, capabilityTasksResponseSchema, await projected(() => queries.capabilityTasks(request.params.planId, request.params.runId, Number(raw))));
   });
 
   app.get(`${apiPrefix}/plans/:planId/runs/:runId/module-capabilities`, async (request: RunRequest, response) => {

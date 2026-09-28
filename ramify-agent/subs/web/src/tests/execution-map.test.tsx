@@ -34,6 +34,9 @@ const map: ExecutionMapSnapshot = canvasMap;
 function client(): ProtocolClient {
   return { getExecutionMap: async () => map, getExecutionCapability: async () => capabilityDetail,
     getExecutionScenario: async () => scenarioDetail,
+    getCapabilityTasks: async (_planId: string, _runId: string, version: number) => ({
+      schema: 'capability-tasks/1', version, terminal: { state: 'running', reason: null, message: null }, requests: [], tasks: [], stack: [],
+    }),
     getGate: async () => ({ commit: null, audited: null, evidence: null, commands: [] }),
   } as unknown as ProtocolClient;
 }
