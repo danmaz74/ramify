@@ -1,10 +1,11 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { runBatch } from '../batch.js';
+import { runAffectedBatch, runBatch } from '../batch.js';
 import { runCli } from '../../subs/cli/src/run-cli.js';
 import type { AnalysisDiagnostic, AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
-import type { BatchInvocation } from '../interfaces/batch.js';
-import { fixture, invoke, put } from './fixture.js';
+import type { AffectedBatchInvocation, BatchInvocation } from '../interfaces/batch.js';
+import type { AffectedDocument } from '../../subs/cli/src/interfaces/cli.js';
+import { affectedFixture, fixture, invoke, put } from './fixture.js';
 
 describe('CLI with real batch sessions', () => {
   for (const selection of ['resolved', 'unresolved'] as const) it(`labels ${selection} batch output without altering the JSON report`, async () => fixture(async root => {
@@ -181,6 +182,38 @@ describe('CLI with real batch sessions', () => {
   it('handles synchronous output failures after a real session releases its resources', async () => fixture(async root => {
     const errors: string[] = [];
     expect(await runCli(['check', '--batch', '--format', 'json'], { cwd: root, version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); }, batch: runBatch,
+      stdout: () => { throw new Error('Broken sink'); }, stderr: text => { errors.push(text); } })).toBe(2);
+    expect(errors.join('')).toContain('output-failure');
+  }), 15_000);
+
+  it('A7-11: affected --batch hands the seeds to the affected batch operation alone and never connects', () => affectedFixture(async root => {
+    const invocations: AffectedBatchInvocation[] = [];
+    const stdout: string[] = [];
+    const exitCode = await runCli(['affected', 'example/lone', '--path', 'subs/mid/src/interfaces/api.ts', '--path', 'docs/notes.md',
+      '--batch', '--root', root, '--format', 'json'], { cwd: join(root, 'subs/lone'), version: '1', stdout: text => { stdout.push(text); },
+      stderr: text => { throw new Error(text); }, connect: async () => { throw new Error('Unexpected daemon connection'); },
+      batch: async () => { throw new Error('Unexpected check batch'); },
+      affectedBatch: async (invocation, control) => { invocations.push(invocation); return runAffectedBatch(invocation, control); } });
+    expect([exitCode, stdout.length]).toEqual([0, 1]);
+    expect(invocations).toEqual([{ cwd: join(root, 'subs/lone'), root, modules: ['example/lone'],
+      paths: ['subs/mid/src/interfaces/api.ts', 'docs/notes.md'] }]);
+    const document = JSON.parse(stdout[0]!) as AffectedDocument;
+    expect(document).toMatchObject({ mode: 'batch', root, revision: { sequence: null } });
+    expect(document.selection).toMatchObject({ changedModules: [{ id: 'example/lone', directory: 'subs/lone' }, { id: 'example/mid', directory: 'subs/mid' }],
+      affectedModules: [{ id: 'example/app', directory: 'subs/app' }], selection: 'all-modules', widening: ['unowned-path'],
+      testModules: ['example', 'example/app', 'example/core', 'example/lone', 'example/mid'].map(id => expect.objectContaining({ id })) });
+  }), 30_000);
+
+  it('A7-11: affected --batch without an affected batch operation is unavailable, not a check', () => affectedFixture(async root => {
+    const result = await invoke(root, ['affected', 'example/core', '--batch', '--format', 'json']);
+    expect([result.exitCode, result.stderr, result.writes]).toEqual([2, '', 1]);
+    expect(JSON.parse(result.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', diagnostics: [{ code: 'unavailable' }] });
+  }), 15_000);
+
+  it('A7-11: handles an output failure after a real affected batch session', () => affectedFixture(async root => {
+    const errors: string[] = [];
+    expect(await runCli(['affected', 'example/core', '--batch', '--format', 'json'], { cwd: root, version: '1',
+      connect: async () => { throw new Error('Unexpected daemon connection'); }, batch: runBatch, affectedBatch: runAffectedBatch,
       stdout: () => { throw new Error('Broken sink'); }, stderr: text => { errors.push(text); } })).toBe(2);
     expect(errors.join('')).toContain('output-failure');
   }), 15_000);

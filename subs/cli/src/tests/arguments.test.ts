@@ -274,3 +274,71 @@ describe('measure command grammar', () => {
     expect(stdout.join('')).toContain('measure: 0 one complete document');
   });
 });
+
+describe('affected command grammar', () => {
+  const unexpected = { cwd: '/project', version: '1', connect: async () => { throw new Error('Unexpected daemon connection'); },
+    batch: async () => { throw new Error('Unexpected batch'); }, affectedBatch: async () => { throw new Error('Unexpected affected batch'); } };
+
+  it('A7-09:positional-ids: parses operands as module IDs in order', () => {
+    expect(parseArguments(['affected', 'a', 'b'])).toEqual({ command: 'affected', format: 'human', batch: false,
+      modules: ['a', 'b'], paths: [] });
+  });
+
+  it('A7-09:path-repeat: repeats --path beside module IDs, keeping each list in order', () => {
+    expect(parseArguments(['affected', '--path', 'x', 'app/core', '--path', 'y', '--root', 'r'])).toEqual({ command: 'affected',
+      root: 'r', format: 'human', batch: false, modules: ['app/core'], paths: ['x', 'y'] });
+    expect(parseArguments(['affected', '--path', 'x', '--path', 'x'])).toEqual({ command: 'affected', format: 'human', batch: false,
+      modules: [], paths: ['x', 'x'] });
+  });
+
+  it('A7-09:no-seed: requires a module ID or --path before any dispatch', async () => {
+    for (const argv of [['affected'], ['affected', '--batch'], ['affected', '--root', 'r', '--format', 'json']]) {
+      expect(() => parseArguments(argv), argv.join(' ')).toThrow('affected requires at least one module ID or --path');
+    }
+    const stdout: string[] = [];
+    const exit = await runCli(['affected', '--format', 'json'], { ...unexpected, stdout: text => { stdout.push(text); },
+      stderr: text => { throw new Error(text); } });
+    expect([exit, stdout.length]).toEqual([2, 1]);
+    expect(JSON.parse(stdout[0]!)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
+      diagnostics: [{ category: 'invocation', code: 'invalid-invocation', message: 'affected requires at least one module ID or --path' }] });
+  });
+
+  it.each([
+    ['affected', 'a', '--since', 'rev/1:00000000-0000-0000-0000-000000000000:1'], ['affected', 'a', '--changed', 'x.ts'],
+    ['affected', 'a', '--deadline', '100'], ['affected', 'a', '--no-snapshot'], ['affected', 'a', '--view', 'api'],
+    ['affected', 'a', '--all'], ['affected', 'a', '--from', '.'], ['affected', 'a', '-p', 'x'], ['affected', '--path'],
+    ['affected', '--path', '--batch'], ['affected', '--path', ''], ['affected', 'a', '--batch', '--batch'],
+    ['affected', 'a', '--root', 'r', '--root', 's'], ['affected', 'a', '--format', 'xml'], ['affected', 'a', '--format', 'json', '--format', 'json'],
+    ['affected', 'a', ''], ['affected', '--help'],
+  ])('A7-09:unknown-flag: rejects unsupported or ambiguous grammar %j', (...argv) => {
+    expect(() => parseArguments(argv)).toThrow();
+  });
+
+  it('A7-09:unknown-flag: names --since and --changed as unsupported arguments before dispatch', async () => {
+    for (const flag of ['--since', '--changed']) {
+      const stderr: string[] = [];
+      const exit = await runCli(['affected', 'a', flag, 'value'], { ...unexpected, stdout: text => { throw new Error(text); },
+        stderr: text => { stderr.push(text); } });
+      expect(exit).toBe(2);
+      expect(stderr.join('')).toBe(`Error [invalid-invocation]: Unsupported argument: ${flag}\n`);
+    }
+  });
+
+  it('A7-09:batch-with-format: parses --batch with either format', () => {
+    expect(parseArguments(['affected', '--batch', '--format', 'json', '--path', 'src/a.ts'])).toEqual({ command: 'affected',
+      format: 'json', batch: true, modules: [], paths: ['src/a.ts'] });
+    expect(parseArguments(['affected', 'a', '--format', 'human', '--batch'])).toEqual({ command: 'affected',
+      format: 'human', batch: true, modules: ['a'], paths: [] });
+  });
+
+  it('A7-09: lists affected grammar, forms and exits in --help without dispatching', async () => {
+    const stdout: string[] = [];
+    const exit = await runCli(['--help'], { ...unexpected, stdout: text => { stdout.push(text); }, stderr: text => { throw new Error(text); } });
+    expect(exit).toBe(0);
+    const text = stdout.join('');
+    expect(text).toContain('ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]\n                       [--format human|json]');
+    expect(text).toContain('ramify.affected-cli/1');
+    expect(text).toContain('affected: 0 one complete answer, including an all-modules answer, 1 the project');
+    expect(help).toContain('--changed, --since and --deadline do not apply');
+  });
+});

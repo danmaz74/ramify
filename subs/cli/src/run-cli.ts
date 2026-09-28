@@ -5,6 +5,7 @@ import { checkCommand } from './check-command.js';
 import { daemonCommand } from './daemon-command.js';
 import { materializeCommand } from './materialize-command.js';
 import { measureCommand } from './measure-command.js';
+import { affectedCommand } from './affected-command.js';
 import { exploreCommand } from './explore-command.js';
 import { watchCommand } from './watch-command.js';
 import { CliFailure } from './errors.js';
@@ -33,6 +34,7 @@ export async function runCli(argv: readonly string[], environment: CliEnvironmen
     if (args.command === 'daemon') return await daemonCommand(args, output, control);
     if (args.command === 'materialize') return await materializeCommand(args, output, control);
     if (args.command === 'measure') return await measureCommand(args, output, control);
+    if (args.command === 'affected') return await affectedCommand(args, output, control);
     if (args.command === 'explore') return await exploreCommand(args, output, control);
     throw new Error('Invalid command dispatch');
   } catch (error) {

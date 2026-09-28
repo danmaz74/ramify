@@ -1,11 +1,12 @@
 # CLI
 
-The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, revision deltas for the files a caller names, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup.
+The CLI parses supported arguments, reaches the resident daemon through an injected connector or runs an injected batch operation, formats completed reports, revision deltas for the files a caller names, streamed revisions and daemon status, and selects the documented process exit code. It contains no checking algorithm and keeps help, version and status independent of compiler and server startup. Its affected command prints module test selections from the resident service or a fresh batch session.
 
 `runCli(argv, environment, control?)` accepts output sinks, a working directory,
-the package version, a service connector and a `BatchOperation`. Root supplies
-the real connector and batch binding, lazy in the Node entry and a Node child in
-the compiled client, and owns SIGINT and stream cleanup.
+the package version, a service connector, a `BatchOperation` and, for
+`affected --batch`, an `AffectedBatchOperation`. Root supplies the real connector
+and batch bindings, lazy in the Node entry and a Node child in the compiled
+client, and owns SIGINT and stream cleanup.
 The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
 `ramify.cli/1`; plain check results retain the bare `ramify.analysis/1` document.

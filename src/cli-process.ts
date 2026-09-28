@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setImmediate as yieldTurn, setTimeout as delay } from 'node:timers/promises';
 import { runCli } from '../subs/cli/src/run-cli.js';
-import type { BatchOperation } from './interfaces/batch.js';
+import type { AffectedBatchOperation, BatchOperation } from './interfaces/batch.js';
 import { createBuildRefusal, createServiceConnector, type ClientLocation } from './client.js';
 import { reportCapacity } from './report-capacity.js';
 import { createPublicationQueue } from './publication-queue.js';
@@ -12,6 +12,8 @@ export interface CliProcessOptions {
   /** Installed package root; its manifest supplies the version. */
   readonly packageRoot: string;
   readonly batch: BatchOperation;
+  /** The affected-module batch form, bound like `batch`. */
+  readonly affectedBatch: AffectedBatchOperation;
   readonly location?: ClientLocation;
   /** The runtime identity a compiled client embeds; commands refuse an installed build with another. */
   readonly buildIdentity?: string;
@@ -73,7 +75,7 @@ export async function runCliProcess(options: CliProcessOptions): Promise<void> {
         catch (error) { outputFailure(); throw error; }
       }, stderr: text => write(process.stderr, text),
       connect: createServiceConnector(manifest.version, options.location),
-      batch: options.batch,
+      batch: options.batch, affectedBatch: options.affectedBatch,
       explore: (input, control) => import('./explore-launcher.js').then(module => module.launchInstalledExplorer(input,
         { packageRoot: options.packageRoot, version: manifest.version, ...(options.location ? { location: options.location } : {}),
           ...(process.env.RAMIFY_ENDPOINT_DIR ? { endpointDirectory: process.env.RAMIFY_ENDPOINT_DIR } : {}) }, control)),

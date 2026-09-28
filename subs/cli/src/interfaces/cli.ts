@@ -1,4 +1,4 @@
-import type { BatchOperation } from '../../../../src/interfaces/batch.js';
+import type { AffectedBatchOperation, BatchOperation } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
 import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
@@ -6,6 +6,7 @@ import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../an
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
 import type { OutsideSourceWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../../analysis/subs/typescript/src/interfaces/source.js';
+import type { AffectedSelection } from '../../../analysis/src/interfaces/affected.js';
 
 export type CliExitCode = 0 | 1 | 2 | 130;
 export interface ExplorerLaunch {
@@ -24,6 +25,9 @@ export interface CliEnvironment {
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
   readonly batch: BatchOperation;
+  /** The affected-module batch form. Root supplies it in installed CLI entries; without it
+   * `affected --batch` is unavailable and the resident form is unaffected. */
+  readonly affectedBatch?: AffectedBatchOperation;
   readonly connect: ServiceConnector;
   /** Root-owned lazy process assembly; present in installed CLI entries. */
   readonly explore?: ExplorerLauncher;
@@ -64,3 +68,13 @@ export type DaemonStatusDocument =
   | { readonly schemaVersion: 'ramify.daemon-status/1'; readonly running: true; readonly status: DaemonStatus }
   | { readonly schemaVersion: 'ramify.daemon-status/1'; readonly running: false;
       readonly record: DaemonRecord | null };
+/** One `ramify affected --format json` answer. `revision.sequence` is the resident
+ * revision's sequence and null for a batch session. */
+export interface AffectedDocument {
+  readonly schemaVersion: 'ramify.affected-cli/1';
+  readonly root: string;
+  readonly mode: 'resident' | 'batch';
+  readonly revision: { readonly sequence: number | null; readonly inputId: string };
+  readonly ramifyVersion: string;
+  readonly selection: AffectedSelection;
+}

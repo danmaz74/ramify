@@ -6,6 +6,8 @@ export const help = `Usage: ramify check [--root <dir>] [--format json [--no-sna
        ramify materialize [--from <path>] [--all] [--root <dir>]
        ramify materialize --view <api|architect>... [--from <path> | --all] [--root <dir>]
        ramify measure [--root <dir>] [--format json]
+       ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]
+                       [--format human|json]
        ramify explore [--root <dir>]
        ramify daemon status|stop [--format json]
        ramify --help
@@ -53,6 +55,16 @@ owned file inventory. --format json prints the ramify.measure/1 document;
 without it, measure prints a short exact/subtree table. It is a synchronized,
 whole-project daemon query: it writes nothing and never falls back to batch.
 
+affected selects the modules whose tests a change calls for. Seeds are module
+IDs and --path paths relative to the root, as the inventory spells them; give at
+least one. The answer lists the changed modules, the modules that depend on
+them, and the test modules, from one revision's dependency facts. A path
+outside every module widens the answer to all modules, as does partial
+coverage; the widening reasons are printed. Without --batch it is a
+synchronized resident query that never falls back to batch; --batch answers
+from a fresh session that trusts no daemon state. --format json prints one
+ramify.affected-cli/1 document. --changed, --since and --deadline do not apply.
+
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in
 the platform browser and exits. The server keeps running after explore exits,
@@ -70,6 +82,9 @@ service, 130 interrupted.
 measure: 0 one complete document, 1 the project is invalid, 2 unavailable,
 pending, cold, deadline, supersession, resource refusal or incompatible service,
 130 interrupted.
+affected: 0 one complete answer, including an all-modules answer, 1 the project
+is invalid, a module ID is unknown or a seed is invalid, 2 unavailable, pending,
+cold, deadline, supersession or incompatible service, 130 interrupted.
 `;
 
 type Arguments = { readonly command: 'help' | 'version' }
@@ -83,6 +98,8 @@ type Arguments = { readonly command: 'help' | 'version' }
       /** Present only when `--view` was given, in the order given. */
       readonly views?: readonly MaterializeViewId[] }
   | { readonly command: 'measure'; readonly root?: string; readonly format: 'human' | 'json' }
+  | { readonly command: 'affected'; readonly root?: string; readonly format: 'human' | 'json'; readonly batch: boolean;
+      readonly modules: readonly string[]; readonly paths: readonly string[] }
   | { readonly command: 'explore'; readonly root?: string };
 
 /** Validate the entire invocation before dispatch, including duplicate flags. */
@@ -90,7 +107,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if ((argv.length === 1 && argv[0] === '--help') || (argv.length === 2 && argv[0] === 'check' && argv[1] === '--help')) return { command: 'help' };
   if (argv.length === 1 && argv[0] === '--version') return { command: 'version' };
   const command = argv[0];
-  if (command !== 'check' && command !== 'watch' && command !== 'daemon' && command !== 'materialize' && command !== 'measure' && command !== 'explore') {
+  if (command !== 'check' && command !== 'watch' && command !== 'daemon' && command !== 'materialize' && command !== 'measure'
+    && command !== 'explore' && command !== 'affected') {
     throw new Error(argv.length ? `Unavailable command: ${command}.` : 'Specify a command. Use ramify --help.');
   }
   const action = argv[1];
@@ -100,13 +118,24 @@ export function parseArguments(argv: readonly string[]): Arguments {
   let batch = false, noSnapshot = false;
   let changed: string[] | undefined, since: string | undefined, deadlineMs: number | undefined;
   let from: string | undefined, all = false, views: MaterializeViewId[] | undefined;
+  const modules: string[] = [], paths: string[] = [];
   const flags = command === 'check' ? ['--root', '--format', '--batch', '--no-snapshot', '--changed', '--since', '--deadline']
+    : command === 'affected' ? ['--root', '--format', '--batch', '--path']
     : command === 'watch' || command === 'measure' ? ['--root', '--format'] : command === 'materialize' ? ['--root', '--from', '--all', '--view']
     : command === 'explore' ? ['--root'] : ['--format'];
   const seen = new Set<string>();
   for (let index = command === 'daemon' ? 2 : 1; index < argv.length; index++) {
     const flag = argv[index];
+    // An affected module ID is any operand that is not an option.
+    if (command === 'affected' && flag && !flag.startsWith('-')) { modules.push(flag); continue; }
     if (!flags.includes(flag)) throw new Error(`Unsupported argument: ${flag}`);
+    // --path repeats, once per path seed.
+    if (flag === '--path') {
+      const value = argv[++index];
+      if (!value || value.startsWith('--')) throw new Error('Missing value for --path');
+      paths.push(value);
+      continue;
+    }
     // --view repeats, once per view.
     if (flag === '--view') {
       const value = argv[++index];
@@ -149,6 +178,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
       deadlineMs = parsed;
     }
     else {
+      if (command === 'affected' && value === 'human') { format = 'human'; continue; }
       if (value !== 'json') throw new Error(`Unsupported format: ${value}. Use --format json or omit it for human output.`);
       format = 'json';
     }
@@ -166,6 +196,10 @@ export function parseArguments(argv: readonly string[]): Arguments {
   }
   if (command === 'watch') return { command, ...project };
   if (command === 'measure') return { command, ...project };
+  if (command === 'affected') {
+    if (!modules.length && !paths.length) throw new Error('affected requires at least one module ID or --path');
+    return { command, ...project, batch, modules, paths };
+  }
   if (command === 'materialize') {
     if (all && from !== undefined) throw new Error('--all cannot be combined with --from');
     if (views && !views.includes('api') && (all || from !== undefined)) throw new Error('--from and --all select the API view; add --view api');

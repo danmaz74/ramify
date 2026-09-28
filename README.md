@@ -102,7 +102,17 @@ npx ramify daemon stop
 npx ramify materialize
 npx ramify materialize --from subs/workspace/subs/reviews/src/tests
 npx ramify materialize --all --root /path/to/project
+npx ramify affected --path src/foo.ts --format json
+npx ramify affected app/core app/storage
+npx ramify affected --path src/foo.ts --batch --format json
 ```
+
+`ramify affected` names the modules whose tests a change calls for: the changed
+modules, the modules that depend on them and their union as test modules, from
+one revision's dependency facts. A path outside every module, or partial
+coverage, widens the answer to every module and says why. It exits 0 for any
+complete answer, 1 for an invalid project, unknown module ID or invalid seed,
+2 when unavailable and 130 when interrupted.
 
 From this checkout, the same executable can check the reference directly:
 

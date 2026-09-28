@@ -1,5 +1,5 @@
 import { basename, dirname, join, resolve } from 'node:path';
-import { createProcessBatch } from './batch-process.js';
+import { createProcessAffectedBatch, createProcessBatch } from './batch-process.js';
 import { runCliProcess } from './cli-process.js';
 
 /** Replaced at compile time with the runtime identity of the build this client belongs to. */
@@ -14,4 +14,5 @@ const packageRoot = resolve(dirname(process.execPath), '../..');
 const node = 'node';
 await runCliProcess({ packageRoot, buildIdentity: RAMIFY_BUILD_IDENTITY,
   location: { packageRoot, daemonEntry: join(packageRoot, 'dist/src/daemon-entry.js'), daemonRuntime: node },
-  batch: createProcessBatch(node, join(packageRoot, 'dist/src/batch-entry.js')) });
+  batch: createProcessBatch(node, join(packageRoot, 'dist/src/batch-entry.js')),
+  affectedBatch: createProcessAffectedBatch(node, join(packageRoot, 'dist/src/batch-entry.js')) });

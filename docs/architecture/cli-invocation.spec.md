@@ -15,6 +15,8 @@ find by itself.
 
 ```sh
 ramify check [--root <dir>] [--format json [--no-snapshot]] [--batch]
+ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]
+                [--format human|json]
 ramify --help
 ramify --version
 ```
@@ -190,6 +192,21 @@ report by its exact revision id, and releases its subscription on SIGINT.
 [resident contracts](../plans/done/iteration-2-resident-verification/contracts.md)
 define those documents, bounded recovery and visible batch fallback after
 exhausted unexpected-failure recovery. Explicit stop never causes fallback.
+
+`ramify affected` selects the project as `check` does and takes at least one
+seed: module IDs as operands and repeated `--path` paths relative to the root.
+It answers which modules changed, which depend on them and which test modules
+follow, from one revision's retained dependency facts. Without `--batch` it
+opens the project context and requests synchronized freshness from the
+resident daemon, and never falls back to batch. `--batch` answers from a fresh
+session over the same root, with the same capabilities as `check --batch`, in
+the same process seam, and disposes it. `--format json` prints one
+`ramify.affected-cli/1` document with the root, the mode, the revision's
+sequence (null in batch) and input identity, and the selection; failures use
+`ramify.cli/1`. It exits 0 for any answer, including one widened to all
+modules, 1 for an invalid project, an unknown module ID or an invalid seed,
+2 when unavailable, pending, cold, superseded or past a deadline, and 130 when
+interrupted. `--changed`, `--since` and `--deadline` do not apply.
 
 ### Hook and complete checks
 

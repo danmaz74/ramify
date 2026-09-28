@@ -32,3 +32,29 @@ export async function invoke(root: string, argv: readonly string[], batch: Batch
     stderr: text => { stderr.push(text); }, batch }, control);
   return { exitCode, stdout: stdout.join(''), stderr: stderr.join(''), writes: stdout.length };
 }
+
+/** The affected-module reference project: `example/app -> example/mid -> example/core`, where an arrow
+ * means "depends on", an unrelated `example/lone`, and an unowned `docs/notes.md`. */
+export const affectedFiles: Readonly<Record<string, string>> = {
+  'module.ramify': 'ramify 1\nmodule example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
+  'README.md': '# Example\n\nThe affected-module reference project.\n',
+  'package.json': '{"type":"module"}',
+  'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true },
+    include: ['src', 'subs'] }),
+  'docs/notes.md': '# Notes\n',
+  'subs/core/module.ramify': 'ramify 1\nmodule core\nexpose-src * from "interfaces/api.ts" to parent\n',
+  'subs/core/src/interfaces/api.ts': 'export const coreValue: number = 1;\n',
+  'subs/mid/module.ramify': 'ramify 1\nmodule mid\nexpose-src * from "interfaces/api.ts" to parent\n',
+  'subs/mid/src/interfaces/api.ts': "import { coreValue } from '../../../core/src/interfaces/api.js';\nexport const midValue: number = coreValue + 1;\n",
+  'subs/app/module.ramify': 'ramify 1\nmodule app\n',
+  'subs/app/src/main.ts': "import { midValue } from '../../mid/src/interfaces/api.js';\nvoid midValue;\n",
+  'subs/lone/module.ramify': 'ramify 1\nmodule lone\n',
+  'subs/lone/src/alone.ts': 'export const alone: number = 1;\n',
+};
+export async function affectedFixture(run: (root: string) => Promise<void>): Promise<void> {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-affected-')));
+  try {
+    for (const [path, text] of Object.entries(affectedFiles)) await put(root, path, text);
+    await run(root);
+  } finally { await rm(root, { recursive: true, force: true }); }
+}

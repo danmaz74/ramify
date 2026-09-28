@@ -5,7 +5,7 @@ import { machine, tmpdir, type } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fixture } from './fixture.js';
+import { affectedFixture, fixture } from './fixture.js';
 import { repositoryRoot } from './process.js';
 
 // The compiled client is observed from outside: the Node process probe cannot load into it.
@@ -63,6 +63,39 @@ describe('compiled client process contracts', () => {
     }
     expect(await processesMentioning(root)).toEqual([]);
   }), 60_000);
+
+  it('A7-11:compiled-child: runs affected --batch in a Node child and prints the Node entry document', async () => affectedFixture(async root => {
+    for (const args of [['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
+      ['affected', 'example/mid', '--path', 'docs/notes.md', '--batch']]) {
+      const [compiled, node] = [await run(launcher, args, { cwd: root, env }), await run(process.execPath, [nodeEntry, ...args], { cwd: root, env })];
+      expect([compiled.code, compiled.signal, compiled.stdout, compiled.stderr], args.join(' ')).toEqual([0, null, node.stdout, node.stderr]);
+    }
+    const document = JSON.parse((await run(launcher, ['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
+      { cwd: root, env })).stdout);
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/1', root, mode: 'batch', revision: { sequence: null },
+      selection: { changedModules: [{ id: 'example/core' }], affectedModules: [{ id: 'example/app' }, { id: 'example/mid' }],
+        selection: 'dependency-closure' } });
+    expect(document.revision.inputId).toBe(document.selection.inputId);
+    // The compiled client carries no engine: without Node on PATH its batch child cannot start.
+    const isolated = await realpath(await mkdtemp('/tmp/rca-')), tools = join(isolated, 'bin');
+    try {
+      await mkdir(tools);
+      for (const tool of ['uname', 'readlink']) {
+        const { stdout } = await promisify(execFile)('sh', ['-c', `command -v ${tool}`]);
+        await symlink(stdout.trim(), join(tools, tool));
+      }
+      const refused = await run(launcher, ['affected', 'example/core', '--batch'], { cwd: root, env: { ...env, PATH: tools } });
+      expect([refused.code, refused.stdout, refused.stderr]).toEqual([2, '', 'Error [internal-error]: Cannot start node for batch analysis (ENOENT)\n']);
+    } finally { await rm(isolated, { recursive: true, force: true }); }
+    const invalid = await realpath(await mkdtemp('/tmp/rcv-'));
+    try {
+      const refusal = await run(launcher, ['affected', 'x', '--batch', '--format', 'json'], { cwd: invalid, env });
+      expect([refusal.code, refusal.stderr]).toEqual([1, '']);
+      expect(JSON.parse(refusal.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 1, diagnostics: [{ code: 'invalid-project' }] });
+    } finally { await rm(invalid, { recursive: true, force: true }); }
+    expect(await processesMentioning(root)).toEqual([]);
+    expect(await readdir(endpoint)).toEqual([]);
+  }), 90_000);
 
   it('starts the Node daemon and matches the Node entry on the resident path', async () => fixture(async root => {
     const cold = await run(launcher, ['check', '--format', 'json'], { cwd: root, env, timeoutMs: 60_000 });
