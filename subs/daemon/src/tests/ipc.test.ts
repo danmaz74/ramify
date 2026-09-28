@@ -383,6 +383,44 @@ import { createMeasureDriver } from './measure-driver.js';
     } finally { await fixture.dispose(); }
   }, 60_000);
 
+  it('A7-08:round-trip response-bound refuses an answer over the negotiated response bound whole, over the socket', async () => {
+    /** Every JSON number at its shortest form, so the encoded size is a lower bound for the same answer at any timings. */
+    const shortest = (value: unknown): unknown => typeof value === 'number' ? 0 : Array.isArray(value) ? value.map(shortest)
+      : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, shortest(item)])) : value;
+    const setup = { registry: 'default' as const, capabilities: ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog',
+      'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage'] as const };
+    const run = async (maximum: number) => {
+      const fixture = await ipcFixture({ maxResponseBytes: maximum }, true);
+      const client = await fixture.connect();
+      const opened = await client.openContext({ ...fixture.params, setup });
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const token = opened.value.token;
+      const result = await client.affected({ token, requestId: 'transport-bound', freshness: { mode: 'synchronized', expect: [] },
+        modules: ['example'], paths: ['src/index.ts'] });
+      return { fixture, token, result };
+    };
+    const generous = await run(32 * 1024 ** 2);
+    try {
+      if (!generous.result.ok || generous.result.value.status !== 'answered') throw new Error(JSON.stringify(generous.result));
+      // The daemon counts its own envelope: request id '2' after the open, without the client's transport time.
+      const { clientTransport, ...timings } = generous.result.value.timings;
+      expect(clientTransport).toEqual(expect.any(Number));
+      const sent = { ok: true, value: { ...generous.result.value, timings } };
+      const encoded = Buffer.byteLength(JSON.stringify({ type: 'response', id: '2', result: shortest(sent) }), 'utf8');
+      const over = await run(encoded - 1);
+      try {
+        const status = await over.fixture.environment.service.contextStatus({ token: over.token });
+        if (!status.ok || !status.value.published) throw new Error(JSON.stringify(status));
+        expect(over.result).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'transport-bound',
+          revision: status.value.published, reason: 'resource-unavailable',
+          message: `Affected response exceeds maxResponseBytes (${encoded - 1})`, unknownModules: [] } });
+        // Refused whole, never truncated.
+        if (!over.result.ok) throw new Error(JSON.stringify(over.result));
+        expect(over.result.value).not.toHaveProperty('result');
+      } finally { await over.fixture.dispose(); }
+    } finally { await generous.fixture.dispose(); }
+  }, 60_000);
+
   it('A7-08:unsupported-peer refuses affected locally when the daemon does not advertise the capability', async () => {
     const fixture = await ipcFixture({}, true, undefined, undefined, ['contexts', 'check', 'measure']);
     try {

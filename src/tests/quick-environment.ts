@@ -22,7 +22,8 @@ export interface QuickEnvironment {
   readonly connect: ServiceConnector;
   readonly batch: BatchOperation;
   /** A production session driver independent of the service's own, for tests that
-   * compare a daemon answer with a directly opened retained session. The caller disposes it. */
+   * compare a daemon answer with a directly opened retained session. The caller may
+   * dispose it; `dispose()` disposes every driver handed out, so none outlives the environment. */
   sessionDriver(): AnalysisDriver;
   request(operation: string, params: unknown, control?: RunControl): Promise<ServiceResult<unknown>>;
   dispose(): Promise<void>;
@@ -44,6 +45,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
     ...(fixture.architectMetricsPolicy ? { architectMetricsPolicy: fixture.architectMetricsPolicy } : {}) };
   const service = fixture.driver ? createDaemonService({ ...assembly, driver: fixture.driver }) : assembleResidentService(assembly);
   const connections = new Set<ServiceConnection>();
+  const drivers = new Set<AnalysisDriver>();
   let disposed = false, stopped: StopDisposition | null = null;
   const stopListener = service.onStop(value => { stopped = value; });
   const through = (message: WireMessage) => decodeMessage(encodeMessage(message));
@@ -136,7 +138,12 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
     connections.add(connection);
     return { status: 'connected', connection, started: false };
   };
-  return { service, watcher, clock, connect, batch: runBatch, sessionDriver: createSessionDriver,
+  return { service, watcher, clock, connect, batch: runBatch,
+    sessionDriver() {
+      const driver = createSessionDriver();
+      drivers.add(driver);
+      return driver;
+    },
     async request(operation, params, control) {
       const message = through({ type: 'request', id: randomUUID(), op: operation, params });
       if (message.type !== 'request') throw new Error('Unexpected quick request');
@@ -158,7 +165,12 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
         }
       } finally {
         stopListener();
+        // A driver's disposal is idempotent, so one the caller already disposed is harmless here.
+        const closed = await Promise.allSettled([...drivers].map(driver => driver.dispose()));
+        drivers.clear();
         try { await watcher.dispose(); } finally { clock.dispose(); }
+        const failures = closed.filter(result => result.status === 'rejected');
+        if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'Quick environment session driver cleanup failed');
       }
     },
   };

@@ -30,19 +30,28 @@ const app = { id: 'example/app', directory: 'subs/app' };
 
 const environments: QuickEnvironment[] = [];
 const roots: string[] = [];
+/** The same value with every JSON number at its shortest form, one byte. Its encoded size is a lower
+ * bound for the same answer at any timings, which differ between runs. */
+function shortest(value: unknown): unknown {
+  if (typeof value === 'number') return 0;
+  if (Array.isArray(value)) return value.map(shortest);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, shortest(item)]));
+  return value;
+}
+
 afterEach(async () => {
   for (const environment of environments.splice(0)) await environment.dispose();
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
 
-async function opened() {
+async function opened(fixture: Parameters<typeof createQuickEnvironment>[1] = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-affected-service-')));
   roots.push(root);
   for (const [path, text] of Object.entries(files)) {
     await mkdir(dirname(join(root, path)), { recursive: true });
     await writeFile(join(root, path), text);
   }
-  const environment = await createQuickEnvironment();
+  const environment = await createQuickEnvironment({}, fixture);
   environments.push(environment);
   const project = { cwd: root, root, scope: 'whole-project' as const, configuration: 'discover' as const };
   const setup = { registry: 'default' as const, capabilities };
@@ -83,6 +92,8 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
       ['unknown freshness', { ...base, freshness: { mode: 'eventual' } }],
       ['published freshness without wait', { ...base, freshness: { mode: 'published' } }],
       ['empty request id', { ...base, requestId: '' }],
+      // The wire bound of each seed list is 10,000 entries.
+      ['modules above the wire cap', { ...base, modules: Array.from({ length: 10_001 }, (_, index) => `example/m${index}`) }],
     ];
     for (const [label, params] of malformed) {
       const expected = { ok: false, error: { code: 'invalid-request', message: 'Invalid parameters for affected', details: { operation: 'affected' } } };
@@ -94,6 +105,36 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
     // Well-formed wire data with an unknown context is a domain answer, not a service error.
     expect(await environment.service.affected(base as never)).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'shape',
       revision: null, reason: 'unknown-context', message: 'unknown-context', unknownModules: [] } });
+
+    // Within the wire cap, more seeds than the session's 4,096 is the session's domain answer.
+    const f = await opened();
+    const many = Array.from({ length: 4_097 }, (_, index) => `example/m${index}`);
+    const answer = await f.environment.request('affected', f.request('many', { modules: many }));
+    const context = await f.environment.service.contextStatus({ token: f.token });
+    if (!context.ok) throw new Error(JSON.stringify(context));
+    expect(answer).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'many', revision: context.value.published,
+      reason: 'invalid-query', message: 'A query names at most 4096 seeds; it named 4097', unknownModules: [] } });
+  });
+
+  it('A7-07:validation response-bound refuses an answer over maxResponseBytes whole, as resource-unavailable', async () => {
+    const seeds = { paths: ['subs/core/src/interfaces/api.ts'] };
+    const generous = await opened();
+    const baseline = await generous.environment.service.affected(generous.request('bound', seeds));
+    if (!baseline.ok || baseline.value.status !== 'answered') throw new Error(JSON.stringify(baseline));
+    // The direct binding counts the complete envelope with the largest legal request id.
+    const envelope = (result: unknown) => ({ type: 'response', id: '~'.repeat(128), result });
+    const encoded = Buffer.byteLength(JSON.stringify(envelope(shortest(baseline))), 'utf8');
+    expect(encoded).toBeLessThanOrEqual(Buffer.byteLength(JSON.stringify(envelope(baseline)), 'utf8'));
+
+    const over = await opened({ maxResponseBytes: encoded - 1 });
+    const refused = await over.environment.service.affected(over.request('bound', seeds));
+    const status = await over.environment.service.contextStatus({ token: over.token });
+    if (!status.ok || !status.value.published) throw new Error(JSON.stringify(status));
+    expect(refused).toEqual({ ok: true, value: { status: 'unavailable', requestId: 'bound', revision: status.value.published,
+      reason: 'resource-unavailable', message: `Affected response exceeds maxResponseBytes (${encoded - 1})`, unknownModules: [] } });
+    // Refused whole, never truncated: no partial selection accompanies the refusal.
+    if (!refused.ok) throw new Error(JSON.stringify(refused));
+    expect(refused.value).not.toHaveProperty('result');
   });
 
   it('A7-07:unknown-module-domain answers an unknown module ID and invalid seeds as unavailable outcomes, not service errors', async () => {

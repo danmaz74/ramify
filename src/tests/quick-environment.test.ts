@@ -62,6 +62,19 @@ describe('quick transport and cleanup boundaries', () => {
     } finally { await environment.dispose(); }
   });
 
+  it('disposes every session driver it handed out, whether or not the caller disposed it', () => fixture(async root => {
+    const environment = await createQuickEnvironment();
+    const project = { ...params.project, cwd: root, root };
+    const forgotten = environment.sessionDriver(), disposed = environment.sessionDriver();
+    try {
+      expect(await forgotten.open(project, params.setup)).toMatchObject({ status: 'opened' });
+      await disposed.dispose();
+    } finally { await environment.dispose(); }
+    // A disposed driver opens nothing, so the forgotten driver and its session were disposed with the environment.
+    expect(await forgotten.open(project, params.setup)).toEqual({ status: 'cancelled' });
+    expect(await disposed.open(project, params.setup)).toEqual({ status: 'cancelled' });
+  }));
+
   it('verifies service cleanup before destroying the controls', () => fixture(async root => {
     const environment = await createQuickEnvironment();
     try {

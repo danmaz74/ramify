@@ -82,6 +82,34 @@ describe('ContextManager.affected (A7-06)', () => {
     } finally { await e.dispose(); }
   });
 
+  it('A7-06:superseded named-revision-after-wait answers superseded when a named revision waits for a later publication', async () => {
+    const e = sessionEnvironment();
+    let finish: ((value: ReturnType<typeof capture>) => void) | undefined;
+    try {
+      const opened = await e.open(); await flush();
+      const first = e.status(opened.token).published;
+      expect(first?.sequence).toBe(1);
+      // A synchronized request for new content starts a capture that has not yet published.
+      e.script.pending.push(() => new Promise(resolve => { finish = resolve; }));
+      const updating = e.manager.affected(request(opened.token, 'updating', { mode: 'synchronized', expect: observed('2') },
+        { modules: ['fixture'] }), 'lease');
+      await flush();
+      expect(e.script.updateCalls).toHaveLength(1);
+      // Revision 1 is still published when the named request arrives, so it waits for the capture.
+      const named = e.manager.affected(request(opened.token, 'named', { mode: 'published', wait: true, revision: first!.revision },
+        { modules: ['core'] }), 'lease');
+      await flush();
+      finish!(capture(2)); await flush();
+      const second = e.status(opened.token).published;
+      expect(second).toMatchObject({ sequence: 2, cause: 'request' });
+      // The capture published revision 2, which the request did not name: superseded, not answered from 2.
+      expect(await named).toEqual({ status: 'superseded', requestId: 'named', revision: second });
+      expect(await updating).toMatchObject({ status: 'answered', requestId: 'updating', revision: { sequence: 2 } });
+      // Only the synchronized request queried the session.
+      expect(e.script.sessions[0]!.affectedCalls).toEqual([{ sequence: 2, modules: ['fixture'] }]);
+    } finally { finish?.(capture(2)); await flush(); await e.dispose(); }
+  });
+
   it('A7-06:cold-wait-false answers cold for a cold context and pending before any publication, without a session query', async () => {
     const e = sessionEnvironment(cooling);
     let finish: ((value: ReturnType<typeof capture>) => void) | undefined;

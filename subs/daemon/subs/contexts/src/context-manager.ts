@@ -483,12 +483,18 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
    * published, or the published revision that covers it. The session query runs at that
    * revision's sequence while its history slot is pinned. An answer naming another
    * sequence, or a refusal because the session has moved past that sequence, is
-   * `superseded` and never relabeled. Settling the request aborts a session query still
-   * running.
+   * `superseded` and never relabeled. A published request naming a revision other than
+   * `publication` is `superseded` with no session query, including one that waited for a
+   * later publication. Settling the request aborts a session query still running.
    */
   async function deliverAffected(context: LiveContext, entry: PendingAffected, publication: HistoryEntry<ContextRevision>,
     started: number | null, reused = false, timings: ReplyTimings = { ...noWork(), publication: 0 }): Promise<void> {
     if (entry.settled) return;
+    const named = entry.request.freshness;
+    if (named.mode === 'published' && named.revision !== undefined && named.revision !== publication.revision.revision) {
+      completeAffected(entry, { status: 'superseded', requestId: entry.request.requestId, revision: context.history.published?.revision ?? null });
+      scheduleIdle(context); return;
+    }
     const unpin = context.history.pin(publication.revision.revision);
     const controller = new AbortController();
     const release = entry.cleanup;

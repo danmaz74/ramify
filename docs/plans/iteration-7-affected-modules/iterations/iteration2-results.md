@@ -252,3 +252,57 @@ None.
 - The daemon architecture service table row, the CLI invocation contract and
   the README command list remain for iteration 3. The root README purpose
   sentence is already present.
+
+## Addendum: review fixes
+
+**Date:** 2026-09-28, on `0629ccb1`.
+
+1. **A named published revision is compared again at delivery.** A published
+   request naming a revision was compared with the published one only on
+   arrival, so one that then waited for a running capture or a cold context's
+   reopening was answered from the next publication, a different revision.
+   `deliverAffected` now completes such a request as `superseded`, with the
+   current published revision and no session query, when the publication it
+   would answer from is not the named one. The contexts test
+   `A7-06:superseded named-revision-after-wait` names revision 1 with `wait:
+   true` during a capture that publishes revision 2 and expects `superseded`
+   with revision 2, while the synchronized request that started the capture is
+   answered; it fails without the fix. `apiView` and `measure` do not share the
+   gap: `ApiViewRequest.freshness` admits only synchronized freshness, and the
+   `measure` wire guard requires it, so neither can name a published revision.
+   They were not changed.
+2. **Response byte bound tests.** `A7-07:validation response-bound` answers the
+   same query in a quick environment whose direct `maxResponseBytes` is one
+   below the encoded envelope and expects `unavailable/resource-unavailable`
+   with the published revision, `unknownModules: []`, the exact message and no
+   `result`. `A7-08:round-trip response-bound` does the same over the socket
+   with the host's negotiated bound. Real timings differ between runs, so
+   `encoded` is the envelope with every number at its one-byte form, a lower
+   bound for the refused answer's envelope.
+3. **Wire cap tests.** `A7-07:validation` adds `modules` of 10,001 entries,
+   refused as `invalid-request` directly and on the wire, and 4,097 distinct
+   module IDs on an opened context, answered by the session as
+   `unavailable/invalid-query` ("A query names at most 4096 seeds; it named
+   4097").
+4. **Quick environment drivers.** `QuickEnvironment` records every driver that
+   `sessionDriver()` hands out and disposes them all in `dispose()`, after the
+   service and before the controls; a driver's disposal is idempotent, so a
+   caller's own disposal is harmless. A new `quick-environment.test.ts` case
+   shows that a forgotten driver and a caller-disposed one both open nothing
+   afterwards.
+5. **Replaced session during the query.** An `invalid-revision` refusal from a
+   session that was replaced while the query ran deliberately stays
+   `unavailable/invalid-revision` with the queried revision, rather than
+   `superseded`, because only a live session that has moved past the sequence
+   shows that a newer revision of the same session supersedes it.
+
+No other behavior changed.
+
+| Command | Outcome |
+| --- | --- |
+| `npm run type-check` | passed (exit 0) |
+| `npm run build` | passed (exit 0; the existing explorer chunk-size warning) |
+| `npx vitest run subs/daemon/subs/contexts/src/tests/affected.test.ts subs/daemon/subs/contexts/src/tests/api-view.test.ts subs/daemon/subs/contexts/src/tests/covering.test.ts subs/daemon/subs/contexts/src/tests/deadlines.test.ts` | passed: 4 files, 75 tests |
+| `npx vitest run subs/daemon/src/tests/affected-service.test.ts subs/daemon/src/tests/ipc.test.ts subs/daemon/src/tests/measure-service.test.ts src/tests/quick-environment.test.ts src/tests/resident-assembly.test.ts` | passed: 5 files, 41 tests (after the build) |
+
+The whole Vitest suite was not run.
