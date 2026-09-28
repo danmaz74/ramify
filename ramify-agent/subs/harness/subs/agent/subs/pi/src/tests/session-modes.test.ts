@@ -45,6 +45,34 @@ describe('session modes', () => {
     expect(readdirSync(places.sessionDirectory)).toHaveLength(1);
   });
 
+  test('a retained engineer session replaces its equipment on read-only consultation', async () => {
+    const places = await workspace(cleanups);
+    const first = await startPi(cleanups, [call('submit_implementation_map', validMap)], {
+      reuse: places, builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
+    });
+    await first.session.outcome;
+    expect(first.toolNames(0)).toContain('write');
+
+    const consultation = await startPi(cleanups, [call('read', { path: 'module.ramify' }),
+      call('submit_implementation_map', validMap)], {
+      reuse: places, session: { mode: 'continue', ref: first.session.ref },
+      builtinTools: ['read', 'grep', 'ls'],
+    });
+    expect(consultation.session.start).toEqual({ mode: 'continue' });
+    await consultation.session.outcome;
+    expect(consultation.toolNames(0)).toEqual(['read', 'grep', 'ls', 'submit_implementation_map']);
+    expect(consultation.toolNames(0)).not.toContain('write');
+    expect(consultation.toolNames(0)).not.toContain('edit');
+
+    const experiment = await startPi(cleanups, [call('submit_implementation_map', validMap)], {
+      reuse: places, session: { mode: 'continue', ref: consultation.session.ref },
+      builtinTools: ['read', 'grep', 'ls', 'edit', 'write'],
+    });
+    expect(experiment.session.start).toEqual({ mode: 'continue' });
+    await experiment.session.outcome;
+    expect(experiment.toolNames(0)).toContain('write');
+  });
+
   test('a fork starts from the point and does not carry the parent\'s later entries', async () => {
     const places = await workspace(cleanups);
     const parent = await startPi(cleanups, [call('ls', { path: '.' }, 'c-1'), text('reply ALPHA')], { reuse: places });

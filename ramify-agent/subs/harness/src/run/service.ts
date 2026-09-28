@@ -2,7 +2,7 @@ import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
-import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
+import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { projectConfigurationFile } from '../../subs/evidence/src/project-configuration.js';
@@ -17,6 +17,7 @@ import {
   type GateCheckFindingOutcome, type ScenarioFindingNote, type ScenarioGateInputs, type ScenarioObservation,
 } from '../checks/scenario-findings.js';
 import type { GuardedScope } from '../guard/write-guard.js';
+import { decideWrite } from '../guard/write-guard.js';
 import { ExcursionWatcher } from './excursions.js';
 import { selectCheckFindings } from '../../subs/check-findings/src/queries.js';
 import { decideCheckFindingChange } from '../../subs/check-findings/src/decide.js';
@@ -39,11 +40,12 @@ import {
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { recordSettledSnapshot } from './mutations.js';
 import { captureProvisionalSource } from '../capability/source.js';
-import { capabilityRequestId, capabilityTaskId, identifyCapabilityNeed, capabilityLayout,
-  type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan } from '../capability/records.js';
+import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout,
+  type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange, type CapabilityAssignment } from '../capability/records.js';
 import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capability/policy.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
-import { qualificationActionSchema, capabilityActionSchema, validateCapabilityAction, type QualificationAction } from '../capability/submission.js';
+import { qualificationActionSchema, capabilityActionSchema, capabilityPlanUpdateSchema, buildCapabilityPlanRevision,
+  validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
 import { replayCapabilityState } from '../capability/state.js';
 import type { CapabilityWorkflow } from '../capability/workflow.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
@@ -167,7 +169,7 @@ import {
 } from '../work/engineer-equipment.js';
 import { engineerWorkingDirectory, repairWorkingDirectory } from '../work/engineer-directory.js';
 import {
-  engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
+  engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
@@ -6441,7 +6443,7 @@ export class RunService {
       deferredWorkItems: providerItems.map(entry => entry.id), source,
       limits: captureCapabilityLimits(run.record.policy),
     };
-    const plan: CapabilityPlan = {
+    let plan: CapabilityPlan = {
       schema: 'ramify-agent.capability-plan/1', task: task.id, revision: 1, basedOn: 0,
       updatedBy: qualification.id, revisionReason: 'Initial qualified request',
       need: request.original.need, proposedInterface: 'Undecided; the capability architect examines actual source and use',
@@ -6511,12 +6513,72 @@ export class RunService {
     let coordinatorSession: SessionId | undefined;
     let coordinatorBasis = qualification.id;
     let progress = '';
+    let consumerPoint = request.continuation.point;
+    let consumerSession: SessionId | undefined = request.continuation.session;
     for (let attempt = 1; attempt <= task.limits.maxInvocations; attempt += 1) {
-    const action = await this.runInvocation(run, agent, {
+    const currentBasis = () => {
+      const state = replayCapabilityState(run.log.events).tasks.get(task.id);
+      return state === undefined ? null : { task: task.id, planRevision: state.planRevision,
+        coordinatorInvocation: state.coordinatorInvocation, state: state.status,
+        openAssignment: state.activeAssignment, openChild: state.activeChild };
+    };
+    const validateActionInput = (input: unknown) => {
+      const basis = currentBasis();
+      if (basis === null) return { valid: false as const, issues: [{ path: ['task'], message: 'Task is absent', kind: 'state' as const }] };
+      const checked = validateCapabilityAction(input, basis);
+      if (!checked.valid || checked.value.kind !== 'assign') return checked;
+      const assignmentAction = checked.value;
+      const children = assignmentAction.includedChildren ?? [];
+      const owner = run.index === null ? undefined : findModule(run.index, assignmentAction.owner);
+      if (owner === undefined) return { valid: false as const, issues: [{ path: ['owner'],
+        message: `${assignmentAction.owner} is absent from the current architect view`, kind: 'state' as const }] };
+      const invalid = children.filter(child => !owner?.children.includes(child));
+      return invalid.length === 0 ? checked : { valid: false as const, issues: invalid.map(child => ({
+        path: ['includedChildren'], message: `${child} is not a direct child of ${assignmentAction.owner}`,
+        kind: 'state' as const,
+      })) };
+    };
+    const tools: ToolDefinition[] = [
+      { name: 'validate_capability_action', description: 'Check an action against the current task without submitting it.',
+        inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
+        execute: async input => {
+          const checked = validateActionInput(input);
+          return { text: JSON.stringify(checked), isError: !checked.valid };
+        } },
+      { name: 'update_capability_plan', description: 'Commit a new plan revision from the current one.',
+        inputSchema: z.toJSONSchema(capabilityPlanUpdateSchema) as JsonSchema,
+        execute: async input => {
+          const basis = currentBasis();
+          if (basis === null) return { text: 'Task is absent', isError: true };
+          const checked = validateCapabilityPlanUpdate(input, basis);
+          if (!checked.valid) return { text: JSON.stringify(checked.issues), isError: true };
+          try {
+            const next = buildCapabilityPlanRevision(plan, checked.value);
+            await run.mutex.run(() => commitCapabilityTransition(run.log, {
+              type: 'capability-plan-revised', data: { task: task.id, revision: next.revision,
+                basedOn: plan.revision, invocation: checked.value.invocation },
+            }, [{ path: capabilityLayout.plan(task.id, next.revision), id: task.id,
+              revision: next.revision, body: next }]));
+            plan = next;
+            return { text: JSON.stringify({ task: task.id, revision: next.revision,
+              path: capabilityLayout.plan(task.id, next.revision) }) };
+          } catch (error) { return { text: message(error), isError: true }; }
+        } },
+      { name: 'read_capability_evidence', description: 'Read recorded assignments, exchanges and check references for this task.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute: async () => {
+          const current = committedRecords(run.log.ledger.replay());
+          return { text: JSON.stringify({ assignments: [...current.capabilityAssignments.values()].filter(entry => entry.task === task.id),
+            exchanges: [...current.capabilityExchanges.values()].filter(entries => entries[0]?.task === task.id),
+            events: run.log.events.filter(event => event.type.startsWith('capability-') && 'task' in event.data && event.data.task === task.id),
+            checks: run.log.events.filter(event => event.type.includes('gate')) }) };
+        } },
+    ];
+    const action = await this.runInvocation<CapabilityAction>(run, agent, {
       role: 'capability-architect', work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
       prompt: [
-        `# Capability task ${task.id}`, `Use task ${task.id}, planRevision 1 and invocation ${coordinatorBasis} as your action basis.`,
+        `# Capability task ${task.id}`, `Use task ${task.id}, planRevision ${plan.revision} and invocation ${coordinatorBasis} as your action basis.`,
         ...(attempt === 1 ? [
           `Original request: ${JSON.stringify(request, null, 2)}`,
           `Current plan: ${JSON.stringify(plan, null, 2)}`,
@@ -6525,7 +6587,7 @@ export class RunService {
           `Read the live source at ${request.original.usage.map(use => use.path).join(', ')} and its tests. The snapshot at ${request.source.snapshot} records the suspension tree.`,
           `# Selected plan package ${selectedHash}\n\n${selected}`,
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
-          `Progress from the last turn: ${progress}`]),
+          `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
@@ -6535,24 +6597,25 @@ export class RunService {
       inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
       submissionSchema: 'ramify-agent.capability-action/1',
       validate: input => {
-        const state = replayCapabilityState(run.log.events).tasks.get(task.id);
-        if (state === undefined) return { ok: false, errors: [{ path: 'task', message: 'Task state is absent', expected: task.id }] };
-        const checked = validateCapabilityAction(input, {
-          task: task.id, planRevision: state.planRevision, coordinatorInvocation: state.coordinatorInvocation,
-          state: state.status, openAssignment: state.activeAssignment, openChild: state.activeChild,
-        });
+        const checked = validateActionInput(input);
         return checked.valid ? { ok: true, value: checked.value }
           : { ok: false, errors: checked.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message,
             expected: issue.kind === 'state' ? 'current task authority' : 'the action schema' })) };
       },
       scope: { write: null, measurement: null, size: null }, keep: () => kept,
+      equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools }),
     });
     if (action.ended !== 'submitted') {
       await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action`);
       return null;
     }
-    if (action.value?.kind === 'partial') {
-      progress = `${action.value.progress}; unfinished: ${action.value.unfinished.join('; ')}`;
+    if (action.value === undefined) {
+      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} submitted no accepted action`);
+      return null;
+    }
+    const chosen = action.value;
+    if (chosen.kind === 'partial') {
+      progress = `${chosen.progress}; unfinished: ${chosen.unfinished.join('; ')}`;
       coordinatorPoint = action.ref || undefined;
       coordinatorSession = action.kept ? action.session : undefined;
       if (coordinatorPoint === undefined || coordinatorSession === undefined) {
@@ -6565,12 +6628,207 @@ export class RunService {
       } });
       continue;
     }
-    // Iteration 3 acts on consultation and assignments. Until then the
-    // active task deliberately owns the frontier and can be stopped safely.
-    return { kind: 'delegated' };
+    // Submission ends the turn; the committed invocation now owns the
+    // transition it selected. The next turn will use this same basis.
+    await this.write(run, { type: 'capability-coordinator-resumed', data: {
+      task: task.id, invocation: action.id, session: action.session,
+    } });
+    if (chosen.kind === 'consult-consumer') {
+      const answer = await this.consultCapabilityConsumer(run, agent, packages, task, request, plan, chosen, action.id,
+        { point: consumerPoint, session: consumerSession });
+      if (answer === null) return null;
+      consumerPoint = answer.point;
+      consumerSession = answer.session;
+      progress = `A-engineer answered exchange ${answer.exchange.id}: ${answer.exchange.answer?.text}; objections: ${answer.exchange.answer?.objections.join('; ')}`;
+    } else if (chosen.kind === 'assign') {
+      const result = await this.assignCapabilityWork(run, agent, packages, task, plan, chosen, action.id,
+        { point: consumerPoint, session: consumerSession });
+      if (result === null) return null;
+      consumerPoint = result.point;
+      consumerSession = result.session;
+      progress = result.progress;
+    } else if (chosen.kind === 'request-placement' || chosen.kind === 'unresolved') {
+      const resolution = chosen.kind === 'request-placement'
+        ? await this.requestPlacement(run, agent, packages, baseline, item, {
+          forCapability: task.id, question: chosen.problem, requiredBehavior: plan.need,
+          findings: chosen.evidence.map(text => ({ text, citations: [] })),
+          candidates: [{ owner: task.provider, note: task.placementReason }], unresolved: [chosen.problem],
+          hypotheses: [], localDecisions: [],
+        })
+        : await this.resolveUnresolved(run, agent, packages, baseline, item, {
+          invocation: action.id, conflict: chosen.problem, evidence: chosen.evidence,
+        });
+      if (resolution === null) return null;
+      progress = `Boundary decision returned to capability task ${task.id}: ${JSON.stringify(resolution)}`;
+    } else {
+      // The real capability gate and handback are installed in iteration 4.
+      return { kind: 'delegated' };
+    }
+    coordinatorPoint = action.ref || undefined;
+    coordinatorSession = action.kept ? action.session : undefined;
+    if (coordinatorPoint === undefined || coordinatorSession === undefined) {
+      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} lost its continuation point`);
+      return null;
+    }
+    coordinatorBasis = action.id;
+    await this.write(run, { type: 'capability-coordinator-resumed', data: {
+      task: task.id, invocation: action.id, session: coordinatorSession,
+    } });
     }
     await this.fail(run, 'limit-exceeded', `The capability architect of ${task.id} exhausted its invocation bound`);
     return null;
+  }
+
+  /** A question uses the requesting engineer's saved point with read-only
+   * equipment. The reply belongs to the task, never to a new A assignment. */
+  private async consultCapabilityConsumer(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, task: CapabilityTask,
+    request: CapabilityRequest, plan: CapabilityPlan,
+    action: Extract<CapabilityAction, { kind: 'consult-consumer' }>, invocation: string,
+    consumer: { readonly point: string | null; readonly session: SessionId | undefined },
+  ): Promise<{ readonly exchange: CapabilityExchange; readonly point: string; readonly session: SessionId } | null> {
+    run.writer.requireSettled('Consumer consultation requires a settled writer');
+    const existing = committedRecords(run.log.ledger.replay()).capabilityExchanges.size;
+    const id = `${task.id}-ex${String(existing + 1).padStart(2, '0')}`;
+    const exchange: CapabilityExchange = { schema: 'ramify-agent.capability-exchange/1', id,
+      task: task.id, request: request.id, planRevision: plan.revision, question: action.question,
+      references: [...action.references], answer: null };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+      type: 'capability-exchange-opened', data: { task: task.id, exchange: id, invocation },
+    }, [{ path: capabilityLayout.exchange(task.id, id, 1), id, revision: 1, body: exchange }]));
+    const loaded = packages.get('engineer');
+    if (loaded === undefined) { await this.fail(run, 'internal', 'Engineer package is absent for consultation'); return null; }
+    const responseSchema = z.object({ answer: z.string().min(1), objections: z.array(z.string()) }).strict();
+    const continuation = consumer.point === null || consumer.session === undefined ? { outcome: 'session-lost' as const }
+      : await agent.appendContext(consumer.point, `consult:${id}`, `Read-only consultation ${id}: ${action.question}`);
+    const reconstructed = continuation.outcome === 'session-lost';
+    const response = await this.runInvocation(run, agent, {
+      role: 'engineer', work: { capabilityTask: task.id, request: request.id }, attempt: 1,
+      loaded, systemPrompt: renderEngineerPrompt(loaded, this.projectRoot, run.record.policy.limits.commandTimeoutMs, this.projectRoot),
+      prompt: [`# Read-only consumer consultation ${id}`, `Question: ${action.question}`,
+        `Current plan revision ${plan.revision}: ${JSON.stringify(plan)}`,
+        ...(reconstructed ? [`Original request and suspended source: ${JSON.stringify(request)}`] : []),
+        `References: ${action.references.join(', ')}`, 'Answer directly; source edits require a separate A-scoped assignment.'].join('\n\n'),
+      workingDirectory: this.projectRoot,
+      start: reconstructed ? { mode: 'fresh' } : { mode: 'continue', ref: continuation.ref },
+      ...(reconstructed ? {
+        ...(consumer.session === undefined ? {} : { replaces: { session: consumer.session, reason: 'reconstructed' as const } }),
+        degraded: { requested: 'continued' as const, reason: 'The original engineer session could not be continued; current request, source and plan were supplied to a reconstructed session.' },
+      } : { session: consumer.session!, continuing: 'capability-coordination' as const }),
+      toolName: 'answer_capability_consultation', description: 'Answer the question from the preserved A-engineer session.',
+      inputSchema: z.toJSONSchema(responseSchema) as JsonSchema,
+      submissionSchema: 'ramify-agent.capability-consultation/1', validate: input => validateAgainst(responseSchema, input),
+      scope: { write: null, measurement: null, size: null },
+      equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
+      keep: () => kept,
+    });
+    if (response.ended !== 'submitted' || response.value === undefined || (response.actual === 'fresh' && !reconstructed)) {
+      await this.fail(run, 'invalid-submission', `Consultation ${id} did not continue the preserved engineer session and answer`);
+      return null;
+    }
+    const answered: CapabilityExchange = { ...exchange, answer: { invocation: response.id,
+      text: response.value.answer, objections: response.value.objections } };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+      type: 'capability-exchange-answered', data: { task: task.id, exchange: id, invocation: response.id },
+    }, [{ path: capabilityLayout.exchange(task.id, id, 2), id, revision: 2, body: answered }]));
+    return { exchange: answered, point: response.ref, session: response.session };
+  }
+
+  /** One task-owned writer. Its scope is captured from the real module view;
+   * the provisional candidate stays live for the next owner. */
+  private async assignCapabilityWork(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, task: CapabilityTask,
+    plan: CapabilityPlan, action: Extract<CapabilityAction, { kind: 'assign' }>, invocation: string,
+    consumer: { readonly point: string | null; readonly session: SessionId | undefined },
+  ): Promise<{ readonly progress: string; readonly point: string | null; readonly session: SessionId | undefined } | null> {
+    run.writer.requireSettled('Capability assignment requires a settled writer');
+    const state = replayCapabilityState(run.log.events).tasks.get(task.id);
+    if (state === undefined || state.nextAssignmentSequence > task.limits.maxAssignments) {
+      await this.fail(run, 'limit-exceeded', `Capability task ${task.id} exhausted its assignment bound`);
+      return null;
+    }
+    if (run.index === null || findModule(run.index, action.owner) === undefined) {
+      await this.fail(run, 'inputs-changed', `Owner ${action.owner} has no current module in the architect view`);
+      return null;
+    }
+    const sequence = state.nextAssignmentSequence;
+    const id = capabilityAssignmentId(task.id, sequence);
+    const scope = await resolveWriteScope({ projectRoot: this.projectRoot, index: run.index,
+      view: run.record.manifest.architectView, revision: sequence,
+      base: { module: action.owner, includedChildren: action.includedChildren ?? [] }, extra: [], read: [], bootstrap: [],
+      rationale: `${task.id}: ${action.purpose}` });
+    const startingTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const assignment: CapabilityAssignment = { schema: 'ramify-agent.capability-assignment/1', id,
+      task: task.id, sequence, owner: action.owner, plan: refOf(task.id, plan.revision, plan),
+      purpose: action.purpose, approach: action.approach, requirementRefs: [...action.requirementRefs],
+      intendedEvidence: [...action.intendedEvidence], scope,
+      gate: { tests: testPolicyOf('ordinary', scope.base, [], scope.extra) }, startingTree };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+      type: 'capability-assigned', data: { task: task.id, assignment: id, sequence, invocation },
+    }, [{ path: capabilityLayout.assignment(task.id, id), id, revision: 1, body: assignment }]));
+    const loaded = packages.get('engineer');
+    if (loaded === undefined) { await this.fail(run, 'internal', 'Engineer package is absent for assignment'); return null; }
+    const workingDirectory = await engineerWorkingDirectory(this.projectRoot, scope, run.index);
+    const guarded = guardedScopeOf(scope, await this.deniedFiles(run));
+    const bounds = engineerBoundsOf(run.record.policy.limits).defaults;
+    const equipment = this.implementationTools(run, { workingDirectory, scopeRevision: sequence,
+      guarded, tests: assignment.gate.tests, commandTimeoutMs: bounds.commandTimeoutMs });
+    const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
+    const changedBefore = new Map(await Promise.all((await this.git.changedPaths(this.projectRoot, this.accepted(run)))
+      .map(async path => [path, await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null)] as const)));
+    const aContinuation = action.owner !== task.consumer || consumer.point === null || consumer.session === undefined
+      ? { outcome: 'session-lost' as const }
+      : await agent.appendContext(consumer.point, `experiment:${id}`, `A-scoped capability assignment ${id}: ${action.purpose}`);
+    const continuingA = action.owner === task.consumer && aContinuation.outcome !== 'session-lost';
+    const response = await this.runInvocation<EngineerSubmission>(run, agent, {
+      role: 'engineer', work: { capabilityTask: task.id, capabilityAssignment: id }, attempt: 1,
+      loaded, systemPrompt: renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory),
+      prompt: [`# Capability assignment ${id} in ${action.owner}`, `Purpose: ${action.purpose}`,
+        `Approach: ${action.approach}`, `Plan: ${JSON.stringify(plan)}`,
+        `Write scope: ${JSON.stringify(scopePaths(this.projectRoot, scope))}`,
+        `Starting candidate: ${startingTree}`, `Intended evidence: ${action.intendedEvidence.join('; ')}`].join('\n\n'),
+      workingDirectory,
+      start: continuingA ? { mode: 'continue', ref: aContinuation.ref } : { mode: 'fresh' },
+      ...(continuingA ? { session: consumer.session!, continuing: 'capability-coordination' as const }
+        : action.owner === task.consumer && consumer.session !== undefined
+          ? { replaces: { session: consumer.session, reason: 'reconstructed' as const },
+            degraded: { requested: 'continued' as const, reason: 'The retained A-engineer session was lost; its task and current source were reconstructed.' } }
+          : {}),
+      toolName: engineerToolName,
+      description: engineerSubmissionDescription, inputSchema: engineerJsonSchema,
+      submissionSchema: 'ramify-agent.engineer-submission/1',
+      validate: input => validateAgainst(engineerSubmissionSchema, input),
+      scope: { write: sequence, measurement: null, size: null }, writer: true, guarded,
+      equip: equipment.equip, bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
+      keep: () => action.owner === task.consumer ? kept : finished('work-closed'),
+    });
+    const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
+    await this.recordLineEvents(run, response.id, before, after, equipment.shellCalls() > 0
+      ? ['unguarded-shell: changed and reverted paths may be missing'] : []);
+    const changedAfter = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+    const mutated: string[] = [];
+    for (const path of new Set([...changedBefore.keys(), ...changedAfter])) {
+      const hash = await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null);
+      if ((changedBefore.get(path) ?? null) !== hash) mutated.push(path);
+    }
+    const outside: string[] = [];
+    for (const path of mutated) {
+      const verdict = await decideWrite(guarded, this.projectRoot, { kind: 'write', paths: [path] });
+      if (verdict.verdict !== 'allowed') outside.push(path);
+    }
+    const outcome = response.ended !== 'submitted' ? 'interrupted' : outside.length > 0 ? 'failed' : 'partial';
+    await this.write(run, { type: 'capability-assignment-settled', data: {
+      task: task.id, assignment: id, outcome, mutated: mutated.sort(), outsideScope: outside.sort(),
+      endingTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+    } });
+    if (response.ended !== 'submitted' || run.writer.blocked !== undefined) {
+      await this.fail(run, run.writer.blocked === undefined ? 'agent-failed' : 'writer-unsettled',
+        `Capability assignment ${id} did not settle: ${run.writer.blocked ?? response.ended}`);
+      return null;
+    }
+    return { progress: `Assignment ${id} in ${action.owner}: ${response.value?.kind ?? 'no submission'}; changed ${mutated.join(', ') || '(none)'}; outside scope ${outside.join(', ') || '(none)'}. Provisional result ${outcome}; iteration 4 owns its combined gate.`,
+      point: action.owner === task.consumer && response.kept ? response.ref : consumer.point,
+      session: action.owner === task.consumer && response.kept ? response.session : consumer.session };
   }
 
   private async takeIteration(

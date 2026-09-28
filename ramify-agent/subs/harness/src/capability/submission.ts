@@ -14,6 +14,7 @@ export const capabilityActionSchema = z.discriminatedUnion('kind', [
   action('consult-consumer', { question: text, sections: z.array(text).min(1), references: z.array(text) }),
   action('assign', {
     owner: modulePathSchema, purpose: text, approach: text,
+    includedChildren: z.array(modulePathSchema).optional(),
     requirementRefs: z.array(elementIdSchema), intendedEvidence: z.array(text).min(1),
   }),
   action('delegate-capability', { request: text, provider: modulePathSchema, placementReason: text, constraints: z.array(text) }),
