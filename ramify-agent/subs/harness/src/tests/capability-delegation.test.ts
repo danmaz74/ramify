@@ -126,9 +126,22 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   expect(task.deferredWorkItems).toContain('wi-002');
   expect(await readFile(join(fixture.root, 'subs/a/src/extra.ts'), 'utf8')).toContain('sourceHint');
   expect(opened.service.getRun('need', receipt.jobId)?.state).toBe('running');
-  const sequence = opened.service.events('need', receipt.jobId)?.at(-1)!.sequence ?? 0;
-  await opened.service.execute(stopRun('need', receipt.jobId, sequence));
+  let stopped = false;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const version = opened.service.getRun('need', receipt.jobId)!.version;
+    try {
+      await opened.service.execute(stopRun('need', receipt.jobId, version));
+      stopped = true;
+      break;
+    } catch (error) {
+      if (!String(error).includes('at version')) throw error;
+    }
+  }
+  expect(stopped).toBe(true);
   await opened.service.settled('need', receipt.jobId);
+  const finished = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(finished.filter(event => event.type === 'job-stopped')).toHaveLength(1);
+  expect(finished.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
 }, 30_000);
 
 test('historical test composition cannot create a policy/5 run', async () => {
