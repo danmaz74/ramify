@@ -11,7 +11,7 @@ import type { ArchitectMeasurements, MeasurementViews } from '../../analysis/src
 import type { ApiViewQueryLimits, CheckOutcome, ContextEvent, ContextRevision, ContextStatus, ContextToken, OpenOutcome, SubscriptionHandle, Unavailable,
   UnavailableReason } from '../subs/contexts/src/interfaces/contexts.js';
 import { createContextManager } from '../subs/contexts/src/context-manager.js';
-import type { DaemonCounters, MaterializedArchitectSummary, MaterializeOutcome, MaterializeParams, MeasureDocument, MeasureOutcome,
+import type { AffectedOutcome, DaemonCounters, MaterializedArchitectSummary, MaterializeOutcome, MaterializeParams, MeasureDocument, MeasureOutcome,
   MeasureParams, RamifyService, ServiceErrorCode, ServiceResult } from '../../../src/interfaces/service.js';
 import type { DaemonService, DaemonServiceOptions, ServiceLease, StopDisposition } from './interfaces/daemon.js';
 import { validateServiceRequest } from './validation.js';
@@ -109,7 +109,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           report: session.report.bind(session), releaseRevision: session.releaseRevision.bind(session),
           status: session.status.bind(session), releaseCompiler: session.releaseCompiler.bind(session),
           apiView: session.apiView.bind(session), architectView: session.architectView.bind(session),
-          measurements: session.measurements.bind(session),
+          measurements: session.measurements.bind(session), affected: session.affected.bind(session),
           explorerDetails: session.explorerDetails.bind(session), dispose: session.dispose.bind(session),
         };
         return { ...opened, session: counted };
@@ -562,6 +562,23 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         observe();
         return success(result);
       },
+      async affected(params, control) {
+        const invalid = guard<AffectedOutcome>('affected', params); if (invalid) return invalid;
+        const handling = performance.now();
+        const result = await manager.affected(params, pair(params.token), control);
+        observe();
+        if (result.status !== 'answered') return success(result);
+        const answered: AffectedOutcome = { ...result, timings: Object.freeze({ ...result.timings, service: performance.now() - handling }) };
+        // An answer the transport would refuse is refused whole here, as `measure` refuses its document.
+        const transport = responseBudgets.getStore();
+        const maximumBytes = transport?.maximumBytes ?? directResponseBytes;
+        const counted = await countJsonBytesBounded({ type: 'response', id: transport?.requestId ?? '~'.repeat(128),
+          result: { ok: true, value: answered } }, maximumBytes, control, () => true);
+        if (counted.status === 'cancelled') return success({ status: 'cancelled', requestId: result.requestId });
+        if (counted.status === 'exceeded') return success({ status: 'unavailable', requestId: result.requestId, revision: result.revision,
+          reason: 'resource-unavailable', message: `Affected response exceeds maxResponseBytes (${maximumBytes})`, unknownModules: [] });
+        return success(answered);
+      },
       async subscribe(params, listener) {
         const invalid = guard<Awaited<ReturnType<RamifyService['subscribe']>> extends ServiceResult<infer T> ? T : never>('subscribe', params);
         if (invalid) return invalid;
@@ -661,6 +678,8 @@ export async function dispatchServiceRequest(service: RamifyService, operation: 
     case 'materialize': return service.materialize(input, control);
     case 'measure': return maxResponseBytes === undefined || requestId === undefined ? service.measure(input, control)
       : responseBudgets.run({ maximumBytes: maxResponseBytes, requestId }, () => service.measure(input, control));
+    case 'affected': return maxResponseBytes === undefined || requestId === undefined ? service.affected(input, control)
+      : responseBudgets.run({ maximumBytes: maxResponseBytes, requestId }, () => service.affected(input, control));
     case 'subscribe': return listener ? service.subscribe(input, listener) : failure('invalid-request', 'Subscription listener is required');
     case 'unsubscribe': return service.unsubscribe(input);
     case 'closeContext': return service.closeContext(input);

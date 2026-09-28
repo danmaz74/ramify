@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
-import { batchBoundary, helpVersionBoundary } from './entry-boundary-cases.js';
+import { batchBoundary, clientEntryBoundary, helpVersionBoundary } from './entry-boundary-cases.js';
 import { fixture } from './fixture.js';
 
 const assertions = {
@@ -15,5 +15,8 @@ describe('compiled entry boundaries', () => {
   it('keeps explicit batch independent of the daemon and preserves report bytes', async () => {
     await fixture(root => batchBoundary(root, assertions).then(() => {}));
   }, 60_000);
+  it('A7-08: keeps the client entry free of analysis runtime while it relays the affected types', async () => {
+    await clientEntryBoundary(assertions);
+  }, 15_000);
   // The independent Plan 2 process gate exercises daemon and resident boundaries.
 });

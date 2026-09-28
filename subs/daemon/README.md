@@ -1,6 +1,6 @@
 # Daemon
 
-Daemon owns the resident process: the validated in-process service that implements the root's service interface over its contexts child, the local socket host and its discovery records, the lightweight client that other processes use to reach it, the wire codec, and the real filesystem watcher and clock ports.
+Daemon owns the resident process: the validated in-process service that implements the root's service interface over its contexts child, the local socket host and its discovery records, the lightweight client that other processes use to reach it, the wire codec, and the real filesystem watcher and clock ports. It exposes the affected-module query through the same bounded service and lightweight client connection.
 
 `createDaemonService` validates each operation and binds it to a context manager. `startDaemon` hosts that same service over framed Unix sockets, enforces connection, request and notification limits, publishes atomic lifecycle records, and releases leases on disconnect or shutdown. Requests and published results retain their context, generation and revision identities across IPC.
 

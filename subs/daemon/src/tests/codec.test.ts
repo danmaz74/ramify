@@ -199,4 +199,10 @@ describe('BD23: service capability negotiation', () => {
     for (const name of ['measurements', 'module-measure']) expect(() => encodeMessage(welcome([name]) as never))
       .toThrow('Invalid IPC message schema');
   });
+  it('A7-07:capability accepts the affected capability beside measure and rejects near names', () => {
+    const message = welcome(['contexts', 'check', 'measure', 'affected']);
+    expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
+    for (const name of ['affected-modules', 'Affected', 'affect']) expect(() => encodeMessage(welcome([name]) as never))
+      .toThrow('Invalid IPC message schema');
+  });
 });

@@ -1,6 +1,6 @@
 import type { SessionChange } from '../../../../analysis/src/interfaces/session.js';
 import type { ProjectRequest } from '../../../../analysis/subs/project/src/interfaces/project.js';
-import type { ApiViewRequest, CheckOutcome, CheckRequest, ContextApiViewOutcome, ContextRevision, ContextSetup, Unavailable, WatchBatch } from './interfaces/contexts.js';
+import type { AffectedRequest, ApiViewRequest, CheckOutcome, CheckRequest, ContextAffectedOutcome, ContextApiViewOutcome, ContextRevision, ContextSetup, Unavailable, WatchBatch } from './interfaces/contexts.js';
 
 export interface Invocation { readonly project: ProjectRequest; readonly setup: ContextSetup }
 export interface PendingCheck {
@@ -31,7 +31,22 @@ export interface PendingApiView {
   settled: boolean;
   deadlineExpired: boolean;
 }
-export type PendingEntry = PendingCheck | PendingApiView;
+/** A queued affected-module query: the same rendezvous shape as `PendingApiView`.
+ * With published freshness it waits only for the next publication, as a published check does. */
+export interface PendingAffected {
+  readonly kind: 'affected';
+  readonly request: AffectedRequest;
+  readonly lease: string;
+  readonly acknowledged: number;
+  readonly invocation: Invocation;
+  readonly resolve: (outcome: ContextAffectedOutcome) => void;
+  readonly revisionAtAcknowledgment: ContextRevision | null;
+  readonly needsSweep: boolean;
+  cleanup: () => void;
+  settled: boolean;
+  deadlineExpired: boolean;
+}
+export type PendingEntry = PendingCheck | PendingApiView | PendingAffected;
 export interface RunningCapture {
   readonly controller: AbortController;
   readonly requests: readonly PendingEntry[];
@@ -69,10 +84,23 @@ export function completeApiView(entry: PendingApiView, outcome: ContextApiViewOu
   entry.cleanup();
   entry.resolve(outcome);
 }
-/** Complete a mixed-kind entry with an outcome shape valid for both kinds:
+export function completeAffected(entry: PendingAffected, outcome: ContextAffectedOutcome): void {
+  if (entry.settled) return;
+  entry.settled = true;
+  entry.cleanup();
+  entry.resolve(outcome);
+}
+/** A lifecycle `Unavailable` as an affected outcome: it describes no revision and names no module. */
+export function unavailableAffected(outcome: Unavailable & { readonly requestId: string }): ContextAffectedOutcome {
+  return { ...outcome, revision: null, unknownModules: [] };
+}
+/** Complete a mixed-kind entry with an outcome shape valid for every kind:
  * cancellation or an `Unavailable` reason, the only two members every
- * `CheckOutcome` and `ContextApiViewOutcome` union shares. */
+ * `CheckOutcome` and `ContextApiViewOutcome` union shares, and which an
+ * affected entry receives as its own `unavailable` variant. */
 export function completeEntry(entry: PendingEntry,
   outcome: (Unavailable & { readonly requestId: string }) | { readonly status: 'cancelled'; readonly requestId: string }): void {
-  if (entry.kind === 'check') complete(entry, outcome); else completeApiView(entry, outcome);
+  if (entry.kind === 'check') complete(entry, outcome);
+  else if (entry.kind === 'apiView') completeApiView(entry, outcome);
+  else completeAffected(entry, outcome.status === 'cancelled' ? outcome : unavailableAffected(outcome));
 }

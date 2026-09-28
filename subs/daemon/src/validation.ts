@@ -3,7 +3,7 @@ import type { MaterializeViewId, ServiceError, ServiceOperation } from '../../..
 
 const operations: ReadonlySet<string> = new Set<ServiceOperation>([
   'openContext', 'contextStatus', 'check', 'subscribe', 'unsubscribe', 'closeContext', 'daemonStatus', 'stopDaemon', 'materialize',
-  'measure', 'explorerDetails', 'dependencyDiagram',
+  'measure', 'explorerDetails', 'dependencyDiagram', 'affected',
 ]);
 const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const contextId = /^ctx\/1:[0-9a-f]{64}$/;
@@ -36,6 +36,10 @@ function array(value: unknown, item: (value: unknown) => boolean, maximum = Infi
 function text(value: unknown): value is string { return typeof value === 'string'; }
 function nonempty(value: unknown): value is string { return text(value) && value.length > 0; }
 function matches(value: unknown, expression: RegExp): boolean { return text(value) && value.match(expression)?.[0] === value; }
+/** Affected seeds per list on the wire: above the session's 4,096-seed bound, so
+ * that bound stays the session's `invalid-query` answer. */
+const maximumAffectedSeeds = 10_000;
+
 function canonicalText(value: unknown): value is string {
   return nonempty(value) && !/[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(value);
 }
@@ -146,6 +150,13 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
           && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
       case 'measure': valid = record(params, ['token', 'requestId', 'freshness'], ['deadlineMs']) && token(params.token)
         && matches(params.requestId, requestId) && synchronizedFreshness(params.freshness)
+        && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
+          && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
+      case 'affected': valid = record(params, ['token', 'requestId', 'freshness'], ['modules', 'paths', 'deadlineMs']) && token(params.token)
+        && matches(params.requestId, requestId) && freshness(params.freshness)
+        // Seed syntax and unknown IDs are domain answers of the session, not shape errors.
+        && (!Object.hasOwn(params, 'modules') || array(params.modules, nonempty, maximumAffectedSeeds))
+        && (!Object.hasOwn(params, 'paths') || array(params.paths, text, maximumAffectedSeeds))
         && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'
           && Number.isSafeInteger(params.deadlineMs) && params.deadlineMs > 0 && params.deadlineMs <= 600_000)); break;
       case 'explorerDetails': {

@@ -15,11 +15,12 @@ export interface SocketConnection extends RamifyService {
   close(): Promise<void>;
 }
 
-/** A check or materialize reply learns its client transport: the round trip
- * less the service's own handling. */
+/** A check, materialize or affected reply learns its client transport: the round
+ * trip less the service's own handling. */
 function transported(result: ServiceResult<unknown>, roundTrip: number): ServiceResult<unknown> {
   const value = result.ok ? result.value as { readonly status?: unknown; readonly timings?: { readonly service?: unknown } } | null : null;
-  if (!result.ok || (value?.status !== 'reported' && value?.status !== 'materialized') || typeof value.timings?.service !== 'number') return result;
+  if (!result.ok || (value?.status !== 'reported' && value?.status !== 'materialized' && value?.status !== 'answered')
+    || typeof value.timings?.service !== 'number') return result;
   return { ok: true, value: { ...value, timings: { ...value.timings, clientTransport: Math.max(0, roundTrip - value.timings.service) } } };
 }
 
@@ -119,7 +120,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     const sent = performance.now();
     return new Promise(resolve => {
       const abortRequest = () => { if (pending.has(id)) send({ type: 'cancel', id }); };
-      pending.set(id, { finish: result => resolve((op === 'check' || op === 'materialize' ? transported(result, performance.now() - sent) : result) as ServiceResult<T>),
+      pending.set(id, { finish: result => resolve((op === 'check' || op === 'materialize' || op === 'affected' ? transported(result, performance.now() - sent) : result) as ServiceResult<T>),
         cleanup: () => control?.signal?.removeEventListener('abort', abortRequest), listen });
       try {
         send({ type: 'request', id, op, params });
@@ -141,6 +142,9 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     measure: (params, control) => welcome!.capabilities.includes('measure') ? request('measure', params, control)
       : Promise.resolve({ ok: false, error: { code: 'unsupported-operation',
         message: 'The daemon does not support measure', details: {} } }),
+    affected: (params, control) => welcome!.capabilities.includes('affected') ? request('affected', params, control)
+      : Promise.resolve({ ok: false, error: { code: 'unsupported-operation',
+        message: 'The daemon does not support affected', details: {} } }),
     subscribe: (params, listener) => request('subscribe', params, undefined, listener),
     unsubscribe: async params => { const result = await request<null>('unsubscribe', params); if (result.ok) subscriptions.delete(params.subscription); return result; },
     closeContext: params => request('closeContext', params), daemonStatus: () => request('daemonStatus', {}),

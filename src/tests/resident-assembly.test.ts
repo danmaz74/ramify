@@ -70,6 +70,36 @@ describe('resident analysis driver resolution lifetime', () => {
     } finally { await driver.dispose(); }
   }), 120_000);
 
+  it('A7-07: forwards affected through the resident session handle and the quick environment operation', () => fixture(async root => {
+    // The fixture's `consumer` imports the root's exposed `value`: changing the root selects the consumer.
+    const expected = { changedModules: [{ id: 'fixture', directory: '.' }], affectedModules: [{ id: 'fixture/consumer', directory: 'subs/consumer' }],
+      testModules: [{ id: 'fixture', directory: '.' }, { id: 'fixture/consumer', directory: 'subs/consumer' }],
+      paths: [{ path: 'src/interfaces/api.ts', module: 'fixture', basis: 'inventory' }], selection: 'dependency-closure', widening: [] };
+    const project = { cwd: root, root, scope: 'whole-project' as const, configuration: 'discover' as const };
+    const driver = createSessionDriver();
+    try {
+      const opened = await driver.open(project, setup);
+      if (opened.status !== 'opened') throw new Error(JSON.stringify(opened));
+      const direct = await opened.session.affected({ sequence: opened.revision.sequence, paths: ['src/interfaces/api.ts'] });
+      expect(direct).toMatchObject({ status: 'answered', sequence: opened.revision.sequence,
+        result: { ...expected, inputId: opened.revision.inputId } });
+    } finally { await driver.dispose(); }
+    const environment = await createQuickEnvironment();
+    try {
+      const context = await environment.service.openContext({ project, setup });
+      if (!context.ok || context.value.status !== 'opened') throw new Error(JSON.stringify(context));
+      const params = { token: context.value.token, requestId: 'quick-affected', freshness: { mode: 'synchronized' as const, expect: [] },
+        paths: ['src/interfaces/api.ts'] };
+      const connected = await environment.connect({ start: 'never' });
+      if (connected.status !== 'connected') throw new Error(JSON.stringify(connected));
+      expect(connected.connection.daemon.capabilities).toContain('affected');
+      const answered = await connected.connection.affected(params);
+      expect(answered).toMatchObject({ ok: true, value: { status: 'answered', requestId: 'quick-affected', result: expected } });
+      expect(await environment.request('affected', { ...params, requestId: 'quick-request' }))
+        .toMatchObject({ ok: true, value: { status: 'answered', requestId: 'quick-request', result: expected } });
+    } finally { await environment.dispose(); }
+  }), 120_000);
+
   it('enforces a smaller assembly retention budget inside the session before publication', () => fixture(async root => {
     const environment = await createQuickEnvironment({ maxRetainedBytesPerContext: 1 });
     try {

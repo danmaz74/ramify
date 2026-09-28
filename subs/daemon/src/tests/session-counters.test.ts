@@ -42,7 +42,7 @@ describe('daemon session audit accounting', () => {
       async report() { return null; }, async releaseRevision() {},
       status() { return { level: 'hot', sequence: current.sequence, observedInputs: 0, factBytes: 100,
         worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
-      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; }, async architectView() { return { status: 'cancelled' }; }, async measurements() { return { status: 'cancelled' }; },
+      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; }, async architectView() { return { status: 'cancelled' }; }, async measurements() { return { status: 'cancelled' }; }, async affected() { return { status: 'cancelled' }; },
       async explorerDetails() { return { status: 'cancelled' }; }, async dispose() { sessionDisposed = true; },
     };
     const driver: AnalysisDriver = {
@@ -94,7 +94,7 @@ describe('daemon racing-hook attribution', () => {
       async report() { return null; }, async releaseRevision() {},
       status() { return { level: 'hot', sequence: current.sequence, observedInputs: 1, factBytes: 100,
         worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
-      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; }, async architectView() { return { status: 'cancelled' }; }, async measurements() { return { status: 'cancelled' }; },
+      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; }, async architectView() { return { status: 'cancelled' }; }, async measurements() { return { status: 'cancelled' }; }, async affected() { return { status: 'cancelled' }; },
       async explorerDetails() { return { status: 'cancelled' }; }, async dispose() {},
     };
     const driver: AnalysisDriver = {
@@ -149,7 +149,7 @@ describe('daemon sweep accounting after reacquisition', () => {
       async report() { return null; }, async releaseRevision() {},
       status() { return { level: 'hot', sequence: current.sequence, observedInputs: 0, factBytes: 100,
         worker: { heapUsed: 100, rss: 100 }, compiler: { pid: null, rss: null }, lastSweepAt: null }; },
-      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; }, async architectView() { return { status: 'cancelled' }; }, async measurements() { return { status: 'cancelled' }; },
+      async releaseCompiler() {}, async apiView() { return { status: 'cancelled' }; }, async architectView() { return { status: 'cancelled' }; }, async measurements() { return { status: 'cancelled' }; }, async affected() { return { status: 'cancelled' }; },
       async explorerDetails() { return { status: 'cancelled' }; }, async dispose() {},
     };
     const driver: AnalysisDriver = {

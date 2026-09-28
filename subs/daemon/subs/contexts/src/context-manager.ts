@@ -5,13 +5,13 @@ import type { ArchitectViewProjection, ArchitectViewQueryOutcome } from '../../.
 import type { SessionMeasurements, SessionMeasurementsOutcome } from '../../../../analysis/src/interfaces/measurements.js';
 import type { ProjectRequest, ProjectResolution } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyAnalyzerOutcome } from '../../../../analysis/src/interfaces/dependency-analyzer.js';
-import type { ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
+import type { AffectedRequest, ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextAffectedOutcome, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExpectedContent, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
 import type { ExplorerDetailDelivery, LiveContext } from './context.js';
 import { createHistory } from './history.js';
 import type { HistoryEntry } from './history.js';
 import { createContextId, createFingerprints, createRevisionId } from './tokens.js';
-import { complete, completeApiView, completeEntry, invocationKey, projectKey, spanBatches } from './queue.js';
-import type { Invocation, PendingApiView, PendingCheck, PendingEntry } from './queue.js';
+import { complete, completeAffected, completeApiView, completeEntry, invocationKey, projectKey, spanBatches, unavailableAffected } from './queue.js';
+import type { Invocation, PendingAffected, PendingApiView, PendingCheck, PendingEntry } from './queue.js';
 
 /** `contracts.md`'s iteration-1 frozen `RetainedSession.apiView` bounds, and Plan 2B's
  * `architectView` bounds, used when `ContextManagerOptions.apiViewLimits` supplies none. */
@@ -24,9 +24,11 @@ const defaultApiViewLimits: ApiViewQueryLimits = {
 
 const implemented = new Set(['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage']);
 function unavailable(reason: Unavailable['reason'], message: string = reason): Unavailable { return { status: 'unavailable', reason, message }; }
-/** A queued check entry using `published` freshness: the only kind of pending
- * entry an apiView request (always synchronized) can never be. */
-function publishedCheck(entry: PendingEntry): entry is PendingCheck { return entry.kind === 'check' && entry.request.freshness.mode === 'published'; }
+/** A queued check or affected entry using `published` freshness, which waits only for
+ * the next publication; an apiView request is always synchronized. */
+function publishedWait(entry: PendingEntry): entry is PendingCheck | PendingAffected { return entry.kind !== 'apiView' && entry.request.freshness.mode === 'published'; }
+/** The outcomes an API-view and an affected request share, which their common scheduling answers. */
+type QueryOutcome = Extract<ContextApiViewOutcome, { readonly status: 'pending' | 'cold' | 'deadline-exceeded' | 'superseded' | 'cancelled' }>;
 /** Distinct project requests whose resolutions one context keeps for reuse. */
 const knownResolutions = 4;
 /** Paths whose change is a configuration change: the compiler configuration, the package
@@ -476,6 +478,45 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     } catch (error) { completeApiView(entry, { ...unavailable('analysis-failed', String(error)), requestId }); }
     finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
+  /**
+   * Deliver one affected request from `publication`: the revision this capture just
+   * published, or the published revision that covers it. The session query runs at that
+   * revision's sequence while its history slot is pinned. An answer naming another
+   * sequence, or a refusal because the session has moved past that sequence, is
+   * `superseded` and never relabeled. Settling the request aborts a session query still
+   * running.
+   */
+  async function deliverAffected(context: LiveContext, entry: PendingAffected, publication: HistoryEntry<ContextRevision>,
+    started: number | null, reused = false, timings: ReplyTimings = { ...noWork(), publication: 0 }): Promise<void> {
+    if (entry.settled) return;
+    const unpin = context.history.pin(publication.revision.revision);
+    const controller = new AbortController();
+    const release = entry.cleanup;
+    entry.cleanup = () => { controller.abort(); release(); };
+    const requestId = entry.request.requestId;
+    const revision = publication.revision;
+    const superseded = (): void => completeAffected(entry, { status: 'superseded', requestId, revision: context.history.published?.revision ?? null });
+    context.deliveries.add(entry);
+    try {
+      const session = context.session;
+      if (!session || context.publishedSession !== session) {
+        completeAffected(entry, unavailableAffected({ ...unavailable('analysis-failed', 'Session lost its published revision'), requestId })); return;
+      }
+      const { modules, paths } = entry.request;
+      const outcome = await session.affected({ sequence: publication.sequence, ...(modules === undefined ? {} : { modules }),
+        ...(paths === undefined ? {} : { paths }) }, { signal: controller.signal });
+      if (outcome.status === 'cancelled') completeAffected(entry, { status: 'cancelled', requestId });
+      else if (outcome.status === 'answered') {
+        if (outcome.sequence !== publication.sequence) superseded();
+        else completeAffected(entry, { status: 'answered', requestId, revision,
+          freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), result: outcome.result, timings: freeze({ ...timings }) });
+      } else if (outcome.reason === 'invalid-revision' && context.session === session && session.current !== null
+        && session.current.sequence !== publication.sequence) superseded();
+      else completeAffected(entry, { status: 'unavailable', requestId, revision, reason: outcome.reason, message: outcome.message,
+        unknownModules: outcome.unknownModules });
+    } catch (error) { completeAffected(entry, unavailableAffected({ ...unavailable('analysis-failed', String(error)), requestId })); }
+    finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
+  }
   /** A named path the daemon already knows as configuration: one the configuration path
    * pattern matches, or one the acquisition observed with the configuration role, such as
    * an `extends` target the configuration helper read. */
@@ -510,6 +551,12 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const found = expectationMismatch(entry, data);
     if (!found) return null;
     if (found.kind === 'unobserved') return { ...unavailable('unobserved-input', `Input was not observed: ${found.path}`), requestId: entry.request.requestId };
+    return { status: 'superseded', requestId: entry.request.requestId, revision: context.history.published?.revision ?? null };
+  }
+  function mismatchAffected(context: LiveContext, entry: PendingAffected, data: SessionRevision): ContextAffectedOutcome | null {
+    const found = expectationMismatch(entry, data);
+    if (!found) return null;
+    if (found.kind === 'unobserved') return unavailableAffected({ ...unavailable('unobserved-input', `Input was not observed: ${found.path}`), requestId: entry.request.requestId });
     return { status: 'superseded', requestId: entry.request.requestId, revision: context.history.published?.revision ?? null };
   }
   async function publish(context: LiveContext, data: SessionRevision, cause: RevisionCause, capture: CaptureTimings): Promise<boolean> {
@@ -620,10 +667,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       if (run.status === 'cancelled') { for (const entry of entries) completeEntry(entry, { status: 'cancelled', requestId: entry.request.requestId }); context.sweepRequired = true; return; }
       if (run.status === 'reported') {
         context.synchronization = 'reconciling'; context.sweepRequired = true;
-        const stragglers = context.queue.filter(publishedCheck);
+        const stragglers = context.queue.filter(publishedWait);
         for (const entry of [...entries, ...stragglers]) {
-          if (entry.kind === 'apiView') {
-            completeApiView(entry, { ...unavailable('analysis-failed', run.report.diagnostics[0]?.message || 'The analysis could not be reported'), requestId: entry.request.requestId });
+          if (entry.kind !== 'check') {
+            completeEntry(entry, { ...unavailable('analysis-failed', run.report.diagnostics[0]?.message || 'The analysis could not be reported'), requestId: entry.request.requestId });
             continue;
           }
           complete(entry, { status: 'reported', requestId: entry.request.requestId, published: false, revision: null, delta: null,
@@ -659,13 +706,19 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           if (failed) { completeApiView(entry, failed); return Promise.resolve(); }
           return deliverApiView(context, entry, publication, data, started, reused, timings);
         }
+        if (entry.kind === 'affected') {
+          const failed = mismatchAffected(context, entry, data);
+          if (failed) { completeAffected(entry, failed); return Promise.resolve(); }
+          return deliverAffected(context, entry, publication, started, reused, timings);
+        }
         const failed = mismatch(context, entry, data);
         if (failed) { complete(entry, failed); return Promise.resolve(); }
         return deliver(context, entry, publication, started, reused, timings);
       }));
-      const waiting = context.queue.filter(publishedCheck);
+      const waiting = context.queue.filter(publishedWait);
       for (const entry of waiting) context.queue.splice(context.queue.indexOf(entry), 1);
-      await Promise.all(waiting.map(entry => deliver(context, entry, publication, null, false, timings)));
+      await Promise.all(waiting.map(entry => entry.kind === 'affected' ? deliverAffected(context, entry, publication, null, false, timings)
+        : deliver(context, entry, publication, null, false, timings)));
       if (context.watcherState === 'unavailable') attach(context);
     } catch (error) {
       // A failed audit observed nothing and requires no re-observation; it is
@@ -678,7 +731,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (!auditing) context.synchronization = 'reconciling';
         // Published readers can join a background open without entering its
         // synchronized request batch. They must observe its failure as well.
-        for (const entry of [...entries, ...context.queue.filter(publishedCheck)]) {
+        for (const entry of [...entries, ...context.queue.filter(publishedWait)]) {
           completeEntry(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId });
         }
       }
@@ -750,6 +803,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     context.queue.splice(0, context.queue.length, ...context.queue.filter(entry => !answered.has(entry)));
     for (const entry of requests) {
       if (entry.kind === 'apiView') track(deliverApiView(context, entry, context.history.published!, context.session!.current!, null, true));
+      else if (entry.kind === 'affected') track(deliverAffected(context, entry, context.history.published!, null, true));
       else track(deliver(context, entry, context.history.published!, null, true));
     }
   }
@@ -826,6 +880,59 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       context.queue.push(entry); scheduleIdle(context); kick();
     });
   }
+  /** Complete an API-view or affected entry with an outcome both kinds share. */
+  function completeQuery(entry: PendingApiView | PendingAffected, outcome: QueryOutcome): void {
+    if (entry.kind === 'apiView') completeApiView(entry, outcome); else completeAffected(entry, outcome);
+  }
+  /** Arm an API-view or affected entry exactly as `check` arms its own: cancellation
+   * withdraws it and aborts a capture only it still waits for, and its deadline releases
+   * only the waiter, answering `cold` before any publication. */
+  function arm(context: LiveContext, entry: PendingApiView | PendingAffected, control?: RunControl): void {
+    const requestId = entry.request.requestId;
+    let stopDeadline: (() => void) | undefined;
+    const cancel = () => {
+      completeQuery(entry, { status: 'cancelled', requestId });
+      const position = context.queue.indexOf(entry); if (position !== -1) context.queue.splice(position, 1);
+      if (context.running?.requests.includes(entry) && context.running.requests.every(item => item.settled) && !context.running.requests.some(item => item.deadlineExpired)) context.running.controller.abort();
+      scheduleIdle(context);
+    };
+    control?.signal?.addEventListener('abort', cancel, { once: true });
+    entry.cleanup = () => { control?.signal?.removeEventListener('abort', cancel); stopDeadline?.(); };
+    if (entry.request.deadlineMs !== undefined) stopDeadline = clock.schedule(entry.request.deadlineMs, () => {
+      const elapsedMs = clock.now() - entry.acknowledged;
+      entry.deadlineExpired = true;
+      completeQuery(entry, entry.revisionAtAcknowledgment
+        ? { status: 'deadline-exceeded', requestId, elapsedMs, revision: entry.revisionAtAcknowledgment }
+        : { status: 'cold', requestId, current: snapshot(context) });
+      // A deadline releases only the waiter. Its queued changes and active
+      // session operation still run and may publish after this reply.
+      scheduleIdle(context);
+    });
+  }
+  /** The synchronized rendezvous of an uncovered API-view or affected request, exactly as
+   * `check`'s own: its named paths are queued for re-observation, owned by the request for
+   * withdrawal on a covering publication; a named configuration path answers at once while
+   * the update still runs; otherwise the request waits for the next capture. */
+  function rendezvous(context: LiveContext, entry: PendingApiView | PendingAffected, expect: readonly ExpectedContent[]): void {
+    // A hook identifies a path to re-observe. The observer determines its
+    // actual creation/deletion and role; preserve stronger watcher hints.
+    const configuration = expect.filter(expectation => namesConfiguration(context, expectation.path));
+    for (const expected of expect) {
+      if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); if (!configuration.length) context.requested.set(expected.path, new Set([entry])); }
+      else if (!configuration.length) context.requested.get(expected.path)?.add(entry);
+    }
+    if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
+    if (entry.needsSweep) context.sweepRequired = true;
+    context.background ??= 'request';
+    if (configuration.length) {
+      completeEntry(entry, { ...unavailable('configuration-changed',
+        `Configuration changed: ${configuration.map(item => item.path).join(', ')}. Verification continues in the background.`),
+      requestId: entry.request.requestId });
+      scheduleIdle(context); kick(); return;
+    }
+    context.debounce?.(); context.debounce = null;
+    context.queue.push(entry); scheduleIdle(context); kick();
+  }
   /**
    * One serialized API-view request: always synchronized freshness, the same
    * queue/rendezvous/deadline/cancellation rules as `check`, joined into the
@@ -847,42 +954,63 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       // Test coverage before touch() can mark a periodic sweep due for this activity.
       const covered = covers(context, entry);
       touch(context);
-      let stopDeadline: (() => void) | undefined;
-      const cancel = () => {
-        completeApiView(entry, { status: 'cancelled', requestId: request.requestId });
-        const position = context.queue.indexOf(entry); if (position !== -1) context.queue.splice(position, 1);
-        if (context.running?.requests.includes(entry) && context.running.requests.every(item => item.settled) && !context.running.requests.some(item => item.deadlineExpired)) context.running.controller.abort();
-        scheduleIdle(context);
-      };
-      control?.signal?.addEventListener('abort', cancel, { once: true });
-      entry.cleanup = () => { control?.signal?.removeEventListener('abort', cancel); stopDeadline?.(); };
-      if (request.deadlineMs !== undefined) stopDeadline = clock.schedule(request.deadlineMs, () => {
-        const elapsedMs = clock.now() - entry.acknowledged;
-        entry.deadlineExpired = true;
-        completeApiView(entry, entry.revisionAtAcknowledgment
-          ? { status: 'deadline-exceeded', requestId: request.requestId, elapsedMs, revision: entry.revisionAtAcknowledgment }
-          : { status: 'cold', requestId: request.requestId, current: snapshot(context) });
-        // A deadline releases only the waiter. Its queued changes and active
-        // session operation still run and may publish after this reply.
-        scheduleIdle(context);
-      });
+      arm(context, entry, control);
       if (covered) { track(deliverApiView(context, entry, context.history.published!, context.session!.current!, null, true)); return; }
-      // A hook identifies a path to re-observe, exactly as `check`'s own synchronized rendezvous does.
-      const configuration = request.freshness.expect.filter(expectation => namesConfiguration(context, expectation.path));
-      for (const expected of request.freshness.expect) {
-        if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); if (!configuration.length) context.requested.set(expected.path, new Set([entry])); }
-        else if (!configuration.length) context.requested.get(expected.path)?.add(entry);
+      rendezvous(context, entry, request.freshness.expect);
+    });
+  }
+  /** The live session still holds the published revision, and no capture other than
+   * periodic maintenance could move it: a published-freshness request is answered now. */
+  function holdsPublication(context: LiveContext): boolean {
+    const running = context.running, publication = context.history.published;
+    const maintenance = !running || (running.sweep === 'periodic' && !running.requests.length && !running.changes.length);
+    return maintenance && !!publication && !!context.session && context.publishedSession === context.session
+      && context.session.current?.sequence === publication.sequence;
+  }
+  /**
+   * One affected-module query. Synchronized freshness takes `apiView`'s path: the same
+   * coverage test, rendezvous, deadline and cancellation, joined into the same capture and
+   * delivered by `deliverAffected` while that capture holds its published revision.
+   * Published freshness answers from the published revision while the live session holds
+   * it. Otherwise `wait` false answers `pending`, or `cold` for a cold context, and `wait`
+   * true joins the next publication as a published check does. A named revision other
+   * than the published one is `superseded`: the session answers only its current revision.
+   */
+  function affected(request: AffectedRequest, lease: string, control?: RunControl): Promise<ContextAffectedOutcome> {
+    const found = lookup(request.token); if ('status' in found) return Promise.resolve(unavailableAffected({ ...found, requestId: request.requestId }));
+    const context = found;
+    if (control?.signal?.aborted) return Promise.resolve({ status: 'cancelled', requestId: request.requestId });
+    return new Promise(resolve => {
+      const freshness = request.freshness;
+      const entry: PendingAffected = { kind: 'affected', request: freeze(structuredClone(request)), lease, acknowledged: clock.now(),
+        invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
+        revisionAtAcknowledgment: context.history.published?.revision ?? null,
+        needsSweep: freshness.mode === 'synchronized' && !freshness.expect.length,
+        resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+      // Test coverage before touch() can mark a periodic sweep due for this activity,
+      // and read the cold state before touch() reopens the context.
+      const covered = freshness.mode === 'synchronized' && covers(context, entry);
+      const cold = context.state === 'cold' ? snapshot(context) : null;
+      touch(context);
+      arm(context, entry, control);
+      if (freshness.mode === 'synchronized') {
+        if (covered) { track(deliverAffected(context, entry, context.history.published!, null, true)); return; }
+        rendezvous(context, entry, freshness.expect);
+        return;
       }
-      if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
-      if (entry.needsSweep) context.sweepRequired = true;
-      context.background ??= 'request';
-      if (configuration.length) {
-        completeApiView(entry, { ...unavailable('configuration-changed',
-          `Configuration changed: ${configuration.map(item => item.path).join(', ')}. Verification continues in the background.`),
-        requestId: request.requestId });
-        scheduleIdle(context); kick(); return;
+      const publication = context.history.published;
+      if (freshness.revision !== undefined && publication?.revision.revision !== freshness.revision) {
+        completeAffected(entry, { status: 'superseded', requestId: request.requestId, revision: publication?.revision ?? null });
+        scheduleIdle(context); return;
       }
-      context.debounce?.(); context.debounce = null;
+      if (publication && !cold && holdsPublication(context)) { track(deliverAffected(context, entry, publication, null)); return; }
+      if (!freshness.wait) {
+        completeAffected(entry, { status: cold ? 'cold' : 'pending', requestId: request.requestId, current: cold ?? snapshot(context) });
+        scheduleIdle(context); return;
+      }
+      // Wait for the next publication. A session that moved past the published revision
+      // with no capture running or due publishes its current revision through one.
+      if (!context.running && !context.background && context.state === 'warm') context.background = 'request';
       context.queue.push(entry); scheduleIdle(context); kick();
     });
   }
@@ -1135,7 +1263,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     finally { resolving.delete(controller); control?.signal?.removeEventListener('abort', abort); }
   }
   return {
-    open: (request, setup, lease, control) => track(open(request, setup, lease, control)), check, apiView, explorerDetails, dependencyDiagram, dependencyFacts,
+    open: (request, setup, lease, control) => track(open(request, setup, lease, control)), check, apiView, affected, explorerDetails, dependencyDiagram, dependencyFacts,
     status(token) { const found = lookup(token); if ('status' in found) return found; touch(found); return snapshot(found); },
     list: () => [...contexts.values()].map(snapshot),
     subscribe(token, lease, listener) {

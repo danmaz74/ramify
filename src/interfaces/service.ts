@@ -7,12 +7,13 @@ import type { MaterializedTarget } from '../../subs/daemon/src/interfaces/daemon
 import type { ContextToken, ContextSetup, ContextStatus, ContextBudgets, CheckOutcome, Freshness, RevisionId,
   ContextRevision, FreshnessRecord, UnavailableReason, ReplyTimings,
   OpenOutcome, ContextEvent, ExplorerDetailsRequest, ContextExplorerDetailsOutcome,
-  DependencyDiagramRequest, ContextDependencyDiagramOutcome } from '../../subs/daemon/src/context-types.js';
+  DependencyDiagramRequest, ContextDependencyDiagramOutcome, AffectedRequest, ContextAffectedOutcome } from '../../subs/daemon/src/context-types.js';
 
 export type ServiceOperation = 'openContext' | 'contextStatus' | 'check' | 'subscribe'
-  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'measure' | 'explorerDetails' | 'dependencyDiagram';
+  | 'unsubscribe' | 'closeContext' | 'daemonStatus' | 'stopDaemon' | 'materialize' | 'measure' | 'explorerDetails' | 'dependencyDiagram'
+  | 'affected';
 export type ServiceCapability = 'contexts' | 'check' | 'subscribe' | 'daemon-control' | 'materialize' | 'explorerDetails'
-  | 'dependencyDiagram' | 'measure'
+  | 'dependencyDiagram' | 'measure' | 'affected'
   /** `materialize` accepts `views`. */
   | 'materialize-views';
 export type ServiceErrorCode = 'invalid-request' | 'unsupported-operation'
@@ -150,6 +151,10 @@ export type MeasureOutcome =
   | { readonly status: 'cancelled'; readonly requestId: string }
   | { readonly status: 'unavailable'; readonly requestId: string;
       readonly reason: UnavailableReason; readonly message: string };
+/** One read-only affected-module query against the covering revision. */
+export type AffectedParams = AffectedRequest;
+/** The selection from one revision's retained facts, or an explicit reason there is none. */
+export type AffectedOutcome = ContextAffectedOutcome;
 export interface RamifyService {
   openContext(params: OpenContextParams, control?: RunControl): Promise<ServiceResult<OpenOutcome>>;
   contextStatus(params: ContextParams): Promise<ServiceResult<ContextStatus>>;
@@ -165,4 +170,5 @@ export interface RamifyService {
   stopDaemon(params: StopParams): Promise<ServiceResult<StopAcknowledged>>;
   materialize(params: MaterializeParams, control?: RunControl): Promise<ServiceResult<MaterializeOutcome>>;
   measure(params: MeasureParams, control?: RunControl): Promise<ServiceResult<MeasureOutcome>>;
+  affected(params: AffectedParams, control?: RunControl): Promise<ServiceResult<AffectedOutcome>>;
 }

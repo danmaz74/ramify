@@ -80,7 +80,7 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
       releaseRevision: session.releaseRevision.bind(session), status: session.status.bind(session),
       releaseCompiler: session.releaseCompiler.bind(session), apiView: session.apiView.bind(session),
       architectView: session.architectView.bind(session),
-      measurements: session.measurements.bind(session),
+      measurements: session.measurements.bind(session), affected: session.affected.bind(session),
       explorerDetails: session.explorerDetails.bind(session),
       dispose() {
         closing ??= Promise.resolve().then(() => session.dispose()).then(() => { sessions.delete(handle); });

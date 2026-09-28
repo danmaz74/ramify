@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { assembleResidentService, residentPublishLimits } from '../resident-assembly.js';
+import { assembleResidentService, createSessionDriver, residentPublishLimits } from '../resident-assembly.js';
 import { contextBudgets, daemonBudgets } from '../resident-budgets.js';
 import { runBatch } from '../batch.js';
 import type { BatchOperation } from '../interfaces/batch.js';
@@ -21,6 +21,9 @@ export interface QuickEnvironment {
   readonly clock: ControlledClock;
   readonly connect: ServiceConnector;
   readonly batch: BatchOperation;
+  /** A production session driver independent of the service's own, for tests that
+   * compare a daemon answer with a directly opened retained session. The caller disposes it. */
+  sessionDriver(): AnalysisDriver;
   request(operation: string, params: unknown, control?: RunControl): Promise<ServiceResult<unknown>>;
   dispose(): Promise<void>;
 }
@@ -59,7 +62,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       client: { name: 'quick', version: instance.version }, buildKey: instance.buildKey, engine: instance.engine } });
     if (hello.type !== 'hello') throw new Error('Unexpected quick handshake');
     const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance,
-      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views'],
+      capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views', 'affected'],
       limits: { maxRequestBytes: daemonBudgets.maxRequestBytes, maxResponseBytes: daemonBudgets.maxResponseBytes,
         leaseMs: daemonBudgets.leaseMs, pingMs: daemonBudgets.pingMs } } });
     if (welcome.type !== 'welcome') throw new Error('Unexpected quick welcome');
@@ -101,6 +104,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
       dependencyDiagram: (params, control) => call('dependencyDiagram', params, control),
       materialize: (params, control) => call('materialize', params, control),
       measure: (params, control) => call('measure', params, control),
+      affected: (params, control) => call('affected', params, control),
       async subscribe(params, listener) {
         let subscriptionId: string | undefined;
         const initial: ContextEvent[] = [];
@@ -132,7 +136,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
     connections.add(connection);
     return { status: 'connected', connection, started: false };
   };
-  return { service, watcher, clock, connect, batch: runBatch,
+  return { service, watcher, clock, connect, batch: runBatch, sessionDriver: createSessionDriver,
     async request(operation, params, control) {
       const message = through({ type: 'request', id: randomUUID(), op: operation, params });
       if (message.type !== 'request') throw new Error('Unexpected quick request');

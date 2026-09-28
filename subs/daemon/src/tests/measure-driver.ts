@@ -2,10 +2,13 @@ import type { AnalysisDriver } from '../context-types.js';
 import type { AnalysisReport } from '../../../analysis/src/interfaces/analysis.js';
 import type { SessionMeasurements } from '../../../analysis/src/interfaces/measurements.js';
 import type { RetainedSession, SessionRevision } from '../../../analysis/src/interfaces/session.js';
+import type { RunControl } from '../../../analysis/src/interfaces/analysis.js';
+import type { AffectedQuery, SessionAffectedOutcome } from '../../../analysis/src/interfaces/affected.js';
 
 /** Minimal retained-session provider for parent-owner measure protocol tests. */
 export function createMeasureDriver(facts: Omit<SessionMeasurements, 'sequence' | 'inputId'>,
-  apiFailure = false, hooks: { readonly apiView?: () => void } = {}): AnalysisDriver {
+  apiFailure = false, hooks: { readonly apiView?: () => void;
+    readonly affected?: (query: AffectedQuery, control?: RunControl) => Promise<SessionAffectedOutcome> } = {}): AnalysisDriver {
   const inputId = `input/1:${'a'.repeat(64)}`;
   const revision: SessionRevision = { sequence: 1, inputId,
     inputs: [{ path: 'src/index.ts', role: 'source', sha256: 'b'.repeat(64), bytes: 1 }], changed: ['src/index.ts'],
@@ -47,6 +50,10 @@ export function createMeasureDriver(facts: Omit<SessionMeasurements, 'sequence' 
         async measurements(sequence, control) { return control?.signal?.aborted ? { status: 'cancelled' }
           : { status: 'measured', measurements: { ...facts, sequence, inputId } }; },
         async explorerDetails() { return { status: 'unavailable', reason: 'analysis-failed', message: 'not used' }; },
+        async affected(query, control) {
+          if (hooks.affected) return hooks.affected(query, control);
+          return { status: 'unavailable', reason: 'missing-facts', message: 'not used', unknownModules: [] };
+        },
         async dispose() { disposed = true; },
       };
       return { status: 'opened', session, revision };

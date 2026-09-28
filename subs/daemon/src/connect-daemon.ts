@@ -137,6 +137,7 @@ export async function connectDaemon(options: ConnectOptions): Promise<ConnectOut
       check: (...args) => current!.check(...args), explorerDetails: (...args) => current!.explorerDetails(...args),
       dependencyDiagram: (...args) => current!.dependencyDiagram(...args),
       materialize: (...args) => current!.materialize(...args), measure: (...args) => current!.measure(...args),
+      affected: (...args) => current!.affected(...args),
       subscribe: (...args) => current!.subscribe(...args),
       unsubscribe: params => current!.unsubscribe(params), closeContext: params => current!.closeContext(params),
       daemonStatus: () => current!.daemonStatus(), stopDaemon: params => current!.stopDaemon(params),

@@ -142,10 +142,8 @@ export interface RetainedSession {
   /** Select the modules affected by the given seeds from the current valid
    * revision's retained facts. Only `query.sequence` equal to the session's
    * current revision is accepted; a warm session answers with its compiler
-   * released; nothing is read from disk or projected through `report()`.
-   * Optional until the session wrappers of contexts, the daemon and root
-   * forward it; analysis's engine and worker host always implement it. */
-  affected?(query: AffectedQuery, control?: RunControl): Promise<SessionAffectedOutcome>;
+   * released; nothing is read from disk or projected through `report()`. */
+  affected(query: AffectedQuery, control?: RunControl): Promise<SessionAffectedOutcome>;
   dispose(): Promise<void>;
 }
 export type SessionOpen =

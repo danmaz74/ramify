@@ -3,6 +3,7 @@ import type { ApiViewQueryLimits, AnalysisDriver, ContextBudgets, ContextSetup }
 import type { AnalysisInputs, AnalysisReport, RunControl } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSession, SessionChange, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from '../../../../../analysis/src/interfaces/session.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from '../../../../../analysis/src/interfaces/architect-view.js';
+import type { AffectedQuery, AffectedSelection, SessionAffectedOutcome } from '../../../../../analysis/src/interfaces/affected.js';
 import type { SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { CapturedInput, ProjectRequest, ProjectResolution } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import { historyReport } from './history-fixture.js';
@@ -70,6 +71,7 @@ export interface ScriptedSession {
   readonly releasedRevisions: number[];
   readonly apiViewCalls: ApiViewQuery[];
   readonly architectViewCalls: ArchitectViewQuery[];
+  readonly affectedCalls: AffectedQuery[];
   readonly explorerDetailsCalls: readonly { readonly sequence: number; readonly requests: readonly SymbolDetailRequest[] }[];
   releaseCompilerCalls: number;
   disposeCalls: number;
@@ -91,6 +93,10 @@ export function createScriptedDriver() {
    * default projects an empty, deterministic projection from the session's current revision. */
   const architectViewPending: ((session: RetainedSession, query: ArchitectViewQuery, signal: AbortSignal | undefined)
     => Promise<ArchitectViewQueryOutcome> | ArchitectViewQueryOutcome)[] = [];
+  /** Scripted `affected` answers, consumed in order, each with the query's signal; the
+   * default answers `scriptedSelection` for the current revision and refuses another sequence. */
+  const affectedPending: ((session: RetainedSession, query: AffectedQuery, signal: AbortSignal | undefined)
+    => Promise<SessionAffectedOutcome> | SessionAffectedOutcome)[] = [];
   const missingReports = new Set<number>();
   let fallback = capture(1);
   let factBytes = 100;
@@ -220,6 +226,19 @@ export function createScriptedDriver() {
           return { status: 'measured', measurements: { sequence, inputId: current.inputId,
             modules: [], files: [], outsideModuleFiles: [] } };
         },
+        async affected(query, runControl) {
+          entry.affectedCalls.push(query);
+          if (runControl?.signal?.aborted) return { status: 'cancelled' };
+          const next = affectedPending.shift();
+          if (next) return await next(session, query, runControl?.signal);
+          if (!current || query.sequence !== current.sequence) {
+            return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${query.sequence} is not current`, unknownModules: [] };
+          }
+          if (current.outcome.execution !== 'completed') {
+            return { status: 'unavailable', reason: 'invalid-current', message: 'The current revision has no valid complete inventory', unknownModules: [] };
+          }
+          return { status: 'answered', sequence: query.sequence, result: scriptedSelection(current.inputId, query.modules ?? []) };
+        },
         async explorerDetails(sequence, requests, runControl) {
           explorerDetailsCalls.push({ sequence, requests });
           if (runControl?.signal?.aborted) return { status: 'cancelled' };
@@ -232,14 +251,14 @@ export function createScriptedDriver() {
         },
         async dispose() { if (sessionDisposed) return; entry.disposeCalls++; sessionDisposed = true; current = null; currentReport = null; reports.clear(); retainedBytes = 0; },
       };
-      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], apiViewCalls: [], architectViewCalls: [], explorerDetailsCalls,
+      const entry: ScriptedSession = { session, project, reportCalls: [], releasedRevisions: [], apiViewCalls: [], architectViewCalls: [], affectedCalls: [], explorerDetailsCalls,
         releaseCompilerCalls: 0, disposeCalls: 0 };
       sessions.push(entry);
       return { status: 'opened', session, revision: initial.revision };
     },
     async dispose() { disposed = true; },
   };
-  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, apiViewPending, architectViewPending, missingReports, resolveCalls,
+  return { driver, calls, pending, sessions, reportCalls, verifyCalls, verifyPending, releasePending, apiViewPending, architectViewPending, affectedPending, missingReports, resolveCalls,
     /** Resolutions actually performed: calls that returned no known resolution. */
     get resolutions() { return resolveCalls.filter(call => !call.reused).length; },
     /** Change the discovery answers: every earlier resolution is invalid, optionally with a moved root. */
@@ -251,5 +270,14 @@ export function createScriptedDriver() {
     set factBytes(value: number) { factBytes = value; },
     get disposed() { return disposed; },
   };
+}
+/** A fixed selection for a scripted revision: the seeds are the changed modules and
+ * nothing depends on them. The fake computes no dependency closure. */
+export function scriptedSelection(inputId: string, modules: readonly string[]): AffectedSelection {
+  const changed = modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` }));
+  return { schemaVersion: 'ramify.affected/1', inputId, paths: [], changedModules: changed, affectedModules: [], testModules: changed,
+    selection: 'dependency-closure', widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture',
+      configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [] },
+    coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' };
 }
 export async function flush(): Promise<void> { for (let index = 0; index < 80; index++) await Promise.resolve(); }

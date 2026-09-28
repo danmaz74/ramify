@@ -51,7 +51,6 @@ async function execute(request: Exclude<WorkerRequest, { operation: 'cancel' }>,
         case 'architectView': result = await session.architectView(request.query, { signal: control.signal }); break;
         case 'measurements': result = await session.measurements(request.sequence, { signal: control.signal }); break;
         case 'affected':
-          if (!session.affected) throw new Error('The session does not answer affected queries');
           result = await session.affected(request.query, { signal: control.signal }); break;
         case 'explorerDetails': result = await session.explorerDetails(request.sequence, request.requests, { signal: control.signal }); break;
       }

@@ -6,6 +6,7 @@ import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../../
 import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ArchitectViewProjection } from '../../../../../analysis/src/interfaces/architect-view.js';
 import type { MeasurementViewUnavailableReason, SessionMeasurements } from '../../../../../analysis/src/interfaces/measurements.js';
+import type { AffectedSelection, AffectedUnavailableReason } from '../../../../../analysis/src/interfaces/affected.js';
 
 export type ContextId = string;
 export type GenerationId = string;
@@ -198,6 +199,36 @@ export type ContextApiViewOutcome =
       readonly revision: ContextRevision | null }
   | { readonly status: 'cancelled'; readonly requestId: string }
   | (Unavailable & { readonly requestId: string });
+/** One affected-module query against the covering revision. Synchronized freshness
+ * joins `apiView`'s rendezvous; published freshness answers from the published
+ * revision while the live session still holds it. Seeds are passed to the session
+ * unchanged, which validates them. */
+export interface AffectedRequest {
+  readonly token: ContextToken;
+  readonly requestId: string;
+  readonly freshness: Freshness;
+  /** Exact inventory module IDs. */
+  readonly modules?: readonly string[];
+  /** Project-relative, `/`-separated paths. */
+  readonly paths?: readonly string[];
+  readonly deadlineMs?: number;
+}
+/** The non-answered variants share `ContextApiViewOutcome`'s shape, which `measure`
+ * answers with; `unavailable` adds the revision it describes, null for a lifecycle
+ * outcome, and the unknown module IDs of an `unknown-module` answer. */
+export type ContextAffectedOutcome =
+  | { readonly status: 'answered'; readonly requestId: string; readonly revision: ContextRevision;
+      readonly freshness: FreshnessRecord; readonly result: AffectedSelection; readonly timings: ReplyTimings }
+  | { readonly status: 'pending' | 'cold'; readonly requestId: string;
+      readonly current: ContextStatus }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string;
+      readonly revision: ContextRevision | null; readonly elapsedMs: number }
+  | { readonly status: 'superseded'; readonly requestId: string;
+      readonly revision: ContextRevision | null }
+  | { readonly status: 'cancelled'; readonly requestId: string }
+  | { readonly status: 'unavailable'; readonly requestId: string; readonly revision: ContextRevision | null;
+      readonly reason: AffectedUnavailableReason | UnavailableReason; readonly message: string;
+      readonly unknownModules: readonly string[] };
 export interface ExplorerDetailsRequest {
   readonly token: ContextToken;
   readonly requestId: string;
@@ -343,6 +374,13 @@ export interface ContextManager {
    * the session query runs while that revision's slot is held, its ephemeral
    * projection released once this call returns. */
   apiView(request: ApiViewRequest, lease: LeaseId, control?: RunControl): Promise<ContextApiViewOutcome>;
+  /** Reuses `apiView`'s scheduler, rendezvous, lease, deadline and cancellation rules for
+   * synchronized freshness. Published freshness answers from the published revision
+   * when the live session still holds it; otherwise `wait` false answers `pending`, or
+   * `cold` for a cold context, and `wait` true joins the next publication. The session
+   * query runs at that revision's sequence while its slot is held, and an answer naming
+   * another sequence is `superseded`, never relabeled. */
+  affected(request: AffectedRequest, lease: LeaseId, control?: RunControl): Promise<ContextAffectedOutcome>;
   explorerDetails(request: ExplorerDetailsRequest, lease: LeaseId,
     control?: RunControl): Promise<ContextExplorerDetailsOutcome>;
   /** Answers in C4's order: superseded, invalid-current, ready from the retained

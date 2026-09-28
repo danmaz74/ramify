@@ -350,4 +350,88 @@ import { createMeasureDriver } from './measure-driver.js';
         .toMatchObject({ ok: true, value: { status: 'measured', document: { files: expect.any(Array) } } });
     } finally { await deadline.fixture.dispose(); }
   }, 60_000);
+
+  it('A7-08:round-trip carries the same answered document over the socket as the direct binding', async () => {
+    const fixture = await ipcFixture({}, true);
+    try {
+      const client = await fixture.connect();
+      expect(client.daemon.capabilities).toContain('affected');
+      const setup = { registry: 'default' as const, capabilities: ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog',
+        'exposure-linking', 'static-access', 'tags-origin', 'namespace-access', 'lazy-access', 'symbol-free-access', 'resource-access', 'coverage'] as const };
+      const opened = await client.openContext({ ...fixture.params, setup });
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const token = opened.value.token;
+      const params = (requestId: string) => ({ token, requestId, freshness: { mode: 'synchronized' as const, expect: [] },
+        modules: ['example'], paths: ['src/index.ts', 'package.json'] });
+      const socket = await client.affected(params('socket'));
+      const direct = await fixture.environment.service.affected(params('direct'));
+      if (!socket.ok || socket.value.status !== 'answered' || !direct.ok || direct.value.status !== 'answered') {
+        throw new Error(JSON.stringify([socket, direct]));
+      }
+      // The one-module fixture: the seed module changed, nothing depends on it, and the unowned
+      // manifest path widens the test selection to every module.
+      const root = { id: 'example', directory: '.' };
+      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/1',
+        paths: [{ path: 'package.json', module: null, basis: 'none' }, { path: 'src/index.ts', module: 'example', basis: 'inventory' }],
+        changedModules: [root], affectedModules: [], testModules: [root], selection: 'all-modules', widening: ['unowned-path'],
+        analysisCheck: 'passed' });
+      expect(socket.value.revision).toEqual(direct.value.revision);
+      expect(socket.value.result).toEqual(direct.value.result);
+      expect(JSON.stringify(socket.value.result)).toBe(JSON.stringify(direct.value.result));
+      expect(socket.value.timings).toMatchObject({ service: expect.any(Number), clientTransport: expect.any(Number) });
+      expect(direct.value.timings).not.toHaveProperty('clientTransport');
+    } finally { await fixture.dispose(); }
+  }, 60_000);
+
+  it('A7-08:unsupported-peer refuses affected locally when the daemon does not advertise the capability', async () => {
+    const fixture = await ipcFixture({}, true, undefined, undefined, ['contexts', 'check', 'measure']);
+    try {
+      const client = await fixture.connect();
+      expect(client.daemon.capabilities).not.toContain('affected');
+      expect(await client.affected({ token: { context: `ctx/1:${'0'.repeat(64)}`,
+        generation: 'gen/1:d5f257c2-2058-499f-9098-045de98690a2' }, requestId: 'old-daemon',
+      freshness: { mode: 'synchronized', expect: [] }, modules: ['example'] })).toEqual({ ok: false, error: {
+        code: 'unsupported-operation', message: 'The daemon does not support affected', details: {},
+      } });
+    } finally { await fixture.dispose(); }
+  });
+
+  it('A7-08:disconnect during the request aborts the session query, releases the lease and leaves the daemon usable', async () => {
+    const signals: AbortSignal[] = [];
+    let blocking = true;
+    const driver = createMeasureDriver({ modules: [], files: [], outsideModuleFiles: [] }, false, {
+      affected: async (query, control) => {
+        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/1',
+          inputId: 'input/1:scripted', paths: [], changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure',
+          widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json',
+            walkedAreas: [], independentScopes: [] }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
+        signals.push(control!.signal!);
+        return new Promise(resolve => control!.signal!.addEventListener('abort', () => resolve({ status: 'cancelled' }), { once: true }));
+      },
+    });
+    const fixture = await ipcFixture({}, true, driver);
+    try {
+      const client = await fixture.connect();
+      const opened = await client.openContext(fixture.params);
+      if (!opened.ok || opened.value.status !== 'opened') throw new Error('Open failed');
+      const token = opened.value.token;
+      const params = { token, requestId: 'dropped', freshness: { mode: 'synchronized' as const, expect: [] } };
+      const pending = client.affected(params);
+      await eventually(() => signals.length === 1);
+      expect(signals[0]!.aborted).toBe(false);
+      const busy = await fixture.environment.service.contextStatus({ token });
+      expect(busy.ok && busy.value.leases.requests).toBe(1);
+      await client.close();
+      expect(await pending).toMatchObject({ ok: false, error: { code: 'cancelled' } });
+      await eventually(() => signals[0]!.aborted);
+      const released = await fixture.environment.service.contextStatus({ token });
+      expect(released.ok && released.value.leases.requests).toBe(0);
+      expect(await fixture.environment.service.daemonStatus()).toMatchObject({ ok: true, value: { connections: 0 } });
+
+      blocking = false;
+      const again = await fixture.connect();
+      expect(await again.affected({ ...params, requestId: 'after' })).toMatchObject({ ok: true,
+        value: { status: 'answered', requestId: 'after', result: { inputId: 'input/1:scripted' } } });
+    } finally { await fixture.dispose(); }
+  }, 60_000);
 });

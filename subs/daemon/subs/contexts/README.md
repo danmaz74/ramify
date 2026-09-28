@@ -1,6 +1,6 @@
 # Contexts
 
-Contexts keeps each selected project root isolated as a context with its own generation, orders its updates and requests into one queue, publishes immutable revisions atomically, and bounds compact history, sessions, leases and idle lifetime. It drives one retained analysis session through a neutral port, answers a request from the published revision when that revision already covers the identities it names, and never reads project files or transport objects itself.
+Contexts keeps each selected project root isolated as a context with its own generation, orders its updates and requests into one queue, publishes immutable revisions atomically, and bounds compact history, sessions, leases and idle lifetime. It drives one retained analysis session through a neutral port, answers a request from the published revision when that revision already covers the identities it names, and never reads project files or transport objects itself. It schedules affected-module queries against the covering revision with explicit freshness and unavailable outcomes.
 
 `createContextManager` preserves each opening lease's invocation and capability
 order. Covered delta requests reuse a coherent publication when no influencing
