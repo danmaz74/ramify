@@ -21,7 +21,8 @@ const b = 'capability-coordination/b';
 const d = 'capability-coordination/d';
 const p = 'capability-coordination';
 
-async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Promise<void> {
+async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 'restart' | 'verify-restart' |
+  'gate-restart' | 'review-restart'): Promise<void> {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   await mkdir(join(fixture.root, 'subs/a/src/tests/steps'), { recursive: true });
   await writeFile(join(fixture.root, 'subs/a/src/tests/steps/capability.steps.js'), [
@@ -50,6 +51,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Pro
   let localTurn = 0;
   let deferredBriefing = '';
   let driftFeedback = '';
+  let resuming = false;
   const scripted: Script = spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') {
@@ -89,6 +91,9 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Pro
       if (owner === a) return submit({ kind: 'completion-proposed', summary: 'A integrated the real B result', findings: [] },
         write('caller.ts', "import { readFact } from '../../b/src/fact.js';\nexport function renderA(): string { const fact = readFact(); return `Fresh fact: ${fact.text} from ${fact.source}`; }\n"),
         write('tests/caller.test.ts', "import { expect, test } from 'vitest';\nimport { renderA } from '../caller.js';\ntest('A renders the source', () => expect(renderA()).toBe(renderA()));\n"));
+      if (mode === 'restart' || mode === 'verify-restart' || mode === 'gate-restart' || mode === 'review-restart') return resuming
+        ? submit({ kind: 'completion-proposed', summary: 'A resumed after restart with the accepted result', findings: [] })
+        : [{ kind: 'wait', ms: 60_000 }];
       if (mode === 'deferred') return submit({ kind: 'completion-proposed', summary: 'A resumed with the accepted result', findings: [] });
       return submit({ kind: 'capability-needed', summary: 'A found a post-handback integration issue', request: {
         need: 'Revise the B result for A integration',
@@ -117,6 +122,11 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Pro
       architect += 1;
       if (architect > 9) {
         if (mode === 'drift') { driftFeedback = spec.prompt; return [{ kind: 'wait', ms: 60_000 }]; }
+        if (mode === 'gate-restart' || mode === 'review-restart') return submit({ task, planRevision: Number(revision), invocation,
+          kind: 'request-handback', summary: 'B result is integrated in A and compatible with D',
+          coverage: [{ case: 'need-001.ex01', evidence: ['subs/a/src/tests/caller.test.ts'] }],
+          interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }],
+          limitations: [] });
         throw new Error(`Unexpected capability turn ${architect}: ${spec.prompt.slice(-1200)}`);
       }
       const basis = { task, planRevision: Number(revision), invocation };
@@ -148,8 +158,21 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Pro
     }
     return [];
   };
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService, script: scripted, inputs: treeInputs(),
+  let closingVerification: Promise<void> | undefined;
+  let closeVerification: (() => Promise<void>) | undefined;
+  let activeService: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
+  const options = { git: gitService, script: scripted, inputs: treeInputs(),
     readinessExecution: directReadinessExecution(), checkExecution: createLocalCommandCheckExecution(),
+    afterWrite: async (write: string, runId: string) => {
+      const event = activeService?.events('need', runId)?.at(-1);
+      const gate = activeService?.events('need', runId)?.filter(entry => entry.type === 'gate-attempted').at(-1);
+      const boundary = mode === 'verify-restart' && write === 'capability-verification-started' ||
+        mode === 'gate-restart' && write === 'capability-gate-recorded' &&
+          gate?.type === 'gate-attempted' && gate.data.gate === 'ga-0004' && gate.data.verdict === 'passed' ||
+        mode === 'review-restart' && write === 'capability-review-recorded' && event?.type === 'capability-review-recorded' &&
+          event.data.outcome === 'passed' && event.data.planRevision >= 2;
+      if (boundary && closingVerification === undefined) closingVerification = closeVerification?.();
+    },
     policy: root => {
       const base = testPolicy(root);
       return { ...base, commands: { ...base.commands,
@@ -158,9 +181,38 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Pro
         typeCheck: checkCommand({ argv: [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'], cwd: root, timeoutMs: 30_000 }),
         ramifyCheck: base.commands.ramifyCheck,
       } };
-    } });
+    } } satisfies Parameters<typeof openCapabilityRuns>[1];
+  const opened = await openCapabilityRuns(fixture.root, options);
   cleanups.push(() => opened.service.close());
+  activeService = opened.service;
+  closeVerification = () => opened.service.close();
   const receipt = await opened.service.execute(startRun('need'));
+  if (mode === 'verify-restart' || mode === 'gate-restart' || mode === 'review-restart') {
+    await until(() => closingVerification !== undefined, 120_000).catch(async error => {
+      const current = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+      throw new Error(`${String(error)}; architect ${architect}; gates ${JSON.stringify(current.filter(event => event.type === 'gate-attempted'))}; tail ${JSON.stringify(current.slice(-12))}`);
+    });
+    await closingVerification;
+    const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+    if (mode === 'verify-restart') expect(before.filter(event => event.type === 'capability-verification-started')).toHaveLength(1);
+    expect(before.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+    const gates = before.filter(event => event.type === 'gate-attempted').length;
+    const reviews = before.filter(event => event.type === 'capability-review-recorded').length;
+    resuming = true;
+    const reopened = await openCapabilityRuns(fixture.root, options);
+    cleanups.push(() => reopened.service.close());
+    await until(() => (reopened.service.events('need', receipt.jobId) ?? []).some(event =>
+      event.type === 'capability-handed-back' || event.type === 'job-failed'), 60_000);
+    const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+    expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-15))).toHaveLength(0);
+    expect(after.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
+    expect(after.filter(event => event.type === 'gate-attempted'), JSON.stringify({ before: before.slice(-12), after: after.slice(-18) })).toHaveLength(gates);
+    if (mode !== 'gate-restart') expect(after.filter(event => event.type === 'capability-review-recorded'),
+      JSON.stringify({ before: before.slice(-12), after: after.slice(-18) })).toHaveLength(reviews);
+    await stopStable(reopened.service, receipt.jobId);
+    await reopened.service.settled('need', receipt.jobId);
+    return;
+  }
   await until(() => mode === 'drift' ? driftFeedback.length > 0 : (opened.service.events('need', receipt.jobId) ?? []).some(event =>
     event.type === 'capability-handed-back' || event.type === 'job-failed'), 120_000).catch(async error => {
     const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
@@ -215,6 +267,32 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift'): Pro
   const continued = opened.service.events('need', receipt.jobId)!;
   expect(continued.filter(event => event.type === 'invocation-started' && event.sequence > handbackEvent.sequence &&
     event.data.role === 'engineer' && event.data.work.iteration === 'wi-001.i01')).toHaveLength(1);
+  if (mode === 'restart') {
+    const resumedA = continued.find(event => event.type === 'invocation-started' && event.sequence > handbackEvent.sequence &&
+      event.data.role === 'engineer' && event.data.work.iteration === 'wi-001.i01');
+    if (resumedA?.type !== 'invocation-started') throw new Error('A continuation did not start');
+    await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
+      event.type === 'writer-acquired' && event.data.invocation === resumedA.data.invocation), 30_000);
+    await opened.service.close();
+    resuming = true;
+    const reopened = await openCapabilityRuns(fixture.root, options);
+    cleanups.push(() => reopened.service.close());
+    expect(reopened.recovery.effects, JSON.stringify({ recovery: reopened.recovery,
+      tail: (await runEventsOnDisk(fixture.root, 'need', receipt.jobId)).slice(-12) })).toContainEqual(
+      expect.stringContaining('resumed capability coordination'));
+    await until(() => (reopened.service.events('need', receipt.jobId) ?? []).some(event =>
+      event.type === 'iteration-closed' && event.data.iteration === 'wi-001.i01') ||
+      (reopened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 45_000);
+    const restarted = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+    expect(restarted.filter(event => event.type === 'job-failed'), JSON.stringify(restarted.slice(-15))).toHaveLength(0);
+    expect(restarted.filter(event => event.type === 'capability-handed-back' && event.data.task === 'cap-001')).toHaveLength(1);
+    expect(restarted.filter(event => event.type === 'iteration-closed' && event.data.iteration === 'wi-001.i01')).toHaveLength(1);
+    expect(restarted.filter(event => event.type === 'invocation-started' && event.data.work.iteration === 'wi-001.i01' &&
+      event.sequence > handbackEvent.sequence).length).toBeGreaterThanOrEqual(2);
+    await stopStable(reopened.service, receipt.jobId);
+    await reopened.service.settled('need', receipt.jobId);
+    return;
+  }
   if (mode === 'deferred') {
     await until(() => deferredBriefing.length > 0 || (opened.service.events('need', receipt.jobId) ?? []).some(event =>
       event.type === 'job-failed'), 30_000).catch(async error => {
@@ -263,3 +341,11 @@ test('CA28: deferred B entry receives accepted handback and replans from current
   () => runAcceptedHandback('deferred'), 150_000);
 test('CA31: source drift after a passing combined gate cannot be handed back',
   () => runAcceptedHandback('drift'), 150_000);
+test('CA17 CA19 CA28 CA30: restart after handback continues the original A assignment once',
+  () => runAcceptedHandback('restart'), 180_000);
+test('CA17 CA20 CA30: restart after verification reuses the accepted gate and review for one handback',
+  () => runAcceptedHandback('verify-restart'), 180_000);
+test('CA20 CA30: restart after the passing gate reuses its audited candidate',
+  () => runAcceptedHandback('gate-restart'), 180_000);
+test('CA20 CA30: restart after the passing review reuses the same gate and review',
+  () => runAcceptedHandback('review-restart'), 180_000);

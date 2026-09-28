@@ -1,0 +1,44 @@
+{
+  "schema": "ramify-agent.capability-projection-fixtures/1",
+  "purpose": "Iteration 6 API and web projections. Match event and record identities from the cited service tests; do not interpret a scripted reviewer as live semantic acceptance.",
+  "fixtures": [
+    {
+      "id": "active",
+      "sourceTest": "subs/harness/src/tests/capability-recovery.test.ts: service restart reconstructs the active architect",
+      "checkpoint": ["capability-requested", "capability-delegated", "capability-coordinator-resumed"],
+      "expected": { "task": "cap-001", "request": "need-001", "stack": ["wi-001", "cap-001"], "status": "coordinating", "terminal": null, "handback": null }
+    },
+    {
+      "id": "waiting-for-child",
+      "sourceTest": "subs/harness/src/tests/capability-dependencies.test.ts: B asks for C",
+      "checkpoint": ["capability-assigned:cap-001.i01", "capability-requested:need-002", "capability-delegated:cap-002"],
+      "expected": { "task": "cap-001", "request": "need-001", "stack": ["wi-001", "cap-001", "cap-002"], "status": "awaiting-dependency", "activeAssignment": "cap-001.i01", "activeChild": "cap-002", "terminal": null }
+    },
+    {
+      "id": "stopped-unsettled",
+      "sourceTest": null,
+      "witness": "projection-input-only; unsettled writer service restart remains unexercised",
+      "checkpoint": ["writer-acquired", "invocation-ended:incomplete", "capability-stopped", "job-failed:writer-unsettled"],
+      "expected": { "task": "cap-001", "status": "stopped", "terminal": "failed", "failure": "writer-unsettled", "handback": null, "sourcePreserved": true }
+    },
+    {
+      "id": "reconstructed",
+      "sourceTest": "subs/harness/src/tests/capability-recovery.test.ts: service restart reconstructs the active architect",
+      "checkpoint": ["session-opened:replaces", "invocation-started:capability-architect", "capability-assigned:cap-001.i01"],
+      "expected": { "task": "cap-001", "status": "implementing", "reconstruction": "fresh", "replacementReason": "reconstructed", "assignmentSequence": 1, "terminal": null }
+    },
+    {
+      "id": "failed-unfinished",
+      "sourceTest": null,
+      "witness": "projection-input-only; the snapshot drift refusal is exercised below the service layer",
+      "checkpoint": ["capability-requested", "job-failed:inputs-changed"],
+      "expected": { "task": null, "request": "need-001", "terminal": "failed", "failure": "inputs-changed", "sourcePreserved": true, "handback": null }
+    },
+    {
+      "id": "handed-back",
+      "sourceTest": "subs/harness/src/tests/capability-dependencies.test.ts: real C child gate and review hand back to the suspended B writer",
+      "checkpoint": ["capability-review-recorded:passed", "capability-candidate-accepted", "capability-verification-started", "capability-handed-back:cap-002"],
+      "expected": { "task": "cap-002", "request": "need-002", "stack": ["wi-001", "cap-001"], "status": "handed-back", "handback": "cap-002", "parentStatus": "implementing", "parentAssignment": "cap-001.i01", "terminal": null }
+    }
+  ]
+}

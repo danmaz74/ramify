@@ -171,6 +171,8 @@ export const capabilityAssignmentSchema = z.object({
   scope: writeScopeSchema,
   gate: z.object({ tests: testSelectionPolicySchema }).strict(),
   startingTree: treeIdentity,
+  /** Dirty paths that predate this writer, retained for attribution after restart. */
+  startingPaths: z.array(z.object({ path: location, hash: z.string().nullable() }).strict()).optional(),
 }).strict().superRefine((assignment, context) => {
   if (assignment.id !== capabilityAssignmentId(assignment.task, assignment.sequence)) {
     context.addIssue({ code: 'custom', path: ['id'], message: 'Assignment ID contains its task and sequence' });
@@ -213,7 +215,8 @@ export const capabilityLayout = {
   exchange: (task: string, exchange: string, revision: number): string => join('capabilities', task, 'exchanges', `${exchange}.${revision}.json`),
   assignment: (task: string, assignment: string): string => join('capabilities', task, 'assignments', `${assignment}.json`),
   handback: (task: string): string => join('capabilities', task, 'handback.json'),
-  review: (task: string, gate: string): string => join('capabilities', task, 'reviews', `${gate}.json`),
+  review: (task: string, gate: string, planRevision: number): string =>
+    join('capabilities', task, 'reviews', `${gate}.p${planRevision}.json`),
 } as const;
 
 export const capabilitySchemas = {

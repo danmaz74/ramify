@@ -3,7 +3,7 @@ import type { CapabilityPlan, CapabilityRequest, CapabilityTask } from './record
 
 const capabilityTypes = [
   'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
-  'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled',
+  'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-interrupted', 'capability-assignment-settled',
   'capability-candidate-accepted', 'capability-review-recorded',
   'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
 ] as const;
@@ -76,7 +76,9 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       if (stack.length === 0) stack = [parent];
       if (stack.at(-1) !== parent) return fail(`request parent ${parent} is not active`);
       const parentTask = tasks.get(parent);
-      if (parentTask && parentTask.status !== 'implementing') return fail(`nested request parent ${parent} is ${parentTask.status}`);
+      if (parentTask && (parentTask.status !== 'implementing' || parentTask.activeAssignment !== assignment)) {
+        return fail(`nested request parent ${parent} does not own assignment ${assignment}`);
+      }
       requests.set(request, { parent, assignment, invocation, task: null });
       break;
     }
@@ -135,6 +137,13 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       const assignments = new Map(current.assignments);
       assignments.set(assignment, 'active');
       update(current, { status: 'implementing', activeAssignment: assignment, assignments, nextAssignmentSequence: sequence + 1 });
+      break;
+    }
+    case 'capability-assignment-interrupted': {
+      const current = active(event.data.task);
+      if (current.status !== 'implementing' || current.activeAssignment !== event.data.assignment) {
+        return fail(`assignment ${event.data.assignment} is not active`);
+      }
       break;
     }
     case 'capability-assignment-settled': {
@@ -232,6 +241,19 @@ export function canCreateCapabilityTask(workItems: number, tasks: number, maxWor
 /** A repair or reconstruction within an assignment does not consume its next number. */
 export function canAssignCapabilityTask(state: CapabilityTaskState, maxAssignments: number): boolean {
   return state.status === 'coordinating' && state.nextAssignmentSequence <= maxAssignments;
+}
+
+/** Exact task identities establish a dependency cycle. Shared provider or
+ * consumer modules are intentionally irrelevant to this graph. */
+export function capabilityDependencyCycle(state: CapabilityState, parent: string, requestedTask: string): readonly string[] | null {
+  const path: string[] = [];
+  let cursor: string | undefined = parent;
+  while (cursor !== undefined) {
+    path.push(cursor);
+    if (cursor === requestedTask) return [...path, parent];
+    cursor = state.tasks.get(cursor)?.parent;
+  }
+  return null;
 }
 
 /** New-workflow completion depends on resolved needs and current task

@@ -238,6 +238,16 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'evidence-reopened': return types.includes('evidence-reopened');
     case 'revision-needed': return types.includes('revision-needed');
     case 'dependency-cycle-detected': return types.includes('dependency-cycle-detected');
+    case 'capability-assignment-interrupted': return types.includes('capability-assignment-interrupted');
+    case 'capability-coordinator-resumed': return types.includes('capability-coordinator-resumed');
+    case 'capability-verification-started': return types.includes('capability-verification-started');
+    case 'capability-source-captured': return types.includes('invocation-ended');
+    case 'capability-exchange-opened': return types.includes('capability-exchange-opened');
+    case 'capability-exchange-answered': return types.includes('capability-exchange-answered');
+    case 'capability-gate-recorded': return types.includes('gate-attempted');
+    case 'capability-review-recorded': return types.includes('capability-review-recorded');
+    case 'capability-assignment-settled': return types.includes('capability-assignment-settled');
+    case 'capability-assigned': return types.includes('capability-assigned');
     case 'nonfunctional-phase-started':
     case 'nonfunctional-repair-assigned':
     case 'nonfunctional-repair-committed':

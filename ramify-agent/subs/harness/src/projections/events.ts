@@ -330,6 +330,8 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Capability task ${event.data.task} received exchange ${event.data.exchange}`, ref('invocation', event.data.invocation)];
     case 'capability-assigned':
       return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, ref('invocation', event.data.invocation)];
+    case 'capability-assignment-interrupted':
+      return [`Capability assignment ${event.data.assignment} remains unfinished: ${event.data.cause}`, ref('invocation', event.data.invocation)];
     case 'capability-assignment-settled':
       return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, []];
     case 'capability-review-recorded':

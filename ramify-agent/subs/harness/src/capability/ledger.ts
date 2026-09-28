@@ -6,7 +6,7 @@ import {
   capabilityAssignmentSchema, capabilityExchangeSchema, capabilityHandbackSchema, capabilityReviewSchema,
   capabilityLayout, capabilityPlanSchema, capabilityRequestSchema, capabilityTaskSchema,
 } from './records.js';
-import { capabilityHandbackReadiness, isCapabilityEvent, replayCapabilityState, transitionCapabilityState } from './state.js';
+import { capabilityCompletionBlockers, capabilityDependencyCycle, capabilityHandbackReadiness, isCapabilityEvent, replayCapabilityState, transitionCapabilityState } from './state.js';
 
 type CapabilityInput = Extract<RunEventInput, { type: `capability-${string}` }>;
 type RecordSpecification = { readonly path: string; readonly schema: z.ZodType; readonly id: string; readonly revision: number };
@@ -39,6 +39,10 @@ export async function commitCapabilityTransition(
       request.assignment !== event.data.assignment || request.invocation !== event.data.invocation ||
       request.original.examples.some((example, index) => example.id !== `${request.id}.ex${String(index + 1).padStart(2, '0')}`)) {
       throw new Error('Request must retain its harness IDs, parent and stable example order');
+    }
+    if (request.parent.kind === 'capability-task' && request.original.revises !== undefined) {
+      const cycle = capabilityDependencyCycle(prior, request.parent.id, request.original.revises.task);
+      if (cycle !== null) throw new Error(`Exact capability dependency cycle: ${cycle.join(' -> ')}`);
     }
   }
   if (event.type === 'capability-delegated') {
@@ -100,7 +104,9 @@ export async function commitCapabilityTransition(
     const request = committed.capabilityRequests.get(handback.request);
     const plan = committed.capabilityPlans.get(handback.task)?.at(-1);
     const state = prior.tasks.get(handback.task);
-    if (!task || !request || !plan || !state || handback.plan.revision !== plan.revision || handback.plan.hash !== recordHash(plan) ||
+    const completedAssignments = new Set([...state?.assignments ?? []].filter(([, outcome]) => outcome === 'accepted').map(([id]) => id));
+    if (!task || !request || !plan || !state || capabilityCompletionBlockers(prior, handback.task, completedAssignments).length > 0 ||
+      handback.plan.revision !== plan.revision || handback.plan.hash !== recordHash(plan) ||
       handback.task !== event.data.task || handback.sourceRevision === '' ||
       capabilityHandbackReadiness(task, request, plan, state).length > 0) {
       throw new Error('Handback lacks current resolved structural evidence');
@@ -121,7 +127,7 @@ function specifications(event: Extract<RunEvent, { type: `capability-${string}` 
     case 'capability-exchange-opened': return [{ path: capabilityLayout.exchange(event.data.task, event.data.exchange, 1), schema: capabilityExchangeSchema, id: event.data.exchange, revision: 1 }];
     case 'capability-exchange-answered': return [{ path: capabilityLayout.exchange(event.data.task, event.data.exchange, 2), schema: capabilityExchangeSchema, id: event.data.exchange, revision: 2 }];
     case 'capability-assigned': return [{ path: capabilityLayout.assignment(event.data.task, event.data.assignment), schema: capabilityAssignmentSchema, id: event.data.assignment, revision: 1 }];
-    case 'capability-review-recorded': return [{ path: capabilityLayout.review(event.data.task, event.data.gate), schema: capabilityReviewSchema, id: event.data.review, revision: 1 }];
+    case 'capability-review-recorded': return [{ path: capabilityLayout.review(event.data.task, event.data.gate, event.data.planRevision), schema: capabilityReviewSchema, id: event.data.review, revision: 1 }];
     case 'capability-handed-back': return [{ path: capabilityLayout.handback(event.data.task), schema: capabilityHandbackSchema, id: event.data.task, revision: 1 }];
     default: return [];
   }

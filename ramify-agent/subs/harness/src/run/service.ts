@@ -41,7 +41,8 @@ import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } 
 import { recordSettledSnapshot } from './mutations.js';
 import { captureProvisionalSource } from '../capability/source.js';
 import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout, capabilityReviewSchema,
-  type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange, type CapabilityAssignment } from '../capability/records.js';
+  type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange, type CapabilityAssignment,
+  type CapabilityReview } from '../capability/records.js';
 import { candidateAcceptanceFindings } from '../capability/acceptance.js';
 import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capability/policy.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
@@ -137,7 +138,7 @@ import { deviationCommands, isPlanDeviation, nextCheckFinding } from '../deviati
 import { nonfunctionalDeviationCommands, nonfunctionalDeviationHash, prepareNonfunctionalDeviation } from '../deviations/nonfunctional.js';
 import { environmentCommands, environmentOptions } from '../deviations/environment.js';
 import {
-  forkJsonSchema, forkToolName, validateFork,
+  forkJsonSchema, forkSubmissionSchema, forkToolName, validateFork,
   type ForkSubmission, type PlacementEvidence, type PlacementRequestBody,
 } from '../architecture/submission.js';
 import {
@@ -218,8 +219,8 @@ import { entryScenariosOf, type EngineerScenarios } from '../work/scenario-brief
 import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import {
-  gateAttemptId, invocationId, invocationOutcomeSchema, invocationSchema,
-  recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
+  gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema,
+  measurementSnapshotSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
   type GateOperation, type Invocation, type InvocationOutcome, type LineEventSummary, type MeasurementSnapshot, type RecordRef, type RunPolicy, type RunRecord,
   type ArchitectRef, type ReviewKind, type ContinueReason, type ContinueRelation, type DegradeRelation, type ForkRelation, type ReplaceRelation,
   type RequestRelation, type SessionFinishReason, type SessionId,
@@ -292,6 +293,16 @@ export type RunWrite =
   | 'nonfunctional-repair-assigned'
   | 'nonfunctional-repair-committed'
   | 'nonfunctional-assessed'
+  | 'capability-assignment-interrupted'
+  | 'capability-coordinator-resumed'
+  | 'capability-verification-started'
+  | 'capability-source-captured'
+  | 'capability-exchange-opened'
+  | 'capability-exchange-answered'
+  | 'capability-gate-recorded'
+  | 'capability-review-recorded'
+  | 'capability-assignment-settled'
+  | 'capability-assigned'
   | 'candidate-prepared'
   | 'iteration-closed'
   | 'work-item-completed'
@@ -2209,6 +2220,62 @@ export class RunService {
 
   // Loading and recovery
 
+  /** The snapshot's exclusive file write precedes the request transaction.
+   * Recover that precise suspended writer from its authenticated submission,
+   * then adopt only matching live source and index bytes. */
+  private async reconcileSuspendedCapabilityRequest(run: Run): Promise<void> {
+    const records = committedRecords(run.log.ledger.replay());
+    const requested = new Set([...records.capabilityRequests.values()].map(request => request.invocation));
+    for (const started of run.log.all('invocation-started')) {
+      const iteration = started.data.work.iteration;
+      const capabilityAssignment = started.data.work.capabilityAssignment;
+      if (started.data.role !== 'engineer' || (iteration === undefined && capabilityAssignment === undefined) ||
+        requested.has(started.data.invocation) || (iteration !== undefined && records.results.has(iteration))) continue;
+      const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
+      const outcome = records.outcomes.get(started.data.invocation);
+      if (ended?.data.ended !== 'submitted' || ended.data.submission === null || !ended.data.kept ||
+        outcome?.disposition !== 'applied' || !outcome.settled.confirmed || outcome.session?.ref === undefined) continue;
+      const bytes = await readIfExists(run.path(runLayout.submission(started.data.invocation)));
+      if (bytes === undefined || sha256(bytes) !== ended.data.submission || outcome.submission?.hash !== ended.data.submission) {
+        throw new Error(`Suspended engineer ${started.data.invocation} has unauthenticated submission bytes`);
+      }
+      const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+      const { schema: _schema, ...body } = raw;
+      const parsed = engineerSubmissionSchema.safeParse(body);
+      if (raw.schema !== 'ramify-agent.engineer-submission/1' || !parsed.success || parsed.data.kind !== 'capability-needed') continue;
+      const assignment = iteration === undefined ? undefined : records.assignments.get(iteration);
+      const item = assignment === undefined ? undefined : records.workItems.find(entry => entry.id === assignment.workItem);
+      const nestedAssignment = capabilityAssignment === undefined ? undefined : records.capabilityAssignments.get(capabilityAssignment);
+      const parentTask = nestedAssignment === undefined ? undefined : records.capabilityTasks.get(nestedAssignment.task);
+      const parentPlan = parentTask === undefined ? undefined : records.capabilityPlans.get(parentTask.id)?.at(-1);
+      if ((iteration !== undefined && (assignment === undefined || item === undefined)) ||
+        (capabilityAssignment !== undefined && (nestedAssignment === undefined || parentTask === undefined || parentPlan === undefined))) {
+        throw new Error(`Suspended engineer ${started.data.invocation} lacks its original assignment`);
+      }
+      const release = run.log.all('writer-released').filter(event => event.data.invocation === started.data.invocation);
+      if (release.length !== 1 || release[0]!.data.confirmed !== true) throw new Error(`Suspended engineer ${started.data.invocation} has no confirmed writer release`);
+      const requestId = capabilityRequestId(records.capabilityRequests.size + 1);
+      const source = await captureProvisionalSource({ projectRoot: this.projectRoot, runDirectory: run.directory,
+        request: requestId, acceptedBase: this.accepted(run), writerSettledBy: started.data.invocation,
+        changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
+      const captured = assignment === undefined ? undefined : await readFile(run.path(runLayout.capturedPlan));
+      const request: CapabilityRequest = { schema: 'ramify-agent.capability-request/1', id: requestId,
+        parent: parentTask === undefined ? { kind: 'work-item', id: item!.id } : { kind: 'capability-task', id: parentTask.id },
+        assignment: assignment?.id ?? nestedAssignment!.id,
+        invocation: started.data.invocation, consumer: item?.module ?? nestedAssignment!.owner,
+        requirementPackage: parentTask === undefined
+          ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(captured!) }
+          : refOf(parentTask.id, parentPlan!.revision, parentPlan!),
+        continuation: { session: started.data.session, point: outcome.session.ref }, source,
+        summary: parsed.data.summary, original: identifyCapabilityNeed(requestId, parsed.data.request) };
+      await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-requested', data: {
+        request: request.id, parent: request.parent.id, assignment: request.assignment, invocation: started.data.invocation,
+      } }, [{ path: capabilityLayout.request(request.id), id: request.id, revision: 1, body: request }]));
+      requested.add(started.data.invocation);
+      break;
+    }
+  }
+
   private async load(): Promise<RunRecoveryReport> {
     const report: RunRecoveryReport = { interrupted: [], rematerialized: [], effects: [], invocations: [], skipped: [], reviews: [] };
     for (const { planId, jobId } of await listJobDirectories(this.projectRoot)) {
@@ -2245,8 +2312,56 @@ export class RunService {
       const rewritten = await recoverCommits(run.log.ledger);
       if (rewritten.rewritten.length > 0) report.rematerialized.push(`${run.key}: ${rewritten.rewritten.length} record file(s)`);
 
+      if (!run.log.terminal && this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion) {
+        try {
+          await this.reconcileSuspendedCapabilityRequest(run);
+        } catch (error) {
+          await this.fail(run, 'inputs-changed', `Suspended capability source could not be reconciled: ${message(error)}`);
+          report.interrupted.push(run.key);
+        }
+      }
+
       if (!run.log.terminal) {
-        if (run.log.find('nonfunctional-phase-started')) {
+        if (this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion &&
+          run.log.find('capability-requested') !== undefined) {
+          for (const effect of await this.completeEffects(run)) report.effects.push(`${run.key}: ${effect}`);
+          for (const invocation of await this.closeInterruptedInvocations(run)) report.invocations.push(`${run.key}: ${invocation}`);
+          const writerIssue = [...run.log.all('writer-acquired')].find(acquired => {
+            const releases = run.log.all('writer-released').filter(event => event.data.invocation === acquired.data.invocation);
+            return releases.length !== 1 || releases[0]!.data.confirmed !== true;
+          });
+          if (writerIssue !== undefined || run.log.find('stop-requested') !== undefined) {
+            const cause = writerIssue === undefined ? 'A stop was requested before restart'
+              : `Writer ${writerIssue.data.invocation} has no unique confirmed settlement`;
+            const active = replayCapabilityState(run.log.events).stack.at(-1);
+            if (active !== undefined && active.startsWith('cap-')) await this.write(run, {
+              type: 'capability-stopped', data: { task: active, reason: cause },
+            });
+            await this.fail(run, writerIssue === undefined ? 'recovery-exhausted' : 'writer-unsettled', cause);
+            report.interrupted.push(run.key);
+          } else if (this.options.agent === undefined) {
+            await this.fail(run, 'recovery-exhausted', 'Capability continuation has no agent port');
+            report.interrupted.push(run.key);
+          } else {
+            const { packages } = await loadPromptPackages({
+              ...(this.options.skillDirectory === undefined ? {} : { skillDirectory: this.options.skillDirectory }),
+              capabilityWorkflow: true,
+            });
+            const changed = [...packages].filter(([role, loaded]) => run.record.prompts[role]?.hash !== loaded.hash).map(([role]) => role);
+            if (changed.length > 0) {
+              await this.fail(run, 'inputs-changed', `Captured prompt packages changed before capability recovery: ${changed.join(', ')}`);
+              report.interrupted.push(run.key);
+            } else {
+              run.index = await this.options.inputs.index(this.projectRoot, run.record.manifest).catch(() => null);
+              const baseline = measurementSnapshotSchema.parse(JSON.parse(await readFile(run.path(runLayout.measurement(snapshotId(1))), 'utf8')));
+              run.done = this.drive(run, this.options.agent, packages, baseline, true)
+                .catch(error => this.fail(run, error instanceof WriterBlockedError ? 'writer-unsettled' : 'recovery-exhausted',
+                  `Capability continuation failed: ${message(error)}`))
+                .catch(error => this.warn(`Run ${run.record.jobId}: ${message(error)}`));
+              report.effects.push(`${run.key}: resumed capability coordination from its committed stack`);
+            }
+          }
+        } else if (run.log.find('nonfunctional-phase-started')) {
           const reason = await this.nonfunctionalResumeRefusal(run);
           if (reason !== null) {
             await this.fail(run, 'recovery-exhausted', `The non-functional phase cannot resume: ${reason}`);
@@ -3002,10 +3117,11 @@ export class RunService {
     return run.stopRequested || this.closed || run.log.terminal !== undefined;
   }
 
-  private async drive(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, baseline: MeasurementSnapshot): Promise<void> {
+  private async drive(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, baseline: MeasurementSnapshot,
+    recovering = false): Promise<void> {
     // The run's files are written and its first event is in the log; nothing
     // of the run itself has happened yet.
-    await this.afterWrite('job-created', run.record.jobId);
+    if (!recovering) await this.afterWrite('job-created', run.record.jobId);
     if (this.ignoring(run)) return;
     this.startReviews(run, agent, packages);
     const accepted = await this.analyse(run, agent, packages, baseline);
@@ -4134,9 +4250,9 @@ export class RunService {
       if (this.ignoring(run)) return false;
       const records = committedRecords(run.log.ledger.replay());
       if (this.workflow !== null && replayCapabilityState(run.log.events).stack.length > 1) {
-        // A live or waiting capability task owns the frontier. A stop wakes
-        // this driver; unrelated entries never run through the wait.
-        await run.changed();
+        // Only the active depth-first frame may be reconstructed here. A
+        // waiting frame cannot release unrelated ordinary frontier work.
+        if (!await this.resumeCapabilityTask(run, agent, packages, baseline)) return false;
         continue;
       }
       if (records.workItems.length === 0) return true;
@@ -4166,6 +4282,138 @@ export class RunService {
       }
       if (await this.takeWorkItem(run, agent, packages, baseline, next.item, next.resumes) === null) return false;
     }
+  }
+
+  /** Rebuild the active capability frame from committed records. An unknown
+   * intermediate state remains incomplete; it never releases the frontier. */
+  private async resumeCapabilityTask(run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>,
+    baseline: MeasurementSnapshot): Promise<boolean> {
+    const state = replayCapabilityState(run.log.events);
+    const activeId = state.stack.at(-1);
+    if (activeId === undefined || !activeId.startsWith('cap-')) return true;
+    const active = state.tasks.get(activeId);
+    if (active === undefined) throw new Error(`Active capability frame ${activeId} has no task`);
+    if (active.status !== 'coordinating' && active.status !== 'implementing' && active.status !== 'awaiting-consumer' && active.status !== 'verifying') {
+      await this.fail(run, 'recovery-exhausted', `Capability ${activeId} remains ${active.status}; its pending effect requires recovery before another invocation`);
+      return false;
+    }
+    const records = committedRecords(run.log.ledger.replay());
+    const task = records.capabilityTasks.get(activeId);
+    const request = task === undefined ? undefined : records.capabilityRequests.get(task.request);
+    const plan = records.capabilityPlans.get(activeId)?.at(-1);
+    const item = records.workItems.find(entry => entry.id === state.stack[0]);
+    if (task === undefined || request === undefined || plan === undefined || item === undefined) {
+      await this.fail(run, 'recovery-exhausted', `Capability ${activeId} lacks its committed task, request, plan or parent work item`);
+      return false;
+    }
+    if (active.status === 'verifying') return this.recoverVerifyingHandback(run, task, request, plan);
+    if (active.status === 'awaiting-consumer') {
+      const entries = active.pendingExchange === null ? undefined : records.capabilityExchanges.get(active.pendingExchange);
+      const exchange = entries?.[0];
+      const opened = run.log.all('capability-exchange-opened').find(event => event.data.exchange === active.pendingExchange);
+      if (exchange === undefined || opened === undefined) {
+        await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has no committed pending consumer question`);
+        return false;
+      }
+      const action: Extract<CapabilityAction, { kind: 'consult-consumer' }> = {
+        kind: 'consult-consumer', task: task.id, planRevision: exchange.planRevision, invocation: opened.data.invocation,
+        question: exchange.question, references: [...exchange.references], sections: ['Recovered pending consultation'],
+      };
+      return await this.consultCapabilityConsumer(run, agent, packages, task, request, plan, action,
+        opened.data.invocation, { point: request.continuation.point, session: request.continuation.session }, exchange) !== null;
+    }
+    if (active.status === 'implementing') {
+      const assignment = active.activeAssignment === null ? undefined : records.capabilityAssignments.get(active.activeAssignment);
+      const assigned = run.log.all('capability-assigned').find(event => event.data.assignment === active.activeAssignment);
+      if (assignment === undefined || assigned === undefined) {
+        await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has no committed active assignment`);
+        return false;
+      }
+      const action: Extract<CapabilityAction, { kind: 'assign' }> = {
+        kind: 'assign', task: task.id, planRevision: plan.revision, invocation: assigned.data.invocation,
+        owner: assignment.owner, purpose: assignment.purpose, approach: assignment.approach,
+        requirementRefs: [...assignment.requirementRefs], intendedEvidence: [...assignment.intendedEvidence],
+      };
+      const result = await this.assignCapabilityWork(run, agent, packages, baseline, item, task, plan, action,
+        assigned.data.invocation, { point: request.continuation.point, session: request.continuation.session },
+        { point: undefined, session: undefined }, assignment);
+      return result !== null;
+    }
+    const delegated = run.log.all('capability-delegated').find(event => event.data.task === activeId);
+    if (delegated === undefined || active.coordinatorInvocation === null) {
+      await this.fail(run, 'recovery-exhausted', `Capability ${activeId} lacks a delegation or coordinator basis`);
+      return false;
+    }
+    const latest = [...run.log.all('invocation-started')].reverse().find(event => event.data.role === 'capability-architect' &&
+      event.data.work.capabilityTask === activeId && event.data.work.request === request.id);
+    let point: string | undefined;
+    let session: SessionId | undefined;
+    let reconstructedFrom: SessionId | undefined;
+    let replay: InvocationResult<CapabilityAction> | undefined;
+    if (latest !== undefined) {
+      const ended = run.log.all('invocation-ended').find(event => event.data.invocation === latest.data.invocation);
+      const outcome = this.committedBody(run, runLayout.outcome(latest.data.invocation)) as InvocationOutcome | null;
+      if (ended?.data.kept && outcome?.session?.ref) {
+        const continued = await agent.appendContext(outcome.session.ref, `recover:${activeId}:${latest.data.invocation}`,
+          `Recover capability ${activeId} from the committed plan and task state`);
+        if (continued.outcome !== 'session-lost') { point = continued.ref; session = latest.data.session; }
+      }
+      if (session === undefined) reconstructedFrom = latest.data.session;
+      if (ended?.data.ended === 'submitted' && ended.data.submission !== null) {
+        const bytes = await readIfExists(run.path(runLayout.submission(latest.data.invocation)));
+        if (bytes === undefined || sha256(bytes) !== ended.data.submission ||
+          outcome?.submission?.hash !== ended.data.submission || outcome.disposition !== 'applied' ||
+          !outcome.settled.confirmed || !ended.data.kept || !outcome.session?.ref) {
+          await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an unauthenticated accepted coordinator action`);
+          return false;
+        }
+        const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+        const { schema: _schema, ...body } = raw;
+        const parsed = capabilityActionSchema.safeParse(body);
+        if (raw.schema !== 'ramify-agent.capability-action/1' || !parsed.success || parsed.data.task !== task.id) {
+          await this.fail(run, 'recovery-exhausted', `Capability ${activeId} has an invalid accepted coordinator action`);
+          return false;
+        }
+        const chosen = parsed.data;
+        const effectExists = chosen.kind === 'assign'
+          ? run.log.all('capability-assigned').some(event => event.data.invocation === latest.data.invocation)
+          : chosen.kind === 'consult-consumer'
+            ? run.log.all('capability-exchange-opened').some(event => event.data.invocation === latest.data.invocation)
+            : chosen.kind === 'request-handback'
+              ? run.log.all('capability-verification-started').some(event => event.data.invocation === latest.data.invocation)
+              : true;
+        if (!effectExists && chosen.planRevision !== plan.revision) {
+          await this.fail(run, 'recovery-exhausted', `Capability ${activeId} accepted action names stale plan revision ${chosen.planRevision}`);
+          return false;
+        }
+        if (!effectExists) replay = { id: latest.data.invocation, ended: 'submitted', value: chosen,
+          ref: outcome.session.ref, session: latest.data.session, kept: true, outcomeKind: 'submitted' };
+      }
+    }
+    if (reconstructedFrom !== undefined) {
+      const spent = run.log.all('session-opened').filter(event => event.data.role === 'capability-architect' &&
+        event.data.work.capabilityTask === activeId && event.data.replaces !== undefined).length;
+      if (spent >= run.record.policy.limits.sessionReconstructionsPerWork) {
+        await this.fail(run, 'limit-exceeded', `Capability ${activeId} lost its coordinator after ${spent} reconstructions; original unfinished task remains`);
+        return false;
+      }
+      await this.finishSession(run, reconstructedFrom, 'replaced');
+    }
+    const providerItems = records.workItems.filter(entry => entry.module === task.provider);
+    const providerDecisions = [...records.decisions.values()].filter(entry => entry.owner === task.provider);
+    const selected = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    const attempt = run.log.all('invocation-started').filter(event => event.data.role === 'capability-architect' &&
+      event.data.work.capabilityTask === activeId && event.data.work.request === request.id).length + (replay === undefined ? 1 : 0);
+    const progress = JSON.stringify({ status: active.status, planRevision: active.planRevision,
+      assignments: [...active.assignments], exchanges: [...records.capabilityExchanges.values()].filter(entries => entries[0]?.task === activeId),
+      reviews: run.log.all('capability-review-recorded').filter(event => event.data.task === activeId).map(event => event.data),
+      pending: run.log.all('capability-assignment-interrupted').filter(event => event.data.task === activeId).map(event => event.data) });
+    const result = await this.runCapabilityCoordinator(run, agent, packages, baseline, item, task, request, plan,
+      delegated.data.invocation, selected, providerItems, providerDecisions,
+      { basis: active.coordinatorInvocation, point, session, progress, attempt,
+        ...(reconstructedFrom === undefined ? {} : { reconstructedFrom }),
+        ...(replay === undefined ? {} : { replay }) });
+    return result !== null && result.kind === 'satisfied';
   }
 
   /**
@@ -4658,6 +4906,89 @@ export class RunService {
     let returned: string | undefined;
     /** The rounds whose brief the architect's own session lacks, which its next input carries from the log. */
     const undelivered: string[] = [];
+
+    // A recovered handback still owes the original A engineer its suspended
+    // iteration. Its assignment remains open; no new local architect turn
+    // may assign over it or treat the handback as completion of A's goal.
+    if (this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion) {
+      const saved = committedRecords(run.log.ledger.replay());
+      const capabilityState = replayCapabilityState(run.log.events);
+      const unqualified = [...saved.capabilityRequests.values()].find(request =>
+        request.parent.kind === 'work-item' && request.parent.id === item.id &&
+        capabilityState.requests.get(request.id)?.task === null &&
+        capabilityState.requests.get(request.id)?.qualification === undefined &&
+        !saved.results.has(request.assignment));
+      if (unqualified !== undefined) {
+        const assignment = saved.assignments.get(unqualified.assignment);
+        const raw = await readIfExists(run.path(runLayout.submission(unqualified.invocation)));
+        const submitted = raw === undefined ? null : JSON.parse(raw.toString('utf8')) as Record<string, unknown>;
+        const parsed = submitted === null ? null : engineerSubmissionSchema.safeParse((({ schema: _schema, ...body }) => body)(submitted));
+        if (assignment === undefined || !parsed?.success || parsed.data.kind !== 'capability-needed' ||
+          unqualified.continuation.point === null) {
+          await this.fail(run, 'recovery-exhausted', `Pending request ${unqualified.id} cannot recover its original engineer submission`);
+          return null;
+        }
+        const suspended: SuspendedCapabilityOutcome = { kind: 'capability-needed', summary: parsed.data.summary,
+          need: parsed.data.request, invocation: unqualified.invocation,
+          session: unqualified.continuation.session, point: unqualified.continuation.point };
+        const answer = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assignment, suspended,
+          undefined, { session: undefined, point: undefined, workingDirectory }, unqualified);
+        if (answer === null || answer.kind === 'delegated') return null;
+        lastAssignment = assignment;
+        let resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
+          session: suspended.session, point: suspended.point, priorInvocation: suspended.invocation, guidance: answer.guidance,
+        });
+        if (resumed === null) return null;
+        while (resumed.kind === 'capability-needed') {
+          const next = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assignment, resumed, undefined,
+            { session, point: sessionRef, workingDirectory });
+          if (next === null || next.kind === 'delegated') return null;
+          resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
+            session: resumed.session, point: resumed.point, priorInvocation: resumed.invocation, guidance: next.guidance,
+          });
+          if (resumed === null) return null;
+        }
+        lastResult = resumed.result;
+        lastIterationGate = resumed.returnedGate;
+        continuing = 'capability-returned';
+      }
+      const pending = [...saved.capabilityRequests.values()].find(request =>
+        request.parent.kind === 'work-item' && request.parent.id === item.id &&
+        saved.capabilityHandbacks.has(capabilityState.requests.get(request.id)?.task ?? '') &&
+        saved.assignments.has(request.assignment) && !saved.results.has(request.assignment));
+      if (pending !== undefined) {
+        const handback = saved.capabilityHandbacks.get(capabilityState.requests.get(pending.id)!.task!)!;
+        const assignment = saved.assignments.get(pending.assignment)!;
+        if (pending.continuation.point === null) {
+          await this.fail(run, 'recovery-exhausted', `Original assignment ${assignment.id} has no captured engineer continuation point`);
+          return null;
+        }
+        lastAssignment = assignment;
+        const guidance = [
+          `Capability ${handback.task} handed back at ${handback.returnedTree}.`,
+          `Accepted source ${handback.sourceRevision}; changes since your suspension: ${handback.deltaFromSuspension.join(', ') || '(none)'}.`,
+          `Interface use: ${handback.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}.`,
+          `Continue ${assignment.id} from its current candidate. Its original goal remains unfinished.`,
+        ].join('\n');
+        let resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
+          session: pending.continuation.session, point: pending.continuation.point,
+          priorInvocation: pending.invocation, guidance,
+        });
+        if (resumed === null) return null;
+        while (resumed.kind === 'capability-needed') {
+          const answer = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assignment, resumed, undefined,
+            { session, point: sessionRef, workingDirectory });
+          if (answer === null || answer.kind === 'delegated') return null;
+          resumed = await this.takeIteration(run, agent, packages, baseline, item, assignment, await this.refreshIndex(run), {
+            session: resumed.session, point: resumed.point, priorInvocation: resumed.invocation, guidance: answer.guidance,
+          });
+          if (resumed === null) return null;
+        }
+        lastResult = resumed.result;
+        lastIterationGate = resumed.returnedGate;
+        continuing = 'capability-returned';
+      }
+    }
 
     turns: for (;;) {
       if (this.ignoring(run)) return null;
@@ -5188,6 +5519,58 @@ export class RunService {
    * point. The fork investigates and decides; the parent neither reassesses
    * nor approves, and is never invoked for the choice.
    */
+  private async replayAcceptedBoundaryFork(run: Run, request: string, view: ViewIdentity):
+    Promise<InvocationResult<ForkSubmission> | null | undefined> {
+    const started = [...run.log.all('invocation-started')].reverse().find(event =>
+      event.data.role === 'global-fork' && event.data.work.request === request);
+    if (started === undefined || run.log.all('fork-returned-partial').some(event =>
+      event.data.request === request && event.data.invocation === started.data.invocation)) return undefined;
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
+    if (ended?.data.ended !== 'submitted' || ended.data.submission === null) return undefined;
+    const priorView = [...run.log.all('view-refreshed')].reverse().find(event =>
+      event.sequence < started.sequence && event.data.request === request);
+    if (priorView === undefined || !sameView(priorView.data.view, view)) {
+      await this.fail(run, 'inputs-changed', `Accepted fork of ${request} has a changed architect view`);
+      return null;
+    }
+    const outcome = this.committedBody(run, runLayout.outcome(started.data.invocation)) as InvocationOutcome | null;
+    const bytes = await readIfExists(run.path(runLayout.submission(started.data.invocation)));
+    if (bytes === undefined || sha256(bytes) !== ended.data.submission ||
+      outcome?.submission?.hash !== ended.data.submission || outcome.disposition !== 'applied' ||
+      !outcome.settled.confirmed) {
+      await this.fail(run, 'recovery-exhausted', `Fork of ${request} has an unauthenticated accepted result`);
+      return null;
+    }
+    const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+    const { schema: _schema, ...body } = raw;
+    const parsed = forkSubmissionSchema.safeParse(body);
+    if (raw.schema !== 'ramify-agent.fork-submission/1' || !parsed.success) {
+      await this.fail(run, 'recovery-exhausted', `Fork of ${request} has an invalid accepted result`);
+      return null;
+    }
+    return { id: started.data.invocation, ended: 'submitted', value: parsed.data,
+      ref: outcome.session?.ref ?? '', session: started.data.session,
+      kept: ended.data.kept, outcomeKind: 'submitted' };
+  }
+
+  private async recoveredBoundaryPartial(run: Run, request: string): Promise<{
+    attempt: number; findings: string[]; gaps: string[] } | undefined> {
+    const partial = run.log.all('fork-returned-partial').filter(event => event.data.request === request).at(-1);
+    if (partial === undefined) return undefined;
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === partial.data.invocation);
+    const bytes = await readIfExists(run.path(runLayout.submission(partial.data.invocation)));
+    if (ended?.data.submission === null || bytes === undefined || sha256(bytes) !== ended?.data.submission) {
+      throw new Error(`The partial fork of ${request} lost its accepted evidence`);
+    }
+    const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+    const { schema: _schema, ...body } = raw;
+    const parsed = forkSubmissionSchema.safeParse(body);
+    if (raw.schema !== 'ramify-agent.fork-submission/1' || !parsed.success || parsed.data.kind !== 'partial') {
+      throw new Error(`The partial fork of ${request} has invalid accepted evidence`);
+    }
+    return { attempt: partial.data.retry, findings: [...parsed.data.findings], gaps: [...parsed.data.gaps] };
+  }
+
   private async requestPlacement(
     run: Run,
     agent: AgentPort,
@@ -5195,6 +5578,7 @@ export class RunService {
     baseline: MeasurementSnapshot,
     item: WorkItem,
     body: PlacementRequestBody,
+    existingId?: string,
   ): Promise<PlacementResolution | null> {
     const loaded = packages.get('global-fork');
     if (loaded === undefined) {
@@ -5203,15 +5587,15 @@ export class RunService {
     }
 
     const count = run.log.count('placement-requested') + 1;
-    if (count > run.record.policy.limits.maxPlacementRequests) {
+    if (existingId === undefined && count > run.record.policy.limits.maxPlacementRequests) {
       await this.fail(run, 'limit-exceeded',
         `The run has made ${count - 1} placement requests; the policy allows ${run.record.policy.limits.maxPlacementRequests}`);
       return null;
     }
 
-    const id = requestId(count);
+    const id = existingId ?? requestId(count);
     const committed = committedRecords(run.log.ledger.replay());
-    const request = placementRequestSchema.parse({
+    const request = existingId === undefined ? placementRequestSchema.parse({
       schema: 'ramify-agent.placement-request/1',
       id,
       workItem: item.id,
@@ -5230,13 +5614,24 @@ export class RunService {
         return [{ ref: refOf(hypothesis.id, hypothesis.revision, hypothesis), stance: tested.stance, evidence: tested.evidence }];
       }),
       localDecisions: [...body.localDecisions],
-    } satisfies PlacementRequest);
+    } satisfies PlacementRequest) : placementRequestSchema.parse(this.committedBody(run, architectureLayout.request(id)));
 
-    await this.write(run, {
+    if (existingId !== undefined) {
+      const accepted = run.log.all('decision-accepted').find(event => event.data.request === id);
+      if (accepted !== undefined) {
+        const decision = committed.decisions.get(accepted.data.decision);
+        if (decision === undefined || !await this.deliverDecision(run, decision)) {
+          await this.fail(run, 'recovery-exhausted', `Placement ${id} has no recoverable accepted decision`);
+          return null;
+        }
+        return { kind: 'decided', decision };
+      }
+    }
+    if (existingId === undefined) await this.write(run, {
       type: 'placement-requested',
       data: { request: id, workItem: item.id, requester: item.module, capability: body.forCapability },
     }, [{ path: architectureLayout.request(id), id, revision: 1, body: request }]);
-    await this.afterWrite('placement-requested', run.record.jobId);
+    if (existingId === undefined) await this.afterWrite('placement-requested', run.record.jobId);
     if (this.ignoring(run)) return null;
 
     const systemPrompt = renderGlobalForkPrompt(loaded, this.projectRoot);
@@ -5245,7 +5640,8 @@ export class RunService {
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
       baseline.supplementary.map(entry => entry.path),
     );
-    let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined;
+    let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined = existingId === undefined
+      ? undefined : await this.recoveredBoundaryPartial(run, id);
     let revalidate: { was: string; now: string } | undefined;
 
     for (;;) {
@@ -5269,7 +5665,9 @@ export class RunService {
       const current = committedRecords(run.log.ledger.replay());
       const context = this.globalContextOf(run);
       const decisions = [...current.decisions.values()];
-      const result = await this.runInvocation<ForkSubmission>(run, agent, {
+      const replay = existingId === undefined ? undefined : await this.replayAcceptedBoundaryFork(run, id, view);
+      if (replay === null) return null;
+      const result = replay ?? await this.runInvocation<ForkSubmission>(run, agent, {
         role: 'global-fork',
         work: { workItem: item.id, request: id },
         attempt,
@@ -5438,6 +5836,7 @@ export class RunService {
     baseline: MeasurementSnapshot,
     item: WorkItem,
     answer: { readonly invocation: string; readonly conflict: string; readonly evidence: readonly string[] },
+    existingId?: string,
   ): Promise<UnresolvedResolution | null> {
     const loaded = packages.get('global-fork');
     if (loaded === undefined) {
@@ -5447,14 +5846,14 @@ export class RunService {
     // Unresolved requests fork the architect context as placement requests
     // do, and count against the same bound.
     const forks = run.log.count('placement-requested') + run.log.count('unresolved-requested') + 1;
-    if (forks > run.record.policy.limits.maxPlacementRequests) {
+    if (existingId === undefined && forks > run.record.policy.limits.maxPlacementRequests) {
       await this.fail(run, 'limit-exceeded',
         `The run has made ${forks - 1} placement and unresolved requests; the policy allows ${run.record.policy.limits.maxPlacementRequests}`);
       return null;
     }
 
-    const id = unresolvedRequestId(run.log.count('unresolved-requested') + 1);
-    const request = unresolvedRequestSchema.parse({
+    const id = existingId ?? unresolvedRequestId(run.log.count('unresolved-requested') + 1);
+    const request = existingId === undefined ? unresolvedRequestSchema.parse({
       schema: 'ramify-agent.unresolved-request/1',
       id,
       workItem: item.id,
@@ -5462,8 +5861,32 @@ export class RunService {
       invocation: answer.invocation,
       conflict: answer.conflict,
       evidence: [...answer.evidence],
-    } satisfies UnresolvedRequest);
-    await this.write(run, {
+    } satisfies UnresolvedRequest) : unresolvedRequestSchema.parse(this.committedBody(run, deviationLayout.request(id)));
+    if (existingId !== undefined) {
+      const accepted = run.log.all('decision-accepted').find(event => event.data.request === id);
+      if (accepted !== undefined) {
+        const decision = committedRecords(run.log.ledger.replay()).decisions.get(accepted.data.decision);
+        if (decision === undefined || !await this.deliverDecision(run, decision)) {
+          await this.fail(run, 'recovery-exhausted', `Unresolved request ${id} has no recoverable accepted decision`);
+          return null;
+        }
+        return { kind: 'decided', decision };
+      }
+      const deviationEvent = run.log.all('plan-deviation-recorded').find(event => event.data.request === id);
+      if (deviationEvent !== undefined) {
+        const deviation = planDeviationSchema.parse(this.committedBody(run, deviationLayout.deviation(deviationEvent.data.deviation)));
+        if (deviation.scenarios.length > 0 && !await this.rewordScenarios(run, deviation)) return null;
+        if (deviation.held && !await this.awaitDeviationDecision(run, deviation)) return null;
+        return { kind: 'deviation', deviation };
+      }
+      const environmentEvent = run.log.all('environment-reported').find(event => event.data.request === id);
+      if (environmentEvent !== undefined) {
+        const problem = environmentProblemSchema.parse(this.committedBody(run, deviationLayout.environment(environmentEvent.data.problem)));
+        const note = await this.awaitEnvironmentAnswer(run, problem);
+        return note === null ? null : { kind: 'environment', problem, note };
+      }
+    }
+    if (existingId === undefined) await this.write(run, {
       type: 'unresolved-requested',
       data: { request: id, workItem: item.id, requester: item.module, invocation: answer.invocation },
     }, [{ path: deviationLayout.request(id), id, revision: 1, body: request }]);
@@ -5492,7 +5915,8 @@ export class RunService {
       this.options.rootModule ?? rootModuleOf(run.index) ?? rootModuleOfSnapshot(baseline) ?? 'root',
       baseline.supplementary.map(entry => entry.path),
     );
-    let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined;
+    let partial: { attempt: number; findings: string[]; gaps: string[] } | undefined = existingId === undefined
+      ? undefined : await this.recoveredBoundaryPartial(run, id);
     let revalidate: { was: string; now: string } | undefined;
 
     for (;;) {
@@ -5512,7 +5936,9 @@ export class RunService {
       const context = this.globalContextOf(run);
       const decisions = [...current.decisions.values()];
       const tracked = trackedScenarios(run.log.ledger.replay());
-      const result = await this.runInvocation<ForkSubmission>(run, agent, {
+      const replay = existingId === undefined ? undefined : await this.replayAcceptedBoundaryFork(run, id, view);
+      if (replay === null) return null;
+      const result = replay ?? await this.runInvocation<ForkSubmission>(run, agent, {
         role: 'global-fork',
         work: { workItem: item.id, request: id },
         attempt,
@@ -6323,6 +6749,33 @@ export class RunService {
   /** The first capability transaction uses the same run invocation, session
    * and ledger paths as ordinary work. The parent architect and requesting
    * engineer are both kept at their exact points until a later handback. */
+  private async replayAcceptedCapabilityQualification(run: Run, request: CapabilityRequest,
+    role: 'local-architect' | 'capability-architect'): Promise<InvocationResult<QualificationAction> | null | undefined> {
+    const started = [...run.log.all('invocation-started')].reverse().find(event =>
+      event.data.role === role && event.data.work.request === request.id);
+    if (started === undefined) return undefined;
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
+    if (ended?.data.ended !== 'submitted' || ended.data.submission === null) return undefined;
+    const outcome = this.committedBody(run, runLayout.outcome(started.data.invocation)) as InvocationOutcome | null;
+    const bytes = await readIfExists(run.path(runLayout.submission(started.data.invocation)));
+    if (bytes === undefined || sha256(bytes) !== ended.data.submission ||
+      outcome?.submission?.hash !== ended.data.submission || outcome.disposition !== 'applied' ||
+      !outcome.settled.confirmed || !ended.data.kept || !outcome.session?.ref) {
+      await this.fail(run, 'recovery-exhausted', `Qualification of ${request.id} has an unauthenticated accepted action`);
+      return null;
+    }
+    const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+    const { schema: _schema, ...body } = raw;
+    const parsed = qualificationActionSchema.safeParse(body);
+    if (raw.schema !== 'ramify-agent.capability-qualification/1' || !parsed.success ||
+      parsed.data.request !== request.id || parsed.data.invocation !== request.invocation) {
+      await this.fail(run, 'recovery-exhausted', `Qualification of ${request.id} has an invalid accepted action`);
+      return null;
+    }
+    return { id: started.data.invocation, ended: 'submitted', value: parsed.data,
+      ref: outcome.session.ref, outcomeKind: 'submitted', session: started.data.session, kept: true };
+  }
+
   private async coordinateCapabilityNeed(
     run: Run,
     agent: AgentPort,
@@ -6333,29 +6786,34 @@ export class RunService {
     suspended: SuspendedCapabilityOutcome,
     contextPackage: WorkPackage | undefined,
     parent: { readonly session: SessionId | undefined; readonly point: string | undefined; readonly workingDirectory: string },
+    existingRequest?: CapabilityRequest,
   ): Promise<{ readonly kind: 'satisfied'; readonly guidance: string } | { readonly kind: 'delegated' } | null> {
     if (this.workflow === null || run.record.policy.version !== capabilityRunPolicyVersion) {
       await this.fail(run, 'internal', 'A capability request reached a run without its captured workflow');
       return null;
     }
     run.writer.requireSettled('A capability request cannot suspend an unsettled writer');
-    const requestId = capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
-    const source = await captureProvisionalSource({
+    const requestId = existingRequest?.id ?? capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
+    const source = existingRequest?.source ?? await captureProvisionalSource({
       projectRoot: this.projectRoot, runDirectory: run.directory, request: requestId,
       acceptedBase: this.accepted(run), writerSettledBy: suspended.invocation,
       changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)),
     });
+    if (existingRequest === undefined) {
+      await this.afterWrite('capability-source-captured', run.record.jobId);
+      if (this.ignoring(run)) return null;
+    }
     const packageRef = contextPackage === undefined
       ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(await readFile(run.path(runLayout.capturedPlan))) }
       : { id: contextPackage.selection, revision: 1, hash: contextPackage.citation.hash };
-    const request: CapabilityRequest = {
+    const request: CapabilityRequest = existingRequest ?? {
       schema: 'ramify-agent.capability-request/1', id: requestId,
       parent: { kind: 'work-item', id: item.id }, assignment: assignment.id,
       invocation: suspended.invocation, consumer: item.module,
       requirementPackage: packageRef, continuation: { session: suspended.session, point: suspended.point },
       source, summary: suspended.summary, original: identifyCapabilityNeed(requestId, suspended.need),
     };
-    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+    if (existingRequest === undefined) await run.mutex.run(() => commitCapabilityTransition(run.log, {
       type: 'capability-requested', data: { request: request.id, parent: item.id,
         assignment: assignment.id, invocation: suspended.invocation },
     }, [{ path: capabilityLayout.request(request.id), id: request.id, revision: 1, body: request }]));
@@ -6369,9 +6827,14 @@ export class RunService {
     let point = parent.point;
     let parentSession = parent.session;
     let returned = '';
-    let qualification: InvocationResult<QualificationAction> | undefined;
-    for (let count = 0; count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
-      qualification = await this.runInvocation<QualificationAction>(run, agent, {
+    const recovered = existingRequest === undefined ? undefined : await this.replayAcceptedCapabilityQualification(run, request, 'local-architect');
+    if (recovered === null) return null;
+    let qualification: InvocationResult<QualificationAction> | undefined = recovered;
+    const priorTurns = run.log.all('invocation-started').filter(event => event.data.role === 'local-architect' &&
+      event.data.work.request === request.id).length;
+    for (let count = priorTurns - (recovered === undefined ? 0 : 1);
+      count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
+      qualification ??= await this.runInvocation<QualificationAction>(run, agent, {
       role: 'local-architect', work: { workItem: item.id, request: request.id },
       attempt: run.log.all('invocation-started').filter(event => event.data.work.workItem === item.id && event.data.work.request === request.id).length + 1,
       loaded: local, systemPrompt: renderLocalArchitectPrompt(local, this.projectRoot, parent.workingDirectory),
@@ -6380,6 +6843,7 @@ export class RunService {
         `The engineer of ${assignment.id} retained its source and session. Its invocation is ${request.invocation}.`,
         `Original request: ${JSON.stringify(request.original, null, 2)}`,
         `Provisional source: ${JSON.stringify(request.source, null, 2)}`,
+        ...(point === undefined ? [`# Captured plan package\n\n${new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)))}`] : []),
         `Registry clues: ${JSON.stringify(registry.map(entry => ({ capability: entry.capability, owner: entry.owner })))}`,
         'Read the actual exposed API and use sites. A matching name is not proof of sufficient behavior, and a missing name is not proof of absence.',
         'Submit satisfy-with-existing with concrete API evidence, delegate-capability with placement reasoning, request-placement, or unresolved.',
@@ -6416,23 +6880,25 @@ export class RunService {
           candidates: request.original.suggestedProvider === undefined ? [] : [{ owner: request.original.suggestedProvider.module,
             note: request.original.suggestedProvider.reason }],
           unresolved: [pending.problem], hypotheses: [], localDecisions: [],
-        });
+        }, run.log.all('placement-requested').find(event => event.data.capability === request.id)?.data.request);
         if (resolution === null) return null;
         returned = resolution.kind === 'decided'
           ? `Placement decision ${resolution.decision.id}: ${JSON.stringify(resolution.decision)}`
           : `The global architect could not settle placement ${resolution.request}: ${[...resolution.findings, ...resolution.gaps].join('; ')}`;
         point = qualification.ref || undefined;
         parentSession = qualification.kept ? qualification.session : undefined;
+        qualification = undefined;
         continue;
       }
       if (pending.kind === 'unresolved') {
         const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
           invocation: qualification.id, conflict: pending.problem, evidence: pending.evidence,
-        });
+        }, run.log.all('unresolved-requested').find(event => event.data.invocation === qualification!.id)?.data.request);
         if (resolution === null) return null;
         returned = `The responsible global architect answered the unresolved request: ${JSON.stringify(resolution)}`;
         point = qualification.ref || undefined;
         parentSession = qualification.kept ? qualification.session : undefined;
+        qualification = undefined;
         continue;
       }
       break;
@@ -6537,19 +7003,40 @@ export class RunService {
       }
       selected = delivered.packageText;
     }
+    return this.runCapabilityCoordinator(run, agent, packages, baseline, item, task, request, plan,
+      qualification.id, selected, providerItems, providerDecisions);
+  }
+
+  /** Drives one delegated task; the same path is used for a nested child. */
+  private async runCapabilityCoordinator(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, baseline: MeasurementSnapshot,
+    item: WorkItem, task: CapabilityTask, request: CapabilityRequest, plan: CapabilityPlan,
+    originInvocation: string, selected: string, providerItems: readonly WorkItem[], providerDecisions: readonly PlacementDecision[],
+    resume?: { readonly basis: string; readonly point: string | undefined; readonly session: SessionId | undefined;
+      readonly progress: string; readonly attempt: number; readonly reconstructedFrom?: SessionId;
+      readonly replay?: InvocationResult<CapabilityAction> },
+  ): Promise<{ readonly kind: 'satisfied'; readonly guidance: string } | { readonly kind: 'delegated' } | null> {
+    const records = committedRecords(run.log.ledger.replay());
     const loaded = packages.get('capability-architect');
     if (loaded === undefined) {
       await this.fail(run, 'internal', 'No capability architect package was captured');
       return null;
     }
     const selectedHash = sha256(selected);
-    let coordinatorPoint: string | undefined;
-    let coordinatorSession: SessionId | undefined;
-    let coordinatorBasis = qualification.id;
-    let progress = '';
-    let consumerPoint = request.continuation.point;
-    let consumerSession: SessionId | undefined = request.continuation.session;
-    for (let attempt = 1; attempt <= task.limits.maxInvocations; attempt += 1) {
+    let coordinatorPoint: string | undefined = resume?.point;
+    let coordinatorSession: SessionId | undefined = resume?.session;
+    let coordinatorBasis = resume?.basis ?? originInvocation;
+    let progress = resume?.progress ?? '';
+    let pendingAction = resume?.replay;
+    const lastAnswer = [...records.capabilityExchanges.values()].flatMap(entries => entries)
+      .filter(entry => entry.task === task.id && entry.answer !== null).at(-1)?.answer;
+    const answerOutcome = lastAnswer === undefined || lastAnswer === null ? undefined :
+      records.outcomes.get(lastAnswer.invocation);
+    const answerStart = lastAnswer === undefined || lastAnswer === null ? undefined :
+      run.log.all('invocation-started').find(event => event.data.invocation === lastAnswer.invocation);
+    let consumerPoint = answerOutcome?.session?.ref ?? request.continuation.point;
+    let consumerSession: SessionId | undefined = answerStart?.data.session ?? request.continuation.session;
+    for (let attempt = resume?.attempt ?? 1; attempt <= task.limits.maxInvocations; attempt += 1) {
     const currentBasis = () => {
       const state = replayCapabilityState(run.log.events).tasks.get(task.id);
       return state === undefined ? null : { task: task.id, planRevision: state.planRevision,
@@ -6610,12 +7097,12 @@ export class RunService {
             checks: run.log.events.filter(event => event.type.includes('gate')) }) };
         } },
     ];
-    const action = await this.runInvocation<CapabilityAction>(run, agent, {
+    const action = pendingAction ?? await this.runInvocation<CapabilityAction>(run, agent, {
       role: 'capability-architect', work: { capabilityTask: task.id, request: request.id }, attempt,
       loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
       prompt: [
         `# Capability task ${task.id}`, `Use task ${task.id}, planRevision ${plan.revision} and invocation ${coordinatorBasis} as your action basis.`,
-        ...(attempt === 1 ? [
+        ...(coordinatorPoint === undefined ? [
           `Original request: ${JSON.stringify(request, null, 2)}`,
           `Current plan: ${JSON.stringify(plan, null, 2)}`,
           `Provider entry decisions: ${JSON.stringify(providerDecisions, null, 2)}`,
@@ -6628,7 +7115,10 @@ export class RunService {
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
-        ? { requestedBy: { invocation: qualification.id, reason: 'capability-needed' as const } }
+        ? resume?.reconstructedFrom === undefined
+          ? { requestedBy: { invocation: originInvocation, reason: 'capability-needed' as const } }
+          : { replaces: { session: resume.reconstructedFrom, reason: 'reconstructed' as const },
+            degraded: { requested: 'continued' as const, reason: 'The capability architect session was lost; durable current request, plan and evidence were supplied to a fresh session.' } }
         : { session: coordinatorSession, continuing: 'capability-coordination' as const }),
       toolName: 'submit_capability_action', description: 'Record the next action for this capability task.',
       inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
@@ -6642,6 +7132,9 @@ export class RunService {
       scope: { write: null, measurement: null, size: null }, keep: () => kept,
       equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools }),
     });
+    const replayed = pendingAction !== undefined;
+    pendingAction = undefined;
+    if (this.ignoring(run)) return null;
     if (action.ended !== 'submitted') {
       await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action`);
       return null;
@@ -6663,13 +7156,23 @@ export class RunService {
       await this.write(run, { type: 'capability-coordinator-resumed', data: {
         task: task.id, invocation: action.id, session: coordinatorSession,
       } });
+      await this.afterWrite('capability-coordinator-resumed', run.record.jobId);
+      if (this.ignoring(run)) return null;
       continue;
     }
     // Submission ends the turn; the committed invocation now owns the
     // transition it selected. The next turn will use this same basis.
-    await this.write(run, { type: 'capability-coordinator-resumed', data: {
-      task: task.id, invocation: action.id, session: action.session,
-    } });
+    if (!run.log.all('capability-coordinator-resumed').some(event => event.data.task === task.id &&
+      event.data.invocation === action.id)) {
+      await this.write(run, { type: 'capability-coordinator-resumed', data: {
+        task: task.id, invocation: action.id, session: action.session,
+      } });
+      await this.afterWrite('capability-coordinator-resumed', run.record.jobId);
+      if (this.ignoring(run)) return null;
+    }
+    let nextCoordinator = { point: replayed && resume?.session === undefined ? undefined : action.ref || undefined,
+      session: replayed && resume?.session === undefined ? undefined : action.kept ? action.session : undefined,
+      invocation: action.id };
     if (chosen.kind === 'consult-consumer') {
       const answer = await this.consultCapabilityConsumer(run, agent, packages, task, request, plan, chosen, action.id,
         { point: consumerPoint, session: consumerSession });
@@ -6678,11 +7181,14 @@ export class RunService {
       consumerSession = answer.session;
       progress = `A-engineer answered exchange ${answer.exchange.id}: ${answer.exchange.answer?.text}; objections: ${answer.exchange.answer?.objections.join('; ')}`;
     } else if (chosen.kind === 'assign') {
-      const result = await this.assignCapabilityWork(run, agent, packages, task, plan, chosen, action.id,
-        { point: consumerPoint, session: consumerSession });
+      const result = await this.assignCapabilityWork(run, agent, packages, baseline, item, task, plan, chosen, action.id,
+        { point: consumerPoint, session: consumerSession }, { point: action.ref, session: action.session });
       if (result === null) return null;
       consumerPoint = result.point;
       consumerSession = result.session;
+      if (result.coordinator !== undefined) {
+        nextCoordinator = result.coordinator;
+      }
       progress = result.progress;
     } else if (chosen.kind === 'request-placement' || chosen.kind === 'unresolved') {
       const resolution = chosen.kind === 'request-placement'
@@ -6706,15 +7212,15 @@ export class RunService {
       // Nested delegation is installed with the depth-first recovery path.
       return { kind: 'delegated' };
     }
-    coordinatorPoint = action.ref || undefined;
-    coordinatorSession = action.kept ? action.session : undefined;
-    if (coordinatorPoint === undefined || coordinatorSession === undefined) {
+    coordinatorPoint = nextCoordinator.point;
+    coordinatorSession = nextCoordinator.session;
+    if ((coordinatorPoint === undefined || coordinatorSession === undefined) && !replayed) {
       await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} lost its continuation point`);
       return null;
     }
-    coordinatorBasis = action.id;
+    coordinatorBasis = nextCoordinator.invocation;
     await this.write(run, { type: 'capability-coordinator-resumed', data: {
-      task: task.id, invocation: action.id, session: coordinatorSession,
+      task: task.id, invocation: coordinatorBasis, session: coordinatorSession ?? action.session,
     } });
     }
     await this.fail(run, 'limit-exceeded', `The capability architect of ${task.id} exhausted its invocation bound`);
@@ -6728,24 +7234,58 @@ export class RunService {
     request: CapabilityRequest, plan: CapabilityPlan,
     action: Extract<CapabilityAction, { kind: 'consult-consumer' }>, invocation: string,
     consumer: { readonly point: string | null; readonly session: SessionId | undefined },
+    existingExchange?: CapabilityExchange,
   ): Promise<{ readonly exchange: CapabilityExchange; readonly point: string; readonly session: SessionId } | null> {
     run.writer.requireSettled('Consumer consultation requires a settled writer');
     const existing = committedRecords(run.log.ledger.replay()).capabilityExchanges.size;
-    const id = `${task.id}-ex${String(existing + 1).padStart(2, '0')}`;
-    const exchange: CapabilityExchange = { schema: 'ramify-agent.capability-exchange/1', id,
+    const id = existingExchange?.id ?? `${task.id}-ex${String(existing + 1).padStart(2, '0')}`;
+    const exchange: CapabilityExchange = existingExchange ?? { schema: 'ramify-agent.capability-exchange/1', id,
       task: task.id, request: request.id, planRevision: plan.revision, question: action.question,
       references: [...action.references], answer: null };
-    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+    if (existingExchange === undefined) await run.mutex.run(() => commitCapabilityTransition(run.log, {
       type: 'capability-exchange-opened', data: { task: task.id, exchange: id, invocation },
     }, [{ path: capabilityLayout.exchange(task.id, id, 1), id, revision: 1, body: exchange }]));
+    if (existingExchange === undefined) await this.afterWrite('capability-exchange-opened', run.record.jobId);
+    if (this.ignoring(run)) return null;
     const loaded = packages.get('engineer');
     if (loaded === undefined) { await this.fail(run, 'internal', 'Engineer package is absent for consultation'); return null; }
     const responseSchema = z.object({ answer: z.string().min(1), objections: z.array(z.string()) }).strict();
+    if (existingExchange !== undefined) {
+      const opened = run.log.all('capability-exchange-opened').find(event => event.data.exchange === id);
+      const prior = [...run.log.all('invocation-started')].reverse().find(event =>
+        opened !== undefined && event.sequence > opened.sequence && event.data.role === 'engineer' &&
+        event.data.work.capabilityTask === task.id && event.data.work.request === request.id);
+      const ended = prior === undefined ? undefined : run.log.all('invocation-ended').find(event => event.data.invocation === prior.data.invocation);
+      if (prior !== undefined && ended?.data.ended === 'submitted' && ended.data.submission !== null) {
+        const bytes = await readIfExists(run.path(runLayout.submission(prior.data.invocation)));
+        const outcome = this.committedBody(run, runLayout.outcome(prior.data.invocation)) as InvocationOutcome | null;
+        if (bytes === undefined || sha256(bytes) !== ended.data.submission ||
+          outcome?.submission?.hash !== ended.data.submission || outcome.disposition !== 'applied' || !outcome.settled.confirmed) {
+          await this.fail(run, 'recovery-exhausted', `Consultation ${id} has an unauthenticated submitted answer`);
+          return null;
+        }
+        const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+        const { schema: _schema, ...body } = raw;
+        const parsed = responseSchema.safeParse(body);
+        if (raw.schema !== 'ramify-agent.capability-consultation/1' || !parsed.success) {
+          await this.fail(run, 'recovery-exhausted', `Consultation ${id} has an invalid submitted answer`);
+          return null;
+        }
+        const answered: CapabilityExchange = { ...exchange, answer: { invocation: prior.data.invocation,
+          text: parsed.data.answer, objections: parsed.data.objections } };
+        await run.mutex.run(() => commitCapabilityTransition(run.log, {
+          type: 'capability-exchange-answered', data: { task: task.id, exchange: id, invocation: prior.data.invocation },
+        }, [{ path: capabilityLayout.exchange(task.id, id, 2), id, revision: 2, body: answered }]));
+        return { exchange: answered, point: outcome.session?.ref ?? '', session: prior.data.session };
+      }
+    }
     const continuation = consumer.point === null || consumer.session === undefined ? { outcome: 'session-lost' as const }
       : await agent.appendContext(consumer.point, `consult:${id}`, `Read-only consultation ${id}: ${action.question}`);
     const reconstructed = continuation.outcome === 'session-lost';
     const response = await this.runInvocation(run, agent, {
-      role: 'engineer', work: { capabilityTask: task.id, request: request.id }, attempt: 1,
+      role: 'engineer', work: { capabilityTask: task.id, request: request.id },
+      attempt: run.log.all('invocation-started').filter(event => event.data.role === 'engineer' &&
+        event.data.work.capabilityTask === task.id && event.data.work.request === request.id).length + 1,
       loaded, systemPrompt: renderEngineerPrompt(loaded, this.projectRoot, run.record.policy.limits.commandTimeoutMs, this.projectRoot),
       prompt: [`# Read-only consumer consultation ${id}`, `Question: ${action.question}`,
         `Current plan revision ${plan.revision}: ${JSON.stringify(plan)}`,
@@ -6764,6 +7304,7 @@ export class RunService {
       equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
       keep: () => kept,
     });
+    if (this.ignoring(run)) return null;
     if (response.ended !== 'submitted' || response.value === undefined || (response.actual === 'fresh' && !reconstructed)) {
       await this.fail(run, 'invalid-submission', `Consultation ${id} did not continue the preserved engineer session and answer`);
       return null;
@@ -6773,6 +7314,8 @@ export class RunService {
     await run.mutex.run(() => commitCapabilityTransition(run.log, {
       type: 'capability-exchange-answered', data: { task: task.id, exchange: id, invocation: response.id },
     }, [{ path: capabilityLayout.exchange(task.id, id, 2), id, revision: 2, body: answered }]));
+    await this.afterWrite('capability-exchange-answered', run.record.jobId);
+    if (this.ignoring(run)) return null;
     return { exchange: answered, point: response.ref, session: response.session };
   }
 
@@ -6789,6 +7332,11 @@ export class RunService {
     if (state === undefined || state.status !== 'coordinating' || state.planRevision !== plan.revision || state.activeChild !== null) {
       return { handedBack: false, guidance: 'The task, plan or child dependency is not ready for verification' };
     }
+    const dependencyState = replayCapabilityState(run.log.events);
+    const submittedAssignments = new Set([...state.assignments].filter(([, outcome]) =>
+      outcome === 'partial' || outcome === 'accepted').map(([id]) => id));
+    const dependencyBlockers = capabilityCompletionBlockers(dependencyState, task.id, submittedAssignments);
+    if (dependencyBlockers.length > 0) return { handedBack: false, guidance: dependencyBlockers.join('; ') };
     const records = committedRecords(run.log.ledger.replay());
     const assignments = [...records.capabilityAssignments.values()].filter(entry => entry.task === task.id)
       .sort((a, b) => a.sequence - b.sequence);
@@ -6800,13 +7348,28 @@ export class RunService {
     const probe = await resolveTestSelection({ projectRoot: this.projectRoot, index,
       policy: { policy: 'owned-by-scope', exactOwners: [...new Set(assignments.map(entry => entry.owner))],
         subtrees: [], extraSuites: [] } });
-    const gateId = gateAttemptId(this.gateCount(run) + 1);
-    const gate = await this.committingCheckpoint(run, {
+    const candidateBefore = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    let priorGate: GateAttempt | null = null;
+    for (const event of [...run.log.all('gate-attempted')].reverse()) {
+      const parsed = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate)));
+      if (!parsed.success || parsed.data.verdict !== 'passed' || parsed.data.audited === null ||
+        parsed.data.checkpoint !== 'work-item' || parsed.data.subject.workItem !== task.parent.id ||
+        parsed.data.proposedBy === null ||
+        records.invocations.get(parsed.data.proposedBy)?.work.capabilityTask !== task.id ||
+        run.log.all('capability-review-recorded').some(review => review.data.gate === parsed.data.id && review.data.outcome === 'failed')) continue;
+      const checked = await openCandidateSnapshot(this.candidates, this.projectRoot,
+        { commit: parsed.data.audited, base: request.source.acceptedBase });
+      if (checked.tree === candidateBefore) { priorGate = parsed.data; break; }
+    }
+    const gateId = priorGate?.id ?? gateAttemptId(this.gateCount(run) + 1);
+    const gate = priorGate ?? await this.committingCheckpoint(run, {
       id: gateId, runId: run.record.jobId, checkpoint: 'work-item', projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)), head: await this.git.currentHead(this.projectRoot),
       policy: run.record.policy, proposedBy: invocation, repairRound: 0,
       subject: { workItem: task.parent.id }, scopeProbe: probe,
     }, `Combined capability ${task.id}: ${action.summary}`);
+    if (priorGate === null) await this.afterWrite('capability-gate-recorded', run.record.jobId);
+    if (this.ignoring(run)) return null;
     if (gate.verdict !== 'passed' || gate.audited === null) {
       return { handedBack: false, guidance: `Combined gate ${gate.id} ${gate.verdict}: ${gate.cause ?? 'no complete evidence'}` };
     }
@@ -6816,9 +7379,21 @@ export class RunService {
     if (snapshot.tree !== currentTree) return { handedBack: false, guidance: `Candidate changed after gate ${gate.id}; rerun verification` };
     const loaded = packages.get('reviewer');
     if (loaded?.reviewer === undefined) return { handedBack: false, guidance: 'Reviewer prompt package is unavailable' };
+    const existingReviewEvent = [...run.log.all('capability-review-recorded')].reverse().find(event =>
+      event.data.task === task.id && event.data.gate === gate.id && event.data.tree === snapshot.tree &&
+      event.data.planRevision === plan.revision && event.data.outcome === 'passed');
+    let review: CapabilityReview | undefined;
+    if (existingReviewEvent !== undefined) {
+      const bytes = await readIfExists(run.path(capabilityLayout.review(task.id, gate.id, plan.revision))) ??
+        await readIfExists(run.path(join('capabilities', task.id, 'reviews', `${gate.id}.json`)));
+      const parsed = bytes === undefined ? null : capabilityReviewSchema.safeParse(JSON.parse(bytes.toString('utf8')));
+      if (parsed?.success && parsed.data.outcome === 'passed' && parsed.data.tree === snapshot.tree &&
+        parsed.data.planRevision === plan.revision) review = parsed.data;
+      else return { handedBack: false, guidance: `Accepted review ${gate.id} could not be authenticated` };
+    }
     const assessments = [] as Array<{ kind: 'code' | 'scope' | 'design'; invocation: string; inspected: string[];
       missing: Array<{ path: string; reason: string }>; findings: string[] }>;
-    for (const kind of ['code', 'scope', 'design'] as const) {
+    for (const kind of review === undefined ? ['code', 'scope', 'design'] as const : []) {
       const reviewerTools = snapshotTools(snapshot, this.candidates, this.projectRoot);
       const reviewed = await this.runInvocation<ReviewSubmission>(run, agent, {
         role: 'reviewer', work: { workItem: task.parent.id }, attempt: assessments.length + 1, loaded,
@@ -6844,14 +7419,18 @@ export class RunService {
             ...reviewed.value.missing.map(entry => `${entry.path}: ${entry.reason}`)]
           : [`${kind} review did not submit: ${reviewed.ended}`] });
     }
-    const findings = assessments.flatMap(assessment => assessment.findings.map(finding => `${assessment.kind}: ${finding}`));
-    const review = capabilityReviewSchema.parse({ schema: 'ramify-agent.capability-review/1', task: task.id,
-      planRevision: plan.revision, tree: snapshot.tree, gate: gate.id,
-      outcome: findings.length === 0 ? 'passed' : 'failed', findings, assessments });
-    await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-review-recorded', data: {
-      task: task.id, gate: gate.id, tree: snapshot.tree, planRevision: plan.revision,
-      outcome: review.outcome, review: gate.id,
-    } }, [{ path: capabilityLayout.review(task.id, gate.id), id: gate.id, revision: 1, body: review }]));
+    if (review === undefined) {
+      const findings = assessments.flatMap(assessment => assessment.findings.map(finding => `${assessment.kind}: ${finding}`));
+      review = capabilityReviewSchema.parse({ schema: 'ramify-agent.capability-review/1', task: task.id,
+        planRevision: plan.revision, tree: snapshot.tree, gate: gate.id,
+        outcome: findings.length === 0 ? 'passed' : 'failed', findings, assessments });
+      await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-review-recorded', data: {
+        task: task.id, gate: gate.id, tree: snapshot.tree, planRevision: plan.revision,
+        outcome: review!.outcome, review: gate.id,
+      } }, [{ path: capabilityLayout.review(task.id, gate.id, plan.revision), id: gate.id, revision: 1, body: review }]));
+      await this.afterWrite('capability-review-recorded', run.record.jobId);
+      if (this.ignoring(run)) return null;
+    }
     if ((await this.git.previewCandidateTree(this.projectRoot)).tree !== snapshot.tree) {
       return { handedBack: false, guidance: `Source changed after gate ${gate.id} and its review; rerun the combined gate` };
     }
@@ -6876,6 +7455,8 @@ export class RunService {
       assignments: provisional, review: gate.id,
     } });
     await this.write(run, { type: 'capability-verification-started', data: { task: task.id, invocation } });
+    await this.afterWrite('capability-verification-started', run.record.jobId);
+    if (this.ignoring(run)) return null;
     const verifying = replayCapabilityState(run.log.events).tasks.get(task.id)!;
     const readiness = capabilityHandbackReadiness(task, request, plan, verifying);
     if (readiness.length > 0) {
@@ -6897,16 +7478,248 @@ export class RunService {
     return { handedBack: true, guidance: `Capability ${task.id} accepted at ${snapshot.tree}. ${action.summary}. Use ${action.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. Continue the original assignment from the current candidate; its remaining goal stays open.` };
   }
 
+  /** Verification has already accepted the candidate. Rebuild its exact
+   * handback from authenticated submissions and checks, without another
+   * reviewer, gate, or coordinator invocation. */
+  private async recoverVerifyingHandback(run: Run, task: CapabilityTask, request: CapabilityRequest,
+    plan: CapabilityPlan): Promise<boolean> {
+    const started = [...run.log.all('capability-verification-started')].reverse().find(event => event.data.task === task.id);
+    const state = replayCapabilityState(run.log.events).tasks.get(task.id);
+    const reviewEvent = [...run.log.all('capability-review-recorded')].reverse().find(event =>
+      event.data.task === task.id && event.data.planRevision === plan.revision && event.data.outcome === 'passed');
+    if (started === undefined || state === undefined || reviewEvent === undefined) {
+      await this.fail(run, 'recovery-exhausted', `Capability ${task.id} has no committed verification basis`);
+      return false;
+    }
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
+    const actionBytes = await readIfExists(run.path(runLayout.submission(started.data.invocation)));
+    const outcome = this.committedBody(run, runLayout.outcome(started.data.invocation)) as InvocationOutcome | null;
+    if (ended?.data.ended !== 'submitted' || ended.data.submission === null || actionBytes === undefined ||
+      sha256(actionBytes) !== ended.data.submission || outcome?.submission?.hash !== ended.data.submission ||
+      outcome.disposition !== 'applied') {
+      await this.fail(run, 'recovery-exhausted', `Capability ${task.id} has no authenticated handback request`);
+      return false;
+    }
+    const raw = JSON.parse(actionBytes.toString('utf8')) as Record<string, unknown>;
+    const { schema: _schema, ...body } = raw;
+    const parsed = capabilityActionSchema.safeParse(body);
+    if (raw.schema !== 'ramify-agent.capability-action/1' || !parsed.success || parsed.data.kind !== 'request-handback' ||
+      parsed.data.task !== task.id || parsed.data.planRevision !== plan.revision) {
+      await this.fail(run, 'recovery-exhausted', `Capability ${task.id} has an invalid handback request basis`);
+      return false;
+    }
+    const action = parsed.data;
+    const reviewBytes = await readIfExists(run.path(capabilityLayout.review(task.id, reviewEvent.data.gate, plan.revision))) ??
+      await readIfExists(run.path(join('capabilities', task.id, 'reviews', `${reviewEvent.data.gate}.json`)));
+    const parsedReview = reviewBytes === undefined ? null : capabilityReviewSchema.safeParse(JSON.parse(reviewBytes.toString('utf8')));
+    const review = parsedReview?.success ? parsedReview.data : null;
+    const gate = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(reviewEvent.data.gate)));
+    const currentTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    if (review === null || review.tree !== currentTree || review.outcome !== 'passed' ||
+      review.gate !== reviewEvent.data.gate || !gate.success || gate.data.verdict !== 'passed' || gate.data.audited === null) {
+      await this.fail(run, 'inputs-changed', `Capability ${task.id} verification evidence or candidate changed before handback`);
+      return false;
+    }
+    const records = committedRecords(run.log.ledger.replay());
+    const assignments = [...records.capabilityAssignments.values()].filter(entry => entry.task === task.id)
+      .sort((a, b) => a.sequence - b.sequence);
+    const index = await this.refreshIndex(run);
+    if (index === null) return false;
+    const ownerDirectories = new Map([task.provider, task.consumer].map(owner => [owner, findModule(index, owner)?.dir] as const)
+      .filter((entry): entry is readonly [string, string] => entry[1] !== undefined));
+    const failures = candidateAcceptanceFindings({ task, request, plan, assignments, ownerDirectories, outcomes: state.assignments,
+      gate: gate.data, tree: currentTree, configuration: sha256(JSON.stringify(run.record.projectConfig)), review });
+    for (const example of request.original.examples) {
+      const reported = action.coverage.find(entry => entry.case === example.id);
+      const disposition = plan.useCases.find(useCase => useCase.id === example.id)?.coverage;
+      if (reported === undefined || disposition === undefined || disposition.state === 'unresolved' ||
+        reported.evidence.some(evidence => !disposition.tests.includes(evidence))) failures.push(`Handback example ${example.id} lost its accepted coverage`);
+    }
+    failures.push(...capabilityHandbackReadiness(task, request, plan, state));
+    if (failures.length > 0) {
+      await this.fail(run, 'recovery-exhausted', `Capability ${task.id} cannot finish its accepted handback: ${failures.join('; ')}`);
+      return false;
+    }
+    const delta = await this.candidates.diffNameStatus(this.projectRoot, request.source.tree, gate.data.audited);
+    const handback = { schema: 'ramify-agent.capability-handback/1' as const, task: task.id, request: request.id,
+      plan: refOf(task.id, plan.revision, plan), sourceRevision: gate.data.audited, returnedTree: currentTree,
+      deltaFromSuspension: delta.map(change => change.path), summary: action.summary,
+      interfaces: action.interfaces, compatibility: [...plan.compatibility],
+      checks: [refOf(gate.data.id, 1, gate.data)], reviews: [refOf(gate.data.id, 1, review)], limitations: action.limitations };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-handed-back', data: {
+      task: task.id, handback: task.id, invocation: started.data.invocation,
+    } }, [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handback }]));
+    return true;
+  }
+
+  /** One task-owned writer. Its scope is captured from the real module view;
+   * the provisional candidate stays live for the next owner. */
+  private async coordinateNestedCapability(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, baseline: MeasurementSnapshot,
+    item: WorkItem, parentTask: CapabilityTask, parentPlan: CapabilityPlan, assignment: CapabilityAssignment,
+    suspended: InvocationResult<EngineerSubmission>,
+    coordinator: { readonly point: string | undefined; readonly session: SessionId | undefined },
+    existingRequest?: CapabilityRequest,
+  ): Promise<{ readonly guidance: string; readonly coordinatorPoint: string; readonly coordinatorSession: SessionId;
+    readonly coordinatorInvocation: string } | null> {
+    if (suspended.ended !== 'submitted' || suspended.value?.kind !== 'capability-needed' || !suspended.kept || suspended.ref === '') {
+      await this.fail(run, 'invalid-submission', `Nested need from ${assignment.id} has no retained requesting engineer`);
+      return null;
+    }
+    run.writer.requireSettled(`Nested request from ${assignment.id} cannot suspend an unsettled writer`);
+    const requestId = existingRequest?.id ?? capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
+    const source = existingRequest?.source ?? await captureProvisionalSource({ projectRoot: this.projectRoot, runDirectory: run.directory,
+      request: requestId, acceptedBase: this.accepted(run), writerSettledBy: suspended.id,
+      changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)) });
+    if (existingRequest === undefined) {
+      await this.afterWrite('capability-source-captured', run.record.jobId);
+      if (this.ignoring(run)) return null;
+    }
+    const request: CapabilityRequest = existingRequest ?? { schema: 'ramify-agent.capability-request/1', id: requestId,
+      parent: { kind: 'capability-task', id: parentTask.id }, assignment: assignment.id,
+      invocation: suspended.id, consumer: assignment.owner,
+      requirementPackage: refOf(parentTask.id, parentPlan.revision, parentPlan),
+      continuation: { session: suspended.session, point: suspended.ref }, source,
+      summary: suspended.value.summary, original: identifyCapabilityNeed(requestId, suspended.value.request) };
+    try {
+      if (existingRequest === undefined) {
+      await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-requested', data: {
+        request: request.id, parent: parentTask.id, assignment: assignment.id, invocation: suspended.id,
+      } }, [{ path: capabilityLayout.request(request.id), id: request.id, revision: 1, body: request }]));
+      }
+    } catch (error) {
+      await this.fail(run, 'unresolvable-requirement', `Nested need ${request.id} could not be recorded: ${message(error)}`);
+      return null;
+    }
+    const loaded = packages.get('capability-architect');
+    if (loaded === undefined) { await this.fail(run, 'internal', 'No capability architect package was captured'); return null; }
+    const recovered = existingRequest === undefined ? undefined : await this.replayAcceptedCapabilityQualification(run, request, 'capability-architect');
+    if (recovered === null) return null;
+    let qualification: InvocationResult<QualificationAction> | undefined = recovered;
+    let point = coordinator.point;
+    let session = coordinator.session;
+    let returned = '';
+    const priorTurns = run.log.all('invocation-started').filter(event => event.data.role === 'capability-architect' &&
+      event.data.work.request === request.id).length;
+    for (let count = priorTurns - (recovered === undefined ? 0 : 1);
+      count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
+    const appended = qualification !== undefined || point === undefined ? { outcome: 'session-lost' as const }
+      : await agent.appendContext(point, `nested:${request.id}:${count}`, `Qualify nested request ${request.id} from ${assignment.id}`);
+    const lost = appended.outcome === 'session-lost' || session === undefined;
+    qualification ??= await this.runInvocation<QualificationAction>(run, agent, {
+      role: 'capability-architect', work: { capabilityTask: parentTask.id, request: request.id },
+      attempt: run.log.all('invocation-started').filter(event => event.data.work.capabilityTask === parentTask.id &&
+        event.data.work.request === request.id).length + 1,
+      loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
+      prompt: [`# Qualify nested request ${request.id}`, `Parent task ${parentTask.id} waits with ${assignment.id} unfinished.`,
+        `Original need and source: ${JSON.stringify(request, null, 2)}`,
+        `Current parent plan: ${JSON.stringify(parentPlan, null, 2)}`,
+        `Use request ${request.id} and invocation ${suspended.id} in the action.`,
+        'Inspect the actual API and use. Satisfy with existing behavior or delegate a fresh child; matching module names do not establish reuse.',
+        ...(returned === '' ? [] : [`# Boundary decision\n\n${returned}`])].join('\n\n'),
+      start: lost ? { mode: 'fresh' } : { mode: 'continue', ref: appended.ref },
+      ...(lost ? { ...(session === undefined ? {} : { replaces: { session, reason: 'reconstructed' as const } }),
+        degraded: { requested: 'continued' as const, reason: 'The parent capability architect session was lost; its request and current plan were reconstructed.' } }
+        : { session: session!, continuing: 'capability-coordination' as const }),
+      toolName: 'submit_capability_qualification', description: 'Qualify this nested need under the parent task.',
+      inputSchema: z.toJSONSchema(qualificationActionSchema) as JsonSchema,
+      submissionSchema: 'ramify-agent.capability-qualification/1',
+      validate: input => { const checked = validateAgainst(qualificationActionSchema, input);
+        if (!checked.ok) return checked;
+        return checked.value.request === request.id && checked.value.invocation === suspended.id ? checked
+          : { ok: false, errors: [{ path: 'request', message: 'The nested request basis is stale', expected: `${request.id} and ${suspended.id}` }] }; },
+      scope: { write: null, measurement: null, size: null }, keep: () => kept,
+      equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools: [] }),
+    });
+    if (qualification.ended !== 'submitted' || qualification.value === undefined) {
+      await this.fail(run, 'invalid-submission', `The parent architect did not qualify nested request ${request.id}`);
+      return null;
+    }
+    if (qualification.value.kind === 'request-placement' || qualification.value.kind === 'unresolved') {
+      const pending = qualification.value;
+      const resolution = pending.kind === 'request-placement'
+        ? await this.requestPlacement(run, agent, packages, baseline, item, {
+          forCapability: request.id, question: pending.problem, requiredBehavior: request.original.need,
+          findings: pending.evidence.map(text => ({ text, citations: [] })),
+          candidates: [{ owner: parentTask.provider, note: parentTask.placementReason }],
+          unresolved: [pending.problem], hypotheses: [], localDecisions: [],
+        }, run.log.all('placement-requested').find(event => event.data.capability === request.id)?.data.request)
+        : await this.resolveUnresolved(run, agent, packages, baseline, item, {
+          invocation: qualification.id, conflict: pending.problem, evidence: pending.evidence,
+        }, run.log.all('unresolved-requested').find(event => event.data.invocation === qualification!.id)?.data.request);
+      if (resolution === null) return null;
+      returned = `The responsible global architect answered the nested boundary request: ${JSON.stringify(resolution)}`;
+      point = qualification.ref || undefined;
+      session = qualification.kept ? qualification.session : undefined;
+      qualification = undefined;
+      continue;
+    }
+    break;
+    }
+    if (qualification?.value === undefined ||
+      (qualification.value.kind !== 'satisfy-with-existing' && qualification.value.kind !== 'delegate-capability')) {
+      await this.fail(run, 'limit-exceeded', `Nested qualification of ${request.id} did not settle within the captured bound`);
+      return null;
+    }
+    const decision = qualification.value;
+    if (decision.kind === 'satisfy-with-existing') {
+      await this.write(run, { type: 'capability-qualified', data: {
+        request: request.id, invocation: qualification.id, outcome: 'satisfied', evidence: decision.evidence,
+      } });
+      return { guidance: `Nested need ${request.id} uses existing ${decision.api.symbol} at ${decision.api.path}. ${decision.guidance}. Verify it in ${assignment.id}.`,
+        coordinatorPoint: qualification.ref, coordinatorSession: qualification.session,
+        coordinatorInvocation: qualification.id };
+    }
+    const records = committedRecords(run.log.ledger.replay());
+    const taskId = capabilityTaskId(records.capabilityTasks.size + 1);
+    const providerItems = records.workItems.filter(entry => entry.module === decision.provider);
+    const child: CapabilityTask = { schema: 'ramify-agent.capability-task/1', id: taskId, request: request.id,
+      parent: request.parent, originatingAssignment: assignment.id, consumer: assignment.owner,
+      provider: decision.provider, placementReason: decision.placementReason,
+      authority: [{ owner: assignment.owner, reason: 'Requesting consumer integration and task-local architecture' },
+        ...(decision.provider === assignment.owner ? [] : [{ owner: decision.provider, reason: decision.placementReason }])],
+      relatedEntries: providerItems.map(entry => ({ entry: entry.id, reason: 'Provider entry remains separate from this task' })),
+      deferredWorkItems: providerItems.map(entry => entry.id), source, limits: captureCapabilityLimits(run.record.policy) };
+    const plan: CapabilityPlan = { schema: 'ramify-agent.capability-plan/1', task: child.id, revision: 1, basedOn: 0,
+      updatedBy: qualification.id, revisionReason: 'Initial nested request', need: request.original.need,
+      proposedInterface: 'Undecided; inspect actual source and consumer use',
+      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title,
+        derivedFrom: [example.id], coverage: { state: 'unresolved' as const, reason: 'Implementation and real use pending' } })),
+      compatibility: [...request.original.constraints],
+      outline: ['Review existing behavior and affected owners', 'Coordinate provider and requesting engineer', 'Verify use and hand back'],
+      decisions: [{ decision: `Coordinate in ${decision.provider}`, reason: decision.placementReason,
+        evidence: [...decision.requirementRefs] }], openQuestions: [], requirementRefs: [...decision.requirementRefs],
+      originalExamples: request.original.examples.map(example => example.id) };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-delegated', data: {
+      task: child.id, request: request.id, parent: parentTask.id, invocation: qualification.id, planRevision: 1,
+    } }, [
+      { path: capabilityLayout.task(child.id), id: child.id, revision: 1, body: child },
+      { path: capabilityLayout.plan(child.id, 1), id: child.id, revision: 1, body: plan },
+    ]));
+    const providerDecisions = [...records.decisions.values()].filter(entry => entry.owner === decision.provider);
+    const selected = new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    const childItem = records.workItems.find(entry => entry.module === assignment.owner) ?? item;
+    const result = await this.runCapabilityCoordinator(run, agent, packages, baseline, childItem, child, request, plan,
+      qualification.id, selected, providerItems, providerDecisions);
+    if (result === null || result.kind !== 'satisfied') return null;
+    return { guidance: result.guidance, coordinatorPoint: qualification.ref, coordinatorSession: qualification.session,
+      coordinatorInvocation: qualification.id };
+  }
+
   /** One task-owned writer. Its scope is captured from the real module view;
    * the provisional candidate stays live for the next owner. */
   private async assignCapabilityWork(
-    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, task: CapabilityTask,
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, baseline: MeasurementSnapshot,
+    item: WorkItem, task: CapabilityTask,
     plan: CapabilityPlan, action: Extract<CapabilityAction, { kind: 'assign' }>, invocation: string,
     consumer: { readonly point: string | null; readonly session: SessionId | undefined },
-  ): Promise<{ readonly progress: string; readonly point: string | null; readonly session: SessionId | undefined } | null> {
+    coordinator: { readonly point: string | undefined; readonly session: SessionId | undefined },
+    existingAssignment?: CapabilityAssignment,
+  ): Promise<{ readonly progress: string; readonly point: string | null; readonly session: SessionId | undefined;
+    readonly coordinator?: { readonly point: string | undefined; readonly session: SessionId | undefined; readonly invocation: string } } | null> {
     run.writer.requireSettled('Capability assignment requires a settled writer');
     const state = replayCapabilityState(run.log.events).tasks.get(task.id);
-    if (state === undefined || state.nextAssignmentSequence > task.limits.maxAssignments) {
+    if (state === undefined || (existingAssignment === undefined && state.nextAssignmentSequence > task.limits.maxAssignments)) {
       await this.fail(run, 'limit-exceeded', `Capability task ${task.id} exhausted its assignment bound`);
       return null;
     }
@@ -6914,21 +7727,25 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `Owner ${action.owner} has no current module in the architect view`);
       return null;
     }
-    const sequence = state.nextAssignmentSequence;
-    const id = capabilityAssignmentId(task.id, sequence);
-    const scope = await resolveWriteScope({ projectRoot: this.projectRoot, index: run.index,
+    const sequence = existingAssignment?.sequence ?? state.nextAssignmentSequence;
+    const id = existingAssignment?.id ?? capabilityAssignmentId(task.id, sequence);
+    const scope = existingAssignment?.scope ?? await resolveWriteScope({ projectRoot: this.projectRoot, index: run.index,
       view: run.record.manifest.architectView, revision: sequence,
       base: { module: action.owner, includedChildren: action.includedChildren ?? [] }, extra: [], read: [], bootstrap: [],
       rationale: `${task.id}: ${action.purpose}` });
-    const startingTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
-    const assignment: CapabilityAssignment = { schema: 'ramify-agent.capability-assignment/1', id,
+    const startingTree = existingAssignment?.startingTree ?? (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const startingPaths = existingAssignment?.startingPaths ?? await Promise.all((await this.git.changedPaths(this.projectRoot, this.accepted(run)))
+      .map(async path => ({ path, hash: await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null) })));
+    const assignment: CapabilityAssignment = existingAssignment ?? { schema: 'ramify-agent.capability-assignment/1', id,
       task: task.id, sequence, owner: action.owner, plan: refOf(task.id, plan.revision, plan),
       purpose: action.purpose, approach: action.approach, requirementRefs: [...action.requirementRefs],
       intendedEvidence: [...action.intendedEvidence], scope,
-      gate: { tests: testPolicyOf('ordinary', scope.base, [], scope.extra) }, startingTree };
-    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+      gate: { tests: testPolicyOf('ordinary', scope.base, [], scope.extra) }, startingTree, startingPaths };
+    if (existingAssignment === undefined) await run.mutex.run(() => commitCapabilityTransition(run.log, {
       type: 'capability-assigned', data: { task: task.id, assignment: id, sequence, invocation },
     }, [{ path: capabilityLayout.assignment(task.id, id), id, revision: 1, body: assignment }]));
+    if (existingAssignment === undefined) await this.afterWrite('capability-assigned', run.record.jobId);
+    if (this.ignoring(run)) return null;
     const loaded = packages.get('engineer');
     if (loaded === undefined) { await this.fail(run, 'internal', 'Engineer package is absent for assignment'); return null; }
     const workingDirectory = await engineerWorkingDirectory(this.projectRoot, scope, run.index);
@@ -6937,34 +7754,186 @@ export class RunService {
     const equipment = this.implementationTools(run, { workingDirectory, scopeRevision: sequence,
       guarded, tests: assignment.gate.tests, commandTimeoutMs: bounds.commandTimeoutMs });
     const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
-    const changedBefore = new Map(await Promise.all((await this.git.changedPaths(this.projectRoot, this.accepted(run)))
-      .map(async path => [path, await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null)] as const)));
+    const changedBefore = new Map(assignment.startingPaths?.map(entry => [entry.path, entry.hash] as const) ?? []);
     const aContinuation = action.owner !== task.consumer || consumer.point === null || consumer.session === undefined
       ? { outcome: 'session-lost' as const }
       : await agent.appendContext(consumer.point, `experiment:${id}`, `A-scoped capability assignment ${id}: ${action.purpose}`);
     const continuingA = action.owner === task.consumer && aContinuation.outcome !== 'session-lost';
-    const response = await this.runInvocation<EngineerSubmission>(run, agent, {
-      role: 'engineer', work: { capabilityTask: task.id, capabilityAssignment: id }, attempt: 1,
+    let response: InvocationResult<EngineerSubmission> | undefined;
+    let interruptions = run.log.all('capability-assignment-interrupted').filter(event => event.data.assignment === id);
+    let originalCause: string | undefined = interruptions[0]?.data.cause;
+    let previousSession: SessionId | undefined = continuingA ? consumer.session : undefined;
+    let previousPoint: string | undefined = continuingA ? aContinuation.ref : undefined;
+    let coordinatorAfterNested: { point: string | undefined; session: SessionId | undefined; invocation: string } | undefined;
+    let nestedGuidance: string | undefined;
+    if (existingAssignment !== undefined) {
+      const committed = committedRecords(run.log.ledger.replay());
+      const graph = replayCapabilityState(run.log.events);
+      const pending = [...committed.capabilityRequests.values()].find(entry =>
+        entry.parent.kind === 'capability-task' && entry.parent.id === task.id && entry.assignment === id &&
+        graph.requests.get(entry.id)?.task === null && graph.requests.get(entry.id)?.qualification === undefined);
+      if (pending !== undefined) {
+        const bytes = await readIfExists(run.path(runLayout.submission(pending.invocation)));
+        const raw = bytes === undefined ? null : JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+        const parsed = raw === null ? null : engineerSubmissionSchema.safeParse((({ schema: _schema, ...body }) => body)(raw));
+        if (!parsed?.success || parsed.data.kind !== 'capability-needed' || pending.continuation.point === null) {
+          await this.fail(run, 'recovery-exhausted', `Nested request ${pending.id} lacks its accepted requesting engineer`);
+          return null;
+        }
+        const suspended: InvocationResult<EngineerSubmission> = { id: pending.invocation, ended: 'submitted',
+          value: parsed.data, ref: pending.continuation.point, session: pending.continuation.session,
+          kept: true, outcomeKind: 'submitted' };
+        const nested = await this.coordinateNestedCapability(run, agent, packages, baseline, item, task, plan,
+          assignment, suspended, coordinator, pending);
+        if (nested === null) return null;
+        nestedGuidance = nested.guidance;
+        coordinatorAfterNested = { point: nested.coordinatorPoint, session: nested.coordinatorSession,
+          invocation: nested.coordinatorInvocation };
+        previousSession = suspended.session;
+        previousPoint = suspended.ref;
+      }
+      const returned = [...committed.capabilityRequests.values()].reverse().find(entry =>
+        entry.parent.kind === 'capability-task' && entry.parent.id === task.id && entry.assignment === id &&
+        committed.capabilityHandbacks.has(graph.requests.get(entry.id)?.task ?? ''));
+      if (returned !== undefined) {
+        const handback = committed.capabilityHandbacks.get(graph.requests.get(returned.id)!.task!)!;
+        nestedGuidance = `Dependency ${handback.task} accepted at ${handback.returnedTree}. ${handback.summary}. ` +
+          handback.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ');
+        const kept = returned.continuation.point === null ? { outcome: 'session-lost' as const }
+          : await agent.appendContext(returned.continuation.point, `dependency-return:${id}:${returned.id}`,
+            `Dependency ${returned.id} handed back to the original assignment ${id}`);
+        previousSession = returned.continuation.session;
+        previousPoint = kept.outcome === 'session-lost' ? undefined : kept.ref;
+      }
+      // An accepted completion can precede the assignment-settled event. It
+      // already spent its writer and has a durable submission; replay that
+      // result instead of starting a second engineer for the same effect.
+      const prior = [...run.log.all('invocation-started')].reverse().find(event =>
+        event.data.role === 'engineer' && event.data.work.capabilityAssignment === id);
+      const ended = prior === undefined ? undefined : run.log.all('invocation-ended').find(event =>
+        event.data.invocation === prior.data.invocation);
+      if (prior !== undefined && ended?.data.ended === 'submitted' && ended.data.submission !== null) {
+        const bytes = await readIfExists(run.path(runLayout.submission(prior.data.invocation)));
+        const outcome = this.committedBody(run, runLayout.outcome(prior.data.invocation)) as InvocationOutcome | null;
+        if (bytes === undefined || sha256(bytes) !== ended.data.submission ||
+          outcome?.submission?.hash !== ended.data.submission || outcome.disposition !== 'applied' ||
+          !outcome.settled.confirmed) {
+          await this.fail(run, 'recovery-exhausted', `Assignment ${id} has an unauthenticated submitted result`);
+          return null;
+        }
+        const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+        const { schema: _schema, ...body } = raw;
+        const parsed = engineerSubmissionSchema.safeParse(body);
+        if (raw.schema !== 'ramify-agent.engineer-submission/1' || !parsed.success) {
+          await this.fail(run, 'recovery-exhausted', `Assignment ${id} has an invalid submitted result`);
+          return null;
+        }
+        if (parsed.data.kind === 'completion-proposed') response = { id: prior.data.invocation, ended: 'submitted',
+          value: parsed.data, ref: outcome.session?.ref ?? '', session: prior.data.session,
+          kept: ended.data.kept, outcomeKind: 'submitted' };
+        if (parsed.data.kind === 'partial' && !interruptions.some(event => event.data.invocation === prior.data.invocation)) {
+          const cause = `partial: ${parsed.data.unfinished.join('; ')}`;
+          originalCause ??= cause;
+          await this.write(run, { type: 'capability-assignment-interrupted', data: {
+            task: task.id, assignment: id, invocation: prior.data.invocation, cause,
+            candidateTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+            attempt: (this.committedBody(run, runLayout.invocation(prior.data.invocation)) as Invocation | null)?.attempt ?? 1,
+          } });
+          interruptions = run.log.all('capability-assignment-interrupted').filter(event => event.data.assignment === id);
+        }
+      } else if (prior !== undefined && ended !== undefined &&
+        !interruptions.some(event => event.data.invocation === prior.data.invocation)) {
+        const outcome = this.committedBody(run, runLayout.outcome(prior.data.invocation)) as InvocationOutcome | null;
+        const cause = `engineer ${id} ended ${ended.data.ended} before a result: ${outcome?.error ?? outcome?.interruption ?? 'no submitted result'}`;
+        originalCause ??= cause;
+        await this.write(run, { type: 'capability-assignment-interrupted', data: {
+          task: task.id, assignment: id, invocation: prior.data.invocation, cause,
+          candidateTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+          attempt: (this.committedBody(run, runLayout.invocation(prior.data.invocation)) as Invocation | null)?.attempt ?? 1,
+        } });
+        interruptions = run.log.all('capability-assignment-interrupted').filter(event => event.data.assignment === id);
+      }
+    }
+    const maxReconstructions = run.record.policy.limits.sessionReconstructionsPerWork;
+    const maxBudgetReturns = run.record.policy.limits.budgetReturnsPerIteration;
+    let reconstructions = interruptions.filter(event => !event.data.cause.includes('context-budget')).length;
+    let budgetReturns = interruptions.length - reconstructions;
+    for (; response?.value?.kind !== 'completion-proposed';) {
+    const attempt = run.log.all('invocation-started').filter(event => event.data.work.capabilityAssignment === id && event.data.role === 'engineer').length + 1;
+    const recovered: boolean = originalCause !== undefined;
+    const candidate = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    response = await this.runInvocation<EngineerSubmission>(run, agent, {
+      role: 'engineer', work: { capabilityTask: task.id, capabilityAssignment: id }, attempt,
       loaded, systemPrompt: renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory),
       prompt: [`# Capability assignment ${id} in ${action.owner}`, `Purpose: ${action.purpose}`,
         `Approach: ${action.approach}`, `Plan: ${JSON.stringify(plan)}`,
         `Write scope: ${JSON.stringify(scopePaths(this.projectRoot, scope))}`,
-        `Starting candidate: ${startingTree}`, `Intended evidence: ${action.intendedEvidence.join('; ')}`].join('\n\n'),
+        `Starting candidate: ${startingTree}`, `Current candidate: ${candidate}`,
+        `Intended evidence: ${action.intendedEvidence.join('; ')}`,
+        ...(nestedGuidance === undefined ? [] : [`# Dependency returned\n${nestedGuidance}`]),
+        ...(recovered ? [`This is a reconstruction of unfinished assignment ${id}. Prior source and index changes remain in the worktree.`,
+          `Original interruption: ${originalCause ?? 'The prior invocation did not submit a result.'}`,
+          `Prior invocation outcomes and transcripts: ${run.log.all('capability-assignment-interrupted')
+            .filter(event => event.data.assignment === id).map(event => `${event.data.invocation}: ${event.data.cause}; ${runLayout.outcome(event.data.invocation)}; ${runLayout.transcript(previousSession ?? consumer.session ?? '')}`).join('; ')}`,
+          'Inspect the current source, finish the same assignment, and submit your own result. A prior partial report or independent check is not a submission.'] : [])].join('\n\n'),
       workingDirectory,
-      start: continuingA ? { mode: 'continue', ref: aContinuation.ref } : { mode: 'fresh' },
-      ...(continuingA ? { session: consumer.session!, continuing: 'capability-coordination' as const }
-        : action.owner === task.consumer && consumer.session !== undefined
+      start: previousPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: previousPoint },
+      ...(previousPoint !== undefined && previousSession !== undefined
+        ? { session: previousSession, continuing: 'capability-coordination' as const }
+        : action.owner === task.consumer && consumer.session !== undefined && !recovered
           ? { replaces: { session: consumer.session, reason: 'reconstructed' as const },
             degraded: { requested: 'continued' as const, reason: 'The retained A-engineer session was lost; its task and current source were reconstructed.' } }
-          : {}),
+          : previousSession === undefined ? {} : { replaces: { session: previousSession, reason: 'reconstructed' as const },
+            degraded: { requested: 'continued' as const, reason: 'The prior engineer ended without submitting; current source and failure evidence were supplied to a reconstructed session.' } }),
       toolName: engineerToolName,
       description: engineerSubmissionDescription, inputSchema: engineerJsonSchema,
       submissionSchema: 'ramify-agent.engineer-submission/1',
       validate: input => validateAgainst(engineerSubmissionSchema, input),
       scope: { write: sequence, measurement: null, size: null }, writer: true, guarded,
       equip: equipment.equip, bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
-      keep: () => action.owner === task.consumer ? kept : finished('work-closed'),
+      keep: (ended, value) => action.owner === task.consumer || (ended === 'submitted' && value?.kind === 'capability-needed')
+        ? kept : finished('work-closed'),
     });
+    if (this.ignoring(run)) return null;
+    if (response.ended === 'submitted' && response.value?.kind === 'completion-proposed') break;
+    if (response.ended === 'submitted' && response.value?.kind === 'capability-needed') {
+      const nested = await this.coordinateNestedCapability(run, agent, packages, baseline, item, task, plan, assignment,
+        response, coordinatorAfterNested ?? coordinator);
+      if (nested === null) return null;
+      nestedGuidance = nested.guidance;
+      coordinatorAfterNested = { point: nested.coordinatorPoint, session: nested.coordinatorSession,
+        invocation: nested.coordinatorInvocation };
+      previousSession = response.session;
+      previousPoint = response.ref;
+      continue;
+    }
+    const cause: string = response.value?.kind === 'partial'
+      ? `partial: ${response.value.unfinished.join('; ')}`
+      : response.value?.kind === 'capability-needed'
+        ? `nested need: ${response.value.request.need}`
+        : failedWithoutResult('engineer', id, response);
+    originalCause ??= cause;
+    const currentTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    await this.write(run, { type: 'capability-assignment-interrupted', data: {
+      task: task.id, assignment: id, invocation: response.id, cause, candidateTree: currentTree, attempt,
+    } });
+    await this.afterWrite('capability-assignment-interrupted', run.record.jobId);
+    if (this.ignoring(run)) return null;
+    if (run.writer.blocked !== undefined) {
+      await this.fail(run, 'writer-unsettled', `Capability assignment ${id} cannot reconstruct: ${run.writer.blocked}; original cause: ${originalCause}`);
+      return null;
+    }
+    if (response.ended === 'context-budget-reached') budgetReturns += 1;
+    else reconstructions += 1;
+    if (budgetReturns >= maxBudgetReturns || reconstructions > maxReconstructions) {
+      await this.fail(run, 'limit-exceeded', `Capability assignment ${id} exhausted its captured continuation bound; original cause: ${originalCause}`);
+      return null;
+    }
+    if (response.kept) await this.finishSession(run, response.session, 'replaced');
+    previousSession = response.session;
+    previousPoint = undefined;
+    }
+    if (response === undefined) throw new Error(`Capability assignment ${id} ended without an invocation`);
     const after = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
     await this.recordLineEvents(run, response.id, before, after, equipment.shellCalls() > 0
       ? ['unguarded-shell: changed and reverted paths may be missing'] : []);
@@ -6979,19 +7948,21 @@ export class RunService {
       const verdict = await decideWrite(guarded, this.projectRoot, { kind: 'write', paths: [path] });
       if (verdict.verdict !== 'allowed') outside.push(path);
     }
-    const outcome = response.ended !== 'submitted' ? 'interrupted' : outside.length > 0 ? 'failed' : 'partial';
+    const outcome = outside.length > 0 ? 'failed' : 'partial';
     await this.write(run, { type: 'capability-assignment-settled', data: {
       task: task.id, assignment: id, outcome, mutated: mutated.sort(), outsideScope: outside.sort(),
       endingTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
     } });
-    if (response.ended !== 'submitted' || run.writer.blocked !== undefined) {
-      await this.fail(run, run.writer.blocked === undefined ? 'agent-failed' : 'writer-unsettled',
-        `Capability assignment ${id} did not settle: ${run.writer.blocked ?? response.ended}`);
+    await this.afterWrite('capability-assignment-settled', run.record.jobId);
+    if (this.ignoring(run)) return null;
+    if (run.writer.blocked !== undefined) {
+      await this.fail(run, 'writer-unsettled', `Capability assignment ${id} did not settle: ${run.writer.blocked}`);
       return null;
     }
     return { progress: `Assignment ${id} in ${action.owner}: ${response.value?.kind ?? 'no submission'}; changed ${mutated.join(', ') || '(none)'}; outside scope ${outside.join(', ') || '(none)'}. Provisional result ${outcome}; iteration 4 owns its combined gate.`,
       point: action.owner === task.consumer && response.kept ? response.ref : consumer.point,
-      session: action.owner === task.consumer && response.kept ? response.session : consumer.session };
+      session: action.owner === task.consumer && response.kept ? response.session : consumer.session,
+      ...(coordinatorAfterNested === undefined ? {} : { coordinator: coordinatorAfterNested }) };
   }
 
   private async takeIteration(

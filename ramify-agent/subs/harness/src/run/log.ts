@@ -208,6 +208,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('capability-exchange-opened', z.object({ task: text, exchange: text, invocation: text }).strict()),
   event('capability-exchange-answered', z.object({ task: text, exchange: text, invocation: text }).strict()),
   event('capability-assigned', z.object({ task: text, assignment: text, sequence: z.int().positive(), invocation: text }).strict()),
+  event('capability-assignment-interrupted', z.object({ task: text, assignment: text, invocation: text,
+    cause: text, candidateTree: text, attempt: z.int().positive() }).strict()),
   event('capability-assignment-settled', z.object({ task: text, assignment: text, outcome: z.enum(['accepted', 'partial', 'failed', 'interrupted']),
     mutated: z.array(text).optional(), outsideScope: z.array(text).optional(), endingTree: text.optional() }).strict()),
   event('capability-candidate-accepted', z.object({ task: text, gate: text, tree: text,
