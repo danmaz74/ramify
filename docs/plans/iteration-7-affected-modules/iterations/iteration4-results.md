@@ -1,12 +1,16 @@
 # Iteration 4 results: real invocations, timing sample and gate
 
 **Date:** 2026-09-28. **Branch:** `feat/plan7-affected-modules`, from `7ae7148f`.
-**Status:** draft. This first pass records A7-12: the real invocations and the
-timing sample. The gate (A7-13), the roadmap update and the final completion
-report are recorded by a second pass.
+**Status:** complete. This is the completion report of
+[Plan 7](../main-plan.md). A first pass recorded A7-12, the real invocations
+and the timing sample, on the build of `7ae7148f`. A second pass ran the gate
+(A7-13) at `83e9ed13`, fixed the one defect it found, and passed the audit at
+`1339930e`.
 
 Every A7-12 instance answered with exit 0 and matched the owners written down
-from the manifests and source imports before the run. No source was changed.
+from the manifests and source imports before the run. The real invocations
+changed no source. The gate found one test defect caused by this branch, fixed
+in `1339930e`; see [Gate](#gate).
 
 ## Setup
 
@@ -299,5 +303,134 @@ start no daemon.
 
 ## Gate
 
-_To be recorded by the second pass: `npm run type-check`, `npm run check:self`
-and the audit request run reference with exit status (A7-13)._
+The second pass ran from the worktree root on `83e9ed13`, with a clean tree.
+`npm run build` exited 0 with the existing explorer chunk-size warning.
+
+| Case | Command | Outcome |
+| --- | --- | --- |
+| A7-13:type-check | `npm run type-check` | passed, exit 0, on `83e9ed13` |
+| A7-13:check-self | `RAMIFY_ENDPOINT_DIR=$(mktemp -d) npm run check:self` | passed, exit 0, on `83e9ed13` |
+| A7-13:audit-request | `ramify-audit audit --request audit/plan7-affected-modules.request.json --cwd /tmp/ramify-plan7-affected --json` | first run failed at `83e9ed13`; the rerun passed at `1339930e`, exit 0, overall `pass` |
+
+The self-check summary:
+
+```text
+Mode: resident (daemon 1125948; ...; revision 1; cold; synchronized; revision reused)
+Execution: completed; check: passed; coverage: complete
+Completed scope: 15 owners, 449 source files, 17 resources, 6836 accesses
+Findings: 0 errors, 0 warnings, 0 analysis limits; 4780 allowed, 0 denied, 2056 external
+```
+
+Its endpoint directory was a fresh `mktemp -d` (`/tmp/tmp.1IMHYldBOl`). The
+daemon it started was stopped afterwards: `daemon stop` printed `Stopped:
+daemon stopped explicitly`, and `daemon status` then printed `not running`.
+
+### Audit
+
+The worktree has no `ramify-agent/node_modules`, so the audit used the main
+checkout's pinned executable read-only,
+`/ramify/ramify-agent/node_modules/.bin/ramify-audit` (ramify-audit 0.1.1),
+with `--cwd /tmp/ramify-plan7-affected`. The request runs in the existing
+worktree, not an isolated one (`workspaceMode: existing-worktree`).
+
+**First run, `83e9ed13`: failed.** Status `completed`, exit 1, overall `fail`,
+587.8 s. Run ref `refs/audited/runs/2026-09-28T09-21-02Z-83e9ed138`, report
+commit `bfae66d3`. `patch-integrity`, `toolkit-build`, `toolkit-typecheck` and
+`toolkit-structure` passed; `toolkit-tests` failed with 4 of 2,397 tests in 2
+of 176 files:
+
+- `subs/analysis/subs/descriptions/src/tests/descriptions.test.ts`, three
+  exact-text parser fixtures (`module.ramify`, `subs/analysis/module.ramify`,
+  `subs/daemon/module.ramify`): `expected [ { kind: 'expose-src', …(4) },
+  …(28) ] to deeply equal [ …(27) ]`. **Caused by this branch.** Iterations 1
+  and 2 added the affected vocabulary exposures (root R3 and R7, analysis A19,
+  daemon N5) to those descriptions, and the reviewed statements were not
+  updated. The iterations ran focused test files only, so the full suite first
+  met the fixtures here. Fixed by `1339930e`
+  (`fix(analysis): Plan 7 gate, description parser fixtures name the affected
+  exposures`), which changes only that test file.
+- `src/tests/dependency-view-server.test.ts`, BD28: `ENOENT: no such file or
+  directory, realpath
+  '/tmp/ramify-plan7-affected/examples/collection-review/node_modules'`.
+  **Environment, not this branch.** The worktree had not been prepared. Before
+  the rerun, `npm --prefix examples/collection-review ci` installed the
+  example's dependencies (its part of `npm run worktree:prepare`, gitignored,
+  root untouched), and BD28 then passed alone.
+
+**Rerun, `1339930e`: passed.** Status `completed`, exit 0, overall `pass`,
+247.0 s, audited at 2026-09-28T09:26:20Z, tree `68adbe41`.
+
+| Check | Status | Duration |
+| --- | --- | --- |
+| `patch-integrity` | pass | 0.004 s |
+| `toolkit-build` | pass | 3.3 s |
+| `toolkit-typecheck` | pass | 3.7 s |
+| `toolkit-tests` | pass, 2,397 tests in 176 files | 237.3 s |
+| `toolkit-structure` | pass | 2.6 s |
+
+- Run ref: `refs/audited/runs/2026-09-28T09-26-20Z-1339930e0`
+- Report commit: `e522588feb511fe94567df82f7a6e3bf6dc59759`
+- Tree ref: `refs/audited/by-tree/68adbe411345b34f602e39163f658c70dc554fd2`
+- Retrieval:
+
+```sh
+git notes --ref=audit show 1339930e0ed305a2d11237920ea1553c84ab0530
+git show refs/audited/runs/2026-09-28T09-26-20Z-1339930e0:reports/audit/summary.json
+```
+
+The audited commit is `1339930e`. `patch-integrity` runs `git diff --check
+HEAD^ HEAD`, so it read only the fix commit's patch. The pass covers the
+build, type-check, complete suite and self-check of the whole tree at that
+commit. The type-check and `check:self` rows above ran at `83e9ed13`; the
+audit reran both at `1339930e`, which differs only in the test file, and they
+passed.
+
+This results file, `main-plan.md` and the roadmap edit are committed after the
+audited commit. They are documentation-only changes under `docs/`, which the
+recorded applicability policy (`ramify-audit/v1`) ignores as non-impacting.
+
+## Evidence per case
+
+Rows A7-01 to A7-11 are recorded in the
+[iteration 1](iteration1-results.md), [iteration 2](iteration2-results.md) and
+[iteration 3](iteration3-results.md) results, and the audited complete suite
+runs their tests.
+
+| Case | Evidence |
+| --- | --- |
+| A7-12:toolkit-path-seed | [section](#a7-12toolkit-path-seed): exact command, answer and hand derivation; 6.40 s including daemon start; matches |
+| A7-12:toolkit-module-seed | [section](#a7-12toolkit-module-seed): `ramify affected ramify/analysis`, lists equal to the path seed as parsed JSON; 0.37 s |
+| A7-12:toolkit-unowned | [section](#a7-12toolkit-unowned): `--path package.json`, basis `none`, `all-modules` with `unowned-path`, all 15 test modules; 0.34 s |
+| A7-12:agent-path-seed | [section](#a7-12agent-path-seed): main checkout read-only, `dependency-closure`, coverage complete with 312 `signature-inferred` notes; 9.77 s. The unprepared worktree attempt widened through 17 `unresolved-target` notes |
+| A7-12:agent-batch | [section](#a7-12agent-batch): `--batch`, selection equal to the resident answer; 8.68 s |
+| A7-12:timing-sample | [section](#a7-12timing-sample): five resident runs and one batch per project; toolkit 0.40 to 0.45 s resident, 6.01 s batch; ramify-agent 0.77 to 0.98 s resident, 10.78 s batch |
+| A7-13:type-check | [Gate](#gate): exit 0 at `83e9ed13`; the audit's `toolkit-typecheck` passed at `1339930e` |
+| A7-13:check-self | [Gate](#gate): passed, 15 owners, 0 findings, at `83e9ed13`; the audit's `toolkit-structure` passed at `1339930e` |
+| A7-13:audit-request | [Audit](#audit): overall `pass` at `1339930e`, run ref `refs/audited/runs/2026-09-28T09-26-20Z-1339930e0`; the failed first run is recorded |
+
+The A7-12 invocations ran on the build of `7ae7148f`. `83e9ed13` changed only
+how a batch open for a project that cannot be found or read exits and how the
+resident form names an invalid project, neither of which the A7-12 instances
+reach, so they were not repeated.
+
+## Remaining limits
+
+- **Imprecise batch refusal.** A batch open refused for `invalid-invocation` or
+  `unavailable-capability` is reported as `project-unavailable`, exit 2. That
+  is conservative, since the caller gets no answer, but it does not name the
+  cause.
+- **Resident scope is the first opener's.** An affected answer does not restate
+  the invocation's scope per request as `check` does, so a resident answer
+  carries the context's first opener's scope and `inputId`; see the
+  [iteration 2 addendum](iteration2-results.md#addendum-review-fixes). Only
+  selections compare across invoking directories and root forms.
+- **Unprepared checkouts widen.** Without installed dependencies, package
+  imports become `unresolved-target` notes, coverage becomes partial, and the
+  answer widens to every module (A7-12:agent-path-seed). A consumer that needs a
+  narrow answer runs `affected` in a prepared checkout.
+- **Deferred by [decision 7](../main-plan.md).** The MCP tool
+  `ramify_affected_modules`, the evidence validator
+  `scripts/verify-affected.mts` and the 200-query measurement gate are not
+  part of this plan. The timing sample sets no budget.
+- **Answer size grows with notes.** Complete answers carry every retained note;
+  the ramify-agent document is about 130 KB, within the response bound.

@@ -216,12 +216,16 @@ completion.
 
 ## Review and completion
 
-- [ ] Iteration 1: projector, session and worker cases pass; no compiler,
+The [iteration 4 results](iterations/iteration4-results.md) are the completion
+report and record the evidence for each item.
+
+- [x] Iteration 1: projector, session and worker cases pass; no compiler,
       source read or report call on a ready query.
-- [ ] Iteration 2: contexts, daemon and IPC answers match at one input identity;
+- [x] Iteration 2: contexts, daemon and IPC answers match at one input identity;
       unavailable, superseded, cold and cancelled outcomes are explicit.
-- [ ] Iteration 3: `ramify affected` resident and batch forms agree on the
+- [x] Iteration 3: `ramify affected` resident and batch forms agree on the
       reference project; documentation names the command and its exits.
-- [ ] Iteration 4: real answers on the toolkit and ramify-agent are recorded
-      with timings; `npm run check:self` passes; the audit request passes.
-- [ ] Roadmap status advanced with the completion report.
+- [x] Iteration 4: real answers on the toolkit and ramify-agent are recorded
+      with timings; `npm run check:self` passes; the audit request passes
+      (at `1339930e`, after the first run found stale description fixtures).
+- [x] Roadmap status advanced with the completion report.
