@@ -7848,19 +7848,13 @@ export class RunService {
           await this.fail(run, 'recovery-exhausted', `Assignment ${id} has an invalid submitted result`);
           return null;
         }
-        if (parsed.data.kind === 'completion-proposed') response = { id: prior.data.invocation, ended: 'submitted',
+        // A submitted partial is a durable handoff to the coordinator. Replay
+        // it after a crash before settlement; a partial already recorded as
+        // interrupted by an older run still follows that run's reconstruction.
+        if (parsed.data.kind === 'completion-proposed' ||
+          (parsed.data.kind === 'partial' && !interruptions.some(event => event.data.invocation === prior.data.invocation))) response = { id: prior.data.invocation, ended: 'submitted',
           value: parsed.data, ref: outcome.session?.ref ?? '', session: prior.data.session,
           kept: ended.data.kept, outcomeKind: 'submitted' };
-        if (parsed.data.kind === 'partial' && !interruptions.some(event => event.data.invocation === prior.data.invocation)) {
-          const cause = `partial: ${parsed.data.unfinished.join('; ')}`;
-          originalCause ??= cause;
-          await this.write(run, { type: 'capability-assignment-interrupted', data: {
-            task: task.id, assignment: id, invocation: prior.data.invocation, cause,
-            candidateTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
-            attempt: (this.committedBody(run, runLayout.invocation(prior.data.invocation)) as Invocation | null)?.attempt ?? 1,
-          } });
-          interruptions = run.log.all('capability-assignment-interrupted').filter(event => event.data.assignment === id);
-        }
       } else if (prior !== undefined && ended !== undefined &&
         !interruptions.some(event => event.data.invocation === prior.data.invocation)) {
         const outcome = this.committedBody(run, runLayout.outcome(prior.data.invocation)) as InvocationOutcome | null;
@@ -7878,7 +7872,7 @@ export class RunService {
     const maxBudgetReturns = run.record.policy.limits.budgetReturnsPerIteration;
     let reconstructions = interruptions.filter(event => !event.data.cause.includes('context-budget')).length;
     let budgetReturns = interruptions.length - reconstructions;
-    for (; response?.value?.kind !== 'completion-proposed';) {
+    for (; response?.value?.kind !== 'completion-proposed' && response?.value?.kind !== 'partial';) {
     const attempt = run.log.all('invocation-started').filter(event => event.data.work.capabilityAssignment === id && event.data.role === 'engineer').length + 1;
     const recovered: boolean = originalCause !== undefined;
     const candidate = (await this.git.previewCandidateTree(this.projectRoot)).tree;
@@ -7915,7 +7909,8 @@ export class RunService {
         ? kept : finished('work-closed'),
     });
     if (this.ignoring(run)) return null;
-    if (response.ended === 'submitted' && response.value?.kind === 'completion-proposed') break;
+    if (response.ended === 'submitted' &&
+      (response.value?.kind === 'completion-proposed' || response.value?.kind === 'partial')) break;
     if (response.ended === 'submitted' && response.value?.kind === 'capability-needed') {
       const nested = await this.coordinateNestedCapability(run, agent, packages, baseline, item, task, plan, assignment,
         response, coordinatorAfterNested ?? coordinator);
@@ -7972,6 +7967,7 @@ export class RunService {
     await this.write(run, { type: 'capability-assignment-settled', data: {
       task: task.id, assignment: id, outcome, mutated: mutated.sort(), outsideScope: outside.sort(),
       endingTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+      ...(response.value?.kind === 'partial' ? { unfinished: response.value.unfinished } : {}),
     } });
     await this.afterWrite('capability-assignment-settled', run.record.jobId);
     if (this.ignoring(run)) return null;
@@ -7979,7 +7975,7 @@ export class RunService {
       await this.fail(run, 'writer-unsettled', `Capability assignment ${id} did not settle: ${run.writer.blocked}`);
       return null;
     }
-    return { progress: `Assignment ${id} in ${action.owner}: ${response.value?.kind ?? 'no submission'}; changed ${mutated.join(', ') || '(none)'}; outside scope ${outside.join(', ') || '(none)'}. Provisional result ${outcome}; iteration 4 owns its combined gate.`,
+    return { progress: `Assignment ${id} in ${action.owner}: ${response.value?.kind ?? 'no submission'}; changed ${mutated.join(', ') || '(none)'}; outside scope ${outside.join(', ') || '(none)'}${response.value?.kind === 'partial' ? `; unfinished: ${response.value.unfinished.join('; ')}` : ''}. Provisional result ${outcome}; iteration 4 owns its combined gate.`,
       point: action.owner === task.consumer && response.kept ? response.ref : consumer.point,
       session: action.owner === task.consumer && response.kept ? response.session : consumer.session,
       ...(coordinatorAfterNested === undefined ? {} : { coordinator: coordinatorAfterNested }) };

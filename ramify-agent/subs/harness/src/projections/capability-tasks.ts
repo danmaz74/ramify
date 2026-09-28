@@ -51,8 +51,9 @@ export function capabilityTasksOf(view: RunView): CapabilityTasksResponse {
       .sort((left, right) => left.sequence - right.sequence).map(item => ({
         id: item.id, owner: item.owner, purpose: item.purpose, approach: item.approach,
         status: current.assignments.get(item.id) ?? 'active' as const, intendedEvidence: item.intendedEvidence,
-        failures: taskEvents.filter(event => event.type === 'capability-assignment-interrupted' && event.data.assignment === item.id)
-          .map(event => event.type === 'capability-assignment-interrupted' ? event.data.cause : ''),
+        failures: taskEvents.flatMap(event => event.type === 'capability-assignment-interrupted' && event.data.assignment === item.id
+          ? [event.data.cause] : event.type === 'capability-assignment-settled' && event.data.assignment === item.id
+            ? event.data.unfinished ?? [] : []),
       }));
     const consultations = [...view.records.capabilityExchanges.values()].flatMap(revisions => {
       const exchange = revisions.at(-1);

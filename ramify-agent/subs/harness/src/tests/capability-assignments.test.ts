@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
@@ -18,11 +18,13 @@ const b = 'capability-coordination/b';
 const d = 'capability-coordination/d';
 const p = 'capability-coordination';
 
-function script(seen: string[], mode: 'assignments' | 'boundary' = 'assignments'): Script {
+function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-blocker' = 'assignments',
+  prompts: string[] = []): Script {
   let engineer = 0;
   let architect = 0;
   return spec => {
     seen.push(`${spec.role}:${spec.submission.name}:${spec.session.mode}:${spec.builtinTools.join(',')}`);
+    prompts.push(spec.prompt);
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
     if (spec.submission.name === 'submit_capability_qualification') {
@@ -53,6 +55,13 @@ function script(seen: string[], mode: 'assignments' | 'boundary' = 'assignments'
       edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('this test still fails')"),
       runScopeTests());
       const owner = /Capability assignment (cap-\d+\.i\d+) in ([^\n]+)/u.exec(spec.prompt)?.[2];
+      if (mode === 'partial-blocker' && owner === a) return submit({
+        kind: 'partial', done: ['A kept the readable selected denial'], unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'],
+        findings: ['A cannot write the root test from its module scope'],
+      }, write('caller.ts', "export const renderA = () => 'readable denial';\n"));
+      if (mode === 'partial-blocker' && owner === p) return submit({
+        kind: 'completion-proposed', summary: 'Root updated its stale assertion', findings: [],
+      }, edit('tests/stale.test.ts', "expect('old')", "expect('readable denial')"));
       if (owner === b) return submit({ kind: 'completion-proposed', summary: 'B extended', findings: [] },
         write('fact.ts', "export const readFact = () => 'old from B';\n"),
         write('../../a/src/caller.ts', 'export const escaped = true;\n'));
@@ -70,6 +79,11 @@ function script(seen: string[], mode: 'assignments' | 'boundary' = 'assignments'
       architect += 1;
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
+      if (mode === 'partial-blocker') return architect <= 2
+        ? submit({ ...basis, kind: 'assign', owner: architect === 1 ? a : p,
+          purpose: architect === 1 ? 'Render A denial' : 'Repair root-owned stale assertion',
+          approach: 'Change only owned source or tests', requirementRefs: [], intendedEvidence: ['Owned source diff'] })
+        : [{ kind: 'wait', ms: 60_000 }];
       if (mode === 'boundary' && architect === 1) return submit({ ...basis, kind: 'request-placement',
         problem: 'Should another owner take the source fact?', evidence: ['B currently owns it'] });
       if (mode === 'boundary' && architect === 2) return submit({ ...basis, kind: 'consult-consumer',
@@ -98,6 +112,40 @@ function script(seen: string[], mode: 'assignments' | 'boundary' = 'assignments'
     return [];
   };
 }
+
+test('an explicit partial capability result returns its cross-owner blocker to the architect', async () => {
+  const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
+  await mkdir(join(fixture.root, 'src/tests'), { recursive: true });
+  await writeFile(join(fixture.root, 'src/tests/stale.test.ts'), "expect('old');\n");
+  await initRepository(fixture.root); await installMiniRunner(fixture.root);
+  const seen: string[] = [], prompts: string[] = [];
+  const opened = await openCapabilityRuns(fixture.root, { git: gitService,
+    script: script(seen, 'partial-blocker', prompts), inputs: treeInputs(),
+    readinessExecution: directReadinessExecution() });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => {
+    const events = opened.service.events('need', receipt.jobId) ?? [];
+    return events.filter(event => event.type === 'capability-assignment-settled').length >= 2 ||
+      events.some(event => event.type === 'job-failed');
+  }, 40_000);
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(events.filter(event => event.type === 'job-failed'), JSON.stringify(events.slice(-8))).toHaveLength(0);
+  expect(events.filter(event => event.type === 'capability-assignment-interrupted')).toHaveLength(0);
+  const settled = events.filter(event => event.type === 'capability-assignment-settled');
+  expect(settled).toHaveLength(2);
+  expect(settled[0]?.data).toMatchObject({ assignment: 'cap-001.i01', outcome: 'partial',
+    unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'], mutated: ['subs/a/src/caller.ts'] });
+  expect(settled[1]?.data).toMatchObject({ assignment: 'cap-001.i02', outcome: 'partial',
+    mutated: ['src/tests/stale.test.ts'] });
+  expect(events.filter(event => event.type === 'capability-assigned').map(event => event.data.assignment))
+    .toEqual(['cap-001.i01', 'cap-001.i02']);
+  expect(prompts.some(prompt => prompt.includes('unfinished: Root-owned stale assertion in src/tests/stale.test.ts')))
+    .toBe(true);
+  expect(await readFile(join(fixture.root, 'src/tests/stale.test.ts'), 'utf8')).toContain("expect('readable denial')");
+  await stopAfterArchitectYield(opened.service, receipt.jobId);
+  await opened.service.settled('need', receipt.jobId);
+}, 60_000);
 
 test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);

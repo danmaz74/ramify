@@ -101,7 +101,7 @@ test('CA23: projection reconstructs the same task after the durable ledger is re
   expect(after.tasks).toMatchObject([{ id: 'cap-001', status: 'coordinating', active: true }]);
 });
 
-test('CA23: a nested dependency suspends its parent assignment on the projected stack', () => {
+test('CA23: nested dependency and settled partial blocker stay visible in the task projection', () => {
   const request = fixtureRequest();
   const task = fixtureTask(request);
   const plan = fixturePlan(request, task);
@@ -132,6 +132,16 @@ test('CA23: a nested dependency suspends its parent assignment on the projected 
   expect(answer.tasks).toMatchObject([{ id: 'cap-001', status: 'awaiting-dependency', active: false,
     activeChild: 'cap-002', assignments: [{ id: 'cap-001.i01', status: 'active' }] },
   { id: 'cap-002', status: 'coordinating', active: true, parent: { kind: 'capability-task', id: 'cap-001' } }]);
+  const partial = capabilityTasksResponseSchema.parse(capabilityTasksOf(runView(constructedRun([
+    ...lines().slice(0, 2),
+    { type: 'capability-assigned', data: { task: task.id, assignment: assignment.id, sequence: 1,
+      invocation: 'inv-0002' }, records: [{ path: 'assignments/cap-001.i01.json', body: assignment }] },
+    { type: 'capability-assignment-settled', data: { task: task.id, assignment: assignment.id,
+      outcome: 'partial', unfinished: ['Root-owned stale assertion'] } },
+  ]))));
+  expect(partial.tasks[0]?.assignments).toMatchObject([{
+    id: assignment.id, status: 'partial', failures: ['Root-owned stale assertion'],
+  }]);
 });
 
 test('CA23 CA34: committed handback closes only the task and retains the separate B entry', () => {

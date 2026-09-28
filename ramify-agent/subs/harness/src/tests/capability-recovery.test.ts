@@ -347,8 +347,8 @@ test('CA19: accepted assign action before its effect replays without a second co
   await second.service.close();
 }, 60_000);
 
-for (const boundary of ['capability-assigned', 'invocation-ended', 'capability-assignment-interrupted'] as const) {
-test(`CA18 CA19 CA26 CA29: restart after ${boundary} keeps one assignment and its original cause`, async () => {
+for (const boundary of ['capability-assigned', 'invocation-ended'] as const) {
+test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial once`, async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -359,7 +359,6 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} keeps one assignment and it
   let architectTurns = 0;
   let closing: Promise<void> | undefined;
   let closeFirst: (() => Promise<void>) | undefined;
-  const prompts: string[] = [];
   const script: Script = spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
@@ -375,10 +374,9 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} keeps one assignment and it
         constraints: [], knownInterface: { kind: 'none-known' },
         examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
       } });
-      prompts.push(spec.prompt);
       if (engineerTurns === 2) return submit({ kind: 'partial', done: ['Edited B source'], unfinished: ['Submit provider result'], findings: [] },
         edit('fact.ts', "return 'old';", "return 'old from B';"));
-      return submit({ kind: 'completion-proposed', summary: 'B returns source', findings: [] });
+      throw new Error('A settled partial must not start another B writer');
     }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
@@ -411,10 +409,12 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} keeps one assignment and it
   const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
   expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
   expect(after.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
-  expect(after.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(1);
-  expect(after.filter(event => event.type === 'invocation-started' && event.data.work.capabilityAssignment === 'cap-001.i01')).toHaveLength(2);
-  expect(prompts[1]).toContain('Original interruption: partial: Submit provider result');
-  expect(prompts[1]).toContain('Current candidate:');
+  const settlements = after.filter(event => event.type === 'capability-assignment-settled');
+  expect(settlements).toHaveLength(1);
+  expect(settlements[0].data).toMatchObject({ outcome: 'partial', unfinished: ['Submit provider result'] });
+  expect(after.filter(event => event.type === 'capability-assignment-interrupted')).toHaveLength(0);
+  expect(after.filter(event => event.type === 'invocation-started' && event.data.work.capabilityAssignment === 'cap-001.i01')).toHaveLength(1);
+  expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const current = second.service.events('need', receipt.jobId)!;
     try { await second.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
