@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { readDeclaredTree } from './helpers/iterations.js';
+import { outline, readDeclaredTree } from './helpers/iterations.js';
 import { copyFixture } from './helpers/fixture.js';
 import { contractJsonSchema, contractSubmissionKinds, contractSubmissionSchema, validateContract } from '../contracts/submission.js';
 import { fakeNamingViolations, isFakeFile } from '../contracts/naming.js';
@@ -203,6 +203,7 @@ describe('the yield that waits for a provider', () => {
 describe('the revision a consumer architect assigns directly', () => {
   const assignment = (extra: Record<string, unknown> = {}) => ({
     kind: 'assign' as const,
+    outline: outline(),
     localDecisions: [],
     assignment: {
       stage: 0,

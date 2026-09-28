@@ -4,7 +4,7 @@ import { assignmentErrors } from '../work/assignment.js';
 import { iterationMessage } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
 import { validateLocalArchitect } from '../work/submission.js';
-import { assign } from './helpers/iterations.js';
+import { assign, outline } from './helpers/iterations.js';
 
 const assignment = {
   id: 'wi-001.i01', goal: 'Implement the endpoint', approach: 'Change the handler.', completionEvidence: 'Tests pass',
@@ -19,12 +19,13 @@ const evidence = { index: null, registry: new Map(), outline: null, package: new
 
 describe('assignment element citations', () => {
   test('an assignment cites an explicit array of elements; the removed fields are refused', () => {
-    const missing = validateLocalArchitect(assign('app/reviews', { citedElements: undefined as unknown as string[] }), { index: null, registry: new Map() });
+    const missing = validateLocalArchitect(assign('app/reviews', { citedElements: undefined as unknown as string[] }, outline()), { index: null, registry: new Map() });
     expect(missing.ok).toBe(false);
     if (!missing.ok) expect(missing.errors.map(error => error.path)).toContain('assignment.citedElements');
-    expect(validateLocalArchitect(assign('app/reviews', { citedElements: [] }), { index: null, registry: new Map() }).ok).toBe(true);
+    expect(validateLocalArchitect(assign('app/reviews', { citedElements: [] }, outline()), { index: null, registry: new Map() }).ok).toBe(true);
     for (const removed of [{ citedItems: [] }, { requirementRefs: [{ anchor: 'Request' }] }]) {
-      const refused = validateLocalArchitect({ ...assign('app/reviews'), assignment: { ...assign('app/reviews').assignment, ...removed } }, { index: null, registry: new Map() });
+      const first = assign('app/reviews', {}, outline());
+      const refused = validateLocalArchitect({ ...first, assignment: { ...first.assignment, ...removed } }, { index: null, registry: new Map() });
       expect(refused.ok).toBe(false);
     }
   });

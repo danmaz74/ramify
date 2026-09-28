@@ -74,7 +74,20 @@ test('CA04 CA06 CA16: a pending question is durable and the retained A session a
     event.type === 'invocation-ended' && (opened.service.events('need', receipt.jobId) ?? []).some(start =>
       start.type === 'invocation-started' && start.data.invocation === event.data.invocation &&
       start.data.role === 'capability-architect')).length >= 2);
-  const current = opened.service.events('need', receipt.jobId)!;
-  await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence));
+  let stopped = false;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = opened.service.events('need', receipt.jobId)!;
+    try {
+      await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence));
+      stopped = true;
+      break;
+    } catch (error) {
+      if (!String(error).includes('at version')) throw error;
+    }
+  }
+  expect(stopped).toBe(true);
   await opened.service.settled('need', receipt.jobId);
+  const finished = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(finished.filter(event => event.type === 'job-stopped')).toHaveLength(1);
+  expect(finished.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
 }, 45_000);
