@@ -1,0 +1,13 @@
+{
+  "plan": "../main-plan.md",
+  "status": "proposed",
+  "iterations": [
+    { "id": "1", "file": "01-records.md", "dependsOn": [] },
+    { "id": "2", "file": "02-delegation.md", "dependsOn": ["1"] },
+    { "id": "3", "file": "03-cooperation.md", "dependsOn": ["2"] },
+    { "id": "4", "file": "04-acceptance.md", "dependsOn": ["3"] },
+    { "id": "5", "file": "05-recovery.md", "dependsOn": ["4"] },
+    { "id": "6", "file": "06-views.md", "dependsOn": ["5"] },
+    { "id": "7", "file": "07-rollout.md", "dependsOn": ["6"] }
+  ]
+}

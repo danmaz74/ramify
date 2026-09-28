@@ -12,6 +12,17 @@ Design documents for the separate agent harness:
 - [Autonomous implementation loop](architecture/autonomous-implementation-loop.md), proposed architecture (formerly hypothesis 3b):
   global and local architects share and refine architectural hypotheses;
   global forks decide and append briefs without a parent model call
+- [Cooperation through a capability plan](architecture/capability-plan-cooperation.hypothesis.md),
+  architecture hypothesis: consumer and provider architects iteratively develop
+  an interface, coordinate implementation and verify real consumer use through
+  a shared plan
+- [A fresh architect for one capability](architecture/fresh-capability-architect.hypothesis.md),
+  architecture hypothesis: one new architect coordinates interface design and
+  provider implementation, consults the consumer engineer and returns the result
+  for consumer integration
+- [Plan 16: a fresh architect coordinates each requested capability](plans/16-capability-architect/main-plan.md),
+  proposed implementation: durable capability plans, direct consumer consultation,
+  scoped provider and compatibility work, real verification and explicit handback
 - [Breaking and non-breaking plans](decomposition/breaking-vs-non-breaking-plans.md),
   reasoning, sequential sub-plan hypothesis and non-breaking-only MVP scope
 - [Harness architecture](architecture.md), early draft

@@ -1,0 +1,35 @@
+{
+  "captured": "2026-09-28",
+  "files": [
+    {
+      "file": "2026-09-27-capability-plan-cooperation-trial.md",
+      "source": "/tmp/ramify-capability-cooperation-20260927/project/docs/analysis/2026-09-27-capability-plan-cooperation-trial.md",
+      "sourceSha256": "d29be6d9fdbbde8dfc52ac4dbc0d29ee0a554198542de0c01a46263f47d6fb15",
+      "storedSha256": "96bb3982fabda8bab3e4f9eb32417e1e2ae4a5cab626c4722b0faf51698cc995",
+      "edits": [
+        "Adjusted hypothesis link for this directory"
+      ]
+    },
+    {
+      "file": "2026-09-27-capability-plan-cooperation-trial.plan.md",
+      "source": "/tmp/ramify-capability-cooperation-20260927/project/docs/analysis/2026-09-27-capability-plan-cooperation-trial.plan.md",
+      "sourceSha256": "cfdc8822802831c479eada2071b920b854a97db5433e4a64f77effc41557a828",
+      "storedSha256": "cfdc8822802831c479eada2071b920b854a97db5433e4a64f77effc41557a828",
+      "edits": []
+    },
+    {
+      "file": "2026-09-28-fresh-capability-architect-trial.md",
+      "source": "/tmp/ramify-fresh-capability-20260928/project/docs/analysis/2026-09-28-fresh-capability-architect-trial.md",
+      "sourceSha256": "3505ea55932ab4f4e986ba83a2af72345e3a945ab6f486f1f0da9a318207e566",
+      "storedSha256": "3505ea55932ab4f4e986ba83a2af72345e3a945ab6f486f1f0da9a318207e566",
+      "edits": []
+    },
+    {
+      "file": "2026-09-28-fresh-capability-architect-trial.plan.md",
+      "source": "/tmp/ramify-fresh-capability-20260928/project/docs/analysis/2026-09-28-fresh-capability-architect-trial.plan.md",
+      "sourceSha256": "894294931ac8b3e5293482932335e6a48a13605f4f84624476f045bf2f496992",
+      "storedSha256": "894294931ac8b3e5293482932335e6a48a13605f4f84624476f045bf2f496992",
+      "edits": []
+    }
+  ]
+}
