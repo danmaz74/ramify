@@ -238,6 +238,35 @@ example and load average about 1.2. Raw data:
 - The remaining hook time is daemon-side work, which targets 1 to 3 of the
   analysis address.
 
+## Deferred: commit-keyed reuse of analysis data
+
+**Status:** noted 2026-09-28, not designed and not implemented. Nothing below
+is an implemented capability.
+
+A batch analysis of the toolkit takes about 10 s and of ramify-agent about 15 s
+from scratch, measured on 2026-09-28 with `ramify check --batch` on Linux x64,
+12 cores, Node 22. Opening a fresh resident context costs about the same. An
+audit of a prepared worktree, as [ramify-audit's Plan 1](https://github.com/danmaz74/ramify-audit)
+intends, pays that cost for every commit it audits even when a resident session
+elsewhere already holds the analysis of the same tree.
+
+The candidate optimization associates a session's retained facts with the Git
+tree they describe: a revision whose observed inputs equal a commit's tree
+content is keyed by that commit. A later request to analyze the same commit,
+in another worktree or a batch session, would duplicate the retained facts
+instead of re-analyzing. The observed-input identity already exists as the
+revision's `inputId`; the missing pieces are the mapping from a commit to that
+identity, proof that the worktree's inputs equal the commit's tree with no
+uncommitted change, and a transfer of frozen facts between sessions or
+processes.
+
+Open before any design: where the mapping lives and how it is invalidated,
+whether a transfer is cheaper than re-analysis for the sizes above, how a
+batch session in a Node child reaches a resident's facts, and whether the
+compiler-dependent parts of a session can be recreated from facts alone.
+[Plan 7](../plans/iteration-7-affected-modules/main-plan.md) explicitly
+excludes this optimization; its `--batch` form re-analyzes the checkout.
+
 ## Open questions
 
 - macOS latency against the acceptable-time budget. Only Linux was measured.

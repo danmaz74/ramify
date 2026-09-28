@@ -1,263 +1,288 @@
 # Affected-module contracts
 
-**Status:** proposed for [Plan 7](main-plan.md). Extend the completed Plan 5
-contracts in place; preserve their unrelated methods and lifecycle guarantees.
+**Status:** revised 2026-09-28 for [Plan 7](main-plan.md). These extend the
+completed Plan 5 session contracts in place; preserve their unrelated methods
+and lifecycle guarantees. Field names are binding for the iterations; an
+iteration that must deviate records the deviation in its results file.
 
 ## Analysis API
 
-New analysis-owned `subs/analysis/src/interfaces/affected.ts` uses the existing
-neutral `ProjectScope` and `SourceLimit` vocabulary:
+New analysis-owned `subs/analysis/src/interfaces/affected.ts`. Foreign types
+arrive as `import type` and are never re-exported from this file.
 
 ```ts
+import type { ProjectScope } from '../../subs/project/src/interfaces/project.js';
+import type { SourceLimit } from '../../subs/typescript/src/interfaces/source.js';
+
 export interface AffectedQuery {
-  readonly modules: readonly string[]; // exact inventory IDs, not paths
+  /** The session's current revision; any other value is `invalid-revision`. */
+  readonly sequence: number;
+  /** Exact inventory module IDs; unknown IDs fail the whole query. */
+  readonly modules?: readonly string[];
+  /** Project-relative, `/`-separated paths as the inventory spells them. */
+  readonly paths?: readonly string[];
 }
 export interface AffectedModule {
   readonly id: string;
-  readonly directory: string; // project-relative; '.' for root
+  readonly directory: string; // project-relative; '.' for the root
 }
+/** How a path seed resolved to a module. */
+export type AffectedPathBasis = 'inventory' | 'declaration' | 'area' | 'none';
+export interface AffectedPathSeed {
+  readonly path: string;
+  readonly module: string | null; // null only with basis 'none'
+  readonly basis: AffectedPathBasis;
+}
+export type AffectedWideningReason = 'unowned-path' | 'partial-coverage';
 export interface AffectedSelection {
   readonly schemaVersion: 'ramify.affected/1';
-  readonly changedModules: readonly AffectedModule[];
-  readonly affectedModules: readonly AffectedModule[]; // excludes seeds
-  readonly testModules: readonly AffectedModule[];
+  /** The revision's observed-input identity; the answer describes exactly these inputs. */
+  readonly inputId: string;
+  readonly paths: readonly AffectedPathSeed[];
+  readonly changedModules: readonly AffectedModule[];   // the seeds
+  readonly affectedModules: readonly AffectedModule[];  // reached dependents, seeds excluded
+  readonly testModules: readonly AffectedModule[];      // union, or every module when widened
   readonly selection: 'dependency-closure' | 'all-modules';
+  /** Empty for `dependency-closure`; distinct, sorted, for `all-modules`. */
+  readonly widening: readonly AffectedWideningReason[];
   readonly scope: ProjectScope;
-  readonly coverage: {
-    readonly status: 'complete' | 'partial';
-    readonly notes: readonly SourceLimit[];
-  };
-  readonly analysisCheck: 'passed' | 'failed'; // existing verdict, not a test run
+  readonly coverage: { readonly status: 'complete' | 'partial'; readonly notes: readonly SourceLimit[] };
+  /** The revision's existing check verdict; never a claim that tests ran. */
+  readonly analysisCheck: 'passed' | 'failed';
 }
 export type AffectedUnavailableReason =
-  | 'invalid-query' | 'unknown-module' | 'invalid-current' | 'missing-facts'
-  | 'superseded' | 'resource-limit' | 'deadline-exceeded';
+  | 'invalid-query' | 'invalid-revision' | 'invalid-current' | 'missing-facts'
+  | 'unknown-module' | 'resource-limit';
 export type SessionAffectedOutcome =
-  | { readonly status: 'answered'; readonly sequence: number;
-      readonly inputId: string; readonly result: AffectedSelection }
+  | { readonly status: 'answered'; readonly sequence: number; readonly result: AffectedSelection }
   | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason;
       readonly message: string; readonly unknownModules: readonly string[] }
   | { readonly status: 'cancelled' };
 ```
 
-Add this method to Plan 5's `RetainedSession`, using its existing `RunControl`:
+`RetainedSession` in `interfaces/session.ts` gains:
 
 ```ts
-affected(query: AffectedQuery, sequence: number,
-  control?: RunControl): Promise<SessionAffectedOutcome>;
+/** Select the modules affected by the given seeds from the current valid
+ * revision's retained facts. Only `query.sequence` equal to the session's
+ * current revision is accepted; a warm session answers with its compiler
+ * released; nothing is read from disk or projected through `report()`. */
+affected(query: AffectedQuery, control?: RunControl): Promise<SessionAffectedOutcome>;
 ```
 
-A sequence other than the current one returns `superseded`; there is no graph
-history. A malformed query is `invalid-query` at this direct boundary. Unknown
-IDs return the complete unknown set, deduplicated and sorted, and no selection.
-Normalize duplicate valid seeds; sort all module lists by UTF-8 byte order of
-canonical ID. Empty seeds return empty arrays, `dependency-closure`, and current
-scope/coverage after readiness and sequence checks. An empty request does not
-hide invalid input or missing facts. Plain immutable outputs contain no Maps,
-compiler handles, worker objects or mutable references into the fact store.
+### Query validation
 
-## Coherent fact view and readiness
+`invalid-query` when `modules` or `paths` is present but not an array of
+nonempty strings, when a path is absolute, contains `\`, an empty segment,
+`.` or `..` segments, or when the seed count exceeds 4,096. Duplicate seeds
+are normalized. Both lists absent or empty is valid and answers with empty
+`changedModules`, `affectedModules` and `testModules` after the readiness
+checks; it still reports coverage and widening.
 
-Implement private `src/affected-query.ts` beside `session-facts.ts` inside
-analysis. A worker-local read view references the committed revision's inventory,
-per-file accesses, per-file descriptions, coverage, sequence/input ID and
-readiness. Reuse these objects and existing file ownership lookup; do not copy
-all facts or export a private store through the public API.
+### Readiness
 
-Require a valid inventory/model and completed source catalog, access
-interpretation and decision stages for the session's supported check
-capabilities. An unrequested, blocked, incomplete or unavailable prerequisite
-is `missing-facts`; invalid configuration/declarations/current input is
-`invalid-current`. A completed check with denied imports can answer and reports
-`analysisCheck: 'failed'`. Source coverage notes make coverage partial, not
-unavailable. Preserve note identities, locations and stable report ordering.
+Mirror `measurements`: disposed session or a sequence other than the current
+one is `invalid-revision`; `facts.invalid`, a null inventory or area issues is
+`invalid-current`. A current revision whose retained facts lack access
+interpretation, because the session's capabilities never requested it or a
+prerequisite stage is blocked, is `missing-facts`. Iteration 1 identifies the
+exact retained field or execution record that proves the access stage
+completed and records it in its results file; `report()` is not called to
+find out.
 
-Plan 5's public `SessionRevision` does not expose stage execution records.
-Verify readiness from retained pipeline state; if necessary add a small private
-readiness record at existing publication sites in iteration 2. Do not call
-`report()` just to determine readiness, and do not add new dependency data.
-A failed/unpublished update or outstanding invalidation must prevent the older
-facts from masquerading as the requested current inputs. Context scheduling
-retains Plan 5's published-versus-synchronized distinction.
+### Path resolution
 
-## Projection and traversal
+For each normalized path, in this order, the first match wins:
 
-For each retained `SourceAccess`, take its importer owner's ID as consumer:
+1. `inventory`: a `ProjectInventory.files[].path` equals the path; the module
+   is its `owner`.
+2. `declaration`: the path equals `<module.directory>/module.ramify` or
+   `<module.directory>/README.md` for an inventoried module, with the root
+   module's directory `.` spelled as `module.ramify` and `README.md`.
+3. `area`: the path lies under the `root` of an `InventoryArea` of an
+   inventoried module; the module is that area's owner. Areas of nested
+   modules never overlap a parent's areas, so at most one area matches.
+   Iteration 1 verifies how `InventoryArea.root` is spelled and whether it is
+   relative to the project root.
+4. `none`: no module. The selection widens with `unowned-path`.
 
-- Add its resolved application target owner's ID as provider, including a
-  symbol-free occurrence with no selections.
-- Add each known selected original's `original.owner` and each recorded
-  `forwarding` origin's owner. `OriginalId` already contains owner; a second
-  original-to-owner index is unnecessary. Include known targets even when
-  a selection is missing/unresolved, and preserve the associated coverage.
-- Include every supported access form regardless of runtime elision, test
-  area or importability verdict. External targets create no module node;
-  outside-module/unresolved targets retain their coverage outcomes.
-- For each retained file/resource description, add its owner's dependency
-  on each owned path in `dependencies.shims`, resolved through inventory
-  ownership. Unowned external shims create no invented module. Do not copy
-  `dependencies.files`, resource contributor backlinks or resolution probes.
+### Projection
 
-Check referenced owned IDs against that revision's inventory; an impossible
-missing owner is `missing-facts`, not a dropped edge. Drop self-edges and
-insert all other pairs into `Map<providerId, Set<consumerId>>`. Deduplicate
-across occurrences naturally. No per-file contribution lists or counts are
-needed because there is no graph to update later.
+Private `subs/analysis/src/affected-query.ts` exports a pure function over a
+plain input assembled from `SessionFacts`, so it is testable without a
+session:
 
-Seed one iterative BFS/DFS with all requested modules. Visit each reached
-module once, traverse its consumers, then create the three sorted lists.
-Propagation crosses the whole intermediate module: B/file1 importing C and
-A importing B/file2 still yields A and B when C changes. Never prune using
-Plan 5's checked set, revision delta, description equality or selected symbols.
+```ts
+export interface AffectedFacts {
+  readonly inventory: ProjectInventory;
+  readonly accesses: readonly SourceAccess[];
+  readonly shims: readonly { readonly file: string; readonly shims: readonly string[] }[];
+  readonly coverage: readonly SourceLimit[];
+  readonly scope: ProjectScope;
+  readonly inputId: string;
+  readonly analysisCheck: 'passed' | 'failed';
+}
+export function projectAffected(facts: AffectedFacts, seeds: { modules: readonly string[]; paths: readonly string[] },
+  limits: { maxModules: number; maxEdges: number }, control?: RunControl):
+  Exclude<SessionAffectedOutcome, { status: 'answered' }> | { status: 'answered'; result: AffectedSelection };
+```
 
-For nonempty seeds, complete coverage uses the reached set as `testModules`.
-Partial coverage keeps the known `affectedModules`, sets `selection` to
-`all-modules`, and includes every inventoried module in `testModules`.
-This fallback remains limited to the returned scope. It cannot discover
-excluded tests, independent projects or unobserved runtime dependencies.
+Edges, with consumer `access.importer.area.owner`:
 
-Cost is O(A + S + F + H + M + E) plus O(M log M) output ordering: access records,
-selection/forwarding entries, descriptions, explicit shim references, modules
-and unique edges. Temporary adjacency is O(M + E), plus traversal/output
-storage. The entire fact scan is expected even for a small affected set.
+- `access.target.kind === 'application'`: provider `target.origin.area.owner`,
+  including accesses with no selections.
+- each `selection.original` that is not null: provider `original.owner`.
+- each `selection.forwarding[]` origin: provider `origin.area.owner`.
+- each shim entry: consumer is the file's owner from the inventory, provider is
+  the shim path's owner from the inventory; unowned shims add no edge.
+- `external`, `outside-module` and `unresolved` targets add no edge. Their
+  coverage notes decide widening.
 
-## Worker execution and resource lifecycle
+Drop self-edges. Count unique non-self edges; over `maxEdges` or an inventory
+over `maxModules` is `resource-limit`. Check `control.signal` at least every
+1,024 accesses and traversal steps; an abort is `cancelled`. Build the reverse
+adjacency, seed the traversal with every seed module, visit each module once.
 
-Extend Plan 5's request-ID worker protocol with `affected(query, sequence)`
-and `SessionAffectedOutcome`. Serialize the operation with session mutations;
-verify the sequence again when its turn begins. Yield to cancellation/deadline
-messages while keeping the mutation queue blocked until this read completes.
-A yielded query must not observe half of two revisions. Disposal cancels the
-operation and waits for its cleanup.
+Coverage is `partial` when any note's `code` is outside the set
+`incomplete-exports`, `ambiguous-original`, `unresolved-original`,
+`unknown-key`, `namespace-escape`, `signature-inferred`,
+`signature-unresolved`. Return every note, sorted by the catalog's existing
+order, whatever the status.
 
-Only one graph build is active per worker; queued requests use Plan 5's existing
-queue admission limits. Check cancellation/deadline at least every 1,024
-examined records, selections, forwarding entries, shim references, edge
-insertions or traversal steps, including one oversized occurrence. Bound final
-sorting by the module limit. The worker has a 1,000 ms active-query budget;
-service queue/startup/synchronization time counts against the caller deadline.
-The stricter elapsed/cancellation condition wins. No truncated closure is a
-success. Limits and measurement gates are in [acceptance.md](acceptance.md).
+`selection` is `all-modules` when `widening` is nonempty; `testModules` is then
+every inventoried module. Otherwise `testModules` is seeds plus reached
+modules. `changedModules` and `affectedModules` are always the real seeds and
+closure, so a consumer can see what was known even when widened.
 
-Release adjacency, traversal and request references in `finally` on every path.
-There is no graph cache, history, persistent contribution bookkeeping, edge
-audit or revision-update maintenance. Retained input facts remain Plan 5's
-responsibility; its normal audit/correction path continues unchanged.
+### Worker
 
-A ready query makes zero compiler calls, source filesystem reads, `report()`
-projections or new analysis sessions. A published read also works after
-`releaseCompiler()` while the warm worker holds ready facts. Cold opening,
-a required sweep or synchronization can use Plan 5's ordinary compiler work;
-measure that separately. Only the compact bounded answer crosses the worker.
+Add `{ operation: 'affected'; query: AffectedQuery }` to `session-messages.ts`,
+the `case 'affected'` to `session-worker.ts`, and the forwarding method to
+`session-host.ts`, exactly as `measurements`. The engine method runs under
+`#serialize`, assembles `AffectedFacts` from the current facts without copying
+accesses, calls the projector, and returns only the plain outcome.
 
-## Context and service contracts
+## Context contract
 
-Add neutral types to contexts' `src/interfaces/contexts.ts`, using the existing
-context, freshness and analysis vocabulary through its exposure channels:
+Add to `subs/daemon/subs/contexts/src/interfaces/contexts.ts`, using the
+existing context, freshness and analysis vocabulary:
 
 ```ts
 export interface AffectedRequest {
   readonly token: ContextToken;
   readonly requestId: string;
   readonly freshness: Freshness;
-  readonly query: AffectedQuery;
+  readonly modules?: readonly string[];
+  readonly paths?: readonly string[];
   readonly deadlineMs?: number;
 }
-export type AffectedOutcome =
-  | { readonly status: 'answered'; readonly requestId: string;
-      readonly revision: ContextRevision; readonly freshness: FreshnessRecord;
-      readonly result: AffectedSelection }
-  | { readonly status: 'not-answered'; readonly requestId: string;
-      readonly revision: ContextRevision | null;
-      readonly reason: AffectedUnavailableReason | UnavailableReason
-        | 'pending' | 'cold' | 'historical-query-unsupported';
-      readonly unknownModules: readonly string[]; readonly message: string }
+export type ContextAffectedOutcome =
+  | { readonly status: 'answered'; readonly requestId: string; readonly revision: ContextRevision;
+      readonly freshness: FreshnessRecord; readonly result: AffectedSelection; readonly timings: ReplyTimings }
+  | { readonly status: 'unavailable'; readonly requestId: string; readonly revision: ContextRevision | null;
+      readonly reason: AffectedUnavailableReason | UnavailableReason; readonly message: string;
+      readonly unknownModules: readonly string[] }
+  | { readonly status: 'deadline-exceeded'; readonly requestId: string; readonly elapsedMs: number }
+  | { readonly status: 'superseded'; readonly requestId: string }
+  | { readonly status: 'pending'; readonly requestId: string }
+  | { readonly status: 'cold'; readonly requestId: string }
   | { readonly status: 'cancelled'; readonly requestId: string };
 ```
 
-`ContextManager.affected(request, lease, control?)` returns
-`Promise<AffectedOutcome>`. Use the same covering-revision scheduler and leases
-as Plan 5's check. Invoke the session method at that sequence; validate the
-returned sequence and input ID against the covering `ContextRevision` before
-answering. On mismatch return `superseded`, never relabel the response.
+Iteration 2 aligns the exact variant fields with the existing `measure`
+outcome in the same file, so the two operations share one shape for the
+non-answered variants. `ContextManager.affected(request, lease, control?)`
+uses the same covering-revision scheduler and leases as `measure`, invokes the
+session at that revision's sequence, and returns `superseded` when the
+session's answer names another sequence. It never relabels an answer from an
+older revision.
 
-| Request/state | Required behavior |
+| Request/state | Behavior |
 | --- | --- |
-| Published, current ready revision | Answer from those facts; no disk freshness claim. |
-| Published, explicit current revision ID | Answer if still current when executed. |
-| Published, older revision ID | `historical-query-unsupported`, even if a historical report exists. |
-| Published, pending/cold, wait false | Explicit `pending`/`cold`; no empty result. |
-| Published, pending/cold, wait true | Use normal Plan 5 readiness/opening with caller deadline. |
-| Synchronized | Use expected-content rendezvous, queued writes, required sweeps and supersession from Plan 5. |
-| Invalid current input after last valid | Explicit unavailable; never answer from `lastValid`. |
-| Disposed/expired generation, resource pressure or disconnect | Existing explicit lifecycle outcome and lease cleanup. |
+| Published or synchronized, ready covering revision | Answer from that revision's facts. |
+| Pending or cold with wait false | Explicit `pending` or `cold`. |
+| Pending or cold with wait true | Plan 5's readiness or opening under the caller's deadline. |
+| Invalid current input after last valid | `unavailable`, never an answer from `lastValid`. |
+| Disposed, expired generation, resource pressure, disconnect | Existing lifecycle outcome and lease cleanup. |
 
-Already-covered expected identities need no compiler work. Otherwise Plan 5
-flushes/debounces/updates as its contract requires. Empty `expect` alone is not
-evidence that an unobserved saved edit is analyzed. Module IDs select seeds;
-they are never interpreted as file identities.
+## Daemon, root and client
 
-Root's `ServiceOperation` and `ServiceCapability` gain `affected`. Its service
+Root's `ServiceOperation` and `ServiceCapability` gain `affected`. The service
 interface, daemon dispatch and lightweight connection gain:
 
 ```ts
-affected(params: AffectedRequest,
-  control?: RunControl): Promise<ServiceResult<AffectedOutcome>>;
+affected(params: AffectedParams, control?: RunControl): Promise<ServiceResult<AffectedOutcome>>;
 ```
 
-Keep the same operation in direct and IPC bindings. Validate exact object
-fields, nonempty string IDs, supported freshness, request/response byte bounds,
-context generation, and finite positive integer deadlines under Plan 5's
-600,000 ms cap. Use Plan 5's default request deadline when omitted. Malformed
-wire data is `invalid-request`; unknown valid IDs are a domain outcome.
-Unsupported peers produce a capability error. No client falls back to batch.
+`AffectedParams` is `AffectedRequest`; `AffectedOutcome` is
+`ContextAffectedOutcome`. Wire validation checks exact fields, nonempty string
+IDs, arrays of strings, supported freshness and a finite positive deadline
+under Plan 5's cap, and the request and response byte bounds. Malformed wire
+data is `invalid-request`; an unknown module ID is a domain outcome. The
+connection method answers `unsupported-operation` when the welcome lacks the
+capability, as `measure` does. No client falls back to batch on its own.
+
+## Batch operation
+
+`src/interfaces/batch.ts` gains:
+
+```ts
+export interface AffectedBatchInvocation {
+  readonly cwd: string;
+  readonly root?: string;
+  readonly modules: readonly string[];
+  readonly paths: readonly string[];
+}
+export type AffectedBatchResult =
+  | { readonly status: 'answered'; readonly inputId: string; readonly result: AffectedSelection }
+  | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason | 'invalid-project'; readonly message: string;
+      readonly unknownModules: readonly string[]; readonly exitCode: 1 | 2 }
+  | { readonly status: 'cancelled'; readonly exitCode: 130 };
+export type AffectedBatchOperation = (invocation: AffectedBatchInvocation, control?: RunControl) => Promise<AffectedBatchResult>;
+```
+
+Root implements it by resolving the project as `check --batch` does, opening a
+retained session over the root with the check capabilities `check --batch`
+requests, calling `affected` at the opened revision, and disposing the session
+in `finally`. The compiled client runs it in the same Node child seam as
+`check --batch`. The CLI environment receives it as `affectedBatch` beside
+`batch`. `invalid-project` maps a `reported` open without a session to exit 1.
 
 ## CLI
 
 ```text
-ramify affected <module-id>... [--root <dir>] [--changed <path>...]
-                [--deadline <ms>] [--format human|json]
+ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]
+                [--format human|json]
 ```
 
-Reuse resident root selection, connector, signal handling and cleanup. Require
-at least one module ID. Default to `{ mode: 'published', wait: true }`.
-`--changed` uses Plan 5's saved-content hashing/deletion helpers and synchronized
-freshness; it never infers module seeds. Reject `--batch` and `--since`.
-
-Human output lists test targets with changed/dependent labels, input revision,
-scope and coverage notes. JSON emits one `AffectedOutcome` envelope; an answered
-`result` contains `ramify.affected/1`. Pre-context invocation/service errors keep
-the existing CLI error schema. Complete answered queries exit 0, partial or
-not-answered results exit 2, cancellation exits 130. Existing importability
-failure is preserved in `analysisCheck` without claiming tests ran or passed.
-
-## MCP
-
-Register `ramify_affected_modules` on Plan 4's stdio provider:
+At least one module ID or `--path` is required; `--path` repeats. Resident
+form: connect, starting the daemon if needed, open the project context as
+`measure` does, request synchronized freshness with wait, and print the
+answer. Batch form: run the batch operation. `--format json` prints one
+document:
 
 ```ts
-{
-  root: string; // explicit project selection using Plan 4 rules
-  modules: readonly string[];
-  expectedContent?: readonly { path: string; sha256: string | null }[];
-  deadlineMs?: number;
+export interface AffectedDocument {
+  readonly schemaVersion: 'ramify.affected-cli/1';
+  readonly root: string;
+  readonly mode: 'resident' | 'batch';
+  readonly revision: { readonly sequence: number | null; readonly inputId: string };
+  readonly ramifyVersion: string;
+  readonly selection: AffectedSelection;
 }
 ```
 
-Use the host's context lifecycle and injected daemon client. Without
-`expectedContent`, use published freshness with wait true; otherwise use
-synchronized freshness. Return the same structured `AffectedOutcome` and
-bounded explanatory text. Partial/not-answered results must be clearly marked;
-map SDK tool errors, protocol validation and cancellation through Plan 4's
-reviewed contract. Advertise support only when the service supports `affected`.
+Human output prints the root, mode, revision, selection with its widening
+reasons, one line per path seed with its module and basis, then the changed,
+affected and test module lists and the count of coverage notes.
 
-MCP never shells out to CLI or loads a compiler/report to compute impact.
-Preserve protocol-only stdout, cancellation and per-host lease cleanup. Do not
-create an independent MCP server in this plan. The provider handoff must include
-its actual SDK schema and stdio harness before iteration 5 starts.
+| Outcome | Exit |
+| --- | --- |
+| Answered, `dependency-closure` or `all-modules` | 0 |
+| Invalid project, unknown module ID or invalid seeds | 1 |
+| Unavailable, pending, cold, superseded, deadline exceeded | 2 |
+| Cancelled | 130 |
 
-## Consumer access
-
-[owners.md](owners.md) gives exact manifest deltas, package exports, README
-purpose additions and owned test placement. No new browser promise, production
-owner, package subpath or model-principles change is part of this plan.
+An `all-modules` answer exits 0 because it is a complete conservative answer;
+consumers read `selection` and `widening`, never the exit code alone. Failures
+use the existing `ramify.cli/1` diagnostic form as `measure` does.

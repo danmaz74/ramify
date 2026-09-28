@@ -1,65 +1,88 @@
-# Iteration 3: Context scheduling and daemon access
+# Iteration 3: CLI command, batch form and documentation
 
 **Plan:** [Plan 7: Affected modules](../main-plan.md).
-**Prerequisites:** Iteration 2 and completed Plan 5 context driver, covering-revision scheduler, compact history, leases and client/worker integration.
-**Owners:** subs/daemon/subs/contexts/, subs/daemon/ and root service/assembly.
+**Prerequisites:** iteration 2 on the branch. **Owners:** `subs/cli/`, root
+`src/` for the batch operation and entries, documentation.
 
 ## Goal
 
-Expose the query through the existing context and lightweight client with exact freshness, revision and lifecycle behavior.
+Add `ramify affected` with a resident form over the daemon and a `--batch`
+form over a fresh session, print the JSON document and human form with the
+contract's exit codes, and document the command.
 
 ## Read first
 
-- [Main plan](../main-plan.md): user workflow, on-demand choice and scope.
-- [Contracts](../contracts.md) and [owners](../owners.md): query semantics,
-  readiness, lifecycle, public types and exact exposure additions.
-- [Acceptance](../acceptance.md) and [case inventory](../cases.json): this
-  iteration's finite expectations and required evidence levels.
-- [Plan 5 contracts](../../iteration-5-fast-incremental-checks/contracts.md),
-  [scope](../../iteration-5-fast-incremental-checks/scope.md) and its completed
-  provider handoff; preserve its accepted session/freshness contracts.
-- [Testing guide](../../../development/testing.md) and the current source/tests
-  of the owners named below; inspect provider versions before editing.
+- [Contracts](../contracts.md): Batch operation and CLI sections.
+- [Main plan](../main-plan.md): decision 5, verified state items 5 and 6,
+  runnable outcome table.
+- [Owners](../owners.md): the root and CLI rows, documentation updates.
+- [Acceptance](../acceptance.md) rows A7-09 to A7-11.
+- Source: `subs/cli/src/arguments.ts`, `run-cli.ts`, `measure-command.ts`,
+  `check-command.ts` (the batch branch), `command-support.ts`,
+  `interfaces/cli.ts`, `errors.ts`; root `src/interfaces/batch.ts`,
+  `batch.ts`, `batch-entry.ts`, `batch-process.ts`, `cli-process.ts`,
+  `compiled-entry.ts`, `cli-entry.ts`; `subs/analysis/src/retained-session.ts`
+  and `resolve-project.ts` for opening a session over a root.
+- Tests to imitate: `subs/cli/src/tests/measure-command.test.ts`,
+  `arguments.test.ts`; `src/tests/batch-cli.test.ts`, `resident-cli.test.ts`,
+  `compiled-client.test.ts`, `fixture.ts`.
+- Documentation to extend: [CLI invocation contract](../../../architecture/cli-invocation.spec.md)
+  (usage and the resident and batch section), [daemon architecture](../../../architecture/daemon.md)
+  service operations table, the README command list, the testing guide's
+  command table, and `subs/cli/src/arguments.ts` help text.
 
 ## Deliverables
 
-1. Add neutral `AffectedRequest`/`AffectedOutcome` and
-   `ContextManager.affected` over Plan 5 covering-revision scheduling. Pass
-   the current sequence into the session, then validate sequence/input ID
-   before attaching context revision metadata. Never request a full report.
-2. Implement published/current, explicit older revision, synchronized expected
-   identities, already-covered inputs, required sweep, cold/wait, invalid
-   current, supersession, cancellation and disposal outcomes from contracts.
-3. Extend root service operation/capability, daemon request validation and
-   dispatch, wire method and lightweight connection. Bound both the request
-   and full service answer. Unsupported peers have no batch fallback.
-4. Apply neutral type relays and package client exports from owners.md; use
-   contexts' existing interface wildcard. Extend real quick-environment
-   binding, controlled race tests and actual IPC/process tests.
-5. Update daemon/context/root purpose paragraphs and daemon architecture for
-   the reviewed method and query lifecycle. Register A7-10–A7-12 evidence.
+1. Root batch operation: `AffectedBatchInvocation`, `AffectedBatchResult`,
+   `AffectedBatchOperation` in `src/interfaces/batch.ts`; implementation in
+   `batch.ts` that resolves the project as `check --batch` does, opens a
+   retained session with the same capabilities, calls `affected` at the opened
+   revision, disposes in `finally`, and maps a `reported` open without a
+   session to `invalid-project`; the batch child protocol carries the new
+   operation so the compiled client runs it in its Node child.
+2. CLI: `affected` in `arguments.ts` with positional module IDs, repeated
+   `--path`, `--root`, `--batch`, `--format`; at least one seed required;
+   `affected-command.ts` with the resident path mirroring `measure-command.ts`
+   and the batch path through `environment.affectedBatch`; the
+   `ramify.affected-cli/1` document; human rendering; exit mapping per the
+   contract; dispatch in `run-cli.ts`; help text.
+3. Documentation: usage line and a short affected paragraph in the CLI
+   invocation contract's resident and batch section; a service operations
+   row in daemon.md; README command list; testing guide command table; CLI
+   purpose sentence.
+4. Tests: `subs/cli/src/tests/affected-command.test.ts` (A7-10 through the
+   quick environment) and `arguments.test.ts` cases (A7-09);
+   `src/tests/affected-batch.test.ts` and cases in `batch-cli.test.ts` and
+   `compiled-client.test.ts` (A7-11) on the reference project, including the
+   equality of resident and batch selections.
 
 ## Matrix rows executed here
 
-A7-10, A7-11 and A7-12, all instances in cases.json.
+A7-09 to A7-11, all instances.
 
 ## Verification
 
 ```sh
-npm run build
 npm run type-check
-npx vitest run subs/daemon/subs/contexts/src/tests/affected.test.ts subs/daemon/src/tests/affected.test.ts src/tests/affected-ipc.test.ts
+npx vitest run subs/cli/src/tests/affected-command.test.ts subs/cli/src/tests/arguments.test.ts src/tests/affected-batch.test.ts src/tests/batch-cli.test.ts
+npm run build && npm run check:self
+RAMIFY_ENDPOINT_DIR=$(mktemp -d) dist/src/ramify affected --path subs/cli/src/affected-command.ts --format json --root .
+dist/src/ramify affected --path subs/cli/src/affected-command.ts --batch --format json --root .
 ```
 
-Use actual context/session services with controlled clock/events for races;
-use actual IPC for framing, capability and disconnect cases. Import the built
-client package in a clean consumer and audit its compiler/server dependency
-boundary. MCP provider absence is irrelevant to this slice.
+Stop the isolated daemon after the resident invocation. The compiled-client
+case may be skipped where Bun is unavailable, recorded as skipped, never as
+passed. Do not run the whole Vitest suite.
 
 ## Exit criteria
 
-Direct and IPC answers agree at one revision; stale hashes, cold states, invalid inputs, worktree isolation and missing capability cannot become false empty successes. Client dependency and lease boundaries hold.
+- Listed tests pass; type-check and self-check pass; both invocations above
+  print a `ramify.affected-cli/1` document whose selections agree.
+- Documentation names the command, its forms and its exits.
+- `iteration3-results.md`: what changed, commands and outcomes, deviations,
+  skipped cases.
 
 ## Handoff
 
-Final service/wire types, capability, client exports, freshness examples and real test binding go to CLI and MCP. Resource evidence retains ready-query time separately from synchronization.
+Iteration 4 runs the built `dist/src/ramify affected` on the toolkit and on
+`ramify-agent/` and records the results.

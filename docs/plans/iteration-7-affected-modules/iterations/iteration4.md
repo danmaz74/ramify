@@ -1,63 +1,65 @@
-# Iteration 4: CLI affected command
+# Iteration 4: Real invocations, self-check, results and audit gate
 
 **Plan:** [Plan 7: Affected modules](../main-plan.md).
-**Prerequisites:** Iteration 3 service/client method and Plan 5 saved-content hashing, root selection and resident command lifecycle.
-**Owners:** subs/cli/ and root CLI entry/tests.
+**Prerequisites:** iteration 3 on the branch, `npm run build` done.
+**Owners:** documentation and evidence only; source fixes only for defects
+found by the real invocations, recorded per file.
 
 ## Goal
 
-Let a user request affected modules and consume a deterministic test selection through human output or JSON.
+Prove the command on the two real projects, record the evidence and timings,
+run the plan's gate, and write the completion report.
 
 ## Read first
 
-- [Main plan](../main-plan.md): user workflow, on-demand choice and scope.
-- [Contracts](../contracts.md) and [owners](../owners.md): query semantics,
-  readiness, lifecycle, public types and exact exposure additions.
-- [Acceptance](../acceptance.md) and [case inventory](../cases.json): this
-  iteration's finite expectations and required evidence levels.
-- [Plan 5 contracts](../../iteration-5-fast-incremental-checks/contracts.md),
-  [scope](../../iteration-5-fast-incremental-checks/scope.md) and its completed
-  provider handoff; preserve its accepted session/freshness contracts.
-- [Testing guide](../../../development/testing.md) and the current source/tests
-  of the owners named below; inspect provider versions before editing.
+- [Acceptance](../acceptance.md): rows A7-12 and A7-13, the timing sample and
+  the final gate.
+- [Main plan](../main-plan.md): verified state item 6 for the baseline
+  timings, review and completion list.
+- `ramify-agent/audit/README.md` for how audit requests are recorded, and
+  [`audit/plan7-affected-modules.request.json`](../../../../audit/plan7-affected-modules.request.json).
+- The [roadmap](../../../roadmap.md) Plan 7 row and section.
 
 ## Deliverables
 
-1. Implement `affected <module-id>...` with root, changed-file freshness,
-   deadline and format options as specified. Validate before connecting;
-   require seeds and reject batch/since options.
-2. Use the injected service with published wait=true by default; reuse Plan 5
-   expected saved-content/deletion helpers for `--changed`. Do not discover
-   Git changes or infer seeds from changed paths.
-3. Format exact affected/test modules, current revision, scope and coverage.
-   Preserve the shared structured envelope, CLI pre-context errors and
-   documented 0/2/130 exits. A failed importability check remains distinguishable
-   from incomplete dependency coverage and from whether tests have run.
-4. Extend help, command dispatch, purpose prose and CLI invocation spec.
-   Register A7-13 owned and executable process cases, including cleanup and
-   stable stdout/stderr framing.
+1. Real invocations on the toolkit checkout with an isolated endpoint:
+   `--path subs/analysis/src/affected-query.ts`, the module seed `analysis`,
+   `--path package.json`, each with `--format json`; record the exact command,
+   the selection lists and the elapsed time. Assert the expected owners from
+   the toolkit's manifests independently before reading the answer.
+2. Real invocations on `ramify-agent/` (its own Ramify project): one path
+   seed inside a harness sub-module and one `--batch` run; confirm coverage is
+   complete despite its `signature-inferred` notes.
+3. Timing sample per acceptance.md: five resident invocations per project and
+   one batch per project, elapsed wall time each, in a table.
+4. Gate: `npm run type-check`, `npm run check:self`, then the audit request
+   from the checkout root with `--cwd .`; record the run reference and the
+   exit status. A failing check is recorded as failing with its output; fix
+   the defect and rerun once, or stop and report.
+5. `iteration4-results.md` as the plan's completion report: evidence per case
+   ID, timings, the audit run reference, remaining limits. Update the roadmap
+   Plan 7 row and section: status implemented on the branch, link the
+   report, name the deferred items from decision 7.
 
 ## Matrix rows executed here
 
-A7-13, all instances in cases.json.
+A7-12 and A7-13.
 
 ## Verification
 
 ```sh
 npm run build
 npm run type-check
-npx vitest run subs/cli/src/tests/affected.test.ts src/tests/affected-cli.test.ts
+npm run check:self
+ramify-agent/node_modules/.bin/ramify-audit audit --request audit/plan7-affected-modules.request.json --cwd . --json
 ```
 
-Spawn the built executable for the CLI cases; quick injected service checks
-supplement process evidence. Compare JSON against the real service at one
-input ID, exercise partial/failed distinctions, saved/deleted expected content,
-SIGINT and invalid arguments. No shell execution of the selected tests occurs.
+The audit is the only full-suite run. If `ramify-agent/node_modules` is
+absent in the execution checkout, run `npm run worktree:prepare` first.
 
 ## Exit criteria
 
-The built CLI produces the reviewed result/schema/exit behavior, preserves freshness and cleanup, and adds no graph or compiler implementation to the client.
-
-## Handoff
-
-CLI examples, help/spec updates, exact process expectations and structured fixture output go to the final integration gate. MCP remains required for full feature completion.
+- Every A7-12 instance has recorded output and elapsed time.
+- The three gate commands pass and the audit run reference is recorded.
+- Roadmap and completion report updated; no source change without a named
+  defect and its test.

@@ -12,38 +12,27 @@
       "file": "iteration1.md",
       "index": 1,
       "parallelGroup": null,
-      "title": "Contract review and Plan 5 handoff"
+      "title": "Projector, session operation and worker round trip"
     },
     {
       "file": "iteration2.md",
       "index": 2,
       "parallelGroup": null,
-      "title": "On-demand graph and retained-session query"
+      "title": "Context scheduling, daemon operation and root service"
     },
     {
       "file": "iteration3.md",
       "index": 3,
       "parallelGroup": null,
-      "title": "Context scheduling and daemon access"
+      "title": "CLI command, batch form and documentation"
     },
     {
       "file": "iteration4.md",
       "index": 4,
       "parallelGroup": null,
-      "title": "CLI affected command"
-    },
-    {
-      "file": "iteration5.md",
-      "index": 5,
-      "parallelGroup": null,
-      "title": "MCP affected-module tool"
-    },
-    {
-      "file": "iteration6.md",
-      "index": 6,
-      "parallelGroup": null,
-      "title": "Cross-client acceptance and resource gate"
+      "title": "Real invocations, self-check, results and audit gate"
     }
   ],
-  "planPath": "main-plan.md"
+  "planPath": "main-plan.md",
+  "revisedAt": "2026-09-28T00:00:00.000Z"
 }

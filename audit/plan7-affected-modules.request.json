@@ -1,0 +1,161 @@
+{
+  "protocolVersion": 1,
+  "requestId": "plan7-affected-modules",
+  "repositoryPath": ".",
+  "source": {
+    "kind": "existing-commit",
+    "revision": "HEAD"
+  },
+  "selector": {
+    "id": "full",
+    "version": "1",
+    "config": {}
+  },
+  "universeId": "ramify-toolkit-plan7-affected-modules",
+  "coverageClaim": {
+    "scope": "repository",
+    "change": "plan7-affected-modules",
+    "validation": "post-commit"
+  },
+  "workspaceMode": "existing-worktree",
+  "registeredExecutorIds": [],
+  "metadata": {
+    "plan": "Plan 7: affected modules from retained dependency facts",
+    "derivedFrom": "ramify-agent/audit/toolkit-run-fixes.request.json",
+    "note": "Runs in the existing checkout because the toolkit tests need the built dist/ and linked root dependencies."
+  },
+  "checks": [
+    {
+      "id": "patch-integrity",
+      "name": "Patch integrity",
+      "description": "Whitespace and conflict-marker check of the audited commit",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "git-diff-check",
+            "cmd": "git",
+            "args": [
+              "diff",
+              "--check",
+              "HEAD^",
+              "HEAD"
+            ],
+            "parser": "none",
+            "timeoutMs": 60000
+          }
+        ],
+        "continueOnFailure": false
+      },
+      "onFailure": "record"
+    },
+    {
+      "id": "toolkit-build",
+      "name": "Toolkit build",
+      "description": "Compile the toolkit so process tests and the self-check run the audited code",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "build",
+            "cmd": "npm",
+            "args": [
+              "run",
+              "build"
+            ],
+            "parser": "none",
+            "timeoutMs": 600000
+          }
+        ],
+        "continueOnFailure": false
+      },
+      "onFailure": "record"
+    },
+    {
+      "id": "toolkit-typecheck",
+      "name": "Toolkit type-check",
+      "description": "tsc over toolkit source, portable, scripts and reference harness scopes",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "type-check",
+            "cmd": "npm",
+            "args": [
+              "run",
+              "type-check"
+            ],
+            "parser": "none",
+            "timeoutMs": 600000
+          }
+        ],
+        "continueOnFailure": false
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "toolkit-build"
+      ]
+    },
+    {
+      "id": "toolkit-tests",
+      "name": "Toolkit regression suite",
+      "description": "Run the complete toolkit Vitest suite",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "toolkit-vitest",
+            "cmd": "npm",
+            "args": [
+              "test",
+              "--",
+              "--maxWorkers=4"
+            ],
+            "parser": "vitest",
+            "timeoutMs": 1800000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "toolkit-typecheck"
+      ]
+    },
+    {
+      "id": "toolkit-structure",
+      "name": "Toolkit self-check",
+      "description": "ramify check over every toolkit owner",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "check-self",
+            "cmd": "npm",
+            "args": [
+              "run",
+              "check:self"
+            ],
+            "parser": "none",
+            "timeoutMs": 600000
+          }
+        ],
+        "continueOnFailure": false
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "toolkit-build"
+      ]
+    }
+  ]
+}

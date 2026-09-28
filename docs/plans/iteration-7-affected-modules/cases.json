@@ -1,710 +1,655 @@
 {
-  "schemaVersion": "ramify.plan-cases/1",
-  "plan": "iteration-7-affected-modules",
-  "cases": [
-    {
-      "id": "A7-01:retained-fields",
-      "row": "A7-01",
-      "iteration": 1,
-      "fixture": "provider-contract",
-      "evidence": "review",
-      "expected": "Completed Plan 5 retains targets, original.owner, forwarding, explicit shims, inventory and coverage after compiler release."
-    },
-    {
-      "id": "A7-01:readiness",
-      "row": "A7-01",
-      "iteration": 1,
-      "fixture": "provider-contract",
-      "evidence": "review",
-      "expected": "A coherent private view identifies completed source stages and invalid current state without report()."
-    },
-    {
-      "id": "A7-01:consumer-access",
-      "row": "A7-01",
-      "iteration": 1,
-      "fixture": "provider-contract",
-      "evidence": "review",
-      "expected": "The final provider declarations expose every foreign signature type and preserve lightweight client imports."
-    },
-    {
-      "id": "A7-02:diamond-cycle",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "Edges a->b,a->c,b->d,c->d,d->b and isolated z; seed d yields affected [a,b,c], test [a,b,c,d]."
-    },
-    {
-      "id": "A7-02:multiple-seeds",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "The same graph with seeds [b,d] yields affected [a,c] and test [a,b,c,d]."
-    },
-    {
-      "id": "A7-02:isolated",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "Seed z yields affected [] and test [z]."
-    },
-    {
-      "id": "A7-02:duplicates-order",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "Repeated/permuted seeds produce identical sorted byte-order output, including non-ASCII valid IDs."
-    },
-    {
-      "id": "A7-02:empty",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "Empty seeds yield three empty arrays with current scope and coverage."
-    },
-    {
-      "id": "A7-02:root",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "The root inventory ID is a normal seed; only observed root dependencies propagate."
-    },
-    {
-      "id": "A7-02:unknown",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "A mixed valid/unknown list fails as a whole and lists every unique unknown ID in byte order."
-    },
-    {
-      "id": "A7-02:malformed",
-      "row": "A7-02",
-      "iteration": 2,
-      "fixture": "chain-diamond-cycle",
-      "evidence": "unit",
-      "expected": "Non-array modules, non-string or empty IDs and extra query fields fail validation."
-    },
-    {
-      "id": "A7-03:barrel-original",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "A imports C through B; changing either B or C reaches A and preserves intermediate ownership."
-    },
-    {
-      "id": "A7-03:star",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "export-star forwarding retains target and selected original/forwarding owners."
-    },
-    {
-      "id": "A7-03:namespace",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "An explicit namespace selection contributes its target and resolved original owner."
-    },
-    {
-      "id": "A7-03:type-only",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "Explicit and inferred type-only imports retain their provider dependency."
-    },
-    {
-      "id": "A7-03:literal-dynamic",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "A literal dynamic member selection contributes its known provider."
-    },
-    {
-      "id": "A7-03:discarded-dynamic",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "A discarded literal dynamic load with no selected binding still contributes its target."
-    },
-    {
-      "id": "A7-03:side-effect",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "An exportless side-effect import with zero selections still contributes its target."
-    },
-    {
-      "id": "A7-03:denied",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "A resolved denied import contributes an edge and reports analysisCheck failed with complete dependency coverage."
-    },
-    {
-      "id": "A7-03:no-invented-edges",
-      "row": "A7-03",
-      "iteration": 2,
-      "fixture": "source-forms",
-      "evidence": "session",
-      "expected": "Unused exposures, ancestry, self-imports and external packages create no foreign module edge."
-    },
-    {
-      "id": "A7-04:owned-tests",
-      "row": "A7-04",
-      "iteration": 2,
-      "fixture": "test-owners",
-      "evidence": "session",
-      "expected": "An import found only in A/src/tests selects A when its provider changes."
-    },
-    {
-      "id": "A7-04:testing-module",
-      "row": "A7-04",
-      "iteration": 2,
-      "fixture": "test-owners",
-      "evidence": "session",
-      "expected": "A separate testing module importing A is selected when A or a transitive provider changes."
-    },
-    {
-      "id": "A7-04:excluded-tests",
-      "row": "A7-04",
-      "iteration": 2,
-      "fixture": "test-owners",
-      "evidence": "session",
-      "expected": "Production compiler scope is returned explicitly; excluded tests and independent projects are not claimed analyzed."
-    },
-    {
-      "id": "A7-05:owned-shim",
-      "row": "A7-05",
-      "iteration": 2,
-      "fixture": "resource-shim",
-      "evidence": "session",
-      "expected": "A imports resource owned by C with effective declaration owned by D; seed D reaches C and A."
-    },
-    {
-      "id": "A7-05:shared-shim",
-      "row": "A7-05",
-      "iteration": 2,
-      "fixture": "resource-shim",
-      "evidence": "session",
-      "expected": "Two resources using one owned shim retain their own identities and both consumers are reached."
-    },
-    {
-      "id": "A7-05:contributors",
-      "row": "A7-05",
-      "iteration": 2,
-      "fixture": "resource-shim",
-      "evidence": "session",
-      "expected": "Changing A does not reach C merely because C description recorded A as an analysis contributor."
-    },
-    {
-      "id": "A7-05:resolution-probes",
-      "row": "A7-05",
-      "iteration": 2,
-      "fixture": "resource-shim",
-      "evidence": "session",
-      "expected": "Unused resolution candidates and external shims do not invent owned dependency edges."
-    },
-    {
-      "id": "A7-06:body-edit",
-      "row": "A7-06",
-      "iteration": 2,
-      "fixture": "body-and-module-boundary",
-      "evidence": "session",
-      "expected": "B calls C; a C body-value edit with unchanged exports still selects B, irrespective of Plan 5 checked counts."
-    },
-    {
-      "id": "A7-06:different-files",
-      "row": "A7-06",
-      "iteration": 2,
-      "fixture": "body-and-module-boundary",
-      "evidence": "session",
-      "expected": "B/file1 imports C and A imports B/file2; seed C selects both B and A."
-    },
-    {
-      "id": "A7-07:duplicate-import-removal",
-      "row": "A7-07",
-      "iteration": 2,
-      "fixture": "revision-edits",
-      "evidence": "session",
-      "expected": "Two B files import C; remove one and retain B->C; remove the last and drop it in the next query."
-    },
-    {
-      "id": "A7-07:add-revert",
-      "row": "A7-07",
-      "iteration": 2,
-      "fixture": "revision-edits",
-      "evidence": "session",
-      "expected": "Add and revert an import; each queried revision has its explicit expected closure."
-    },
-    {
-      "id": "A7-07:file-lifecycle",
-      "row": "A7-07",
-      "iteration": 2,
-      "fixture": "revision-edits",
-      "evidence": "session",
-      "expected": "Create/delete a contributing source file; subsequent queries reflect only committed current facts."
-    },
-    {
-      "id": "A7-07:barrel-retarget",
-      "row": "A7-07",
-      "iteration": 2,
-      "fixture": "revision-edits",
-      "evidence": "session",
-      "expected": "Retarget a barrel/alias without editing its consumers; new original and forwarding owners are reflected."
-    },
-    {
-      "id": "A7-07:owner-change",
-      "row": "A7-07",
-      "iteration": 2,
-      "fixture": "revision-edits",
-      "evidence": "session",
-      "expected": "Rename/remove/change module ownership in a broad update; new IDs work and old seed IDs are unknown."
-    },
-    {
-      "id": "A7-07:position-and-audit",
-      "row": "A7-07",
-      "iteration": 2,
-      "fixture": "revision-edits",
-      "evidence": "session",
-      "expected": "Position-only edits and Plan 5 corrected audit publication preserve expected edges and update revision/coverage identity."
-    },
-    {
-      "id": "A7-08:unresolved",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "Unresolved target yields partial coverage, known closure and all-inventory test fallback."
-    },
-    {
-      "id": "A7-08:namespace-unknown",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "Unknown namespace use yields partial coverage and all-inventory test fallback."
-    },
-    {
-      "id": "A7-08:nonliteral-dynamic",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "Nonliteral dynamic import yields partial coverage and all-inventory test fallback."
-    },
-    {
-      "id": "A7-08:unsupported-loader",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "A reported unsupported loader yields partial coverage and all-inventory test fallback."
-    },
-    {
-      "id": "A7-08:shared-global",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "A reported shared-global source limitation yields partial coverage and all-inventory test fallback."
-    },
-    {
-      "id": "A7-08:outside-module",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "An outside-module target yields partial coverage without an invented module node."
-    },
-    {
-      "id": "A7-08:missing-stages",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "Missing/unrun/incomplete required source stages or absent facts yield unavailable."
-    },
-    {
-      "id": "A7-08:invalid-current",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "Invalid config or module description after a valid revision yields unavailable, not last-valid success."
-    },
-    {
-      "id": "A7-08:partial-empty",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "Partial coverage plus empty API seeds keeps all lists empty and coverage partial."
-    },
-    {
-      "id": "A7-08:invalid-owner",
-      "row": "A7-08",
-      "iteration": 2,
-      "fixture": "coverage-and-readiness",
-      "evidence": "session",
-      "expected": "An owned source fact referencing a nonexistent inventory owner yields missing-facts, not a silently omitted edge."
-    },
-    {
-      "id": "A7-09:hot-query",
-      "row": "A7-09",
-      "iteration": 2,
-      "fixture": "worker-read",
-      "evidence": "worker",
-      "expected": "A ready hot query builds once for all seeds, with zero compiler calls, source reads and report projections."
-    },
-    {
-      "id": "A7-09:warm-query",
-      "row": "A7-09",
-      "iteration": 2,
-      "fixture": "worker-read",
-      "evidence": "worker",
-      "expected": "The same query after releaseCompiler returns the same answer without restarting the compiler."
-    },
-    {
-      "id": "A7-09:release-and-update",
-      "row": "A7-09",
-      "iteration": 2,
-      "fixture": "worker-read",
-      "evidence": "worker",
-      "expected": "Two queries build twice and release both graphs; intervening ordinary updates perform zero graph construction."
-    },
-    {
-      "id": "A7-09:cancel-large-occurrence",
-      "row": "A7-09",
-      "iteration": 2,
-      "fixture": "worker-read",
-      "evidence": "worker",
-      "expected": "Cancellation during one large selection/forwarding list releases all request state within bounded checkpoints."
-    },
-    {
-      "id": "A7-09:limits",
-      "row": "A7-09",
-      "iteration": 2,
-      "fixture": "worker-read",
-      "evidence": "worker",
-      "expected": "Edge/module/request/response boundaries and active-query deadline return explicit outcomes without truncated successes."
-    },
-    {
-      "id": "A7-09:serialized-yields",
-      "row": "A7-09",
-      "iteration": 2,
-      "fixture": "worker-read",
-      "evidence": "worker",
-      "expected": "A query yielding during construction and a queued mutation never mix revisions; no second build runs concurrently."
-    },
-    {
-      "id": "A7-10:covering-update",
-      "row": "A7-10",
-      "iteration": 3,
-      "fixture": "revision-race",
-      "evidence": "quick",
-      "expected": "Expected saved identities wait for the covering revision and return its exact sequence/input ID and edges."
-    },
-    {
-      "id": "A7-10:already-covered",
-      "row": "A7-10",
-      "iteration": 3,
-      "fixture": "revision-race",
-      "evidence": "quick",
-      "expected": "Already-covered expected identities trigger no compiler update for the query."
-    },
-    {
-      "id": "A7-10:superseded",
-      "row": "A7-10",
-      "iteration": 3,
-      "fixture": "revision-race",
-      "evidence": "quick",
-      "expected": "An obsolete sequence or superseded expected identity produces an explicit outcome, never a relabelled selection."
-    },
-    {
-      "id": "A7-10:unobserved-input",
-      "row": "A7-10",
-      "iteration": 3,
-      "fixture": "revision-race",
-      "evidence": "quick",
-      "expected": "An unobserved path or empty expected list cannot falsely certify an unseen saved edit; required sweeps follow Plan 5."
-    },
-    {
-      "id": "A7-11:worktree-isolation",
-      "row": "A7-11",
-      "iteration": 3,
-      "fixture": "context-lifecycle",
-      "evidence": "quick",
-      "expected": "Two worktrees with equal module IDs and different edges return their own selections and input identities."
-    },
-    {
-      "id": "A7-11:cold-wait",
-      "row": "A7-11",
-      "iteration": 3,
-      "fixture": "context-lifecycle",
-      "evidence": "quick",
-      "expected": "Cold wait=false is explicit; wait=true opens normally or reaches caller deadline."
-    },
-    {
-      "id": "A7-11:generation-disposal",
-      "row": "A7-11",
-      "iteration": 3,
-      "fixture": "context-lifecycle",
-      "evidence": "quick",
-      "expected": "Expired generations and disposal cannot answer from disposed or different-context facts."
-    },
-    {
-      "id": "A7-11:historical",
-      "row": "A7-11",
-      "iteration": 3,
-      "fixture": "context-lifecycle",
-      "evidence": "quick",
-      "expected": "An explicit older revision is historical-query-unsupported even if its report is retained."
-    },
-    {
-      "id": "A7-11:last-valid",
-      "row": "A7-11",
-      "iteration": 3,
-      "fixture": "context-lifecycle",
-      "evidence": "quick",
-      "expected": "Invalid current input cannot return the prior valid selection under the new current request."
-    },
-    {
-      "id": "A7-11:cancel-lease",
-      "row": "A7-11",
-      "iteration": 3,
-      "fixture": "context-lifecycle",
-      "evidence": "quick",
-      "expected": "Cancellation during queueing/synchronization frees the request lease and preserves other clients."
-    },
-    {
-      "id": "A7-12:equivalence",
-      "row": "A7-12",
-      "iteration": 3,
-      "fixture": "daemon-ipc",
-      "evidence": "ipc",
-      "expected": "Actual daemon/client affected operation matches the direct service at one input identity."
-    },
-    {
-      "id": "A7-12:validation",
-      "row": "A7-12",
-      "iteration": 3,
-      "fixture": "daemon-ipc",
-      "evidence": "ipc",
-      "expected": "Malformed framing/input and oversized request/response are rejected with bounded errors."
-    },
-    {
-      "id": "A7-12:capability",
-      "row": "A7-12",
-      "iteration": 3,
-      "fixture": "daemon-ipc",
-      "evidence": "ipc",
-      "expected": "A daemon lacking affected capability is explicit and causes no batch fallback."
-    },
-    {
-      "id": "A7-12:disconnect",
-      "row": "A7-12",
-      "iteration": 3,
-      "fixture": "daemon-ipc",
-      "evidence": "ipc",
-      "expected": "Disconnect cancels the request, releases its lease and leaves other clients usable."
-    },
-    {
-      "id": "A7-12:lightweight",
-      "row": "A7-12",
-      "iteration": 3,
-      "fixture": "daemon-ipc",
-      "evidence": "ipc",
-      "expected": "Built client entry imports/calls affected without loading compiler or server dependencies."
-    },
-    {
-      "id": "A7-13:json-human",
-      "row": "A7-13",
-      "iteration": 4,
-      "fixture": "cli-command",
-      "evidence": "cli",
-      "expected": "Spawned CLI supports exact/duplicate IDs, root selection and stable JSON/human selection, revision and coverage."
-    },
-    {
-      "id": "A7-13:arguments",
-      "row": "A7-13",
-      "iteration": 4,
-      "fixture": "cli-command",
-      "evidence": "cli",
-      "expected": "No seeds, unknown IDs, malformed options and --batch/--since are explicit nonzero outcomes."
-    },
-    {
-      "id": "A7-13:changed",
-      "row": "A7-13",
-      "iteration": 4,
-      "fixture": "cli-command",
-      "evidence": "cli",
-      "expected": "--changed hashes saved content and expected deletion using Plan 5 helpers; module seeds stay explicit."
-    },
-    {
-      "id": "A7-13:partial-failed",
-      "row": "A7-13",
-      "iteration": 4,
-      "fixture": "cli-command",
-      "evidence": "cli",
-      "expected": "Partial coverage exits 2; a complete dependency result with importability failure exits 0 and preserves analysisCheck failed."
-    },
-    {
-      "id": "A7-13:cancel",
-      "row": "A7-13",
-      "iteration": 4,
-      "fixture": "cli-command",
-      "evidence": "cli",
-      "expected": "SIGINT exits 130, keeps stdout/stderr framing valid and releases leases/process resources."
-    },
-    {
-      "id": "A7-14:registration",
-      "row": "A7-14",
-      "iteration": 5,
-      "fixture": "mcp-tool",
-      "evidence": "mcp",
-      "expected": "Actual in-memory SDK client initializes, lists ramify_affected_modules and verifies its exact schema/capability."
-    },
-    {
-      "id": "A7-14:stdio-result",
-      "row": "A7-14",
-      "iteration": 5,
-      "fixture": "mcp-tool",
-      "evidence": "mcp",
-      "expected": "Actual stdio client calls root/modules and gets the same structured selection and revision as the service."
-    },
-    {
-      "id": "A7-14:freshness",
-      "row": "A7-14",
-      "iteration": 5,
-      "fixture": "mcp-tool",
-      "evidence": "mcp",
-      "expected": "expectedContent and deadlineMs preserve covering revision and explicit supersession/deadline results."
-    },
-    {
-      "id": "A7-14:errors",
-      "row": "A7-14",
-      "iteration": 5,
-      "fixture": "mcp-tool",
-      "evidence": "mcp",
-      "expected": "Malformed input, unknown IDs, partial coverage and unavailable states have the reviewed SDK mapping."
-    },
-    {
-      "id": "A7-14:cancel-disconnect",
-      "row": "A7-14",
-      "iteration": 5,
-      "fixture": "mcp-tool",
-      "evidence": "mcp",
-      "expected": "Cancellation/disconnect releases one host leases while a second actual host remains usable."
-    },
-    {
-      "id": "A7-14:process-boundary",
-      "row": "A7-14",
-      "iteration": 5,
-      "fixture": "mcp-tool",
-      "evidence": "mcp",
-      "expected": "Stdout is protocol-only and the adapter launches no shell, CLI or compiler to compute impact."
-    },
-    {
-      "id": "A7-15:reference",
-      "row": "A7-15",
-      "iteration": 6,
-      "fixture": "cross-client",
-      "evidence": "integration",
-      "expected": "Session API, client, spawned CLI and actual MCP agree on the reference project at one input ID."
-    },
-    {
-      "id": "A7-15:chain",
-      "row": "A7-15",
-      "iteration": 6,
-      "fixture": "cross-client",
-      "evidence": "integration",
-      "expected": "The same clients match explicit chain/cycle expectations after a live body edit."
-    },
-    {
-      "id": "A7-15:partial",
-      "row": "A7-15",
-      "iteration": 6,
-      "fixture": "cross-client",
-      "evidence": "integration",
-      "expected": "The same clients preserve partial coverage/all-module fallback; unavailable is never compared as an empty success."
-    },
-    {
-      "id": "A7-16:sparse-latency",
-      "row": "A7-16",
-      "iteration": 6,
-      "fixture": "resource-budgets",
-      "evidence": "measurement",
-      "expected": "Source-shaped sparse 1000-module/10000-edge projection p95 <=15 ms; actual reference/toolkit and an admissible real cross-module fixture worker/service p95 <=15/40 ms; 20 warmups/200 samples."
-    },
-    {
-      "id": "A7-16:dense-latency",
-      "row": "A7-16",
-      "iteration": 6,
-      "fixture": "resource-budgets",
-      "evidence": "measurement",
-      "expected": "Source-shaped dense 1000-module/100000-edge projection p95 <=100 ms; report this separately from actual retained-session capacity and service latency."
-    },
-    {
-      "id": "A7-16:temporary-memory",
-      "row": "A7-16",
-      "iteration": 6,
-      "fixture": "resource-budgets",
-      "evidence": "measurement",
-      "expected": "Additional live graph/query heap <=4 MiB sparse and <=16 MiB dense; after 200 queries settled retained growth <=1 MiB."
-    },
-    {
-      "id": "A7-16:overlap-bounds",
-      "row": "A7-16",
-      "iteration": 6,
-      "fixture": "resource-budgets",
-      "evidence": "measurement",
-      "expected": "No graph maintenance on 1000 updates; concurrent query/update stays serialized, within query deadline, queue and Plan 5 memory limits."
-    },
-    {
-      "id": "A7-16:hook-regression",
-      "row": "A7-16",
-      "iteration": 6,
-      "fixture": "resource-budgets",
-      "evidence": "measurement",
-      "expected": "Plan 5 binding hook budgets pass with no affected queries; overlap latency is reported separately, never hidden as a hook baseline."
-    },
-    {
-      "id": "A7-17:predecessor",
-      "row": "A7-17",
-      "iteration": 6,
-      "fixture": "regressions",
-      "evidence": "gate",
-      "expected": "The completed Plan 5 required acceptance instances and existing Plan 4 lifecycle tests pass."
-    },
-    {
-      "id": "A7-17:project-checks",
-      "row": "A7-17",
-      "iteration": 6,
-      "fixture": "regressions",
-      "evidence": "gate",
-      "expected": "Build, every TypeScript scope, existing tests, toolkit/reference checks, package consumer imports and diff checks pass."
-    },
-    {
-      "id": "A7-17:case-completeness",
-      "row": "A7-17",
-      "iteration": 6,
-      "fixture": "regressions",
-      "evidence": "gate",
-      "expected": "Every case in cases.json has matching fresh evidence at its required level; no missing MCP or measurement case counts as complete."
-    }
-  ]
+ "schemaVersion": "ramify.plan-cases/1",
+ "plan": "iteration-7-affected-modules",
+ "revised": "2026-09-28",
+ "cases": [
+  {
+   "id": "A7-01:chain",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "A->B->C: seed c yields affected [a,b], test [a,b,c], dependency-closure."
+  },
+  {
+   "id": "A7-01:diamond-cycle",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "Edges a->b,a->c,b->d,c->d,d->b and isolated z; seed d yields affected [a,b,c], test [a,b,c,d]; traversal terminates."
+  },
+  {
+   "id": "A7-01:multiple-seeds",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "Seeds [c,z] in the diamond fixture yield one union; z is a seed, not an affected module."
+  },
+  {
+   "id": "A7-01:isolated",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "Seed z with no dependents yields affected [] and test [z]."
+  },
+  {
+   "id": "A7-01:duplicates-order",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "Duplicate seeds and unsorted input yield deduplicated lists in UTF-8 byte order of ID."
+  },
+  {
+   "id": "A7-01:empty",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "No modules and no paths answers with empty lists, coverage and widening reported, after readiness checks."
+  },
+  {
+   "id": "A7-01:root-module",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "The root module (directory \".\") is a valid seed and a valid dependent."
+  },
+  {
+   "id": "A7-01:unknown-module",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "Seeds [a,nope,zzz] fail the whole query as unknown-module with unknownModules [nope,zzz] and no selection."
+  },
+  {
+   "id": "A7-01:invalid-query",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "A non-string seed and more than 4,096 seeds are invalid-query."
+  },
+  {
+   "id": "A7-01:self-edge",
+   "row": "A7-01",
+   "iteration": 1,
+   "fixture": "graph",
+   "evidence": "unit",
+   "expected": "A file importing another file of its own module adds no edge and no dependent."
+  },
+  {
+   "id": "A7-02:inventory-file",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "A path equal to an inventoried source file seeds its owner with basis inventory."
+  },
+  {
+   "id": "A7-02:owned-test-file",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "A path under a module's src/tests/ seeds that module, not a testing dependency."
+  },
+  {
+   "id": "A7-02:declaration-file",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "<dir>/module.ramify seeds that module with basis declaration; the root's module.ramify seeds the root."
+  },
+  {
+   "id": "A7-02:readme",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "<dir>/README.md seeds that module with basis declaration."
+  },
+  {
+   "id": "A7-02:area-fixture",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "A non-inventoried path under a module's area root, such as a fixture, seeds that module with basis area."
+  },
+  {
+   "id": "A7-02:deleted-file",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "A path under a module area that is not on disk and not inventoried seeds that module with basis area; the answer is dependency-closure."
+  },
+  {
+   "id": "A7-02:unowned-root-file",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "package.json resolves to basis none; selection is all-modules with widening [unowned-path]; changedModules and affectedModules keep the known values."
+  },
+  {
+   "id": "A7-02:docs-path",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "docs/notes.md resolves to basis none and widens; the caller filters documentation before asking."
+  },
+  {
+   "id": "A7-02:absolute-rejected",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "An absolute path is invalid-query."
+  },
+  {
+   "id": "A7-02:dotdot-rejected",
+   "row": "A7-02",
+   "iteration": 1,
+   "fixture": "path-seeds",
+   "evidence": "unit",
+   "expected": "A path with a .. segment or a backslash is invalid-query."
+  },
+  {
+   "id": "A7-03:barrel-original",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "A re-export through a barrel adds edges to the barrel owner and to the original's owner."
+  },
+  {
+   "id": "A7-03:star",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "export * from another module adds an edge to that module."
+  },
+  {
+   "id": "A7-03:namespace",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "import * as ns adds an edge to the target owner."
+  },
+  {
+   "id": "A7-03:type-only",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "import type adds an edge; a type-only seed change selects the importer."
+  },
+  {
+   "id": "A7-03:literal-dynamic",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "A literal dynamic import adds an edge."
+  },
+  {
+   "id": "A7-03:side-effect",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "A side-effect import with zero selections adds an edge to the target owner."
+  },
+  {
+   "id": "A7-03:denied",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "A denied import still adds an edge; analysisCheck is failed."
+  },
+  {
+   "id": "A7-03:shim",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "A resource whose owned declaration shim lives in another module adds an edge to the shim owner."
+  },
+  {
+   "id": "A7-03:no-invented-edges",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "Exposure declarations, ancestry and resolution candidates add no edges."
+  },
+  {
+   "id": "A7-03:testing-module",
+   "row": "A7-03",
+   "iteration": 1,
+   "fixture": "source-forms",
+   "evidence": "session",
+   "expected": "A separately declared testing module importing production code is its own node and a dependent of that code."
+  },
+  {
+   "id": "A7-04:nonliteral-dynamic",
+   "row": "A7-04",
+   "iteration": 1,
+   "fixture": "coverage",
+   "evidence": "unit and session",
+   "expected": "A nonliteral dynamic import anywhere makes coverage partial and widens to all-modules with [partial-coverage]."
+  },
+  {
+   "id": "A7-04:unresolved-target",
+   "row": "A7-04",
+   "iteration": 1,
+   "fixture": "coverage",
+   "evidence": "unit and session",
+   "expected": "An import of a deleted file makes coverage partial and widens."
+  },
+  {
+   "id": "A7-04:outside-module-target",
+   "row": "A7-04",
+   "iteration": 1,
+   "fixture": "coverage",
+   "evidence": "unit and session",
+   "expected": "An import of a file outside every module makes coverage partial and widens."
+  },
+  {
+   "id": "A7-04:signature-only-complete",
+   "row": "A7-04",
+   "iteration": 1,
+   "fixture": "coverage",
+   "evidence": "unit and session",
+   "expected": "A project whose only notes are signature-inferred or unresolved-original keeps coverage complete and dependency-closure."
+  },
+  {
+   "id": "A7-04:resource-limit",
+   "row": "A7-04",
+   "iteration": 1,
+   "fixture": "coverage",
+   "evidence": "unit and session",
+   "expected": "An edge count over the limit is resource-limit, never a truncated list."
+  },
+  {
+   "id": "A7-05:edit-changes-answer",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "After an edit adds an import from d to c and a revision publishes, seed c includes d; before it, it does not."
+  },
+  {
+   "id": "A7-05:stale-sequence",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "A sequence other than the current one is unavailable invalid-revision."
+  },
+  {
+   "id": "A7-05:invalid-current",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "An invalid current revision is unavailable invalid-current; the previous valid answer is not returned."
+  },
+  {
+   "id": "A7-05:missing-facts",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "A session without access interpretation answers missing-facts."
+  },
+  {
+   "id": "A7-05:warm-after-release",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "After releaseCompiler the query still answers from retained facts."
+  },
+  {
+   "id": "A7-05:no-disk-or-report",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "A ready query performs no source read, compiler call or report() projection, observed through the existing test seams."
+  },
+  {
+   "id": "A7-05:worker-round-trip",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "The worker fixture answers affected with the same result as the in-process engine."
+  },
+  {
+   "id": "A7-05:worker-cancel",
+   "row": "A7-05",
+   "iteration": 1,
+   "fixture": "session",
+   "evidence": "session and worker",
+   "expected": "A cancelled worker request returns cancelled and leaves the session usable."
+  },
+  {
+   "id": "A7-06:covering-revision",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "A published ready revision answers with that revision, freshness record and result."
+  },
+  {
+   "id": "A7-06:superseded",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "A session answer naming another sequence is superseded, never relabeled."
+  },
+  {
+   "id": "A7-06:cold-wait-false",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "A cold context with wait false answers cold."
+  },
+  {
+   "id": "A7-06:cold-wait-true",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "A cold context with wait true opens and answers."
+  },
+  {
+   "id": "A7-06:invalid-current",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "An invalid current input answers unavailable and never from lastValid."
+  },
+  {
+   "id": "A7-06:deadline",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "An unmet deadline answers deadline-exceeded with elapsed time."
+  },
+  {
+   "id": "A7-06:cancel-lease",
+   "row": "A7-06",
+   "iteration": 2,
+   "fixture": "contexts",
+   "evidence": "quick",
+   "expected": "Cancellation answers cancelled and releases the lease."
+  },
+  {
+   "id": "A7-07:capability",
+   "row": "A7-07",
+   "iteration": 2,
+   "fixture": "daemon",
+   "evidence": "quick",
+   "expected": "The welcome lists affected; the connection method returns unsupported-operation when absent."
+  },
+  {
+   "id": "A7-07:validation",
+   "row": "A7-07",
+   "iteration": 2,
+   "fixture": "daemon",
+   "evidence": "quick",
+   "expected": "Malformed params (missing token, non-array modules, negative deadline) are invalid-request."
+  },
+  {
+   "id": "A7-07:unknown-module-domain",
+   "row": "A7-07",
+   "iteration": 2,
+   "fixture": "daemon",
+   "evidence": "quick",
+   "expected": "An unknown module ID is an unavailable outcome, not a service error."
+  },
+  {
+   "id": "A7-07:equivalence-with-session",
+   "row": "A7-07",
+   "iteration": 2,
+   "fixture": "daemon",
+   "evidence": "quick",
+   "expected": "The daemon answer equals the retained session's answer at the same input identity."
+  },
+  {
+   "id": "A7-08:round-trip",
+   "row": "A7-08",
+   "iteration": 2,
+   "fixture": "ipc",
+   "evidence": "ipc",
+   "expected": "A real client over the socket receives the same answered document as the direct binding."
+  },
+  {
+   "id": "A7-08:unsupported-peer",
+   "row": "A7-08",
+   "iteration": 2,
+   "fixture": "ipc",
+   "evidence": "ipc",
+   "expected": "A peer without the capability yields a capability error."
+  },
+  {
+   "id": "A7-08:disconnect",
+   "row": "A7-08",
+   "iteration": 2,
+   "fixture": "ipc",
+   "evidence": "ipc",
+   "expected": "A disconnect during the request releases the lease and leaves the daemon usable."
+  },
+  {
+   "id": "A7-09:positional-ids",
+   "row": "A7-09",
+   "iteration": 3,
+   "fixture": "cli-arguments",
+   "evidence": "unit",
+   "expected": "ramify affected a b parses modules [a,b]."
+  },
+  {
+   "id": "A7-09:path-repeat",
+   "row": "A7-09",
+   "iteration": 3,
+   "fixture": "cli-arguments",
+   "evidence": "unit",
+   "expected": "--path x --path y parses paths [x,y] alongside module IDs."
+  },
+  {
+   "id": "A7-09:no-seed",
+   "row": "A7-09",
+   "iteration": 3,
+   "fixture": "cli-arguments",
+   "evidence": "unit",
+   "expected": "ramify affected with no seed is an invocation error naming the requirement."
+  },
+  {
+   "id": "A7-09:unknown-flag",
+   "row": "A7-09",
+   "iteration": 3,
+   "fixture": "cli-arguments",
+   "evidence": "unit",
+   "expected": "--since and --changed are unsupported arguments for affected."
+  },
+  {
+   "id": "A7-09:batch-with-format",
+   "row": "A7-09",
+   "iteration": 3,
+   "fixture": "cli-arguments",
+   "evidence": "unit",
+   "expected": "--batch --format json parses both."
+  },
+  {
+   "id": "A7-10:json-document",
+   "row": "A7-10",
+   "iteration": 3,
+   "fixture": "cli-resident",
+   "evidence": "quick",
+   "expected": "--format json prints one ramify.affected-cli/1 document with root, mode resident, revision and selection."
+  },
+  {
+   "id": "A7-10:human",
+   "row": "A7-10",
+   "iteration": 3,
+   "fixture": "cli-resident",
+   "evidence": "quick",
+   "expected": "Human output lists root, mode, revision, selection, each path with module and basis, and the three module lists."
+  },
+  {
+   "id": "A7-10:widened-exit-0",
+   "row": "A7-10",
+   "iteration": 3,
+   "fixture": "cli-resident",
+   "evidence": "quick",
+   "expected": "An all-modules answer exits 0 and names its widening reasons."
+  },
+  {
+   "id": "A7-10:unknown-module-exit-1",
+   "row": "A7-10",
+   "iteration": 3,
+   "fixture": "cli-resident",
+   "evidence": "quick",
+   "expected": "An unknown module ID exits 1 with the unknown set."
+  },
+  {
+   "id": "A7-10:unavailable-exit-2",
+   "row": "A7-10",
+   "iteration": 3,
+   "fixture": "cli-resident",
+   "evidence": "quick",
+   "expected": "A cold or superseded outcome exits 2 with the ramify.cli/1 diagnostic form."
+  },
+  {
+   "id": "A7-10:cancel-130",
+   "row": "A7-10",
+   "iteration": 3,
+   "fixture": "cli-resident",
+   "evidence": "quick",
+   "expected": "SIGINT exits 130 and releases the context."
+  },
+  {
+   "id": "A7-11:reference-json",
+   "row": "A7-11",
+   "iteration": 3,
+   "fixture": "cli-batch",
+   "evidence": "process",
+   "expected": "ramify affected --batch on the reference project prints a document with mode batch and a nonempty inputId."
+  },
+  {
+   "id": "A7-11:resident-batch-agree",
+   "row": "A7-11",
+   "iteration": 3,
+   "fixture": "cli-batch",
+   "evidence": "process",
+   "expected": "Resident and batch selections on the same unchanged reference project are equal except mode and sequence."
+  },
+  {
+   "id": "A7-11:invalid-project",
+   "row": "A7-11",
+   "iteration": 3,
+   "fixture": "cli-batch",
+   "evidence": "process",
+   "expected": "--batch on a directory without a root description exits 1."
+  },
+  {
+   "id": "A7-11:compiled-child",
+   "row": "A7-11",
+   "iteration": 3,
+   "fixture": "cli-batch",
+   "evidence": "process",
+   "expected": "The compiled client runs the batch form in its Node child and prints the same document."
+  },
+  {
+   "id": "A7-12:toolkit-path-seed",
+   "row": "A7-12",
+   "iteration": 4,
+   "fixture": "real",
+   "evidence": "manual, recorded",
+   "expected": "ramify affected --path subs/analysis/src/affected-query.ts on the toolkit selects analysis, daemon, contexts, cli and root, recorded with the exact output."
+  },
+  {
+   "id": "A7-12:toolkit-module-seed",
+   "row": "A7-12",
+   "iteration": 4,
+   "fixture": "real",
+   "evidence": "manual, recorded",
+   "expected": "ramify affected analysis on the toolkit equals the path-seeded answer."
+  },
+  {
+   "id": "A7-12:toolkit-unowned",
+   "row": "A7-12",
+   "iteration": 4,
+   "fixture": "real",
+   "evidence": "manual, recorded",
+   "expected": "ramify affected --path package.json widens to all modules with unowned-path."
+  },
+  {
+   "id": "A7-12:agent-path-seed",
+   "row": "A7-12",
+   "iteration": 4,
+   "fixture": "real",
+   "evidence": "manual, recorded",
+   "expected": "A path seed in ramify-agent answers dependency-closure with complete coverage despite its signature notes."
+  },
+  {
+   "id": "A7-12:agent-batch",
+   "row": "A7-12",
+   "iteration": 4,
+   "fixture": "real",
+   "evidence": "manual, recorded",
+   "expected": "ramify affected --batch on ramify-agent answers and records its elapsed time."
+  },
+  {
+   "id": "A7-12:timing-sample",
+   "row": "A7-12",
+   "iteration": 4,
+   "fixture": "real",
+   "evidence": "manual, recorded",
+   "expected": "Five resident invocations per project and one batch invocation per project are recorded with elapsed times."
+  },
+  {
+   "id": "A7-13:check-self",
+   "row": "A7-13",
+   "iteration": 4,
+   "fixture": "gate",
+   "evidence": "gate",
+   "expected": "npm run check:self passes on the built execution checkout."
+  },
+  {
+   "id": "A7-13:type-check",
+   "row": "A7-13",
+   "iteration": 4,
+   "fixture": "gate",
+   "evidence": "gate",
+   "expected": "npm run type-check passes."
+  },
+  {
+   "id": "A7-13:audit-request",
+   "row": "A7-13",
+   "iteration": 4,
+   "fixture": "gate",
+   "evidence": "gate",
+   "expected": "ramify-audit audit --request audit/plan7-affected-modules.request.json passes and its run reference is recorded."
+  }
+ ]
 }

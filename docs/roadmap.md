@@ -198,7 +198,7 @@ retained session and executes before the separately reviewed Plan 3 successor.
 | 2E. Self-sufficient diagnostics | Every error, warning, analysis limit and not-checked reply of `ramify check` explains itself in its own text and fields, so a consumer relays it verbatim and keeps no per-code wording. No allowed or denied outcome changes. | Plan 2's resident check. Independent of Plan 2D. | [Detailed Plan 2E](plans/iteration-2e-diagnostic-messages/main-plan.md), draft awaiting contract review. |
 | [3. Understand a project](#plan-3-project-inspection) | Deferred: an `explain` query for why a named original is or is not available from a place, with missing exposure hops and the specifier to write; usage, staleness and an architect query as separable later parts. | Plans 2A and 2D. | [Successor draft](plans/iteration-3-inspection-successor/main-plan.md), high level, awaiting its review decisions. The pre-2A [Detailed Plan 3](plans/iteration-3-project-inspection/main-plan.md) is preserved as input and is not executed. |
 | [4. Use Ramify through MCP](#plan-4-mcp-access) | A host-launched stdio adapter exposes the daemon's checks and inspection. | Plan 2's service and Plan 3's queries for this deliverable's full scope. | Brief below; detailed plan not yet written. |
-| [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing through API, CLI and MCP. | Plan 5's retained session and contexts; Plan 4's stdio provider for MCP. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), draft awaiting contract review. |
+| [7. Find modules affected by changes](#plan-7-affected-modules) | An on-demand reverse dependency query uses retained facts to select modules for testing from changed paths or module IDs, through API, daemon client and CLI, with a batch form for prepared checkouts. | Plan 5's retained session and contexts. | [Detailed Plan 7](plans/iteration-7-affected-modules/main-plan.md), revised 2026-09-28; implementation in progress on `feat/plan7-affected-modules`. MCP deferred. |
 | [8. Require signature companions](#plan-8-signature-companions) | Implemented: a module exposing a symbol must make the project symbols named in its declared signature type-available wherever the exposure makes it visible. Ramify reports the missing exposure at the exposure statement and never supplies it. | Plans 1 and 5. | [Detailed Plan 8](plans/iteration-8-signature-companions/main-plan.md), implemented on 2026-09-21 on branch `feat/plan8-signature-companions`, not merged to `main`; its [completion report](plans/iteration-8-signature-companions/iterations/iteration5-results.md) records the evidence, the budget outcomes and the remaining gaps, and [iteration 6](plans/iteration-8-signature-companions/iterations/iteration6-results.md) meets the hook-latency and retained-fact budgets by identity accounting and a shared model. [Iteration 7](plans/iteration-8-signature-companions/iterations/iteration7-results.md) makes the reference example declare its signatures; the Plan 1 gate passes 274 of 308, and the remaining failures come from fixture F's `value` and the toolkit's own notes. |
 | [6. Explore visually](#plan-6-project-explorer) | Complete: a standalone live explorer through a separate tRPC web process. | Plan 2's published report and lightweight client. | [Detailed Plan 6](plans/iteration-6-project-explorer/main-plan.md) and [completion report](plans/iteration-6-project-explorer/iterations/iteration7-results.md). |
 | [6A. Show only Ramify-module imports](#plan-6a-module-only-project-explorer) | Complete: the explorer shows only Ramify modules and cross-module imports, while analysis retains external facts. | Completed Plan 6. | [Detailed Plan 6A](plans/iteration-6a-module-only-project-explorer/main-plan.md) and [completion report](plans/iteration-6a-module-only-project-explorer/iterations/iteration4-results.md). |
@@ -1095,9 +1095,15 @@ remains on its ordinary published project view.
 ## Plan 7: Affected modules
 
 **Detailed artifact:** [Plan 7](plans/iteration-7-affected-modules/main-plan.md),
-a draft with its [live-data assessment](plans/iteration-7-affected-modules/data-assessment.md),
-[contracts](plans/iteration-7-affected-modules/contracts.md) and
-[acceptance matrix](plans/iteration-7-affected-modules/acceptance.md).
+revised on 2026-09-28 after Plan 5's completion, with its
+[contracts](plans/iteration-7-affected-modules/contracts.md),
+[ownership package](plans/iteration-7-affected-modules/owners.md) and
+[acceptance matrix](plans/iteration-7-affected-modules/acceptance.md); the
+2026-09-12 [live-data assessment](plans/iteration-7-affected-modules/data-assessment.md)
+is historical evidence. The revision adds path seeds resolved through the
+inventory, a `--batch` form for prepared checkouts, global coverage widening,
+and defers MCP, the evidence validator and the measurement gate. Commit-keyed
+reuse of analysis data is a [deferred optimization](architecture/optimization.md#deferred-commit-keyed-reuse-of-analysis-data).
 
 **Working outcome.** Given changed module IDs, traverse the reverse module
 dependency graph and return every transitive dependent, together with the
