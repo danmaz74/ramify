@@ -1,0 +1,200 @@
+{
+  "protocolVersion": 1,
+  "requestId": "plan16-capability-architect",
+  "repositoryPath": ".",
+  "source": {
+    "kind": "existing-commit",
+    "revision": "HEAD"
+  },
+  "checks": [
+    {
+      "id": "patch-integrity",
+      "name": "Committed patch integrity",
+      "description": "Reject whitespace errors in the committed patch",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "git-diff-check",
+            "cmd": "git",
+            "args": [
+              "diff",
+              "--check",
+              "5a1934aa844c5ab95013653f15c7aeb422690b13",
+              "HEAD"
+            ],
+            "parser": "none",
+            "timeoutMs": 30000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record"
+    },
+    {
+      "id": "agent-typecheck",
+      "name": "Ramify agent type checks",
+      "description": "Type-check the harness, web package and scripts",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "agent-typecheck",
+            "cmd": "npm",
+            "args": [
+              "--prefix",
+              "ramify-agent",
+              "run",
+              "type-check"
+            ],
+            "parser": "none",
+            "timeoutMs": 180000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "patch-integrity"
+      ]
+    },
+    {
+      "id": "agent-tests",
+      "name": "Ramify agent regression suite",
+      "description": "Run the complete four-worker Ramify agent suite",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "agent-vitest",
+            "cmd": "npm",
+            "args": [
+              "--prefix",
+              "ramify-agent",
+              "test",
+              "--",
+              "--maxWorkers=4"
+            ],
+            "parser": "vitest",
+            "timeoutMs": 600000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "agent-typecheck"
+      ]
+    },
+    {
+      "id": "agent-structure",
+      "name": "Ramify agent structural check",
+      "description": "Run the agent package's batch Ramify self-check",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "agent-check-self",
+            "cmd": "npm",
+            "args": [
+              "--prefix",
+              "ramify-agent",
+              "run",
+              "check:self"
+            ],
+            "parser": "none",
+            "timeoutMs": 180000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "agent-typecheck"
+      ]
+    },
+    {
+      "id": "parent-daemon-test",
+      "name": "Parent daemon regression",
+      "description": "Run the dependency-diagram daemon case in the parent package",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "dependency-diagram-daemon",
+            "cmd": "npm",
+            "args": [
+              "test",
+              "--",
+              "src/tests/dependency-diagram-daemon.test.ts",
+              "--maxWorkers=1"
+            ],
+            "parser": "vitest",
+            "timeoutMs": 120000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "patch-integrity"
+      ]
+    },
+    {
+      "id": "agent-web-build",
+      "name": "Ramify agent web production build",
+      "description": "Build the web consumer of harness projections",
+      "scope": "both",
+      "category": "deterministic",
+      "executor": {
+        "kind": "command",
+        "commands": [
+          {
+            "name": "agent-web-build",
+            "cmd": "npm",
+            "args": [
+              "--prefix",
+              "ramify-agent",
+              "run",
+              "build:web"
+            ],
+            "parser": "none",
+            "timeoutMs": 180000
+          }
+        ],
+        "continueOnFailure": true
+      },
+      "onFailure": "record",
+      "dependsOn": [
+        "agent-typecheck"
+      ]
+    }
+  ],
+  "selector": {
+    "id": "full",
+    "version": "1",
+    "config": {}
+  },
+  "universeId": "ramify-agent-plan16",
+  "coverageClaim": {
+    "scope": "ramify-agent and parent daemon boundary",
+    "change": "plan16-capability-architect",
+    "validation": "revision-bound full regression, structural checks, typecheck and web build; browser and live model witnesses recorded separately"
+  },
+  "workspaceMode": "existing-worktree",
+  "registeredExecutorIds": [],
+  "metadata": {
+    "plan": "ramify-agent/docs/plans/16-capability-architect/main-plan.md",
+    "contractAppendix": "ramify-agent/docs/plans/16-capability-architect/contract-appendix.md"
+  }
+}
