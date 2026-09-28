@@ -1136,7 +1136,7 @@ Git diff discovery, historical/deleted-module impact, test execution and
 visualization remain outside this deliverable.
 
 **Completion.** Implemented on 2026-09-28 on `feat/plan7-affected-modules`,
-not merged: the plan revision `87b806d4`; implementation `5e2504ba`,
+not merged to `main`: the plan revision `87b806d4`; implementation `5e2504ba`,
 `33348a73` and `0629ccb1`; review fixes `3b017fbf`, `7ae7148f` and
 `83e9ed13`; real runs `76293aa3`; and the gate fix `1339930e`. The audit passed
 at `1339930e` with run ref `refs/audited/runs/2026-09-28T09-26-20Z-1339930e0`.
