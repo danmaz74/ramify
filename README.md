@@ -81,10 +81,27 @@ specification](docs/architecture/materialized-api-view.spec.md) and [Plan 2A
 completion report](docs/plans/iteration-2a-materialized-api-view/iterations/iteration10-results.md)
 record its scope, measured limits and the one outstanding macOS platform gap.
 
+## Install
+
+ramify.ts is published to the registry at https://npm.braimax.com as `ramify.ts`.
+Point npm at that registry in the consuming package's `.npmrc`, then install:
+
+```ini
+registry=https://npm.braimax.com
+```
+
+```sh
+npm install ramify.ts
+```
+
+The package does not contain the Bun-compiled client executable, so its
+`ramify` launcher runs the Node entry `node dist/src/cli-entry.js`.
+
 ## Check a project
 
-Build this package with `npm run build`, then install it locally with
-`npm install /path/to/ramify` in a consuming package. The build also compiles a
+To use a checkout instead of the published package, build it with
+`npm run build`, then install it locally with `npm install /path/to/ramify`
+in a consuming package. The build also compiles a
 client executable for the host with Bun, a pinned devDependency. The `ramify`
 command, the `dist/src/ramify` launcher, runs that executable, or the Node entry
 `node dist/src/cli-entry.js` where none was built. It is available through npm's
@@ -226,3 +243,18 @@ CSS class names, so switching site frameworks stays mechanical config work.
 ESM with `.js` extensions in source imports, strict TypeScript, vitest for
 unit tests. This package intentionally does not participate in the host
 repository's build, test, audit, or dependency-rule tooling.
+
+## Release
+
+1. Bump `version` in `package.json` and the root entries of `package-lock.json`.
+2. Commit the change.
+3. Audit that commit with `audit/plan7-affected-modules.request.json`, or the
+   request that succeeds it:
+   `ramify-audit audit --request audit/plan7-affected-modules.request.json --cwd . --json`.
+4. From a clean checkout of the audited commit, run `npm publish`. Its
+   `prepublishOnly` script runs `npm run build`, and `publishConfig` sends the
+   package to https://npm.braimax.com.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

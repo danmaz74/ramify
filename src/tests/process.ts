@@ -1,10 +1,15 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 export const compiledEntry = join(repositoryRoot, 'dist/src/cli-entry.js');
+/** The checkout's package version, which endpoint selection and the daemon entry verify. */
+export const packageVersion = (JSON.parse(readFileSync(join(repositoryRoot, 'package.json'), 'utf8')) as { version: string }).version;
+/** The engine identity the installed entries derive from that version. */
+export const packageEngine = `ramify.ts@${packageVersion}+typescript@7.0.2`;
 const preload = fileURLToPath(new URL('./process-probe.mjs', import.meta.url));
 export interface TraceEvent {
   readonly pid: number;

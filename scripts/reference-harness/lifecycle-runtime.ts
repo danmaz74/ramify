@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { selectEndpoint, readDaemonRecord } from '../../subs/daemon/src/discovery.js';
 import { processAlive, withProcessScope, waitForProcessCondition } from '../../src/tests/lifecycle-process.js';
 import type { LiveProcess, ProcessScope } from '../../src/tests/lifecycle-process.js';
+import { packageEngine, packageVersion } from '../../src/tests/process.js';
 import type { ContextToken } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import type { DaemonRecord, EndpointSelection } from '../../subs/daemon/src/interfaces/daemon.js';
 import { command } from './processes.js';
@@ -37,10 +38,10 @@ export async function withLifecycleRuntime<T>(budgets: Readonly<Record<string, n
     assert.equal(installed.code, 0, installed.stderr);
     const executable = join(installation, 'node_modules/.bin/ramify');
     return await withProcessScope(async scope => {
-      const endpoint = await selectEndpoint({ packageRoot: repositoryRoot, version: '0.0.0', endpointDirectory: scope.endpointDirectory });
+      const endpoint = await selectEndpoint({ packageRoot: repositoryRoot, version: packageVersion, endpointDirectory: scope.endpointDirectory });
       const children: LifecycleClient[] = [];
       const foreground = scope.start({ cwd: repositoryRoot, args: [join(repositoryRoot, 'dist/src/daemon-entry.js'), '--endpoint-dir', endpoint.directory,
-        '--build-key', endpoint.buildKey, '--version', '0.0.0', '--engine', 'ramify.ts@0.0.0+typescript@7.0.2', '--budgets', JSON.stringify(budgets)], timeoutMs: 180_000 });
+        '--build-key', endpoint.buildKey, '--version', packageVersion, '--engine', packageEngine, '--budgets', JSON.stringify(budgets)], timeoutMs: 180_000 });
       await waitForProcessCondition('real daemon startup record', 10_000, async () => {
         if (foreground.exit) throw new Error(`Daemon exited during startup: ${foreground.stderr}`);
         return (await readDaemonRecord(endpoint))?.state === 'running';

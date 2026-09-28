@@ -10,11 +10,11 @@ import type { DaemonRecord, EndpointSelection, ServiceConnection } from '../../s
 import { processAlive, waitForProcessCondition, withProcessScope } from '../../src/tests/lifecycle-process.js';
 import type { ProcessScope, LiveProcess } from '../../src/tests/lifecycle-process.js';
 import { repositoryRoot } from './plan.js';
+import { packageEngine as engine, packageVersion as version } from '../../src/tests/process.js';
 import { referenceRoot } from './fixtures/plan2/reference.js';
 import { archiveObservation, recordObservation, traceEvidence } from './observations.js';
 import type { Assertions, InstanceHandler } from './runner.js';
 
-const version = '0.0.0', engine = 'ramify.ts@0.0.0+typescript@7.0.2';
 const daemonEntry = join(repositoryRoot, 'dist/src/daemon-entry.js');
 const clientEntry = pathToFileURL(join(repositoryRoot, 'dist/subs/daemon/src/client-entry.js')).href;
 const options = (directory: string) => ({ endpointDirectory: directory, client: { name: 'reference-process', version }, engine,

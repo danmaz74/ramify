@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { connectDaemon } from '../../subs/daemon/src/connect-daemon.js';
 import { readDaemonRecord, selectEndpoint } from '../../subs/daemon/src/discovery.js';
 import { fixture } from './fixture.js';
-import { repositoryRoot } from './process.js';
+import { packageEngine, packageVersion, repositoryRoot } from './process.js';
 
 const entry = join(repositoryRoot, 'dist/src/explorer-entry.js');
 const cleanups: (() => Promise<void>)[] = [];
@@ -62,11 +62,11 @@ async function endpointDirectory(): Promise<string> {
 
 /** Stop the daemon the server started in the isolated endpoint, and wait for its process to exit. */
 async function stopIsolatedDaemon(directory: string): Promise<void> {
-  const endpoint = await selectEndpoint({ packageRoot: repositoryRoot, version: '0.0.0', endpointDirectory: directory });
+  const endpoint = await selectEndpoint({ packageRoot: repositoryRoot, version: packageVersion, endpointDirectory: directory });
   const record = await readDaemonRecord(endpoint);
   if (!record || record.state !== 'running') return;
-  const connected = await connectDaemon({ start: 'never', client: { name: 'explorer-process-test', version: '0.0.0' },
-    engine: 'ramify.ts@0.0.0+typescript@7.0.2', daemonEntry: null, packageRoot: repositoryRoot, endpointDirectory: directory });
+  const connected = await connectDaemon({ start: 'never', client: { name: 'explorer-process-test', version: packageVersion },
+    engine: packageEngine, daemonEntry: null, packageRoot: repositoryRoot, endpointDirectory: directory });
   if (connected.status === 'connected') {
     await connected.connection.stopDaemon({ instanceId: connected.connection.daemon.instance.instanceId }).catch(() => {});
     await connected.connection.close().catch(() => {});
@@ -97,7 +97,7 @@ describe('RS10: resident explorer server process', () => {
     expect(await status(port, '/health/ready', `127.0.0.1:${port}`)).toBe(200);
     expect(await status(port, '/health/ready', `example.test:${port}`)).toBe(403);
     // The server started the isolated daemon itself with `if-needed`.
-    const daemon = await readDaemonRecord(await selectEndpoint({ packageRoot: repositoryRoot, version: '0.0.0', endpointDirectory: directory }));
+    const daemon = await readDaemonRecord(await selectEndpoint({ packageRoot: repositoryRoot, version: packageVersion, endpointDirectory: directory }));
     expect(daemon).toMatchObject({ state: 'running' });
     const served = await fetch(`http://127.0.0.1:${port}/trpc/serverStatus`);
     expect(await served.json()).toMatchObject({ result: { data: { root, binding: 'ready', message: null, daemonPid: daemon!.pid } } });
@@ -117,7 +117,7 @@ describe('RS10: resident explorer server process', () => {
     expect(server.stderr).toContain('EADDRINUSE');
     expect((await readdir(directory)).filter(name => /^explorer-.*\.json$/.test(name))).toEqual([]);
     // The listener fails before the binding connects, so no daemon was started.
-    expect(await readDaemonRecord(await selectEndpoint({ packageRoot: repositoryRoot, version: '0.0.0', endpointDirectory: directory }))).toBeNull();
+    expect(await readDaemonRecord(await selectEndpoint({ packageRoot: repositoryRoot, version: packageVersion, endpointDirectory: directory }))).toBeNull();
   }), 60_000);
 
   it('rejects the removed arguments', async () => {

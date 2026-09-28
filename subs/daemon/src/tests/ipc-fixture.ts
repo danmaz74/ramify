@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createConnection, type Socket } from 'node:net';
 import { join } from 'node:path';
@@ -13,6 +14,10 @@ import type { AnalysisDriver } from '../context-types.js';
 import type { DependencyDiagramRunner } from '../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ServiceCapability } from '../../../../src/interfaces/service.js';
 
+/** The checkout's package version, which endpoint selection verifies, and the engine identity derived from it. */
+export const packageVersion = (JSON.parse(readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
+export const packageEngine = `ramify.ts@${packageVersion}+typescript@7.0.2`;
+
 export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicClient = false, driver?: AnalysisDriver,
   dependencyDiagrams?: DependencyDiagramRunner, capabilities?: readonly ServiceCapability[]) {
   const directory = await mkdtemp('/tmp/ri-');
@@ -22,8 +27,8 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
   await writeFile(join(project, 'README.md'), '# Example\n\nAn isolated IPC fixture.\n');
   await writeFile(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', types: [] }, include: ['src/**/*.ts'] }));
   await writeFile(join(project, 'src/index.ts'), 'export const value = 1;\n');
-  const selected = publicClient ? await selectEndpoint({ packageRoot: process.cwd(), version: '0.0.0', endpointDirectory: directory }) : undefined;
-  const instance = selected ? { instanceId: randomUUID(), pid: process.pid, version: '0.0.0', engine: 'ramify.ts@0.0.0+typescript@7.0.2', buildKey: selected.buildKey } : undefined;
+  const selected = publicClient ? await selectEndpoint({ packageRoot: process.cwd(), version: packageVersion, endpointDirectory: directory }) : undefined;
+  const instance = selected ? { instanceId: randomUUID(), pid: process.pid, version: packageVersion, engine: packageEngine, buildKey: selected.buildKey } : undefined;
   const environment = await createQuickEnvironment({}, { instance, driver, ...(dependencyDiagrams ? { dependencyDiagrams } : {}) });
   const buildKey = environment.service.instance.buildKey;
   const prefix = join(directory, `daemon-${buildKey}`);
@@ -44,13 +49,13 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
     const closed = new Promise<void>(resolve => socket.once('close', () => { decoder.dispose(); sockets.delete(socket); resolve(); }));
     await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
     if (hello) socket.write(encodeMessage({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', buildKey,
-      engine: environment.service.instance.engine, client: { name: 'ipc-test', version: '0.0.0' } } }));
+      engine: environment.service.instance.engine, client: { name: 'ipc-test', version: packageVersion } } }));
     return { socket, messages, closed, send(message: WireMessage) { socket.write(encodeMessage(message)); } };
   }
   async function connect() {
     if (publicClient) {
       const result = await connectDaemon({ start: 'never', daemonEntry: null, endpointDirectory: directory,
-        client: { name: 'ipc-test', version: '0.0.0' }, engine: environment.service.instance.engine });
+        client: { name: 'ipc-test', version: packageVersion }, engine: environment.service.instance.engine });
       if (result.status !== 'connected') throw new Error(`IPC connect failed: ${JSON.stringify(result)}`);
       const connection = result.connection;
       // Retain the same cleanup protocol while exposing the public API to callers.
@@ -58,7 +63,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
       return connection;
     }
     const connection = await openSocketConnection(endpoint, { start: 'never', daemonEntry: null,
-      client: { name: 'ipc-test', version: '0.0.0' }, engine: environment.service.instance.engine }, 2000, () => {});
+      client: { name: 'ipc-test', version: packageVersion }, engine: environment.service.instance.engine }, 2000, () => {});
     connections.add(connection); return Object.assign(connection, { recover: async () => ({ status: 'unavailable' as const, attempts: 0, reason: { kind: 'closed' as const } }) });
   }
   const params = { project: { cwd: project, root: project, scope: 'whole-project' as const, configuration: 'discover' as const },

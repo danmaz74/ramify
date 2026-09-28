@@ -6,12 +6,12 @@ import { connectDaemon } from '../connect-daemon.js';
 import { selectEndpoint } from '../discovery.js';
 import { writeDaemonRecord } from '../records.js';
 import { createFrameDecoder, encodeMessage } from '../codec.js';
-import { ipcFixture } from './ipc-fixture.js';
+import { ipcFixture, packageEngine, packageVersion } from './ipc-fixture.js';
 import { eventually } from './socket-fixture.js';
 
 const dispose: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of dispose.splice(0).reverse()) await cleanup(); });
-const options = { client: { name: 'connect-test', version: '0.0.0' }, engine: 'ramify.ts@0.0.0+typescript@7.0.2', start: 'never' as const, daemonEntry: null };
+const options = { client: { name: 'connect-test', version: packageVersion }, engine: packageEngine, start: 'never' as const, daemonEntry: null };
 
 describe('public lightweight connector lifecycle', () => {
   it('returns not-running without starting when no record exists', async () => {
@@ -71,7 +71,7 @@ describe('public lightweight connector lifecycle', () => {
   });
   it('reports a legacy empty lock as unavailable without guessing ownership', async () => {
     const directory = await mkdtemp('/tmp/rc-'); dispose.push(() => rm(directory, { recursive: true, force: true }));
-    const endpoint = await selectEndpoint({ packageRoot: process.cwd(), version: '0.0.0', endpointDirectory: directory });
+    const endpoint = await selectEndpoint({ packageRoot: process.cwd(), version: packageVersion, endpointDirectory: directory });
     await writeFile(endpoint.lock, '', { mode: 0o600 });
     expect(await connectDaemon({ ...options, endpointDirectory: directory })).toMatchObject({
       status: 'unavailable', attempts: 0, reason: { kind: 'failure', message: 'Empty legacy daemon start lock; ownership cannot be established' },

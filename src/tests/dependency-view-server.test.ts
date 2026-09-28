@@ -9,11 +9,9 @@ import { connectDaemon } from '../../subs/daemon/src/connect-daemon.js';
 import { readDaemonRecord, selectEndpoint } from '../../subs/daemon/src/discovery.js';
 import type { ExplorerRouter } from '../../subs/service-api/src/router.js';
 import type { TraceEvent } from './process.js';
-import { repositoryRoot } from './process.js';
+import { packageEngine as engine, packageVersion as version, repositoryRoot } from './process.js';
 import { processAlive, waitForProcessCondition, withProcessScope } from './lifecycle-process.js';
 
-const version = '0.0.0';
-const engine = `ramify.ts@${version}+typescript@7.0.2`;
 const example = 'examples/collection-review';
 /** Compiler and analysis runtime: any analysis module, the TypeScript packages or a compiler helper. */
 const analysisRuntime = /\/subs\/analysis\/|\/node_modules\/typescript\/|\/node_modules\/@typescript\/|compiler-helper|dependency-analyzer/;

@@ -7,6 +7,7 @@ import { ipcFixture } from '../../subs/daemon/src/tests/ipc-fixture.js';
 import { eventually } from '../../subs/daemon/src/tests/socket-fixture.js';
 import type { CheckDocument } from '../../subs/cli/src/interfaces/cli.js';
 import type { CheckParams } from '../../src/interfaces/service.js';
+import { packageEngine, packageVersion } from '../../src/tests/process.js';
 import type { TraceEvent } from '../../src/tests/process.js';
 import { waitForProcessCondition } from '../../src/tests/lifecycle-process.js';
 import { materializeSynthetic } from '../measurements/materialize.js';
@@ -29,8 +30,8 @@ type HookEvent = TraceEvent & { readonly threadId?: number; readonly params?: Ch
 const trace = async (p: SequenceProcess) => await readTrace(p.traceFile) as HookEvent[];
 
 async function connection(p: SequenceProcess) {
-  const result = await connectDaemon({ endpointDirectory: p.endpoint, client: { name: 'hook-evidence', version: '0.0.0' },
-    engine: 'ramify.ts@0.0.0+typescript@7.0.2', daemonEntry: join(repositoryRoot, 'dist/src/daemon-entry.js'), start: 'never' });
+  const result = await connectDaemon({ endpointDirectory: p.endpoint, client: { name: 'hook-evidence', version: packageVersion },
+    engine: packageEngine, daemonEntry: join(repositoryRoot, 'dist/src/daemon-entry.js'), start: 'never' });
   if (result.status !== 'connected') throw new Error(JSON.stringify(result));
   return result.connection;
 }

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { cliProcess, repositoryRoot } from '../../src/tests/process.js';
+import { cliProcess, packageEngine, packageVersion, repositoryRoot } from '../../src/tests/process.js';
 import { waitForProcessCondition } from '../../src/tests/lifecycle-process.js';
 import { connectDaemon } from '../../subs/daemon/src/connect-daemon.js';
 import { withResident, reference } from './process-cases.js';
@@ -59,8 +59,8 @@ add('I2-23:watch-no-fallback', assertions => fault(async (directory, project, en
 add('I2-23:client-no-fallback', assertions => fault(async (directory, _project, entry) => {
   const script = join(directory, 'client.mjs');
   await writeFile(script, `import {connectDaemon} from ${JSON.stringify(pathToFileURL(join(repositoryRoot, 'dist/subs/daemon/src/client-entry.js')).href)};\n`
-    + `console.log(JSON.stringify(await connectDaemon(${JSON.stringify({ client: { name: 'fallback-reference', version: '0.0.0' },
-      engine: 'ramify.ts@0.0.0+typescript@7.0.2', start: 'if-needed', daemonEntry: entry, endpointDirectory: directory })})));\n`);
+    + `console.log(JSON.stringify(await connectDaemon(${JSON.stringify({ client: { name: 'fallback-reference', version: packageVersion },
+      engine: packageEngine, start: 'if-needed', daemonEntry: entry, endpointDirectory: directory })})));\n`);
   const result = await cliProcess(repositoryRoot, [], { entry: script, env: { RAMIFY_ENDPOINT_DIR: directory }, allowSockets: true, timeoutMs: 30_000 });
   assertions.equal('external client process exits normally with an unavailable result', [result.code, JSON.parse(result.stdout).status], [0, 'unavailable']);
   assertions.equal('external client never imports an engine or contexts', parentLoads(result).filter(value => forbidden.test(value)), []);

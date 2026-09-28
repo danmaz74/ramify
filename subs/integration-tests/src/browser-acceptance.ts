@@ -1114,7 +1114,8 @@ async function exerciseOwnSourceNode(page: Page, model: ProjectExplorerModel, de
     ownCounts, beforeCounts, afterCounts, notDrawn, measuredRow: row };
 }
 
-const version = '0.0.0';
+// Endpoint selection and the installed entries verify the package's own version.
+const version = (JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')) as { version: string }).version;
 const explorerEntry = join(packageRoot, 'dist/src/explorer-entry.js');
 const ramifyCommand = join(packageRoot, 'dist/src/ramify');
 

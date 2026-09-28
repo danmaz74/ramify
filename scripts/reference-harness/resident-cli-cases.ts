@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { connectDaemon } from '../../subs/daemon/src/connect-daemon.js';
 import type { ServiceConnection } from '../../subs/daemon/src/interfaces/daemon.js';
-import { compiledEntry } from '../../src/tests/process.js';
+import { compiledEntry, packageEngine as engine, packageVersion as version } from '../../src/tests/process.js';
 import { withProcessScope, waitForProcessCondition } from '../../src/tests/lifecycle-process.js';
 import { readTrace, object, withSequenceProcess } from './equivalence-process.js';
 import type { SequenceProcess } from './equivalence-process.js';
@@ -19,7 +19,6 @@ import { analysisEvidence, archiveObservation, recordObservation } from './obser
 import type { AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
 import type { Assertions, InstanceHandler } from './runner.js';
 
-const version = '0.0.0', engine = 'ramify.ts@0.0.0+typescript@7.0.2';
 const semantic = (report: { runId: string }) => { const { runId: _, ...rest } = report; return rest; };
 const noEngine = (url: string) => /\/dist\/(?:src\/batch\.js|subs\/analysis\/)|\/node_modules\/(?:typescript|@typescript)\//.test(url);
 async function client(endpointDirectory: string): Promise<ServiceConnection> {

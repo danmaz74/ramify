@@ -9,12 +9,10 @@ import { readDaemonRecord, selectEndpoint } from '../../subs/daemon/src/discover
 import type { ContextDependencyDiagramOutcome, ContextToken } from '../../subs/daemon/src/context-types.js';
 import type { DaemonStatus, ServiceResult } from '../interfaces/service.js';
 import type { TraceEvent } from './process.js';
-import { repositoryRoot } from './process.js';
+import { packageEngine as engine, packageVersion as version, repositoryRoot } from './process.js';
 import { dependencyAnalyzerCapacity } from '../dependency-analyzer-process.js';
 import { processAlive, waitForProcessCondition, withProcessScope } from './lifecycle-process.js';
 
-const version = '0.0.0';
-const engine = `ramify.ts@${version}+typescript@7.0.2`;
 /** A leaf toolkit source file the test rewrites in the project copy. */
 const edited = 'subs/daemon/src/system-clock.ts';
 const analyzerModule = /\/subs\/analysis\/src\/dependency-analyzer\.js$/;
