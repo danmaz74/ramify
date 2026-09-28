@@ -329,6 +329,8 @@ describe('affected command grammar', () => {
       format: 'json', batch: true, modules: [], paths: ['src/a.ts'] });
     expect(parseArguments(['affected', 'a', '--format', 'human', '--batch'])).toEqual({ command: 'affected',
       format: 'human', batch: true, modules: ['a'], paths: [] });
+    expect(() => parseArguments(['affected', 'a', '--format', 'xml']))
+      .toThrow('Unsupported format: xml. Use --format json or --format human, or omit it for human output.');
   });
 
   it('A7-09: lists affected grammar, forms and exits in --help without dispatching', async () => {
@@ -339,6 +341,7 @@ describe('affected command grammar', () => {
     expect(text).toContain('ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch]\n                       [--format human|json]');
     expect(text).toContain('ramify.affected-cli/1');
     expect(text).toContain('affected: 0 one complete answer, including an all-modules answer, 1 the project');
+    expect(text).toContain('2 unavailable (including\na project that cannot be found), pending, cold, supersession or incompatible\nservice');
     expect(help).toContain('--changed, --since and --deadline do not apply');
   });
 });

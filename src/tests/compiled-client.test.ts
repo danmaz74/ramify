@@ -90,8 +90,8 @@ describe('compiled client process contracts', () => {
     const invalid = await realpath(await mkdtemp('/tmp/rcv-'));
     try {
       const refusal = await run(launcher, ['affected', 'x', '--batch', '--format', 'json'], { cwd: invalid, env });
-      expect([refusal.code, refusal.stderr]).toEqual([1, '']);
-      expect(JSON.parse(refusal.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 1, diagnostics: [{ code: 'invalid-project' }] });
+      expect([refusal.code, refusal.stderr]).toEqual([2, '']);
+      expect(JSON.parse(refusal.stdout)).toMatchObject({ schemaVersion: 'ramify.cli/1', exitCode: 2, diagnostics: [{ code: 'project-unavailable' }] });
     } finally { await rm(invalid, { recursive: true, force: true }); }
     expect(await processesMentioning(root)).toEqual([]);
     expect(await readdir(endpoint)).toEqual([]);

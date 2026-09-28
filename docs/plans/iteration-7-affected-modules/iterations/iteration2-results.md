@@ -298,6 +298,10 @@ None.
 
 No other behavior changed.
 
+Follow-up, deferred: affected answers do not restate the invocation's scope per
+request as `check` does (`stated()` in `context-manager.ts`), so a resident
+answer carries the context's first opener's scope and `inputId`.
+
 | Command | Outcome |
 | --- | --- |
 | `npm run type-check` | passed (exit 0) |

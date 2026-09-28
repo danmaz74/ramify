@@ -20,10 +20,11 @@ export interface AffectedBatchInvocation {
   readonly modules: readonly string[];
   readonly paths: readonly string[];
 }
-/** `invalid-project` is an open that reported instead of opening a session. */
+/** `invalid-project` (exit 1) is an invalid project; `project-unavailable` (exit 2) is an open that
+ * reported because the project could not be found or read. */
 export type AffectedBatchResult =
   | { readonly status: 'answered'; readonly inputId: string; readonly result: AffectedSelection }
-  | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason | 'invalid-project'; readonly message: string;
+  | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason | 'invalid-project' | 'project-unavailable'; readonly message: string;
       readonly unknownModules: readonly string[]; readonly exitCode: 1 | 2 }
   | { readonly status: 'cancelled'; readonly exitCode: 130 };
 export type AffectedBatchOperation = (invocation: AffectedBatchInvocation, control?: RunControl) => Promise<AffectedBatchResult>;

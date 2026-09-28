@@ -585,7 +585,7 @@
    "iteration": 4,
    "fixture": "real",
    "evidence": "manual, recorded",
-   "expected": "ramify affected --path subs/analysis/src/affected-query.ts on the toolkit selects analysis, daemon, contexts, cli and root, recorded with the exact output."
+   "expected": "ramify affected --path subs/analysis/src/affected-query.ts on the toolkit answers changed ramify/analysis and affected ramify, ramify/cli, ramify/daemon, ramify/daemon/contexts, ramify/explorer, ramify/integration-tests, ramify/presentation, ramify/presentation/project-view and ramify/service-api, recorded with the exact output."
   },
   {
    "id": "A7-12:toolkit-module-seed",

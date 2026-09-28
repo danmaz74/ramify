@@ -44,11 +44,16 @@ export async function runBatch(invocation: BatchInvocation, control: RunControl 
 /** Report codes of a session that failed to start or compute rather than a project that cannot be opened. */
 const failureCodes = new Set(['internal-error', 'resource-limit', 'session-disposed']);
 
+/** A reported open: a session failure is `analysis-failed` and a project that cannot be found or read
+ * (`execution: 'unavailable'`) is `project-unavailable`, both exit 2 as `check --batch` exits; only an
+ * invalid project is `invalid-project`, exit 1. */
 function refusal(report: AnalysisReport): AffectedBatchResult {
   const failed = report.outcome.execution === 'incomplete' || report.diagnostics.some(item => failureCodes.has(item.code));
   const message = report.diagnostics[0]?.message ?? `Project ${report.outcome.execution}`;
-  return failed ? { status: 'unavailable', reason: 'analysis-failed', message, unknownModules: [], exitCode: 2 }
-    : { status: 'unavailable', reason: 'invalid-project', message, unknownModules: [], exitCode: 1 };
+  if (failed) return { status: 'unavailable', reason: 'analysis-failed', message, unknownModules: [], exitCode: 2 };
+  return report.outcome.execution === 'invalid'
+    ? { status: 'unavailable', reason: 'invalid-project', message, unknownModules: [], exitCode: 1 }
+    : { status: 'unavailable', reason: 'project-unavailable', message, unknownModules: [], exitCode: 2 };
 }
 
 /** The affected-module batch form: a fresh retained session over the project `check --batch` would

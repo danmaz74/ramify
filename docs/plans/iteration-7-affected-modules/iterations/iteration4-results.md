@@ -21,8 +21,10 @@ from the manifests and source imports before the run. No source was changed.
 - Elapsed wall time is measured with Python's monotonic clock around each
   process (`subprocess.run`), from the worktree root. Node v22.23.2, 12 CPUs.
 - Invocations use the built launcher `dist/src/ramify` (the Bun-compiled client,
-  whose `--batch` form runs in a Node child) with `--root` given explicitly, so
-  every `inputId` is independent of the invoking directory (iteration 3 handoff).
+  whose `--batch` form runs in a Node child) with `--root` given explicitly,
+  from the same working directory. `inputId` still depends on the invoking
+  directory and root form (iteration 3 handoff), so only selections are
+  compared across forms.
 - Expected owners were derived before any `affected` invocation from the
   `module.ramify` files and from the relative imports of every owned file under
   `src/` and `subs/**/src/`. Each import was resolved to the owner of its target
@@ -65,8 +67,8 @@ scope           configuration tsconfig.json, 30 walked areas, 6 independent scop
 
 **Matches the expectation:** yes, exactly.
 
-The case wording in `cases.json` ("selects analysis, daemon, contexts, cli and
-root") names only the direct path to the CLI. The answer also selects
+The earlier case wording in `cases.json` ("selects analysis, daemon, contexts, cli and
+root") named only the direct path to the CLI. The answer also selects
 explorer, integration-tests, presentation, project-view and service-api,
 through root's re-exposure and through contexts. The hand derivation confirms
 those edges; see Defects observed.
@@ -191,10 +193,11 @@ dist/src/ramify affected --path subs/harness/subs/audit/src/check-execution.ts \
 
 **Elapsed:** 8.68 s, exit 0.
 
-**Answer:** mode `batch`, revision `{ sequence: null, inputId: input/1:d47c995f…8ef9 }`
-(the resident `inputId`), coverage complete with 312 `signature-inferred`
-notes. The `selection` member is equal to the resident answer's as parsed JSON.
-**Matches:** yes.
+**Answer:** mode `batch`, revision `{ sequence: null, inputId: input/1:d47c995f…8ef9 }`,
+coverage complete with 312 `signature-inferred` notes. The `selection` member
+is equal to the resident answer's as parsed JSON. The `inputId` happened to
+match the resident one because the runs shared the same working directory and
+root form. **Matches:** yes.
 
 ## A7-12:timing-sample
 
@@ -255,16 +258,16 @@ derived beforehand, and resident and batch selections agree on both projects.
 
 One plan-text discrepancy, not a source defect:
 
-- **`cases.json` A7-12:toolkit-path-seed understates the expected set.** It
-  reads "selects analysis, daemon, contexts, cli and root". The real answer and
+- **`cases.json` A7-12:toolkit-path-seed understated the expected set.** It
+  read "selects analysis, daemon, contexts, cli and root". The real answer and
   the hand derivation also select `ramify/explorer`, `ramify/integration-tests`,
   `ramify/presentation`, `ramify/presentation/project-view` and
   `ramify/service-api`. Evidence from the relative imports:
   `ramify/integration-tests` and `ramify/service-api` import analysis files
   directly. Explorer imports root, contexts and service-api. Project-view imports
   contexts, and presentation imports project-view. The expectation predates the
-  finding in iteration 3 that root is a hub. The second pass may reword the case
-  to the recorded lists; the answer itself is correct.
+  finding in iteration 3 that root is a hub. The iteration 3 review fixes
+  reworded the case to the recorded lists; the answer itself is correct.
 
 ## Observations
 

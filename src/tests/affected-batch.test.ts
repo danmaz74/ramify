@@ -75,13 +75,40 @@ describe('affected batch form (A7-11)', () => {
       expect([json.exitCode, json.stderr, json.writes]).toEqual([1, '', 1]);
       expect(JSON.parse(json.stdout)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 1,
         diagnostics: [{ category: 'execution', code: 'invalid-project', message: expect.any(String) }] });
-      const human = await invoke(empty, ['affected', 'x', '--batch']);
+      const human = await invoke(empty, ['affected', 'x', '--root', empty, '--batch']);
       expect(human.exitCode).toBe(1);
-      expect(human.stdout).toContain(`Root: (discovered from ${empty})\nNot selected (invalid-project): `);
+      expect(human.stdout).toContain(`Root: ${empty}\nNot selected (invalid-project): `);
+      const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
+      try {
+        const resident = await invoke(empty, ['affected', 'x', '--root', empty, '--format', 'json'], runAffectedBatch, quick.connect);
+        expect([resident.exitCode, resident.stderr]).toEqual([1, '']);
+        expect(JSON.parse(resident.stdout)).toMatchObject({ exitCode: 1, diagnostics: [{ code: 'invalid-project' }] });
+      } finally { await quick.dispose(); }
     } finally { await rm(empty, { recursive: true, force: true }); }
   }, 30_000);
 
-  it('A7-11: maps session refusals to exits 1 in both forms and disposes every session', () => affectedFixture(async root => {
+  it('A7-11:invalid-project not-found-exit-2: no project found from the directory is project-unavailable, exit 2, in both forms', async () => {
+    const empty = await realpath(await mkdtemp(join(tmpdir(), 'ramify-affected-none-')));
+    try {
+      await put(empty, 'src/value.ts', 'export const value = 1;\n');
+      const direct = await runAffectedBatch({ cwd: empty, modules: ['x'], paths: [] });
+      expect(direct).toMatchObject({ status: 'unavailable', reason: 'project-unavailable', unknownModules: [], exitCode: 2 });
+      const human = await invoke(empty, ['affected', 'x', '--batch']);
+      expect([human.exitCode, human.stderr]).toEqual([2, '']);
+      expect(human.stdout).toContain(`Root: (discovered from ${empty})\nNot selected (project-unavailable): `);
+      const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
+      try {
+        for (const form of [[], ['--batch']]) {
+          const json = await invoke(empty, ['affected', 'x', '--format', 'json', ...form], runAffectedBatch, quick.connect);
+          expect([json.exitCode, json.stderr, json.writes], form.join(' ')).toEqual([2, '', 1]);
+          expect(JSON.parse(json.stdout)).toEqual({ schemaVersion: 'ramify.cli/1', status: 'unavailable', exitCode: 2,
+            diagnostics: [{ category: 'execution', code: 'project-unavailable', message: expect.any(String) }] });
+        }
+      } finally { await quick.dispose(); }
+    } finally { await rm(empty, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it('A7-11: maps unknown modules, invalid seeds and an invalid revision to exit 1 in both forms', () => affectedFixture(async root => {
     expect(await runAffectedBatch({ cwd: root, modules: ['example/nope', 'example/core'], paths: [] })).toEqual({ status: 'unavailable',
       reason: 'unknown-module', message: 'Unknown module IDs: example/nope', unknownModules: ['example/nope'], exitCode: 1 });
     expect(await runAffectedBatch({ cwd: root, modules: [], paths: ['/abs.ts'] })).toMatchObject({ status: 'unavailable',

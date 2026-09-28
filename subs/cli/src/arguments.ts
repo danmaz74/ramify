@@ -83,8 +83,9 @@ measure: 0 one complete document, 1 the project is invalid, 2 unavailable,
 pending, cold, deadline, supersession, resource refusal or incompatible service,
 130 interrupted.
 affected: 0 one complete answer, including an all-modules answer, 1 the project
-is invalid, a module ID is unknown or a seed is invalid, 2 unavailable, pending,
-cold, deadline, supersession or incompatible service, 130 interrupted.
+is invalid, a module ID is unknown or a seed is invalid, 2 unavailable (including
+a project that cannot be found), pending, cold, supersession or incompatible
+service, 130 interrupted.
 `;
 
 type Arguments = { readonly command: 'help' | 'version' }
@@ -179,7 +180,9 @@ export function parseArguments(argv: readonly string[]): Arguments {
     }
     else {
       if (command === 'affected' && value === 'human') { format = 'human'; continue; }
-      if (value !== 'json') throw new Error(`Unsupported format: ${value}. Use --format json or omit it for human output.`);
+      if (value !== 'json') throw new Error(command === 'affected'
+        ? `Unsupported format: ${value}. Use --format json or --format human, or omit it for human output.`
+        : `Unsupported format: ${value}. Use --format json or omit it for human output.`);
       format = 'json';
     }
   }

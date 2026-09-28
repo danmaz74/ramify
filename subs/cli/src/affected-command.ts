@@ -107,10 +107,11 @@ export async function affectedCommand(args: AffectedArguments, environment: CliE
         control.signal?.throwIfAborted();
         if (!opened.ok) throw serviceFailure(opened.error);
         if (opened.value.status === 'unresolved') {
+          // The batch form's codes: an invalid project exits 1, one that cannot be found or read exits 2.
           const label = opened.value.resolution.status;
           const message = opened.value.resolution.issues[0]?.message ?? `project ${label}`;
-          const exitCode = label === 'invalid' ? 1 : 2;
-          environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, `project-${label}`, message, exitCode));
+          const [code, exitCode] = label === 'invalid' ? ['invalid-project', 1 as const] : ['project-unavailable', 2 as const];
+          environment.stdout(failure(args.root ?? `(discovered from ${environment.cwd})`, args.format, code, message, exitCode));
           return exitCode;
         }
         if (opened.value.status === 'unavailable') throw new CliFailure(

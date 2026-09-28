@@ -237,7 +237,7 @@ export interface AffectedBatchInvocation {
 }
 export type AffectedBatchResult =
   | { readonly status: 'answered'; readonly inputId: string; readonly result: AffectedSelection }
-  | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason | 'invalid-project'; readonly message: string;
+  | { readonly status: 'unavailable'; readonly reason: AffectedUnavailableReason | 'invalid-project' | 'project-unavailable'; readonly message: string;
       readonly unknownModules: readonly string[]; readonly exitCode: 1 | 2 }
   | { readonly status: 'cancelled'; readonly exitCode: 130 };
 export type AffectedBatchOperation = (invocation: AffectedBatchInvocation, control?: RunControl) => Promise<AffectedBatchResult>;
@@ -248,7 +248,11 @@ retained session over the root with the check capabilities `check --batch`
 requests, calling `affected` at the opened revision, and disposing the session
 in `finally`. The compiled client runs it in the same Node child seam as
 `check --batch`. The CLI environment receives it as `affectedBatch` beside
-`batch`. `invalid-project` maps a `reported` open without a session to exit 1.
+`batch`. A `reported` open without a session maps to `invalid-project`, exit 1,
+when the project is invalid (`execution: 'invalid'`), and to
+`project-unavailable`, exit 2, when it cannot be found or read
+(`execution: 'unavailable'`), as `check --batch` exits. The resident form
+prints the same two codes for an unresolved open.
 
 ## CLI
 
@@ -282,7 +286,7 @@ affected and test module lists and the count of coverage notes.
 | --- | --- |
 | Answered, `dependency-closure` or `all-modules` | 0 |
 | Invalid project, unknown module ID or invalid seeds | 1 |
-| Unavailable, including `analysis-failed`, pending, cold, superseded, deadline exceeded | 2 |
+| Unavailable, including `project-unavailable`, `analysis-failed`, pending, cold, superseded, deadline exceeded | 2 |
 | Cancelled | 130 |
 
 An `all-modules` answer exits 0 because it is a complete conservative answer;

@@ -188,12 +188,19 @@ interfaces, so a CLI change reaches them through root.
    | --- | --- | --- |
    | Answered, either selection | — | 0 |
    | `unknown-module`, `invalid-query` | the session reason | 1 |
-   | Batch open `reported` (no project found, unreadable configuration) | `invalid-project` | 1 |
+   | Batch open `reported` for an invalid project (`execution: 'invalid'`) | `invalid-project` | 1 |
    | Invalid revision (`execution: 'invalid'`) | `invalid-project` | 1 |
-   | Resident open `unresolved/invalid` | `project-invalid` (as `measure`) | 1 |
+   | Resident open `unresolved/invalid` | `invalid-project` | 1 |
+   | Batch open `reported` with `execution: 'unavailable'` (root or configuration not found, read failure) | `project-unavailable` | 2 |
+   | Resident open `unresolved/unavailable` | `project-unavailable` | 2 |
    | Batch open `reported` for a session failure (see 4) | `analysis-failed` | 2 |
    | Any other unavailable, pending, cold, superseded, deadline-exceeded | its reason | 2 |
    | Cancelled outcome or interrupt | — | 130 |
+
+   The iteration 3 review changed two rows: a batch open that found no project
+   answered `invalid-project`, exit 1, and the resident invalid open printed
+   `project-invalid`, copied from `measure`. Both forms now print one code per
+   condition, and a missing project exits 2 as `check --batch` does.
 
 4. **A reported failure is not an invalid project.** A `reported` open whose
    report has `execution: 'incomplete'` or an `internal-error`, `resource-limit`
@@ -231,12 +238,15 @@ None. No case was skipped.
 - The resident form over a daemon warmed by `check:self` answered at sequence 1
   with the revision reused; warm invocations took about 0.4 s and `--batch`
   about 5.9 s on the toolkit.
-- `inputId` depends on the working directory the project is discovered from:
-  in a draft of `reference-json`, the same unchanged project discovered from
-  `subs/app` and from the root gave different `inputId`s. The agreement test
-  therefore runs both forms from the same directory. ramify-audit should expect
-  equal `inputId`s only for invocations from the same working directory, or pass
-  `--root`.
+- `inputId` hashes the inventory scope, which includes the real path the
+  command was invoked from and whether the root was given or found: in a draft
+  of `reference-json`, the same unchanged project discovered from `subs/app`
+  and from the root gave different `inputId`s. `--root` changes the id rather
+  than removing that dependence. A resident context also keeps its first
+  opener's scope and `inputId` for later invocations. Only the `selection`
+  members are comparable across forms and invocations, so ramify-audit should
+  compare selections, not `inputId`s. The agreement test runs both forms from
+  the same directory with the same root form.
 - Exit 1 now also covers an invalid project at the queried revision
   (deviation 3); the contract's CLI table still reads correctly, but iteration
   2's handoff list is superseded by the table above.
