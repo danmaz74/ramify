@@ -211,6 +211,11 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
   }
   const outline = shape.value.outline;
   const errors = [
+    ...(outline === undefined && evidence.outline == null ? [{
+      path: 'outline',
+      message: 'The first assignment needs an outline; there is no committed outline to reuse',
+      expected: 'an outline for this work item',
+    }] : []),
     ...(outline === undefined ? [] : outlineErrors(outline, evidence)),
     ...localDecisionErrors(shape.value.localDecisions, placementEvidence(evidence), 'localDecisions'),
     ...assignmentErrors(shape.value.assignment, {

@@ -207,6 +207,16 @@ describe('the rules the schema cannot hold', () => {
 });
 
 describe('the rules an assignment must satisfy', () => {
+  test('a first assignment supplies an outline, while a later assignment may reuse its committed outline', () => {
+    const first = validateLocalArchitect(assign('shop/orders'), evidence);
+    expect(first.ok).toBe(false);
+    if (first.ok) return;
+    expect(first.errors).toEqual([expect.objectContaining({ path: 'outline' })]);
+
+    const retained = validateLocalArchitect(assign('shop/orders'), { ...evidence, outline: outline() });
+    expect(retained.ok).toBe(true);
+  });
+
   /** The smallest assignment over a module the view has. */
   const over = (module: string, extra: Record<string, unknown> = {}) => assign(module, extra as never, outline());
 
@@ -508,5 +518,25 @@ describe('a rejected submission in a run', () => {
     expect(outcome).toMatchObject({ ended: 'invalid-submission', rejectedSubmissions: 3, submission: null });
     expect(events.some(event => event.type === 'outline-revised')).toBe(false);
     expect(events.some(event => event.type === 'gate-attempted')).toBe(false);
+  }, 300_000);
+
+  test('a first assignment without an outline is rejected before scheduling and can be corrected in the same session', async () => {
+    const { root, runId, service, agent } = await run(
+      [assign(reviews), requestCompletion()],
+      [scenariosCommit('review-notes'), 'wi-001', 'final verification of plan "review-notes"'],
+    );
+
+    const local = agent!.sessions.find(session => session.spec.submission.name === localArchitectToolName)!;
+    expect(local.verdicts[0]).toMatchObject({ accepted: false });
+    const answer = JSON.parse((local.verdicts[0] as { errors: string[] }).errors[0]!.split('\n\n')[0]!) as {
+      errors: Array<{ path: string; message: string }>;
+    };
+    expect(answer.errors).toEqual([expect.objectContaining({ path: 'outline' })]);
+    expect(local.verdicts[1]).toEqual({ accepted: true });
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+
+    const events = await runEventsOnDisk(root, 'review-notes', runId);
+    expect(events.some(event => event.type === 'iteration-assigned')).toBe(false);
+    expect(events.some(event => event.type === 'job-failed')).toBe(false);
   }, 300_000);
 });
