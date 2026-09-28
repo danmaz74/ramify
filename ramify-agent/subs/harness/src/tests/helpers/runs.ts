@@ -17,6 +17,7 @@ import { defaultRunPolicy } from '../../run/policy.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
+import type { CapabilityWorkflow } from '../../capability/workflow.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { installScriptedCucumber } from './project-config.js';
@@ -235,6 +236,8 @@ export async function realRamify(): Promise<Awaited<ReturnType<typeof privateRam
 }
 
 export interface OpenRunsOptions extends Partial<RunServiceOptions> {
+  /** Test-only workflow factory; production composition never receives it. */
+  readonly capabilityWorkflowFactory?: (() => CapabilityWorkflow) | undefined;
   /** Every test chooses its Git boundary explicitly; this helper has no production fallback. */
   readonly git: NonNullable<RunServiceOptions['git']>;
   readonly script?: Script | undefined;
@@ -258,13 +261,13 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
   const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script), options.agentOptions);
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
-  const { script: _script, checkScript, agentOptions: _agentOptions, ...rest } = options;
+  const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, ...rest } = options;
   const checkExecution = checkScript === undefined
     ? createPassingCheckExecution()
     : typeof checkScript === 'function'
       ? createMappedCheckExecution({ script: checkScript })
       : createDirectCheckExecution({ script: checkScript });
-  const { service, recovery } = await RunService.open({
+  const serviceOptions: RunServiceOptions = {
     projectRoot: root,
     lock,
     inputs: shapeOnlyInputs,
@@ -275,7 +278,10 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
     warn: message => warnings.push(message),
     ...rest,
     ...(agent === undefined ? {} : { agent }),
-  });
+  };
+  const { service, recovery } = capabilityWorkflowFactory === undefined
+    ? await RunService.open(serviceOptions)
+    : await RunService.openForCapabilityTests(serviceOptions, capabilityWorkflowFactory);
   return { service, recovery, agent: scripted, lock, warnings };
 }
 

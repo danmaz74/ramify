@@ -316,6 +316,8 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Candidate ${event.data.candidate} bound to gate ${event.data.gate}`, ref('gate', event.data.gate)];
     case 'capability-requested':
       return [`Capability request ${event.data.request} recorded`, ref('invocation', event.data.invocation)];
+    case 'capability-qualified':
+      return [`Capability request ${event.data.request} qualified: ${event.data.outcome}`, ref('invocation', event.data.invocation)];
     case 'capability-delegated':
       return [`Capability task ${event.data.task} delegated`, ref('invocation', event.data.invocation)];
     case 'capability-plan-revised':

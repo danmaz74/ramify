@@ -29,6 +29,9 @@ export function capabilityPolicyFrom(previous: RunPolicy): RunPolicy {
   return {
     ...previous,
     version: capabilityRunPolicyVersion,
+    context: { ...previous.context, 'capability-architect': {
+      compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000,
+    } },
     limits: { ...previous.limits, maxIterationsPerCapabilityTask: previous.limits.maxIterationsPerWorkItem },
   };
 }

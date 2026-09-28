@@ -200,6 +200,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
   /** Plan 16 coordination records are committed with these events. The
    * original request and each revision remain separate immutable records. */
   event('capability-requested', z.object({ request: text, parent: text, assignment: text, invocation: text }).strict()),
+  event('capability-qualified', z.object({ request: text, invocation: text,
+    outcome: z.enum(['satisfied', 'request-placement', 'unresolved']), evidence: z.array(text) }).strict()),
   event('capability-delegated', z.object({ task: text, request: text, parent: text, invocation: text, planRevision: z.literal(1) }).strict()),
   event('capability-plan-revised', z.object({ task: text, revision: z.int().positive(), basedOn: z.int().positive(), invocation: text }).strict()),
   event('capability-coordinator-resumed', z.object({ task: text, invocation: text, session: sessionIdSchema }).strict()),

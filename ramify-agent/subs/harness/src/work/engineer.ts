@@ -16,6 +16,7 @@ import { resolveTestSelection } from '../checks/selection.js';
 import { validateAgainst, type SubmissionError, type SubmissionValidation } from '../run/submissions.js';
 import { openFindingsMessage, type HookFinding } from '../hooks/post-write.js';
 import { needAsBehaviorSchema } from '../contracts/submission.js';
+import { capabilityNeedInputSchema } from '../capability/records.js';
 import { declarationErrors, type DeclarationContext } from './declarations.js';
 import type { IterationAssignment } from './iterations.js';
 import { injectionSiteRule, moduleOwning } from './scope.js';
@@ -104,11 +105,17 @@ export const engineerSubmissionSchema = z.discriminatedUnion('kind', [
     /** What this iteration did before it stopped, in the engineer's own words. */
     summary: text,
   }).strict(),
+  z.object({
+    kind: z.literal('capability-needed'),
+    summary: text,
+    request: capabilityNeedInputSchema,
+  }).strict(),
 ]);
 export type EngineerSubmission = z.infer<typeof engineerSubmissionSchema>;
 
 /** The members this iteration's package offers the role. */
 export const engineerSubmissionKinds = ['completion-proposed', 'partial', 'unsuitable', 'contract-needed'] as const;
+export const capabilityEngineerSubmissionKinds = ['completion-proposed', 'partial', 'unsuitable', 'capability-needed'] as const;
 
 /** The schema the agent's tool is given, taken from the same definition that validates. */
 export const engineerJsonSchema = z.toJSONSchema(engineerSubmissionSchema) as JsonSchema;
@@ -139,6 +146,8 @@ export function iterationAcceptance(kind: EngineerSubmission['kind'], checkNotRu
       return 'The report was accepted and recorded. This iteration closes on it, unverified and uncommitted, and the local architect decides what follows. Nothing more is asked of you in this session.';
     case 'contract-needed':
       return 'The report was accepted and recorded. This iteration closes with what it did, and the harness answers the need you named with a contract iteration of its own. Nothing more is asked of you in this session.';
+    case 'capability-needed':
+      return 'The need was recorded with your provisional source. Your assignment and session remain suspended while its architect qualifies it.';
   }
 }
 
@@ -150,6 +159,8 @@ const trailerLine = /^\s*Ramify-[A-Za-z-]*\s*:/m;
 
 /** What the rules beyond the schema are checked against. */
 export interface EngineerEvidence {
+  /** Only the internal test workflow may offer the new submission before rollout. */
+  readonly capabilityWorkflow?: boolean;
   /**
    * The real-provider obligation this assignment owes, where it owes one.
    * The harness derives it from the assignment; no submission carries it.
@@ -184,6 +195,12 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
   if (!shape.ok) return shape;
   const errors: SubmissionError[] = [];
   const value = shape.value;
+  if (value.kind === 'capability-needed' && evidence.capabilityWorkflow !== true) {
+    errors.push({ path: 'kind', message: 'Capability coordination is not enabled for this run', expected: 'an enabled capability workflow' });
+  }
+  if (value.kind === 'contract-needed' && evidence.capabilityWorkflow === true) {
+    errors.push({ path: 'kind', message: 'The contract workflow is unavailable in capability coordination', expected: 'capability-needed' });
+  }
 
   // The harness writes the accepted commit's trailers, and one of them is the
   // key a repeat after a crash finds the commit by. Text that would be read
@@ -194,6 +211,8 @@ export function validateEngineer(input: unknown, evidence: EngineerEvidence = {}
       ? [{ path: 'detail', value: value.detail }]
       : value.kind === 'contract-needed'
         ? [{ path: 'summary', value: value.summary }]
+        : value.kind === 'capability-needed'
+          ? [{ path: 'summary', value: value.summary }]
         : [];
   for (const entry of prose) {
     if (trailerLine.test(entry.value)) {

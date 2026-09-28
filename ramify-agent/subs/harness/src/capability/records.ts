@@ -41,6 +41,19 @@ export const capabilityNeedSchema = z.object({
 });
 export type CapabilityNeed = z.infer<typeof capabilityNeedSchema>;
 
+/** The engineer does not choose durable example IDs. The harness assigns
+ * them after the request ID is reserved. */
+const { examples: _identifiedExamples, ...needInputShape } = capabilityNeedSchema.shape;
+export const capabilityNeedInputSchema = z.object({ ...needInputShape,
+  examples: z.array(z.object({ title: text, code: text, designation: z.enum(['executable', 'pseudocode']) }).strict()).min(1),
+}).strict();
+export type CapabilityNeedInput = z.infer<typeof capabilityNeedInputSchema>;
+export function identifyCapabilityNeed(request: string, input: CapabilityNeedInput): CapabilityNeed {
+  return capabilityNeedSchema.parse({
+    ...input, examples: input.examples.map((example, index) => ({ ...example, id: capabilityExampleId(request, index + 1) })),
+  });
+}
+
 export const provisionalSourceSchema = z.object({
   acceptedBase: text,
   tree: treeIdentity,

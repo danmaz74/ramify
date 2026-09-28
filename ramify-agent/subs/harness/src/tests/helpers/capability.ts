@@ -2,6 +2,30 @@ import {
   capabilityExampleId, capabilityRequestId, capabilityTaskId,
   type CapabilityPlan, type CapabilityRequest, type CapabilityTask,
 } from '../../capability/records.js';
+import { capabilityPolicyFrom } from '../../capability/policy.js';
+import { createCapabilityWorkflow } from '../../capability/workflow.js';
+import { openRuns, testPolicy, type OpenRunsOptions } from './runs.js';
+import { cp } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { temporaryDirectory } from './fixture.js';
+
+/** A private Git target, separate from the old collection-review fixture. */
+export async function copyCapabilityFixture(nested = false): Promise<{ root: string; remove: () => Promise<void> }> {
+  const directory = await temporaryDirectory();
+  const name = nested ? 'capability-coordination-nested' : 'capability-coordination';
+  const source = fileURLToPath(new URL(`../../../../../fixtures/${name}/`, import.meta.url));
+  const root = join(directory.path, name);
+  await cp(source, root, { recursive: true });
+  return { root, remove: directory.remove };
+}
+
+/** Drives the capability factory through the real service and ledger while
+ * capturing policy/5. This seam lives only in the harness test tree. */
+export function openCapabilityRuns(root: string, options: OpenRunsOptions) {
+  return openRuns(root, { ...options, capabilityWorkflowFactory: createCapabilityWorkflow,
+    policy: projectRoot => capabilityPolicyFrom(testPolicy(projectRoot)) });
+}
 
 /** Small record builders for scripted Plan 16 transitions. Later fixtures
  * can vary the need, provider and source without copying a whole run. */

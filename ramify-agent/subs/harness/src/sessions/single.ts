@@ -561,7 +561,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     ended,
     ...(interruption === undefined ? {} : { interruption }),
     ...(error === undefined ? {} : { error }),
-    submission: submission === null || submissionHash === null ? null : { kind: (submission as EngineerSubmission).kind, hash: submissionHash },
+    submission: submission === null || submissionHash === null || (submission as EngineerSubmission).kind === 'capability-needed'
+      ? null : { kind: (submission as Exclude<EngineerSubmission, { kind: 'capability-needed' }>).kind, hash: submissionHash },
     rejectedSubmissions: judge.rejections,
     standingViolations: standing.map(finding => ({ code: finding.code, message: finding.message, file: finding.file, line: finding.line })),
     settled,

@@ -2,7 +2,7 @@ import type { RunEvent } from '../run/log.js';
 import type { CapabilityPlan, CapabilityRequest, CapabilityTask } from './records.js';
 
 const capabilityTypes = [
-  'capability-requested', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
+  'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
   'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled',
   'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
 ] as const;
@@ -24,7 +24,8 @@ export interface CapabilityTaskState {
   readonly handback: string | null;
 }
 export interface CapabilityState {
-  readonly requests: ReadonlyMap<string, { readonly parent: string; readonly assignment: string; readonly invocation: string; readonly task: string | null }>;
+  readonly requests: ReadonlyMap<string, { readonly parent: string; readonly assignment: string; readonly invocation: string; readonly task: string | null;
+    readonly qualification?: 'satisfied' | 'request-placement' | 'unresolved' }>;
   readonly tasks: ReadonlyMap<string, CapabilityTaskState>;
   /** The ordinary work item remains at the bottom while child tasks are active. */
   readonly stack: readonly string[];
@@ -71,6 +72,12 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       const parentTask = tasks.get(parent);
       if (parentTask && parentTask.status !== 'implementing') return fail(`nested request parent ${parent} is ${parentTask.status}`);
       requests.set(request, { parent, assignment, invocation, task: null });
+      break;
+    }
+    case 'capability-qualified': {
+      const request = requests.get(event.data.request);
+      if (!request || request.task !== null || request.qualification !== undefined) return fail(`request ${event.data.request} cannot be qualified here`);
+      requests.set(event.data.request, { ...request, qualification: event.data.outcome });
       break;
     }
     case 'capability-delegated': {

@@ -107,6 +107,7 @@ export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context
   'global-fork': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 16_000 },
   engineer: { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
   'contract-engineer': { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
+  'capability-architect': { compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 },
   // A reviewer reads a bounded diff and submits; running out of room is an
   // execution failure of its attempt, never a compacted half-review.
   reviewer: { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },

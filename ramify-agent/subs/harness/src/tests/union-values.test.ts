@@ -30,7 +30,7 @@ import {
 import { forkSubmissionKinds, forkSubmissionSchema } from '../architecture/submission.js';
 import { deviationLayout, deviationSchemas } from '../deviations/records.js';
 import { localArchitectSubmissionSchema, localArchitectSubmissionKinds } from '../work/submission.js';
-import { engineerSubmissionSchema, engineerSubmissionKinds, unsuitableReasonSchema } from '../work/engineer.js';
+import { engineerSubmissionSchema, engineerSubmissionKinds, capabilityEngineerSubmissionKinds, unsuitableReasonSchema } from '../work/engineer.js';
 import { assignableKindSchema, assignmentBodySchema } from '../work/assignment.js';
 import {
   extraPurposeSchema, iterationAssignmentSchema, iterationKindSchema, iterationLayout,
@@ -89,6 +89,9 @@ describe('the run log', () => {
     expect(types).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
+      'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
+      'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled',
+      'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
       'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
       'scenarios-materializing', 'scenarios-materialized',
@@ -115,10 +118,10 @@ describe('the run log', () => {
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']);
     expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
-    expect(requestReasonSchema.options).toEqual(['contract-needed']);
+    expect(requestReasonSchema.options).toEqual(['contract-needed', 'capability-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
 
     const base = { jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z' };
@@ -465,8 +468,9 @@ describe('the records this iteration establishes', () => {
 
   test('every member of the engineer submission, and the two unsuitable reasons offered', () => {
     const kinds = engineerSubmissionSchema.options.map(option => option.shape.kind.value);
-    expect(kinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'contract-needed']);
-    expect([...engineerSubmissionKinds]).toEqual(kinds);
+    expect(kinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'contract-needed', 'capability-needed']);
+    expect([...engineerSubmissionKinds]).toEqual(kinds.filter(kind => kind !== 'capability-needed'));
+    expect([...capabilityEngineerSubmissionKinds]).toEqual(kinds.filter(kind => kind !== 'contract-needed'));
     // `obligation-change` and `unplaced-need` have no iteration that can act
     // on them yet, so the role never sees them and no run can produce one.
     // `provider-cannot-conform` gained its producer with the
@@ -859,7 +863,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'catalog-extractor', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'catalog-extractor', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'capability-architect', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
   });
 
   test('every failure reason and every phase is named', () => {

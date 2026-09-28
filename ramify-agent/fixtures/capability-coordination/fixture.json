@@ -1,0 +1,16 @@
+{
+  "schema": "ramify-agent.capability-fixture/1",
+  "roles": {
+    "P": "capability-coordination",
+    "A": "capability-coordination/a",
+    "B": "capability-coordination/b",
+    "D": "capability-coordination/d"
+  },
+  "plan": "plans/need/plan.md",
+  "deferredEntry": "B",
+  "provisionalSource": [
+    "subs/a/src/caller.ts",
+    "subs/a/src/extra.ts",
+    "subs/a/src/tests/caller.test.ts"
+  ]
+}

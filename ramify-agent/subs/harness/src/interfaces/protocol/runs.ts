@@ -40,6 +40,7 @@ export const roleSchema = z.enum([
   'local-architect',
   'engineer',
   'contract-engineer',
+  'capability-architect',
   'reviewer',
   'failure-analyst',
   'context-selector',

@@ -1,4 +1,5 @@
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
+import { z } from 'zod';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart } from '../../subs/agent/src/interfaces/port.js';
@@ -37,6 +38,14 @@ import {
 } from '../reviews/reconciliation.js';
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { recordSettledSnapshot } from './mutations.js';
+import { captureProvisionalSource } from '../capability/source.js';
+import { capabilityRequestId, capabilityTaskId, identifyCapabilityNeed, capabilityLayout,
+  type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan } from '../capability/records.js';
+import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capability/policy.js';
+import { commitCapabilityTransition } from '../capability/ledger.js';
+import { qualificationActionSchema, capabilityActionSchema, validateCapabilityAction, type QualificationAction } from '../capability/submission.js';
+import { replayCapabilityState } from '../capability/state.js';
+import type { CapabilityWorkflow } from '../capability/workflow.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
 import { userCheckFindingChange, userRejectionCode } from '../check-findings/user-commands.js';
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
@@ -101,7 +110,7 @@ import {
   inputsHash, loadPromptPackages, renderContractPrompt, renderEngineerPrompt, renderFailureAnalystPrompt, renderGlobalForkPrompt,
   renderInitialArchitectPrompt, renderLocalArchitectPrompt, renderOrientationPrompt, renderReconciliationPrompt, renderReviewerPrompt, sha256,
   renderContextSelectorPrompt, renderWorkOrientationPrompt, renderNonfunctionalCoordinatorPrompt,
-  renderNonfunctionalRepairPrompt, renderExtractionPrompt,
+  renderNonfunctionalRepairPrompt, renderExtractionPrompt, renderCapabilityArchitectPrompt,
   type ExtractionTurn, type LoadedPackage,
 } from '../prompts/packages.js';
 import { baselineScope, captureSnapshot, rootModuleOfSnapshot, scopeSize, supportDocument } from '../kpi/capture.js';
@@ -504,7 +513,8 @@ interface ContractOutcome {
   readonly cycle?: DependencyCycle | undefined;
 }
 
-interface IterationOutcome {
+interface ClosedIterationOutcome {
+  readonly kind: 'closed';
   /** Set where the iteration reported that the provider cannot conform. */
   readonly reportedRevision?: boolean | undefined;
   readonly result: IterationResult;
@@ -523,6 +533,17 @@ interface IterationOutcome {
     readonly invocation: string;
   } | undefined;
 }
+
+interface SuspendedCapabilityOutcome {
+  readonly kind: 'capability-needed';
+  readonly summary: string;
+  readonly need: CapabilityNeedInput;
+  readonly invocation: string;
+  readonly session: SessionId;
+  readonly point: string;
+}
+
+type IterationOutcome = ClosedIterationOutcome | SuspendedCapabilityOutcome;
 
 /** What one invocation ended with. `value` is present only for an accepted submission. */
 interface InvocationResult<T> {
@@ -647,7 +668,7 @@ export class RunService {
   private readonly git: GitService;
   private readonly candidates: CandidateSource;
 
-  private constructor(private readonly options: RunServiceOptions) {
+  private constructor(private readonly options: RunServiceOptions, private readonly workflow: CapabilityWorkflow | null = null) {
     this.git = options.git ?? gitService;
     this.candidates = options.candidates ?? gitCandidateSource;
   }
@@ -662,6 +683,16 @@ export class RunService {
    */
   static async open(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
     const service = new RunService(options);
+    const recovery = await service.load();
+    return { service, recovery };
+  }
+
+  /** Internal test composition. The harness testing helper is its only
+   * caller until the rollout installs this factory as the production default. */
+  static async openForCapabilityTests(options: RunServiceOptions, factory: () => CapabilityWorkflow): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
+    const workflow = factory();
+    if (workflow.version !== 'capability-coordination/1') throw new Error('Unknown capability workflow factory');
+    const service = new RunService(options, workflow);
     const recovery = await service.load();
     return { service, recovery };
   }
@@ -2737,6 +2768,7 @@ export class RunService {
   private async captureInputs(captured: Uint8Array) {
     const { manifest: promptManifest, packages } = await loadPromptPackages({
       ...(this.options.skillDirectory === undefined ? {} : { skillDirectory: this.options.skillDirectory }),
+      ...(this.workflow === null ? {} : { capabilityWorkflow: true }),
     });
     let manifest;
     try {
@@ -2747,6 +2779,12 @@ export class RunService {
     }
     const nested = await discoverNestedPackages(this.projectRoot);
     const policy = (this.options.policy ?? ((root, found) => defaultRunPolicy({ projectRoot: root, nested: found })))(this.projectRoot, nested);
+    if (policy.version === capabilityRunPolicyVersion && this.workflow === null) {
+      throw new CommandRejection('conflict', 'Capability coordination is unavailable through production run commands before rollout');
+    }
+    if (this.workflow !== null && policy.version !== capabilityRunPolicyVersion) {
+      throw new CommandRejection('conflict', 'The injected capability workflow requires run-policy/5');
+    }
     return { manifest, packages, promptManifest, policy };
   }
 
@@ -4082,6 +4120,12 @@ export class RunService {
     for (;;) {
       if (this.ignoring(run)) return false;
       const records = committedRecords(run.log.ledger.replay());
+      if (this.workflow !== null && replayCapabilityState(run.log.events).stack.length > 1) {
+        // A live or waiting capability task owns the frontier. A stop wakes
+        // this driver; unrelated entries never run through the wait.
+        await run.changed();
+        continue;
+      }
       if (records.workItems.length === 0) return true;
       if (records.workItems.length > run.record.policy.limits.maxWorkItems) {
         await this.fail(run, 'limit-exceeded', `The run has ${records.workItems.length} work items; the policy allows ${run.record.policy.limits.maxWorkItems}`);
@@ -4882,8 +4926,18 @@ export class RunService {
           continuing = 'iteration-closed';
           continue;
         }
-        const outcome = await this.takeIteration(run, agent, packages, baseline, item, assigned, index);
+        let outcome = await this.takeIteration(run, agent, packages, baseline, item, assigned, index);
         if (outcome === null) return null;
+        while (outcome.kind === 'capability-needed') {
+          const answer = await this.coordinateCapabilityNeed(run, agent, packages, baseline, item, assigned, outcome, contextPackage,
+            { session, point: sessionRef, workingDirectory });
+          if (answer === null) return null;
+          if (answer.kind === 'delegated') return 'reported';
+          outcome = await this.takeIteration(run, agent, packages, baseline, item, assigned, index, {
+            session: outcome.session, point: outcome.point, priorInvocation: outcome.invocation, guidance: answer.guidance,
+          });
+          if (outcome === null) return null;
+        }
         lastResult = outcome.result;
         // The iteration spent its repair rounds without a pass: what it
         // declared is pending again, so no untagged failing scenario stays
@@ -6239,6 +6293,286 @@ export class RunService {
    * closes it. The counters are keyed by the iteration, not by the session,
    * so a fresh session after a context-budget return resets nothing.
    */
+  /** The first capability transaction uses the same run invocation, session
+   * and ledger paths as ordinary work. The parent architect and requesting
+   * engineer are both kept at their exact points until a later handback. */
+  private async coordinateCapabilityNeed(
+    run: Run,
+    agent: AgentPort,
+    packages: ReadonlyMap<string, LoadedPackage>,
+    baseline: MeasurementSnapshot,
+    item: WorkItem,
+    assignment: IterationAssignment,
+    suspended: SuspendedCapabilityOutcome,
+    contextPackage: WorkPackage | undefined,
+    parent: { readonly session: SessionId | undefined; readonly point: string | undefined; readonly workingDirectory: string },
+  ): Promise<{ readonly kind: 'satisfied'; readonly guidance: string } | { readonly kind: 'delegated' } | null> {
+    if (this.workflow === null || run.record.policy.version !== capabilityRunPolicyVersion) {
+      await this.fail(run, 'internal', 'A capability request reached a run without its captured workflow');
+      return null;
+    }
+    run.writer.requireSettled('A capability request cannot suspend an unsettled writer');
+    const requestId = capabilityRequestId(committedRecords(run.log.ledger.replay()).capabilityRequests.size + 1);
+    const source = await captureProvisionalSource({
+      projectRoot: this.projectRoot, runDirectory: run.directory, request: requestId,
+      acceptedBase: this.accepted(run), writerSettledBy: suspended.invocation,
+      changedPaths: await this.git.changedPaths(this.projectRoot, this.accepted(run)),
+    });
+    const packageRef = contextPackage === undefined
+      ? { id: runLayout.capturedPlan, revision: 1, hash: sha256(await readFile(run.path(runLayout.capturedPlan))) }
+      : { id: contextPackage.selection, revision: 1, hash: contextPackage.citation.hash };
+    const request: CapabilityRequest = {
+      schema: 'ramify-agent.capability-request/1', id: requestId,
+      parent: { kind: 'work-item', id: item.id }, assignment: assignment.id,
+      invocation: suspended.invocation, consumer: item.module,
+      requirementPackage: packageRef, continuation: { session: suspended.session, point: suspended.point },
+      source, summary: suspended.summary, original: identifyCapabilityNeed(requestId, suspended.need),
+    };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+      type: 'capability-requested', data: { request: request.id, parent: item.id,
+        assignment: assignment.id, invocation: suspended.invocation },
+    }, [{ path: capabilityLayout.request(request.id), id: request.id, revision: 1, body: request }]));
+
+    const local = packages.get('local-architect');
+    if (local === undefined) {
+      await this.fail(run, 'internal', 'The local architect package is absent during qualification');
+      return null;
+    }
+    const registry = committedRecords(run.log.ledger.replay()).registry;
+    let point = parent.point;
+    let parentSession = parent.session;
+    let returned = '';
+    let qualification: InvocationResult<QualificationAction> | undefined;
+    for (let count = 0; count < run.record.policy.limits.maxIterationsPerWorkItem; count += 1) {
+      qualification = await this.runInvocation<QualificationAction>(run, agent, {
+      role: 'local-architect', work: { workItem: item.id, request: request.id },
+      attempt: run.log.all('invocation-started').filter(event => event.data.work.workItem === item.id && event.data.work.request === request.id).length + 1,
+      loaded: local, systemPrompt: renderLocalArchitectPrompt(local, this.projectRoot, parent.workingDirectory),
+      prompt: [
+        `# Qualify capability request ${request.id}`,
+        `The engineer of ${assignment.id} retained its source and session. Its invocation is ${request.invocation}.`,
+        `Original request: ${JSON.stringify(request.original, null, 2)}`,
+        `Provisional source: ${JSON.stringify(request.source, null, 2)}`,
+        `Registry clues: ${JSON.stringify(registry.map(entry => ({ capability: entry.capability, owner: entry.owner })))}`,
+        'Read the actual exposed API and use sites. A matching name is not proof of sufficient behavior, and a missing name is not proof of absence.',
+        'Submit satisfy-with-existing with concrete API evidence, delegate-capability with placement reasoning, request-placement, or unresolved.',
+        `Use request ${request.id} and invocation ${request.invocation} in the action.`,
+        ...(returned === '' ? [] : [`# Boundary decision\n\n${returned}`]),
+      ].join('\n\n'),
+      workingDirectory: parent.workingDirectory,
+      start: point === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: point },
+      ...(point === undefined || parentSession === undefined ? {} : { session: parentSession, continuing: 'capability-qualification' as const }),
+      toolName: 'submit_capability_qualification',
+      description: 'Qualify this exact request using current behavior and placement evidence.',
+      inputSchema: z.toJSONSchema(qualificationActionSchema) as JsonSchema,
+      submissionSchema: 'ramify-agent.capability-qualification/1',
+      validate: input => {
+        const parsed = validateAgainst(qualificationActionSchema, input);
+        if (!parsed.ok) return parsed;
+        if (parsed.value.request !== request.id || parsed.value.invocation !== request.invocation) {
+          return { ok: false, errors: [{ path: 'request', message: 'The request or originating invocation is stale', expected: `${request.id} and ${request.invocation}` }] };
+        }
+        return parsed;
+      },
+      scope: { write: null, measurement: null, size: null },
+      keep: (ended, value) => ended === 'submitted' && value !== undefined ? kept : finished('not-kept'),
+      });
+      if (qualification.ended !== 'submitted' || qualification.value === undefined) {
+        await this.fail(run, 'invalid-submission', `The local architect could not qualify ${request.id}`);
+        return null;
+      }
+      const pending = qualification.value;
+      if (pending.kind === 'request-placement') {
+        const resolution = await this.requestPlacement(run, agent, packages, baseline, item, {
+          forCapability: request.id, question: pending.problem, requiredBehavior: request.original.need,
+          findings: pending.evidence.map(text => ({ text, citations: [] })),
+          candidates: request.original.suggestedProvider === undefined ? [] : [{ owner: request.original.suggestedProvider.module,
+            note: request.original.suggestedProvider.reason }],
+          unresolved: [pending.problem], hypotheses: [], localDecisions: [],
+        });
+        if (resolution === null) return null;
+        returned = resolution.kind === 'decided'
+          ? `Placement decision ${resolution.decision.id}: ${JSON.stringify(resolution.decision)}`
+          : `The global architect could not settle placement ${resolution.request}: ${[...resolution.findings, ...resolution.gaps].join('; ')}`;
+        point = qualification.ref || undefined;
+        parentSession = qualification.kept ? qualification.session : undefined;
+        continue;
+      }
+      if (pending.kind === 'unresolved') {
+        const resolution = await this.resolveUnresolved(run, agent, packages, baseline, item, {
+          invocation: qualification.id, conflict: pending.problem, evidence: pending.evidence,
+        });
+        if (resolution === null) return null;
+        returned = `The responsible global architect answered the unresolved request: ${JSON.stringify(resolution)}`;
+        point = qualification.ref || undefined;
+        parentSession = qualification.kept ? qualification.session : undefined;
+        continue;
+      }
+      break;
+    }
+    if (qualification?.value === undefined ||
+      (qualification.value.kind !== 'satisfy-with-existing' && qualification.value.kind !== 'delegate-capability')) {
+      await this.fail(run, 'limit-exceeded', `Qualification of ${request.id} did not settle within the captured work-item bound`);
+      return null;
+    }
+    const decision = qualification.value;
+    if (decision.kind === 'satisfy-with-existing') {
+      await this.write(run, { type: 'capability-qualified', data: {
+        request: request.id, invocation: qualification.id, outcome: 'satisfied', evidence: decision.evidence,
+      } });
+      return { kind: 'satisfied', guidance: [
+        `Request ${request.id} was satisfied by existing behavior. Verify it from your original calling code and examples.`,
+        `API: ${decision.api.owner}, ${decision.api.path}, ${decision.api.symbol}`,
+        `Guidance: ${decision.guidance}`, `Evidence: ${decision.evidence.join('; ')}`,
+      ].join('\n') };
+    }
+    const records = committedRecords(run.log.ledger.replay());
+    const taskId = capabilityTaskId(records.capabilityTasks.size + 1);
+    const providerItems = records.workItems.filter(entry => entry.module === decision.provider);
+    const task: CapabilityTask = {
+      schema: 'ramify-agent.capability-task/1', id: taskId, request: request.id,
+      parent: request.parent, originatingAssignment: assignment.id, consumer: item.module,
+      provider: decision.provider, placementReason: decision.placementReason,
+      authority: [
+        { owner: item.module, reason: 'Requesting consumer integration and task-local architecture' },
+        ...(decision.provider === item.module ? [] : [{ owner: decision.provider, reason: decision.placementReason }]),
+      ],
+      relatedEntries: providerItems.map(entry => ({ entry: entry.id, reason: 'Provider entry remains separate from this task' })),
+      deferredWorkItems: providerItems.map(entry => entry.id), source,
+      limits: captureCapabilityLimits(run.record.policy),
+    };
+    const plan: CapabilityPlan = {
+      schema: 'ramify-agent.capability-plan/1', task: task.id, revision: 1, basedOn: 0,
+      updatedBy: qualification.id, revisionReason: 'Initial qualified request',
+      need: request.original.need, proposedInterface: 'Undecided; the capability architect examines actual source and use',
+      useCases: request.original.examples.map(example => ({ id: example.id, expectedBehavior: example.title,
+        derivedFrom: [example.id], coverage: { state: 'unresolved' as const, reason: 'Implementation and real use pending' } })),
+      compatibility: [...request.original.constraints],
+      outline: ['Review existing behavior and affected owners', 'Coordinate provider and consumer work', 'Verify real use and hand back'],
+      decisions: [{ decision: `Coordinate in ${decision.provider}`, reason: decision.placementReason, evidence: [...decision.requirementRefs] }],
+      openQuestions: [], requirementRefs: [...decision.requirementRefs],
+      originalExamples: request.original.examples.map(example => example.id),
+    };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, {
+      type: 'capability-delegated', data: { task: task.id, request: request.id, parent: item.id,
+        invocation: qualification.id, planRevision: 1 },
+    }, [
+      { path: capabilityLayout.task(task.id), id: task.id, revision: 1, body: task },
+      { path: capabilityLayout.plan(task.id, 1), id: task.id, revision: 1, body: plan },
+    ]));
+
+    // The provider entry's recorded decisions belong in the fresh briefing.
+    // It receives the selected source package whole, while its own transcript
+    // has none of either local architect's history.
+    const providerDecisions = [...records.decisions.values()].filter(entry =>
+      entry.owner === decision.provider || providerItems.some(item =>
+        item.id === entry.workItem || entry.revises?.affected.some(affected => affected.workItem === item.id)));
+    let selected = contextPackage?.text ?? new TextDecoder().decode(await readFile(run.path(runLayout.capturedPlan)));
+    if (providerItems.length > 0 && contextPackage !== undefined) {
+      const selector = packages.get('context-selector');
+      if (selector === undefined) {
+        await this.fail(run, 'internal', 'No context selector is available for the expanded owner set');
+        return null;
+      }
+      const catalog = await this.frozenCatalog(run);
+      const expanded = await this.selectElements(run, agent, selector, item, {
+        catalog, planDeviations: this.planDeviationsOf(run),
+        workItemElements: [...new Set([
+          ...item.requirementRefs, ...item.acceptanceRefs, ...item.contextRefs,
+          ...providerItems.flatMap(entry => [...entry.requirementRefs, ...entry.acceptanceRefs, ...entry.contextRefs]),
+        ])],
+      }, {
+        packet: [
+          `Capability task ${task.id} adds provider ${decision.provider} to the relevant owner set.`,
+          `Original request: ${request.original.need}`,
+          `Earlier package: ${contextPackage.citation.elements.join(', ') || '(no elements)'}`,
+          `Provider decisions: ${JSON.stringify(providerDecisions)}`,
+        ].join('\n'), orientationInvocation: qualification.id,
+        point: qualification.ref || null, session: qualification.kept ? qualification.session : undefined,
+      });
+      if (expanded === 'failed' || expanded === undefined) {
+        await this.fail(run, 'inputs-changed', `The expanded owner context of ${task.id} could not be selected`);
+        return null;
+      }
+      const delivered = await readRecordedContextSelection(run.directory, expanded, catalog, this.planDeviationsOf(run));
+      if (delivered.status === 'unavailable') {
+        await this.fail(run, 'inputs-changed', `The expanded owner package of ${task.id} is unavailable: ${delivered.reason}`);
+        return null;
+      }
+      selected = delivered.packageText;
+    }
+    const loaded = packages.get('capability-architect');
+    if (loaded === undefined) {
+      await this.fail(run, 'internal', 'No capability architect package was captured');
+      return null;
+    }
+    const selectedHash = sha256(selected);
+    let coordinatorPoint: string | undefined;
+    let coordinatorSession: SessionId | undefined;
+    let coordinatorBasis = qualification.id;
+    let progress = '';
+    for (let attempt = 1; attempt <= task.limits.maxInvocations; attempt += 1) {
+    const action = await this.runInvocation(run, agent, {
+      role: 'capability-architect', work: { capabilityTask: task.id, request: request.id }, attempt,
+      loaded, systemPrompt: renderCapabilityArchitectPrompt(loaded, this.projectRoot),
+      prompt: [
+        `# Capability task ${task.id}`, `Use task ${task.id}, planRevision 1 and invocation ${coordinatorBasis} as your action basis.`,
+        ...(attempt === 1 ? [
+          `Original request: ${JSON.stringify(request, null, 2)}`,
+          `Current plan: ${JSON.stringify(plan, null, 2)}`,
+          `Provider entry decisions: ${JSON.stringify(providerDecisions, null, 2)}`,
+          `Provider entry outlines: ${JSON.stringify(providerItems.map(entry => ({ item: entry.id, outline: records.outlines.get(entry.id) ?? [] })), null, 2)}`,
+          `Read the live source at ${request.original.usage.map(use => use.path).join(', ')} and its tests. The snapshot at ${request.source.snapshot} records the suspension tree.`,
+          `# Selected plan package ${selectedHash}\n\n${selected}`,
+        ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
+          `Progress from the last turn: ${progress}`]),
+      ].join('\n\n'),
+      start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
+      ...(coordinatorPoint === undefined || coordinatorSession === undefined
+        ? { requestedBy: { invocation: qualification.id, reason: 'capability-needed' as const } }
+        : { session: coordinatorSession, continuing: 'capability-coordination' as const }),
+      toolName: 'submit_capability_action', description: 'Record the next action for this capability task.',
+      inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
+      submissionSchema: 'ramify-agent.capability-action/1',
+      validate: input => {
+        const state = replayCapabilityState(run.log.events).tasks.get(task.id);
+        if (state === undefined) return { ok: false, errors: [{ path: 'task', message: 'Task state is absent', expected: task.id }] };
+        const checked = validateCapabilityAction(input, {
+          task: task.id, planRevision: state.planRevision, coordinatorInvocation: state.coordinatorInvocation,
+          state: state.status, openAssignment: state.activeAssignment, openChild: state.activeChild,
+        });
+        return checked.valid ? { ok: true, value: checked.value }
+          : { ok: false, errors: checked.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message,
+            expected: issue.kind === 'state' ? 'current task authority' : 'the action schema' })) };
+      },
+      scope: { write: null, measurement: null, size: null }, keep: () => kept,
+    });
+    if (action.ended !== 'submitted') {
+      await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action`);
+      return null;
+    }
+    if (action.value?.kind === 'partial') {
+      progress = `${action.value.progress}; unfinished: ${action.value.unfinished.join('; ')}`;
+      coordinatorPoint = action.ref || undefined;
+      coordinatorSession = action.kept ? action.session : undefined;
+      if (coordinatorPoint === undefined || coordinatorSession === undefined) {
+        await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} lost its continuation point`);
+        return null;
+      }
+      coordinatorBasis = action.id;
+      await this.write(run, { type: 'capability-coordinator-resumed', data: {
+        task: task.id, invocation: action.id, session: coordinatorSession,
+      } });
+      continue;
+    }
+    // Iteration 3 acts on consultation and assignments. Until then the
+    // active task deliberately owns the frontier and can be stopped safely.
+    return { kind: 'delegated' };
+    }
+    await this.fail(run, 'limit-exceeded', `The capability architect of ${task.id} exhausted its invocation bound`);
+    return null;
+  }
+
   private async takeIteration(
     run: Run,
     agent: AgentPort,
@@ -6247,6 +6581,7 @@ export class RunService {
     item: WorkItem,
     assignment: IterationAssignment,
     assignedIndex: ArchitectIndex | null,
+    resume?: { readonly session: SessionId; readonly point: string; readonly guidance: string; readonly priorInvocation: string },
   ): Promise<IterationOutcome | null> {
     const loaded = packages.get('engineer');
     if (loaded === undefined) {
@@ -6268,26 +6603,27 @@ export class RunService {
       supportDocuments: baseline.supplementary.map(entry => entry.path),
     };
 
-    const invocations: string[] = [];
+    const invocations: string[] = resume === undefined ? [] : [resume.priorInvocation];
     const findings: string[] = [];
-    let sessionRef: string | undefined;
+    let sessionRef: string | undefined = resume?.point;
     /** The engineer's session while the harness keeps it; `sessionRef` is its executor's point. */
-    let session: SessionId | undefined;
+    let session: SessionId | undefined = resume?.session;
     /** A lost session the next one is reconstructed in place of. */
     let replacing: SessionId | undefined;
     let handoff: { done: string[]; unfinished: string[] } | undefined;
     let failedGate: { id: string; cause: string | null; summary: string[] } | undefined;
     let firstCause: { gate: string; cause: string | null } | undefined;
     let repairRound = 0;
-    let attempt = 0;
+    let attempt = resume === undefined ? 0 : run.log.all('invocation-started').filter(event => event.data.work.iteration === assignment.id && event.data.role === 'engineer').length;
+    let guidancePending = resume?.guidance;
 
     // Closing the iteration closes the work of a session still kept for it.
-    const close = async (outcome: IterationResult['outcome'], extra: Partial<IterationResult> = {}): Promise<IterationOutcome> => {
+    const close = async (outcome: IterationResult['outcome'], extra: Partial<IterationResult> = {}): Promise<ClosedIterationOutcome> => {
       const result = await this.closeIteration(run, item, number, assignment, {
         outcome, invocations, findings, gate: null, commit: null, ...extra,
       });
       await this.finishSession(run, session, 'work-closed');
-      return { result };
+      return { kind: 'closed', result };
     };
 
     for (;;) {
@@ -6358,7 +6694,7 @@ export class RunService {
         attempt,
         loaded,
         systemPrompt,
-        prompt: iterationMessage({
+        prompt: `${iterationMessage({
           assignment,
           projectRoot: this.projectRoot,
           workingDirectory,
@@ -6368,14 +6704,14 @@ export class RunService {
           ...(handoff === undefined ? {} : { handoff: { ...handoff, returns: this.budgetReturns(run, assignment.id) } }),
           ...(briefedScenarios === undefined ? {} : { scenarios: briefedScenarios }),
           ...(assignmentPackage === undefined ? {} : { package: assignmentPackage }),
-        }),
+        })}${guidancePending === undefined ? '' : `\n\n# Qualified existing behavior\n\n${guidancePending}`}`,
         start,
         session,
         // The engineer is kept only after a proposed completion, and
         // continued only for the repair its failing gate asks for. The
         // harness point is its previous invocation's end: the note appended
         // before it is the executor's, and no other session starts from it.
-        continuing: 'repair',
+        continuing: resume === undefined ? 'repair' : 'capability-returned',
         ...(replacing === undefined ? {} : { replaces: { session: replacing, reason: 'reconstructed' } }),
         ...(degraded === undefined ? {} : { degraded }),
         // A proposed completion is kept for the repair its gate may ask
@@ -6387,7 +6723,8 @@ export class RunService {
             return finished(this.budgetReturns(run, assignment.id) + 1 >= run.record.policy.limits.budgetReturnsPerIteration ? 'work-closed' : 'not-kept');
           }
           if (ended !== 'submitted' || value === undefined) return finished('not-kept');
-          return value.kind === 'completion-proposed' ? kept : finished('work-closed');
+          return value.kind === 'completion-proposed' || (value.kind === 'capability-needed' && this.workflow !== null)
+            ? kept : finished('work-closed');
         },
         toolName: engineerToolName,
         description: engineerSubmissionDescription,
@@ -6397,6 +6734,7 @@ export class RunService {
         // before it is judged, because the hook checks saw only the
         // mutations they covered.
         validate: async input => validateEngineer(input, {
+          capabilityWorkflow: this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion,
           obligation: assignment.evidenceObligations
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
           kind: assignment.kind,
@@ -6424,6 +6762,7 @@ export class RunService {
         endedAs: () => (tools.exhausted() ? 'invalid-submission' : undefined),
       });
       invocations.push(result.id);
+      guidancePending = undefined;
       sessionRef = result.kept && result.ref !== '' ? result.ref : undefined;
       session = sessionRef === undefined ? undefined : result.session;
       replacing = undefined;
@@ -6506,6 +6845,7 @@ export class RunService {
         findings.push(`the behavior needed for "${need.capability}" is owned outside this scope: ${result.value.summary}`);
         const closed = await close('partial');
         return {
+          kind: 'closed',
           result: closed.result,
           need: {
             need,
@@ -6514,6 +6854,15 @@ export class RunService {
             invocation: result.id,
           },
         };
+      }
+
+      if (result.value.kind === 'capability-needed') {
+        if (this.workflow === null || result.ref === '' || !result.kept || run.writer.isUnsettled) {
+          await this.fail(run, 'internal', 'The requesting engineer could not be retained after its writer settled');
+          return null;
+        }
+        return { kind: 'capability-needed', summary: result.value.summary, need: result.value.request,
+          invocation: result.id, session: result.session, point: result.ref };
       }
 
       const proposal = result.value;
@@ -6545,7 +6894,7 @@ export class RunService {
           // verification that replaced every fake injection closes its
           // requirement.
           if (!await this.dischargeEvidence(run, item, assignment, gate.id, closed)) return null;
-          return { result: closed };
+          return { kind: 'closed', result: closed };
         }
 
         if (gate.next === 'retry-infrastructure') {
