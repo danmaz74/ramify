@@ -86,9 +86,10 @@ When work requires a broad search space, split it into individual iterations,
 each with one focused goal, explicit write boundaries and a clear completion
 check. Each invocation retrieves only the information needed for that goal.
 
-A focused goal may require coordinated changes to several artifacts. Designing
-an interface, its tests and fake, and integrating them in one consumer can form
-a single coherent iteration.
+A focused goal may require coordinated changes to several artifacts. A fresh
+capability architect may read relevant consumer and provider source and evidence
+for one bounded task without inheriting either local architect's full history.
+It continues within the task and returns a concise brief after verification.
 
 The division of work should also facilitate integration and maintain a clean
 architecture. Every other principle serves this divide-and-conquer
@@ -157,9 +158,11 @@ breaking change necessary.
 
 ### Every Agent Scope Is a Cut on the Module Tree
 
-Agent roles differ only in which part of the module tree they see and may
-change. Ramify supplies the evidence for choosing that scope and enforces the
-model within it.
+An architect's read and design context can span several modules. Each engineer
+has a separate module write scope. A capability architect's authority to
+coordinate several owners does not combine their write scopes or change their
+module responsibilities. Ramify supplies the evidence for choosing each scope
+and enforces the model within it.
 
 The tree states who has authority over an interface. A parent owns the
 boundaries of its children. An interface between two branches belongs to
@@ -207,54 +210,31 @@ the choice. Work decomposition is not 1:1 with module decomposition.
 
 ### Horizontal Work Uses Separate Agents Joined by a Contract
 
-Implementation in different branches uses separate agents. Neither side
-designs the other's interface.
+Implementation in different branches uses separate scoped engineers. A fresh
+capability architect coordinates the interface, provider implementation,
+affected consumers and requesting consumer under one durable task. It reads
+the relevant source and evidence, revises the design as findings develop, and
+handles the task's decisions through verified handback. A separate contract
+iteration or fake integration before provider work is not required.
 
-A contract iteration has the focused goal of establishing an agreement and
-integrating it in the requesting consumer. Its agent reads both sides of the
-seam and, where the capability changes symbols that already have consumers,
-may read all of those consumers. It writes the shared interface, conformance
-tests and any required fake, and makes the consumer changes needed to
-integrate them. Provider
-implementation and changes to other consumers remain separate work.
-
-The iteration verifies the agreement against the consumer's behavior before
-provider implementation begins.
-
-No separate role carries it out. An engineer does, with a skill for contract
-work that the harness supplies with the iteration. What keeps the agreement
-from serving one side is not who writes it: it is what the iteration must
-read, the executable evidence it must produce, and the provider's standing to
-report that a contract needs revision.
-
-Changing symbols that already have consumers preserves those consumers'
-contracts, including their behavioral guarantees. If a proposed design would
-require changes to other consumers, the contract iteration first seeks a
-compatible design. If the
-requirement makes compatibility impossible, it reports the conflict for an
-explicit contract-revision decision. Only an accepted breaking change creates
-migration work in other consumers. Revalidating compatibility may require
-running their tests without changing their code.
+Existing consumer contracts and behavioral guarantees remain binding. The
+architect seeks a compatible design first. A change that must break a
+guarantee needs the existing explicit breaking-change authority and migration
+work in affected owners. Passing checks against a revised API cannot silently
+remove an earlier guarantee.
 
 ### Fakes and Tests Guide Delegation
 
-Work is delegated as executable evidence, never as prose alone.
+An engineer's capability request records required behavior, actual or
+prospective usage, known constraints and examples. Pseudocode and proposed
+signatures remain provisional. The original need survives plan and API
+revisions. Executable evidence develops with the design, and real provider
+and requesting-consumer verification precede handback.
 
-The consumer implements its real behavior against a fake of what it needs.
-Using the fake reveals what the requirement actually is, before anyone
-implements it. The fake replaces only the missing part; existing behavior
-stays real.
-
-The tests that pass against the fake become the provider's obligation. The
-provider's work is complete when the same tests pass unchanged against the
-real implementation.
-
-A delegation is finished only when the consumer's own behavioral tests pass
-with the real provider in place of the fake. Passing against a fake is never
-completion.
-
-This applies to a seam, to a need discovered during work, and to a parent
-delegating to a descendant outside its agent's scope.
+A fake can help implement or test a seam, but is optional. Passing a fake does
+not complete the task. When a test signature changes with an API revision, or
+an expected value proves wrong, the architect records why and preserves the
+case's behavioral requirement. Changing tests alone cannot erase it.
 
 ### Fakes Are Explicitly Named
 
@@ -265,8 +245,8 @@ Re-exports preserve that designation rather than exposing a fake under a
 production-looking name.
 
 Shared contracts keep behavior-oriented names, such as `SendEmail`, because
-both the fake and the real provider implement them. The contract iteration
-checks the naming convention as part of completion.
+both the fake and the real provider implement them. The implementing
+assignment and its gate check the naming convention when a fake is used.
 
 Explicit names make fakes recognizable in source and generated architectural
 evidence. A contract and fake can establish a capability's intended placement;
@@ -278,10 +258,10 @@ A fake is placed and used at the seam where the real provider will act, and
 exactly the modules that will receive the real export receive the fake. A
 fake that reaches further is wired where the real provider never acts, and
 retiring it means re-plumbing its consumer. The agreement names the real
-export each fake stands for, and the gates verify the parity while the fake
-is registered. The agreement also names the files that hold the fake, on
-either side of the seam; the contract iteration may write exactly those
-files beyond its scope, and nothing else of the provider's internals.
+export each fake stands for, and the implementing assignments and their gates
+verify exposure parity while it is used. Every source change remains within
+the assigned module scope; a fake file does not create an exception allowing
+an engineer to write in another owner's internals.
 
 Retiring a fake is the harness's and its agents' concern: verification
 replaces it with the real provider and removes its exposure with it. Ramify,
@@ -295,7 +275,8 @@ when the analysis is accepted. Agents bind them late, with step definitions,
 and never change them; only the harness writes a feature file or moves a
 scenario's state.
 
-A scenario that passes against a fake is bound, not done, as a delegation is.
+A scenario that passes against a fake is bound, not done; real integration
+and its current gate remain required.
 A plan is finished when every scenario passes in full mode at the final
 gate. A completed automated run may still await a person's decision on a
 non-functional plan deviation. Merge readiness requires that decision on the
@@ -318,13 +299,16 @@ required gate into an option.
 
 ### Work Starts at the Consumer; Integration Happens on the Return
 
-Work begins at the highest consumer of the feature. It writes its behavioral
-tests, implements against fakes of what it lacks, and delegates each fake's
-obligation. Each provider repeats this for what it lacks in turn.
+Work begins at the highest consumer of the feature. An engineer records a
+capability request when required behavior is outside its scope, preserving its
+partial candidate and original examples. The qualified task coordinates
+provider work, compatibility repairs and real consumer integration. A nested
+request suspends its parent task and runs depth-first. Unrelated frontier work,
+including a provider's separate entry, stays deferred until handback.
 
-On the return, each fake is replaced by its real provider and the tests of
-that level run again. Integration therefore happens one delegation at a time,
-at every level, and not once at the end.
+The capability architect verifies the requesting consumer against the real
+provider before handback. The parent then resumes its broader goal; the
+handback does not complete that goal or the provider's separate entry.
 
 The implementation map says which modules carry the work. This order says where
 the work starts and how it reaches them.
@@ -362,9 +346,11 @@ The harness never treats every discovery as a reason to pause the run.
 
 ### State Lives in the Repository
 
-A blocked agent completes what it can and leaves a failing test, a stub and a
-written need. It reports partial completion with its needs, and any fresh
-agent can continue from the repository.
+A blocked engineer records its need and may leave failing tests, stubs, staged
+edits or untracked source. The harness captures the dirty candidate and its
+attribution after the writer settles and before suspension. Fresh recovery
+uses the durable request, plan, source and results; it cannot discard the
+candidate or invent a completed engineer result.
 
 Only the next iteration's goal is fixed; later iterations are decided from
 the state reached. Resuming a session is an optimization, never a requirement
@@ -386,7 +372,10 @@ Substantial composition work is split into focused iterations. Each invocation
 addresses one composition issue with explicit write boundaries and a clear
 completion check, even when it needs to search the whole common subtree.
 
-The conformance tests of each seam prevent it from redesigning a contract.
+The integration agent honors each seam's currently accepted interface,
+behavioral guarantees and evidence. If composition calls for a revision, the
+capability task reopens, coordinates affected owners and verifies the new
+candidate. Editing tests alone does not remove a guarantee.
 Feature-level tests at the common ancestor decide completion.
 
 ### A Small Closed Set of Outcomes Is the Whole Protocol
@@ -394,10 +383,14 @@ Feature-level tests at the common ancestor decide completion.
 An agent resolves ordinary failures itself: compile errors, failing tests and
 violations reported by Ramify's checks.
 
-It reports to the harness only an outcome that changes the orchestration: the
-goal is reached; the work is partially complete, with its needs; a contract
-needs revision; the request cannot be satisfied as specified; the implementation
-map is wrong. The harness acts on nothing else.
+Each role submits from a closed action union. A requesting engineer can
+propose completion, report partial work or request a capability. The local
+architect qualifies reuse or delegates. The capability architect consults,
+revises its plan, assigns scoped work, delegates a nested need, records a
+placement conflict or requests handback. An accepted submission changes the
+orchestration; it does not claim that implementation is accepted. Read,
+plan-update and prevalidation tools have explicit recorded effects but do not
+complete work. The harness applies only accepted actions and current gates.
 
 A request that cannot be satisfied because of how the gate or the harness runs
 is an environment problem: it is reported to the operator, never answered as a

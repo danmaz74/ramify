@@ -131,7 +131,7 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   await opened.service.settled('need', receipt.jobId);
 }, 30_000);
 
-test('CA33: public composition rejects policy/5 before rollout', async () => {
+test('historical test composition cannot create a policy/5 run', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -140,8 +140,33 @@ test('CA33: public composition rejects policy/5 before rollout', async () => {
     readinessExecution: directReadinessExecution(),
     policy: root => capabilityPolicyFrom(testPolicy(root)) });
   cleanups.push(() => opened.service.close());
-  await expect(opened.service.execute(startRun('need'))).rejects.toThrow('unavailable through production run commands');
+  await expect(opened.service.execute(startRun('need'))).rejects.toThrow('historical test workflow cannot create');
 });
+
+test('CA33: production composition captures policy/5 and delegates without contract dispatch', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const opened = await openRuns(fixture.root, {
+    production: true, git: gitService, script: script([]), inputs: treeInputs(),
+    readinessExecution: directReadinessExecution(),
+  });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
+    event.type === 'capability-delegated' || event.type === 'job-failed'));
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(events.filter(event => event.type === 'capability-delegated')).toHaveLength(1);
+  expect(events.filter(event => event.type === 'contract-requested')).toHaveLength(0);
+  const job = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as {
+    policy: { version: string }; prompts: Record<string, unknown>;
+  };
+  expect(job.policy.version).toBe('run-policy/5');
+  expect(job.prompts['capability-architect']).toBeDefined();
+  expect(job.prompts['contract-engineer']).toBeUndefined();
+  await opened.service.close();
+}, 30_000);
 
 test('an unresolved qualification returns through the global architect and the same local architect', async () => {
   const fixture = await copyCapabilityFixture();
@@ -164,7 +189,18 @@ test('an unresolved qualification returns through the global architect and the s
     'local-architect:submit_capability_qualification:continue',
     'local-architect:submit_capability_qualification:continue',
   ]);
-  await opened.service.execute(stopRun('need', receipt.jobId, events.at(-1)!.sequence));
+  // The runner may append another event after the on-disk snapshot above.
+  // Stop against the live version, retrying only that optimistic-concurrency race.
+  for (;;) {
+    const current = opened.service.getRun('need', receipt.jobId)!;
+    if (current.state !== 'running') break;
+    try {
+      await opened.service.execute(stopRun('need', receipt.jobId, current.version));
+      break;
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('version')) throw error;
+    }
+  }
   await opened.service.settled('need', receipt.jobId);
 }, 30_000);
 
@@ -211,7 +247,15 @@ test('CA02: local architect finds an existing API and the same engineer verifies
   expect(events.filter(event => event.type === 'capability-delegated')).toHaveLength(0);
   expect(events.filter(event => event.type === 'contract-requested')).toHaveLength(0);
   if (!events.some(event => event.type === 'job-completed' || event.type === 'job-failed')) {
-    await opened.service.execute(stopRun('need', receipt.jobId, events.at(-1)!.sequence));
+    for (;;) {
+      const version = opened.service.getRun('need', receipt.jobId)!.version;
+      try {
+        await opened.service.execute(stopRun('need', receipt.jobId, version));
+        break;
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('version')) throw error;
+      }
+    }
   }
   await opened.service.settled('need', receipt.jobId);
 }, 30_000);

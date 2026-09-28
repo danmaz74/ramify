@@ -1,7 +1,6 @@
 import type { RunPolicy } from '../run/records.js';
 
-/** The version reserved for capability workflow runs. Production continues
- * capturing run-policy/4 until the replacement workflow is enabled. */
+/** The policy version captured by every new production run. */
 export const capabilityRunPolicyVersion = 'run-policy/5';
 
 export interface CapabilityLimits {

@@ -1,9 +1,12 @@
 # Autonomous implementation loop with global and local architects
 
-**Status:** Proposed architecture, developed as hypothesis 3b. No implementation or validation of this loop is claimed.
+**Status:** Current implementation design, developed from hypothesis 3b and
+revised by [Plan 16](../plans/16-capability-architect/main-plan.md). The
+production capability workflow has scripted verification; its live Pi and
+served-browser acceptance remains a separate gate.
 
-This is a variant of [hypothesis 3](../decomposition/dan-hypothesis-3.md), copied as a separate
-hypothesis. It keeps the same execution design but changes how the global
+This design grew from [hypothesis 3](../decomposition/dan-hypothesis-3.md). It
+keeps bounded execution and changes how the global
 architect handles placement requests: a fork of its current context investigates
 and makes the decision. A concise decision brief is appended to the long-lived
 session without invoking the model there; the next fork inherits that update.
@@ -15,10 +18,10 @@ decisions, and removes all waits for human review from the MVP. The local
 architect plans a module work item and tests the global architect's hypotheses
 against concrete work.
 
-It deliberately differs from the current [harness principles](../harness.principles.md)
-where they require a person's architectural approval, and from the
-[non-breaking-only MVP](../decomposition/breaking-vs-non-breaking-plans.md). Those documents
-remain unchanged; this hypothesis explores a different implementation boundary.
+The current [harness principles](../harness.principles.md) describe its
+capability coordination and verification rules. The earlier
+[non-breaking-only MVP](../decomposition/breaking-vs-non-breaking-plans.md)
+remains a historical design boundary.
 
 [Acceptance scenarios](acceptance-scenarios.md), implemented by
 [Plan 10](../plans/10-acceptance-scenarios/main-plan.md), change this design
@@ -52,30 +55,27 @@ model invocation. Iteration planning happens locally: a local architect examines
 the assigned goal, its module and the architect view, plans iterations, and
 delegates each iteration to an engineer.
 
-During its initial analysis, the local architect identifies required breaking
-changes and isolates them into ordinary scoped implementation iterations.
-Non-breaking iterations use the contract and delegation process below.
-
-In a non-breaking iteration, an engineer that needs work outside its scope
-invokes a contract sub-session.
-That session establishes the agreement, tests and fake and integrates them in
-the consumer. The harness registers the provider obligation. The engineer
-continues from the changed files, and the provider is implemented later through
-the same module-work-item process.
-
-Vertical and horizontal delegation use this same mechanism. Their differences
-concern scope and contract ownership, not different execution protocols.
+The local architect identifies required breaking changes and delegates
+bounded engineer assignments. An engineer needing behavior outside its scope
+records a capability request with actual calling code, constraints and
+examples. Its partial source is captured after the writer settles. The local
+architect qualifies existing behavior and, when new coordination is needed,
+delegates to a fresh capability architect. That task's architect coordinates
+separate owner-scoped engineers, current design, real provider and requesting
+consumer checks through verified handback. The original engineer and work
+item resume their broader goal after handback.
 
 | Role | Responsibility |
 | --- | --- |
 | Global architect | Maintains architectural hypotheses, considers shared needs and resolves placement across responsibility boundaries or where local ownership is uncertain. |
 | Local architect | Tests relevant hypotheses against module work, makes local decomposition choices, and plans and assesses engineer iterations. |
 | Module engineer | Implements an assigned iteration within its goal and write scope. |
+| Capability architect | Coordinates one delegated task, its owner assignments, consultation, checks and handback. |
 | Harness | Runs sessions, persists records, schedules work and enforces transitions. |
 
 The local architect is assigned to one module work item, not permanently to a
-module. Its responsibility ends when that work item and its obligations are
-complete. Local authority does not imply local-only visibility: it can consult
+module. Its responsibility ends when that work item's own gates complete.
+Local authority does not imply local-only visibility: it can consult
 the global architect view to discover reuse and surrounding responsibilities.
 
 ## 1. A global architect: form hypotheses first, resolve actual needs later
@@ -98,12 +98,13 @@ execution gate.
 **Architectural hypotheses and actual decisions are separate records.** Both
 are available for display and human review, without an approval wait. The harness starts work
 from the entry assignments; it never turns deeper hypothesis entries directly
-into work items, provider obligations or completion requirements. The original
+into work items, capability tasks or completion requirements. The original
 request remains the source of feature-level acceptance and constraints.
 
 A top-level work item gets its goal from the relevant request requirements.
-A provider work item gets its goal from a consumer's registered obligation.
-Both are handled by the same local architect process.
+A provider's independent entry work item retains its own goal and gates. A
+capability task may assign its owner while deferring that entry; the task does
+not absorb or complete it.
 
 ### Resolve shared placement in sequential global architect forks
 
@@ -136,21 +137,19 @@ come to the global architect in both breaking and non-breaking work.
 
 The global architect resolves shared or uncertain capability identity and
 ownership; the local architect makes bounded local placement and decomposition
-choices and decides iterations and scope. Engineers establish contracts and
-implement assigned work. Placement does not establish requester-specific importability
-or implementation readiness, or replace the contract's executable evidence.
-A contract, explicitly named fake or partial implementation can already identify
-the intended capability and owner. The architect can direct another local architect
-to that capability without claiming that its provider is complete. The
-local architect uses the contract, iteration and obligation records to determine
-what can be used and what still requires work. Unfinished work changes placement
-only when new evidence calls the capability identity or ownership into question.
+choices and decides iterations and scope. Scoped engineers implement the
+affected owners. Placement does not establish requester-specific importability
+or implementation readiness. A contract, fake or partial implementation may
+identify intended behavior without establishing that its provider is ready.
+The architect reads current source, capability tasks, checks and handbacks to
+judge what can be used. Unfinished work changes placement only when new
+evidence calls capability identity or ownership into question.
 
 ### Keep architectural knowledge durable
 
 A shared capability registry records resolved capability identifiers,
 behavioral descriptions, owners and placement rationale, with references to
-contracts and provider obligations as those become available. It includes
+capability tasks and evidence as those become available. It includes
 decided capabilities that are not yet implemented, so later requests can find
 them. Hypothesis entries remain separately identifiable and may reference the
 decisions that confirm, revise or replace them. Preserve the initial hypotheses
@@ -272,9 +271,9 @@ silently combine different revisions.
 The fork can resolve placement and return proposed registry updates. The harness
 remains the writer of durable records; acceptance is protocol validation and
 persistence, not another agent or human approval. The fork has no source-write
-authority and does not create implementation obligations merely by placing a
-capability. Existing contract and implementation processes still establish those
-obligations and their completion.
+authority and does not create a capability task merely by placing a
+capability. A concrete engineer request starts task coordination and its
+separate completion gate.
 
 The local architect supplies a compact brief:
 
@@ -312,7 +311,7 @@ outside the parent context.
 
 Only conclusions of global architect invocations, including their hypothesis
 revisions, are appended through this mechanism. Local implementation changes,
-contracts and placement decisions remain in durable records and the registry;
+capability tasks and placement decisions remain in durable records and the registry;
 they are not routinely copied into the global context. Each fork retrieves
 relevant records alongside the refreshed view, and focused requests supply
 local findings that require global judgment. Planned capabilities must remain
@@ -369,7 +368,7 @@ established by the design alone.
 
 A module work item is a bounded goal assigned to a module, not all future work
 that might happen in that module. It may require several iterations. A later
-obligation in the same module can create another work item.
+entry in the same module can create another work item.
 
 The local architect has the architect view, access to the assigned module,
 requirements relevant to its goal, and the relevant global architectural
@@ -408,10 +407,10 @@ implementation and test sequence, and internal implementation details within
 that assignment. It reports discoveries that make the boundary unsuitable
 rather than silently expanding its scope.
 
-For example, an iteration may implement the customer-page send action against
-the agreed fake, including loading, success and failure behavior, within the
-page and its selected rendering child. Its completion check is the relevant
-consumer tests. The local architect need not prescribe component edits,
+For example, an iteration may implement the customer-page send action,
+including loading, success and failure behavior, within the page and its
+selected rendering child. Its completion check is the relevant consumer
+tests. The local architect need not prescribe component edits,
 individual test cases or each red/green step.
 
 The local architect may assign a small work item as one iteration. Several
@@ -423,10 +422,9 @@ The local architect's broader visibility serves a narrow planning responsibility
 It does not become an unrestricted implementation agent. It passes the engineer
 a bounded goal, write scope, applicable requirements, identified external
 capabilities to reuse or request, and evidence obligations. The handoff states
-whether the iteration uses ordinary breaking-change implementation or the
-non-breaking contract and delegation process. For each external capability,
-it identifies the owner and intended role. In non-breaking iterations,
-contract details are established through contract sub-sessions where needed;
+whether a known breaking change needs its explicit authority. For each
+external capability, it identifies the proposed owner and intended role.
+An engineer's new out-of-scope need enters the capability task protocol;
 newly discovered dependencies can revise the plan.
 
 Results return as concise findings, changed assumptions and artifact references,
@@ -509,12 +507,12 @@ its contents into context.
 
 When work must be delegated outside the assigned scope, the engineer writes
 the need as behavior: use cases, inputs and outputs, side effects, constraints
-and any existing executable evidence. It invokes the same contract mechanism
+and any existing executable evidence. It submits the same capability request
 whether the provider is a descendant or lies in another branch.
 
 Expected providers come from the local architect's planning. A newly discovered
 need is resolved within its local authority or referred to the global architect
-when shared or uncertain, before the contract is designed. This answers an
+when shared or uncertain, before a task plan is accepted. This answers an
 actual execution need; it does not make architectural hypotheses executable.
 
 The module tree still determines authority over interfaces. The module that
@@ -541,9 +539,8 @@ changing ownership and exposure.
 Start with the straightforward controls supported by pi's tool lifecycle.
 The harness intercepts `edit` and `write` calls before execution and blocks
 targets outside the invocation's recorded write scope. Apply the same rule to
-module engineers, contract sub-sessions and breaking iterations, using their
-respective scopes and explicitly assigned contract or exposure-declaration
-locations. Resolve paths relative to the invocation's working directory and
+module engineers, capability assignments and breaking iterations, using their
+respective module scopes. Resolve paths relative to the invocation's working directory and
 account for traversal and symlinks, including the existing parent of a new
 file. If the target cannot be resolved sufficiently to check its scope, block
 with that distinct reason rather than assuming it is allowed.
@@ -587,81 +584,60 @@ which tools were guarded and which activity was observed; zero blocked attempts
 does not prove that all writes respected scope. No broader enforcement guarantee
 is implied by enabling these controls.
 
-## 4. The contract sub-session
+## 4. A capability request and one coordinator
 
-This is an engineer invocation with the contracts skill, not a separate
-persona. The harness supplies the skill and scope explicitly. It may reuse
-the consumer module's oriented context, or start fresh from the files.
+An engineer whose assignment needs behavior outside its scope submits a
+`capability-needed` result with actual or prospective use sites, constraints,
+known interface evidence and examples. Proposed signatures and pseudocode are
+marked provisional. The harness settles its writer, captures staged, working
+and untracked source with attribution, and suspends the original assignment
+and session. Its local architect checks existing behavior and importability.
+A suitable API returns to the same engineer; an unresolved boundary receives
+the responsible architect's decision. A need requiring work becomes one
+durable capability task with a fresh capability architect.
 
-Its focused goal is to establish an executable agreement and integrate it in
-the requesting consumer. It has:
+The task records the original request, provisional source, current plan
+revision, owner assignments, consultations, checks, reviews and handback. The
+capability architect reads relevant A and B source and previous decisions. It
+can consult the requesting engineer read-only, or assign an explicit A-scoped
+experiment with the writer. Every source change, including compatibility
+repair in another owner, is made by an engineer with a module scope. Its
+assignments have one task-owned sequence across owners; they do not consume
+an owner's separate entry iteration numbers.
 
-- Read and write access to the consumer for that integration.
-- Read and write access to the selected contract, tests and fake locations.
-- Read access to the provider, or the requested capability and available
-  architectural evidence when no implementation exists.
-- Read access to existing consumers where the capability changes symbols
-  those consumers already use.
-- Explicitly scoped exposure-declaration changes when required by the chosen
-  access arrangement.
+One coordinator remains active for the task. New evidence revises its plan
+without rewriting the original request or dropping behavioral cases. A nested
+need suspends its parent and runs depth-first. During a task, unrelated work
+items, including a provider's own entry, stay deferred. The provider's entry
+retains its own goal, outline, sequence and completion gate. After handback its
+architect receives intervening changes and replans stale assignments before
+continuing.
 
-The session designs the interface, creates conformance tests and a fake for
-missing behavior, and integrates them in the consumer. It fixes integration
-issues until the relevant consumer tests pass against the fake and the fake
-passes the conformance tests. Existing behavior remains real.
+## 5. Real verification and return
 
-The session applies the [fake-naming principle](../harness.principles.md#fakes-are-explicitly-named):
-fake files use `.fake` before the language extension and exported fake
-implementations, factories and classes include `Fake`. Re-exports preserve
-that designation. For example, `send-email.fake.ts` exports
-`createSendEmailFake`, implementing the shared `SendEmail` contract. The shared
-contract keeps its behavior-oriented name; the consumer depends on that
-contract and receives the fake through injection. The session checks naming,
-including re-exports, as part of completion so generated architectural evidence
-does not present a fake under a production-looking name.
+Fakes can help an implementation, with explicit names and matching exposure,
+but no fake is mandatory and a fake pass is never handback. The capability
+architect coordinates provider and requesting-consumer tests, a combined
+current-source gate, semantic coverage review and checks of affected owners.
+A provisional type or test failure stays visible until an owner-scoped repair
+and fresh gate settle it. Correcting a wrong expected value or adapting an API
+test requires an explicit plan reason and preserves the original behavioral
+requirement.
 
-For an existing capability that only needs an exposure change, it establishes
-access and integrates the real behavior. No fake or provider implementation
-is required for behavior that already exists.
+A handback names the accepted plan revision, current source identity, checks,
+reviews, interface use and continuation brief. The harness verifies those
+references and the current candidate before accepting it. It resumes the
+requesting engineer and parent coordinator once; their broader work remains
+open. A post-handback finding creates linked revision work without rewriting
+the earlier accepted source or evidence.
 
-On completion, it returns the changed paths, agreement, evidence and any
-relevant findings. The caller rereads affected files and continues. It does
-not have a second fake-integration step to perform.
-
-The caller suspends writes while the sub-session operates in the consumer.
-The MVP uses one active implementation writer at a time, including nested
-sub-sessions.
-
-## 5. Registration, provider work and return
-
-A completed contract sub-session has two outputs: an integrated consumer state
-and, where implementation is missing, a provider obligation registered by the
-harness. The registration identifies the resolved capability, consumer,
-provider owner, required behavior, contract revision and executable evidence.
-Neither a hypothesis entry nor a placement decision alone registers a provider
-implementation obligation.
-
-Contract completion does not mean provider completion. The consumer can keep
-working against the fake while the obligation remains outstanding.
-
-For the initial scheduling policy, the consumer finishes available local work
-against fakes and yields at an iteration boundary when it needs real providers.
-The harness processes its provider obligations depth-first before moving to
-the next independent top-level work item. Each provider starts its own local
-architect and repeats the same process.
-
-The provider satisfies the registered conformance tests against the real
-implementation. The consumer then gets a verification iteration: replace the
-fake and rerun its behavioral tests. Only that verification closes the
-delegation. Completion of an individual iteration does not complete the
-module work item while local work or provider obligations remain. Once those
-are satisfied, the local architect requests the global completion gate
-described in section 8. Passing provider conformance alone does not bypass it.
-
-Repeated registration of the same obligation must not duplicate work. A new
-obligation or contract revision must not reuse an older completion merely
-because the capability has the same identifier. Shared obligations and cycles
-need explicit handling; their detailed representation remains open.
+An ordinary work item cannot complete with a pending request, a stopped task,
+or a delegated task without accepted current handback. The harness rechecks
+this predicate at the completion commit, along with ordinary scenarios,
+reviews and gates. Crashes reconstruct from durable records; an interrupted
+engineer with source changes needs its own structured result. A stopped task
+or exhausted bound remains explicitly unfinished and never becomes an
+accepted handback because a check happened to pass.
 
 ## 6. The local architect isolates breaking work before execution
 
@@ -677,10 +653,10 @@ affected. It plans iterations around those changes, isolating breaking work
 from compatible feature work as far as practical and ordering both according
 to their dependencies. It does not wait for human review.
 
-In the MVP, breaking iterations use ordinary agentic implementation: inspect
-affected code, change interfaces and implementations, adapt consumers, and run
-relevant tests. They do not require the contract/fake/provider-delegation
-process. That more structured process applies to non-breaking iterations.
+Breaking changes use scoped implementation: inspect affected code, change
+interfaces and implementations, adapt consumers, and run relevant tests.
+When discovered within a capability task, its architect coordinates affected
+owners and records the necessary authority and plan revision.
 
 Both approaches retain a bounded goal, explicit write scope, context-budget
 enforcement, recorded results and verification obligations. A breaking iteration
@@ -711,11 +687,10 @@ be adapted and verified before the run can complete. Previously completed work
 may acquire new verification obligations. Tests whose expectations the request
 explicitly supersedes are revised; unrelated guarantees remain requirements.
 
-Initial detection can miss a break. An engineer or contract sub-session that
-discovers one reports it to the local architect, which revises the remaining
-iterations and their execution approach. The engineer does not silently switch
-approaches or expand its writes. A contract sub-session still does not edit
-other consumers or implement the provider.
+Initial detection can miss a break. An engineer that discovers one reports it
+to its coordinating architect, which revises the remaining assignments and
+their execution approach. The engineer does not silently switch approaches or
+expand its writes; affected owners receive separate scopes.
 
 This draft does not introduce a dedicated migration state machine or claim
 that ordinary breaking iterations have the same intermediate guarantees as
@@ -764,9 +739,9 @@ the parent receives durable context updates without another model invocation.
 
 The global architect, local architects and engineers make semantic decisions within
 their respective responsibilities. The harness records work, launches
-invocations, registers obligations and applies explicit
-transitions. Calling a sub-session is an agent-facing operation backed by
-that same execution machinery, not an untracked child conversation.
+invocations, commits capability requests, assignments and handbacks, and
+applies explicit transitions. Consultation and nested delegation use that
+same durable execution machinery.
 
 The whole run is:
 
@@ -781,20 +756,20 @@ start -> assign entry capabilities and record the architectural hypotheses
 unresolved failure after bounded recovery -> failed, with evidence
 ```
 
-Work can wait for an architect decision, contract sub-session or provider, but
-never for human review. A final integration step handles composition at the common ancestor
+Work can wait for an architect decision, capability task, check or recovery,
+but never for human review. A final integration step handles composition at the common ancestor
 through focused iterations. An empty work queue is not sufficient for success;
 the original acceptance and all required obligations must be satisfied.
 
 Goals, architectural hypotheses, the capability registry, iteration plans,
-decisions, contracts and progress live in files. The harness's durable records identify invocations
-and accepted results. A crash
-restarts unfinished work from those files, without duplicating registered
-obligations. A caller that dies after its contract sub-session succeeds must
-be able to discover that result without receiving the original reply.
+decisions, capability requests, task plans and progress live in files. The
+harness's durable records identify invocations and accepted results. A crash
+restarts unfinished work from those records without duplicate handbacks. A
+caller that dies after handback can discover the accepted result without
+receiving the original reply.
 
 Reusing an oriented session is an optimization. The global architect and every
-local architect, engineer and contract sub-session must also work from a fresh
+local architect, engineer and capability architect must also work from a fresh
 session using durable records. Runtime failures remain separate from semantic
 outcomes; bounded recovery does not depend on
 a person answering a review request.
@@ -811,7 +786,7 @@ After bounded preparation recovery, unresolved readiness ends the run with
 evidence rather than waiting for review or beginning implementation anyway.
 
 Every invocation has a distinct identity. Before transferring write authority
-to a contract sub-session, checking the working tree or starting a replacement
+to another scoped engineer, checking the working tree or starting a replacement
 engineer, settle the previous writer's mutating tools. On timeout, cancellation
 or recovery after a crash, confirm that the superseded invocation and its
 mutating subprocesses have stopped before releasing write authority. Discarding
@@ -827,7 +802,7 @@ it has stopped is not sufficient evidence.
 ### Ramify hooks for engineering sessions
 
 Every engineering invocation uses harness-installed Ramify hooks, including
-module engineers, contract sub-sessions, breaking iterations and integration
+module engineers, capability assignments, breaking iterations and integration
 or verification iterations that edit source. Hook execution is part of the
 tool lifecycle, not an optional instruction for the agent to remember.
 
@@ -873,7 +848,7 @@ hardcoded type-check command. Behavioral test selection is mechanical:
 | Checkpoint | Required behavioral tests |
 | --- | --- |
 | Ordinary engineering iteration | All tests owned by modules in its assigned write scope. |
-| Contract sub-session | All tests owned by the consumer modules in its write scope and by the owners of the contract, fake and conformance suite; include fake conformance. |
+| Capability assignment | Tests owned by its assigned module scope; the combined task gate also verifies current provider and requesting-consumer behavior. |
 | Breaking-change iteration | All project tests. |
 | Local architect proposes work-item completion | All project tests. |
 | Final run completion | All project tests and the original feature acceptance checks. |
@@ -884,7 +859,7 @@ and the final run completion's feature acceptance checks are the plan's
 tracked scenarios, run in full mode.
 
 For an ordinary iteration, the scope means the assigned module's own tests
-plus all tests in each included child subtree. A contract artifact at a common
+plus all tests in each included child subtree. An artifact at a common
 ancestor includes that ancestor's own tests, not every descendant's tests
 unless those descendants are also included in the scope. Merely reading a
 provider does not include its tests. Selection does not shrink to changed files
@@ -893,28 +868,23 @@ or expand through an inferred impact graph. Include both module-owned
 the supported runner's discovery rules. Missing required commands or an empty
 selection where tests are required cannot silently pass.
 
-Registered evidence obligations are included even when their test artifacts
-are owned elsewhere: provider implementation runs the agreed conformance suite
-against the real provider, and consumer verification runs its behavioral tests
-against that provider. Contract sessions verify the fake; they are not required
-to pass tests against a provider that has not yet been implemented. The brief
-identifies these obligations before execution. The engineer cannot remove them
-or weaken an agreed contract to make a failing gate pass.
+The capability task's combined gate and review cover required provider and
+requesting-consumer behavior across owners. A provisional assignment failure
+remains evidence, not accepted migration. The architect records test revisions
+against original examples and current guarantees. No engineer can remove or
+weaken those guarantees to make a failing gate pass.
 
 Capture the check commands, selection policy and required evidence obligations
-before the iteration starts. The engineer may add or update tests to implement
+before the assignment starts. The engineer may add or update tests to implement
 the assigned behavior, but may not narrow discovery, disable required suites
-or weaken established conformance obligations to obtain a pass. Inspect changes
-to relevant test configuration and required contract artifacts against the
-captured assignment. Legitimate changes to established obligations return to
-the local architect for a recorded revision consistent with the original
-request and existing contract authority, without a human-review wait. This
-needs explicit obligations and checks on relevant changes, not a general
-sealed-file mechanism or an automated judgment of every test's quality.
+or weaken established guarantees to obtain a pass. Inspect changes to
+relevant test configuration and evidence against the captured assignment.
+Legitimate changes return to the coordinating architect for a recorded
+revision consistent with the original request and existing contract authority.
 
 "Local architect completion" means finishing its assigned module work item,
-including required provider work and consumer verification, not finishing each
-planning turn or yielding to a provider. Global tests can expose failures
+including accepted current capability handbacks and its own remaining gates.
+It does not follow from a task handback alone. Global tests can expose failures
 outside the most recent engineer's scope. Return those findings to the local
 architect, which assigns scoped repair work and requests the global gate again.
 It uses the existing placement and delegation rules when another owner is
@@ -963,7 +933,7 @@ Use a few explicit failure categories to select recovery:
 | Failed assertion, type error or Ramify violation within scope | Return diagnostics to the engineer for bounded repair. |
 | Runner failure, unavailable daemon or other execution infrastructure failure | Harness attempts bounded infrastructure recovery; do not ask the engineer to repair application code without evidence of a code defect. |
 | Invalid or lost agent session | Replace or reconstruct the session from durable records after settling its tools; preserve outstanding work and repair counters. |
-| Engineer or contract session that ends without a result: an idle or absolute bound, a provider error, an adapter fault, a session that stops on its own, or rejected submissions at their bound | After its writer settles, record the failure digest, run the failure analysis, close the iteration as partial with both and return to the local architect. The work item's iteration limit bounds repeated failures; an unconfirmed settlement still ends the run. |
+| Engineer session that ends without a result: an idle or absolute bound, a provider error, an adapter fault, a session that stops on its own, or rejected submissions at their bound | After its writer settles, preserve provisional source, record the failure digest and reconstruct a scoped engineer for the same capability assignment. A structured result and current gates are still required; an unconfirmed settlement blocks replacement work. |
 | Required change outside the assignment or to an established obligation | Return to the local architect for a scoped assignment or recorded obligation revision. |
 
 An invocation's idle bound measures the session's silence, not the harness's
@@ -1044,10 +1014,9 @@ working -> reporting -> returned(context_budget_reached)
 
 The harness persists this as an incomplete outcome. If reporting fails, it
 still returns the outcome with the available execution evidence and files;
-unfinished changes are not assumed to pass verification. A contract sub-session
-that returns incomplete must not register its contract as ready for provider
-implementation. Its caller accounts for the partial work before continuing or
-returning to the local architect.
+unfinished changes are not assumed to pass verification. A capability engineer
+that returns incomplete leaves its task unfinished; its coordinator assigns
+recovery and requires a structured result before handback.
 
 An architect decision fork that reaches its budget uses the same bounded
 reporting mechanism, returning partial findings and unresolved questions to the
@@ -1097,27 +1066,21 @@ Replacing engineer compaction with fresh invocations must not hide that signal.
    chooses the capability and server owner. The harness records that decision
    and appends its brief to the parent without invoking the model there. The
    local architect receives the decision and plans the page's iterations.
-3. An engineer implementing the action requests a contract sub-session. The
-   harness suspends its writes while the sub-session defines the server
-   agreement, tests and fake and integrates the fake into the page. The shared
-   contract is `SendEmail`; `send-email.fake.ts` exports `createSendEmailFake`.
-4. The harness registers the server obligation. The engineer receives the
-   changed paths and evidence, rereads them and completes its local iteration.
-5. When the page needs its real provider, the server work item starts. Its
-   local architect discovers an existing notification service and requests a delivery
-   placement. The next architect fork inherits the preceding decision brief,
-   checks current evidence and registers a new capability, `send-order-email`,
-   owned by that existing service module, recording that implementing it
-   changes symbols the service's current consumers already use. The service's
-   own notification capability is left as it stands. The fork revises the
-   relevant hypothesis: both consumers can share transport, while message
-   composition remains separate. The harness records the revision and supplies
-   it to affected local architects at their next coordination point. No
-   speculative delivery task needs cancellation: none was scheduled. The new
-   capability follows the same contract and delegation process as any other.
-6. The server satisfies the agreement. A page iteration replaces the fake and
-   verifies the real interaction. Final composition checks the feature as a
-   whole.
+3. An engineer implementing the action records a capability request with the
+   page's actual calling code, behavioral examples and partial source. The
+   local architect checks existing interfaces, then delegates the new server
+   behavior to a fresh capability architect.
+4. That architect reads the page and server evidence, revises one plan and
+   assigns separate scoped engineers to the server and page. If an existing
+   notification service changes a guarantee used by another consumer, its
+   owner receives a compatibility assignment and the original need remains
+   linked through the plan revisions.
+5. The architect verifies the real server behavior and page interaction
+   against current source, checks affected guarantees and requests handback.
+   The page engineer resumes its original assignment. The server's separate
+   entry work item later replans against the intervening changes and retains
+   its own completion gate.
+6. Final composition checks the feature as a whole.
 
 No step waits for review. Placement, contracts and other significant choices
 remain available for the person to inspect alongside the initial hypotheses.
@@ -1140,8 +1103,8 @@ the evaluation data, independently of source-change and context-usage metrics.
 Keep stable capability IDs, top-level capability references and explicit
 consumer-to-dependency links. Distinguish tentative hypotheses from confirmed
 capabilities and dependencies, and retain revisions and superseded entries.
-Link capabilities and consumer requirements to work items, contracts, provider
-obligations and verification evidence. A hypothesized dependency does not
+Link capabilities and consumer requirements to work items, capability tasks,
+their handbacks and verification evidence. A hypothesized dependency does not
 create an execution obligation.
 
 The harness derives plan-relative progress from these records:
@@ -1184,7 +1147,12 @@ as the graph evolves. Node and edge details expose the linked work, outstanding
 consumer requirements and evidence. The UI renders harness records; it does
 not infer dependencies from module imports or maintain a second progress model.
 
-## Open questions for the first experiment
+## Historical first-experiment questions
+
+The questions below record the earlier contract/fake experiment. Its
+provider-obligation scheduling was replaced for new runs by the capability
+task protocol above. The [Plan 16 acceptance matrix](../plans/16-capability-architect/acceptance.md)
+defines the current gates.
 
 1. **Provider scheduling and shared obligations.** How are readiness, revision
    identity and cycle detection represented with the smallest durable model?

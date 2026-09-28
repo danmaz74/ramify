@@ -31,7 +31,7 @@ import { TranscriptWriter } from '../transcripts/writer.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
 import { engineerWorkingDirectory } from '../work/engineer-directory.js';
 import {
-  engineerJsonSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
+  capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
   type EngineerSubmission,
 } from '../work/engineer.js';
 import type { IterationAssignment } from '../work/iterations.js';
@@ -50,7 +50,7 @@ import {
  * check after each mutation, the shell, the scoped test tool and the
  * validated submission. It holds the project lock for its whole life, so it
  * never runs beside an implementation run. Nothing follows its submission:
- * no contract iteration, no architect turn and no commit. With the gate
+ * no capability task, no architect turn and no commit. With the gate
  * option the iteration checkpoint runs over the module afterwards, and its
  * verdict is recorded; the changes stay in the working tree either way.
  *
@@ -181,7 +181,7 @@ export function sessionAcceptance(kind: EngineerSubmission['kind'], gate: boolea
     : kind === 'unsuitable'
       ? 'The report that this assignment is unsuitable was accepted and recorded.'
       : 'The report that the behavior you need is owned elsewhere was accepted and recorded.';
-  return `${what} Nothing follows it in this session: no contract, no architect and no further session act on it. A person reads your report. Nothing more is asked of you in this session.`;
+  return `${what} Nothing follows it in this session: no capability task, architect or further session acts on it. A person reads your report. Nothing more is asked of you in this session.`;
 }
 
 /** Runs one engineer session on one module, from the lock to the records. */
@@ -361,9 +361,11 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     bound: limits.rejectedSubmissionsPerTurn,
     // A claimed completion is checked afresh over the write scope before it
     // is judged: the hook checks saw only the mutations they covered.
-    validate: async input => validateEngineer(input, {
-      kind: 'ordinary', obligation: null, openFindings: await tools.findingsAtCompletion(input),
-    }),
+    validate: async input => capabilityEngineerSubmissionSchema.safeParse(input).success
+      ? validateEngineer(input, {
+        capabilityWorkflow: true, kind: 'ordinary', obligation: null, openFindings: await tools.findingsAtCompletion(input),
+      })
+      : { ok: false, errors: [{ path: 'kind', message: 'This session accepts only the current capability engineer submissions' }] },
     accept: async value => {
       const content = `${JSON.stringify({ schema: 'ramify-agent.engineer-submission/1', ...value }, null, 2)}\n`;
       await writeFileAtomic(at(sessionLayout.submission), content);
@@ -417,7 +419,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     submission: {
       name: engineerToolName,
       description: engineerSubmissionDescription,
-      inputSchema: engineerJsonSchema,
+      inputSchema: capabilityEngineerJsonSchema,
       accept: async input => {
         const verdict = await judge.judge(input);
         transcript.note(verdictNote(recorder.callId(engineerToolName), engineerToolName, verdict));
@@ -561,8 +563,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     ended,
     ...(interruption === undefined ? {} : { interruption }),
     ...(error === undefined ? {} : { error }),
-    submission: submission === null || submissionHash === null || (submission as EngineerSubmission).kind === 'capability-needed'
-      ? null : { kind: (submission as Exclude<EngineerSubmission, { kind: 'capability-needed' }>).kind, hash: submissionHash },
+    submission: submission === null || submissionHash === null
+      ? null : { kind: (submission as EngineerSubmission).kind, hash: submissionHash },
     rejectedSubmissions: judge.rejections,
     standingViolations: standing.map(finding => ({ code: finding.code, message: finding.message, file: finding.file, line: finding.line })),
     settled,

@@ -180,7 +180,7 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
       owned = await privateRamify();
       ramify = owned.ramify;
     }
-    ({ service: runs, recovery } = await RunService.open({
+    const runOptions: RunServiceOptions = {
       inputs: architectRunInputs({ ramify }),
       ...options.runs,
       projectRoot,
@@ -189,7 +189,10 @@ export async function startServerWith(options: ServerSettings): Promise<RunningS
       checkExecution: options.runs?.checkExecution ?? createAuditCheckExecution({ workspaceOwnership: createAuditWorkspaceOwnership(projectRoot) }),
       ...(agent === undefined ? {} : { agent }),
       ...(model === undefined ? {} : { model }),
-    }));
+    };
+    ({ service: runs, recovery } = options.runs?.policy === undefined
+      ? await RunService.open(runOptions)
+      : await RunService.openForHistoricalTests(runOptions));
   } catch (error) {
     await owned?.dispose();
     await lock.release();

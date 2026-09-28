@@ -16,8 +16,8 @@ import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig
  * own settings, built again at the moment of the spawn.
  */
 
-/** The version this policy is recorded under. `run-policy/2` runs, without reviews, stay readable. */
-export const runPolicyVersion = 'run-policy/4';
+/** New runs use capability coordination. Earlier policy versions remain readable. */
+export const runPolicyVersion = 'run-policy/5';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {
@@ -36,6 +36,7 @@ export const defaultLimits: RunPolicy['limits'] = {
   invocationIdleMs: 300_000,
   invocationAbsoluteMs: 3_600_000,
   maxIterationsPerWorkItem: 12,
+  maxIterationsPerCapabilityTask: 12,
   maxWorkItems: 64,
   maxPlacementRequests: 32,
   maxInvocationsPerRun: 400,
@@ -259,7 +260,8 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
   const { projectRoot } = options;
   const ramify = options.ramify ?? ramifyExecutable;
   const ramifySettings: Record<string, string> = options.endpointDirectory === undefined ? {} : { RAMIFY_ENDPOINT_DIR: options.endpointDirectory };
-  const context = Object.fromEntries(roles.map(role => [role, defaultContextPolicies[role]])) as RunPolicy['context'];
+  const context = Object.fromEntries(roles.filter(role => role !== 'contract-engineer')
+    .map(role => [role, defaultContextPolicies[role]])) as RunPolicy['context'];
   return runPolicySchema.parse({
     version: runPolicyVersion,
     limits: defaultLimits,

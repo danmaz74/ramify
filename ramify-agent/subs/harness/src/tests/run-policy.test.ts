@@ -3,6 +3,7 @@ import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkpointPolicies, allProjectChecks } from '../checks/checkpoint.js';
 import { commandTimeouts, defaultLimits, defaultRunPolicy, discoverNestedPackages, nestedPackageDepth } from '../run/policy.js';
 import { runPolicySchema } from '../run/records.js';
+import { RunService, type RunServiceOptions } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -22,9 +23,14 @@ afterEach(async () => {
 });
 
 describe('the captured commands', () => {
+  test('production constructor refuses policy injection before creating a service', async () => {
+    await expect(RunService.open({ policy: () => defaultRunPolicy({ projectRoot: '/project', nested: [] }) } as unknown as RunServiceOptions))
+      .rejects.toThrow('Production run policy is fixed');
+  });
   test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
-    expect(policy.version).toBe('run-policy/4');
+    expect(policy.version).toBe('run-policy/5');
+    expect(policy.limits.maxIterationsPerCapabilityTask).toBe(12);
     expect(policy.limits.nonfunctionalRoundsPerPlan).toBe(3);
     // The first trial's review policy and reconciliation bound (Plan 12).
     expect(policy.reviews).toEqual({ version: 'review-policy/1', kinds: ['code', 'scope', 'design'], concurrency: 2, queue: 12, retries: 1, attemptMs: 600_000, settleMs: 900_000, maxConcerns: 20 });

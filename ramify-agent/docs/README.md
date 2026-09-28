@@ -9,9 +9,9 @@ Design documents for the separate agent harness:
   module, background reviews, durable dispositions and work-item reconciliation
 - [Decomposition hypothesis 3](decomposition/dan-hypothesis-3.md), initial draft:
   local coordinators, unified delegation and decisions recorded without review waits
-- [Autonomous implementation loop](architecture/autonomous-implementation-loop.md), proposed architecture (formerly hypothesis 3b):
-  global and local architects share and refine architectural hypotheses;
-  global forks decide and append briefs without a parent model call
+- [Autonomous implementation loop](architecture/autonomous-implementation-loop.md), current implementation design:
+  global and local architects refine architectural hypotheses, and a fresh
+  capability architect coordinates scoped work through verified handback
 - [Cooperation through a capability plan](architecture/capability-plan-cooperation.hypothesis.md),
   architecture hypothesis: consumer and provider architects iteratively develop
   an interface, coordinate implementation and verify real consumer use through
@@ -25,9 +25,9 @@ Design documents for the separate agent harness:
   scoped provider and compatibility work, real verification and explicit handback
 - [Breaking and non-breaking plans](decomposition/breaking-vs-non-breaking-plans.md),
   reasoning, sequential sub-plan hypothesis and non-breaking-only MVP scope
-- [Harness architecture](architecture.md), early draft
-- [Implementation loop](implementation-loop.md), task state machine proposal
-- [The work loop as a state machine](work-loop.md), proposed
+- [Harness architecture](architecture.md), superseded early draft
+- [Implementation loop](implementation-loop.md), superseded task state machine proposal
+- [The work loop as a state machine](work-loop.md), superseded proposal
 - [State machine architecture with XState](analysis/2026-09-26-state-machine-architecture.md),
   analysis of owner-local workflow machines with the run ledger as authority
 - [What the plan-to-brief spike taught us](analysis/2026-09-19-plan-to-brief-spike.md),

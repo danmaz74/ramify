@@ -45,6 +45,7 @@ import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identify
   type CapabilityReview } from '../capability/records.js';
 import { candidateAcceptanceFindings } from '../capability/acceptance.js';
 import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capability/policy.js';
+import { createCapabilityWorkflow } from '../capability/workflow.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
 import { qualificationActionSchema, capabilityActionSchema, capabilityPlanUpdateSchema, buildCapabilityPlanRevision,
   validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
@@ -171,7 +172,7 @@ import {
 } from '../work/engineer-equipment.js';
 import { engineerWorkingDirectory, repairWorkingDirectory } from '../work/engineer-directory.js';
 import {
-  engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
+  capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerJsonSchema, engineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationAcceptance, iterationMessage,
   validateEngineer, type EngineerSubmission, type IterationApiViews,
 } from '../work/engineer.js';
 import {
@@ -193,7 +194,7 @@ import { committedRecords, refOf } from '../work/committed.js';
 import { capabilityOf, frontierOrder, hypothesesFor } from '../work/frontier.js';
 import { integrationScenarioOf, originKindOf, workLayout, workItemId, workItemOutlineSchema, type WorkItem, type WorkItemOutline } from '../work/records.js';
 import { apiViewsOf, iterationApiViews, onboardingOf, workItemMessage, type DelegationBriefing, type WorkItemBriefing, type ReconciliationBriefing } from '../work/session.js';
-import { localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
+import { capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectToolName, validateLocalArchitect, type LocalArchitectSubmission } from '../work/submission.js';
 import { gateDiagnostics, scenarioCheckLines, type GateAudience } from '../checks/diagnostics.js';
 import { commitForGate, commitMessage, prepareCheckpoint, type CheckpointRequest } from './gates.js';
 import { capturePlan, EvidenceUnavailableError, type RunInputs } from './inputs.js';
@@ -682,7 +683,7 @@ export class RunService {
   private readonly git: GitService;
   private readonly candidates: CandidateSource;
 
-  private constructor(private readonly options: RunServiceOptions, private readonly workflow: CapabilityWorkflow | null = null) {
+  private constructor(private readonly options: RunServiceOptions, private readonly workflow: CapabilityWorkflow | null) {
     this.git = options.git ?? gitService;
     this.candidates = options.candidates ?? gitCandidateSource;
   }
@@ -696,13 +697,20 @@ export class RunService {
    * calls no agent and makes no duplicate.
    */
   static async open(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
-    const service = new RunService(options);
+    if (options.policy !== undefined) throw new Error('Production run policy is fixed; a caller cannot inject a policy');
+    const service = new RunService(options, createCapabilityWorkflow());
     const recovery = await service.load();
     return { service, recovery };
   }
 
-  /** Internal test composition. The harness testing helper is its only
-   * caller until the rollout installs this factory as the production default. */
+  /** Historical workflow tests remain executable without exposing their path to new production runs. */
+  static async openForHistoricalTests(options: RunServiceOptions): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
+    const service = new RunService(options, null);
+    const recovery = await service.load();
+    return { service, recovery };
+  }
+
+  /** Internal test composition for the same factory production now uses. */
   static async openForCapabilityTests(options: RunServiceOptions, factory: () => CapabilityWorkflow): Promise<{ service: RunService; recovery: RunRecoveryReport }> {
     const workflow = factory();
     if (workflow.version !== 'capability-coordination/1') throw new Error('Unknown capability workflow factory');
@@ -2321,6 +2329,13 @@ export class RunService {
         }
       }
 
+      if (!run.log.terminal && run.record.policy.version !== capabilityRunPolicyVersion && this.workflow !== null) {
+        await this.endRun(run, { type: 'job-interrupted', data: {
+          message: `Unsupported historical workflow ${run.record.policy.version}; its records remain readable. Resume it with the original harness revision that captured its prompt packages, or start a new capability-coordination run.`,
+        } }, 'interrupted');
+        report.interrupted.push(run.key);
+      }
+
       if (!run.log.terminal) {
         if (this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion &&
           run.log.find('capability-requested') !== undefined) {
@@ -2896,7 +2911,7 @@ export class RunService {
   private async captureInputs(captured: Uint8Array) {
     const { manifest: promptManifest, packages } = await loadPromptPackages({
       ...(this.options.skillDirectory === undefined ? {} : { skillDirectory: this.options.skillDirectory }),
-      ...(this.workflow === null ? {} : { capabilityWorkflow: true }),
+      capabilityWorkflow: this.workflow !== null,
     });
     let manifest;
     try {
@@ -2908,10 +2923,10 @@ export class RunService {
     const nested = await discoverNestedPackages(this.projectRoot);
     const policy = (this.options.policy ?? ((root, found) => defaultRunPolicy({ projectRoot: root, nested: found })))(this.projectRoot, nested);
     if (policy.version === capabilityRunPolicyVersion && this.workflow === null) {
-      throw new CommandRejection('conflict', 'Capability coordination is unavailable through production run commands before rollout');
+      throw new CommandRejection('conflict', 'The historical test workflow cannot create a capability-coordination run');
     }
     if (this.workflow !== null && policy.version !== capabilityRunPolicyVersion) {
-      throw new CommandRejection('conflict', 'The injected capability workflow requires run-policy/5');
+      throw new CommandRejection('conflict', `New runs require ${capabilityRunPolicyVersion}; policy ${policy.version} is historical`);
     }
     return { manifest, packages, promptManifest, policy };
   }
@@ -5159,7 +5174,7 @@ export class RunService {
           : finished('not-kept')),
         toolName: localArchitectToolName,
         description: 'End this turn with the work item\'s result. The harness validates it; an invalid submission is returned with every error and its path, and a valid one ends this invocation.',
-        inputSchema: localArchitectJsonSchema,
+        inputSchema: this.workflow === null ? localArchitectJsonSchema : capabilityLocalArchitectJsonSchema,
         submissionSchema: 'ramify-agent.local-architect-submission/1',
         ...(!packageInPrompt ? {} : { onStarted: async (invocation: string, destination: SessionId) => {
           await this.write(run, { type: 'context-package-prompt-bound', data: {
@@ -5167,7 +5182,12 @@ export class RunService {
             invocation, session: destination,
           } });
         } }),
-        validate: input => validateLocalArchitect(input, {
+        validate: input => this.workflow !== null && typeof input === 'object' && input !== null && (
+          (input as { kind?: unknown }).kind === 'yield-for-providers' ||
+          (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.kind === 'contract' ||
+          (input as { kind?: unknown; assignment?: { kind?: unknown; revisesContract?: unknown } }).assignment?.revisesContract !== undefined
+        ) ? { ok: false, errors: [{ path: 'kind', message: 'The contract and provider-yield workflow is historical; use capability requests and scoped assignments' }] }
+          : validateLocalArchitect(input, {
           index,
           registry,
           outline: outlines.at(-1) ?? null,
@@ -7886,9 +7906,9 @@ export class RunService {
           : previousSession === undefined ? {} : { replaces: { session: previousSession, reason: 'reconstructed' as const },
             degraded: { requested: 'continued' as const, reason: 'The prior engineer ended without submitting; current source and failure evidence were supplied to a reconstructed session.' } }),
       toolName: engineerToolName,
-      description: engineerSubmissionDescription, inputSchema: engineerJsonSchema,
+      description: engineerSubmissionDescription, inputSchema: capabilityEngineerJsonSchema,
       submissionSchema: 'ramify-agent.engineer-submission/1',
-      validate: input => validateAgainst(engineerSubmissionSchema, input),
+      validate: input => validateAgainst(capabilityEngineerSubmissionSchema, input),
       scope: { write: sequence, measurement: null, size: null }, writer: true, guarded,
       equip: equipment.equip, bounds: { idleMs: bounds.idleMs, absoluteMs: bounds.absoluteMs },
       keep: (ended, value) => action.owner === task.consumer || (ended === 'submitted' && value?.kind === 'capability-needed')
@@ -8120,7 +8140,7 @@ export class RunService {
         },
         toolName: engineerToolName,
         description: engineerSubmissionDescription,
-        inputSchema: engineerJsonSchema,
+        inputSchema: this.workflow === null ? engineerJsonSchema : capabilityEngineerJsonSchema,
         submissionSchema: 'ramify-agent.engineer-submission/1',
         // A claimed completion is checked afresh over the write scope
         // before it is judged, because the hook checks saw only the
@@ -10205,6 +10225,14 @@ export class RunService {
     if (afterGate.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during final verification', [runLayout.assessment(binding.assessment.id), runLayout.gate(gateId)]);
       return;
+    }
+    if (run.record.policy.version === capabilityRunPolicyVersion) {
+      const blockers = committedRecords(run.log.ledger.replay()).workItems.flatMap(item =>
+        this.capabilityBlockers(run, item.id));
+      if (blockers.length > 0) {
+        await this.fail(run, 'acceptance-incomplete', `Final completion has unresolved capability work: ${blockers.join('; ')}`);
+        return;
+      }
     }
     const workItems = run.log.count('work-item-completed');
     // A run that recorded plan deviations completes with them to review,

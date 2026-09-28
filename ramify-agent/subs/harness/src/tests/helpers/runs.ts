@@ -143,6 +143,7 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
   const { reviews: _reviews, ...unreviewed } = base;
   return {
     ...unreviewed,
+    version: 'run-policy/4',
     ...(options.reviews === undefined ? {} : { reviews: options.reviews }),
     commands: {
       ...base.commands,
@@ -236,6 +237,8 @@ export async function realRamify(): Promise<Awaited<ReturnType<typeof privateRam
 }
 
 export interface OpenRunsOptions extends Partial<RunServiceOptions> {
+  /** Exercise the public production constructor and its fixed policy. */
+  readonly production?: boolean | undefined;
   /** Test-only workflow factory; production composition never receives it. */
   readonly capabilityWorkflowFactory?: (() => CapabilityWorkflow) | undefined;
   /** Every test chooses its Git boundary explicitly; this helper has no production fallback. */
@@ -261,7 +264,7 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
   const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script), options.agentOptions);
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
-  const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, ...rest } = options;
+  const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, production, ...rest } = options;
   const checkExecution = checkScript === undefined
     ? createPassingCheckExecution()
     : typeof checkScript === 'function'
@@ -274,14 +277,16 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
     ramify: options.ramify ?? new FakeRamifyCli(),
     checkExecution,
     stopGraceMs: 500,
-    policy: projectRoot => testPolicy(projectRoot),
+    ...(production === true ? {} : { policy: (projectRoot: string) => testPolicy(projectRoot) }),
     warn: message => warnings.push(message),
     ...rest,
     ...(agent === undefined ? {} : { agent }),
   };
-  const { service, recovery } = capabilityWorkflowFactory === undefined
+  const { service, recovery } = production === true
     ? await RunService.open(serviceOptions)
-    : await RunService.openForCapabilityTests(serviceOptions, capabilityWorkflowFactory);
+    : capabilityWorkflowFactory === undefined
+      ? await RunService.openForHistoricalTests(serviceOptions)
+      : await RunService.openForCapabilityTests(serviceOptions, capabilityWorkflowFactory);
   return { service, recovery, agent: scripted, lock, warnings };
 }
 

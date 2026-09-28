@@ -1,7 +1,10 @@
 # Implementation loop: a durable task state machine
 
-**Status:** Design proposal, 2026-09-19. No implementation or acceptance is
-claimed. This proposal follows the [harness principles](harness.principles.md).
+**Status:** Superseded design proposal, 2026-09-19. Its contract-first task
+sequence describes an earlier proposal; the current implementation design is
+the [autonomous implementation loop](architecture/autonomous-implementation-loop.md).
+No implementation or acceptance is claimed by this document. It follows the
+[harness principles](harness.principles.md).
 The [architecture draft](architecture.md) supplies context, not constraints.
 
 The whole plan has an outer machine: **map, approve, implement, integrate,

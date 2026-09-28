@@ -123,6 +123,11 @@ export const localArchitectSubmissionKinds = ['assign', 'request-placement', 're
 
 /** The schema the agent's tool is given, taken from the same definition that validates. */
 export const localArchitectJsonSchema = z.toJSONSchema(localArchitectSubmissionSchema) as JsonSchema;
+/** New-run tool surface excludes the historical provider-yield action. */
+export const capabilityLocalArchitectJsonSchema = z.toJSONSchema(z.discriminatedUnion('kind', [
+  localArchitectSubmissionSchema.options[0]!, localArchitectSubmissionSchema.options[1]!,
+  localArchitectSubmissionSchema.options[2]!, localArchitectSubmissionSchema.options[4]!,
+])) as JsonSchema;
 
 export const localArchitectToolName = 'submit_work_item_result';
 

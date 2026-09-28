@@ -193,7 +193,8 @@ export const runPolicySchema = z.object({
     'global-fork': contextPolicySchema,
     'local-architect': contextPolicySchema,
     engineer: contextPolicySchema,
-    'contract-engineer': contextPolicySchema,
+    /** Historical runs keep this role; new runs never invoke it. */
+    'contract-engineer': contextPolicySchema.optional(),
     'capability-architect': contextPolicySchema.optional(),
     reviewer: contextPolicySchema.optional(),
     /** Absent from a run captured before failure analysis existed, which analyzes nothing. */

@@ -119,6 +119,12 @@ export const capabilityEngineerSubmissionKinds = ['completion-proposed', 'partia
 
 /** The schema the agent's tool is given, taken from the same definition that validates. */
 export const engineerJsonSchema = z.toJSONSchema(engineerSubmissionSchema) as JsonSchema;
+/** New-run tool surface excludes the historical contract request. */
+export const capabilityEngineerSubmissionSchema = z.discriminatedUnion('kind', [
+  engineerSubmissionSchema.options[0]!, engineerSubmissionSchema.options[1]!,
+  engineerSubmissionSchema.options[2]!, engineerSubmissionSchema.options[4]!,
+]);
+export const capabilityEngineerJsonSchema = z.toJSONSchema(capabilityEngineerSubmissionSchema) as JsonSchema;
 
 export const engineerToolName = 'submit_iteration_result';
 

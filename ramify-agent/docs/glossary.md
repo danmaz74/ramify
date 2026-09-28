@@ -122,6 +122,52 @@ is, and no relation to "send email" is recorded. Its implementation may change
 the symbols that implement the existing capability, and both capabilities may
 end at the same symbol. An existing capability is never revised to cover more.
 
+## Capability request
+
+A **capability request** is an engineer's recorded need for behavior outside
+its current implementation scope, including usage, known constraints and
+examples.
+
+## Capability task
+
+A **capability task** is a durable coordination unit that answers a
+[capability request](#capability-request) through design, scoped implementation
+and real consumer verification.
+
+## Capability plan
+
+A **capability plan** is the versioned design, work and evidence record of one
+[capability task](#capability-task).
+
+## Capability architect
+
+A **capability architect** is the agent coordinating one
+[capability task](#capability-task) from delegation to handback.
+
+## Handback
+
+A **handback** is the accepted return of a verified
+[capability task](#capability-task) result to its suspended parent coordinator
+and requesting engineer.
+
+## Contract
+
+A **contract** is the interface and behavioral guarantees on which a consumer
+relies. The term remains useful independently of the historical contract
+engineer workflow.
+
+## Provider obligation (historical workflow)
+
+A **provider obligation** is the historical recorded requirement for a
+provider to pass the conformance suite of a fake-backed contract revision.
+New runs do not create one; historical readers retain its original meaning.
+
+## Conformance
+
+**Conformance** is evidence that an implementation satisfies a specified
+[contract](#contract). It is an evidence claim, not a separate scheduling
+unit in the capability workflow.
+
 ## Implementation map
 
 The **implementation map** is the architect's record of where the
@@ -142,12 +188,9 @@ its owner forms a seam. The interface belongs to neither side.
 
 ## Work item
 
-A **work item** is one unit of the work loop: a scope on the module tree and a
-goal, carried out by one agent session.
-
-Its kind states the scope: implement, for one subtree; contract, for one seam;
-integrate, for the subtree of a lowest common ancestor; architect, for the
-architect view.
+A **work item** is an entry or other ordinary frontier goal with assignments
+and sessions over its lifecycle. It is neither one agent session nor a
+[capability task](#capability-task).
 
 ## Invocation
 
@@ -199,12 +242,10 @@ Each side is carried out by a separate agent. See
 
 ## Fake
 
-A **fake** is a temporary stand-in for the missing part of a provider, used by
-a consumer until the real provider exists.
-
-It replaces only what is missing; existing behavior stays real. The tests that
-pass against the fake must pass unchanged against the real provider, and the
-fake is then removed.
+A **fake** is a temporary stand-in for the missing part of a provider. It
+replaces only what is missing; existing behavior stays real. Its tests may
+adapt when an API changes, with the original behavioral requirement and real
+integration still verified.
 
 ## Scenario
 
