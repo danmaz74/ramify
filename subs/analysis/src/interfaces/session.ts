@@ -3,6 +3,7 @@ import type { CapturedInput, ObservedChange, OutsideSourceWarning } from '../../
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../subs/typescript/src/interfaces/source.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './architect-view.js';
+import type { AffectedQuery, SessionAffectedOutcome } from './affected.js';
 import type { SessionMeasurementsOutcome } from './measurements.js';
 
 /** Limits of one retained session; contexts owns request deadlines and sweep scheduling. */
@@ -138,6 +139,13 @@ export interface RetainedSession {
    * still-live compiler. This never rehydrates or substitutes a revision. */
   explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],
     control?: RunControl): Promise<SessionExplorerDetailsOutcome>;
+  /** Select the modules affected by the given seeds from the current valid
+   * revision's retained facts. Only `query.sequence` equal to the session's
+   * current revision is accepted; a warm session answers with its compiler
+   * released; nothing is read from disk or projected through `report()`.
+   * Optional until the session wrappers of contexts, the daemon and root
+   * forward it; analysis's engine and worker host always implement it. */
+  affected?(query: AffectedQuery, control?: RunControl): Promise<SessionAffectedOutcome>;
   dispose(): Promise<void>;
 }
 export type SessionOpen =

@@ -1,5 +1,6 @@
 import type { AnalysisInputs, AnalysisReport } from './interfaces/analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
+import type { AffectedQuery, SessionAffectedOutcome } from './interfaces/affected.js';
 import type { SessionMeasurementsOutcome } from './interfaces/measurements.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, SessionChange, SessionOpen, SessionRevision, SessionStatus, SessionUpdate,
   SessionExplorerDetailsOutcome, VerifyOutcome } from './interfaces/session.js';
@@ -16,12 +17,13 @@ export type SessionCommand =
   | { readonly operation: 'apiView'; readonly query: ApiViewQuery }
   | { readonly operation: 'architectView'; readonly query: ArchitectViewQuery }
   | { readonly operation: 'measurements'; readonly sequence: number }
+  | { readonly operation: 'affected'; readonly query: AffectedQuery }
   | { readonly operation: 'explorerDetails'; readonly sequence: number;
       readonly requests: readonly SymbolDetailRequest[] };
 export type WorkerRequest = (SessionCommand & { readonly id: number }) | { readonly operation: 'cancel'; readonly id: number };
 export type WorkerOpen = Exclude<SessionOpen, { status: 'opened' }> | { readonly status: 'opened'; readonly revision: SessionRevision };
 export type WorkerResult = WorkerOpen | SessionUpdate | VerifyOutcome | AnalysisReport | ApiViewQueryOutcome
-  | ArchitectViewQueryOutcome | SessionMeasurementsOutcome | SessionExplorerDetailsOutcome | null
+  | ArchitectViewQueryOutcome | SessionMeasurementsOutcome | SessionAffectedOutcome | SessionExplorerDetailsOutcome | null
   | { readonly status: 'unchanged'; readonly timings?: OperationTimings };
 export type WorkerMessage =
   | { readonly kind: 'ready'; readonly heapLimit: number; readonly oldGenerationMiB: number }

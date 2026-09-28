@@ -4,6 +4,7 @@ import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSessi
 import type { SessionExplorerDetailsOutcome } from './interfaces/session.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
 import type { SessionMeasurementsOutcome } from './interfaces/measurements.js';
+import type { AffectedQuery, SessionAffectedOutcome } from './interfaces/affected.js';
 import type { SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
 import type { SessionCommand, WorkerMessage, WorkerOpen, WorkerResult } from './session-messages.js';
 import { timedResult } from './session-messages.js';
@@ -220,6 +221,24 @@ class SessionHost implements RetainedSession {
       const reported = await this.#reportedFailure(error as Error);
       return { status: 'unavailable', reason: 'analysis-failed',
         message: reported.report.diagnostics[0]?.message ?? String(error) };
+    }
+  }
+  async affected(query: AffectedQuery, control: RunControl = {}): Promise<SessionAffectedOutcome> {
+    if (control.signal?.aborted) return { status: 'cancelled' };
+    try {
+      const result = await this.#request({ operation: 'affected', query }, control) as SessionAffectedOutcome;
+      return control.signal?.aborted ? { status: 'cancelled' } : result;
+    }
+    catch (error) {
+      // A disposed session is an invalid revision, as for measurements. The
+      // affected reasons have no analysis failure: a failed worker disposes
+      // the session, so its failure is reported as the same invalid revision.
+      const disposed = error instanceof Error && 'code' in error
+        && (error as { code?: unknown }).code === 'session-disposed';
+      if (disposed) return { status: 'unavailable', reason: 'invalid-revision', message: 'Retained session is disposed', unknownModules: [] };
+      const reported = await this.#reportedFailure(error as Error);
+      return { status: 'unavailable', reason: 'invalid-revision',
+        message: reported.report.diagnostics[0]?.message ?? String(error), unknownModules: [] };
     }
   }
   async explorerDetails(sequence: number, requests: readonly SymbolDetailRequest[],

@@ -46,7 +46,8 @@ function scalar(text: string, index: number): number {
   }
   return 0xfffd;
 }
-const locatedOrder = (a: { location: SourceLocation | null; code: string; id: string }, b: typeof a): number =>
+/** The order a report lists its located diagnostics and coverage notes. */
+export const locatedOrder = (a: { location: SourceLocation | null; code: string; id: string }, b: typeof a): number =>
   byteOrder(a.location?.file ?? '', b.location?.file ?? '') || (a.location?.start ?? 0) - (b.location?.start ?? 0)
   || byteOrder(a.code, b.code) || byteOrder(a.id, b.id);
 

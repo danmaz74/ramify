@@ -14,6 +14,8 @@ import { architectLimitIssue, planArchitectView, projectArchitectView } from './
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, RunControl } from './interfaces/analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './interfaces/architect-view.js';
 import type { InventoryModuleMeasurement, MeasurementFileRecord, SessionMeasurementsOutcome } from './interfaces/measurements.js';
+import type { AffectedQuery, SessionAffectedOutcome } from './interfaces/affected.js';
+import { affectedLimits, assembleAffectedFacts, projectAffected } from './affected-query.js';
 import type { ApiViewQuery, ApiViewQueryOutcome, FindingDelta, OperationTimings, RetainedSession, SessionChange, SessionInputs, SessionOpen,
   SessionExplorerDetailsOutcome, SessionRevision, SessionStatus, SessionUpdate, VerifyOutcome } from './interfaces/session.js';
 import { detached, diagnostic } from './report-data.js';
@@ -492,6 +494,42 @@ class Session implements RetainedSession {
         sequence, inputId: current.inputId, modules, files,
         outsideModuleFiles: [...facts.inventory.outsideModuleFiles],
       } };
+    });
+  }
+
+  /**
+   * Select the modules affected by the query's seeds from the current
+   * revision's retained facts, as `measurements` reads its inventory: only the
+   * current sequence, no compiler, no disk and no `report()`. A revision whose
+   * access interpretation did not complete, because the link stage is invalid
+   * and access is blocked, answers `missing-facts`; the revision's published
+   * `outcome.execution` is `completed` exactly when the access and decide
+   * stages completed over a linked model.
+   */
+  affected(query: AffectedQuery, control: RunControl = {}): Promise<SessionAffectedOutcome> {
+    return this.#serialize(async () => {
+      if (control.signal?.aborted) return { status: 'cancelled' };
+      const unavailable = (reason: Extract<SessionAffectedOutcome, { status: 'unavailable' }>['reason'], message: string):
+        SessionAffectedOutcome => ({ status: 'unavailable', reason, message, unknownModules: [] });
+      if (this.#disposed) return unavailable('invalid-revision', 'Retained session is disposed');
+      if (typeof query !== 'object' || query === null) return unavailable('invalid-query', 'An affected query must be an object');
+      const current = this.#current;
+      if (!current || query.sequence !== this.#sequence) {
+        return unavailable('invalid-revision', `Sequence ${query.sequence} is not the session's current revision (${this.#sequence})`);
+      }
+      const facts = this.#state.facts;
+      if (!facts || facts.invalid || !facts.inventory || facts.areaIssues.length) {
+        return unavailable('invalid-current', 'The current revision has no valid complete inventory');
+      }
+      const check = current.outcome.check;
+      if (current.outcome.execution !== 'completed' || check === 'not-run' || !facts.model || facts.linkIssues.length) {
+        return unavailable('missing-facts', 'The current revision did not complete access interpretation');
+      }
+      const outcome = projectAffected(assembleAffectedFacts(facts, current.inputId, facts.inventory.scope, check),
+        { modules: query.modules === undefined ? [] : query.modules, paths: query.paths === undefined ? [] : query.paths },
+        affectedLimits, control);
+      if (control.signal?.aborted) return { status: 'cancelled' };
+      return outcome.status === 'answered' ? { status: 'answered', sequence: current.sequence, result: outcome.result } : outcome;
     });
   }
 

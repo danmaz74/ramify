@@ -101,6 +101,12 @@ export function assembleCoverage(files: Readonly<Record<string, FileFacts>>): So
   return [...notes.values()].sort((a, b) => byteOrder(a.location.file, b.location.file) || a.location.start - b.location.start || byteOrder(a.id, b.id));
 }
 
+/** Catalog coverage a report records: a resource description note only for an exactly referenced resource. */
+export function reportedCatalogCoverage(facts: SessionFacts): SourceLimit[] {
+  return facts.catalog.coverage.filter(note => note.code !== 'resource-description'
+    || (facts.inventory?.references.some(reference => reference.normalized === note.location.file) ?? false));
+}
+
 /** The owned files an access's facts read: its target and every forwarding hop. */
 export function accessTargets(access: SourceAccess): string[] {
   const targets = new Set<string>();
@@ -353,8 +359,7 @@ function driveReport(facts: SessionFacts, request: AnalysisInputs, snapshot: boo
     draft.current = 'catalog';
     if (snapshot) draft.patch({ catalog: facts.catalog });
     else draft.counts = { ...draft.counts!, originals: facts.catalog.originals.length };
-    draft.cover(facts.catalog.coverage.filter(note => note.code !== 'resource-description'
-      || facts.inventory!.references.some(reference => reference.normalized === note.location.file)));
+    draft.cover(reportedCatalogCoverage(facts));
     draft.stage('catalog', 'completed');
     draft.current = 'link';
     if (facts.linked && snapshot) draft.patch({ linked: facts.linked });
