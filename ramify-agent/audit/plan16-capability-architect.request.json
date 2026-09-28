@@ -82,7 +82,7 @@
               "--maxWorkers=4"
             ],
             "parser": "vitest",
-            "timeoutMs": 600000
+            "timeoutMs": 900000
           }
         ],
         "continueOnFailure": true

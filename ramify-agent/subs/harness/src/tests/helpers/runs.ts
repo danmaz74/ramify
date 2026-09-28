@@ -13,7 +13,7 @@ import type { InputManifest } from '../../interfaces/protocol/evidence.js';
 import type { RunCommand } from '../../interfaces/protocol/runs.js';
 import { sha256 } from '../../prompts/packages.js';
 import type { RunEvent } from '../../run/log.js';
-import { defaultRunPolicy } from '../../run/policy.js';
+import { defaultContextPolicies, defaultRunPolicy } from '../../run/policy.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
@@ -144,6 +144,9 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
   return {
     ...unreviewed,
     version: 'run-policy/4',
+    // Historical fixture runs use the captured contract role. New production
+    // policy/5 deliberately omits it from its context and prompt manifest.
+    context: { ...base.context, 'contract-engineer': defaultContextPolicies['contract-engineer'] },
     ...(options.reviews === undefined ? {} : { reviews: options.reviews }),
     commands: {
       ...base.commands,

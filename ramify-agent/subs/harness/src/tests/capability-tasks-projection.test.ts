@@ -11,6 +11,7 @@ import { protocolPaths } from '../interfaces/protocol/paths.js';
 import { createApp } from '../http/app.js';
 import { RunQueries } from '../projections/queries.js';
 import { capabilityTasksOf } from '../projections/capability-tasks.js';
+import { projectEvent } from '../projections/events.js';
 import { reachOf } from '../projections/sessions.js';
 import { runView } from '../projections/inputs.js';
 import type { RunService } from '../run/service.js';
@@ -48,6 +49,19 @@ function lines() {
     { type: 'capability-verification-failed' as const, data: { task: task.id, finding: 'A real test still fails' } },
   ];
 }
+
+test('CA23: capability event references identify requests, tasks and assignments', () => {
+  const run = constructedRun([
+    ...lines(),
+    { type: 'capability-assigned', data: { task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0002' } },
+  ]);
+  const refs = run.entries.flatMap(entry => projectEvent(entry.transaction.event).refs);
+  expect(refs).toEqual(expect.arrayContaining([
+    { kind: 'capability-request', id: 'need-001' },
+    { kind: 'capability-task', id: 'cap-001' },
+    { kind: 'capability-assignment', id: 'cap-001.i01' },
+  ]));
+});
 
 test('CA23 CA34: request, design, consultation and failed verification remain distinct from registry capability', () => {
   const run = constructedRun(lines());
