@@ -59,6 +59,7 @@ if (mode === 'lease') {
     }],
     selector: { id: FULL_SELECTOR_ID, version: FULL_SELECTOR_VERSION, config: {} },
     registeredExecutorIds: ['host.block'],
+    force: true,
   });
   process.stdout.write(`${JSON.stringify({ type: 'result', result })}\n`);
 } else {

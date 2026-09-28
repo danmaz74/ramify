@@ -9,7 +9,7 @@ commit, invoke it with:
 ```sh
 ramify-agent/node_modules/.bin/ramify-audit audit \
   --request ramify-agent/audit/plan11-execution-map.request.json \
-  --cwd . --json
+  --cwd . --json --force
 ```
 
 Plan 12's CheckFindings and iteration reviews use
@@ -21,7 +21,7 @@ From the clean final Plan 12 commit, invoke it with:
 ```sh
 ramify-agent/node_modules/.bin/ramify-audit audit \
   --request ramify-agent/audit/plan12-check-findings.request.json \
-  --cwd . --json
+  --cwd . --json --force
 ```
 
 Plan 14's unified evidence packages use
@@ -33,7 +33,7 @@ check reading every commit since the plan's start and the claim bound to
 ```sh
 ramify-agent/node_modules/.bin/ramify-audit audit \
   --request ramify-agent/audit/plan14-unified-evidence-packages.request.json \
-  --cwd . --json
+  --cwd . --json --force
 ```
 
 The request below remains the recorded Plan 8 claim.
@@ -68,8 +68,14 @@ the toolkit's checks.
 
 ## How it is invoked
 
-ramify-audit is not on the shell path. It is `ramify-agent`'s pinned
-dependency, so its executable is the one npm links for this package.
+ramify-audit is not on the shell path. It is `ramify-agent`'s dependency,
+pinned to 0.2.1 from the registry `ramify-agent/.npmrc` names, so its
+executable is the one npm links for this package.
+
+Since 0.2.0, ramify-audit answers a request for code it already audited with
+that earlier audit, running and publishing nothing, and the answer's
+`summary.sourceCommit` is the earlier commit. Every invocation recorded here
+passes `--force`, so the claim is always a new audit of the commit named.
 
 ```sh
 # from the repository root, on the commit to audit, with a clean tree
@@ -79,7 +85,7 @@ npm run worktree:prepare
 
 ramify-agent/node_modules/.bin/ramify-audit audit \
   --request ramify-agent/audit/ramify-agent-suite.request.json \
-  --cwd . --json
+  --cwd . --json --force
 ```
 
 The request names `"revision": "HEAD"` and `"workspaceMode":

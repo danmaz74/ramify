@@ -257,6 +257,8 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           message: auditFailureMessage(result.error, setup.restore),
         }));
       }
+      const unexpected = unexpectedCompletedAudit(result, request.context.sourceCommit);
+      if (unexpected !== null) return executionFailure(await infrastructureRecords(checks, request, unexpected));
       const prepared = await preparedSetupRecords(checks, request, result, setup);
       if ('missing' in prepared) {
         return executionFailure(await infrastructureRecords(checks, request, {
@@ -485,7 +487,38 @@ function auditRequest(
     ...(workspacePreparation === undefined ? {} : { workspacePreparation }),
     registeredExecutorIds: [executorId],
     metadata: { runId, attemptId: request.context.attemptId },
+    // A gate's evidence must come from checks run over the commit it just
+    // made, with this attempt's plan and records. ramify-audit 0.2 would
+    // otherwise answer with an earlier audit of the same code, whose checks
+    // and records are not this attempt's, so reuse is never harmless here.
+    force: true,
   };
+}
+
+/**
+ * Why a completed audit is not this gate's answer, or null where it is.
+ * The request forces a new audit, so an answer that reused an existing one,
+ * or that audited another commit, is the audit's own failure: it is never
+ * read as the gate's verdict.
+ */
+export function unexpectedCompletedAudit(
+  result: Extract<AuditResult, { status: 'completed' }>,
+  sourceCommit: string,
+): { readonly kind: string; readonly message: string } | null {
+  if (result.reused !== undefined) {
+    return {
+      kind: 'audit-reused',
+      message: `The audit of ${sourceCommit} returned the existing audit of ${result.reused.auditedCommit}`
+        + ` (run ${result.refs.runRef}) instead of running the gate's checks, although the request forced a new audit`,
+    };
+  }
+  if (result.summary.sourceCommit !== sourceCommit) {
+    return {
+      kind: 'audit-result',
+      message: `The audit requested for ${sourceCommit} recorded ${result.summary.sourceCommit} as its source commit`,
+    };
+  }
+  return null;
 }
 
 function harnessSummary(request: CheckExecutionRequest): RegisteredExecutorResult {

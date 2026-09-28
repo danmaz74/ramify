@@ -33,8 +33,10 @@ engineer sessions.
 
 ## Commands
 
-Run from `ramify-agent/`. Build the toolkit first (`npm run build` in the repository
-root) so that `ramify.ts` resolves to a current `dist/`.
+Run from `ramify-agent/`. `ramify.ts` and `ramify-audit` are exact pins from
+the registry `.npmrc` names, not the surrounding checkout. To take a new
+toolkit release, run `npm install --save-exact ramify.ts@<version>` and commit
+the manifest and lockfile.
 
 ```sh
 npm install
@@ -159,3 +161,8 @@ prepare another.
 with two plans under `plans/`. It is test data and an independent project:
 its own `tsconfig.json` makes Ramify's discovery treat it as an independent
 scope, so its `module.ramify` files are not part of this project.
+
+## License
+
+ramify-agent is licensed under the GNU General Public License, version 3 only
+([LICENSE](LICENSE)). It is private and not published.

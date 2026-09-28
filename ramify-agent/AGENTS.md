@@ -20,8 +20,10 @@ repository.
   web module may also render a presentation component the toolkit exports
   through a package entry; it never copies or re-implements one. Such a
   component shares the web module's single React runtime.
-- The toolkit is linked with `"ramify.ts": "file:.."`. Build it from the
-  repository root before relying on a changed toolkit surface.
+- The toolkit is an ordinary library dependency: `ramify.ts` is pinned to an
+  exact release from the registry `.npmrc` names, as is `ramify-audit`. A
+  toolkit change reaches ramify-agent only through a pin bump, never through
+  the checkout it lives in.
 
 ## Inside the project
 

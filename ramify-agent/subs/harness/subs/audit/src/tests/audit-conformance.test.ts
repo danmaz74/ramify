@@ -134,6 +134,8 @@ function auditRequest(
     coverageClaim: { fixture: 'commit-audit-conformance' },
     registeredExecutorIds: [...new Set(checks.flatMap(check =>
       check.executor.kind === 'registered' ? [check.executor.executorId] : []))],
+    // As the adapter's requests do: every audit runs, never answered by an earlier one.
+    force: true,
   };
 }
 
@@ -238,7 +240,7 @@ afterEach(async () => {
   repositories.clear();
 });
 
-describe('ramify-audit 0.1.0 conformance', () => {
+describe('ramify-audit 0.2.1 conformance', () => {
   it('fact 1: command summaries preserve status and runner errors but never an exit code', async () => {
     const repository = await createRepository();
     const request = auditRequest(repository, [commandCheck('commands', [
@@ -654,6 +656,48 @@ describe('ramify-audit 0.1.0 conformance', () => {
       },
     }).run(wrong);
     expect(injected.status).toBe('completed');
+  });
+
+  it('fact 13: an audit of already audited code is reused unless forced, and names the audited commit', async () => {
+    const repository = await createRepository({ 'source.txt': 'source\n', 'docs/guide.md': 'guide\n' });
+    const unforced = { ...auditRequest(repository), force: false };
+    const first = await runPassing(repository, unforced);
+    expect(first).toMatchObject({ status: 'completed', summary: { overall: 'pass', sourceCommit: repository.commit } });
+    if (first.status !== 'completed') return;
+    expect(first.reused).toBeUndefined();
+    const refs = publishedRefs(repository.root);
+
+    const again = await runPassing(repository, { ...unforced, requestId: 'same-code' });
+    expect(again).toMatchObject({
+      status: 'completed',
+      summary: { sourceCommit: repository.commit },
+      refs: { runRef: first.refs.runRef, reportCommit: first.refs.reportCommit },
+      reused: { sourceCommit: repository.commit, auditedCommit: repository.commit, ignoredChangedPaths: [] },
+    });
+    expect(publishedRefs(repository.root)).toEqual(refs);
+
+    // A later commit that changes only ignored paths is answered by the
+    // earlier audit: its summary keeps the audited commit, not the requested one.
+    await writeFile(join(repository.root, 'docs/guide.md'), 'guide, revised\n');
+    git(repository.root, ['add', '--all']);
+    git(repository.root, [
+      '-c', 'user.name=Ramify Agent Test',
+      '-c', 'user.email=ramify-agent-test@example.invalid',
+      'commit', '--no-gpg-sign', '-m', 'docs',
+    ]);
+    const later = git(repository.root, ['rev-parse', 'HEAD']);
+    const derived = await runPassing(repository, { ...unforced, requestId: 'docs-only', source: { kind: 'existing-commit', revision: later } });
+    expect(derived).toMatchObject({
+      status: 'completed',
+      summary: { sourceCommit: repository.commit },
+      reused: { sourceCommit: later, auditedCommit: repository.commit, ignoredChangedPaths: ['docs/guide.md'] },
+    });
+
+    const forced = await runPassing(repository, { ...unforced, requestId: 'forced', force: true });
+    expect(forced).toMatchObject({ status: 'completed', summary: { overall: 'pass', sourceCommit: repository.commit } });
+    if (forced.status !== 'completed') return;
+    expect(forced.reused).toBeUndefined();
+    expect(forced.refs.reportCommit).not.toBe(first.refs.reportCommit);
   });
 
   it('refuses duplicate check IDs, including two checks of kind tests', async () => {

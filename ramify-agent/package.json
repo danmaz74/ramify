@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Agent harness for Ramify projects: architectural planning and module-scoped implementation sessions. A separate consumer of ramify.ts; ramify.ts never depends on it.",
+  "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
     "type-check": "tsc --noEmit && tsc --noEmit -p subs/web/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p scripts/browser-acceptance/tsconfig.json",
@@ -23,8 +24,8 @@
     "@earendil-works/pi-coding-agent": "0.87.1",
     "@xyflow/react": "12.11.6",
     "express": "5.2.1",
-    "ramify-audit": "github:danmaz74/ramify-audit#3ced97a67ade6b9ac1b01dd19570bf3f5e39d9b6",
-    "ramify.ts": "file:..",
+    "ramify-audit": "0.2.1",
+    "ramify.ts": "0.1.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "10.1.0",
