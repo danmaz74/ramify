@@ -550,7 +550,7 @@ describe('the prompt package', () => {
     // The contract sub-session is an engineer invocation with the contract
     // skill, and the skill is a file of its package like any other.
     const contract = manifest.packages['contract-engineer']!;
-    expect(contract.package).toBe('contract-engineer/2');
+    expect(contract.package).toBe('contract-engineer/3');
     expect(contract.submissionKinds).toEqual(['established', 'incomplete']);
     expect(contract.files.some(file => file.kind === 'skill' && file.path.endsWith('contract.skill.md'))).toBe(true);
     expect(contract.hash).toMatch(/^[0-9a-f]{64}$/);

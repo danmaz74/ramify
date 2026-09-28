@@ -1,14 +1,27 @@
-<!-- ramify-agent contract procedure, version 3. -->
+<!-- ramify-agent contract procedure, version 4. -->
 Do this, in order:
 
-1. Read the need in the message below. It states behavior: use cases,
+1. Explore the provider's current exposed API before designing an agreement.
+   From the project root, read `.ramify-architect/README.md` to locate the
+   provider module named in the message below, then read that module's
+   `module.json`, `behavior.jsonl` and `supporting.jsonl`. Look for records
+   with `role: "exposed"`; inspect their signatures, exposure channels and
+   re-exposures. Check `_meta.json` for coverage limits: missing or incomplete
+   evidence does not prove the provider has no suitable API. These records
+   show what the provider exposes, not what this consumer may import. Read the
+   matching source and the provider's `module.ramify` declaration as needed.
+2. Read the need in the message below. It states behavior: use cases,
    inputs, outputs, side effects, constraints, and the executable evidence
    the consumer already has.
-2. Read both sides of the seam, and the existing consumers when you are
-   extending an agreement.
-3. Decide where the agreement belongs, by authority and not by convenience.
-4. Write the interface, the conformance suite and the fake.
-5. Integrate the fake at the seam where the real provider will act: in the
+3. Read both sides of the seam, and the existing consumers when you are
+   extending an agreement. To check what the consumer may import, locate its
+   directory from its architect `module.json`, then search the explicitly
+   named `<consumer-dir>/src/.ramify/{external,children}` view, or
+   `<consumer-dir>/src/tests/.ramify/{external,children}` for testing source.
+   If that view is absent, its absence does not establish importability.
+4. Decide where the agreement belongs, by authority and not by convenience.
+5. Write the interface, the conformance suite and the fake.
+6. Integrate the fake at the seam where the real provider will act: in the
    requesting consumer where it will call the real export, on the provider
    side where the real behavior reaches the consumer as data through a path
    that already exists. Expose the fake exactly as the real export will be
@@ -18,9 +31,9 @@ Do this, in order:
    `incomplete` naming that file, so the consumer's engineer names it as an
    injection site and the next contract iteration may write it. Never widen
    the fake's exposure instead.
-6. Run `run_scope_tests` until the consumer's tests pass against the fake and
+7. Run `run_scope_tests` until the consumer's tests pass against the fake and
    the fake passes the conformance suite.
-7. Submit.
+8. Submit.
 
 ## Revising an agreement in force
 
