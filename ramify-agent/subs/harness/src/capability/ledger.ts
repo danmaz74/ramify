@@ -3,7 +3,7 @@ import { RunLog, type RunEvent, type RunEventInput } from '../run/log.js';
 import { committedRecords, recordHash } from '../work/committed.js';
 import type { RecordBody } from '../../subs/ledger/src/ledger.js';
 import {
-  capabilityAssignmentSchema, capabilityExchangeSchema, capabilityHandbackSchema,
+  capabilityAssignmentSchema, capabilityExchangeSchema, capabilityHandbackSchema, capabilityReviewSchema,
   capabilityLayout, capabilityPlanSchema, capabilityRequestSchema, capabilityTaskSchema,
 } from './records.js';
 import { capabilityHandbackReadiness, isCapabilityEvent, replayCapabilityState, transitionCapabilityState } from './state.js';
@@ -50,6 +50,14 @@ export async function commitCapabilityTransition(
       task.source.tree !== request.source.tree || plan.originalExamples.join('\0') !== request.original.examples.map(example => example.id).join('\0')) {
       throw new Error('Delegation must retain its original request, parent, source and examples');
     }
+    const revises = request.original.revises;
+    const earlier = revises === undefined ? undefined : committed.capabilityHandbacks.get(revises.task);
+    if ((revises === undefined) !== (task.revises === undefined) ||
+      (revises !== undefined && (earlier === undefined || task.revises?.handback.id !== revises.task ||
+        task.revises.handback.hash !== recordHash(earlier) || task.revises.sourceRevision !== earlier.sourceRevision ||
+        task.revises.reason !== revises.reason))) {
+      throw new Error('Revision task must link its immutable accepted handback and source');
+    }
     if (committed.workItems.length + committed.capabilityTasks.size >= task.limits.maxWorkUnits) throw new Error('Combined work-unit limit exhausted');
   }
   if (event.type === 'capability-plan-revised') {
@@ -79,6 +87,13 @@ export async function commitCapabilityTransition(
       throw new Error('Assignment is not within the task\'s captured limit');
     }
   }
+  if (event.type === 'capability-review-recorded') {
+    const review = capabilityReviewSchema.parse(records[0]!.body);
+    if (review.task !== event.data.task || review.planRevision !== event.data.planRevision ||
+      review.tree !== event.data.tree || review.gate !== event.data.gate || review.outcome !== event.data.outcome) {
+      throw new Error('Capability review event and record differ');
+    }
+  }
   if (event.type === 'capability-handed-back') {
     const handback = capabilityHandbackSchema.parse(records[0]!.body);
     const task = committed.capabilityTasks.get(handback.task);
@@ -106,6 +121,7 @@ function specifications(event: Extract<RunEvent, { type: `capability-${string}` 
     case 'capability-exchange-opened': return [{ path: capabilityLayout.exchange(event.data.task, event.data.exchange, 1), schema: capabilityExchangeSchema, id: event.data.exchange, revision: 1 }];
     case 'capability-exchange-answered': return [{ path: capabilityLayout.exchange(event.data.task, event.data.exchange, 2), schema: capabilityExchangeSchema, id: event.data.exchange, revision: 2 }];
     case 'capability-assigned': return [{ path: capabilityLayout.assignment(event.data.task, event.data.assignment), schema: capabilityAssignmentSchema, id: event.data.assignment, revision: 1 }];
+    case 'capability-review-recorded': return [{ path: capabilityLayout.review(event.data.task, event.data.gate), schema: capabilityReviewSchema, id: event.data.review, revision: 1 }];
     case 'capability-handed-back': return [{ path: capabilityLayout.handback(event.data.task), schema: capabilityHandbackSchema, id: event.data.task, revision: 1 }];
     default: return [];
   }

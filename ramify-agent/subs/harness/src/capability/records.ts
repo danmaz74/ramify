@@ -32,6 +32,7 @@ export const capabilityNeedSchema = z.object({
   ]),
   examples: z.array(z.object({ id: exampleId, title: text, code: text, designation: z.enum(['executable', 'pseudocode']) }).strict()).min(1),
   suggestedProvider: z.object({ module: modulePathSchema, reason: text }).strict().optional(),
+  revises: z.object({ task: id, reason: text }).strict().optional(),
 }).strict().superRefine((value, context) => {
   const seen = new Set<string>();
   value.examples.forEach((example, index) => {
@@ -56,7 +57,10 @@ export function identifyCapabilityNeed(request: string, input: CapabilityNeedInp
 
 export const provisionalSourceSchema = z.object({
   acceptedBase: text,
+  /** Git tree object for the live candidate at suspension. */
   tree: treeIdentity,
+  /** Hash of the worktree/index byte manifest, which preserves staging. */
+  snapshotHash: sha256Schema,
   snapshot: location,
   delta: z.array(z.object({ path: location, before: sha256Schema.nullable(), after: sha256Schema.nullable(), staged: z.boolean() }).strict()),
   writerSettledBy: text,
@@ -94,6 +98,8 @@ export const capabilityTaskSchema = z.object({
   relatedEntries: z.array(z.object({ entry: text, reason: text }).strict()),
   deferredWorkItems: z.array(text),
   source: provisionalSourceSchema,
+  /** A later task links an accepted handback without changing its verdict. */
+  revises: z.object({ handback: recordRefSchema, sourceRevision: text, reason: text }).strict().optional(),
   limits: z.object({ maxAssignments: positive, maxWorkUnits: positive, maxInvocations: positive }).strict(),
 }).strict();
 export type CapabilityTask = z.infer<typeof capabilityTaskSchema>;
@@ -189,6 +195,16 @@ export const capabilityHandbackSchema = z.object({
 }).strict();
 export type CapabilityHandback = z.infer<typeof capabilityHandbackSchema>;
 
+export const capabilityReviewSchema = z.object({
+  schema: z.literal('ramify-agent.capability-review/1'), task: id, planRevision: positive,
+  tree: treeIdentity, gate: text,
+  outcome: z.enum(['passed', 'failed']), findings: z.array(text),
+  assessments: z.array(z.object({ kind: z.enum(['code', 'scope', 'design']), invocation: text,
+    inspected: z.array(location), missing: z.array(z.object({ path: location, reason: text }).strict()),
+    findings: z.array(text) }).strict()).length(3),
+}).strict();
+export type CapabilityReview = z.infer<typeof capabilityReviewSchema>;
+
 export const capabilityLayout = {
   /** A request may be satisfied by existing behavior before a task exists. */
   request: (request: string): string => join('capabilities', 'requests', `${request}.json`),
@@ -197,6 +213,7 @@ export const capabilityLayout = {
   exchange: (task: string, exchange: string, revision: number): string => join('capabilities', task, 'exchanges', `${exchange}.${revision}.json`),
   assignment: (task: string, assignment: string): string => join('capabilities', task, 'assignments', `${assignment}.json`),
   handback: (task: string): string => join('capabilities', task, 'handback.json'),
+  review: (task: string, gate: string): string => join('capabilities', task, 'reviews', `${gate}.json`),
 } as const;
 
 export const capabilitySchemas = {

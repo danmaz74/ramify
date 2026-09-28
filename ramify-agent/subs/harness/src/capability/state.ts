@@ -4,6 +4,7 @@ import type { CapabilityPlan, CapabilityRequest, CapabilityTask } from './record
 const capabilityTypes = [
   'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
   'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled',
+  'capability-candidate-accepted', 'capability-review-recorded',
   'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
 ] as const;
 export type CapabilityEvent = Extract<RunEvent, { type: typeof capabilityTypes[number] }>;
@@ -64,6 +65,11 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
   };
 
   switch (event.type) {
+    case 'capability-review-recorded': {
+      const current = active(event.data.task);
+      if (current.status !== 'coordinating' || current.planRevision !== event.data.planRevision) return fail('review basis is stale');
+      break;
+    }
     case 'capability-requested': {
       const { request, parent, assignment, invocation } = event.data;
       if (requests.has(request)) return fail(`request ${request} already exists`);
@@ -138,6 +144,17 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       const assignments = new Map(current.assignments);
       assignments.set(assignment, outcome);
       update(current, { status: 'coordinating', activeAssignment: null, assignments });
+      break;
+    }
+    case 'capability-candidate-accepted': {
+      const current = active(event.data.task);
+      if (current.status !== 'coordinating' || current.planRevision !== event.data.planRevision) return fail('candidate basis is stale');
+      const assignments = new Map(current.assignments);
+      const provisional = [...assignments].filter(([, outcome]) => outcome === 'partial').map(([id]) => id);
+      if (provisional.length === 0 || provisional.join(',') !== event.data.assignments.join(',')) return fail('candidate assignments differ');
+      if ([...assignments.values()].some(outcome => outcome === 'active' || outcome === 'failed' || outcome === 'interrupted')) return fail('candidate has unfinished assignments');
+      for (const id of provisional) assignments.set(id, 'accepted');
+      update(current, { assignments });
       break;
     }
     case 'capability-verification-started': {
@@ -215,4 +232,24 @@ export function canCreateCapabilityTask(workItems: number, tasks: number, maxWor
 /** A repair or reconstruction within an assignment does not consume its next number. */
 export function canAssignCapabilityTask(state: CapabilityTaskState, maxAssignments: number): boolean {
   return state.status === 'coordinating' && state.nextAssignmentSequence <= maxAssignments;
+}
+
+/** New-workflow completion depends on resolved needs and current task
+ * handbacks. An existing-API decision still needs the consumer's accepted
+ * iteration, and a child's handback is required before its parent can pass. */
+export function capabilityCompletionBlockers(state: CapabilityState, workItem: string,
+  acceptedIterations: ReadonlySet<string>): string[] {
+  const blocked: string[] = [];
+  for (const [id, request] of state.requests) {
+    if (request.parent !== workItem) continue;
+    if (request.task === null) {
+      if (request.qualification !== 'satisfied' || !acceptedIterations.has(request.assignment)) {
+        blocked.push(`${id} has no accepted consumer verification`);
+      }
+      continue;
+    }
+    const task = state.tasks.get(request.task);
+    if (task?.status !== 'handed-back' || task.handback === null) blocked.push(`${request.task} has no accepted current handback`);
+  }
+  return blocked;
 }

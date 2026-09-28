@@ -234,7 +234,14 @@ test('CA30: provisional snapshot keeps staged, worktree, untracked and deleted b
   });
   const manifest = JSON.parse(await readFile(join(run.path, captured.snapshot), 'utf8')) as {
     files: Array<{ path: string; worktree: string | null; index: string | null; base: string | null }>;
+    tree: string; snapshotHash: string;
   };
+  expect(captured.tree).toBe(manifest.tree);
+  expect(captured.snapshotHash).toBe(manifest.snapshotHash);
+  expect(captured.tree).not.toBe(captured.snapshotHash);
+  expect((await git(fixture.root, 'cat-file', '-t', captured.tree)).trim()).toBe('tree');
+  expect((await git(fixture.root, 'diff', '--name-only', captured.tree, base)).trim().split('\n'))
+    .toContain('subs/a/src/extra.ts');
   const staged = manifest.files.find(file => file.path === tracked)!;
   expect(Buffer.from(staged.index!, 'base64').toString()).toContain('staged = true');
   expect(Buffer.from(staged.worktree!, 'base64').toString()).toContain('worktree = true');

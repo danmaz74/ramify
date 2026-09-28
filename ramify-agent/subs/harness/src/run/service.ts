@@ -40,13 +40,14 @@ import {
 import { reconciliationMessage, type PacketRequest, type ReconciliationPacket } from '../reviews/reconciliation-message.js';
 import { recordSettledSnapshot } from './mutations.js';
 import { captureProvisionalSource } from '../capability/source.js';
-import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout,
+import { capabilityRequestId, capabilityTaskId, capabilityAssignmentId, identifyCapabilityNeed, capabilityLayout, capabilityReviewSchema,
   type CapabilityNeedInput, type CapabilityRequest, type CapabilityTask, type CapabilityPlan, type CapabilityExchange, type CapabilityAssignment } from '../capability/records.js';
+import { candidateAcceptanceFindings } from '../capability/acceptance.js';
 import { capabilityRunPolicyVersion, captureCapabilityLimits } from '../capability/policy.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
 import { qualificationActionSchema, capabilityActionSchema, capabilityPlanUpdateSchema, buildCapabilityPlanRevision,
   validateCapabilityAction, validateCapabilityPlanUpdate, type QualificationAction, type CapabilityAction } from '../capability/submission.js';
-import { replayCapabilityState } from '../capability/state.js';
+import { capabilityCompletionBlockers, capabilityHandbackReadiness, replayCapabilityState } from '../capability/state.js';
 import type { CapabilityWorkflow } from '../capability/workflow.js';
 import { reportCommand, type BoundReport } from '../check-findings/report.js';
 import { userCheckFindingChange, userRejectionCode } from '../check-findings/user-commands.js';
@@ -2119,6 +2120,12 @@ export class RunService {
    * caller reconciles again; otherwise the work item completes, naming each
    * CheckFinding left open and why.
    */
+  private capabilityBlockers(run: Run, workItem: string): string[] {
+    const accepted = new Set(run.log.all('iteration-closed').filter(event => event.data.outcome === 'accepted')
+      .map(event => event.data.iteration));
+    return capabilityCompletionBlockers(replayCapabilityState(run.log.events), workItem, accepted);
+  }
+
   private async completeWorkItem(run: Run, item: WorkItem, gate: GateAttempt, basis: CompletionBasis): Promise<'completed' | 'ended' | { readonly refused: string }> {
     const limit = run.record.policy.limits.reconciliationRoundsPerWorkItem ?? defaultReconciliationRounds;
     const minimum = run.record.policy.limits.laterRoundMinimumRisk ?? 'medium';
@@ -2126,6 +2133,10 @@ export class RunService {
     const lineage = basis.decided ? await this.sourceLineage(run, basis.commit, gate.audited) : null;
     const outcome = await run.mutex.run(async () => {
       if (run.log.terminal !== undefined) return 'ended' as const;
+      if (this.workflow !== null) {
+        const blockers = this.capabilityBlockers(run, item.id);
+        if (blockers.length > 0) return { refused: blockers.join('; ') };
+      }
       const now = this.basisState(run, item.id);
       const rounds = run.log.all('reconciliation-started').filter(event => event.data.workItem === item.id).length;
       const inBasis = new Set(basis.checkFindings.map(entry => entry.checkFinding));
@@ -4772,6 +4783,18 @@ export class RunService {
         return null;
       }
       if (packageInPrompt) prompt = `${prompt}\n\n# Your work-item package\n\n${contextPackage!.text}`;
+      if (attempt === 1 && this.workflow !== null) {
+        const intervening = [...current.capabilityHandbacks.values()].flatMap(handback => {
+          const task = current.capabilityTasks.get(handback.task);
+          return task?.deferredWorkItems.includes(item.id) ? [{ task, handback }] : [];
+        });
+        if (intervening.length > 0) prompt += `\n\n# Intervening capability work\n\n${intervening.map(({ task, handback }) =>
+          `Task ${task.id} returned tree ${handback.returnedTree} at ${handback.sourceRevision}. ` +
+          `Plan ${handback.plan.id} revision ${handback.plan.revision}; changed since A suspension: ${handback.deltaFromSuspension.join(', ') || '(none)'}. ` +
+          `Interface use: ${handback.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. ` +
+          `This task did not complete ${item.id}. Reassess its prior outline, decisions and any unexecuted assignment against the current source before assigning it.`
+        ).join('\n\n')}`;
+      }
       packageUndelivered = false;
       // A finding is delivered once: the next turn of this same architect
       // has it in its own history, and repeating it would read as a second
@@ -4988,18 +5011,20 @@ export class RunService {
       const owing = this.obligationOwedBy(run, item, current);
       const owed = owing !== null && !conformed.has(conformanceKey(owing.id, owing.revision)) ? owing : null;
       const unbound = this.unfinishedScenarios(run, item, ['pending', 'bound']);
-      if (open.length > 0 || owed !== null || unbound.length > 0) {
+      const capabilityBlockers = this.workflow === null ? [] : this.capabilityBlockers(run, item.id);
+      if ((this.workflow === null && (open.length > 0 || owed !== null)) || capabilityBlockers.length > 0 || unbound.length > 0) {
         refusals += 1;
         blocked = [
-          ...open.map(requirement => {
+          ...(this.workflow === null ? open : []).map(requirement => {
             const obligation = current.obligations.get(requirement.obligation);
             return `${requirement.id} is open: ${obligation?.capability ?? requirement.forCapability} is still held by the fake at ${requirement.evidence.fakeInjections.join(', ')}`;
           }),
-          ...(owed === null ? [] : [`${owed.id} is owed: the agreed conformance suite has not passed against the real provider yet`]),
+          ...(this.workflow !== null || owed === null ? [] : [`${owed.id} is owed: the agreed conformance suite has not passed against the real provider yet`]),
+          ...capabilityBlockers,
           ...unbound.map(scenario => scenarioRefusal(scenario)),
         ];
         if (refusals > bound) {
-          await this.refuseCompletion(run, item, refusals, blocked, { open, owed: owed !== null, scenarios: unbound });
+          await this.refuseCompletion(run, item, refusals, blocked, { open: this.workflow === null ? open : [], owed: this.workflow === null && owed !== null, scenarios: unbound });
           return null;
         }
         continuing = 'completion-refused';
@@ -6429,6 +6454,12 @@ export class RunService {
       ].join('\n') };
     }
     const records = committedRecords(run.log.ledger.replay());
+    const prior = request.original.revises === undefined ? undefined : records.capabilityHandbacks.get(request.original.revises.task);
+    if (request.original.revises !== undefined && (prior === undefined ||
+      records.capabilityTasks.get(request.original.revises.task)?.parent.id !== item.id)) {
+      await this.fail(run, 'inputs-changed', `Revision request ${request.id} names no accepted handback of ${item.id}: ${request.original.revises.task}`);
+      return null;
+    }
     const taskId = capabilityTaskId(records.capabilityTasks.size + 1);
     const providerItems = records.workItems.filter(entry => entry.module === decision.provider);
     const task: CapabilityTask = {
@@ -6441,6 +6472,9 @@ export class RunService {
       ],
       relatedEntries: providerItems.map(entry => ({ entry: entry.id, reason: 'Provider entry remains separate from this task' })),
       deferredWorkItems: providerItems.map(entry => entry.id), source,
+      ...(prior === undefined || request.original.revises === undefined ? {} : { revises: {
+        handback: refOf(prior.task, 1, prior), sourceRevision: prior.sourceRevision, reason: request.original.revises.reason,
+      } }),
       limits: captureCapabilityLimits(run.record.policy),
     };
     let plan: CapabilityPlan = {
@@ -6568,7 +6602,9 @@ export class RunService {
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         execute: async () => {
           const current = committedRecords(run.log.ledger.replay());
-          return { text: JSON.stringify({ assignments: [...current.capabilityAssignments.values()].filter(entry => entry.task === task.id),
+          return { text: JSON.stringify({ candidate: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+            configuration: sha256(JSON.stringify(run.record.projectConfig)),
+            assignments: [...current.capabilityAssignments.values()].filter(entry => entry.task === task.id),
             exchanges: [...current.capabilityExchanges.values()].filter(entries => entries[0]?.task === task.id),
             events: run.log.events.filter(event => event.type.startsWith('capability-') && 'task' in event.data && event.data.task === task.id),
             checks: run.log.events.filter(event => event.type.includes('gate')) }) };
@@ -6588,6 +6624,7 @@ export class RunService {
           `# Selected plan package ${selectedHash}\n\n${selected}`,
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
           `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
+        'Before requesting handback, use read_capability_evidence to identify the current candidate and configuration. Update each original case with the exact executed test path, candidate and configuration; explain any corrected expectation with independent evidence. The combined gate and reviewer will check them again.',
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
@@ -6660,8 +6697,13 @@ export class RunService {
         });
       if (resolution === null) return null;
       progress = `Boundary decision returned to capability task ${task.id}: ${JSON.stringify(resolution)}`;
+    } else if (chosen.kind === 'request-handback') {
+      const result = await this.verifyCapabilityHandback(run, agent, packages, task, request, plan, chosen, action.id);
+      if (result === null) return null;
+      if (result.handedBack) return { kind: 'satisfied', guidance: result.guidance };
+      progress = `Handback refused for ${task.id}: ${result.guidance}`;
     } else {
-      // The real capability gate and handback are installed in iteration 4.
+      // Nested delegation is installed with the depth-first recovery path.
       return { kind: 'delegated' };
     }
     coordinatorPoint = action.ref || undefined;
@@ -6732,6 +6774,127 @@ export class RunService {
       type: 'capability-exchange-answered', data: { task: task.id, exchange: id, invocation: response.id },
     }, [{ path: capabilityLayout.exchange(task.id, id, 2), id, revision: 2, body: answered }]));
     return { exchange: answered, point: response.ref, session: response.session };
+  }
+
+  /** A combined candidate is accepted only after the project's complete gate
+   * and the existing snapshot reviewer have examined the inherited A edits
+   * together with every task assignment. Failed attempts stay in the log. */
+  private async verifyCapabilityHandback(
+    run: Run, agent: AgentPort, packages: ReadonlyMap<string, LoadedPackage>, task: CapabilityTask,
+    request: CapabilityRequest, plan: CapabilityPlan,
+    action: Extract<CapabilityAction, { kind: 'request-handback' }>, invocation: string,
+  ): Promise<{ readonly handedBack: boolean; readonly guidance: string } | null> {
+    run.writer.requireSettled(`Capability ${task.id} cannot verify an unsettled writer`);
+    const state = replayCapabilityState(run.log.events).tasks.get(task.id);
+    if (state === undefined || state.status !== 'coordinating' || state.planRevision !== plan.revision || state.activeChild !== null) {
+      return { handedBack: false, guidance: 'The task, plan or child dependency is not ready for verification' };
+    }
+    const records = committedRecords(run.log.ledger.replay());
+    const assignments = [...records.capabilityAssignments.values()].filter(entry => entry.task === task.id)
+      .sort((a, b) => a.sequence - b.sequence);
+    if (assignments.length === 0 || assignments.some(entry => state.assignments.get(entry.id) !== 'partial' && state.assignments.get(entry.id) !== 'accepted')) {
+      return { handedBack: false, guidance: 'Every capability engineer must submit an in-scope result before handback' };
+    }
+    const index = await this.refreshIndex(run);
+    if (index === null) return { handedBack: false, guidance: 'The current architect index is unavailable' };
+    const probe = await resolveTestSelection({ projectRoot: this.projectRoot, index,
+      policy: { policy: 'owned-by-scope', exactOwners: [...new Set(assignments.map(entry => entry.owner))],
+        subtrees: [], extraSuites: [] } });
+    const gateId = gateAttemptId(this.gateCount(run) + 1);
+    const gate = await this.committingCheckpoint(run, {
+      id: gateId, runId: run.record.jobId, checkpoint: 'work-item', projectRoot: this.projectRoot,
+      directory: run.path(runLayout.gateOutput(gateId)), head: await this.git.currentHead(this.projectRoot),
+      policy: run.record.policy, proposedBy: invocation, repairRound: 0,
+      subject: { workItem: task.parent.id }, scopeProbe: probe,
+    }, `Combined capability ${task.id}: ${action.summary}`);
+    if (gate.verdict !== 'passed' || gate.audited === null) {
+      return { handedBack: false, guidance: `Combined gate ${gate.id} ${gate.verdict}: ${gate.cause ?? 'no complete evidence'}` };
+    }
+    const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot,
+      { commit: gate.audited, base: request.source.acceptedBase });
+    const currentTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    if (snapshot.tree !== currentTree) return { handedBack: false, guidance: `Candidate changed after gate ${gate.id}; rerun verification` };
+    const loaded = packages.get('reviewer');
+    if (loaded?.reviewer === undefined) return { handedBack: false, guidance: 'Reviewer prompt package is unavailable' };
+    const assessments = [] as Array<{ kind: 'code' | 'scope' | 'design'; invocation: string; inspected: string[];
+      missing: Array<{ path: string; reason: string }>; findings: string[] }>;
+    for (const kind of ['code', 'scope', 'design'] as const) {
+      const reviewerTools = snapshotTools(snapshot, this.candidates, this.projectRoot);
+      const reviewed = await this.runInvocation<ReviewSubmission>(run, agent, {
+        role: 'reviewer', work: { workItem: task.parent.id }, attempt: assessments.length + 1, loaded,
+        systemPrompt: renderReviewerPrompt(loaded, '(audited capability candidate)', kind),
+        prompt: [`Review ${kind} for capability ${task.id} against plan revision ${plan.revision}.`,
+          `The original request and examples: ${JSON.stringify(request.original)}`,
+          `Current plan and case dispositions: ${JSON.stringify(plan)}`,
+          `Assignment owners, scopes and candidate trees: ${JSON.stringify(assignments)}`,
+          `Combined gate ${gate.id} checked tree ${snapshot.tree}; independently judge real provider/consumer behavior, compatibility, expected values, scope and design.`,
+          `The diff from ${request.source.acceptedBase} includes the requesting A engineer\'s inherited partial source.`,
+          `Changed paths: ${snapshot.changes.map(change => change.path).join(', ')}`].join('\n\n'),
+        start: { mode: 'fresh' }, toolName: reviewToolName, description: reviewSubmissionDescription,
+        inputSchema: reviewJsonSchema, submissionSchema: 'ramify-agent.review-submission/1',
+        validate: input => validateReview(input, { snapshot, inspected: reviewerTools.inspected(),
+          read: reviewerTools.read(), maxConcerns: run.record.policy.reviews?.maxConcerns ?? 20 }),
+        keep: () => finished('work-closed'), scope: { write: null, measurement: null, size: null },
+        reader: true, equip: () => ({ builtinTools: [], tools: [...reviewerTools.definitions] }),
+      });
+      assessments.push({ kind, invocation: reviewed.id, inspected: reviewed.value?.inspected ?? [],
+        missing: reviewed.value?.missing ?? [],
+        findings: reviewed.ended === 'submitted' && reviewed.value !== undefined
+          ? [...reviewed.value.concerns.map(concern => concern.summary),
+            ...reviewed.value.missing.map(entry => `${entry.path}: ${entry.reason}`)]
+          : [`${kind} review did not submit: ${reviewed.ended}`] });
+    }
+    const findings = assessments.flatMap(assessment => assessment.findings.map(finding => `${assessment.kind}: ${finding}`));
+    const review = capabilityReviewSchema.parse({ schema: 'ramify-agent.capability-review/1', task: task.id,
+      planRevision: plan.revision, tree: snapshot.tree, gate: gate.id,
+      outcome: findings.length === 0 ? 'passed' : 'failed', findings, assessments });
+    await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-review-recorded', data: {
+      task: task.id, gate: gate.id, tree: snapshot.tree, planRevision: plan.revision,
+      outcome: review.outcome, review: gate.id,
+    } }, [{ path: capabilityLayout.review(task.id, gate.id), id: gate.id, revision: 1, body: review }]));
+    if ((await this.git.previewCandidateTree(this.projectRoot)).tree !== snapshot.tree) {
+      return { handedBack: false, guidance: `Source changed after gate ${gate.id} and its review; rerun the combined gate` };
+    }
+    const configuration = sha256(JSON.stringify(run.record.projectConfig));
+    const ownerDirectories = new Map([task.provider, task.consumer].map(owner => [owner, findModule(index, owner)?.dir] as const)
+      .filter((entry): entry is readonly [string, string] => entry[1] !== undefined));
+    const failures = candidateAcceptanceFindings({ task, request, plan, assignments, ownerDirectories, outcomes: state.assignments,
+      gate, tree: snapshot.tree, configuration, review });
+    for (const example of request.original.examples) {
+      const reported = action.coverage.find(entry => entry.case === example.id);
+      const disposition = plan.useCases.find(useCase => useCase.id === example.id)?.coverage;
+      if (reported === undefined) failures.push(`Handback omits original example ${example.id}`);
+      else if (disposition === undefined || disposition.state === 'unresolved' ||
+        reported.evidence.some(evidence => !disposition.tests.includes(evidence))) {
+        failures.push(`Handback example ${example.id} cites evidence outside the current plan`);
+      }
+    }
+    if (failures.length > 0) return { handedBack: false, guidance: failures.join('; ') };
+    const provisional = [...state.assignments].filter(([, outcome]) => outcome === 'partial').map(([id]) => id);
+    if (provisional.length > 0) await this.write(run, { type: 'capability-candidate-accepted', data: {
+      task: task.id, gate: gate.id, tree: snapshot.tree, planRevision: plan.revision,
+      assignments: provisional, review: gate.id,
+    } });
+    await this.write(run, { type: 'capability-verification-started', data: { task: task.id, invocation } });
+    const verifying = replayCapabilityState(run.log.events).tasks.get(task.id)!;
+    const readiness = capabilityHandbackReadiness(task, request, plan, verifying);
+    if (readiness.length > 0) {
+      await this.write(run, { type: 'capability-verification-failed', data: { task: task.id, finding: readiness.join('; ') } });
+      return { handedBack: false, guidance: readiness.join('; ') };
+    }
+    const delta = await this.candidates.diffNameStatus(this.projectRoot, request.source.tree, gate.audited);
+    const handback = {
+      schema: 'ramify-agent.capability-handback/1' as const, task: task.id, request: request.id,
+      plan: refOf(task.id, plan.revision, plan), sourceRevision: gate.audited, returnedTree: snapshot.tree,
+      deltaFromSuspension: delta.map(change => change.path), summary: action.summary,
+      interfaces: action.interfaces, compatibility: [...plan.compatibility],
+      checks: [refOf(gate.id, 1, this.committedBody(run, runLayout.gate(gate.id)))],
+      reviews: [refOf(gate.id, 1, review)], limitations: action.limitations,
+    };
+    await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-handed-back', data: {
+      task: task.id, handback: task.id, invocation,
+    } }, [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handback }]));
+    return { handedBack: true, guidance: `Capability ${task.id} accepted at ${snapshot.tree}. ${action.summary}. Use ${action.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. Continue the original assignment from the current candidate; its remaining goal stays open.` };
   }
 
   /** One task-owned writer. Its scope is captured from the real module view;

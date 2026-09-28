@@ -332,6 +332,10 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Capability task ${event.data.task} assigned ${event.data.assignment}`, ref('invocation', event.data.invocation)];
     case 'capability-assignment-settled':
       return [`Capability assignment ${event.data.assignment} settled: ${event.data.outcome}`, []];
+    case 'capability-review-recorded':
+      return [`Capability task ${event.data.task} review ${event.data.outcome} at ${event.data.tree}`, ref('gate', event.data.gate)];
+    case 'capability-candidate-accepted':
+      return [`Capability task ${event.data.task} accepted candidate ${event.data.tree}`, ref('gate', event.data.gate)];
     case 'capability-verification-started':
       return [`Capability task ${event.data.task} verification started`, ref('invocation', event.data.invocation)];
     case 'capability-verification-failed':

@@ -23,7 +23,7 @@ export const capabilityActionSchema = z.discriminatedUnion('kind', [
   action('request-handback', {
     summary: text,
     coverage: z.array(z.object({ case: text, evidence: z.array(text).min(1) }).strict()).min(1),
-    interfaces: z.array(z.object({ path: text, use: text }).strict()).min(1),
+    interfaces: z.array(z.object({ path: text, symbols: z.array(text).min(1), use: text }).strict()).min(1),
     limitations: z.array(text),
   }),
   action('partial', { progress: text, unfinished: z.array(text).min(1) }),

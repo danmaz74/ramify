@@ -43,9 +43,9 @@ test('CA04 CA06 CA16: a pending question is durable and the retained A session a
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (architectTurns === 1) return submit({ ...basis, kind: 'consult-consumer',
         question: 'What does the calling code require?', sections: ['need'], references: ['subs/a/src/caller.ts'] });
-      return submit({ ...basis, kind: 'request-handback', summary: 'Gate pending',
-        coverage: [{ case: 'need-001.ex01', evidence: ['candidate'] }],
-        interfaces: [{ path: 'subs/b/src/fact.ts', use: 'A calls B' }], limitations: [] });
+      if (architectTurns === 2) return submit({ ...basis, kind: 'partial', progress: 'Consumer answered',
+        unfinished: ['Implementation and acceptance remain'] });
+      return [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };

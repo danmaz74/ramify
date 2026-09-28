@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { sha256 } from '../prompts/packages.js';
 import { provisionalSourceSchema, type ProvisionalSource } from './records.js';
+import { previewCandidateTree } from '../../subs/evidence/src/candidate-tree.js';
 
 const exec = promisify(execFile);
 
@@ -64,10 +65,11 @@ export async function captureProvisionalSource(input: {
   const snapshot = join('capabilities', 'snapshots', `${input.request}.json`).split(sep).join('/');
   const document = { schema: 'ramify-agent.provisional-source/1', acceptedBase: input.acceptedBase,
     writerSettledBy: input.writerSettledBy, files };
-  const tree = sha256(JSON.stringify(document));
+  const snapshotHash = sha256(JSON.stringify(document));
+  const tree = (await previewCandidateTree(input.projectRoot)).tree;
   const target = join(input.runDirectory, snapshot);
   await mkdir(dirname(target), { recursive: true });
-  await writeFile(target, `${JSON.stringify({ ...document, tree }, null, 2)}\n`, { flag: 'wx', flush: true });
-  return provisionalSourceSchema.parse({ acceptedBase: input.acceptedBase, tree, snapshot, delta,
+  await writeFile(target, `${JSON.stringify({ ...document, tree, snapshotHash }, null, 2)}\n`, { flag: 'wx', flush: true });
+  return provisionalSourceSchema.parse({ acceptedBase: input.acceptedBase, tree, snapshotHash, snapshot, delta,
     writerSettledBy: input.writerSettledBy });
 }

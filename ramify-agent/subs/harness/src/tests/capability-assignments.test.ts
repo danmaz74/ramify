@@ -74,9 +74,9 @@ function script(seen: string[], mode: 'assignments' | 'boundary' = 'assignments'
         problem: 'Should another owner take the source fact?', evidence: ['B currently owns it'] });
       if (mode === 'boundary' && architect === 2) return submit({ ...basis, kind: 'consult-consumer',
         question: 'Can A use B unchanged?', sections: ['need'], references: ['subs/a/src/caller.ts'] });
-      if (mode === 'boundary') return submit({ ...basis, kind: 'request-handback', summary: 'Pending gate',
-        coverage: [{ case: 'need-001.ex01', evidence: ['candidate'] }],
-        interfaces: [{ path: 'subs/b/src/fact.ts', use: 'A calls B' }], limitations: [] });
+      if (mode === 'boundary') return architect === 3
+        ? submit({ ...basis, kind: 'partial', progress: 'Boundary decision returned', unfinished: ['Acceptance remains'] })
+        : [{ kind: 'wait', ms: 60_000 }];
       if (architect === 1) return [
         { kind: 'tool', tool: 'validate_capability_action', input: { ...basis, kind: 'assign', owner: b } },
         { kind: 'tool', tool: 'update_capability_plan', input: { task: ids[1], basedOn: 1,
@@ -91,8 +91,9 @@ function script(seen: string[], mode: 'assignments' | 'boundary' = 'assignments'
       if (architect >= 2 && architect <= 5) return submit({ ...basis, kind: 'assign', owner: owners[architect - 2],
         ...(owners[architect - 2] === p ? { includedChildren: [b] } : {}),
         purpose: `Update ${owners[architect - 2]}`, approach: 'Change owned source', requirementRefs: [], intendedEvidence: ['Owned source diff'] });
-      return submit({ ...basis, kind: 'request-handback', summary: 'Pending gate',
-        coverage: [{ case: 'need-001.ex01', evidence: ['candidate'] }], interfaces: [{ path: 'subs/b/src/fact.ts', use: 'A calls B' }], limitations: [] });
+      return architect === 6
+        ? submit({ ...basis, kind: 'partial', progress: 'Assignments are provisional', unfinished: ['Acceptance remains'] })
+        : [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };
@@ -169,8 +170,7 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).filter(event => event.type === 'invocation-ended' &&
     (opened.service.events('need', receipt.jobId) ?? []).some(start => start.type === 'invocation-started' &&
       start.data.invocation === event.data.invocation && start.data.role === 'capability-architect')).length >= 6);
-  const current = opened.service.events('need', receipt.jobId)!;
-  await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence));
+  await stopAfterArchitectYield(opened.service, receipt.jobId);
   await opened.service.settled('need', receipt.jobId);
 }, 60_000);
 
@@ -200,7 +200,19 @@ test('CA10: a wider boundary decision returns to the same capability architect',
       start.type === 'invocation-started' && start.data.invocation === event.data.invocation &&
       start.data.role === 'capability-architect')).length >= 3;
   });
-  const current = opened.service.events('need', receipt.jobId)!;
-  await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence));
+  await stopAfterArchitectYield(opened.service, receipt.jobId);
   await opened.service.settled('need', receipt.jobId);
 }, 45_000);
+
+async function stopAfterArchitectYield(service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'], jobId: string): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const events = service.events('need', jobId)!;
+    try {
+      await service.execute(stopRun('need', jobId, events.at(-1)!.sequence));
+      return;
+    } catch (error) {
+      if (!String(error).includes('at version')) throw error;
+    }
+  }
+  throw new Error('The architect did not yield a stable stop version');
+}
