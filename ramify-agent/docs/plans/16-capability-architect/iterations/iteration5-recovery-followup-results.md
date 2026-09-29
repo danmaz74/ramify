@@ -30,5 +30,5 @@ The corrected reviewer baseline and candidate were run in separate worktrees. Th
 ## Remaining coverage
 
 - CA26 has capability-specific invalid final submission, port-input, preview-counter, reconstruction and architect-budget witnesses. Repair-round exhaustion remains unexercised in a dedicated capability run.
-- CA20 still lacks a process-level witness of an actual registered process group surviving service restart. The existing missing confirmed writer-release service test fails closed and blocks the frontier.
+- The original addendum did not have a process-level CA20 witness. Iteration 7 later integrated the dedicated real-process restart case in `capability-recovery.test.ts`; see [iteration 7 results](iteration7-results.md) for its platform scope and result.
 - The live Pi, external semantic audit and served-browser gates remain separate Plan 16 iteration 7 evidence.
