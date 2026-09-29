@@ -8,7 +8,7 @@ import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.
 import { assign, edit, installMiniRunner, outline, runScopeTests, submit, treeInputs, write } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, until } from './helpers/runs.js';
-import type { CapabilityAssignment } from '../capability/records.js';
+import type { IterationAssignment } from '../work/iterations.js';
 import { decision, forkDecision } from './helpers/placement.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -54,7 +54,7 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
       write('extra.ts', "export const sourceHint = 'B';\n"),
       edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('this test still fails')"),
       runScopeTests());
-      const owner = /Capability assignment (cap-\d+\.i\d+) in ([^\n]+)/u.exec(spec.prompt)?.[2];
+      const owner = spec.prompt.includes('# Iteration cap-') ? /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1] : undefined;
       if (mode === 'partial-blocker' && owner === a) return submit({
         kind: 'partial', done: ['A kept the readable selected denial'], unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'],
         findings: ['A cannot write the root test from its module scope'],
@@ -80,9 +80,7 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (mode === 'partial-blocker') return architect <= 2
-        ? submit({ ...basis, kind: 'assign', owner: architect === 1 ? a : p,
-          purpose: architect === 1 ? 'Render A denial' : 'Repair root-owned stale assertion',
-          approach: 'Change only owned source or tests', requirementRefs: [], intendedEvidence: ['Owned source diff'] })
+        ? submit({ ...basis, kind: 'assign', assignment: assign(architect === 1 ? a : p, { goal: architect === 1 ? 'Render A denial' : 'Repair root-owned stale assertion', approach: 'Change only owned source or tests', completionEvidence: 'Owned source diff' }).assignment })
         : [{ kind: 'wait', ms: 60_000 }];
       if (mode === 'boundary' && architect === 1) return submit({ ...basis, kind: 'request-placement',
         problem: 'Should another owner take the source fact?', evidence: ['B currently owns it'] });
@@ -102,9 +100,11 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
           sections: ['need'], references: ['subs/a/src/caller.ts'] }),
       ];
       const owners = [b, d, p, a];
-      if (architect >= 2 && architect <= 5) return submit({ ...basis, kind: 'assign', owner: owners[architect - 2],
-        ...(owners[architect - 2] === p ? { includedChildren: [b] } : {}),
-        purpose: `Update ${owners[architect - 2]}`, approach: 'Change owned source', requirementRefs: [], intendedEvidence: ['Owned source diff'] });
+      if (architect >= 2 && architect <= 5) return submit({ ...basis, kind: 'assign', assignment: assign(owners[architect - 2]!, {
+        goal: `Update ${owners[architect - 2]}`, approach: 'Change owned source', completionEvidence: 'Owned source diff',
+        scope: { base: { module: owners[architect - 2]!, includedChildren: owners[architect - 2] === p ? [b] : [] },
+          extra: [], read: [], rationale: 'Scoped compatibility change' },
+      }).assignment });
       return architect === 6
         ? submit({ ...basis, kind: 'partial', progress: 'Assignments are provisional', unfinished: ['Acceptance remains'] })
         : [{ kind: 'wait', ms: 60_000 }];
@@ -135,11 +135,13 @@ test('an explicit partial capability result returns its cross-owner blocker to t
   const settled = events.filter(event => event.type === 'capability-assignment-settled');
   expect(settled).toHaveLength(2);
   expect(settled[0]?.data).toMatchObject({ assignment: 'cap-001.i01', outcome: 'partial',
-    unfinished: ['Root-owned stale assertion in src/tests/stale.test.ts'], mutated: ['subs/a/src/caller.ts'] });
-  expect(settled[1]?.data).toMatchObject({ assignment: 'cap-001.i02', outcome: 'partial',
+    mutated: ['subs/a/src/caller.ts'] });
+  expect(settled[1]?.data).toMatchObject({ assignment: 'cap-001.i02', outcome: 'accepted',
     mutated: ['src/tests/stale.test.ts'] });
   expect(events.filter(event => event.type === 'capability-assigned').map(event => event.data.assignment))
     .toEqual(['cap-001.i01', 'cap-001.i02']);
+  const partial = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'work-items/cap-001/iterations/01/result.json'), 'utf8'));
+  expect(partial.findings).toContain('unfinished: Root-owned stale assertion in src/tests/stale.test.ts');
   expect(prompts.some(prompt => prompt.includes('unfinished: Root-owned stale assertion in src/tests/stale.test.ts')))
     .toBe(true);
   expect(await readFile(join(fixture.root, 'src/tests/stale.test.ts'), 'utf8')).toContain("expect('readable denial')");
@@ -190,11 +192,11 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     data: expect.objectContaining({ outcome: 'failed' }) }));
   const consultation = engineerStarts.find(event => event.data.work.capabilityTask === 'cap-001' &&
     event.data.work.capabilityAssignment === undefined)!;
-  const aExperiment = engineerStarts.find(event => event.data.work.capabilityAssignment === 'cap-001.i04')!;
+  const aExperiment = engineerStarts.find(event => event.data.work.iteration === 'cap-001.i04')!;
   expect(consultation.data.session).toBe(original.data.session);
-  expect(aExperiment.data.session).toBe(original.data.session);
-  expect(aExperiment.data.start).toBe('continued');
-  const bInvocation = engineerStarts.find(event => event.data.work.capabilityAssignment === 'cap-001.i01')!;
+  expect(aExperiment.data.session).not.toBe(original.data.session);
+  expect(aExperiment.data.start).toBe('opened');
+  const bInvocation = engineerStarts.find(event => event.data.work.iteration === 'cap-001.i01')!;
   const bObservations = (await readFile(runPath(fixture.root, 'need', receipt.jobId,
     `invocations/${bInvocation.data.invocation}/observations.jsonl`), 'utf8')).trim().split('\n').map(line => JSON.parse(line) as {
       type: string; data: { verdict?: string; requested?: string };
@@ -207,9 +209,9 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     ['module.ramify', 'subs/b/src/companion.ts'], ['subs/a/src/caller.ts'],
   ]);
   const assignments = await Promise.all([1, 2, 3, 4].map(async number => JSON.parse(await readFile(
-    runPath(fixture.root, 'need', receipt.jobId, `capabilities/cap-001/assignments/cap-001.i0${number}.json`), 'utf8')) as CapabilityAssignment));
-  expect(assignments.map(a => a.owner)).toEqual([b, d, p, a]);
-  expect(assignments.map(a => a.sequence)).toEqual([1, 2, 3, 4]);
+    runPath(fixture.root, 'need', receipt.jobId, `work-items/cap-001/iterations/0${number}/assignment.json`), 'utf8')) as IterationAssignment));
+  expect(assignments.map(assignment => 'module' in assignment.scope.base ? assignment.scope.base.module : assignment.scope.base.modules[0])).toEqual([b, d, p, a]);
+  expect(assignments.map(assignment => assignment.coordination?.kind === 'capability-task' ? assignment.coordination.sequence : null)).toEqual([1, 2, 3, 4]);
   expect(events.filter(event => event.type === 'invocation-started' && event.data.role === 'local-architect' &&
     event.sequence > events.find(delegated => delegated.type === 'capability-delegated')!.sequence)).toHaveLength(0);
   expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);

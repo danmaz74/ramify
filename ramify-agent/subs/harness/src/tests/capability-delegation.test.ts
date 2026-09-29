@@ -80,8 +80,7 @@ function script(starts: string[], capabilityPrompts: string[] = [], qualificatio
       ];
       if (capabilityTurns === budgetReturns + 1) return submit({ kind: 'partial', ...basis,
         progress: 'Read A source and B entry context', unfinished: ['Coordinate B and A assignments'] });
-      return submit({ kind: 'assign', ...basis, owner: b,
-        purpose: 'Provide richer fact', approach: 'Extend B fact API', requirementRefs: [], intendedEvidence: ['A consumes the new B fact'] });
+      return submit({ kind: 'assign', ...basis, assignment: assign(b, { goal: 'Provide richer fact', approach: 'Extend B fact API', completionEvidence: 'A consumes the new B fact' }).assignment });
     }
     return [];
   };
@@ -307,7 +306,7 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
   }, 45_000);
 }
 
-test('historical test composition cannot create a policy/5 run', async () => {
+test('historical test composition cannot create a policy/6 run', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -319,7 +318,7 @@ test('historical test composition cannot create a policy/5 run', async () => {
   await expect(opened.service.execute(startRun('need'))).rejects.toThrow('historical test workflow cannot create');
 });
 
-test('CA33: production composition captures policy/5 and delegates without contract dispatch', async () => {
+test('CA33: production composition captures policy/6 and delegates without contract dispatch', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -338,7 +337,7 @@ test('CA33: production composition captures policy/5 and delegates without contr
   const job = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as {
     policy: { version: string }; prompts: Record<string, unknown>;
   };
-  expect(job.policy.version).toBe('run-policy/5');
+  expect(job.policy.version).toBe('run-policy/6');
   expect(job.prompts['capability-architect']).toBeDefined();
   expect(job.prompts['contract-engineer']).toBeUndefined();
   await opened.service.close();

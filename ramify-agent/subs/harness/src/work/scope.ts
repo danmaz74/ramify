@@ -261,23 +261,6 @@ export async function captureGuardedFiles(
   ].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
-/**
- * The probe an all-project checkpoint runs beside the project's own tests:
- * the modules of the assignment's base, as an ordinary owned selection, and
- * the tests beneath its `outside-modules` paths. It is what tells a failure
- * inside the iteration's own scope from one outside it, and it selects
- * nothing more than the scope names.
- */
-export function scopeProbePolicyOf(base: WriteScope['base'], extra: WriteScope['extra'] = []): {
-  policy: 'owned-by-scope'; exactOwners: string[]; subtrees: string[]; extraSuites: string[]; outsideModules?: string[];
-} {
-  const outside = outsideModulePaths(extra);
-  const outsideModules = outside.length === 0 ? {} : { outsideModules: outside };
-  return 'module' in base
-    ? { policy: 'owned-by-scope', exactOwners: [base.module], subtrees: [...base.includedChildren], extraSuites: [], ...outsideModules }
-    : { policy: 'owned-by-scope', exactOwners: [...base.modules], subtrees: [], extraSuites: [], ...outsideModules };
-}
-
 /** Every module of the view that lies inside one directory, the directory's own owner included. */
 export function modulesBeneath(index: ArchitectIndex, dir: string): ModuleEntry[] {
   const prefix = toPosix(dir);

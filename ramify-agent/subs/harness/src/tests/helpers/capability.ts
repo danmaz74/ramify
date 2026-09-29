@@ -21,7 +21,7 @@ export async function copyCapabilityFixture(nested = false): Promise<{ root: str
 }
 
 /** Drives the capability factory through the real service and ledger while
- * capturing policy/5. This seam lives only in the harness test tree. */
+ * capturing the current shared-lifecycle policy. This seam lives only in the harness test tree. */
 export function openCapabilityRuns(root: string, options: OpenRunsOptions) {
   return openRuns(root, { ...options, capabilityWorkflowFactory: createCapabilityWorkflow,
     policy: (projectRoot, nested) => capabilityPolicyFrom(options.policy?.(projectRoot, nested) ?? testPolicy(projectRoot)) });
