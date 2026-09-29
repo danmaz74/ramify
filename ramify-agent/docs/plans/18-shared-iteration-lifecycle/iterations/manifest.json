@@ -1,0 +1,46 @@
+{
+  "plan": "../main-plan.md",
+  "status": "proposed",
+  "iterations": [
+    {
+      "id": "1",
+      "file": "01-shared-contracts.md",
+      "dependsOn": []
+    },
+    {
+      "id": "2",
+      "file": "02-provider-integration.md",
+      "dependsOn": [
+        "1"
+      ]
+    },
+    {
+      "id": "3",
+      "file": "03-shared-execution.md",
+      "dependsOn": [
+        "2"
+      ]
+    },
+    {
+      "id": "4",
+      "file": "04-completion-recovery.md",
+      "dependsOn": [
+        "3"
+      ]
+    },
+    {
+      "id": "5",
+      "file": "05-inspection-delivery.md",
+      "dependsOn": [
+        "4"
+      ]
+    },
+    {
+      "id": "6",
+      "file": "06-production-acceptance.md",
+      "dependsOn": [
+        "5"
+      ]
+    }
+  ]
+}
