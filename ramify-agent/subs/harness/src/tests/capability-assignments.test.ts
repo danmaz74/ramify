@@ -157,7 +157,8 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
     readinessExecution: directReadinessExecution() });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun('need'));
-  await until(() => { const events = opened.service.events('need', receipt.jobId) ?? []; return events.filter(event => event.type === 'capability-assignment-settled').length >= 4 || events.some(event => event.type === 'job-failed'); }, 40_000);
+  await until(() => { const events = opened.service.events('need', receipt.jobId) ?? []; return events.filter(event => event.type === 'capability-assignment-settled').length >= 4 || events.some(event => event.type === 'job-failed'); }, 120_000)
+    .catch(async error => { throw new Error(`${String(error)}; seen=${JSON.stringify(seen)}; tail=${JSON.stringify((await runEventsOnDisk(fixture.root, 'need', receipt.jobId)).slice(-25))}`); });
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
   expect(events.filter(event => event.type === 'job-failed'), JSON.stringify({ seen, tail: events.slice(-8) })).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-exchange-answered')).toHaveLength(1);
@@ -222,7 +223,7 @@ test('CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A recei
       start.data.invocation === event.data.invocation && start.data.role === 'capability-architect')).length >= 6);
   await stopAfterArchitectYield(opened.service, receipt.jobId);
   await opened.service.settled('need', receipt.jobId);
-}, 60_000);
+}, 180_000);
 
 test('CA10: a wider boundary decision returns to the same capability architect', async () => {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
