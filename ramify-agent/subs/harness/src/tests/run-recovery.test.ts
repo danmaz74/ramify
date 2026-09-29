@@ -211,6 +211,7 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'outline-revised': return types.includes('outline-revised');
     case 'iteration-assigned': return types.includes('iteration-assigned');
     case 'writer-acquired': return types.includes('writer-acquired');
+    case 'writer-process-registered': return types.includes('writer-process-registered');
     case 'writer-released': return types.includes('writer-released');
     case 'iteration-closed': return types.includes('iteration-closed');
     case 'work-item-completed': return types.includes('work-item-completed');

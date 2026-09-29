@@ -208,6 +208,8 @@ function describe(event: RunEvent): [string, Ref[]] {
       ];
     case 'writer-acquired':
       return [`Session ${event.data.invocation} holds the writer`, ref('invocation', event.data.invocation)];
+    case 'writer-process-registered':
+      return [`Session ${event.data.invocation} registered process group ${event.data.pid}`, ref('invocation', event.data.invocation)];
     case 'writer-released':
       return [
         event.data.confirmed ? `Session ${event.data.invocation} released the writer` : `Session ${event.data.invocation}'s release was not confirmed; no writer or gate may follow`,

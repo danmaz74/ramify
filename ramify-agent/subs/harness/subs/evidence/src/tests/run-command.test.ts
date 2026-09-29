@@ -45,6 +45,29 @@ describe('runCommand', () => {
     expect(Date.parse(run.startedAt)).not.toBeNaN();
   });
 
+  it('holds the command behind durable group registration and reports its kernel identity', async () => {
+    const marker = join(directory.path, 'started.txt');
+    let release!: () => void;
+    const registered = new Promise<void>(resolve => { release = resolve; });
+    let observed: { pid: number; identity: string | null } | null = null;
+    const running = runCommand(request(`echo started > ${marker}`, {
+      registerProcessGroup: async (pid, identity) => {
+        observed = { pid, identity };
+        await registered;
+      },
+    }));
+    for (let attempt = 0; attempt < 100 && observed === null; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    expect(observed).not.toBeNull();
+    expect(observed!.pid).toBeGreaterThan(0);
+    if (process.platform === 'linux') expect(observed!.identity).toMatch(/^[0-9a-f-]+:\d+$/u);
+    await expect(stat(marker)).rejects.toThrow();
+    release();
+    expect((await running).outcome).toEqual({ kind: 'completed', exitCode: 0 });
+    expect(await readFile(marker, 'utf8')).toBe('started\n');
+  });
+
   it('tells a non-zero exit from a timeout', async () => {
     const failed = await runCommand(request('exit 7'));
     const timedOut = await runCommand(request('sleep 30', { timeoutMs: 300 }));

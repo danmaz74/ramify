@@ -103,6 +103,7 @@ export const nonfunctionalRecoveryBoundaries = {
   'nonfunctional-repair-committed': 'nonfunctional-recovery.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
 export const capabilityRecoveryBoundaries = {
+  'writer-process-registered': 'capability-recovery.test.ts',
   'capability-coordinator-resumed': 'capability-recovery.test.ts',
   'capability-source-captured': 'capability-recovery.test.ts',
   'capability-exchange-opened': 'capability-recovery.test.ts',
@@ -347,6 +348,7 @@ const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   'capability-gate-recorded': 'gate-attempted',
   'capability-review-recorded': 'capability-review-recorded',
   'capability-assignment-settled': 'capability-assignment-settled',
+  'writer-process-registered': 'writer-process-registered',
   'capability-assigned': 'capability-assigned',
 };
 

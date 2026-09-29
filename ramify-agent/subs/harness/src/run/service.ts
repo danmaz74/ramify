@@ -233,6 +233,7 @@ import { ContentStore } from '../transcripts/store.js';
 import { readBody, readTranscript, TranscriptWriter } from '../transcripts/writer.js';
 import { SubmissionJudge, validateAgainst, type SubmissionValidation } from './submissions.js';
 import { nodeProcessGroups, WriterBlockedError, WriterOwnership, type ProcessGroups, type TreeObserver } from './writer.js';
+import { processGroupIdentity } from '../../subs/evidence/src/run-command.js';
 
 /*
  * The implementation runs of one project: their commands, their lifecycle,
@@ -289,6 +290,7 @@ export type RunWrite =
   | 'outline-revised'
   | 'iteration-assigned'
   | 'writer-acquired'
+  | 'writer-process-registered'
   | 'writer-released'
   | 'nonfunctional-phase-started'
   | 'nonfunctional-repair-assigned'
@@ -2613,6 +2615,19 @@ export class RunService {
     for (const started of run.log.all('invocation-started')) {
       const id = started.data.invocation;
       if (ended.has(id)) continue;
+      const acquired = run.log.all('writer-acquired').some(event => event.data.invocation === id);
+      const released = run.log.all('writer-released').some(event => event.data.invocation === id);
+      if (acquired && !released) {
+        // The new service has a new in-memory writer. Restore only the groups
+        // durably registered before their commands were allowed to start.
+        run.writer.acquire(id);
+        for (const event of run.log.all('writer-process-registered')) {
+          if (event.data.invocation !== id) continue;
+          const current = await processGroupIdentity(event.data.pid);
+          if (current !== null && current === event.data.identity) run.writer.register(id, event.data.pid);
+          else this.warn(`Run ${run.record.jobId}: process group ${event.data.pid} cannot be authenticated after restart; it will not be signalled`);
+        }
+      }
       const settled = await run.writer.release(id).catch(() => ({ confirmed: false, at: this.now().toISOString(), groupsKilled: 0, lateWrites: [] }));
       // Observations are appended without a transaction, by decision 2, so
       // the last of an invocation the harness was interrupted in may be
@@ -6719,6 +6734,12 @@ export class RunService {
   }): EngineerEquipment {
     return engineerEquipment({
       commandExecution: this.options.commandExecution,
+      registerProcessGroup: async (invocation, pid, identity) => {
+        const committed = await this.write(run, { type: 'writer-process-registered', data: { invocation, pid, identity } });
+        if (committed === 'ended') throw new Error(`Run ${run.record.jobId} ended before process group ${pid} was registered`);
+        run.writer.register(invocation, pid);
+        await this.afterWrite('writer-process-registered', run.record.jobId);
+      },
       projectRoot: this.projectRoot,
       ramify: this.options.ramify,
       commands: run.record.policy.commands,

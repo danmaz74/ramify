@@ -11,12 +11,72 @@ import { RunLog } from '../run/log.js';
 import { committedRecords } from '../work/committed.js';
 import { copyCapabilityFixture, fixtureRequest, openCapabilityRuns } from './helpers/capability.js';
 import { temporaryDirectory } from './helpers/fixture.js';
-import { assign, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
+import { assign, edit, installMiniRunner, outline, shell, submit, treeInputs } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
 import { freeze, git, initRepository, runEventsOnDisk, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { nodeProcessGroups } from '../run/writer.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+
+test('CA20: a registered real process group survives a service crash and is settled before any successor work', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const a = 'capability-coordination/a';
+  const b = 'capability-coordination/b';
+  let engineerTurns = 0;
+  let frozen = false;
+  const script: Script = spec => {
+    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
+    if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
+    if (spec.submission.name === 'submit_capability_qualification') {
+      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
+        placementReason: 'B owns the source fact', constraints: [], requirementRefs: [] });
+    }
+    if (spec.role === 'engineer') {
+      engineerTurns += 1;
+      if (engineerTurns === 1) return submit({ kind: 'capability-needed', summary: 'A needs source', request: {
+        need: 'B source for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display B source', prospective: false }],
+        constraints: [], knownInterface: { kind: 'none-known' },
+        examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
+      } });
+      return [shell('node -e "setTimeout(() => {}, 60000)"', { timeoutMs: 60000 })];
+    }
+    if (spec.role === 'capability-architect') {
+      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3], kind: 'assign', owner: b,
+        purpose: 'Provide B source', approach: 'Implement B source', requirementRefs: [], intendedEvidence: ['A consumes B source'] });
+    }
+    return [];
+  };
+  const first = await openCapabilityRuns(fixture.root, {
+    git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    afterWrite: async write => { if (write === 'writer-process-registered' && !frozen) { frozen = true; await freeze(); } },
+  });
+  const receipt = await first.service.execute(startRun('need'));
+  await until(() => frozen, 30_000);
+  const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const registered = before.find(event => event.type === 'writer-process-registered');
+  if (registered?.type !== 'writer-process-registered') throw new Error('Missing durable process registration');
+  const pid = registered.data.pid;
+  cleanups.push(async () => nodeProcessGroups.kill(pid));
+  expect(nodeProcessGroups.alive(pid)).toBe(true);
+  expect(before.some(event => event.type === 'writer-released' && event.data.invocation === registered.data.invocation)).toBe(false);
+
+  await staleCrashLock(fixture.root);
+  const second = await openCapabilityRuns(fixture.root, {
+    git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+  });
+  cleanups.push(() => second.service.close());
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(nodeProcessGroups.alive(pid)).toBe(false);
+  expect(events.find(event => event.type === 'job-failed')?.data.reason).toBe('writer-unsettled');
+  expect(events.filter(event => event.type === 'capability-handed-back' || event.type === 'gate-attempted')).toHaveLength(0);
+  expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
+}, 45_000);
 
 test('CA19 CA30: a snapshot written before its request commit is adopted with the exact dirty index and tree', async () => {
   const fixture = await copyCapabilityFixture();

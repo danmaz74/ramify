@@ -1,8 +1,7 @@
 import { execFile as execFileCb } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
 /*
  * Running one of the target project's own commands.
@@ -12,7 +11,7 @@ import { promisify } from 'node:util';
  * `childEnvironment` began as `cleanEnvironment` from
  * src/domain-sub-apps/implementation-studio/core/runtime/check-execution/check-runner.ts
  * lines 92-100. Same author; licensed here under GPL-3.0 with ramify-agent.
- * The wrapper script beside this file is verbatim. Plan 3 iteration 2 adjusts
+ * The wrapper script beside this file is adapted for a durable start barrier. Plan 3 iteration 2 adjusts
  * the executor: a timeout is told from a failure with Node's `killed`, the
  * complete output is written to a file and answered as a bounded description,
  * a spawn failure's string `code` becomes a structured runner error, and the
@@ -24,14 +23,29 @@ import { promisify } from 'node:util';
  * outcomes, and none of them is read from what the command printed.
  */
 
-const execFile = promisify(execFileCb);
-
 /**
  * The wrapper that owns process-group teardown, resolved from this module's
  * own directory. Every command runs as `bash <wrapper> <command> <args...>`,
  * so a descendant that outlives its parent is killed with the group.
  */
 export const processGroupCleanupScript = fileURLToPath(new URL('./run-command-with-cleanup.sh', import.meta.url));
+
+/** Kernel identity of a live process-group leader, when Linux exposes one. */
+export async function processGroupIdentity(pid: number): Promise<string | null> {
+  try {
+    const [stat, boot] = await Promise.all([
+      readFile(`/proc/${pid}/stat`, 'utf8'),
+      readFile('/proc/sys/kernel/random/boot_id', 'utf8'),
+    ]);
+    const close = stat.lastIndexOf(')');
+    if (close < 0) return null;
+    // /proc stat fields after the closing parenthesis begin at field 3;
+    // field 22 is the kernel start tick and is not affected by the command.
+    const start = stat.slice(close + 2).trim().split(/\s+/u)[19];
+    if (start === undefined || !/^\d+$/u.test(start)) return null;
+    return `${boot.trim()}:${start}`;
+  } catch { return null; }
+}
 
 /** The bound on the tail a caller receives, in bytes. The complete output is the file. */
 export const outputTailBytes = 8 * 1024;
@@ -95,6 +109,8 @@ export interface CommandRequest {
   readonly signal?: AbortSignal | undefined;
   /** The output cap; the command is killed when it is reached. */
   readonly maxBytes?: number | undefined;
+  /** Persist the detached process group before the wrapper may start the command. */
+  readonly registerProcessGroup?: ((pid: number, identity: string | null) => Promise<void>) | undefined;
 }
 
 /*
@@ -210,13 +226,39 @@ export async function runCommand(request: CommandRequest): Promise<CommandRun> {
 
   const maxBuffer = request.maxBytes ?? outputCapBytes;
   try {
-    const { stdout, stderr } = await execFile('bash', [processGroupCleanupScript, command, ...args], {
-      cwd: request.cwd,
-      env: request.env,
-      ...(request.signal === undefined ? {} : { signal: request.signal }),
-      timeout: request.timeoutMs,
-      maxBuffer,
-      encoding: 'utf8',
+    const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      const child = execFileCb('bash', [processGroupCleanupScript, command, ...args], {
+        cwd: request.cwd,
+        env: request.env,
+        ...(request.signal === undefined ? {} : { signal: request.signal }),
+        timeout: request.timeoutMs,
+        maxBuffer,
+        encoding: 'utf8',
+      }, (error, stdout, stderr) => {
+        const clean = stderr.replace(/^RAMIFY_GROUP:\d+\r?\n/u, '');
+        if (error === null) resolve({ stdout, stderr: clean });
+        else reject(Object.assign(error, { stdout, stderr: clean }));
+      });
+      // The wrapper reports its child's group ID before the child's stdin
+      // barrier opens. A crash before registration sends EOF, so the requested
+      // command cannot start without the durable process registration.
+      let control = '';
+      let answered = false;
+      child.stderr?.on('data', (part: string | Buffer) => {
+        if (answered) return;
+        control += part.toString();
+        const newline = control.indexOf('\n');
+        if (newline < 0) return;
+        answered = true;
+        const matched = /^RAMIFY_GROUP:(\d+)\r?$/u.exec(control.slice(0, newline));
+        if (matched === null) { child.stdin?.destroy(); reject(new Error('Command wrapper did not report its group')); return; }
+        const pid = Number(matched[1]);
+        void (pid === 0 ? Promise.resolve() : processGroupIdentity(pid).then(identity =>
+          request.registerProcessGroup?.(pid, identity) ?? Promise.resolve())).then(() => {
+          if (request.signal?.aborted) child.stdin?.destroy();
+          else child.stdin?.end('start\n');
+        }, error => { child.stdin?.destroy(); reject(error); });
+      });
     });
     return finish(request, startedAt, startedHr, stdout, stderr, { kind: 'completed', exitCode: 0 }, false);
   } catch (caught: unknown) {

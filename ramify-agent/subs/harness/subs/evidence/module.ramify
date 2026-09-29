@@ -16,7 +16,7 @@ expose-src MeasurementDocument, ModuleMeasurement, MeasurementRead, readMeasurem
 
 // Running one of the target project's own commands, in its own process group
 // and with a clean environment.
-expose-src CommandRunner, runCommand, CommandRequest, CommandRun, CommandOutcome, CommandOutput, childEnvironment, environmentNames, outputTailBytes from "run-command.ts" to parent
+expose-src CommandRunner, runCommand, CommandRequest, CommandRun, CommandOutcome, CommandOutput, childEnvironment, environmentNames, outputTailBytes, processGroupIdentity from "run-command.ts" to parent
 
 // The target project's configuration for the harness, read as bytes; its
 // schema and what an invalid file means belong to the harness.

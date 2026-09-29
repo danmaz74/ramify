@@ -569,6 +569,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('work-item-completed', z.object({ workItem: text, gate: text, unresolved: unresolvedField.optional() }).strict()),
   /** Appended before a writer starts; the one writer of the run holds it. */
   event('writer-acquired', z.object({ invocation: text, scopeRevision: z.int().nonnegative().nullable() }).strict()),
+  /** Persisted before the detached wrapper is allowed to start its command. */
+  event('writer-process-registered', z.object({ invocation: text, pid: z.int().positive(), identity: text.nullable() }).strict()),
   /** `confirmed: false` blocks every writer and every gate that follows. */
   event('writer-released', z.object({ invocation: text, confirmed: z.boolean(), groupsKilled: z.int().nonnegative() }).strict()),
   /** The durable intent of a verified committing gate's commit-and-audit effect. */
