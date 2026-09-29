@@ -69,13 +69,11 @@ export interface ProjectCommands {
  *
  * The project's own runner does the selecting, so those commands carry no
  * `TestSelection`. A planned scenario check follows them. Where the caller
- * supplies the last assignment's own selection as well, it runs last, as the
- * probe that tells a failure inside that scope from one outside it.
+ * supplies a scenario selection, it follows those required commands.
  */
 export function allProjectChecks(
   commands: ProjectCommands,
   policy: CheckpointPolicy,
-  scopeProbe?: ResolvedTests | undefined,
   scenarios?: PlannedCheck | undefined,
 ): PlannedCheck[] {
   const checks: PlannedCheck[] = [{ kind: 'tests', command: commands.allTests, attribution: 'project' }];
@@ -87,7 +85,6 @@ export function allProjectChecks(
   checks.push({ kind: 'type-check', command: commands.typeCheck, attribution: 'project' });
   checks.push({ kind: 'ramify-check', command: commands.ramifyCheck, attribution: 'project' });
   if (scenarios !== undefined) checks.push(scenarios);
-  if (scopeProbe !== undefined) checks.push(...scopedTestChecks(commands, scopeProbe));
   return checks;
 }
 

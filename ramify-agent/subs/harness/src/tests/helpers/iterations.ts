@@ -219,26 +219,59 @@ export function expect(actual) {
 `;
 
 const RUNNER = `import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { resolve, relative } from 'node:path';
+import { readdirSync, writeFileSync } from 'node:fs';
 
-const files = process.argv.slice(2);
+let files = process.argv.slice(2).filter(argument => !argument.startsWith('--'));
+if (files.length === 0) {
+  const found = [];
+  const visit = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      const path = directory + '/' + entry.name;
+      if (entry.isDirectory()) visit(path);
+      else if (/\\.test\\.[cm]?[jt]sx?$/.test(entry.name)) found.push(path);
+    }
+  };
+  visit(process.cwd());
+  files = found.sort();
+}
 if (files.length === 0) {
   console.log('no test file was given');
   process.exit(1);
 }
 const vitest = await import('vitest');
 let failures = 0;
+let passed = 0;
+const reports = [];
+const failedTests = [];
+const root = process.env.RAMIFY_AUDIT_VITEST_ROOT || process.cwd();
 for (const file of files) {
   await import(pathToFileURL(resolve(file)).href);
+  let fileFailed = false;
   for (const entry of vitest.__queue.splice(0)) {
     try {
       await entry.fn();
+      passed += 1;
       console.log('ok ' + file + ' ' + entry.name);
     } catch (error) {
       failures += 1;
+      fileFailed = true;
+      failedTests.push({ project: '', path: relative(root, resolve(file)).replaceAll('\\\\', '/'), fullName: entry.name, name: entry.name, errors: [{ message: error.message }] });
       console.log('not ok ' + file + ' ' + entry.name + ': ' + error.message);
     }
   }
+  reports.push({ project: '', path: relative(root, resolve(file)).replaceAll('\\\\', '/'), state: fileFailed ? 'failed' : 'passed' });
+}
+if (process.env.RAMIFY_AUDIT_VITEST_SUMMARY) {
+  writeFileSync(process.env.RAMIFY_AUDIT_VITEST_SUMMARY, JSON.stringify({
+    format: 'ramify-audit.vitest-summary', version: 1, reason: failures === 0 ? 'passed' : 'failed', root,
+    counts: {
+      files: { total: reports.length, passed: reports.filter(report => report.state === 'passed').length, failed: reports.filter(report => report.state === 'failed').length, skipped: 0 },
+      tests: { total: passed + failures, passed, failed: failures, skipped: 0 },
+    },
+    files: reports, failedTests, loadErrors: [], unhandledErrors: [],
+  }) + '\\n');
 }
 process.exit(failures === 0 ? 0 : 1);
 `;

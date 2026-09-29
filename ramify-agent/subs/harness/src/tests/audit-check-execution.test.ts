@@ -301,6 +301,10 @@ describe('audit-backed gate execution', () => {
     expect(passingAudit.auditOverall).toBe('pass');
     expect(failingAudit.auditOverall).toBe('fail');
     expect(failingAudit.evidence).not.toBeNull();
+    const retained = failingAudit.provider as { result: { refs: { reportCommit: string }; composition: { verdict: string } }; checks: Record<string, { output?: string }> };
+    expect(retained.result.refs.reportCommit).toBe(failingAudit.evidence?.reportCommit);
+    expect(retained.result.composition.verdict).toBe('fail');
+    expect(retained.checks['check-01-tests']?.output).toContain('failed');
 
     expect(commandSemantics(passingAudit)).toEqual(commandSemantics(passingInPlace));
     expect([passingAudit.verdict, passingAudit.cause, passingAudit.next])
@@ -332,7 +336,39 @@ describe('audit-backed gate execution', () => {
     expect(commandSemantics(attempt)).toEqual(commandSemantics(inPlace));
   });
 
-  it('uses distinct per-position IDs for an all-project scope probe, preserves order, and names coverage', async () => {
+  it('reopens the exact completed provider receipt without executing the check again', async () => {
+    const fixture = await repository({ 'source.txt': 'source\n' });
+    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
+    const directory = await temporaryDirectory('ramify-agent-audit-receipt-');
+    const workspaces: IntendedAuditWorkspace[] = [];
+    const execution = createAuditCheckExecution({ workspaceOwnership: {
+      async recordIntendedWorkspace(workspace) { workspaces.push(workspace); },
+      async recoverAbandonedWorkspaces() {},
+      async recordWorkspaceCleaned() {},
+    } });
+    const checks: PlannedCheck[] = [{ kind: 'tests', command: command(fixture.projectRoot, 'console.error("one failure"); process.exit(1)') }];
+    const request = {
+      id: 'ga-receipt', runId: 'run-audit-equivalence', projectRoot: fixture.projectRoot,
+      directory, head: fixture.commit, checks,
+      selection: { policy: 'all-project' as const, exactOwners: [], subtrees: [] },
+      dependencyDirectories: [],
+    };
+    const first = await runGate(execution, 'iteration', request);
+    const receipt = JSON.parse(await readFile(join(directory, 'provider-receipt.json'), 'utf8')) as { schema: string; completed: { evidence: { reportCommit: string } } };
+    expect(receipt.schema).toBe('ramify-agent.provider-receipt/1');
+    expect(receipt.completed.evidence.reportCommit).toBe(first.evidence?.reportCommit);
+    const second = await runGate(execution, 'iteration', request);
+    expect(second.evidence).toEqual(first.evidence);
+    expect(second.provider).toEqual(first.provider);
+    expect(workspaces).toHaveLength(1);
+    await rm(join(directory, 'provider-receipt.json'));
+    const beforeReceiptRecovery = await runGate(execution, 'iteration', request);
+    expect(beforeReceiptRecovery.evidence).toEqual(first.evidence);
+    expect((beforeReceiptRecovery.provider as { checks: unknown }).checks).toEqual((first.provider as { checks: unknown }).checks);
+    expect(workspaces).toHaveLength(1);
+  });
+
+  it('uses distinct per-position IDs for planned checks, preserves order, and names coverage', async () => {
     const fixture = await repository({ 'source.txt': 'source\n' });
     await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
     const checks: PlannedCheck[] = [
@@ -406,11 +442,11 @@ describe('audit-backed gate execution', () => {
     await mkdir(join(projectModules, '.bin'), { recursive: true });
     await mkdir(join(nestedModules, 'fixture-dep'), { recursive: true });
     await writeFile(join(nestedModules, 'fixture-dep/index.js'), 'module.exports = "dependency-ready"\n');
-    const vitest = join(projectModules, '.bin/vitest');
+    const scopedRunner = join(projectModules, '.bin/scoped-runner');
     const ramify = join(projectModules, '.bin/ramify');
-    await writeFile(vitest, '#!/bin/sh\nprintf "scoped:%s:%s\\n" "$PWD" "$2"\n[ "$2" = "src/tests/scoped.test.ts" ]\n');
+    await writeFile(scopedRunner, '#!/bin/sh\nprintf "scoped:%s:%s\\n" "$PWD" "$2"\n[ "$2" = "src/tests/scoped.test.ts" ]\n');
     await writeFile(ramify, '#!/bin/sh\nprintf "ramify:%s:%s\\n" "$PWD" "$*"\n[ "$4" = "$PWD" ]\n');
-    await chmod(vitest, 0o755);
+    await chmod(scopedRunner, 0o755);
     await chmod(ramify, 0o755);
 
     const checks: PlannedCheck[] = [
@@ -419,7 +455,7 @@ describe('audit-backed gate execution', () => {
       { kind: 'ramify-check', command: checkCommand({ argv: [ramify, 'check', '--batch', '--root', fixture.projectRoot, '--format', 'json'], cwd: fixture.projectRoot, timeoutMs: 30_000 }), attribution: 'project' },
       {
         kind: 'tests',
-        command: checkCommand({ argv: [vitest, 'run', 'src/tests/scoped.test.ts'], cwd: fixture.projectRoot, timeoutMs: 30_000 }),
+        command: checkCommand({ argv: [scopedRunner, 'run', 'src/tests/scoped.test.ts'], cwd: fixture.projectRoot, timeoutMs: 30_000 }),
         selection: selection(),
         requiresTests: true,
         attribution: 'in-scope',

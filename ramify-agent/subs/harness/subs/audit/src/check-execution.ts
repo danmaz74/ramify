@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { readFile, realpath, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import {
@@ -9,6 +10,8 @@ import {
   createNodeExecutionLeaseProcessLookup,
   createNodeProcessExecutor,
   createNodeRepositoryExecutionLease,
+  findCompletedAuditRequest,
+  readRawCheckResults,
   resolveRepositoryExecutionLeaseIdentity,
   type AuditCheckSummary,
   type AuditRequest,
@@ -24,6 +27,7 @@ import { childEnvironment, outputTailBytes, runCommand } from '../../evidence/sr
 import type { CommandOutcome, CommandRun } from '../../evidence/src/run-command.js';
 import { checkOutputPath, commandStart, notRun } from '../../../src/checks/execution.js';
 import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/checks/execution.js';
+import type { CheckExecutionResult } from '../../../src/checks/execution.js';
 import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
 import { runScenarioCheck } from '../../../src/checks/scenario-check.js';
@@ -93,6 +97,8 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           message: 'An audit gate requires the durable run ID that owns its workspace',
         }));
       }
+      const receipt = await readAuditReceipt(checks, request);
+      if (receipt !== null) return receipt;
       if (request.signal.aborted) return executionFailure(await interruptedRecords(checks, request, signalReason(request.signal)));
 
       const baseGit = gitWithHarnessEnvironment();
@@ -182,11 +188,17 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
               runner: suite ? runner : undefined,
             });
             const record = request.classify(check, outcome.run, outputFile, outcome.summary);
-            records.set(registered.checkId, record);
+            const identified = { ...record, providerCheckId: registered.checkId };
+            await writeCommandReceipt(request, registered.checkId, identified);
+            records.set(registered.checkId, identified);
             if (outcome.run.outcome.kind === 'cancelled') {
               return { status: 'cancelled', reason: 'Gate execution was interrupted' };
             }
-            return { status: 'completed', result: auditSummary(record, outcome.run) };
+            // The producer parsed and aggregated every actual profile invocation.
+            // Keep that complete result, including each raw message stream, as
+            // the published check rather than rebuilding a second Cucumber
+            // verdict from the host's display summary.
+            return { status: 'completed', result: outcome.provider as AuditCheckSummary };
           }
           const testRun = registered.testRun;
           const command = {
@@ -205,7 +217,9 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           });
           const mapped = await writeMappedRun(run, outputFile, mapping, worktreeRoot);
           const record = request.classify(check, mapped, outputFile);
-          records.set(registered.checkId, record);
+          const identified = { ...record, providerCheckId: registered.checkId };
+          await writeCommandReceipt(request, registered.checkId, identified);
+          records.set(registered.checkId, identified);
           if (mapped.outcome.kind === 'cancelled') {
             return { status: 'cancelled', reason: 'Gate execution was interrupted' };
           }
@@ -275,7 +289,18 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         bound.dispose();
         return executionFailure(await infrastructureRecords(checks, request, { kind: 'audit-plan', message: errorMessage(error) }));
       }
-      const result = await service.run(auditRequest(definitions, request, mapping, runId, preparation), signal).finally(() => bound.dispose());
+      const recovered = await findCompletedAuditRequest({
+        repositoryPath: mapping.repositoryRoot,
+        projectRoot: mapping.projectPrefix || '.',
+        requestId: `${runId}:${request.context.attemptId}`,
+        sourceCommit: request.context.sourceCommit,
+        git: baseGit,
+      });
+      if (recovered !== null) {
+        for (const [id, record] of await readCommandReceipts(request, checks)) records.set(id, record);
+      }
+      const result = recovered ?? await service.run(auditRequest(definitions, request, mapping, runId, preparation), signal).finally(() => bound.dispose());
+      if (recovered !== null) bound.dispose();
       if (recordedWorkspace.current !== null) await options.workspaceOwnership.recordWorkspaceCleaned(recordedWorkspace.current);
       // After workspace intent is recorded, library results may name the
       // isolated worktree even though its finally block has removed it.
@@ -321,14 +346,104 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         if (record !== undefined) commands.push(record);
         else if (!selected.has(id)) commands.push(...await omittedRecords([check], request, index));
       }
-      return {
-        commands,
+      let publishedChecks: Awaited<ReturnType<typeof readRawCheckResults>>;
+      try {
+        publishedChecks = await readRawCheckResults(result.summary, result.refs.reportCommit, mapping.repositoryRoot);
+      } catch (error) {
+        return executionFailure(await infrastructureRecords(checks, request, {
+          kind: 'audit-evidence-unavailable',
+          message: `The exact published check results at ${result.refs.reportCommit} could not be retrieved: ${errorMessage(error)}`,
+        }));
+      }
+      const reconciled = commands.map(command => {
+        const provider = command.providerCheckId === undefined ? undefined : publishedChecks[command.providerCheckId];
+        if (provider === undefined || provider.passed || command.outcome !== 'passed') return command;
+        const error = provider.runnerError;
+        return error === undefined ? { ...command, outcome: 'failed' as const }
+          : { ...command, outcome: 'not-verified' as const, notVerified: 'runner-error' as const,
+            runnerError: { kind: error.kind ?? 'provider-error', message: error.message ?? provider.summary } };
+      });
+      const completed: CheckExecutionResult = {
+        commands: reconciled,
         audited: result.summary.sourceCommit,
         evidence: { runRef: result.refs.runRef, reportCommit: result.refs.reportCommit, treeRef: result.refs.treeRef },
         auditOverall: result.composition.verdict,
+        provider: { result, checks: publishedChecks },
       };
+      await writeAuditReceipt(checks, request, completed);
+      return completed;
     },
   };
+}
+
+/** A receipt binds an exact published provider answer to one durable gate operation. */
+function auditReceiptIdentity(checks: readonly PlannedCheck[], request: CheckExecutionRequest): string {
+  return createHash('sha256').update(JSON.stringify({
+    runId: request.context.runId,
+    attemptId: request.context.attemptId,
+    sourceCommit: request.context.sourceCommit,
+    checks,
+  })).digest('hex');
+}
+
+function auditReceiptPath(request: CheckExecutionRequest): string {
+  return join(request.directory, 'provider-receipt.json');
+}
+
+function commandReceiptPath(request: CheckExecutionRequest, id: string): string {
+  return join(request.directory, 'provider-commands', `${id}.json`);
+}
+
+async function writeCommandReceipt(request: CheckExecutionRequest, id: string, record: GateCommandRecord): Promise<void> {
+  const path = commandReceiptPath(request, id);
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify({
+    schema: 'ramify-agent.provider-command-receipt/1',
+    sourceCommit: request.context.sourceCommit,
+    id,
+    record,
+  }));
+  await rename(temporary, path);
+}
+
+async function readCommandReceipts(request: CheckExecutionRequest, checks: readonly PlannedCheck[]): Promise<Map<string, GateCommandRecord>> {
+  const found = new Map<string, GateCommandRecord>();
+  for (const [index, check] of checks.entries()) {
+    if (check.kind === 'setup') continue;
+    const id = checkId(index, check);
+    const text = await readFile(commandReceiptPath(request, id), 'utf8').catch(() => null);
+    if (text === null) continue;
+    const body = JSON.parse(text) as { schema?: string; sourceCommit?: string; id?: string; record?: GateCommandRecord };
+    if (body.schema !== 'ramify-agent.provider-command-receipt/1' || body.sourceCommit !== request.context.sourceCommit
+      || body.id !== id || body.record?.providerCheckId !== id || body.record.kind !== check.kind
+      || JSON.stringify(body.record.command.argv) !== JSON.stringify(check.command.argv)) {
+      throw new Error(`The provider command receipt for ${id} does not match this gate operation`);
+    }
+    found.set(id, body.record);
+  }
+  return found;
+}
+
+async function readAuditReceipt(checks: readonly PlannedCheck[], request: CheckExecutionRequest): Promise<CheckExecutionResult | null> {
+  const text = await readFile(auditReceiptPath(request), 'utf8').catch(() => null);
+  if (text === null) return null;
+  const body = JSON.parse(text) as { schema?: string; identity?: string; completed?: CheckExecutionResult };
+  if (body.schema !== 'ramify-agent.provider-receipt/1' || body.identity !== auditReceiptIdentity(checks, request) || body.completed === undefined) {
+    throw new Error(`The provider receipt at ${auditReceiptPath(request)} does not match this gate operation`);
+  }
+  return body.completed;
+}
+
+async function writeAuditReceipt(checks: readonly PlannedCheck[], request: CheckExecutionRequest, completed: CheckExecutionResult): Promise<void> {
+  const path = auditReceiptPath(request);
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify({
+    schema: 'ramify-agent.provider-receipt/1',
+    identity: auditReceiptIdentity(checks, request),
+    completed,
+  }));
+  await rename(temporary, path);
 }
 
 /** Only a check the audit selected and executed owes the harness a command record. */
@@ -473,7 +588,7 @@ async function isVitestCommand(
 ): Promise<boolean> {
   const executable = command.argv[0] ?? '';
   if ((executable === 'vitest' || executable.endsWith('/vitest')) && command.argv[1] === 'run') {
-    return command.argv.slice(2).every(argument => argument.startsWith('-'));
+    return true;
   }
   if (executable !== 'npm' || command.argv[1] !== 'test') return false;
   try {
@@ -566,7 +681,7 @@ function auditRequest(
   const universeId = 'ramify-agent:gates';
   return {
     protocolVersion: AUDIT_PROTOCOL_VERSION,
-    requestId: request.context.attemptId,
+    requestId: `${runId}:${request.context.attemptId}`,
     repositoryPath: mapping.repositoryRoot,
     source: { kind: 'existing-commit', revision: request.context.sourceCommit },
     checks,

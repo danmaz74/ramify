@@ -1,7 +1,7 @@
 # audit
 
 Implements the harness's in-process adapter to `ramify-audit`, pinned at
-version 0.2.1. It hides the library, its
+version 0.3.1. It hides the library, its
 registered-executor and evidence models, repository lease, isolated worktree,
 publication refs and Git environment from the rest of the harness. The harness owns gate policy and
 durable run state; this child receives a verified check plan and an
@@ -61,9 +61,10 @@ A `scenarios` check runs through the harness's `runScenarioCheck`, as the
 in-place runner runs it, with the audit's path mapping: the runs start in the
 worktree, the configured commands' paths are rebased into it, the profiles
 and message streams stay in the attempt's directory outside it, and printed
-worktree paths are restored. ramify-audit's own Cucumber summary
-(`CUCUMBER_SUMMARY_FILE`) is not used; the check's outcome is the harness's
-reduction of the message streams, and the audit records its summary.
+worktree paths are restored. Each exact NDJSON stream is parsed by
+ramify-audit and the complete per-profile producer result is published with
+the audit. The harness maps final scenario identities and step bindings to
+its frozen tracked scenario records for briefings.
 
 ## Why it is separate
 
@@ -78,7 +79,7 @@ the gate and every durable record.
 
 ## Dependency
 
-`ramify-audit` is pinned to the exact version 0.2.1 from the private proxy
+`ramify-audit` is pinned to the exact version 0.3.1 from the private proxy
 registry this package's `.npmrc` names, which also serves the other
 dependencies. It is MIT-licensed. No other module imports it. The existing
 `legacy-peer-deps=true` setting remains necessary for npm 10.9's Vitest peer

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { findingsOf, sentenceOf, type HookFinding } from '../hooks/post-write.js';
-import type { GateAttempt, GateAttribution, GateCommandRecord, ScenarioCheckSummary } from './records.js';
+import type { GateAttempt, GateCommandRecord, ScenarioCheckSummary } from './records.js';
 
 /*
  * What a failing gate says to the agent that receives it.
@@ -23,7 +23,7 @@ export const briefedOutputLines = 40;
 /** The bound on those lines together, in characters. */
 export const briefedOutputCharacters = 4_000;
 
-/** Who a briefing is for, which decides the remedy it ends with. */
+/** Who receives a briefing. Both audiences see the same check evidence. */
 export type GateAudience = 'engineer' | 'local-architect';
 
 /** A failing gate as a briefing carries it: its attempt, its cause and the lines to place. */
@@ -78,13 +78,12 @@ export async function ramifyFindingsOf(command: GateCommandRecord): Promise<Hook
  */
 export async function gateDiagnostics(
   gate: GateAttempt,
-  audience: GateAudience,
+  _audience: GateAudience,
   names: ReadonlyMap<string, string> = new Map(),
   /** The exact lock provider lines recorded before commands began, by one-based position. */
   waiting: ReadonlyMap<number, string> = new Map(),
 ): Promise<GateDiagnostics> {
   const summary: string[] = [];
-  let findings: HookFinding[] = [];
   // The commands a setup command that did not pass kept from running are
   // named once, after it: they report nothing about the source.
   const skipped = gate.commands.filter(command => command.notVerified === 'setup-failed');
@@ -122,19 +121,24 @@ export async function gateDiagnostics(
       summary.push(`- \`${command.kind}\`: ${outcome}${exit}`);
       continue;
     }
+    const provider = providerFailureLines(gate, index);
+    if (provider.length > 0) {
+      summary.push(`- \`${command.kind}\`: ${outcome}${exit}; complete provider diagnostics follow; full command output: \`${command.output.path}\`:`);
+      summary.push(...provider.map(line => `  ${line}`));
+      continue;
+    }
     const reported = await ramifyFindingsOf(command);
     if (reported.length > 0) {
-      findings = [...findings, ...reported];
-      summary.push(`- \`${command.kind}\`: ${outcome}${exit}, ${reported.length} finding${reported.length === 1 ? '' : 's'}:`);
+      summary.push(`- \`${command.kind}\`: ${outcome}${exit}, ${reported.length} finding${reported.length === 1 ? '' : 's'}; full output: \`${command.output.path}\`:`);
       for (const finding of reported) summary.push(`  - ${sentenceOf(finding)}`);
       continue;
     }
     const tail = outputTail(command);
     if (tail.length === 0) {
-      summary.push(`- \`${command.kind}\`: ${outcome}${exit}; it printed nothing`);
+      summary.push(`- \`${command.kind}\`: ${outcome}${exit}; full output: \`${command.output.path}\`; ${command.output.bytes === 0 ? 'it printed nothing' : 'the output excerpt is unavailable'}`);
       continue;
     }
-    summary.push(`- \`${command.kind}\`: ${outcome}${exit}; the end of what it printed:`);
+    summary.push(`- \`${command.kind}\`: ${outcome}${exit}; full output: \`${command.output.path}\`; the end of what it printed:`);
     for (const line of tail) summary.push(`      ${line}`);
   }
   if (blocking === undefined && skipped.length > 0) {
@@ -149,8 +153,50 @@ export async function gateDiagnostics(
     if (change.authorizedBy !== null) continue;
     summary.push(`- no record authorizes the change to the guarded file \`${change.path}\`${change.after === null ? ', which was deleted' : ''}`);
   }
-  if (findings.length > 0 && audience === 'local-architect') summary.push(architectRemedy(findings));
   return { id: gate.id, cause: gate.cause, summary };
+}
+
+/** Read only failure facts from the retained provider payload; successful output stays on demand. */
+function providerFailureLines(gate: GateAttempt, index: number): string[] {
+  const checks = gate.provider?.checks;
+  if (checks === null || typeof checks !== 'object' || Array.isArray(checks)) return [];
+  const command = gate.commands[index];
+  if (command === undefined) return [];
+  const id = command.providerCheckId;
+  if (id === undefined) return [];
+  const value = (checks as Record<string, unknown>)[id];
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return [];
+  const check = value as Record<string, unknown>;
+  const lines: string[] = [];
+  const render = (label: string, result: Record<string, unknown>): void => {
+    lines.push(`- ${label || id} status: ${typeof result['status'] === 'string' ? result['status'] : 'unknown'}; counts: ${result['counts'] === undefined ? 'unknown' : JSON.stringify(result['counts'])}`);
+    for (const field of ['failedTests', 'failedScenarios', 'failedSuites', 'warnedSuites'] as const) {
+      const entries = result[field];
+      if (!Array.isArray(entries)) {
+        if (entries !== undefined) lines.push(`- ${label}${field}: ${JSON.stringify(entries)}`);
+        continue;
+      }
+      for (const entry of entries) lines.push(`- ${label}${field}: ${JSON.stringify(entry)}`);
+    }
+    for (const field of ['runnerError', 'outputRef'] as const) {
+      const entry = result[field];
+      if (entry !== undefined && entry !== null) lines.push(`- ${label}${field}: ${JSON.stringify(entry)}`);
+    }
+    const cucumber = result['cucumberMessages'];
+    if (cucumber !== null && typeof cucumber === 'object' && !Array.isArray(cucumber)) {
+      const { raw: _raw, ...reference } = cucumber as Record<string, unknown>;
+      lines.push(`- ${label}cucumberMessages: ${JSON.stringify(reference)}`);
+    }
+    const commands = result['commands'];
+    if (commands !== null && typeof commands === 'object' && !Array.isArray(commands)) {
+      for (const [name, entry] of Object.entries(commands)) {
+        if (entry !== null && typeof entry === 'object' && !Array.isArray(entry)) render(`${label}${name}.`, entry as Record<string, unknown>);
+      }
+    }
+  };
+  render('', check);
+  if (lines.length === 0) lines.push(`- The provider supplied no structured failure details for ${id}; inspect its exact check payload and full output.`);
+  return lines;
 }
 
 /**
@@ -185,20 +231,6 @@ function setupLines(command: GateCommandRecord, outcome: string, exit: string): 
   const where = `; its complete output is in \`${command.output.path}\``;
   if (tail.length === 0) return [`${title}: ${outcome}${exit}${where}; it printed nothing`];
   return [`${title}: ${outcome}${exit}${where}; the end of what it printed:`, ...tail.map(line => `      ${line}`)];
-}
-
-/**
- * What a Ramify finding at a gate leaves the local architect to decide. An
- * engineer cannot widen its own module's access, and no repair round on the
- * same brief would: what the module receives is the architect's to arrange.
- */
-function architectRemedy(findings: readonly HookFinding[]): string {
-  const owners = [...new Set(findings.flatMap(finding => (finding.original === null ? [] : [finding.original.owner])))];
-  const from = owners.length === 0 ? '' : ` The imports are owned by ${owners.map(owner => `\`${owner}\``).join(' and ')}.`;
-  return 'A module violation is not a repair round: what your module receives is yours to arrange, not an engineer\'s.'
-    + `${from} Re-brief the iteration naming what the module already receives and what to use instead, submit`
-    + ' `request-placement` where another owner would have to expose a symbol, or re-plan the scope so the work sits'
-    + ' with the owner that has what it needs.';
 }
 
 /** How many lines of one scenario's failure message a briefing carries. */
@@ -301,35 +333,4 @@ function outputTail(command: GateCommandRecord): string[] {
     kept.push(line);
   }
   return kept;
-}
-
-/**
- * Where a failed Ramify check's findings lie, against the write scope of the
- * assignment the attempt followed. Ramify names each finding's file, so this
- * is read from the report and never from what a test printed. Without a
- * write scope, or without a failed Ramify check, there is nothing to
- * attribute and the cause keeps its own rules.
- */
-export async function ramifyAttribution(
-  commands: readonly GateCommandRecord[],
-  writeScope: readonly string[] | null,
-): Promise<GateAttribution | null> {
-  if (writeScope === null) return null;
-  const failed = commands.find(command => command.kind === 'ramify-check' && command.outcome === 'failed');
-  if (failed === undefined) return null;
-  const findings = await ramifyFindingsOf(failed);
-  if (findings.length === 0) return null;
-  const inScope: string[] = [];
-  const outside: string[] = [];
-  for (const finding of findings) {
-    const file = finding.file;
-    if (file === null) outside.push('the project');
-    else (inside(file, writeScope) ? inScope : outside).push(finding.line === null ? file : `${file}:${finding.line}`);
-  }
-  return { basis: 'ramify-findings', inScope, outside };
-}
-
-/** Whether one project-relative file lies inside the write scope's roots or is one of its files. */
-function inside(file: string, writeScope: readonly string[]): boolean {
-  return writeScope.some(path => file === path || path === '.' || file.startsWith(`${path}/`));
 }

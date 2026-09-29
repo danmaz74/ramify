@@ -77,16 +77,16 @@ const walk = path => {
 for (const path of profile.paths ?? []) walk(resolve(path));
 
 const time = { seconds: 0, nanos: 0 };
-const messages = [{ testRunStarted: { timestamp: time } }];
+const messages = [{ meta: { protocolVersion: '34.2.0', implementation: { name: 'scripted-cucumber', version: '1' } } }, { testRunStarted: { timestamp: time } }];
 for (const file of features) {
   const uri = relative(process.cwd(), file).split(sep).join('/');
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
+  for (const [lineIndex, line] of readFileSync(file, 'utf8').split('\n').entries()) {
     const tags = line.trim().split(/\s+/);
     const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
     if (identity === undefined || !selects(tags)) continue;
     const id = identity.slice('@ramify-'.length);
     messages.push(
-      { pickle: { id: 'pickle-' + id, uri, name: id, language: 'en', astNodeIds: ['node-' + id], tags: tags.map(name => ({ name, astNodeId: 'tag-' + name })), steps: [] } },
+      { pickle: { id: 'pickle-' + id, uri, name: id, location: { line: lineIndex + 1, column: 1 }, language: 'en', astNodeIds: ['node-' + id], tags: tags.map(name => ({ name, astNodeId: 'tag-' + name })), steps: [] } },
       { testCase: { id: 'case-' + id, pickleId: 'pickle-' + id, testSteps: [] } },
       { testCaseStarted: { id: 'started-' + id, testCaseId: 'case-' + id, attempt: 0, timestamp: time } },
       { testCaseFinished: { testCaseStartedId: 'started-' + id, willBeRetried: false, timestamp: time } },
@@ -140,16 +140,16 @@ export async function scriptedScenarioRun(request: CommandRequest): Promise<Comm
   for (const path of profile.paths ?? []) await walk(resolve(request.cwd, path));
 
   const time = { seconds: 0, nanos: 0 };
-  const messages: unknown[] = [{ testRunStarted: { timestamp: time } }];
+  const messages: unknown[] = [{ meta: { protocolVersion: '34.2.0', implementation: { name: 'scripted-cucumber', version: '1' } } }, { testRunStarted: { timestamp: time } }];
   for (const file of features) {
     const uri = relative(request.cwd, file).split(sep).join('/');
-    for (const line of (await readFile(file, 'utf8')).split('\n')) {
+    for (const [lineIndex, line] of (await readFile(file, 'utf8')).split('\n').entries()) {
       const tags = line.trim().split(/\s+/);
       const identity = tags.find(tag => /^@ramify-sc-\d{3,}$/.test(tag));
       if (identity === undefined || !selects(tags)) continue;
       const id = identity.slice('@ramify-'.length);
       messages.push(
-        { pickle: { id: `pickle-${id}`, uri, name: id, language: 'en', astNodeIds: [`node-${id}`], tags: tags.map(name => ({ name, astNodeId: `tag-${name}` })), steps: [] } },
+        { pickle: { id: `pickle-${id}`, uri, name: id, location: { line: lineIndex + 1, column: 1 }, language: 'en', astNodeIds: [`node-${id}`], tags: tags.map(name => ({ name, astNodeId: `tag-${name}` })), steps: [] } },
         { testCase: { id: `case-${id}`, pickleId: `pickle-${id}`, testSteps: [] } },
         { testCaseStarted: { id: `started-${id}`, testCaseId: `case-${id}`, attempt: 0, timestamp: time } },
         { testCaseFinished: { testCaseStartedId: `started-${id}`, willBeRetried: false, timestamp: time } },

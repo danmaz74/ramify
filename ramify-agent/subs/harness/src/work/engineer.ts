@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
+import { runFocusedCheck } from '../../subs/audit/src/focused-check.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ProjectCommands } from '../checks/checkpoint.js';
 import { scopedTestChecks, type ScenarioCheckPlanning } from '../checks/checkpoint.js';
@@ -437,6 +438,30 @@ async function runScopeTestSelection(options: ScopeTestsOptions, signal: AbortSi
   // A suite beneath an `outside-modules` path runs on its own, as at the
   // gate, so one the runner does not select fails rather than vanishing.
   const checks = scopedTestChecks(options.commands, resolved);
+  if (options.commandExecution === undefined) {
+    const results = [];
+    for (const check of checks) {
+      results.push({ files: check.selection?.resolved ?? [], result: await runFocusedCheck(check.command, signal) });
+      if (signal.aborted) break;
+    }
+    const decisive = results.find(entry => entry.result.outcome === 'not-verified')
+      ?? results.find(entry => entry.result.outcome === 'failed') ?? results[0]!;
+    const elapsedMs = results.reduce((total, entry) => total + entry.result.elapsedMs, 0);
+    return {
+      observation: {
+        resolved: resolved.selection.resolved,
+        outcome: decisive.result.outcome,
+        notVerified: decisive.result.notVerified,
+        exitCode: decisive.result.exitCode,
+        elapsedMs,
+      },
+      text: [
+        `${resolved.selection.resolved.length} test file(s): ${resolved.selection.resolved.join(', ')}`,
+        `Outcome: ${decisive.result.outcome}${decisive.result.exitCode === null ? '' : ` (exit ${decisive.result.exitCode})`}, ${(elapsedMs / 1000).toFixed(1)} s.`,
+        ...results.flatMap(entry => ['', `Run of ${entry.files.join(', ')}:`, entry.result.diagnostics]),
+      ].join('\n'),
+    };
+  }
   const runs = [];
   for (const check of checks) {
     const run = await (options.commandExecution ?? runCommand)({

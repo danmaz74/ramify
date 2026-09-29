@@ -6,3 +6,5 @@ module audit
 // workspace-ownership callback contract. No ramify-audit type crosses.
 expose-src createAuditCheckExecution, AuditCheckExecutionOptions, AuditWorkspaceOwnershipRecorder, IntendedAuditWorkspace from "check-execution.ts" to parent
 expose-src testLockedRunner, TestLockOwner, TestLockHooks, TestLockOverride from "test-lock.ts" to parent
+expose-src scenarioReport, ReportedScenarioCommand from "scenario-report.ts" to parent
+expose-src runFocusedCheck, dispatchHarnessCommand from "focused-check.ts" to parent

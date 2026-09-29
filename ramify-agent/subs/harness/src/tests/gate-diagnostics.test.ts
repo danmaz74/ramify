@@ -1,6 +1,7 @@
 import { mockGit } from './helpers/mock-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
 import { localArchitectToolName } from '../work/submission.js';
+import { engineerToolName } from '../work/engineer.js';
 import { directReadinessExecution, expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -86,6 +87,40 @@ async function attempt(checks: readonly PlannedCheck[], writeScope?: readonly st
 }
 
 describe('a Ramify check that failed at a gate', () => {
+  test('retains every nested provider failure and malformed command error by its exact check ID', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-provider-diagnostics-'));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const base = await attempt([
+      { kind: 'tests', command: prints('failed\n', 1, directory) },
+      { kind: 'tests', command: prints('malformed\n', 1, directory) },
+    ]);
+    const longMessage = `first failure: ${'detail '.repeat(1500)} END`;
+    const gate: GateAttempt = {
+      ...base,
+      commands: base.commands.map((command, index) => ({ ...command, providerCheckId: index === 0 ? 'suite-tests' : 'scenario-profiles' })),
+      provider: {
+        result: { status: 'completed', refs: { reportCommit: 'exact-report' } },
+        checks: {
+          'suite-tests': { status: 'fail', commands: {
+            first: { status: 'fail', failedTests: [{ name: 'alpha', errorFull: longMessage }] },
+            second: { status: 'fail', failedTests: [{ name: 'beta', errorFull: 'second failure' }] },
+          } },
+          'scenario-profiles': { status: 'fail', commands: { profile: { status: 'fail',
+            runnerError: { kind: 'malformed-result', message: 'NDJSON line 4 is malformed' },
+            cucumberMessages: { status: 'undecodable', detail: 'line 4', raw: 'private large stream', artifactPath: 'reports/raw/profile.ndjson' },
+          } } },
+        },
+      },
+    };
+    const lines = (await gateDiagnostics(gate, 'engineer')).summary.join('\n');
+    expect(lines).toContain(longMessage);
+    expect(lines).toContain('second failure');
+    expect(lines).toContain('malformed-result');
+    expect(lines).toContain('reports/raw/profile.ndjson');
+    expect(lines).not.toContain('private large stream');
+    expect(lines).toContain('counts: unknown');
+  });
+
   test('a failed gate briefing attributes queued time to the machine lock with the recorded provider line', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-cwd-'));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
@@ -95,12 +130,12 @@ describe('a Ramify check that failed at a gate', () => {
     const briefed = await gateDiagnostics(gate, 'engineer', new Map(), new Map([[1, line]]));
     expect(briefed.summary.slice(0, 2)).toEqual([
       `- \`tests\` waited for 120000 ms for the machine test lock: ${line}`,
-      '- `tests`: failed, exit 1; the end of what it printed:',
+      `- ` + '`tests`' + `: failed, exit 1; full output: ` + '`' + `${gate.commands[0]!.output.path}` + '`' + `; the end of what it printed:`,
     ]);
     expect(briefed.summary).toContain('      failed assertion');
   });
 
-  test('its findings attribute the cause, and it returns to the local architect although they are in scope', async () => {
+  test('its findings reach the engineer for repair without location-based ownership inference', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-cwd-'));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
 
@@ -113,31 +148,17 @@ describe('a Ramify check that failed at a gate', () => {
     expect(gate.verdict).toBe('failed');
     // Every finding lies inside the write scope, so the failure is in scope.
     expect(gate.cause).toBe('in-scope');
-    expect(gate.attribution).toEqual({ basis: 'ramify-findings', inScope: [`${source}:13`], outside: [] });
-    // And it still goes to the architect: what the module may import is not
-    // an engineer's to widen, so no repair round is spent on it.
-    expect(gate.next).toBe('return-to-local-architect');
+    expect(gate.attribution).toBeUndefined();
+    expect(gate.next).toBe('repair');
 
     const briefed = await gateDiagnostics(gate, 'local-architect');
-    expect(briefed.summary).toEqual([
-      '- `tests`: passed, exit 0',
-      '- `type-check`: passed, exit 0',
-      '- `ramify-check`: failed, exit 1, 1 finding:',
-      `  - ${source}:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`), which does not expose it to your module. \`import type\` counts too.`,
-      'A module violation is not a repair round: what your module receives is yours to arrange, not an engineer\'s.'
-      + ' The imports are owned by `collection-review`. Re-brief the iteration naming what the module already receives'
-      + ' and what to use instead, submit `request-placement` where another owner would have to expose a symbol, or'
-      + ' re-plan the scope so the work sits with the owner that has what it needs.',
-    ]);
-
-    // The engineer's own briefing carries the same findings and not the
-    // decision that is the architect's.
+    expect(briefed.summary.join('\n')).toContain(`${source}:13 imports `);
+    expect(briefed.summary.join('\n')).toContain('full output:');
     const engineer = await gateDiagnostics(gate, 'engineer');
-    expect(engineer.summary.slice(0, 4)).toEqual(briefed.summary.slice(0, 4));
-    expect(engineer.summary).toHaveLength(4);
+    expect(engineer.summary).toEqual(briefed.summary);
   }, 60_000);
 
-  test('a finding outside the write scope is outside-assignment, read from the report and not from a test', async () => {
+  test('a finding outside the write scope is still delivered to the engineer', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-cwd-'));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
 
@@ -146,9 +167,9 @@ describe('a Ramify check that failed at a gate', () => {
       { kind: 'ramify-check', command: prints(checkReport([notVisible('subs/other/src/mcp.ts', 4)]), 1, directory), attribution: 'project' },
     ], [scope]);
 
-    expect(gate.cause).toBe('outside-assignment');
-    expect(gate.attribution).toEqual({ basis: 'ramify-findings', inScope: [], outside: ['subs/other/src/mcp.ts:4'] });
-    expect(gate.next).toBe('return-to-local-architect');
+    expect(gate.cause).toBe('in-scope');
+    expect(gate.attribution).toBeUndefined();
+    expect(gate.next).toBe('repair');
   }, 60_000);
 
   test('a failure that is not a Ramify check keeps the rules it had: in scope, and one repair round', async () => {
@@ -168,7 +189,7 @@ describe('a Ramify check that failed at a gate', () => {
     // The command has no structured findings, so the end of its own output
     // is carried, bounded, and nothing of it is parsed.
     const briefed = await gateDiagnostics(gate, 'engineer');
-    expect(briefed.summary[0]).toBe('- `tests`: failed, exit 1; the end of what it printed:');
+    expect(briefed.summary[0]).toContain('full output:');
     const quoted = briefed.summary.slice(1, -1);
     expect(quoted).toHaveLength(40);
     expect(quoted[0]).toBe('      line 41');
@@ -181,7 +202,7 @@ const notes = 'collection-review/workspace/reviews/notes';
 const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 describe('a module violation at the iteration gate, over a run', () => {
-  test('the iteration returns to the local architect, whose briefing carries the finding itself', async () => {
+  test('the iteration returns to the same engineer with the finding before completion', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
     const root = fixture.root;
@@ -233,9 +254,6 @@ describe('a module violation at the iteration gate, over a run', () => {
         'initial-architect': [submit(analysis([entry('review-note', notes)]))],
         'local-architect': [
           submit(assign(notes, {}, outline())),
-          // The finding came back here, not to the engineer. This architect
-          // assigns the work again, and the check passes from now on.
-          submit(assign(notes, { kind: 'repair', goal: 'Use what the module receives instead of the refused import.' })),
           submit(requestCompletion()),
         ],
         engineer: [
@@ -250,35 +268,21 @@ describe('a module violation at the iteration gate, over a run', () => {
     const runId = receipt.jobId;
     expect(onlyRun(opened.service, 'review-notes').state).toBe('completed');
 
-    // The attempt: attributed from the finding's own location, and returned.
+    // The failed attempt is retained, and the same engineer repairs it.
     const events = await runEventsOnDisk(root, 'review-notes', runId);
     const ids = [...new Set(events.filter(event => event.type === 'gate-attempted').map(event => (event.data as { gate: string }).gate))];
     const attempts = await Promise.all(ids.map(async id =>
       JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
-    const returned = attempts.find(gate => gate.subject.iteration === 'wi-001.i01')!;
-    expect(returned.cause).toBe('in-scope');
-    expect(returned.next).toBe('return-to-local-architect');
-    expect(returned.attribution).toEqual({
-      basis: 'ramify-findings', inScope: [`${notesDirectory}/src/notes.ts:13`], outside: [],
-    });
+    const failed = attempts.find(gate => gate.subject.iteration === 'wi-001.i01')!;
+    expect([failed.cause, failed.next]).toEqual(['in-scope', 'repair']);
+    expect(failed.attribution).toBeUndefined();
 
-    // The iteration closed on it, and no repair round was spent.
     const result = JSON.parse(await readFile(
       runPath(root, 'review-notes', runId, iterationLayout.result('wi-001', 1)), 'utf8')) as IterationResult;
-    expect(result.outcome).toBe('unsuitable');
-    expect(result.invocations).toHaveLength(1);
-
-    // What the architect was given: the failing command, the finding itself,
-    // and what it leaves the architect to decide.
-    const architects = opened.agent!.sessions.filter(session => session.spec.submission.name === localArchitectToolName);
-    expect(architects).toHaveLength(3);
-    const briefing = architects[1]!.spec.prompt;
-    expect(briefing).toContain('## The iteration you last assigned');
-    expect(briefing).toContain(`Its gate \`${returned.id}\` did not pass (in-scope). What ran, and what it reported:`);
-    expect(briefing).toContain('- `ramify-check`: failed, exit 1, 1 finding:');
-    expect(briefing).toContain(`${notesDirectory}/src/notes.ts:13 imports \`ToolResult\` from src/interfaces/protocol.ts (module \`collection-review\`)`);
-    expect(briefing).toContain('submit `request-placement` where another owner would have to expose a symbol');
-    expect(git.commitAccepted).toHaveBeenCalledTimes(5);
+    expect(result.invocations).toHaveLength(2);
+    const engineers = opened.agent!.sessions.filter(session => session.spec.submission.name === engineerToolName);
+    expect(engineers[1]!.spec.prompt).toContain(`${notesDirectory}/src/notes.ts:13 imports `);
+    expect(engineers[1]!.spec.prompt).toContain('ramify-check');
     expect(previewIndex).toBe(final.previews.length);
     expect(git.unexpected).toEqual([]);
   }, 300_000);

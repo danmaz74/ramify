@@ -34,7 +34,7 @@ expose-src buildScenarioProfile, ScenarioProfile, ScenarioProfileOptions, Scenar
 expose-src ScenarioMode, scenarioModeSchema, ScenarioSelection, scenarioSelectionSchema from "profiles.ts" to parent
 expose-src scenarioTagExpression, scenarioRunName from "profiles.ts" to parent
 
-expose-src summarizeScenarioRun, TrackedScenario, ScenarioRunSummary, scenarioRunSummarySchema from "messages.ts" to parent
+expose-src TrackedScenario, ScenarioRunSummary, scenarioRunSummarySchema from "messages.ts" to parent
 expose-src ScenarioRunResult, scenarioRunResultSchema, ScenarioRunStatus, scenarioRunStatusSchema from "messages.ts" to parent
 expose-src untrackedScenarioCountsSchema from "messages.ts" to parent
 

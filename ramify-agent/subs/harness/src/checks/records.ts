@@ -188,6 +188,8 @@ export interface GateRuleRecord {
 /** One command of an attempt, as the attempt records it. */
 export interface GateCommandRecord {
   readonly kind: CheckCommandKind;
+  /** The audit producer's exact definition ID; absent for in-place and preparation commands. */
+  readonly providerCheckId?: string;
   /** A setup command's declared name, such as `build`; absent for every other kind and for an unnamed one. */
   readonly name?: string;
   readonly command: CheckCommand;
@@ -283,6 +285,8 @@ export interface GateAttempt {
   readonly evidence: GateEvidence | null;
   /** Exact external report result. Kept on the in-memory attempt for atomic durable publication. */
   readonly auditOverall?: 'pass' | 'fail' | 'indeterminate' | null;
+  /** Exact versioned provider payload and check results. Legacy attempts omit it. */
+  readonly provider?: { readonly result: unknown; readonly checks: unknown };
   /** `after: null` is a deletion, which is a change like any other. */
   readonly guardedChanges: Array<{ readonly path: string; readonly before: string; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
   /** Rules the harness verified itself. A checkpoint with none records none. */

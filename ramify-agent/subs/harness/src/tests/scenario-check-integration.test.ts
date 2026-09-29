@@ -151,9 +151,9 @@ describe.each([
     expect(command.scenarios!.scenarios).toMatchObject([{
       id: 'sc-001', run: 'demo/shelf', status: 'passed', file: featureFile, line: 4,
       binding: [
-        { step: 'Given an empty shelf', definition: `${stepsFile}:3` },
-        { step: 'When the user shelves "Dune"', definition: `${stepsFile}:4` },
-        { step: 'Then the shelf lists 1 book', definition: `${stepsFile}:5` },
+        { step: 'an empty shelf', definition: `${stepsFile}:3` },
+        { step: 'the user shelves "Dune"', definition: `${stepsFile}:4` },
+        { step: 'the shelf lists 1 book', definition: `${stepsFile}:5` },
       ],
     }]);
     expect(command.scenarios!.runs).toEqual([{ module: 'demo/shelf', exit: 0, profile: 'scenarios/subs-shelf.profile.mjs', messages: 'scenarios/subs-shelf.ndjson' }]);
@@ -299,7 +299,7 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
     expect(result.attempt.verdict).toBe('failed');
     expect(step('baseline-acceptance').outcome).toBe('passed');
     expect(step('acceptance-full').outcome).toBe('failed');
-    expect(step('acceptance-full').detail).toContain('did not pass');
+    expect(step('acceptance-full').detail).toContain('failed');
     expect(failingStep(result.attempt)?.step).toBe('acceptance-full');
     expect(recoveryFor(result.attempt, result.gate, testPolicy(fixture.root))).toBeNull();
   }, 60_000);

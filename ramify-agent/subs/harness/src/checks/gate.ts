@@ -1,12 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { guardedFilesHash } from '../../subs/evidence/src/guarded-files.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
-import { ramifyAttribution } from './diagnostics.js';
 import { checkOutputPath } from './execution.js';
-import { typeCheckAttribution } from './type-check-output.js';
 import type { CheckExecutionPort, CheckExecutionResult, GateCommandStarted } from './execution.js';
 import type {
-  AcceptedCommit, CheckCommand, CheckCommandKind, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
+  AcceptedCommit, CheckCommand, Checkpoint, GateAttempt, GateAttemptId, GateCause,
   GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference, ScenarioCheckSummary,
 } from './records.js';
 import { gateAttemptSchema } from './records.js';
@@ -38,7 +36,7 @@ export interface GateRequest {
   readonly checks: readonly PlannedCheck[];
   /** The project's whole-suite command, persisted so a scoped audit can hand Ramify the selection. */
   readonly auditAllTests?: CheckCommand | undefined;
-  /** The checkpoint's selection, kept separate from any all-project scope probe. */
+  /** The checkpoint's test selection. */
   readonly selection?: {
     readonly policy: 'owned-by-scope' | 'all-project';
     readonly exactOwners: readonly string[];
@@ -52,11 +50,7 @@ export interface GateRequest {
   readonly infrastructureAttempt?: number | undefined;
   /** The guarded files as the assignment captured them. */
   readonly guarded?: readonly { readonly path: string; readonly hash: string }[] | undefined;
-  /**
-   * The project-relative write scope of the assignment this attempt follows,
-   * its roots and its named files. A failed Ramify check's findings are
-   * attributed against it; an attempt that follows no assignment has none.
-   */
+  /** The assignment's project-relative write scope, retained for historical request compatibility. */
   readonly writeScope?: readonly string[] | undefined;
   /** A guarded path whose change a committed record authorized. */
   readonly authorizations?: readonly { readonly path: string; readonly by: RecordReference }[] | undefined;
@@ -177,19 +171,9 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
   const verdict = executionResult.auditOverall === 'indeterminate' ? 'not-verified'
     : executionResult.auditOverall === 'fail' && localVerdict === 'passed' ? 'failed'
       : localVerdict;
-  // A failed Ramify check reported where each of its findings lies, and a
-  // failed type check whose output format the project declared named the
-  // file of each error, so the cause is attributed from those locations and
-  // not only from which commands failed. Nothing of a test's output is read,
-  // nor any output whose format the project did not declare.
-  const writeScope = request.writeScope ?? null;
-  const attribution = mergeAttributions(
-    await ramifyAttribution(commands, writeScope),
-    await typeCheckAttribution(commands, request.checks, writeScope, request.projectRoot),
-  );
   const cause = executionResult.auditOverall === 'indeterminate' && localVerdict === 'passed' ? 'infrastructure'
     : executionResult.auditOverall === 'fail' && localVerdict === 'passed' ? 'unknown'
-      : causeOf(decisive, commands, request.checks, verdict, unauthorized, ruleFailed, attribution);
+      : causeOf(decisive, commands, verdict, unauthorized, ruleFailed);
   return {
     schema: gateAttemptSchema,
     id: request.id,
@@ -203,14 +187,14 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
     audited: executionResult.audited,
     evidence: executionResult.evidence,
     ...(executionResult.auditOverall == null ? {} : { auditOverall: executionResult.auditOverall }),
+    ...(executionResult.provider === undefined ? {} : { provider: executionResult.provider }),
     guardedChanges,
     ...(rules.length === 0 ? {} : { rules }),
     commands,
     ...(request.scenarios === undefined ? {} : { scenarios: request.scenarios }),
     verdict,
     cause,
-    ...(attribution === null ? {} : { attribution }),
-    next: nextOf(request, verdict, cause, commands),
+    next: nextOf(request, verdict, cause),
   };
 }
 
@@ -320,11 +304,9 @@ function verdictOf(commands: readonly GateCommandRecord[], harnessFinding: boole
 function causeOf(
   decisive: readonly NotVerified[],
   commands: readonly GateCommandRecord[],
-  checks: readonly PlannedCheck[],
   verdict: GateAttempt['verdict'],
   unauthorizedGuardedChange: boolean,
   ruleFailed: boolean,
-  attribution: GateAttribution | null,
 ): GateCause | null {
   if (unauthorizedGuardedChange) return 'guarded-change';
   if (verdict === 'passed') return null;
@@ -339,99 +321,22 @@ function causeOf(
   if (reasons.has('runner-error') || reasons.has('command-missing') || reasons.has('interrupted') || reasons.has('discovery-error')) return 'infrastructure';
   if (reasons.has('empty-selection') || reasons.has('required-suite-missing')) return 'unknown';
   if (verdict !== 'failed') return 'unknown';
-  // A setup command that ran and exited non-zero failed on the source it
-  // was given; nothing after it ran. The change since the last state that
-  // passed is the assignment's own, so the failure is in scope, the
-  // engineer's to repair, as any project-wide failure is when the probe of
-  // the assignment's own tests did not pass.
-  if (commands.some(command => command.kind === 'setup' && command.outcome === 'failed')) return 'in-scope';
-  // A rule the harness verified is about what this iteration wrote, so it is
-  // the engineer's to repair whatever else ran.
-  if (ruleFailed) return 'in-scope';
-  // A failed Ramify check named the file of every finding, and a failed type
-  // check in a declared format the file of every error. Where any of them
-  // lies outside the assignment's own write scope the failure is not that
-  // assignment's, whatever the tests of that scope did; where all of them
-  // lie inside it, the failure is in scope, the engineer's to repair, even
-  // though it is the local architect that answers a module violation.
-  if (attribution !== null) {
-    // Both are commands of the whole project, so leaving them in the scope
-    // comparison would call every module violation and every type error a
-    // failure outside the assignment. Their own output already said where
-    // each lies.
-    return attribution.outside.length > 0 || outsideAssignment(commands, checks, attributedKinds(attribution)) ? 'outside-assignment' : 'in-scope';
-  }
-  return outsideAssignment(commands, checks) ? 'outside-assignment' : 'in-scope';
-}
-
-/** The one attribution of an attempt, from the Ramify report's locations and the type check's. */
-function mergeAttributions(ramify: GateAttribution | null, typeCheck: GateAttribution | null): GateAttribution | null {
-  if (ramify === null || typeCheck === null) return ramify ?? typeCheck;
-  return {
-    basis: 'ramify-findings-and-type-check-errors',
-    inScope: [...ramify.inScope, ...typeCheck.inScope],
-    outside: [...ramify.outside, ...typeCheck.outside],
-  };
-}
-
-/** The command kinds whose own output located their failures. */
-function attributedKinds(attribution: GateAttribution): ReadonlySet<CheckCommandKind> {
-  switch (attribution.basis) {
-    case 'ramify-findings': return new Set(['ramify-check']);
-    case 'type-check-errors': return new Set(['type-check']);
-    case 'ramify-findings-and-type-check-errors': return new Set(['ramify-check', 'type-check']);
-  }
-}
-
-/**
- * Whether this failure lies outside the last assignment's own scope: every
- * command of that scope passed, and what failed is a command of the whole
- * project. It is read from which files ran and how each command exited.
- * Without a probe of the assignment's own selection there is nothing to
- * attribute, so the failure stays in scope.
- *
- * The kinds in `except` are left out of the comparison: a Ramify check and
- * a type check run over the whole project, but where their own output named
- * the file of every finding or error, that is what attributes them.
- */
-function outsideAssignment(
-  commands: readonly GateCommandRecord[],
-  checks: readonly PlannedCheck[],
-  except: ReadonlySet<CheckCommandKind> = new Set(),
-): boolean {
-  let probed = false;
-  let failedOutside = false;
-  for (const [index, check] of checks.entries()) {
-    const record = commands[index];
-    if (record === undefined || check.attribution === undefined) continue;
-    if (except.has(check.kind)) continue;
-    if (check.attribution === 'in-scope') {
-      if (record.outcome !== 'passed') return false;
-      probed = true;
-    } else if (record.outcome === 'failed') {
-      failedOutside = true;
-    }
-  }
-  return probed && failedOutside;
+  // The engineer diagnoses every failed check and requests another owner when
+  // repair exceeds its authority. A diagnostic path or test location is evidence,
+  // not a decision about who receives the failed iteration.
+  return commands.some(command => command.outcome === 'failed') || ruleFailed ? 'in-scope' : 'unknown';
 }
 
 function nextOf(
   request: GateRequest,
   verdict: GateAttempt['verdict'],
   cause: GateCause | null,
-  commands: readonly GateCommandRecord[],
 ): GateNext {
   if (verdict === 'passed') return 'accept';
   if (cause === 'infrastructure' || cause === 'timeout') {
     const bound = request.limits?.infrastructureRetries;
     return bound !== undefined && (request.infrastructureAttempt ?? 0) + 1 >= bound ? 'exhausted' : 'retry-infrastructure';
   }
-  // A Ramify check that failed goes to the local architect whatever scope
-  // its findings lie in. What a module may import is the architect's to
-  // arrange with the owner; an engineer given the same brief again cannot
-  // widen its own module's access, so a repair round would spend an
-  // invocation on work it is not authorized to do.
-  if (commands.some(command => command.kind === 'ramify-check' && command.outcome === 'failed')) return 'return-to-local-architect';
   if (cause === 'in-scope') {
     const bound = request.limits?.repairRounds;
     return bound !== undefined && (request.repairRound ?? 0) + 1 >= bound ? 'exhausted' : 'repair';

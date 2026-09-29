@@ -367,9 +367,9 @@ describe('run_scope_tests', () => {
     expect(result.text).toContain('Outcome: passed (exit 0)');
     expect(result.text).toContain('Scenarios: failed; quick mode, selected by identity: sc-002, sc-003.');
     expect(result.text).toContain(`- \`sc-003\` "A returned book is listed again" undefined, at \`${shelfFile}:22\`:`);
-    expect(result.text).toContain('  - The failing step: `When the user lends "Dune" to Ada`.');
+    expect(result.text).toContain('  - The failing step: `the user lends "Dune" to Ada`.');
     expect(result.text).toContain('  - No step definition matches "the user lends "Dune" to Ada".');
-    expect(result.text).toContain('- sc-002 was selected and the run of sample/shelf did not execute it');
+    expect(result.text).toContain('- sc-002 was selected but no final scenario result was reported');
     expect(seen).toEqual([{ selected: ['sc-002', 'sc-003'], passed: [], failures: 2 }]);
     expect(await readFile(join(directories[0]!, 'scenarios.log'), 'utf8')).toContain('Scenario check, quick mode');
   });
@@ -383,7 +383,7 @@ describe('run_scope_tests', () => {
     const result = await passing.execute({}, new AbortController().signal);
     expect(result.isError).toBe(false);
     expect(result.text).toContain('Scenarios: passed; quick mode, selected by identity: sc-001.');
-    expect(result.text).toContain(`- \`sc-001\` "A shelved book is listed" passed, at \`${shelfFile}:10\`, bound by:\n  - \`Given an empty shelf\` → \`${shelfSteps}:8\``);
+    expect(result.text).toContain(`- \`sc-001\` "A shelved book is listed" passed, at \`${shelfFile}:10\`, bound by:\n  - \`an empty shelf\` → \`${shelfSteps}:8\``);
     expect(seen).toEqual([{ selected: ['sc-001'], passed: ['sc-001'], failures: 0 }]);
 
     const none = tool(root, scriptedRunner([]).runner, [{ id: 'sc-007', owner: shelf, file: shelfFile, state: 'pending' }], [], seen, directories);
@@ -486,23 +486,23 @@ describe('diagnostics from a recorded failing stream', () => {
       const { summary: lines } = await gateDiagnostics(gate(summary, 'failed'), audience, names);
       const text = lines.join('\n');
       expect(lines[0]).toBe('- `scenarios`: failed, exit 1; quick mode, selected by identity: sc-002, sc-003, sc-001:');
-      expect(text).toContain(`  - \`sc-002\` "A miscounted shelf fails" failed, at \`${shelfFile}:16\`:\n    - The failing step: \`Then the shelf lists 2 books\`.\n    - Its message`);
+      expect(text).toContain(`  - \`sc-002\` "A miscounted shelf fails" failed, at \`${shelfFile}:16\`:\n    - The failing step: \`the shelf lists 2 books\`.\n    - Its message`);
       expect(text).toMatch(/AssertionError/);
       expect(text).toContain('1 !== 2');
       expect(text).toContain(`  - \`sc-003\` "Lending is not defined yet" undefined, at \`${shelfFile}:22\`:`);
       expect(text).toContain('    - No step definition matches "the user lends "Dune" to Ada".');
       expect(text).toContain([
         `  - \`sc-001\` "A shelved book is listed" passed, at \`${shelfFile}:10\`, bound by:`,
-        `    - \`Given an empty shelf\` → \`${shelfSteps}:8\``,
-        `    - \`When the user shelves "Dune"\` → \`${shelfSteps}:12\``,
-        `    - \`Then the shelf lists 1 book\` → \`${shelfSteps}:28\``,
+        `    - \`an empty shelf\` → \`${shelfSteps}:8\``,
+        `    - \`the user shelves "Dune"\` → \`${shelfSteps}:12\``,
+        `    - \`the shelf lists 1 book\` → \`${shelfSteps}:28\``,
       ].join('\n'));
       // The failure lines of the check that are not about one scenario stay;
       // the per-scenario ones are not repeated.
       expect(text).toContain('  - the run of sample/shelf exited with 1');
       expect(lines.some(line => /^ {2}- sc-00\d (failed|undefined):/.test(line))).toBe(false);
       // Other commands keep their own lines.
-      expect(text).toContain('- `type-check`: failed, exit 2; the end of what it printed:');
+      expect(text).toContain('- `type-check`: failed, exit 2; full output: `/nowhere/type-check.log`; the end of what it printed:');
     }
   });
 

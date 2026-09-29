@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import { testLockedRunner, type TestLockHooks, type TestLockOverride } from '../../subs/audit/src/test-lock.js';
+import { dispatchHarnessCommand } from '../../subs/audit/src/focused-check.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
 import type { CheckCommand, CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
@@ -109,6 +110,8 @@ export interface CheckExecutionResult {
   readonly evidence: GateEvidence | null;
   /** The external audit's exact overall result, when it published a report. */
   readonly auditOverall?: 'pass' | 'fail' | 'indeterminate' | null;
+  /** Complete provider result and published per-check records, retained without a competing harness schema. */
+  readonly provider?: { readonly result: unknown; readonly checks: unknown };
 }
 
 /**
@@ -121,6 +124,7 @@ export function createInPlaceCheckExecution(testLock?: TestLockOverride): CheckE
   return {
   async run(checks, request) {
     const commands: GateCommandRecord[] = [];
+    const providerChecks: Record<string, unknown> = {};
     const startedAt = new Date().toISOString();
     let interrupted = false;
     let setupFailed = false;
@@ -165,26 +169,35 @@ export function createInPlaceCheckExecution(testLock?: TestLockOverride): CheckE
           signal: request.signal,
           runner: suite ? runner : undefined,
         });
+        const id = `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
         const record = request.classify(check, outcome.run, outputFile, outcome.summary);
-        commands.push(record);
+        commands.push({ ...record, providerCheckId: id });
+        providerChecks[id] = outcome.provider;
         if (record.notVerified === 'interrupted') interrupted = true;
         continue;
       }
 
-      const run = await runner({
-        argv: check.command.argv,
-        cwd: check.command.cwd,
-        env: checkCommandEnvironment(check.command),
-        timeoutMs: check.command.timeoutMs,
-        outputFile,
-        signal: request.signal,
-      });
-      const record = request.classify(check, run, outputFile);
-      commands.push(record);
-      if (record.notVerified === 'interrupted') interrupted = true;
-      else if (check.kind === 'setup' && record.outcome !== 'passed') setupFailed = true;
+      if (check.kind === 'setup') {
+        const run = await runner({ argv: check.command.argv, cwd: check.command.cwd,
+          env: checkCommandEnvironment(check.command), timeoutMs: check.command.timeoutMs, outputFile, signal: request.signal });
+        const record = request.classify(check, run, outputFile);
+        commands.push(record);
+        if (record.notVerified === 'interrupted') interrupted = true;
+        else if (record.outcome !== 'passed') setupFailed = true;
+        continue;
+      }
+      const id = `check-${String(index + 1).padStart(2, '0')}-${check.kind}`;
+      const executed = await dispatchHarnessCommand({ command: check.command, signal: request.signal, runner, outputFile, checkId: id });
+      const record = request.classify(check, executed.run, outputFile);
+      const decided: GateCommandRecord = executed.passed || record.outcome !== 'passed' ? record
+        : executed.runnerError === null ? { ...record, outcome: 'failed' }
+          : { ...record, outcome: 'not-verified', notVerified: 'runner-error', runnerError: executed.runnerError };
+      commands.push({ ...decided, providerCheckId: id });
+      providerChecks[id] = executed.provider;
+      if (decided.notVerified === 'interrupted') interrupted = true;
     }
-    return { commands, audited: null, evidence: null };
+    return { commands, audited: null, evidence: null,
+      ...(Object.keys(providerChecks).length === 0 ? {} : { provider: { result: { source: 'working-tree', published: false }, checks: providerChecks } }) };
   },
   };
 }

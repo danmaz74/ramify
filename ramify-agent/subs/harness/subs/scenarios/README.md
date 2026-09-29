@@ -104,22 +104,11 @@ are the caller's.
 
 ## The message stream
 
-`summarizeScenarioRun(stream, tracked)` reads one run's NDJSON message
-stream and returns a `ScenarioRunSummary`: per tracked scenario the run
-executed, its status as the worst of its pickles at their last attempt, its
-file and line, its binding (each step with the `uri:line` of every
-definition that matched it), the first step with the scenario's status and
-its message, and the step texts no definition matched. A scenario is tracked
-when its identity tag names a record and it sits in the file that record
-names. Tracked scenarios the run did not execute are listed as excluded; the
-project's own scenarios are counted as passed, skipped or failed. A line that
-is not JSON is reported and the rest is read, and a step the stream never
-finished did not pass. A scenario the stream does not hold whole also
-carries `unfinished`: how many of its pickles never started and of its steps
-have no result, and the worst status of the steps that did finish, so a
-reader can tell a failure the run observed from a gap in the stream.
-Whether the check passes is the caller's, since it also weighs the exit
-code, the selection and the mode.
+The harness runs each profile and captures its complete NDJSON output. The
+audit child passes that output to ramify-audit's public Cucumber parser,
+which owns final scenario results, errors, counts and raw evidence. The
+harness associates the producer's final identities and step bindings with
+its frozen tracked scenario IDs for briefings and state transitions.
 
 ## Composition failures
 

@@ -3,18 +3,19 @@ import { posix } from 'node:path';
 import { outputTailBytes, runCommand } from '../../subs/evidence/src/run-command.js';
 import type { CommandOutcome, CommandRun, CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { buildScenarioProfile, type ScenarioMode, type ScenarioSelection } from '../../subs/scenarios/src/profiles.js';
-import { summarizeScenarioRun, type TrackedScenario } from '../../subs/scenarios/src/messages.js';
+import type { TrackedScenario } from '../../subs/scenarios/src/messages.js';
+import { scenarioIdOfTag } from '../../subs/scenarios/src/rendering.js';
+import { scenarioReport } from '../../subs/audit/src/scenario-report.js';
 import type { ScenarioModule } from '../../subs/scenarios/src/records.js';
 import { checkCommandEnvironment } from './records.js';
-import type { CheckCommand, ScenarioCheckResult, ScenarioCheckRun, ScenarioCheckSummary } from './records.js';
+import type { CheckCommand, ScenarioCheckRun, ScenarioCheckSummary } from './records.js';
 
 /*
  * The scenario check: one Cucumber run per module, in sequence, with the
  * mode's `setup` before the first and `teardown` after the last, each run
  * reading a profile the harness wrote into the attempt's directory, outside
- * the worktree. The check passes by what the message streams say, reduced
- * by the `scenarios` module, and not by the exit codes alone: `undefined`,
- * `pending` and `ambiguous` fail it.
+ * the worktree. The audit child parses each captured message stream with the
+ * provider and maps its final scenario facts to frozen scenario IDs.
  *
  * Both runners call `runScenarioCheck`: the in-place runner in the project
  * itself, the audit's executor in its worktree with its path mapping. What
@@ -85,6 +86,17 @@ export interface ScenarioCheckExecution {
 export interface ScenarioCheckOutcome {
   readonly run: CommandRun;
   readonly summary: ScenarioCheckSummary;
+  /** Opaque complete producer result; only the audit child consumes its schema. */
+  readonly provider: unknown;
+  /** Exact Cucumber streams from each executed profile for the audit producer's parser. */
+  readonly reportedCommands: readonly {
+    readonly name: string;
+    readonly rawMessages: string | null;
+    readonly exitCode: number | null;
+    readonly output: string;
+    readonly durationSeconds: number;
+    readonly outputIncomplete: boolean;
+  }[];
 }
 
 /** Runs one scenario check and answers its combined run and its summary. It never throws on a command's failure. */
@@ -125,9 +137,7 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
   }
 
   const runs: ScenarioCheckRun[] = [];
-  const scenarios: ScenarioCheckResult[] = [];
-  const untracked = { passed: 0, skipped: 0, failed: 0 };
-  let excluded = 0;
+  const reportedCommands: Array<ScenarioCheckOutcome['reportedCommands'][number]> = [];
   const config = { support: plan.support, modes: { quick: { command: execution.command.argv }, full: { command: execution.command.argv } } };
   for (const { module, selection } of plan.runs) {
     const profile = buildScenarioProfile(module, plan.mode, selection, config, attemptDirectory, { dryRun: plan.dryRun, projectRoot });
@@ -140,6 +150,15 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
     await rm(profile.messagesPath, { force: true });
     const run = await invoke(profile.argv, plan.runTimeoutMs, execution.signal);
     runs.push({ ...entry, exit: exitOf(run.outcome) });
+    const stream = await readFile(profile.messagesPath, 'utf8').catch(() => null);
+    reportedCommands.push({
+      name: module.module,
+      rawMessages: stream,
+      exitCode: run.outcome.kind === 'completed' ? run.outcome.exitCode : null,
+      output: `${run.stdout}${run.stderr}`,
+      durationSeconds: run.elapsedMs / 1000,
+      outputIncomplete: run.outcome.kind !== 'completed',
+    });
     if (run.outcome.kind !== 'completed') {
       failures.push(`the run of ${module.module} ${describeOutcome(run.outcome)}`);
       // A run that did not complete leaves nothing the next one could rely
@@ -149,32 +168,6 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
     }
     if (run.outcome.exitCode !== 0) failures.push(`the run of ${module.module} exited with ${run.outcome.exitCode}`);
 
-    const stream = await readFile(profile.messagesPath, 'utf8').catch(() => null);
-    if (stream === null) {
-      failures.push(`the run of ${module.module} wrote no message stream`);
-      continue;
-    }
-    const summary = summarizeScenarioRun(stream, plan.tracked);
-    if (summary.finished === null) failures.push(`the message stream of ${module.module} ends before its run finished`);
-    if (summary.malformedLines.length > 0) failures.push(`the message stream of ${module.module} has ${summary.malformedLines.length} line(s) that are not JSON`);
-    excluded += summary.excluded.length;
-    untracked.passed += summary.untracked.passed;
-    untracked.skipped += summary.untracked.skipped;
-    untracked.failed += summary.untracked.failed;
-    for (const result of summary.scenarios) {
-      scenarios.push({ ...result, run: module.module, ...(result.failure === undefined ? {} : { failure: { ...result.failure, message: restore(result.failure.message) } }) });
-    }
-    const failedBefore = failures.length;
-    failures.push(...scenarioFailures(summary.scenarios, plan.dryRun));
-    if (selection.kind === 'identity') {
-      const ran = new Set(summary.scenarios.map(result => result.id));
-      for (const id of selection.scenarios) if (!ran.has(id)) failures.push(`${id} was selected and the run of ${module.module} did not execute it`);
-    }
-    if (summary.untracked.failed > 0) failures.push(`${summary.untracked.failed} of the project's own scenarios in ${module.module} did not pass`);
-    if (!plan.dryRun && summary.untracked.skipped > 0) failures.push(`${summary.untracked.skipped} of the project's own scenarios in ${module.module} were skipped`);
-    if (summary.finished?.success === false && failures.length === failedBefore && run.outcome.exitCode === 0) {
-      failures.push(`the runner reported the run of ${module.module} unsuccessful`);
-    }
   }
 
   let teardown: ScenarioCheckSummary['teardown'] = null;
@@ -189,16 +182,19 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
     }
   }
 
+  const reported = await scenarioReport({ commands: reportedCommands, projectRoot, tracked: plan.tracked, selection: plan.selection, dryRun: plan.dryRun, restore, scenarioIdOfTag });
+  failures.push(...reported.failures);
+  if (reportedCommands.length === 0 && plan.runs.length > 0 && !stopped) failures.push('No Cucumber profile produced a result');
   const summary: ScenarioCheckSummary = {
     mode: plan.mode,
     selection: plan.selection,
     dryRun: plan.dryRun,
-    excluded,
+    excluded: reported.excluded,
     setup,
     teardown,
     runs,
-    scenarios,
-    untracked,
+    scenarios: reported.scenarios,
+    untracked: reported.untracked,
     failures,
   };
   log.push(summaryText(summary));
@@ -222,6 +218,8 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
       stderr: '',
     },
     summary,
+    provider: reported.provider,
+    reportedCommands,
   };
 }
 
@@ -230,20 +228,6 @@ export function scenarioCheckPassed(summary: ScenarioCheckSummary): boolean {
   return summary.failures.length === 0;
 }
 
-/**
- * The tracked scenarios that did not pass, one line each: strictly, only
- * `passed` passes; in a dry run, `skipped` is what a scenario whose every
- * step has one definition reports, and passes too.
- */
-function scenarioFailures(results: readonly { id: string; status: string; failure?: { step: string; message: string } | undefined; undefined: readonly string[] }[], dryRun: boolean): string[] {
-  const allowed = dryRun ? ['passed', 'skipped'] : ['passed'];
-  return results.filter(result => !allowed.includes(result.status)).map(result => {
-    const detail = result.status === 'undefined' && result.undefined.length > 0
-      ? `no step definition matches ${result.undefined.map(text => `"${text}"`).join(', ')}`
-      : result.failure === undefined ? result.status : `${result.failure.step}: ${firstLine(result.failure.message)}`;
-    return `${result.id} ${result.status}: ${detail}`;
-  });
-}
 
 /** The outcome the check reports as one command: a cancellation first, then a timeout, a runner error, then the first non-zero exit. */
 function combinedOutcome(outcomes: readonly CommandOutcome[]): CommandOutcome {
@@ -272,10 +256,6 @@ function describeOutcome(outcome: CommandOutcome): string {
 
 function relativeTo(directory: string, path: string): string {
   return posix.relative(directory, path);
-}
-
-function firstLine(text: string): string {
-  return text.split('\n').find(line => line.trim() !== '')?.trim() ?? '';
 }
 
 /** The last lines of the check's output: its verdict, and why it failed. */

@@ -293,7 +293,7 @@ describe('execution over the recorded streams', () => {
   });
 
   test.each([
-    ['failing', 'sc-002', /^sc-002 failed: Then the shelf lists 2 books: AssertionError/],
+    ['failing', 'sc-002', /^sc-002 failed: the shelf lists 2 books: AssertionError/],
     ['undefined', 'sc-003', /^sc-003 undefined: no step definition matches "the user lends "Dune" to Ada"$/],
     ['ambiguous', 'sc-004', /^sc-004 ambiguous: /],
     ['pending', 'sc-005', /^sc-005 pending: /],
@@ -316,7 +316,7 @@ describe('execution over the recorded streams', () => {
   test('a selected scenario the run did not execute fails the check', async () => {
     const { runner } = scriptedRunner({ streamFor: () => 'passing' });
     const { summary } = await execute(plan({ selection: identity('sc-001', 'sc-005'), runs: [{ module: shelf, selection: identity('sc-001', 'sc-005') }] }), runner);
-    expect(summary.failures).toEqual(['sc-005 was selected and the run of sample/shelf did not execute it']);
+    expect(summary.failures).toEqual(['sc-005 was selected but no final scenario result was reported']);
   });
 
   test('all-untagged: every tracked failure by ID, the project\'s own by count, and the pending one excluded', async () => {
@@ -327,7 +327,7 @@ describe('execution over the recorded streams', () => {
     expect(summary.untracked).toEqual({ passed: 2, skipped: 0, failed: 1 });
     expect(summary.failures[0]).toBe('the run of sample/shelf exited with 1');
     expect(summary.failures.slice(1, 6).map(line => line.split(':')[0])).toEqual(['sc-002 failed', 'sc-003 undefined', 'sc-004 ambiguous', 'sc-005 pending', 'sc-006 failed']);
-    expect(summary.failures.at(-1)).toBe('1 of the project\'s own scenarios in sample/shelf did not pass');
+    expect(summary.failures.at(-1)).toBe('The project\'s own scenarios: 2 passed, 0 skipped, 1 failed');
   });
 
   test('a dry run passes skipped scenarios and fails on undefined and ambiguous steps', async () => {
@@ -342,7 +342,7 @@ describe('execution over the recorded streams', () => {
     const { runner } = scriptedRunner({ streamFor: () => null });
     const { summary, run } = await execute(plan(), runner);
     expect(run.outcome).toEqual({ kind: 'completed', exitCode: 0 });
-    expect(summary.failures).toEqual(['the run of sample/shelf wrote no message stream']);
+    expect(summary.failures).toEqual(['sample/shelf: Cucumber did not provide complete message output: Cucumber wrote no message output.']);
   });
 
   test('a non-zero exit fails a check whose stream passed', async () => {
@@ -446,7 +446,7 @@ describe('the verdict', () => {
     expect(command.outcome).toBe('failed');
     expect(command.exitCode).toBe(0);
     expect(command.scenarios?.failures).toHaveLength(1);
-    expect(command.scenarios?.failures[0]).toMatch(/^sc-002 failed: Then the shelf lists 2 books/);
+    expect(command.scenarios?.failures[0]).toMatch(/^sc-002 failed: the shelf lists 2 books/);
     expect(attempt).toMatchObject({ verdict: 'failed', cause: 'in-scope', next: 'repair' });
     expect(command.output.tail).toContain('- sc-002 failed');
   });
