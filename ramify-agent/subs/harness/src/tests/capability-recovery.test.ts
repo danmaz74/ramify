@@ -13,7 +13,7 @@ import { copyCapabilityFixture, fixtureRequest, openCapabilityRuns } from './hel
 import { temporaryDirectory } from './helpers/fixture.js';
 import { assign, edit, installMiniRunner, outline, shell, submit, treeInputs } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
-import { freeze, git, initRepository, runEventsOnDisk, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { freeze, git, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { nodeProcessGroups } from '../run/writer.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -47,8 +47,7 @@ test('CA20: a registered real process group survives a service crash and is sett
     }
     if (spec.role === 'capability-architect') {
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
-      return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3], kind: 'assign', owner: b,
-        purpose: 'Provide B source', approach: 'Implement B source', requirementRefs: [], intendedEvidence: ['A consumes B source'] });
+      return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3], kind: 'assign', assignment: assign(b, { goal: 'Provide B source', approach: 'Implement B source', completionEvidence: 'A consumes B source' }).assignment });
     }
     return [];
   };
@@ -138,7 +137,7 @@ test('CA19: retry refuses a changed staged or untracked candidate and preserves 
   expect((await git(fixture.root, 'show', ':subs/a/src/caller.ts')).trim()).toContain('changedIndex = true');
 });
 
-async function lostBWriterCase(exhaustAfterRestart: boolean): Promise<void> {
+async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -166,60 +165,49 @@ async function lostBWriterCase(exhaustAfterRestart: boolean): Promise<void> {
       } });
       prompts.push(spec.prompt);
       if (engineerTurns === 2) return [edit('fact.ts', "return 'old';", "return 'old from B';"), { kind: 'end', message: 'Context lost before submission' }];
-      if (exhaustAfterRestart) return [{ kind: 'end', message: 'Context lost again before submission' }];
-      return submit({ kind: 'completion-proposed', summary: 'B returns source', findings: [] });
+      throw new Error('An ended engineer must close partial rather than restart automatically');
     }
     if (spec.role === 'capability-architect') {
       architectTurns += 1;
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
-        kind: 'assign', owner: b, purpose: 'Return B source', approach: 'Extend B result',
-        requirementRefs: [], intendedEvidence: ['B source appears in A'] }) : [{ kind: 'wait', ms: 60_000 }];
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B source appears in A' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };
   const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
-    ...(exhaustAfterRestart ? {
+    ...(restartBeforeSettlement ? {
       policy: (root: string) => ({ ...testPolicy(root), limits: {
         ...testPolicy(root).limits, sessionReconstructionsPerWork: 1,
       } }),
       afterWrite: async (write: string) => {
-        if (write === 'capability-assignment-interrupted' && !frozen) { frozen = true; await freeze(); }
+        if (write === 'invocation-ended' && engineerTurns === 2 && !frozen) { frozen = true; await freeze(); }
       },
     } : {}) };
   let opened = await openCapabilityRuns(fixture.root, options);
   const receipt = await opened.service.execute(startRun('need'));
-  if (exhaustAfterRestart) {
+  if (restartBeforeSettlement) {
     await until(() => frozen, 30_000);
     await staleCrashLock(fixture.root);
     opened = await openCapabilityRuns(fixture.root, options);
   }
   cleanups.push(() => opened.service.close());
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === (exhaustAfterRestart ? 'job-failed' : 'capability-assignment-settled') || event.type === 'job-failed'), 30_000);
+    event.type === 'capability-assignment-settled' || event.type === 'job-failed'), 30_000);
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-  if (exhaustAfterRestart) {
-    const failed = events.find(event => event.type === 'job-failed');
-    expect(failed?.type === 'job-failed' ? failed.data.reason : null).toBe('limit-exceeded');
-    expect(failed?.type === 'job-failed' ? failed.data.message : '').toContain('ended without a result');
-    expect(events.filter(event => event.type === 'capability-assignment-interrupted' &&
-      event.data.assignment === 'cap-001.i01')).toHaveLength(2);
-    expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
-    expect(events.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(0);
-    expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
-    expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
-    await opened.service.settled('need', receipt.jobId);
-    return;
-  }
-  expect(events.filter(event => event.type === 'job-failed')).toHaveLength(0);
+  const failedOutcomes = await Promise.all(events.flatMap(event => event.type === 'invocation-ended' && event.data.ended === 'failed'
+    ? [readFile(runPath(fixture.root, 'need', receipt.jobId, `invocations/${event.data.invocation}/outcome.json`), 'utf8')] : []));
+  expect(events.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: events.slice(-12), failedOutcomes })).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
-  const interrupted = events.filter(event => event.type === 'capability-assignment-interrupted');
-  expect(interrupted).toHaveLength(1);
-  expect(interrupted[0]?.data.cause).toContain('ended without a result');
   expect(events.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(1);
-  expect(events.filter(event => event.type === 'invocation-started' && event.data.work.capabilityAssignment === 'cap-001.i01')).toHaveLength(2);
-  expect(prompts[1]).toContain('Original interruption:');
-  expect(prompts[1]).toContain('Inspect the current source');
+  expect(events.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer' &&
+    event.data.work.iteration === 'cap-001.i01')).toHaveLength(1);
+  const partial = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    'work-items/cap-001/iterations/01/result.json'), 'utf8')) as { outcome: string; gate: string | null; findings: string[]; failure?: unknown };
+  expect(partial).toMatchObject({ outcome: 'partial', gate: null });
+  expect(partial.findings.join(' ')).toContain('ended without a result');
+  expect(partial.failure).toBeDefined();
+  expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
   expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const current = opened.service.events('need', receipt.jobId)!;
@@ -233,9 +221,9 @@ async function lostBWriterCase(exhaustAfterRestart: boolean): Promise<void> {
   await opened.service.settled('need', receipt.jobId);
 }
 
-test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within the same assignment',
+test('CA18 CA26 CA29: an ended B writer keeps dirty source and closes partial through ordinary failure analysis',
   () => lostBWriterCase(false), 45_000);
-test('CA18 CA26 CA29: a lost B writer keeps dirty source and exhausts its captured reconstruction bound after restart',
+test('CA18 CA26 CA29: restart after an ended B writer preserves its ordinary partial result without a second writer',
   () => lostBWriterCase(true), 45_000);
 
 test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry', async () => {
@@ -274,8 +262,7 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
       const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
       if (architectTurns === 1) return submit({ ...basis, kind: 'partial', progress: 'A source inspected',
         unfinished: ['Assign B'] });
-      if (architectTurns === 2) return submit({ ...basis, kind: 'assign', owner: b, purpose: 'Provide B source',
-        approach: 'Update B owned source', requirementRefs: [], intendedEvidence: ['A uses B source'] });
+      if (architectTurns === 2) return submit({ ...basis, kind: 'assign', assignment: assign(b, { goal: 'Provide B source', approach: 'Update B owned source', completionEvidence: 'A uses B source' }).assignment });
       return [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
@@ -347,8 +334,7 @@ test('a restart after a capability architect budget return reconstructs from com
         { kind: 'message', text: 'The capability task is unfinished at my context budget.' },
       ];
       return submit({ kind: 'assign', task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
-        owner: b, purpose: 'Provide B source', approach: 'Update B owned source',
-        requirementRefs: [], intendedEvidence: ['A uses B source'] });
+        assignment: assign(b, { goal: 'Provide B source', approach: 'Update B owned source', completionEvidence: 'A uses B source' }).assignment });
     }
     return [];
   };
@@ -474,8 +460,7 @@ test('CA19: accepted assign action before its effect replays without a second co
       architectTurns += 1;
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
-        kind: 'assign', owner: b, purpose: 'Return B source', approach: 'Extend B result',
-        requirementRefs: [], intendedEvidence: ['B result'] }) : [{ kind: 'wait', ms: 60_000 }];
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };
@@ -547,8 +532,7 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
       architectTurns += 1;
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
-        kind: 'assign', owner: b, purpose: 'Return B source', approach: 'Extend B result',
-        requirementRefs: [], intendedEvidence: ['B source appears in A'] }) : [{ kind: 'wait', ms: 60_000 }];
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B source appears in A' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };
@@ -576,9 +560,23 @@ test(`CA18 CA19 CA26 CA29: restart after ${boundary} settles an explicit partial
   expect(after.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
   const settlements = after.filter(event => event.type === 'capability-assignment-settled');
   expect(settlements).toHaveLength(1);
-  expect(settlements[0].data).toMatchObject({ outcome: 'partial', unfinished: ['Submit provider result'] });
+  expect(settlements[0].data).toMatchObject({ outcome: 'partial' });
+  expect(settlements[0].data.mutated).toContain('subs/b/src/fact.ts');
+  const writer = after.find(event => event.type === 'invocation-started' &&
+    event.data.role === 'engineer' && event.data.work.iteration === 'cap-001.i01');
+  if (writer?.type !== 'invocation-started') throw new Error('Missing capability writer');
+  const invocation = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    `invocations/${writer.data.invocation}/invocation.json`), 'utf8')) as { candidateBefore?: string };
+  const outcome = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    `invocations/${writer.data.invocation}/outcome.json`), 'utf8')) as { candidateAfter?: string };
+  expect(invocation.candidateBefore).toMatch(/^[0-9a-f]{40,64}$/u);
+  expect(outcome.candidateAfter).toMatch(/^[0-9a-f]{40,64}$/u);
+  expect(outcome.candidateAfter).not.toBe(invocation.candidateBefore);
+  const partialResult = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    'work-items/cap-001/iterations/01/result.json'), 'utf8')) as { outcome: string; findings: string[] };
+  expect(partialResult).toMatchObject({ outcome: 'partial', findings: expect.arrayContaining(['unfinished: Submit provider result']) });
   expect(after.filter(event => event.type === 'capability-assignment-interrupted')).toHaveLength(0);
-  expect(after.filter(event => event.type === 'invocation-started' && event.data.work.capabilityAssignment === 'cap-001.i01')).toHaveLength(1);
+  expect(after.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer' && event.data.work.iteration === 'cap-001.i01'), JSON.stringify(after.slice(-25))).toHaveLength(1);
   expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const current = second.service.events('need', receipt.jobId)!;
@@ -620,8 +618,7 @@ test('CA19: accepted B completion before assignment settlement replays without a
       architectTurns += 1;
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       return architectTurns === 1 ? submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
-        kind: 'assign', owner: b, purpose: 'Return B source', approach: 'Extend B result',
-        requirementRefs: [], intendedEvidence: ['B result'] }) : [{ kind: 'wait', ms: 60_000 }];
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment }) : [{ kind: 'wait', ms: 60_000 }];
     }
     return [];
   };
@@ -644,10 +641,10 @@ test('CA19: accepted B completion before assignment settlement replays without a
   expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-12))).toHaveLength(0);
   expect(after.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
   expect(after.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(1);
-  expect(after.filter(event => event.type === 'invocation-started' && event.data.work.capabilityAssignment === 'cap-001.i01')).toHaveLength(1);
+  expect(after.filter(event => event.type === 'invocation-started' && event.data.role === 'engineer' && event.data.work.iteration === 'cap-001.i01'), JSON.stringify(after.slice(-25))).toHaveLength(1);
   expect(after.filter(event => event.type === 'writer-acquired' &&
     after.some(started => started.type === 'invocation-started' && started.data.invocation === event.data.invocation &&
-      started.data.work.capabilityAssignment === 'cap-001.i01'))).toHaveLength(1);
+      started.data.work.iteration === 'cap-001.i01'))).toHaveLength(1);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const current = second.service.events('need', receipt.jobId)!;
     try { await second.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
@@ -684,8 +681,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
     if (spec.role === 'capability-architect') {
       const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       return submit({ task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
-        kind: 'assign', owner: b, purpose: 'Return B source', approach: 'Extend B result',
-        requirementRefs: [], intendedEvidence: ['B result'] });
+        kind: 'assign', assignment: assign(b, { goal: 'Return B source', approach: 'Extend B result', completionEvidence: 'B result' }).assignment });
     }
     return [];
   };
@@ -696,7 +692,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
       const acquired = events.at(-1);
       if (acquired?.type === 'writer-acquired' && events.some(event => event.type === 'invocation-started' &&
         event.data.invocation === acquired.data.invocation &&
-        event.data.work.capabilityAssignment === 'cap-001.i01')) {
+        event.data.work.iteration === 'cap-001.i01')) {
         frozen = true;
         await freeze();
       }
@@ -711,7 +707,7 @@ test('CA20 CA32: restart with a B writer lacking confirmed release stops the sta
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
   expect(events.filter(event => event.type === 'writer-acquired' &&
     events.some(started => started.type === 'invocation-started' && started.data.invocation === event.data.invocation &&
-      started.data.work.capabilityAssignment === 'cap-001.i01'))).toHaveLength(1);
+      started.data.work.iteration === 'cap-001.i01'))).toHaveLength(1);
   expect(events.filter(event => event.type === 'capability-stopped')).toHaveLength(1);
   expect(events.filter(event => event.type === 'job-failed').at(-1)?.data.reason).toBe('writer-unsettled');
   expect(events.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(0);
