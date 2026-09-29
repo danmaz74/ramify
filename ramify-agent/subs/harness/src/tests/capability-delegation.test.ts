@@ -277,8 +277,13 @@ for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port
         .filter(result => result.tool === 'validate_capability_action') ?? [];
       expect(preview).toHaveLength(5);
       expect(preview.every(result => result.isError)).toBe(true);
-      const version = opened.service.getRun('need', receipt.jobId)!.version;
-      await opened.service.execute(stopRun('need', receipt.jobId, version));
+      let stopped = false;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const version = opened.service.getRun('need', receipt.jobId)!.version;
+        try { await opened.service.execute(stopRun('need', receipt.jobId, version)); stopped = true; break; }
+        catch (error) { if (!String(error).includes('at version')) throw error; }
+      }
+      expect(stopped).toBe(true);
       await opened.service.settled('need', receipt.jobId);
     } else {
       expect(outcome).toMatchObject({
