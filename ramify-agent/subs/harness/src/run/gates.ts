@@ -61,10 +61,12 @@ export interface CheckpointRequest {
    * planned. A gate without them, such as a standalone session's, has none.
    */
   readonly scenarios?: ScenarioCheckInputs | undefined;
+  /** A bounded task's scenario identities at this common checkpoint. */
+  readonly scenarioScope?: { readonly exactOwners: readonly string[]; readonly include: readonly string[] } | undefined;
   /**
    * The format the project declared for what its type check prints, from
-   * its captured `ramify-agent.json`. A failed type check is then attributed
-   * by where its errors lie.
+   * its captured `ramify-agent.json`, retained with the command's diagnostic
+   * evidence. Failure keeps the ordinary gate repair route.
    */
   readonly typeCheckOutput?: TypeCheckOutput | undefined;
   /**
@@ -122,6 +124,11 @@ function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly
   const scenarios = request.scenarios === undefined ? undefined : planScenarioCheck(request.checkpoint, request.scenarios, {
     projectRoot: request.projectRoot,
     ...(request.tests === undefined ? {} : { scope: request.tests.selection }),
+    ...(request.scenarioScope === undefined ? {} : {
+      selection: 'identity' as const,
+      scope: { exactOwners: request.scenarioScope.exactOwners, subtrees: [] },
+      include: request.scenarioScope.include,
+    }),
   });
   const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
   const planned = request.tests === undefined

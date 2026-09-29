@@ -190,6 +190,21 @@ describe('planning per checkpoint', () => {
     expect(without.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check']);
     expect(without.scenarios).toBeUndefined();
   });
+
+  test('a bounded completion gate runs only its assigned scenario identities', async () => {
+    const root = await directory();
+    const basis = { checkpoint: 'work-item' as const, projectRoot: root, head: 'head', policy: testPolicy(root),
+      scenarios: inputs([scenario('sc-001', 'sample/shelf', 'bound'), scenario('sc-003', 'sample/acceptance', 'declared')]) };
+    const none = await runCheckpoint(createPassingCheckExecution(), { ...basis, id: 'ga-0011', directory: join(root, 'gate-none'),
+      scenarios: { ...basis.scenarios, scenarios: [] },
+      scenarioScope: { exactOwners: ['sample/shelf'], include: [] } });
+    expect(none.scenarios).toBe('none-selected');
+    expect(none.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check']);
+    const assigned = await runCheckpoint(createPassingCheckExecution(), { ...basis, id: 'ga-0012', directory: join(root, 'gate-assigned'),
+      scenarioScope: { exactOwners: ['sample/shelf'], include: [] } });
+    expect(assigned.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'scenarios']);
+    expect(assigned.commands.at(-1)?.scenarios?.selection).toEqual({ kind: 'identity', scenarios: ['sc-001'] });
+  });
 });
 
 // Execution.

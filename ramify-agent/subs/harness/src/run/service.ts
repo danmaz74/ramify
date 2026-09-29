@@ -9982,6 +9982,8 @@ export class RunService {
       [...committedRecords(run.log.ledger.replay()).assignments.values()]
         .filter(assignment => assignment.coordination?.kind === 'capability-task' && assignment.coordination.id === taskOwner)
         .flatMap(assignment => assignment.scenarios ?? []));
+    const scenarioOwners = relevant === undefined || taskScenarios === undefined ? [] :
+      [...new Set(taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)).map(scenario => scenario.owner))];
     const attempt = await this.committingCheckpoint(run, {
       id: gateId,
       runId: run.record.jobId,
@@ -9995,6 +9997,7 @@ export class RunService {
       subject: { workItem: taskOwner ?? item.id },
       ...(taskScenarios === undefined || relevant === undefined ? {} : {
         scenarios: { ...taskScenarios, scenarios: taskScenarios.scenarios.filter(scenario => relevant.has(scenario.id)) },
+        scenarioScope: { exactOwners: scenarioOwners, include: [...relevant] },
       }),
       ...(lastAssignment === undefined ? {} : { writeScope: writeScopePaths(this.projectRoot, lastAssignment) }),
     }, summary);

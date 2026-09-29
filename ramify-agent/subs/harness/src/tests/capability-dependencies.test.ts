@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { checkCommand } from '../checks/records.js';
+import { testReviewPolicy } from './helpers/candidates.js';
 import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
 import { commitCapabilityTransition } from '../capability/ledger.js';
 import { recoverCommits } from '../jobs/commit.js';
@@ -21,6 +22,11 @@ import { decision, forkDecision, forkPartial } from './helpers/placement.js';
 
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(directory => rm(directory, { recursive: true, force: true }))); });
+
+async function completionGateDiagnostic(root: string, runId: string): Promise<unknown> {
+  const path = join(root, 'plans', 'need', '.harness', 'jobs', runId, 'gates', 'ga-0004', 'attempt.json');
+  return readFile(path, 'utf8').then(JSON.parse, error => ({ unavailable: String(error) }));
+}
 
 test('CA21 CA29 CA32: a nested request keeps its parent assignment and depth-first authority in the real ledger', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'capability-nested-'));
@@ -455,7 +461,7 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
           kind: 'completion-proposed', summary: 'B uses the real C normalizer', findings: [],
         }, write('fact.ts', "import { normalizeSource } from '../../c/src/source.js';\nexport function readFact(): string { return normalizeSource(' b '); }\n"),
         write('tests/fact.test.ts', "import { expect, test } from 'vitest';\nimport { readFact } from '../fact.js';\ntest('B uses C normalized source', () => expect(readFact()).toBe('B'));\n"));
-        if (spec.prompt.includes('Nested capability cap-002 handed back')) {
+        if (spec.prompt.includes('Nested capability cap-002 handed back') || spec.prompt.includes('Capability cap-002 accepted at')) {
           returnedPrompt = spec.prompt;
           return submit({ kind: 'completion-proposed', summary: 'B completed the original source assignment', findings: [] });
         }
@@ -501,7 +507,7 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
       },
       policy: (root: string) => {
         const base = testPolicy(root);
-        return { ...base, commands: { ...base.commands,
+        return { ...base, reviews: testReviewPolicy({ kinds: ['code'], concurrency: 1, settleMs: 120_000 }), commands: { ...base.commands,
           allTests: checkCommand({ argv: [join(root, 'node_modules/.bin/vitest'), 'run',
             'subs/b/src/tests/fact.test.ts', 'subs/c/src/tests/source.test.ts'], cwd: root, timeoutMs: 30_000 }),
           typeCheck: checkCommand({ argv: [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'], cwd: root, timeoutMs: 30_000 }),
@@ -522,16 +528,21 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     cleanups.push(() => opened.service.close());
     await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
       event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01') ||
-      (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 120_000);
+      (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 120_000)
+      .catch(async error => { throw new Error(`${String(error)}; completion gate: ${JSON.stringify(await completionGateDiagnostic(fixture.root, receipt.jobId))}`); });
     const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-    expect(events.filter(event => event.type === 'job-failed'), JSON.stringify(events.slice(-18))).toHaveLength(0);
+    expect(events.filter(event => event.type === 'job-failed'), JSON.stringify({ events: events.slice(-18),
+      gate: await completionGateDiagnostic(fixture.root, receipt.jobId) })).toHaveLength(0);
     expect(events.filter(event => event.type === 'capability-handed-back' && event.data.task === 'cap-002')).toHaveLength(1);
-    expect(events.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01')).toHaveLength(1);
+    const originalSettlement = events.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01');
+    expect(originalSettlement).toHaveLength(1);
+    expect(originalSettlement[0]).toMatchObject({ data: { outcome: 'accepted' } });
     expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
-    expect(returnedPrompt).toContain('Nested capability cap-002 handed back');
+    expect(returnedPrompt, JSON.stringify({ engineerTurns, events: events.slice(-30).map(event => ({ type: event.type, data: event.data })) })).toMatch(/(?:Nested capability cap-002 handed back|Capability cap-002 accepted at)/u);
     const passed = events.filter(event => event.type === 'gate-attempted' && event.data.verdict === 'passed');
     expect(passed.length).toBeGreaterThan(0);
-    expect(events.filter(event => event.type === 'review-request-recorded' && event.data.workItem === 'cap-002').length).toBeGreaterThan(0);
+    expect(events.filter(event => event.type === 'review-request-recorded' && event.data.workItem === 'cap-002').length,
+      JSON.stringify(events.filter(event => event.type === 'review-request-recorded' || event.type === 'iteration-closed' || event.type === 'capability-handed-back'))).toBeGreaterThan(0);
     expect(events.filter(event => event.type === 'capability-review-recorded')).toHaveLength(0);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const current = opened.service.events('need', receipt.jobId)!;
