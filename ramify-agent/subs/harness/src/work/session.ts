@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { architectViewDirectory, findModule, readApiView, type ApiViewSnapshot, type ArchitectIndex, type SourceArea } from '../../subs/evidence/src/views.js';
 import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
@@ -73,13 +73,27 @@ export async function apiViewsOf(
   const result = await ramify.materialize(projectRoot, entry.dir);
   if (!result.ok) return { evidence: null, unavailable: `the API view could not be materialized: ${result.message}` };
   const views: ApiViewEvidence['views'][number][] = [];
+  const unavailable: string[] = [];
   for (const area of ['src', 'src/tests'] as const satisfies readonly SourceArea[]) {
-    const snapshot: ApiViewSnapshot | undefined = await readApiView(projectRoot, entry, area).catch(() => undefined);
-    if (!snapshot) continue;
-    views.push({ area: snapshot.area, path: snapshot.path, revision: snapshot.revision, coverage: snapshot.coverage });
+    try {
+      const source = await stat(join(projectRoot, entry.dir, area)).catch(error => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+        throw error;
+      });
+      if (source === undefined) continue;
+      if (!source.isDirectory()) throw new Error('the source area is not a directory');
+      const snapshot: ApiViewSnapshot | undefined = await readApiView(projectRoot, entry, area);
+      if (!snapshot) throw new Error('materialization reported success but the existing source area has no generated API metadata');
+      if (snapshot.module !== entry.module || typeof snapshot.revision !== 'string' || snapshot.revision.length === 0) {
+        throw new Error('the generated API metadata has no valid module/revision identity');
+      }
+      views.push({ area: snapshot.area, path: snapshot.path, revision: snapshot.revision, coverage: snapshot.coverage });
+    } catch (error) {
+      unavailable.push(`${[entry.dir, area, '.ramify'].filter(Boolean).join('/')}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
-  if (views.length === 0) return { evidence: null, unavailable: `"${module}" has no source area with an API view` };
-  return { evidence: { module, views }, unavailable: null };
+  if (views.length === 0) return { evidence: null, unavailable: unavailable.join('; ') || `"${module}" has no existing source area with an API view` };
+  return { evidence: { module, views }, unavailable: unavailable.length === 0 ? null : unavailable.join('; ') };
 }
 
 /**
@@ -98,7 +112,7 @@ export async function iterationApiViews(
       .catch(error => ({ evidence: null, unavailable: `the API view could not be read: ${error instanceof Error ? error.message : String(error)}` }));
     entries.push({
       module,
-      views: result.evidence === null ? [] : result.evidence.views.map(view => ({ area: view.area, path: view.path, coverage: view.coverage })),
+      views: result.evidence === null ? [] : result.evidence.views.map(view => ({ area: view.area, path: view.path, revision: view.revision, coverage: view.coverage })),
       unavailable: result.unavailable,
     });
   }
@@ -281,6 +295,7 @@ export function workItemMessage(briefing: WorkItemBriefing): string {
   if (briefing.views.evidence === null) {
     lines.push(`- API view: none was materialized, because ${briefing.views.unavailable}. Absence of a view is not a refusal; say so in your outline if it matters.`);
   } else {
+    if (briefing.views.unavailable !== null) lines.push(`- API view limitations: ${briefing.views.unavailable}. Missing evidence is not proof of API absence.`);
     for (const view of briefing.views.evidence.views) {
       lines.push(`- API view (${view.area}): \`${rooted(view.path)}/\`, revision \`${view.revision}\`; ${view.coverage === null
         ? 'coverage complete, so absence means unavailable'

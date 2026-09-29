@@ -45,10 +45,10 @@ describe('what an engineer is told about the Ramify project it works in', () => 
       assignment: assignment(),
       projectRoot: '/p',
       base: 'abc',
-      views: [{ module: 'app/reviews', views: [{ area: 'ordinary', path: 'subs/reviews/src/.ramify', coverage: null }], unavailable: null }],
+      views: [{ module: 'app/reviews', views: [{ area: 'ordinary', path: 'subs/reviews/src/.ramify', revision: 'rev/1:current:2', coverage: null }], unavailable: null }],
     });
     expect(text).toContain('## What you may import');
-    expect(text).toContain('- `app/reviews` (ordinary): `subs/reviews/src/.ramify/` (project-relative; open `/p/subs/reviews/src/.ramify/` from this cwd); coverage complete, so a symbol it does not list is not importable.');
+    expect(text).toContain('- `app/reviews` (ordinary): `subs/reviews/src/.ramify/` (project-relative; open `/p/subs/reviews/src/.ramify/` from this cwd); revision `rev/1:current:2`; coverage complete, so a symbol it does not list is not importable.');
     expect(text).toContain('reported with `unsuitable`, reason `scope`');
   });
 

@@ -145,7 +145,7 @@ export function iterationAcceptance(kind: EngineerSubmission['kind'], checkNotRu
     : ` The Ramify check over your write scope could not be run (${checkNotRun}), so nothing here verified it.`;
   switch (kind) {
     case 'completion-proposed':
-      return `The submission was accepted and recorded. The iteration gate now runs the complete required set and owns the verdict; nothing is committed until it passes.${note} Nothing more is asked of you in this session.`;
+      return `The submission was accepted and recorded. The iteration gate commits the candidate before running the complete required checks and owns the verdict; a commit alone is not acceptance.${note} Nothing more is asked of you in this session.`;
     case 'partial':
       return 'The report was accepted and recorded. The work is not complete: the local architect reads what is unfinished and decides what follows. Nothing more is asked of you in this session.';
     case 'unsuitable':
@@ -531,7 +531,7 @@ async function runScopeScenarios(options: ScopeTestsOptions, scenarios: ScopeSce
 /** What one written module may import: its API views, or why none was materialized. */
 export interface IterationApiViews {
   readonly module: string;
-  readonly views: readonly { readonly area: string; readonly path: string; readonly coverage: number | null }[];
+  readonly views: readonly { readonly area: string; readonly path: string; readonly revision: string; readonly coverage: number | null }[];
   readonly unavailable: string | null;
 }
 
@@ -596,8 +596,9 @@ export function iterationMessage(briefing: IterationBriefing): string {
         lines.push(`- \`${entry.module}\`: no API view, because ${entry.unavailable ?? 'none was materialized'}. Absence of a view is not permission; the Ramify check after each change still answers.`);
         continue;
       }
+      if (entry.unavailable !== null) lines.push(`- \`${entry.module}\` API view limitations: ${entry.unavailable}. Missing evidence is not proof of API absence.`);
       for (const view of entry.views) {
-        lines.push(`- \`${entry.module}\` (${view.area}): \`${view.path}/\` (project-relative; open \`${briefing.projectRoot}/${view.path}/\` from this cwd); ${view.coverage === null
+        lines.push(`- \`${entry.module}\` (${view.area}): \`${view.path}/\` (project-relative; open \`${briefing.projectRoot}/${view.path}/\` from this cwd); revision \`${view.revision}\`; ${view.coverage === null
           ? 'coverage complete, so a symbol it does not list is not importable'
           : `coverage limits: ${view.coverage}, so absence is not proof`}.`);
       }
@@ -638,7 +639,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
     '## The tree you start from',
     '',
     `\`git diff ${briefing.base}\` shows exactly the work since the last accepted boundary, this iteration's included.`,
-    'Uncommitted changes are that work; the harness commits only after a gate passes.',
+    'Uncommitted changes are that work; the gate commits a candidate before checking it. A candidate commit is not acceptance.',
     '',
   );
 
