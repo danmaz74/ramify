@@ -36,7 +36,9 @@ export const defaultLimits: RunPolicy['limits'] = {
   invocationIdleMs: 300_000,
   invocationAbsoluteMs: 3_600_000,
   maxIterationsPerWorkItem: 12,
-  maxIterationsPerCapabilityTask: 12,
+  // A cross-owner capability may need provider, consumer, then root repair;
+  // retry4 reached a valid root assignment at i13 before the old bound stopped it.
+  maxIterationsPerCapabilityTask: 24,
   maxWorkItems: 64,
   maxPlacementRequests: 32,
   maxInvocationsPerRun: 400,
