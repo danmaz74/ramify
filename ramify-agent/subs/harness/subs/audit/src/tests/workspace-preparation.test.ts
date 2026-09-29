@@ -39,7 +39,6 @@ describe('the audit request\'s workspace preparation', () => {
           { name: 'build', cmd: 'npm', args: ['run', 'build'], timeoutMs: 900_000 },
           { cmd: 'npm', args: ['run', 'build'], timeoutMs: 600_000, cwd: 'packages/ui', env: { NODE_ENV: 'production' } },
         ],
-        outputDirectory: '/runs/r1/gates/ga-0004/setup-output',
       },
     });
   });

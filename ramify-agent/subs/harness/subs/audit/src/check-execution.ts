@@ -4,8 +4,6 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import {
   AUDIT_PROTOCOL_VERSION,
-  FULL_SELECTOR_ID,
-  FULL_SELECTOR_VERSION,
   createAuditService,
   createInProcessRegisteredExecutorBridge,
   createNodeExecutionLeaseProcessLookup,
@@ -121,7 +119,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         }));
       }
       const records = new Map<string, GateCommandRecord>();
-      const definitions = checkDefinitions(checks);
+      const definitions = await checkDefinitions(checks, mapping, baseGit, request.context.sourceCommit, request.signal);
       const bridge = createInProcessRegisteredExecutorBridge({
         [executorId]: async (registered, signal) => {
           if (registered.checkId === harnessCheckId) return harnessSummary(request);
@@ -135,7 +133,9 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           const [index, check] = planned;
           await request.started?.(commandStart(checks, index));
           const outputFile = checkOutputPath(request.directory, index, check);
-          const auditedProjectRoot = mapping.projectRootIn(registered.workingDirectory);
+          const auditedProjectRoot = registered.workingDirectory;
+          const worktreeRoot = mapping.projectPrefix === '' ? auditedProjectRoot
+            : resolve(auditedProjectRoot, ...mapping.projectPrefix.split('/').map(() => '..'));
           if (check.scenarios !== undefined) {
             // The profiles and streams go into the attempt's directory,
             // outside the worktree; the runs start in the worktree, and the
@@ -147,7 +147,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
               attemptDirectory: request.directory,
               outputFile,
               rebase: argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot),
-              restore: text => mapping.restoreText(text, registered.workingDirectory),
+              restore: text => mapping.restoreText(text, worktreeRoot),
               signal,
             });
             const record = request.classify(check, outcome.run, outputFile, outcome.summary);
@@ -157,25 +157,31 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
             }
             return { status: 'completed', result: auditSummary(record, outcome.run) };
           }
+          const testRun = registered.testRun;
           const command = {
             ...check.command,
             cwd: mapping.rebaseProjectPath(check.command.cwd, auditedProjectRoot),
-            argv: check.command.argv.map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot)),
+            argv: testRun === undefined
+              ? check.command.argv.map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot))
+              : [testRun.command, ...testRun.args].map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot)),
           };
           const run = await runCommand({
             argv: command.argv,
             cwd: command.cwd,
-            env: checkCommandEnvironment(check.command),
+            env: { ...checkCommandEnvironment(check.command), ...testRun?.environment },
             timeoutMs: check.command.timeoutMs,
             signal,
           });
-          const mapped = await writeMappedRun(run, outputFile, mapping, registered.workingDirectory);
+          const mapped = await writeMappedRun(run, outputFile, mapping, worktreeRoot);
           const record = request.classify(check, mapped, outputFile);
           records.set(registered.checkId, record);
           if (mapped.outcome.kind === 'cancelled') {
             return { status: 'cancelled', reason: 'Gate execution was interrupted' };
           }
-          return { status: 'completed', result: auditSummary(record, mapped) };
+          return {
+            status: 'completed', result: auditSummary(record, mapped),
+            ...(testRun === undefined ? {} : { testRun: { exitCode: mapped.outcome.kind === 'completed' ? mapped.outcome.exitCode : null } }),
+          };
         },
       });
 
@@ -259,35 +265,56 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
       }
       const unexpected = unexpectedCompletedAudit(result, request.context.sourceCommit);
       if (unexpected !== null) return executionFailure(await infrastructureRecords(checks, request, unexpected));
-      const prepared = await preparedSetupRecords(checks, request, result, setup);
+      const selected = new Set(result.summary.coverage.selection.selectedCheckIds);
+      const noExecution = result.summary.evidenceSchemaVersion === 3 && result.summary.noExecution === true;
+      const prepared = noExecution
+        ? { records: await omittedRecords(checks.slice(0, setupCount), request, 0) }
+        : await preparedSetupRecords(checks, request, result, setup, baseGit, mapping.repositoryRoot);
       if ('missing' in prepared) {
         return executionFailure(await infrastructureRecords(checks, request, {
           kind: 'audit-result',
           message: `The completed audit recorded no setup command at position ${prepared.missing.join(', ')}; the installed ramify-audit may not run setup commands`,
         }));
       }
-      const missing = definitions
-        .filter(definition => definition.id !== harnessCheckId && !records.has(definition.id))
-        .map(definition => definition.id);
+      const missing = missingExecutedRecords(definitions, selected, records);
       if (missing.length > 0) {
         return executionFailure(await infrastructureRecords(checks, request, {
           kind: 'audit-result',
           message: `The completed audit returned no harness command record for ${missing.join(', ')}`,
         }));
       }
-      const commands = [...prepared.records, ...definitions.flatMap(definition => {
-        if (definition.id === harnessCheckId) return [];
-        const record = records.get(definition.id);
-        return record === undefined ? [] : [record];
-      })];
+      const commands = [...prepared.records];
+      for (const [index, check] of checks.entries()) {
+        if (index < setupCount) continue;
+        const id = checkId(index, check);
+        const record = records.get(id);
+        if (record !== undefined) commands.push(record);
+        else if (!selected.has(id)) commands.push(...await omittedRecords([check], request, index));
+      }
       return {
         commands,
         audited: result.summary.sourceCommit,
         evidence: { runRef: result.refs.runRef, reportCommit: result.refs.reportCommit, treeRef: result.refs.treeRef },
-        auditOverall: result.summary.overall,
+        auditOverall: result.composition.verdict,
       };
     },
   };
+}
+
+/** Only a check the audit selected and executed owes the harness a command record. */
+export function missingExecutedRecords(
+  definitions: readonly CheckDefinition[], selected: ReadonlySet<string>, records: ReadonlyMap<string, GateCommandRecord>,
+): string[] {
+  return definitions.filter(definition => definition.id !== harnessCheckId && selected.has(definition.id) && !records.has(definition.id))
+    .map(definition => definition.id);
+}
+
+async function omittedRecords(checks: readonly PlannedCheck[], request: CheckExecutionRequest, offset: number): Promise<GateCommandRecord[]> {
+  return Promise.all(checks.map(async (check, position) => {
+    const outputFile = checkOutputPath(request.directory, offset + position, check);
+    await writeFile(outputFile, '');
+    return notRun(check, outputFile, new Date().toISOString(), 'audit-unselected');
+  }));
 }
 
 function executionFailure(commands: readonly GateCommandRecord[]) {
@@ -369,17 +396,34 @@ function leadingSetup(checks: readonly PlannedCheck[]): number {
 }
 
 /** The audit's checks: every planned check but the setup commands, which its preparation runs, and the harness's rules. */
-function checkDefinitions(checks: readonly PlannedCheck[]): CheckDefinition[] {
-  const planned = checks.flatMap((check, index): CheckDefinition[] => check.kind === 'setup' ? [] : [{
-    id: checkId(index, check),
-    name: `${check.kind} ${index + 1}`,
-    description: `Harness-planned ${check.kind} check at position ${index + 1}`,
-    scope: 'both',
-    category: 'registered',
-    executor: { kind: 'registered', executorId },
-    onFailure: 'record',
-    metadata: { kind: check.kind, position: index + 1 },
-  }]);
+async function checkDefinitions(
+  checks: readonly PlannedCheck[], mapping: PathMapping, git: GitExecutorPort, commit: string, signal: AbortSignal,
+): Promise<CheckDefinition[]> {
+  const planned: CheckDefinition[] = [];
+  for (const [index, check] of checks.entries()) {
+    if (check.kind === 'setup') continue;
+    const vitest = check.kind === 'tests' && await isVitestCommand(check.command, mapping, git, commit, signal);
+    planned.push({
+      id: checkId(index, check),
+      name: `${check.kind} ${index + 1}`,
+      description: `Harness-planned ${check.kind} check at position ${index + 1}`,
+      scope: 'both',
+      category: 'registered',
+      executor: {
+        kind: 'registered', executorId,
+        ...(vitest ? {
+          acceptsNarrowing: true,
+          testCommand: {
+            name: 'tests', cmd: check.command.argv[0]!, args: check.command.argv.slice(1),
+            parser: 'vitest' as const, timeoutMs: check.command.timeoutMs,
+            env: { ...check.command.envAdditions },
+          },
+        } : {}),
+      },
+      onFailure: 'record',
+      metadata: { kind: check.kind, position: index + 1 },
+    });
+  }
   planned.push({
     id: harnessCheckId,
     name: 'Harness rules',
@@ -390,6 +434,25 @@ function checkDefinitions(checks: readonly PlannedCheck[]): CheckDefinition[] {
     onFailure: 'record',
   });
   return planned;
+}
+
+async function isVitestCommand(
+  command: PlannedCheck['command'], mapping: PathMapping, git: GitExecutorPort, commit: string, signal: AbortSignal,
+): Promise<boolean> {
+  const executable = command.argv[0] ?? '';
+  if ((executable === 'vitest' || executable.endsWith('/vitest')) && command.argv[1] === 'run') {
+    return command.argv.slice(2).every(argument => argument.startsWith('-'));
+  }
+  if (executable !== 'npm' || command.argv[1] !== 'test') return false;
+  try {
+    const suffix = containedSuffix(mapping.projectRoot, command.cwd);
+    if (suffix === null) return false;
+    const path = [mapping.projectPrefix, suffix.split(sep).join('/'), 'package.json'].filter(Boolean).join('/');
+    const manifest = JSON.parse(await gitText(git, mapping.repositoryRoot, ['show', `${commit}:${path}`], signal)) as { scripts?: { test?: string } };
+    return /(?:^|\s|\/)vitest(?:\s|$)/u.test(manifest.scripts?.test ?? '');
+  } catch {
+    return false;
+  }
 }
 
 function checkId(index: number, check: PlannedCheck): string {
@@ -406,8 +469,9 @@ function plannedCheck(checks: readonly PlannedCheck[], id: string): readonly [nu
  * The workspace preparation an audit request names: ramify-audit's
  * built-in `nodejs` preparation, which links the installed dependencies of
  * the project root and of each nested package into the worktree, then runs
- * the project's setup commands there in order, each command's output
- * captured beside the attempt. It never runs a build the project did not
+ * the project's setup commands there in order. A published preparation
+ * artifact supplies each successful command's output to the attempt record.
+ * It never runs a build the project did not
  * declare.
  */
 export function workspacePreparationOf(input: {
@@ -428,7 +492,8 @@ export function workspacePreparationOf(input: {
       packageDirectories: [...new Set(['', ...input.dependencyDirectories])],
       build: false,
       setupCommands: input.setup.map(check => setupCommandOf(check, input.projectRoot)),
-      outputDirectory: resolve(input.directory, 'setup-output'),
+      // Per-attempt paths change the definition digest and force every partial link full.
+      // Successful setup output is read from the published preparation artifact.
     },
   };
 }
@@ -466,17 +531,15 @@ function auditRequest(
   const owners = selection.policy === 'owned-by-scope'
     ? [...selection.exactOwners.map(owner => `exact:${owner}`), ...selection.subtrees.map(owner => `subtree:${owner}`)].sort()
     : [];
-  const universeId = [
-    'ramify-agent', request.context.checkpoint, selection.policy,
-    ...(owners.length === 0 ? [] : [owners.join(',')]),
-  ].join(':');
+  const universeId = 'ramify-agent:gates';
   return {
     protocolVersion: AUDIT_PROTOCOL_VERSION,
     requestId: request.context.attemptId,
     repositoryPath: mapping.repositoryRoot,
     source: { kind: 'existing-commit', revision: request.context.sourceCommit },
     checks,
-    selector: { id: FULL_SELECTOR_ID, version: FULL_SELECTOR_VERSION, config: {} },
+    projectRoot: mapping.projectPrefix || '.',
+    ...(request.context.checkpoint === 'final' ? { mode: 'full' as const } : {}),
     universeId,
     coverageClaim: {
       checkpoint: request.context.checkpoint,
@@ -732,6 +795,8 @@ interface PreparedCommand {
   readonly exitCode: number | null;
   readonly durationMs: number;
   readonly outputFile: string | null;
+  /** Published artifact of a successful setup command. */
+  readonly outputPath: string | null;
   readonly outputTruncated: boolean;
   readonly outputTail: string | null;
   /** How the preparation stopped the command's process tree, in words, where it stopped it. */
@@ -749,6 +814,7 @@ function preparedCommandOf(value: unknown): PreparedCommand | null {
     exitCode: typeof entry['exitCode'] === 'number' ? entry['exitCode'] : null,
     durationMs: typeof entry['durationMs'] === 'number' && entry['durationMs'] >= 0 ? Math.round(entry['durationMs']) : 0,
     outputFile: typeof entry['outputFile'] === 'string' ? entry['outputFile'] : null,
+    outputPath: typeof entry['outputPath'] === 'string' ? entry['outputPath'] : null,
     outputTruncated: entry['outputTruncated'] === true,
     outputTail: typeof entry['outputTail'] === 'string' ? entry['outputTail'] : null,
     stopped: stoppedOf(entry['termination']),
@@ -824,6 +890,8 @@ async function preparedSetupRecords(
   request: CheckExecutionRequest,
   result: Extract<AuditResult, { status: 'completed' }>,
   setup: SetupRun,
+  git: GitExecutorPort,
+  repositoryRoot: string,
 ): Promise<{ readonly records: GateCommandRecord[] } | { readonly missing: number[] }> {
   if (setup.count === 0) return { records: [] };
   const evidence = (result.summary as { workspacePreparation?: { payload?: { setupCommands?: unknown } } }).workspacePreparation;
@@ -836,7 +904,8 @@ async function preparedSetupRecords(
       missing.push(index + 1);
       continue;
     }
-    records.push(await setupRecord(check, index, entry, request, setup, { kind: 'completed', exitCode: entry.exitCode ?? 0 }));
+    records.push(await setupRecord(check, index, entry, request, setup, { kind: 'completed', exitCode: entry.exitCode ?? 0 },
+      async path => gitText(git, repositoryRoot, ['show', `${result.refs.reportCommit}:${path}`], request.signal)));
   }
   return missing.length > 0 ? { missing } : { records };
 }
@@ -923,9 +992,12 @@ async function setupRecord(
   request: CheckExecutionRequest,
   setup: SetupRun,
   outcome: CommandOutcome,
+  readPublished?: (path: string) => Promise<string>,
 ): Promise<GateCommandRecord> {
   const captured = entry.outputFile === null ? null : await readFile(entry.outputFile, 'utf8').catch(() => null);
-  const text = setup.restore(captured ?? entry.outputTail ?? '');
+  const published = captured === null && entry.outputPath !== null && readPublished !== undefined
+    ? await readPublished(entry.outputPath).catch(() => null) : null;
+  const text = setup.restore(captured ?? published ?? entry.outputTail ?? '');
   const outputFile = checkOutputPath(request.directory, index, check);
   const bytes = Buffer.from(text, 'utf8');
   await writeFile(outputFile, bytes);

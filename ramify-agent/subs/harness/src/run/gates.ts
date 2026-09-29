@@ -132,7 +132,7 @@ function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly
   const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
   const planned = request.tests === undefined
     ? allProjectChecks(request.policy.commands, policy, request.scopeProbe, scenarioCheck)
-    : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
+    : scopedChecks(request.policy.commands, request.tests, scenarioCheck, policy.committing);
   const output = request.typeCheckOutput;
   const checks = [
     ...setupChecks(request.setup ?? [], request.projectRoot),

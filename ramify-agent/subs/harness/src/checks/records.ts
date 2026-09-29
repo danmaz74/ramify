@@ -130,7 +130,7 @@ export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'tests'
  */
 export type NotVerified =
   | 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection'
-  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed';
+  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed' | 'audit-unselected';
 
 /**
  * A format of the type checker's output the project declares in
@@ -280,7 +280,7 @@ export interface GateAttempt {
   /** The audit publication bound to `audited`; null when no evidence was published. */
   readonly evidence: GateEvidence | null;
   /** Exact external report result. Kept on the in-memory attempt for atomic durable publication. */
-  readonly auditOverall?: 'pass' | 'fail' | null;
+  readonly auditOverall?: 'pass' | 'fail' | 'indeterminate' | null;
   /** `after: null` is a deletion, which is a change like any other. */
   readonly guardedChanges: Array<{ readonly path: string; readonly before: string; readonly after: string | null; readonly authorizedBy: RecordReference | null }>;
   /** Rules the harness verified itself. A checkpoint with none records none. */

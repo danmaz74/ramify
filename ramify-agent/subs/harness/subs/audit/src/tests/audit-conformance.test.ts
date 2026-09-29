@@ -10,21 +10,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import {
   AUDIT_PROTOCOL_VERSION,
-  FULL_SELECTOR_ID,
-  FULL_SELECTOR_VERSION,
   createAuditService,
   createDefaultWorkspacePreparationPort,
   createInProcessRegisteredExecutorBridge,
   createNodeGitExecutor,
   createNodeRepositoryExecutionLease,
-  digestCanonicalJson,
   getBranchAuditStatus,
   readCommitAuditNote,
   resolveRepositoryExecutionLeaseIdentity,
   type AuditCheckSummary,
   type AuditRequest,
-  type AuditSelectionInput,
-  type AuditSelectionOutput,
   type CheckDefinition,
   type GitExecutorPort,
   type ProcessExecutionRequest,
@@ -129,7 +124,6 @@ function auditRequest(
     repositoryPath: repository.root,
     source: { kind: 'existing-commit', revision: repository.commit },
     checks,
-    selector: { id: FULL_SELECTOR_ID, version: FULL_SELECTOR_VERSION, config: {} },
     universeId: 'commit-audit-conformance',
     coverageClaim: { fixture: 'commit-audit-conformance' },
     registeredExecutorIds: [...new Set(checks.flatMap(check =>
@@ -503,49 +497,10 @@ describe('ramify-audit 0.2.1 conformance', () => {
     await rm(dirname(abandoned as string), { recursive: true, force: true });
   });
 
-  it('fact 9: branch applicability ignores a scoped coverage envelope', async () => {
+  it('fact 9: a full audit remains applicable to its branch', async () => {
     const repository = await createRepository();
-    const config = { scope: 'one-check' };
-    const selector = {
-      async select(input: AuditSelectionInput): Promise<AuditSelectionOutput> {
-        const checkIds = input.universe.checks.map(check => check.id);
-        const selectedCheckIds = [checkIds[0]!];
-        const selectedTestUnitIds: string[] = [];
-        const universe = {
-          id: input.universe.id,
-          checkIds,
-          testUnitIds: input.universe.testUnitIds,
-        };
-        return {
-          selector: {
-            id: 'scoped-conformance',
-            version: '1',
-            config,
-            configDigest: digestCanonicalJson(config),
-          },
-          universe: { ...universe, digest: digestCanonicalJson(universe) },
-          selection: {
-            kind: 'scoped',
-            selectedCheckIds,
-            omittedCheckIds: checkIds.slice(1),
-            selectedTestUnitIds,
-            omittedTestUnitIds: input.universe.testUnitIds,
-          },
-          claim: { scope: 'narrow' },
-        };
-      },
-    };
-    const request = auditRequest(repository, [registeredCheck('one'), registeredCheck('two')]);
-    request.selector = { id: 'scoped-conformance', version: '1', config };
-    const result = await createAuditService({
-      git: gitWithHarnessIdentity(),
-      selector,
-      registeredExecutors: passingBridge(),
-    }).run(request);
-    expect(result).toMatchObject({
-      status: 'completed',
-      summary: { coverage: { selection: { kind: 'scoped', omittedCheckIds: ['two'] } } },
-    });
+    const result = await runPassing(repository);
+    expect(result).toMatchObject({ status: 'completed', composition: { verdict: 'pass' } });
     const branch = await getBranchAuditStatus('main', repository.root);
     expect(branch.auditPassed).toBe(true);
     expect(branch.auditStillApplies).toBe(true);
@@ -615,47 +570,19 @@ describe('ramify-audit 0.2.1 conformance', () => {
     expect(publishedRefs(repository.root)).toEqual([]);
   });
 
-  it('fact 12: selector is required and defaults accept only full@1', async () => {
+  it('fact 12: protocol v2 accepts the default mode and rejects a selector', async () => {
     const repository = await createRepository();
     const base = auditRequest(repository);
-    const missing = structuredClone(base) as Omit<AuditRequest, 'selector'> & {
-      selector?: AuditRequest['selector'];
-    };
-    delete missing.selector;
-    const missingResult = await createAuditService({
-      git: gitWithHarnessIdentity(), registeredExecutors: passingBridge(),
-    }).run(missing as AuditRequest);
-    expect(missingResult.status).toBe('failed');
+    const accepted = await runPassing(repository, base);
+    expect(accepted).toMatchObject({ status: 'completed', composition: { verdict: 'pass' } });
 
-    const wrong = { ...base, selector: { id: 'scoped', version: '1', config: {} } };
-    const wrongResult = await createAuditService({
+    const wrong = { ...base, requestId: 'selector-rejected', selector: { id: 'scoped', version: '1', config: {} } };
+    const refused = await createAuditService({
       git: gitWithHarnessIdentity(), registeredExecutors: passingBridge(),
     }).run(wrong);
-    expect(wrongResult).toMatchObject({
-      status: 'failed', error: { message: expect.stringContaining('full@1') },
+    expect(refused).toMatchObject({
+      status: 'failed', error: { message: expect.stringContaining('selector is not part') },
     });
-
-    const injected = await createAuditService({
-      git: gitWithHarnessIdentity(),
-      registeredExecutors: passingBridge(),
-      selector: {
-        async select(input) {
-          const config = input.selectorConfig;
-          const checkIds = input.universe.checks.map(check => check.id);
-          const universe = { id: input.universe.id, checkIds, testUnitIds: input.universe.testUnitIds };
-          return {
-            selector: { id: 'scoped', version: '1', config, configDigest: digestCanonicalJson(config) },
-            universe: { ...universe, digest: digestCanonicalJson(universe) },
-            selection: {
-              kind: 'full', selectedCheckIds: checkIds, omittedCheckIds: [],
-              selectedTestUnitIds: input.universe.testUnitIds, omittedTestUnitIds: [],
-            },
-            claim: { injected: true },
-          };
-        },
-      },
-    }).run(wrong);
-    expect(injected.status).toBe('completed');
   });
 
   it('fact 13: an audit of already audited code is reused unless forced, and names the audited commit', async () => {

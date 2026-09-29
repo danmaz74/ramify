@@ -5,10 +5,12 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { existsSync } from 'node:fs';
+import { symlink } from 'node:fs/promises';
 import { setupChecks } from '../checks/checkpoint.js';
 import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
 import { gateDiagnostics } from '../checks/diagnostics.js';
 import { runGate } from '../checks/gate.js';
+import { gateAuditOutcomeSchema } from '../run/records.js';
 import { checkCommand } from '../checks/records.js';
 import type { GateAttempt, TestSelection } from '../checks/records.js';
 import type { PlannedCheck } from '../checks/verify.js';
@@ -161,6 +163,96 @@ function commandSemantics(attempt: GateAttempt) {
 }
 
 describe('audit-backed gate execution', () => {
+  it('narrows a registered Vitest run to Ramify-selected source after a full root', { timeout: 60_000 }, async () => {
+    const fixture = await repository({
+      'module.ramify': 'ramify 1\nmodule "fixture"\nexpose-sub value from producer to descendants\n',
+      'package.json': '{"name":"fixture","private":true,"type":"module","scripts":{"test":"vitest run"}}',
+      'tsconfig.json': '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","subs/**/*.ts"]}',
+      'src/index.ts': 'export {};\n',
+      'subs/producer/module.ramify': 'ramify 1\nmodule producer\nexpose-src value from "value.ts" to parent\n',
+      'subs/producer/src/value.ts': 'export const value = 1;\n',
+      'subs/producer/src/tests/value.test.ts': 'import { expect, it } from "vitest"; import { value } from "../value.js"; it("value", () => expect(value).toBeGreaterThan(0));\n',
+      'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
+      'subs/consumer/src/compute.ts': 'import { value } from "../../producer/src/value.js"; export const computed = value + 1;\n',
+      'subs/consumer/src/tests/compute.test.ts': 'import { expect, it } from "vitest"; import { computed } from "../compute.js"; it("computed", () => expect(computed).toBeGreaterThan(1));\n',
+    });
+    await symlink(join(process.cwd(), 'node_modules'), join(fixture.projectRoot, 'node_modules'));
+    const checks: PlannedCheck[] = [{ kind: 'tests', command: checkCommand({ argv: ['npm', 'test'], cwd: fixture.projectRoot, timeoutMs: 30_000 }) }];
+    const full = (await auditGate(fixture, checks, 'ga-vitest-full', { checkpoint: 'final' })).attempt;
+    expect(full.auditOverall).toBe('pass');
+
+    await writeFile(join(fixture.projectRoot, 'subs/producer/src/value.ts'), 'export const value = 2;\n');
+    git(fixture.repositoryRoot, ['add', 'subs/producer/src/value.ts']);
+    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'change value']);
+    const changed = { ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) };
+    const partial = (await auditGate(changed, checks, 'ga-vitest-partial')).attempt;
+    expect(partial.auditOverall).toBe('pass');
+    const summary = JSON.parse(git(fixture.repositoryRoot, ['show', `${partial.evidence!.reportCommit}:reports/audit/summary.json`])) as {
+      mode: { requestedMode: string; executedMode: string };
+      coverage: { selectedModules?: Array<{ id: string }> };
+    };
+    expect(summary.mode, JSON.stringify(summary.mode)).toMatchObject({ requestedMode: 'ramify-partial', executedMode: 'ramify-partial' });
+    expect(summary.coverage.selectedModules?.map(module => module.id)).toContain('fixture/consumer');
+
+    const failedFile = 'subs/consumer/src/tests/compute.test.ts';
+    await writeFile(join(fixture.projectRoot, failedFile),
+      'import { expect, it } from "vitest"; import { computed } from "../compute.js"; it("computed", () => expect(computed).toBeGreaterThan(100));\n');
+    git(fixture.repositoryRoot, ['add', failedFile]);
+    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'failing consumer test']);
+    const failing = (await auditGate({ ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) }, checks, 'ga-vitest-failing')).attempt;
+    expect(failing.auditOverall).toBe('fail');
+
+    await mkdir(join(fixture.projectRoot, 'docs'), { recursive: true });
+    await writeFile(join(fixture.projectRoot, 'docs/guide.md'), 'Documentation edit\n');
+    git(fixture.repositoryRoot, ['add', 'docs/guide.md']);
+    git(fixture.repositoryRoot, ['-c', 'user.name=fixture', '-c', 'user.email=fixture@localhost', 'commit', '--no-gpg-sign', '-m', 'documentation after failed gate']);
+    const rerun = (await auditGate({ ...fixture, commit: git(fixture.repositoryRoot, ['rev-parse', 'HEAD']) }, checks, 'ga-vitest-rerun')).attempt;
+    expect(rerun.auditOverall).toBe('fail');
+    const rerunSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${rerun.evidence!.reportCommit}:reports/audit/summary.json`])) as {
+      mode: { executedMode: string };
+      coverage: { carriedFailures?: Array<{ path: string }> };
+    };
+    expect(rerunSummary.mode.executedMode).toBe('ramify-partial');
+    expect(rerunSummary.coverage.carriedFailures?.map(failure => failure.path)).toContain(failedFile);
+  });
+
+  it('defaults committing gates to partial mode and requests full mode for final', async () => {
+    const fixture = await repository({
+      'module.ramify': 'ramify 1\nmodule "fixture"\n',
+      'package.json': '{"name":"fixture","private":true}',
+      'src/index.ts': 'export const value = 1;\n',
+    });
+    await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
+    const checks: PlannedCheck[] = [{ kind: 'type-check', command: command(fixture.projectRoot, 'console.log("checked")') }];
+    const iteration = (await auditGate(fixture, checks, 'ga-partial-default')).attempt;
+    const iterationSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${iteration.evidence!.reportCommit}:reports/audit/summary.json`])) as {
+      mode: { requestedMode: string; resolution: string };
+    };
+    expect(iterationSummary.mode).toMatchObject({ requestedMode: 'ramify-partial', resolution: 'defaulted' });
+    const final = (await auditGate(fixture, checks, 'ga-final-full', { checkpoint: 'final' })).attempt;
+    const finalSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${final.evidence!.reportCommit}:reports/audit/summary.json`])) as {
+      mode: { requestedMode: string; resolution: string; executedMode: string };
+    };
+    expect(finalSummary.mode).toMatchObject({ requestedMode: 'full', resolution: 'requested', executedMode: 'full' });
+  });
+
+  it.each(['fail', 'indeterminate'] as const)('blocks a run-local pass when composition is %s', async overall => {
+    const fixture = await repository({ 'source.txt': 'source\n' });
+    const checks: PlannedCheck[] = [{ kind: 'type-check', command: command(fixture.projectRoot, 'console.log("pass")') }];
+    const directory = await temporaryDirectory('ramify-agent-composed-verdict-');
+    const attempt = await runGate({
+      async run(planned, request) {
+        const local = await inPlaceCheckExecution.run(planned, request);
+        return { ...local, auditOverall: overall };
+      },
+    }, 'iteration', { id: `ga-composed-${overall}`, projectRoot: fixture.projectRoot, directory, head: fixture.commit, checks });
+    expect(attempt.commands[0]?.outcome).toBe('passed');
+    expect(attempt.auditOverall).toBe(overall);
+    expect(attempt.verdict).toBe(overall === 'fail' ? 'failed' : 'not-verified');
+    expect(attempt.next).not.toBe('accept');
+    expect(gateAuditOutcomeSchema.parse({ schema: 'ramify-agent.gate-audit-outcome/1', gate: attempt.id, overall, audited: fixture.commit }).overall).toBe(overall);
+  });
+
   it('matches passing and failing in-place commands, verdict, cause and next over the same commit', async () => {
     const fixture = await repository({ 'source.txt': 'source\n' });
     await mkdir(join(fixture.projectRoot, 'node_modules'), { recursive: true });
@@ -250,7 +342,7 @@ describe('audit-backed gate execution', () => {
     expect(attempt.commands.map(record => record.output.tail.trim())).toEqual(['project', 'types', 'scope']);
     expect(Object.keys(summary.checks)).toEqual(['check-01-tests', 'check-02-type-check', 'check-03-tests', 'harness-rules']);
     expect(summary.coverage.universe.checkIds).toEqual(['check-01-tests', 'check-02-type-check', 'check-03-tests', 'harness-rules']);
-    expect(summary.coverage.universe.id).toContain('breaking-iteration:all-project');
+    expect(summary.coverage.universe.id).toBe('ramify-agent:gates');
     expect(summary.coverage.claim).toEqual({
       checkpoint: 'breaking-iteration',
       selectionPolicy: 'all-project',
@@ -263,7 +355,7 @@ describe('audit-backed gate execution', () => {
     const ownedSummary = JSON.parse(git(fixture.repositoryRoot, ['show', `${ownedRunRef}:reports/audit/summary.json`])) as {
       coverage: { universe: { id: string }; claim: { checkpoint: string; selectionPolicy: string; owners: string[] } };
     };
-    expect(ownedSummary.coverage.universe.id).toContain('iteration:owned-by-scope');
+    expect(ownedSummary.coverage.universe.id).toBe('ramify-agent:gates');
     expect(ownedSummary.coverage.claim).toEqual({
       checkpoint: 'iteration',
       selectionPolicy: 'owned-by-scope',
@@ -462,7 +554,7 @@ describe('the project\'s setup commands in the audited worktree', () => {
     expect(setup!.output.path).toBe(join(outputDirectory, '01-setup.log'));
     expect(setup!.output.tail).toContain(`wrote ${fixture.projectRoot}/dist/out.txt`);
     expect(setup!.output.tail).not.toContain(workspaces[0]?.worktreePath ?? 'missing-worktree');
-    expect(await readFile(join(outputDirectory, 'setup-output', 'setup-01.txt'), 'utf8')).toContain('status: passed');
+    expect(git(fixture.repositoryRoot, ['show', `${attempt.evidence!.reportCommit}:reports/audit/workspace-preparation/setup-01.txt`])).toContain('status: passed');
     expect(tests).toMatchObject({ kind: 'tests', outcome: 'passed' });
     expect(tests!.output.tail).toContain('built for audited');
     // The build ran in the worktree, never in the project.
@@ -508,7 +600,7 @@ describe('the project\'s setup commands in the audited worktree', () => {
     expect(attempt.evidence).toBeNull();
     expect(attempt.audited).toBeNull();
     expect(attempt.commands[0]!.output.path).toBe(join(outputDirectory, '01-setup.log'));
-    expect(await readFile(attempt.commands[0]!.output.path, 'utf8')).toContain('exit: 2');
+    expect(await readFile(attempt.commands[0]!.output.path, 'utf8')).toContain('error TS2304: Cannot find name x.');
     expect(existsSync(marker)).toBe(false);
   });
 

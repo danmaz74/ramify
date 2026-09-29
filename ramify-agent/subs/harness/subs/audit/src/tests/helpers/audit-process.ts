@@ -1,7 +1,5 @@
 import {
   AUDIT_PROTOCOL_VERSION,
-  FULL_SELECTOR_ID,
-  FULL_SELECTOR_VERSION,
   createAuditService,
   createInProcessRegisteredExecutorBridge,
   createNodeGitExecutor,
@@ -57,7 +55,6 @@ if (mode === 'lease') {
       executor: { kind: 'registered', executorId: 'host.block' },
       onFailure: 'record',
     }],
-    selector: { id: FULL_SELECTOR_ID, version: FULL_SELECTOR_VERSION, config: {} },
     registeredExecutorIds: ['host.block'],
     force: true,
   });

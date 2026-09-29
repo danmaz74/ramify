@@ -102,7 +102,7 @@ export interface CheckExecutionResult {
   /** Null unless an external audit published evidence. */
   readonly evidence: GateEvidence | null;
   /** The external audit's exact overall result, when it published a report. */
-  readonly auditOverall?: 'pass' | 'fail' | null;
+  readonly auditOverall?: 'pass' | 'fail' | 'indeterminate' | null;
 }
 
 /**
@@ -175,7 +175,7 @@ export function notRun(
   check: PlannedCheck,
   outputFile: string,
   startedAt: string,
-  reason: 'interrupted' | 'setup-failed',
+  reason: 'interrupted' | 'setup-failed' | 'audit-unselected',
   tail = '',
 ): GateCommandRecord {
   return {

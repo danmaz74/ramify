@@ -161,7 +161,10 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
     throw new Error(`Check execution answered ${commands.length} command records for ${request.checks.length} planned checks`);
   }
 
-  const verdict = verdictOf(commands, unauthorized || ruleFailed);
+  const localVerdict = verdictOf(commands, unauthorized || ruleFailed);
+  const verdict = executionResult.auditOverall === 'indeterminate' ? 'not-verified'
+    : executionResult.auditOverall === 'fail' && localVerdict === 'passed' ? 'failed'
+      : localVerdict;
   // A failed Ramify check reported where each of its findings lies, and a
   // failed type check whose output format the project declared named the
   // file of each error, so the cause is attributed from those locations and
@@ -172,7 +175,9 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
     await ramifyAttribution(commands, writeScope),
     await typeCheckAttribution(commands, request.checks, writeScope, request.projectRoot),
   );
-  const cause = causeOf(decisive, commands, request.checks, verdict, unauthorized, ruleFailed, attribution);
+  const cause = executionResult.auditOverall === 'indeterminate' && localVerdict === 'passed' ? 'infrastructure'
+    : executionResult.auditOverall === 'fail' && localVerdict === 'passed' ? 'unknown'
+      : causeOf(decisive, commands, request.checks, verdict, unauthorized, ruleFailed, attribution);
   return {
     schema: gateAttemptSchema,
     id: request.id,
@@ -293,7 +298,7 @@ function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scen
  * verified.
  */
 function verdictOf(commands: readonly GateCommandRecord[], harnessFinding: boolean): GateAttempt['verdict'] {
-  if (commands.some(command => command.outcome === 'not-verified' && command.notVerified !== 'setup-failed')) return 'not-verified';
+  if (commands.some(command => command.outcome === 'not-verified' && command.notVerified !== 'setup-failed' && command.notVerified !== 'audit-unselected')) return 'not-verified';
   if (harnessFinding || commands.some(command => command.outcome === 'failed')) return 'failed';
   return 'passed';
 }

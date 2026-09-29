@@ -846,7 +846,7 @@ export const gateAttemptSchema = z.object({
     elapsedMs: z.int().nonnegative(),
     exitCode: z.int().nullable(),
     outcome: z.enum(['passed', 'failed', 'not-verified']),
-    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed']).optional(),
+    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed', 'audit-unselected']).optional(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     output: z.object({ path: z.string(), bytes: z.int().nonnegative(), truncated: z.boolean(), tail: z.string() }).strict(),
     /** How ramify-audit stopped the command's process tree, in words; absent where it did not stop it. */
@@ -877,7 +877,7 @@ export const gateAttemptSchema = z.object({
 export const gateAuditOutcomeSchema = z.object({
   schema: z.literal('ramify-agent.gate-audit-outcome/1'),
   gate: text,
-  overall: z.enum(['pass', 'fail']),
+  overall: z.enum(['pass', 'fail', 'indeterminate']),
   audited: text,
 }).strict();
 
