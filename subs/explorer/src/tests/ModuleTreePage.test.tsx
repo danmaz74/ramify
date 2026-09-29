@@ -95,17 +95,17 @@ describe('MT09: connected module tree page', () => {
 
     render(<ModuleTreePage client={client(() => ({ sequence: 1, view: exactly60 }), () => status(1))} pollIntervalMs={60_000} />);
     await screen.findByText('60 modules, depth 2');
-    expect(flowNodes.current).toHaveLength(60);
+    await waitFor(() => expect(flowNodes.current).toHaveLength(60));
     cleanup();
 
     render(<ModuleTreePage client={client(() => ({ sequence: 1, view: over }), () => status(1))} pollIntervalMs={60_000} />);
     await screen.findByText('61 modules, depth 2');
     // Depth-2 modules have no children, so every module stays visible; depth 1 collapses on request.
-    expect(flowNodes.current).toHaveLength(61);
+    await waitFor(() => expect(flowNodes.current).toHaveLength(61));
     fireEvent.click(screen.getByRole('button', { name: 'Collapse to depth 1' }));
-    expect(flowNodes.current).toEqual(['root', 'root/a', 'root/b', 'root/c', 'root/d']);
+    await waitFor(() => expect(flowNodes.current).toEqual(['root', 'root/a', 'root/b', 'root/c', 'root/d']));
     fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
-    expect(flowNodes.current).toHaveLength(61);
+    await waitFor(() => expect(flowNodes.current).toHaveLength(61));
   });
 
   it('collapses modules with children below depth 2 in a large tree', async () => {
@@ -202,4 +202,3 @@ describe('MT11: tree focus from ?module=', () => {
     expect(flowProps.current.fitView).toBe(true);
   });
 });
-
