@@ -1,6 +1,5 @@
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
@@ -12,6 +11,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
+import { testReviewPolicy } from './helpers/candidates.js';
 import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -48,10 +48,15 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   await symlink(join(process.cwd(), 'node_modules/@cucumber/cucumber'), join(fixture.root, 'node_modules/@cucumber/cucumber'));
   let architect = 0;
   let reviewer = 0;
+  let raisedConcern = false;
   let originalEngineer = true;
   let localTurn = 0;
   let deferredBriefing = '';
   let driftFeedback = '';
+  let lastCapabilityPrompt = '';
+  let correctionAssigned = false;
+  let planExercised = false;
+  let planCorrected = false;
   let resuming = false;
   const scripted: Script = spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('richer-a-fact', a), entry('b-entry', b)]));
@@ -78,13 +83,13 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
         write('extra.ts', "export const sourceHint = 'B';\n"),
         edit('tests/caller.test.ts', "toBe('Fact: old')", "toBe('unfinished')"));
       }
-      const owner = /Capability assignment cap-\d+\.i\d+ in ([^\n]+)/u.exec(spec.prompt)?.[1];
-      if (owner === b) return submit({ kind: 'completion-proposed', summary: 'B added the source field', findings: [] },
+      const owner = spec.prompt.includes('# Iteration cap-') ? /Your starting module is `([^`]+)`/u.exec(spec.prompt)?.[1] : undefined;
+      if (owner === b) return submit({ kind: 'partial', summary: 'B added the source field for combined verification', findings: [], unfinished: [] },
         write('fact.ts', "export interface FactResult { text: string; source: string }\nexport const readFact = (): FactResult => ({ text: 'old', source: 'B' });\n"),
         write('tests/fact.test.ts', "import { expect, test } from 'vitest';\nimport { readFact } from '../fact.js';\ntest('B returns the independently specified fact', () => expect(readFact()).toEqual({ text: 'old', source: 'B' }));\n"));
-      if (owner === d) return submit({ kind: 'completion-proposed', summary: 'D migrated its typed use', findings: [] },
+      if (owner === d) return submit({ kind: 'partial', summary: 'D migrated its typed use for combined verification', findings: [], unfinished: [] },
         write('consumer.ts', "import { readFact } from '../../b/src/fact.js';\nexport function legacyLabel(): string { return readFact().text.toUpperCase(); }\n"));
-      if (owner === p) return submit({ kind: 'completion-proposed', summary: 'P exposed the signature companion', findings: [] },
+      if (owner === p) return submit({ kind: 'partial', summary: 'P exposed the signature companion for combined verification', findings: [], unfinished: [] },
         write('../module.ramify', 'ramify 1\nmodule capability-coordination\nexpose-sub readFact, FactResult from b to descendants\n'),
         write('assembly.ts', "import { renderA } from '../subs/a/src/caller.js';\nexport const render = () => renderA();\n"));
       if (owner === a && spec.prompt.includes('independent literal')) return submit({ kind: 'completion-proposed', summary: 'A repaired the circular oracle', findings: [] },
@@ -112,51 +117,75 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       if (mode === 'drift' && spec.prompt.includes('Review design for capability cap-001 against plan revision 2.')) {
         writeFileSync(join(fixture.root, 'subs/b/src/fact.ts'), `${readFileSync(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')}\n// concurrent source edit after the passing gate\n`);
       }
-      const paths = /Changed paths: ([^\n]+)/u.exec(spec.prompt)?.[1]?.split(', ') ?? [];
+      const changedPaths = spec.prompt.split('## The changed paths\n\n')[1]?.split('\n\n')[0] ?? '';
+      const paths = [...changedPaths.matchAll(/^- [A-Z] (.+)$/gmu)].map(match => match[1]!);
       const concern = { summary: 'A expected value copies the implementation', consequence: 'The assertion cannot catch a wrong result',
         rationale: 'The candidate calls renderA on both sides', uncertainty: 'low', remedy: 'Use an independent literal',
         locations: [{ path: 'subs/a/src/tests/caller.test.ts', startLine: 3, endLine: 3 }], suggests: null, risk: 'medium', ground: null };
+      const shouldRaise = !raisedConcern && paths.includes('subs/a/src/tests/caller.test.ts') &&
+        readFileSync(join(fixture.root, 'subs/a/src/tests/caller.test.ts'), 'utf8').includes('toBe(renderA())');
+      if (shouldRaise) raisedConcern = true;
       return [...paths.map(path => ({ kind: 'tool' as const, tool: 'snapshot_diff', input: { path } })),
-        { kind: 'submit', input: { inspected: paths, missing: [], concerns: reviewer === 1 ? [concern] : [] } }];
+        { kind: 'submit', input: { inspected: paths, missing: [], concerns: shouldRaise ? [concern] : [] } }];
+    }
+    if (spec.submission.name === 'submit_reconciliation') {
+      const id = /### `(cf-\d+)`/u.exec(spec.prompt)?.[1];
+      if (id === undefined) throw new Error(`Reconciliation lacks its CheckFinding: ${spec.prompt}`);
+      const firstRound = spec.prompt.includes('round 1 of');
+      const report = /- `(cfr-\d+)` by reviewer/u.exec(spec.prompt)?.[1];
+      if (!firstRound && report === undefined) throw new Error(`Reconciliation lacks its report: ${spec.prompt}`);
+      return submit({ relations: [], dispositions: [{ checkFinding: id,
+        rationale: firstRound ? 'The circular test oracle needs an independent expected value.'
+          : 'The repaired test now asserts the independent literal from the original request.',
+        communication: { mode: 'quiet' },
+        action: firstRound ? { action: 'repair' } : { action: 'fixed', reassessed: [report] },
+      }], next: firstRound ? { kind: 'correct', goal: 'Repair the A test with an independent expected literal.' } : { kind: 'complete' },
+      brief: firstRound ? 'The A test oracle copies the implementation; assign an independent literal.' : 'The independent literal fixes the review concern.' });
     }
     if (spec.role === 'capability-architect') {
+      lastCapabilityPrompt = spec.prompt;
       const [, task, revision, invocation] = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
       if (task === 'cap-002') return [{ kind: 'wait', ms: 60_000 }];
       architect += 1;
-      if (architect > 9) {
-        if (mode === 'drift') { driftFeedback = spec.prompt; return [{ kind: 'wait', ms: 60_000 }]; }
-        if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
-          mode === 'review-restart' || mode === 'review-submission-restart') return submit({ task, planRevision: Number(revision), invocation,
-          kind: 'request-handback', summary: 'B result is integrated in A and compatible with D',
-          coverage: [{ case: 'need-001.ex01', evidence: ['subs/a/src/tests/caller.test.ts'] }],
-          interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }],
-          limitations: [] });
-        throw new Error(`Unexpected capability turn ${architect}: ${spec.prompt.slice(-1200)}`);
-      }
       const basis = { task, planRevision: Number(revision), invocation };
-      const assignOwner = (owner: string, purpose: string) => submit({ ...basis, kind: 'assign', owner,
-        purpose, approach: purpose, requirementRefs: [], intendedEvidence: ['Real source and tests'] });
+      const assignOwner = (owner: string, purpose: string) => submit({ ...basis, kind: 'assign', assignment: assign(owner, {
+        goal: purpose, approach: purpose, completionEvidence: 'Real source and tests',
+      }).assignment });
+      if (spec.prompt.includes('requires a correction assignment')) {
+        correctionAssigned = true;
+        return assignOwner(a, 'Repair the A test with an independent literal');
+      }
+      if (mode === 'drift' && spec.prompt.includes('Source changed after gate')) {
+        driftFeedback = spec.prompt;
+        return [{ kind: 'wait', ms: 60_000 }];
+      }
       if (architect === 1) return assignOwner(b, 'Add the source field');
       if (architect === 3) return assignOwner(d, 'Migrate D typed use');
       if (architect === 4) return assignOwner(p, 'Expose the companion');
       if (architect === 5) return assignOwner(a, 'Integrate A');
-      if (architect === 7) return assignOwner(a, 'Repair with independent literal');
       const handback = (atRevision: number) => ({ ...basis, planRevision: atRevision, kind: 'request-handback',
         summary: 'B result is integrated in A and compatible with D',
         coverage: [{ case: 'need-001.ex01', evidence: ['subs/a/src/tests/caller.test.ts'] }],
         interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }], limitations: [] });
-      if (architect !== 9) return submit(handback(Number(revision)));
-      const jobs = readdirSync(join(fixture.root, 'plans', 'need', '.harness', 'jobs'));
-      const job = JSON.parse(readFileSync(runPath(fixture.root, 'need', jobs[0]!, 'job.json'), 'utf8')) as { projectConfig: unknown };
-      const configuration = createHash('sha256').update(JSON.stringify(job.projectConfig)).digest('hex');
-      const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: fixture.root, encoding: 'utf8' }).trim();
+      if (architect >= 6 && !planExercised) {
+        planExercised = true;
+        return [
+          { kind: 'tool', tool: 'update_capability_plan', input: { task, basedOn: Number(revision), invocation,
+            reason: 'Record the executed A example while ordinary review judges its oracle',
+            changes: { useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Fresh fact: old from B', derivedFrom: ['need-001.ex01'],
+              coverage: { state: 'exercised', tests: ['subs/a/src/tests/caller.test.ts'] } }] } } },
+          { kind: 'submit', input: handback(Number(revision) + 1) },
+        ];
+      }
+      if (!correctionAssigned || planCorrected) return submit(handback(Number(revision)));
+      planCorrected = true;
       return [
         { kind: 'tool', tool: 'update_capability_plan', input: { task, basedOn: Number(revision), invocation,
           reason: 'Record independent executable coverage after repairing the circular oracle',
           changes: { useCases: [{ id: 'need-001.ex01', expectedBehavior: 'Fresh fact: old from B', derivedFrom: ['need-001.ex01'],
             coverage: { state: 'corrected', reason: 'The earlier oracle compared the value to itself',
               evidence: ['review of circular assertion', 'independent literal from original request'], decidedBy: invocation,
-              tests: ['subs/a/src/tests/caller.test.ts'], candidate: tree, configuration } }] } } },
+              tests: ['subs/a/src/tests/caller.test.ts'] } }] } } },
         { kind: 'submit', input: handback(Number(revision) + 1) },
       ];
     }
@@ -164,6 +193,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   };
   let closingVerification: Promise<void> | undefined;
   let frozenFault = false;
+  let targetGateId: string | undefined;
   let closeVerification: (() => Promise<void>) | undefined;
   let activeService: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
   const realChecks = createLocalCommandCheckExecution();
@@ -176,10 +206,9 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     checkExecution: mode === 'repair-exhaustion' ? { run: (checks: Parameters<typeof realChecks.run>[0],
       request: Parameters<typeof realChecks.run>[1]) => {
         gateContexts.push(`${request.context.attemptId}:${request.context.checkpoint}`);
-        // This fixture's first three gates belong to scoped assignments;
-        // ga-0004 and later are its combined handback attempts.
-        return request.context.checkpoint === 'work-item' &&
-          Number(request.context.attemptId.slice(3)) >= 4
+        // Scoped assignments still use the real command runner; only the
+        // bounded task's ordinary completion gate is scripted to fail.
+        return request.context.checkpoint === 'work-item'
           ? failingCombinedChecks.run(checks, request) : realChecks.run(checks, request);
       } } : realChecks,
     afterWrite: async (write: string, runId: string) => {
@@ -187,18 +216,20 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       const gate = activeService?.events('need', runId)?.filter(entry => entry.type === 'gate-attempted').at(-1);
       const boundary = mode === 'verify-restart' && write === 'capability-verification-started' ||
         mode === 'gate-intent-restart' && write === 'gate-attempted' &&
-          event?.type === 'gate-committing' && event.data.gate === 'ga-0004' ||
+          event?.type === 'gate-committing' && event.data.checkpoint === 'work-item' ||
         mode === 'gate-committing-restart' && write === 'gate-committing' &&
-          event?.type === 'gate-committing' && event.data.gate === 'ga-0004' ||
-        mode === 'gate-restart' && write === 'capability-gate-recorded' &&
-          gate?.type === 'gate-attempted' && gate.data.gate === 'ga-0004' && gate.data.verdict === 'passed' ||
-        mode === 'review-submission-restart' && write === 'invocation-ended' && reviewer === 9 &&
+          event?.type === 'gate-committing' && event.data.checkpoint === 'work-item' ||
+        mode === 'gate-restart' && write === 'gate-committed' &&
+          gate?.type === 'gate-attempted' && gate.data.checkpoint === 'work-item' && gate.data.verdict === 'passed' ||
+        mode === 'review-submission-restart' && write === 'invocation-ended' && reviewer >= 2 &&
           event?.type === 'invocation-ended' && event.data.ended === 'submitted' &&
           (activeService?.events('need', runId) ?? []).some(started => started.type === 'invocation-started' &&
             started.data.invocation === event.data.invocation && started.data.role === 'reviewer') ||
-        mode === 'review-restart' && write === 'capability-review-recorded' && event?.type === 'capability-review-recorded' &&
-          event.data.outcome === 'passed' && event.data.planRevision >= 2;
+        mode === 'review-restart' && write === 'review-attempt-finished' && reviewer >= 2 &&
+          event?.type === 'review-attempt-finished';
       if (boundary && !frozenFault && closingVerification === undefined) {
+        targetGateId = event?.type === 'gate-committing' ? event.data.gate
+          : gate?.type === 'gate-attempted' && gate.data.checkpoint === 'work-item' ? gate.data.gate : undefined;
         if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart' || mode === 'review-submission-restart') {
           frozenFault = true;
           await freeze();
@@ -207,7 +238,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     },
     policy: root => {
       const base = testPolicy(root);
-      return { ...base, commands: { ...base.commands,
+      return { ...base, reviews: testReviewPolicy(), commands: { ...base.commands,
         allTests: checkCommand({ argv: [join(root, 'node_modules/.bin/vitest'), 'run',
           'subs/a/src/tests/caller.test.ts', 'subs/b/src/tests/fact.test.ts', 'subs/d/src/tests/consumer.test.ts'], cwd: root, timeoutMs: 30_000 }),
         typeCheck: checkCommand({ argv: [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'], cwd: root, timeoutMs: 30_000 }),
@@ -233,8 +264,8 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     if (mode === 'verify-restart') expect(before.filter(event => event.type === 'capability-verification-started')).toHaveLength(1);
     expect(before.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
     const gates = before.filter(event => event.type === 'gate-attempted').length;
-    const committing = before.filter(event => event.type === 'gate-committing' && event.data.gate === 'ga-0004').length;
-    const reviews = before.filter(event => event.type === 'capability-review-recorded').length;
+    const committing = before.filter(event => event.type === 'gate-committing' && event.data.gate === targetGateId).length;
+    const reviews = before.filter(event => event.type === 'review-attempt-finished').length;
     const reviewerStarts = before.filter(event => event.type === 'invocation-started' && event.data.role === 'reviewer').length;
     resuming = true;
     const reopened = await openCapabilityRuns(fixture.root, options);
@@ -247,14 +278,13 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     expect(after.filter(event => event.type === 'gate-attempted'), JSON.stringify({ before: before.slice(-12), after: after.slice(-18) }))
       .toHaveLength(gates + (mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ? 1 : 0));
     if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart') {
-      expect(after.filter(event => event.type === 'gate-committing' && event.data.gate === 'ga-0004')).toHaveLength(committing || 1);
-      expect(after.filter(event => event.type === 'gate-attempted' && event.data.gate === 'ga-0004')).toHaveLength(1);
+      expect(targetGateId).toBeDefined();
+      expect(after.filter(event => event.type === 'gate-committing' && event.data.gate === targetGateId)).toHaveLength(committing || 1);
+      expect(after.filter(event => event.type === 'gate-attempted' && event.data.gate === targetGateId)).toHaveLength(1);
     }
-    const reviewEvents = after.filter(event => event.type === 'capability-review-recorded');
+    const reviewEvents = after.filter(event => event.type === 'review-attempt-finished');
     if (mode === 'verify-restart' || mode === 'review-restart') expect(reviewEvents).toHaveLength(reviews);
-    expect(reviewEvents.filter(event => event.data.gate === 'ga-0004' && event.data.planRevision === 2 &&
-      event.data.outcome === 'passed')).toHaveLength(1);
-    expect(new Set(reviewEvents.map(event => `${event.data.gate}:${event.data.planRevision}`)).size).toBe(reviewEvents.length);
+    expect(after.filter(event => event.type === 'review-request-recorded').length).toBeGreaterThan(0);
     if (mode === 'review-submission-restart') {
       const replayedReviewers = after.filter(event => event.type === 'invocation-started' && event.data.role === 'reviewer');
       expect(replayedReviewers).toHaveLength(reviewerStarts);
@@ -264,9 +294,12 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     return;
   }
   await until(() => mode === 'drift' ? driftFeedback.length > 0 : (opened.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === 'capability-handed-back' || event.type === 'job-failed'), 120_000).catch(async error => {
+    event.type === 'capability-handed-back' || event.type === 'job-failed'), 75_000).catch(async error => {
     const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
-    throw new Error(`${String(error)}; architect ${architect}, reviewer ${reviewer}; last events ${JSON.stringify(events.slice(-18))}`);
+    const gate = events.filter(event => event.type === 'gate-attempted').at(-1);
+    const body = gate?.type === 'gate-attempted' ? JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+      `gates/${gate.data.gate}/attempt.json`), 'utf8')) as { provider?: unknown; commands?: unknown } : null;
+    throw new Error(`${String(error)}; architect ${architect}, reviewer ${reviewer}; prompt ${lastCapabilityPrompt.slice(-2200)}; gate ${JSON.stringify(body)}; last events ${JSON.stringify(events.slice(-18))}`);
   });
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
   if (mode === 'repair-exhaustion') {
@@ -296,7 +329,6 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   if (mode === 'drift') {
     expect(driftFeedback).toContain('Source changed after gate');
     expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
-    expect(events.filter(event => event.type === 'capability-candidate-accepted')).toHaveLength(0);
     expect(events.filter(event => event.type === 'gate-attempted' && event.data.verdict === 'passed').length).toBeGreaterThan(0);
     expect(readFileSync(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('concurrent source edit');
     await stopStable(opened.service, receipt.jobId);
@@ -305,27 +337,38 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   }
   const lastGate = events.filter(event => event.type === 'gate-attempted').at(-1);
   const lastGateBody = lastGate?.type === 'gate-attempted' ? JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
-    `gates/${lastGate.data.gate}/attempt.json`), 'utf8')) as { cause: string; commands: Array<{ kind: string; outcome: string; output: { tail: string } }> } : null;
+    `gates/${lastGate.data.gate}/attempt.json`), 'utf8')) as {
+      cause: string;
+      commands: Array<{ kind: string; outcome: string; providerCheckId?: string; output: { tail: string } }>;
+      provider?: { checks: Record<string, { passed: boolean; vitest?: { reason: string; files: Array<{ path: string; state: string }> };
+        commands?: Record<string, { passed: boolean; vitest?: { reason: string; files: Array<{ path: string; state: string }> } }> }> };
+    } : null;
   expect(events.filter(event => event.type === 'job-failed'), JSON.stringify({ tail: events.slice(-12),
+    architect, reviewer, lastCapabilityPrompt: lastCapabilityPrompt.slice(-1600),
     gate: lastGateBody === null ? null : { cause: lastGateBody.cause,
       commands: lastGateBody.commands.map(command => [command.kind, command.outcome, command.output.tail.slice(-300)]) } })).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
-  expect(events.filter(event => event.type === 'capability-candidate-accepted')).toHaveLength(1);
-  expect(events.filter(event => event.type === 'capability-review-recorded' && event.data.outcome === 'failed')).toHaveLength(1);
-  const failed = events.filter((event): event is Extract<typeof event, { type: 'gate-attempted' }> =>
-    event.type === 'gate-attempted' && event.data.verdict === 'failed');
-  expect(failed.length).toBeGreaterThanOrEqual(1);
-  const firstFailed = failed[0]!;
-  const firstBody = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
-    `gates/${firstFailed.data.gate}/attempt.json`), 'utf8')) as { commands: Array<{ kind: string; outcome: string; output: { tail: string } }> };
-  expect(firstBody.commands.find(command => command.kind === 'type-check')?.outcome).toBe('failed');
-  expect(firstBody.commands.find(command => command.kind === 'type-check')?.output.tail).toContain('error TS');
+  const taskSettlements = events.filter((event): event is Extract<typeof event, { type: 'capability-assignment-settled' }> =>
+    event.type === 'capability-assignment-settled' && event.data.task === 'cap-001');
+  expect(taskSettlements.filter(event => event.data.outcome === 'partial')).toHaveLength(3);
+  expect(taskSettlements.filter(event => event.data.outcome === 'accepted').length).toBeGreaterThanOrEqual(1);
+  expect(events.filter(event => event.type === 'review-attempt-finished').length).toBeGreaterThan(0);
+  expect(events.filter((event): event is Extract<typeof event, { type: 'reconciliation-assessed' }> =>
+    event.type === 'reconciliation-assessed' && event.data.workItem === 'cap-001')
+    .map(event => event.data.next)).toEqual(['correct']);
+  expect(events.filter(event => event.type === 'capability-assigned' && event.data.corrects === 'cap-001.rc01')).toHaveLength(1);
+  expect(events.filter(event => event.type === 'iteration-closed' && event.data.checkFindings?.some(finding =>
+    finding.type === 'check-finding-decided' && finding.data.decision.decision.action === 'claim-repair'))).toHaveLength(1);
   expect(lastGateBody?.commands.filter(command => ['tests', 'type-check', 'ramify-check'].includes(command.kind))
     .every(command => command.outcome === 'passed')).toBe(true);
-  expect(lastGateBody?.commands.filter(command => command.kind === 'tests').some(command =>
-    command.output.tail.includes('subs/a/src/tests/caller.test.ts'))).toBe(true);
-  expect(lastGateBody?.commands.filter(command => command.kind === 'tests').some(command =>
-    command.output.tail.includes('subs/b/src/tests/fact.test.ts'))).toBe(true);
+  const executedFiles = lastGateBody?.commands.filter(command => command.kind === 'tests' && command.outcome === 'passed')
+    .flatMap(command => {
+      const check = command.providerCheckId === undefined ? undefined : lastGateBody.provider?.checks[command.providerCheckId];
+      return check?.passed === true ? [check, ...Object.values(check.commands ?? {}).filter(nested => nested.passed)] : [];
+    }).filter(check => check.vitest?.reason === 'passed')
+    .flatMap(check => check.vitest?.files.filter(file => file.state === 'passed').map(file => file.path) ?? []) ?? [];
+  expect(executedFiles).toContain('subs/a/src/tests/caller.test.ts');
+  expect(executedFiles).toContain('subs/b/src/tests/fact.test.ts');
   const handback = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
     'capabilities/cap-001/handback.json'), 'utf8')) as { deltaFromSuspension: string[]; returnedTree: string };
   expect(handback.deltaFromSuspension).toContain('subs/b/src/fact.ts');

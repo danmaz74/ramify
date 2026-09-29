@@ -121,6 +121,7 @@ export function createLocalCommandCheckExecution(): CheckExecutionPort {
         commands: result.commands,
         audited: cancelled ? null : request.context.sourceCommit,
         evidence: cancelled ? null : testEvidence(request.context),
+        ...(result.provider === undefined ? {} : { provider: result.provider }),
       };
     },
   };
