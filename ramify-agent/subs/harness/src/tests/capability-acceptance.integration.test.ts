@@ -114,9 +114,6 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     }
     if (spec.role === 'reviewer') {
       reviewer += 1;
-      if (mode === 'drift' && spec.prompt.includes('Review design for capability cap-001 against plan revision 2.')) {
-        writeFileSync(join(fixture.root, 'subs/b/src/fact.ts'), `${readFileSync(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')}\n// concurrent source edit after the passing gate\n`);
-      }
       const changedPaths = spec.prompt.split('## The changed paths\n\n')[1]?.split('\n\n')[0] ?? '';
       const paths = [...changedPaths.matchAll(/^- [A-Z] (.+)$/gmu)].map(match => match[1]!);
       const concern = { summary: 'A expected value copies the implementation', consequence: 'The assertion cannot catch a wrong result',
@@ -130,9 +127,10 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     }
     if (spec.submission.name === 'submit_reconciliation') {
       const id = /### `(cf-\d+)`/u.exec(spec.prompt)?.[1];
-      if (id === undefined) throw new Error(`Reconciliation lacks its CheckFinding: ${spec.prompt}`);
+      if (id === undefined) return submit({ relations: [], dispositions: [], next: { kind: 'complete' },
+        brief: 'The accepted correction closed the finding; no new concern needs attention.' });
       const firstRound = spec.prompt.includes('round 1 of');
-      const report = /- `(cfr-\d+)` by reviewer/u.exec(spec.prompt)?.[1];
+      const report = /- `(cfr-\d+)` by /u.exec(spec.prompt)?.[1];
       if (!firstRound && report === undefined) throw new Error(`Reconciliation lacks its report: ${spec.prompt}`);
       return submit({ relations: [], dispositions: [{ checkFinding: id,
         rationale: firstRound ? 'The circular test oracle needs an independent expected value.'
@@ -214,6 +212,10 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     afterWrite: async (write: string, runId: string) => {
       const event = activeService?.events('need', runId)?.at(-1);
       const gate = activeService?.events('need', runId)?.filter(entry => entry.type === 'gate-attempted').at(-1);
+      if (mode === 'drift' && write === 'gate-committed' && gate?.type === 'gate-attempted' &&
+        gate.data.checkpoint === 'work-item' && gate.data.verdict === 'passed') {
+        writeFileSync(join(fixture.root, 'subs/b/src/fact.ts'), `${readFileSync(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')}\n// concurrent source edit after the passing gate\n`);
+      }
       const boundary = mode === 'verify-restart' && write === 'capability-verification-started' ||
         mode === 'gate-intent-restart' && write === 'gate-attempted' &&
           event?.type === 'gate-committing' && event.data.checkpoint === 'work-item' ||
@@ -225,12 +227,13 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
           event?.type === 'invocation-ended' && event.data.ended === 'submitted' &&
           (activeService?.events('need', runId) ?? []).some(started => started.type === 'invocation-started' &&
             started.data.invocation === event.data.invocation && started.data.role === 'reviewer') ||
-        mode === 'review-restart' && write === 'review-attempt-finished' && reviewer >= 2 &&
-          event?.type === 'review-attempt-finished';
+        mode === 'review-restart' && write === 'gate-attempted' && reviewer >= 2 &&
+          event?.type === 'gate-committing' && event.data.checkpoint === 'work-item';
       if (boundary && !frozenFault && closingVerification === undefined) {
         targetGateId = event?.type === 'gate-committing' ? event.data.gate
           : gate?.type === 'gate-attempted' && gate.data.checkpoint === 'work-item' ? gate.data.gate : undefined;
-        if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart' || mode === 'review-submission-restart') {
+        if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
+          mode === 'review-restart' || mode === 'review-submission-restart') {
           frozenFault = true;
           await freeze();
         } else closingVerification = closeVerification?.();
@@ -246,7 +249,8 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       } };
     } } satisfies Parameters<typeof openCapabilityRuns>[1];
   const opened = await openCapabilityRuns(fixture.root, options);
-  if (mode !== 'gate-intent-restart' && mode !== 'gate-committing-restart' && mode !== 'review-submission-restart') {
+  if (mode !== 'gate-restart' && mode !== 'gate-intent-restart' && mode !== 'gate-committing-restart' &&
+    mode !== 'review-restart' && mode !== 'review-submission-restart') {
     cleanups.push(() => opened.service.close());
   }
   activeService = opened.service;
@@ -275,8 +279,10 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-15))).toHaveLength(0);
     expect(after.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
+    const alreadyPassedTaskGate = before.some(event => event.type === 'gate-attempted' &&
+      event.data.checkpoint === 'work-item' && event.data.verdict === 'passed');
     expect(after.filter(event => event.type === 'gate-attempted'), JSON.stringify({ before: before.slice(-12), after: after.slice(-18) }))
-      .toHaveLength(gates + (mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ? 1 : 0));
+      .toHaveLength(gates + (alreadyPassedTaskGate ? 0 : 1));
     if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart') {
       expect(targetGateId).toBeDefined();
       expect(after.filter(event => event.type === 'gate-committing' && event.data.gate === targetGateId)).toHaveLength(committing || 1);
@@ -287,7 +293,11 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     expect(after.filter(event => event.type === 'review-request-recorded').length).toBeGreaterThan(0);
     if (mode === 'review-submission-restart') {
       const replayedReviewers = after.filter(event => event.type === 'invocation-started' && event.data.role === 'reviewer');
-      expect(replayedReviewers).toHaveLength(reviewerStarts);
+      expect(replayedReviewers, JSON.stringify({ before: before.filter(event => event.type.startsWith('review-') ||
+        (event.type === 'invocation-started' && event.data.role === 'reviewer') ||
+        event.type === 'invocation-ended').slice(-14), after: after.filter(event => event.type.startsWith('review-') ||
+        (event.type === 'invocation-started' && event.data.role === 'reviewer') ||
+        event.type === 'invocation-ended').slice(-16) })).toHaveLength(reviewerStarts);
     }
     await stopStable(reopened.service, receipt.jobId);
     await reopened.service.settled('need', receipt.jobId);
@@ -316,7 +326,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
           id: string; proposedBy: string | null; repairRound: number; cause: string | null;
         }));
     const combined = attempts.filter(attempt => attempt.proposedBy !== null && architectInvocations.has(attempt.proposedBy));
-    expect(combined.map(attempt => attempt.repairRound)).toEqual([0, 1, 2]);
+    expect(combined.map(attempt => attempt.repairRound)).toEqual([0, 1, 2, 3]);
     expect(failed?.type === 'job-failed' ? failed.data.message : '').toContain(`first cause was ${combined[0]?.cause ?? 'unknown'} at gate ${combined[0]?.id}`);
     expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
     expect(events.filter(event => event.type === 'work-item-completed' && event.data.workItem === 'wi-001')).toHaveLength(0);
@@ -355,7 +365,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   expect(events.filter(event => event.type === 'review-attempt-finished').length).toBeGreaterThan(0);
   expect(events.filter((event): event is Extract<typeof event, { type: 'reconciliation-assessed' }> =>
     event.type === 'reconciliation-assessed' && event.data.workItem === 'cap-001')
-    .map(event => event.data.next)).toEqual(['correct']);
+    .map(event => event.data.next)).toEqual(['correct', 'complete']);
   expect(events.filter(event => event.type === 'capability-assigned' && event.data.corrects === 'cap-001.rc01')).toHaveLength(1);
   expect(events.filter(event => event.type === 'iteration-closed' && event.data.checkFindings?.some(finding =>
     finding.type === 'check-finding-decided' && finding.data.decision.decision.action === 'claim-repair'))).toHaveLength(1);
