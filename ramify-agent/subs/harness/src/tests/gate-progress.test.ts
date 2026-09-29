@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { inPlaceCheckExecution, type GateCommandStart } from '../checks/execution.js';
+import { commandStart, inPlaceCheckExecution, type CheckExecutionPort, type GateCommandStart } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { checkCommand } from '../checks/records.js';
 import { projectEvent } from '../projections/events.js';
@@ -55,6 +55,50 @@ describe('the in-place executor', () => {
 });
 
 describe('a run', () => {
+  test('a composed readiness records the provider wait for tests and scenarios before their commands start', async () => {
+    const fixture = await copyFixture();
+    cleanups.push(fixture.remove);
+    await installTestRunner(fixture.root);
+    const direct = directReadinessExecution();
+    const waitingExecution: CheckExecutionPort = {
+      async run(checks, request) {
+        for (const [index, check] of checks.entries()) {
+          if (check.kind === 'tests' || check.kind === 'scenarios') {
+            const release = request.pauseForTestLock?.();
+            try {
+              await request.waiting?.(commandStart(checks, index), 'Waiting for another test run (injected lock)');
+            } finally {
+              release?.();
+            }
+          }
+          await request.started?.(commandStart(checks, index));
+        }
+        return direct.run(checks, request);
+      },
+    };
+    const { service } = await openUnchangedRuns(fixture.root, {
+      script: [{ kind: 'submit', input: emptyAnalysis() }],
+      unchangedCheckpoints: ['final verification of plan "review-notes"'],
+      readinessExecution: waitingExecution,
+      checkExecution: createPassingCheckExecution(),
+    });
+    cleanups.push(() => service.close());
+
+    const receipt = await service.execute(startRun('review-notes'));
+    await service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(service, 'review-notes').state).toBe('completed');
+    const events = await runEventsOnDisk(fixture.root, 'review-notes', receipt.jobId);
+    const waits = events.filter((event): event is Extract<RunEvent, { type: 'gate-command-waiting' }> => event.type === 'gate-command-waiting');
+    expect(waits.map(event => event.data.kind)).toEqual(['tests', 'scenarios', 'scenarios']);
+    for (const wait of waits) {
+      expect(wait.data).toMatchObject({ gate: 'ga-0001', checkpoint: 'readiness', line: 'Waiting for another test run (injected lock)' });
+      const started = events.find(event => event.type === 'gate-command-started' &&
+        event.data.gate === wait.data.gate && event.data.position === wait.data.position && event.sequence > wait.sequence);
+      expect(started).toBeDefined();
+      expect(projectEvent(wait)).toMatchObject({ transition: 'gate-command-waiting', refs: [{ kind: 'gate', id: 'ga-0001' }] });
+    }
+  }, 120_000);
+
   test('records the start of each command of readiness and of a committing gate', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);
