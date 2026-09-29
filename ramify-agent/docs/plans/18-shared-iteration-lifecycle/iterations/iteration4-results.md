@@ -1,6 +1,6 @@
 # Iteration 4 handoff — completion and recovery
 
-Status on 2026-09-29: implemented at `eb86e43f`, with final integration and live acceptance still pending.
+Status on 2026-09-29: implemented at `eb86e43f` with bounded child completion correction `cdeb3b25`; final audit and live acceptance remain pending.
 
 Capability handback now uses the common completion gate and ordinary review reconciliation under the task owner. Accepted task iterations retain their own gate, commit and review records; prior partial or failed iterations remain historical facts and are never retroactively accepted. Completion checks return to the capability architect. A task handback resumes the original engineer assignment and leaves the parent's broader goal open. The task's pending correction intent and CheckFinding repair claim use the common reconciliation path.
 
@@ -8,4 +8,4 @@ Recovery replays a committed, settled engineer outcome before opening another wr
 
 The current task projection includes common iteration results, gates and ordinary review failures; the session projection identifies the task and actual assigned module. Historical capability records remain readable, while incompatible old-policy runs do not resume into the version-6 executor.
 
-Focused evidence: restart-after-ended partial and accepted-completion replay passed 2/2 without a second writer; partial attribution and restart cases passed 3/3; a depth-first child restart passed 1/1; capability projection/session tests passed 23/23; type-check passed. The remaining exit checks are the full nested handback and acceptance fixtures against the provider's 0.3.2 executed-file payload, full source audit, and the single authorized live Pi witness. No final acceptance verdict is asserted here.
+Focused evidence: full capability recovery passed 16/16, including exact mutation attribution and no second writer after a durable end. Real nested child gate, ordinary code review, and parent handback passed both direct and restarted cases (2/2). The common scenario planner passed 36/36, including zero assigned scenarios and exact child selection; capability projection/session tests passed 23/23; type-check passed. The remaining exit checks are the full capability acceptance fixture against the provider's 0.3.2 executed-file payload, a source audit at or after `cdeb3b25`, and the single authorized live Pi witness. No final acceptance verdict is asserted here.
