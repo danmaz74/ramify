@@ -12,7 +12,7 @@ import { architectScenarioSection, type BriefedScenario } from './scenario-brief
 import type { WorkItem, WorkItemOutline } from './records.js';
 import type { EngineerBounds } from '../run/policy.js';
 import { analysisLines, boundOf, digestLines } from './failure.js';
-import type { IterationResult } from './iterations.js';
+import type { IterationResult, WriteScope } from './iterations.js';
 
 /*
  * What a local architect is given for one work item: the goal, its
@@ -104,10 +104,14 @@ export async function iterationApiViews(
   ramify: RamifyCli,
   projectRoot: string,
   index: ArchitectIndex | null,
-  modules: readonly string[],
+  base: WriteScope['base'],
 ): Promise<IterationApiViews[]> {
+  const modules = 'module' in base
+    ? [base.module, ...base.includedChildren, ...[...index?.modules.keys() ?? []].filter(module =>
+      base.includedChildren.some(child => module.startsWith(`${child}/`)))]
+    : base.modules;
   const entries: IterationApiViews[] = [];
-  for (const module of modules) {
+  for (const module of new Set(modules)) {
     const result = await apiViewsOf(ramify, projectRoot, index, module)
       .catch(error => ({ evidence: null, unavailable: `the API view could not be read: ${error instanceof Error ? error.message : String(error)}` }));
     entries.push({

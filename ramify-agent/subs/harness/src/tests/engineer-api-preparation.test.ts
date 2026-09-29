@@ -12,7 +12,7 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function fixture() {
+async function fixture(nested = false) {
   const directory = await temporaryDirectory();
   cleanups.push(directory.remove);
   const root = directory.path;
@@ -26,6 +26,11 @@ async function fixture() {
     files[`subs/${owner}/module.ramify`] = `ramify 1\nmodule ${owner}\n`;
     files[`subs/${owner}/src/use.ts`] = 'export const ready = true;\n';
     files[`subs/${owner}/src/tests/use.test.ts`] = 'export const expected = true;\n';
+  }
+  if (nested) {
+    files['subs/model/subs/detail/module.ramify'] = 'ramify 1\nmodule detail\n';
+    files['subs/model/subs/detail/src/use.ts'] = 'export const ready = true;\n';
+    files['subs/model/subs/detail/src/tests/use.test.ts'] = 'export const expected = true;\n';
   }
   for (const [path, content] of Object.entries(files)) {
     await mkdir(join(root, path, '..'), { recursive: true });
@@ -41,7 +46,8 @@ test('cold Analysis and Model preparation publishes real separate source-area vi
   const { root, ramify, index } = await fixture();
   await expect(readFile(join(root, 'subs/analysis/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
   await expect(readFile(join(root, 'subs/model/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
-  const first = await iterationApiViews(ramify, root, index, ['app/analysis', 'app/model']);
+  const base = { modules: ['app/analysis', 'app/model'], rationale: 'Both owners are assigned.' };
+  const first = await iterationApiViews(ramify, root, index, base);
   for (const entry of first) {
     expect(entry.unavailable).toBeNull();
     expect(entry.views.map(view => view.area)).toEqual(['src', 'src/tests']);
@@ -53,7 +59,7 @@ test('cold Analysis and Model preparation publishes real separate source-area vi
   }
   await writeFile(join(root, 'src/api.ts'), 'export function readFreshToken(): number { return 42; }\n');
   await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule app\nexpose-src readFreshToken from "api.ts" to descendants\n');
-  const continued = await iterationApiViews(ramify, root, index, ['app/analysis', 'app/model']);
+  const continued = await iterationApiViews(ramify, root, index, base);
   for (const [i, entry] of continued.entries()) {
     expect(entry.unavailable).toBeNull();
     expect(entry.views[0]!.revision).not.toBe(first[i]!.views[0]!.revision);
@@ -63,7 +69,7 @@ test('cold Analysis and Model preparation publishes real separate source-area vi
       expect(text).not.toContain('## `readToken`');
     }
   }
-  const reconstructed = await iterationApiViews(ramify, root, await loadArchitectIndex(root), ['app/analysis']);
+  const reconstructed = await iterationApiViews(ramify, root, await loadArchitectIndex(root), { module: 'app/analysis', includedChildren: [] });
   expect(reconstructed[0]).toEqual(continued[0]);
 }, 90_000);
 
@@ -77,9 +83,25 @@ test('failed refresh never presents leftover views as current; a missing expecte
   });
   materialize.mockResolvedValue({ ok: true, output: '' });
   await rm(join(root, 'subs/analysis/src/tests/.ramify'), { recursive: true });
-  const missing = await iterationApiViews(ramify, root, index, ['app/analysis']);
+  const missing = await iterationApiViews(ramify, root, index, { module: 'app/analysis', includedChildren: [] });
   expect(missing[0]!.views.map(view => view.area)).toEqual(['src']);
   expect(missing[0]!.unavailable).toContain('src/tests/.ramify: materialization reported success');
   await rm(join(root, 'subs/analysis/src/tests'), { recursive: true });
   expect((await apiViewsOf(ramify, root, index, 'app/analysis')).unavailable).toBeNull();
 }, 60_000);
+
+test('an included child prepares all descendant owners, while a broad scope retains its exact modules', async () => {
+  const { root, ramify, index } = await fixture(true);
+  await expect(readFile(join(root, 'subs/model/subs/detail/src/.ramify/_meta.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  const selected = await iterationApiViews(ramify, root, index, { module: 'app', includedChildren: ['app/model'] });
+  expect(selected.map(entry => entry.module).sort()).toEqual(['app', 'app/model', 'app/model/detail']);
+  const descendant = selected.find(entry => entry.module === 'app/model/detail')!;
+  expect(descendant.unavailable).toBeNull();
+  expect(descendant.views.map(view => view.area)).toEqual(['src', 'src/tests']);
+  for (const view of descendant.views) {
+    expect(view.revision).toBeTruthy();
+    expect(await readFile(join(root, view.path, 'external/src/api.ts.md'), 'utf8')).toContain('## `readToken`');
+  }
+  expect((await iterationApiViews(ramify, root, index, { modules: ['app/model'], rationale: 'Only Model itself is assigned.' }))
+    .map(entry => entry.module)).toEqual(['app/model']);
+}, 90_000);

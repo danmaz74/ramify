@@ -353,7 +353,7 @@ export interface ScopeTestsOptions {
 
 /**
  * The scenario check `run_scope_tests` runs beside the tests: in quick mode,
- * the scope's scenarios selected by identity, the work item's pending ones
+ * the scope's scenarios selected by identity, the assigned context's pending scenarios
  * included, so an engineer sees whether the scenarios it binds pass before
  * it declares them.
  */
@@ -646,7 +646,7 @@ export function iterationMessage(briefing: IterationBriefing): string {
   if (briefing.scenarios !== undefined) {
     lines.push(
       'It also runs, in quick mode, every scenario of your scope that has been declared, selected by identity.',
-      '`run_scope_tests` runs those and this work item\'s pending ones.',
+      '`run_scope_tests` runs those and the assigned context\'s pending scenarios.',
       '',
     );
   }
