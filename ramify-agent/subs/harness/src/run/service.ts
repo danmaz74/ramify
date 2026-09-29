@@ -7423,6 +7423,24 @@ export class RunService {
     const probe = await resolveTestSelection({ projectRoot: this.projectRoot, index,
       policy: { policy: 'owned-by-scope', exactOwners: [...new Set(assignments.map(entry => entry.owner))],
         subtrees: [], extraSuites: [] } });
+    // The combined gate returns to this capability architect for repair, so
+    // count its durable failed attempts across turns and service restarts.
+    const failedGates = run.log.all('gate-attempted').flatMap(event => {
+      if (event.data.verdict !== 'failed') return [];
+      const parsed = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate)));
+      return parsed.success && parsed.data.checkpoint === 'work-item' &&
+        parsed.data.subject.workItem === task.parent.id && parsed.data.proposedBy !== null &&
+        records.invocations.get(parsed.data.proposedBy)?.work.capabilityTask === task.id
+        ? [parsed.data] : [];
+    });
+    const repairLimit = run.record.policy.limits.repairRoundsPerWorkItemGate;
+    const firstFailed = failedGates[0];
+    if (failedGates.length >= repairLimit) {
+      await this.fail(run, 'repair-exhausted',
+        `Combined capability ${task.id} exhausted its captured gate repair bound of ${repairLimit}; the first cause was ${firstFailed?.cause ?? 'unknown'} at gate ${firstFailed?.id ?? 'unknown'}`,
+        firstFailed === undefined ? [] : [runLayout.gate(firstFailed.id)]);
+      return null;
+    }
     const candidateBefore = (await this.git.previewCandidateTree(this.projectRoot)).tree;
     let priorGate: GateAttempt | null = null;
     for (const event of [...run.log.all('gate-attempted')].reverse()) {
@@ -7440,12 +7458,19 @@ export class RunService {
     const gate = priorGate ?? await this.committingCheckpoint(run, {
       id: gateId, runId: run.record.jobId, checkpoint: 'work-item', projectRoot: this.projectRoot,
       directory: run.path(runLayout.gateOutput(gateId)), head: await this.git.currentHead(this.projectRoot),
-      policy: run.record.policy, proposedBy: invocation, repairRound: 0,
+      policy: run.record.policy, proposedBy: invocation, repairRound: failedGates.length,
       subject: { workItem: task.parent.id }, scopeProbe: probe,
     }, `Combined capability ${task.id}: ${action.summary}`);
     if (priorGate === null) await this.afterWrite('capability-gate-recorded', run.record.jobId);
     if (this.ignoring(run)) return null;
     if (gate.verdict !== 'passed' || gate.audited === null) {
+      if (gate.verdict === 'failed' && failedGates.length + 1 >= repairLimit) {
+        const original = firstFailed ?? gate;
+        await this.fail(run, 'repair-exhausted',
+          `Combined capability ${task.id} exhausted its captured gate repair bound of ${repairLimit}; the first cause was ${original.cause ?? 'unknown'} at gate ${original.id}`,
+          [runLayout.gate(original.id), runLayout.gate(gate.id)]);
+        return null;
+      }
       return { handedBack: false, guidance: `Combined gate ${gate.id} ${gate.verdict}: ${gate.cause ?? 'no complete evidence'}` };
     }
     const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot,

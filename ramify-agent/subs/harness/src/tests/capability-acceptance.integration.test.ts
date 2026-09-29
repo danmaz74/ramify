@@ -7,7 +7,7 @@ import { afterEach, expect, test } from 'vitest';
 import type { Script } from '../../subs/agent/src/scripted.js';
 import { gitService } from '../../subs/evidence/src/git.js';
 import { checkCommand } from '../checks/records.js';
-import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
+import { createLocalCommandCheckExecution, createMappedCheckExecution } from './helpers/direct-check-execution.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
@@ -23,7 +23,7 @@ const p = 'capability-coordination';
 
 async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 'restart' | 'verify-restart' |
   'gate-restart' | 'gate-intent-restart' | 'gate-committing-restart' |
-  'review-restart' | 'review-submission-restart'): Promise<void> {
+  'review-restart' | 'review-submission-restart' | 'repair-exhaustion'): Promise<void> {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   await mkdir(join(fixture.root, 'subs/a/src/tests/steps'), { recursive: true });
   await writeFile(join(fixture.root, 'subs/a/src/tests/steps/capability.steps.js'), [
@@ -166,8 +166,22 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   let frozenFault = false;
   let closeVerification: (() => Promise<void>) | undefined;
   let activeService: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
+  const realChecks = createLocalCommandCheckExecution();
+  const failingCombinedChecks = createMappedCheckExecution({ script: ({ check }) => check.kind === 'tests'
+    ? { outcome: { kind: 'completed', exitCode: 1 }, stdout: 'Combined capability repair fixture failure' }
+    : {} });
+  const gateContexts: string[] = [];
   const options = { git: gitService, script: scripted, inputs: treeInputs(),
-    readinessExecution: directReadinessExecution(), checkExecution: createLocalCommandCheckExecution(),
+    readinessExecution: directReadinessExecution(),
+    checkExecution: mode === 'repair-exhaustion' ? { run: (checks: Parameters<typeof realChecks.run>[0],
+      request: Parameters<typeof realChecks.run>[1]) => {
+        gateContexts.push(`${request.context.attemptId}:${request.context.checkpoint}`);
+        // This fixture's first three gates belong to scoped assignments;
+        // ga-0004 and later are its combined handback attempts.
+        return request.context.checkpoint === 'work-item' &&
+          Number(request.context.attemptId.slice(3)) >= 4
+          ? failingCombinedChecks.run(checks, request) : realChecks.run(checks, request);
+      } } : realChecks,
     afterWrite: async (write: string, runId: string) => {
       const event = activeService?.events('need', runId)?.at(-1);
       const gate = activeService?.events('need', runId)?.filter(entry => entry.type === 'gate-attempted').at(-1);
@@ -255,6 +269,30 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     throw new Error(`${String(error)}; architect ${architect}, reviewer ${reviewer}; last events ${JSON.stringify(events.slice(-18))}`);
   });
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  if (mode === 'repair-exhaustion') {
+    const failed = events.find(event => event.type === 'job-failed');
+    expect(failed?.type === 'job-failed' ? failed.data.reason : null,
+      JSON.stringify({ gateContexts, tail: events.slice(-20).map(event => [event.type, event.data]) })).toBe('repair-exhausted');
+    const architectInvocations = new Set(events.flatMap(event => event.type === 'invocation-started' &&
+      event.data.role === 'capability-architect' ? [event.data.invocation] : []));
+    const failedGateIds = events.flatMap(event => event.type === 'gate-attempted' &&
+      event.data.verdict === 'failed' ? [event.data.gate] : []);
+    const attempts = await Promise.all(failedGateIds.map(async gate =>
+      JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+        `gates/${gate}/attempt.json`), 'utf8')) as {
+          id: string; proposedBy: string | null; repairRound: number; cause: string | null;
+        }));
+    const combined = attempts.filter(attempt => attempt.proposedBy !== null && architectInvocations.has(attempt.proposedBy));
+    expect(combined.map(attempt => attempt.repairRound)).toEqual([0, 1, 2]);
+    expect(failed?.type === 'job-failed' ? failed.data.message : '').toContain(`first cause was ${combined[0]?.cause ?? 'unknown'} at gate ${combined[0]?.id}`);
+    expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+    expect(events.filter(event => event.type === 'work-item-completed' && event.data.workItem === 'wi-001')).toHaveLength(0);
+    const job = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as {
+      policy: { limits: { repairRoundsPerWorkItemGate: number } } };
+    expect(job.policy.limits.repairRoundsPerWorkItemGate).toBe(3);
+    await opened.service.settled('need', receipt.jobId);
+    return;
+  }
   if (mode === 'drift') {
     expect(driftFeedback).toContain('Source changed after gate');
     expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
@@ -391,3 +429,5 @@ test('CA20 CA30: restart after the passing review reuses the same gate and revie
   () => runAcceptedHandback('review-restart'), 180_000);
 test('CA19: accepted reviewer submissions replay before their combined review record',
   () => runAcceptedHandback('review-submission-restart'), 180_000);
+test('CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback',
+  () => runAcceptedHandback('repair-exhaustion'), 180_000);
