@@ -287,7 +287,7 @@ describe('a work-item gate that does not pass', () => {
     expect(run.state).toBe('failed');
     expect(run.failure).toMatchObject({ reason: 'repair-exhausted' });
     // The original cause is preserved with the first attempt that recorded it.
-    expect(run.failure!.message).toContain('the first cause was in-scope at gate');
+    expect(run.failure!.message).toContain('the first cause was check-failed at gate');
 
     const events = await runEventsOnDisk(project, 'review-notes', receipt.jobId);
     // The original attempt plus the policy's three repair rounds.

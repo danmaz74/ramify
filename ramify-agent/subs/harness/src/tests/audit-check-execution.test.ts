@@ -154,7 +154,10 @@ async function inPlaceGate(
 function commandSemantics(attempt: GateAttempt) {
   return attempt.commands.map(record => ({
     kind: record.kind,
-    command: record.command,
+    // The outer audit's private reporter endpoints are sanitized by the
+    // provider. Their presence in a parent process is not command semantics.
+    command: { ...record.command, env: record.command.env.filter(name =>
+      name !== 'RAMIFY_AUDIT_VITEST_ROOT' && name !== 'RAMIFY_AUDIT_VITEST_SUMMARY') },
     selection: record.selection,
     exitCode: record.exitCode,
     outcome: record.outcome,

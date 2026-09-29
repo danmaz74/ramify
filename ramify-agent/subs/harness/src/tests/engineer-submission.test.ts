@@ -244,7 +244,7 @@ describe('a rejected submission in a run', () => {
     // answer says rather than passing over.
     expect(engineer.verdicts[1]).toMatchObject({ accepted: true });
     expect((engineer.verdicts[1] as { text: string }).text)
-      .toContain('The iteration gate now runs the complete required set and owns the verdict');
+      .toContain('The iteration gate commits the candidate before running the complete required checks and owns the verdict');
     expect((engineer.verdicts[1] as { text: string }).text)
       .toContain('The Ramify check over your write scope could not be run');
 

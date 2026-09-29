@@ -66,7 +66,7 @@ export const sessionRecordSchema = z.object({
   guarded: z.array(z.object({ path: text, hash: text }).strict()),
   views: z.array(z.object({
     module: text,
-    views: z.array(z.object({ area: text, path: text, coverage: z.number().nullable() }).strict()),
+    views: z.array(z.object({ area: text, path: text, revision: text.optional(), coverage: z.number().nullable() }).strict()),
     unavailable: z.string().nullable(),
   }).strict()),
   prompts: z.object({ package: text, hash: sha256Schema, inputsHash: sha256Schema }).strict(),
