@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -192,8 +190,7 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
             if (!childReturned) throw new Error('Parent resumed while child was active');
             return [{ kind: 'wait', ms: 60_000 }];
           }
-          return submit({ ...basis, kind: 'assign', owner: b, purpose: 'Provide source', approach: 'Read C source',
-            requirementRefs: [], intendedEvidence: ['B returns source'] });
+          return submit({ ...basis, kind: 'assign', assignment: assign(b, { goal: 'Provide source', approach: 'Read C source', completionEvidence: 'B returns source' }).assignment });
         }
         childTurns += 1;
         return childTurns === 1 ? submit({ ...basis, kind: 'partial', progress: 'C source inspected',
@@ -263,7 +260,8 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
     expect(returnedEvents.filter(event => event.type === 'job-failed'), JSON.stringify(returnedEvents.slice(-12))).toHaveLength(0);
     expect(returnedEvents.filter(event => event.type === 'capability-assigned' && event.data.task === 'cap-001')).toHaveLength(1);
     expect(returnedEvents.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01')).toHaveLength(1);
-    expect(resumedBPrompt).toContain('Dependency returned');
+    expect(resumedBPrompt).toContain('Nested capability cap-002 handed back');
+    expect(resumedBPrompt).toContain('Continue cap-001.i01');
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const current = resumed.service.events('need', receipt.jobId)!;
       try { await resumed.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
@@ -337,8 +335,7 @@ test(`CA21 CA32: nested ${boundary} returns a global decision before child deleg
       if (spec.role === 'capability-architect') {
         const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
         if (ids[1] === 'cap-001' && parentTurns++ === 0) return submit({ kind: 'assign', task: ids[1],
-          planRevision: Number(ids[2]), invocation: ids[3], owner: b, purpose: 'Provide B source',
-          approach: 'Read C source', requirementRefs: [], intendedEvidence: ['B returns source'] });
+          planRevision: Number(ids[2]), invocation: ids[3], assignment: assign(b, { goal: 'Provide B source', approach: 'Read C source', completionEvidence: 'B returns source' }).assignment });
         return [{ kind: 'wait', ms: 60_000 }];
       }
       return [];
@@ -425,8 +422,6 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     let engineerTurns = 0;
     let childTurns = 0;
     let parentTurns = 0;
-    let candidate = '';
-    let config = '';
     let returnedPrompt = '';
     let frozenHandback = false;
     let service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
@@ -452,15 +447,15 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
           examples: [{ title: 'normalizes source', code: "expect(readFact()).toBe('B')", designation: 'pseudocode' }],
           suggestedProvider: { module: c, reason: 'C owns normalization' },
         } }, edit('fact.ts', "return 'old';", "return 'old from C';"));
-        if (spec.prompt.includes('# Capability assignment cap-002.i01')) return submit({
+        if (spec.prompt.includes('# Iteration cap-002.i01')) return submit({
           kind: 'completion-proposed', summary: 'C normalizes the source', findings: [],
         }, write('source.ts', 'export function normalizeSource(value: string): string { return value.trim().toUpperCase(); }\n'),
         write('tests/source.test.ts', "import { expect, test } from 'vitest';\nimport { normalizeSource } from '../source.js';\ntest('C normalizes source', () => expect(normalizeSource(' b ')).toBe('B'));\n"));
-        if (spec.prompt.includes('# Capability assignment cap-002.i02')) return submit({
+        if (spec.prompt.includes('# Iteration cap-002.i02')) return submit({
           kind: 'completion-proposed', summary: 'B uses the real C normalizer', findings: [],
         }, write('fact.ts', "import { normalizeSource } from '../../c/src/source.js';\nexport function readFact(): string { return normalizeSource(' b '); }\n"),
         write('tests/fact.test.ts', "import { expect, test } from 'vitest';\nimport { readFact } from '../fact.js';\ntest('B uses C normalized source', () => expect(readFact()).toBe('B'));\n"));
-        if (spec.prompt.includes('# Dependency returned')) {
+        if (spec.prompt.includes('Nested capability cap-002 handed back')) {
           returnedPrompt = spec.prompt;
           return submit({ kind: 'completion-proposed', summary: 'B completed the original source assignment', findings: [] });
         }
@@ -472,20 +467,17 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
         if (basis.task === 'cap-001') {
           parentTurns += 1;
           return parentTurns > 1 ? [{ kind: 'wait', ms: 60_000 }]
-            : submit({ ...basis, kind: 'assign', owner: b, purpose: 'Provide B source', approach: 'Use C normalization',
-            requirementRefs: [], intendedEvidence: ['B returns C normalized source'] });
+            : submit({ ...basis, kind: 'assign', assignment: assign(b, { goal: 'Provide B source', approach: 'Use C normalization', completionEvidence: 'B returns C normalized source' }).assignment });
         }
         childTurns += 1;
-        if (childTurns === 1) return submit({ ...basis, kind: 'assign', owner: c, purpose: 'Normalize source',
-          approach: 'Implement and test C behavior', requirementRefs: [], intendedEvidence: ['C test passes'] });
-        if (childTurns === 2) return submit({ ...basis, kind: 'assign', owner: b, purpose: 'Use normalized source in B',
-          approach: 'Call real C from B', requirementRefs: [], intendedEvidence: ['B test passes'] });
-        if (childTurns !== 3 || candidate === '' || config === '') throw new Error('Child candidate was not captured');
+        if (childTurns === 1) return submit({ ...basis, kind: 'assign', assignment: assign(c, { goal: 'Normalize source', approach: 'Implement and test C behavior', completionEvidence: 'C test passes' }).assignment });
+        if (childTurns === 2) return submit({ ...basis, kind: 'assign', assignment: assign(b, { goal: 'Use normalized source in B', approach: 'Call real C from B', completionEvidence: 'B test passes' }).assignment });
+        if (childTurns !== 3) throw new Error('Unexpected child coordinator turn');
         return [{ kind: 'tool', tool: 'update_capability_plan', input: { task: basis.task,
           basedOn: basis.planRevision, invocation: basis.invocation, reason: 'Real C and B tests cover the original case',
           changes: { useCases: [{ id: 'need-002.ex01', expectedBehavior: 'B uses normalized C source',
             derivedFrom: ['need-002.ex01'], coverage: { state: 'exercised',
-              tests: ['subs/b/src/tests/fact.test.ts', 'subs/c/src/tests/source.test.ts'], candidate, configuration: config } }] } } },
+              tests: ['subs/b/src/tests/fact.test.ts', 'subs/c/src/tests/source.test.ts'] } }] } } },
           { kind: 'submit', input: { ...basis, planRevision: basis.planRevision + 1, kind: 'request-handback',
             summary: 'C normalization is used by B',
             coverage: [{ case: 'need-002.ex01', evidence: ['subs/b/src/tests/fact.test.ts', 'subs/c/src/tests/source.test.ts'] }],
@@ -506,13 +498,6 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
           frozenHandback = true;
           await freeze();
         }
-        if (event !== 'capability-assignment-settled') return;
-        const settled = service?.events('need', runId)?.at(-1);
-        if (settled?.type !== 'capability-assignment-settled' || settled.data.assignment !== 'cap-002.i02') return;
-        if (settled.data.endingTree === undefined) throw new Error('Child assignment has no ending candidate');
-        candidate = settled.data.endingTree;
-        const job = JSON.parse(readFileSync(join(fixture.root, 'plans/need/.harness/jobs', runId, 'job.json'), 'utf8')) as { projectConfig: unknown };
-        config = createHash('sha256').update(JSON.stringify(job.projectConfig)).digest('hex');
       },
       policy: (root: string) => {
         const base = testPolicy(root);
@@ -543,11 +528,11 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     expect(events.filter(event => event.type === 'capability-handed-back' && event.data.task === 'cap-002')).toHaveLength(1);
     expect(events.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01')).toHaveLength(1);
     expect(events.filter(event => event.type === 'work-item-started' && event.data.workItem === 'wi-002')).toHaveLength(0);
-    expect(returnedPrompt).toContain('Dependency returned');
+    expect(returnedPrompt).toContain('Nested capability cap-002 handed back');
     const passed = events.filter(event => event.type === 'gate-attempted' && event.data.verdict === 'passed');
     expect(passed.length).toBeGreaterThan(0);
-    expect(events.filter(event => event.type === 'capability-review-recorded' && event.data.task === 'cap-002' &&
-      event.data.outcome === 'passed')).toHaveLength(1);
+    expect(events.filter(event => event.type === 'review-request-recorded' && event.data.workItem === 'cap-002').length).toBeGreaterThan(0);
+    expect(events.filter(event => event.type === 'capability-review-recorded')).toHaveLength(0);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const current = opened.service.events('need', receipt.jobId)!;
       try { await opened.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
