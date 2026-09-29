@@ -13,10 +13,11 @@ import type { InputManifest } from '../../interfaces/protocol/evidence.js';
 import type { RunCommand } from '../../interfaces/protocol/runs.js';
 import { sha256 } from '../../prompts/packages.js';
 import type { RunEvent } from '../../run/log.js';
-import { defaultRunPolicy } from '../../run/policy.js';
+import { defaultContextPolicies, defaultRunPolicy } from '../../run/policy.js';
 import type { RunPolicy } from '../../run/records.js';
 import type { RunInputs } from '../../run/inputs.js';
 import { RunService, type RunServiceOptions } from '../../run/service.js';
+import type { CapabilityWorkflow } from '../../capability/workflow.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
 import { installScriptedCucumber } from './project-config.js';
@@ -142,6 +143,10 @@ export function testPolicy(projectRoot: string, options: TestPolicyOptions = {})
   const { reviews: _reviews, ...unreviewed } = base;
   return {
     ...unreviewed,
+    version: 'run-policy/4',
+    // Historical fixture runs use the captured contract role. New production
+    // policy/5 deliberately omits it from its context and prompt manifest.
+    context: { ...base.context, 'contract-engineer': defaultContextPolicies['contract-engineer'] },
     ...(options.reviews === undefined ? {} : { reviews: options.reviews }),
     commands: {
       ...base.commands,
@@ -235,6 +240,10 @@ export async function realRamify(): Promise<Awaited<ReturnType<typeof privateRam
 }
 
 export interface OpenRunsOptions extends Partial<RunServiceOptions> {
+  /** Exercise the public production constructor and its fixed policy. */
+  readonly production?: boolean | undefined;
+  /** Test-only workflow factory; production composition never receives it. */
+  readonly capabilityWorkflowFactory?: (() => CapabilityWorkflow) | undefined;
   /** Every test chooses its Git boundary explicitly; this helper has no production fallback. */
   readonly git: NonNullable<RunServiceOptions['git']>;
   readonly script?: Script | undefined;
@@ -258,24 +267,29 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
   const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script), options.agentOptions);
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
-  const { script: _script, checkScript, agentOptions: _agentOptions, ...rest } = options;
+  const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, production, ...rest } = options;
   const checkExecution = checkScript === undefined
     ? createPassingCheckExecution()
     : typeof checkScript === 'function'
       ? createMappedCheckExecution({ script: checkScript })
       : createDirectCheckExecution({ script: checkScript });
-  const { service, recovery } = await RunService.open({
+  const serviceOptions: RunServiceOptions = {
     projectRoot: root,
     lock,
     inputs: shapeOnlyInputs,
     ramify: options.ramify ?? new FakeRamifyCli(),
     checkExecution,
     stopGraceMs: 500,
-    policy: projectRoot => testPolicy(projectRoot),
+    ...(production === true ? {} : { policy: (projectRoot: string) => testPolicy(projectRoot) }),
     warn: message => warnings.push(message),
     ...rest,
     ...(agent === undefined ? {} : { agent }),
-  });
+  };
+  const { service, recovery } = production === true
+    ? await RunService.open(serviceOptions)
+    : capabilityWorkflowFactory === undefined
+      ? await RunService.openForHistoricalTests(serviceOptions)
+      : await RunService.openForCapabilityTests(serviceOptions, capabilityWorkflowFactory);
   return { service, recovery, agent: scripted, lock, warnings };
 }
 

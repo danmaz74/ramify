@@ -27,7 +27,7 @@ export function capabilityOf(reach: SessionReach): string | null {
 
 /** The module a session reaches, if any. */
 export function moduleOf(reach: SessionReach): string | null {
-  return reach.kind === 'work-item' || reach.kind === 'module' ? reach.module : null;
+  return reach.kind === 'work-item' || reach.kind === 'module' || reach.kind === 'capability-task' ? reach.module : null;
 }
 
 /** The sessions of each element, keyed by what `elementOf` answers; a session with no element is left out. */

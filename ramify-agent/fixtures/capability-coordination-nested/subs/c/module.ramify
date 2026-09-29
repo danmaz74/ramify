@@ -1,0 +1,3 @@
+ramify 1
+module c
+expose-src normalizeSource from "source.ts" to parent

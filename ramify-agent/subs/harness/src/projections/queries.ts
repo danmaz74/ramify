@@ -22,6 +22,8 @@ import { ProjectionError, readRunFile, runView, unservedRun, unservedRuns, type 
 import { metricsOf } from './metrics.js';
 import { moduleCapabilityComparisonOf, type AnalysisCoverageLimits } from './module-capabilities.js';
 import { capabilityProgressOf } from './progress.js';
+import { capabilityTasksOf } from './capability-tasks.js';
+import type { CapabilityTasksResponse } from '../interfaces/protocol/capability-tasks.js';
 import { scenarioListOf } from './scenarios.js';
 import { decisionRequestsOf, snapshotOf } from './snapshot.js';
 import { currentModuleTree } from './tree.js';
@@ -127,6 +129,11 @@ export class RunQueries {
   async capabilities(planId: string, runId: string): Promise<CapabilityListResponse> {
     const all = capabilityProgressOf(await this.view(planId, runId));
     return { capabilities: all.slice(0, runQueryLimits.capabilities), total: all.length };
+  }
+
+  /** Task coordination at one committed version; distinct from capability registry progress. */
+  async capabilityTasks(planId: string, runId: string, version: number): Promise<CapabilityTasksResponse> {
+    return capabilityTasksOf(await this.versioned(planId, runId, version));
   }
 
   /**

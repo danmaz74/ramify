@@ -4,6 +4,7 @@ import type {
   ProjectedRunEvent, RunNotice, RunSnapshot, WorkItemResponse,
 } from '../../harness/src/interfaces/protocol/runs.js';
 import { CapabilityDependencyGraph } from './capability-graph.js';
+import { CapabilityTasksArea } from './capability-tasks.js';
 import { CatalogReview } from './catalog-review.js';
 import { EnvironmentProblems, ModuleCheckFindings, PlanDeviations, WorkItemCheckFindings } from './check-findings.js';
 import { ExecutionMapArea } from './execution-map.js';
@@ -39,6 +40,7 @@ const areas = [
   ['scenarios', 'Scenarios'],
   ['checks', 'Checks'],
   ['progress', 'Progress'],
+  ['capability-tasks', 'Capability tasks'],
   ['execution', 'Execution map'],
   ['sessions', 'Sessions'],
   ['measurements', 'Measurements'],
@@ -111,6 +113,7 @@ export function RunPage({ client, planId, runId, interval }: {
             onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} />
         )}
         {area === 'sessions' && <RunSessions {...props} />}
+        {area === 'capability-tasks' && <CapabilityTasksArea {...props} onOpenWorkItem={id => { setWorkItem(id); setArea('work'); }} onOpenGate={openGate} />}
         {area === 'execution' && <ExecutionMapArea {...props} events={events} onOpenGate={openGate} waitingWorkItems={waiting} />}
         {area === 'measurements' && <Measurements {...props} />}
       </section>

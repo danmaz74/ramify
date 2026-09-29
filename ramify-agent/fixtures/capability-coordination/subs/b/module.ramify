@@ -1,0 +1,3 @@
+ramify 1
+module b
+expose-src readFact from "fact.ts" to parent

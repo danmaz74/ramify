@@ -32,10 +32,10 @@ describe('what an engineer is told about the Ramify project it works in', () => 
     expect(prompt).toContain('Foreign source never establishes importability');
     expect(prompt).toContain('`RAMIFY MODULE VIOLATION`');
     expect(prompt).toContain('the harness\nchecks your whole write scope once more before it accepts');
-    expect(prompt).toContain('submit `unsuitable` with reason `scope`');
+    expect(prompt).toContain('submit `capability-needed` with the actual usage');
     expect(prompt).toContain('do not copy its definition');
     expect(prompt).toContain('Expose a symbol together with every named type its signature mentions');
-    expect(prompt).toContain('it is an incomplete exposure');
+    expect(prompt).toContain('cannot use it cleanly');
     expect(prompt).not.toContain('Awaited<');
     expect(prompt).not.toMatch(/\{\{[a-zA-Z]+\}\}/);
   });

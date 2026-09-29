@@ -32,7 +32,12 @@ export function shownState(session: RunSession, ended: boolean): ShownSessionSta
 /** The diagram elements one of a run's sessions reaches. */
 export function reachOf(view: RunView, session: RunSession): SessionReach {
   if (session.role === 'initial-architect') return { kind: 'run' };
-  const { workItem, request } = session.work;
+  const { workItem, request, capabilityTask, capabilityAssignment } = session.work;
+  if (capabilityTask !== undefined) {
+    const assignment = capabilityAssignment === undefined ? undefined : view.records.capabilityAssignments.get(capabilityAssignment);
+    return { kind: 'capability-task', task: capabilityTask, request: request ?? null,
+      assignment: capabilityAssignment ?? null, module: assignment?.owner ?? null };
+  }
   if (session.role === 'global-fork' && request !== undefined) {
     const record = view.records.requests.get(request);
     return { kind: 'request', request, workItem: record?.workItem ?? workItem ?? null, capability: record?.forCapability ?? null };

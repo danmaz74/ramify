@@ -1,0 +1,3 @@
+ramify 1
+module capability-coordination
+expose-sub readFact from b to descendants

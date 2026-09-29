@@ -102,7 +102,21 @@ export const nonfunctionalRecoveryBoundaries = {
   'nonfunctional-repair-assigned': 'nonfunctional-recovery.test.ts',
   'nonfunctional-repair-committed': 'nonfunctional-recovery.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
-type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries>;
+export const capabilityRecoveryBoundaries = {
+  'writer-process-registered': 'capability-recovery.test.ts',
+  'capability-coordinator-resumed': 'capability-recovery.test.ts',
+  'capability-source-captured': 'capability-recovery.test.ts',
+  'capability-exchange-opened': 'capability-recovery.test.ts',
+  'capability-exchange-answered': 'capability-recovery.test.ts',
+  'capability-gate-recorded': 'capability-acceptance.integration.test.ts',
+  'capability-review-recorded': 'capability-acceptance.integration.test.ts',
+  'capability-handed-back': 'capability-dependencies.test.ts',
+  'capability-assignment-settled': 'capability-dependencies.test.ts',
+  'capability-assigned': 'capability-recovery.test.ts',
+  'capability-assignment-interrupted': 'capability-recovery.test.ts',
+  'capability-verification-started': 'capability-acceptance.integration.test.ts',
+} as const satisfies Partial<Record<RunWrite, string>>;
+type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries>;
 
 /** One row per durable boundary with the interrupted-run recovery contract. */
 export const recoveryTable = {
@@ -325,6 +339,17 @@ const lastLineOf: Readonly<Record<RunWrite, RunEvent['type']>> = {
   'gate-committing': 'gate-committing',
   'gate-committed': 'gate-attempted',
   'brief-appending': 'decision-accepted',
+  'capability-assignment-interrupted': 'capability-assignment-interrupted',
+  'capability-coordinator-resumed': 'capability-coordinator-resumed',
+  'capability-verification-started': 'capability-verification-started',
+  'capability-source-captured': 'invocation-ended',
+  'capability-exchange-opened': 'capability-exchange-opened',
+  'capability-exchange-answered': 'capability-exchange-answered',
+  'capability-gate-recorded': 'gate-attempted',
+  'capability-review-recorded': 'capability-review-recorded',
+  'capability-assignment-settled': 'capability-assignment-settled',
+  'writer-process-registered': 'writer-process-registered',
+  'capability-assigned': 'capability-assigned',
 };
 
 /** Every row, named. */

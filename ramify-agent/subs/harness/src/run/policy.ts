@@ -16,8 +16,8 @@ import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig
  * own settings, built again at the moment of the spawn.
  */
 
-/** The version this policy is recorded under. `run-policy/2` runs, without reviews, stay readable. */
-export const runPolicyVersion = 'run-policy/4';
+/** New runs use capability coordination. Earlier policy versions remain readable. */
+export const runPolicyVersion = 'run-policy/5';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {
@@ -25,7 +25,9 @@ export const defaultLimits: RunPolicy['limits'] = {
   repairRoundsPerWorkItemGate: 3,
   infrastructureRetriesPerGate: 2,
   forkRetriesPerRequest: 2,
-  budgetReturnsPerIteration: 3,
+  // Retry 7 reached three coordinator context returns while semantic review
+  // still had an actionable Model-owned repair. Keep a finite captured bound.
+  budgetReturnsPerIteration: 6,
   sessionReconstructionsPerWork: 2,
   cycleReplansPerWorkItem: 1,
   rejectedSubmissionsPerTurn: 3,
@@ -36,6 +38,9 @@ export const defaultLimits: RunPolicy['limits'] = {
   invocationIdleMs: 300_000,
   invocationAbsoluteMs: 3_600_000,
   maxIterationsPerWorkItem: 12,
+  // A cross-owner capability may need provider, consumer, then root repair;
+  // retry4 reached a valid root assignment at i13 before the old bound stopped it.
+  maxIterationsPerCapabilityTask: 24,
   maxWorkItems: 64,
   maxPlacementRequests: 32,
   maxInvocationsPerRun: 400,
@@ -107,6 +112,7 @@ export const defaultContextPolicies: Record<Role, NonNullable<RunPolicy['context
   'global-fork': { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 16_000 },
   engineer: { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
   'contract-engineer': { compaction: 'forbidden', budgetTokens: 140_000, budgetFraction: 0.7, reportReserveTokens: 12_000 },
+  'capability-architect': { compaction: 'allowed', budgetTokens: 150_000, budgetFraction: 0.75, reportReserveTokens: 16_000 },
   // A reviewer reads a bounded diff and submits; running out of room is an
   // execution failure of its attempt, never a compacted half-review.
   reviewer: { compaction: 'forbidden', budgetTokens: 120_000, budgetFraction: 0.6, reportReserveTokens: 8_000 },
@@ -258,7 +264,8 @@ export function defaultRunPolicy(options: RunPolicyOptions): RunPolicy {
   const { projectRoot } = options;
   const ramify = options.ramify ?? ramifyExecutable;
   const ramifySettings: Record<string, string> = options.endpointDirectory === undefined ? {} : { RAMIFY_ENDPOINT_DIR: options.endpointDirectory };
-  const context = Object.fromEntries(roles.map(role => [role, defaultContextPolicies[role]])) as RunPolicy['context'];
+  const context = Object.fromEntries(roles.filter(role => role !== 'contract-engineer')
+    .map(role => [role, defaultContextPolicies[role]])) as RunPolicy['context'];
   return runPolicySchema.parse({
     version: runPolicyVersion,
     limits: defaultLimits,

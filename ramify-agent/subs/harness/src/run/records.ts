@@ -153,6 +153,8 @@ export const runPolicySchema = z.object({
     invocationIdleMs: z.int().positive(),
     invocationAbsoluteMs: z.int().positive(),
     maxIterationsPerWorkItem: z.int().positive(),
+    /** Captured for capability workflow runs; absent on historical policies. */
+    maxIterationsPerCapabilityTask: z.int().positive().optional(),
     maxWorkItems: z.int().positive(),
     maxPlacementRequests: z.int().positive(),
     maxInvocationsPerRun: z.int().positive(),
@@ -191,7 +193,9 @@ export const runPolicySchema = z.object({
     'global-fork': contextPolicySchema,
     'local-architect': contextPolicySchema,
     engineer: contextPolicySchema,
-    'contract-engineer': contextPolicySchema,
+    /** Historical runs keep this role; new runs never invoke it. */
+    'contract-engineer': contextPolicySchema.optional(),
+    'capability-architect': contextPolicySchema.optional(),
     reviewer: contextPolicySchema.optional(),
     /** Absent from a run captured before failure analysis existed, which analyzes nothing. */
     'failure-analyst': contextPolicySchema.optional(),
@@ -574,6 +578,7 @@ export const usageSchema = z.object({
 
 /** The work one invocation, and the session it belongs to, is for: none for the initial architect. */
 export const invocationWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional(),
+  capabilityTask: text.optional(), capabilityAssignment: text.optional(),
   nonfunctionalRepair: text.optional(),
 }).strict();
 export type InvocationWork = z.infer<typeof invocationWorkSchema>;
@@ -601,7 +606,7 @@ export type SessionPoint = z.infer<typeof sessionPointSchema>;
  * resumed the run after its unresolved request was answered with an
  * environment problem.
  */
-export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected']);
+export const continueReasonSchema = z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']);
 export type ContinueReason = z.infer<typeof continueReasonSchema>;
 
 /**
@@ -618,7 +623,7 @@ export const forkReasonSchema = z.enum(['placement-request', 'scope-review', 'de
 export const replaceReasonSchema = z.enum(['reconstructed', 'context-rebuilt']);
 
 /** Why an invocation's result opened a session: an engineer's need opens a contract sub-session. */
-export const requestReasonSchema = z.enum(['contract-needed']);
+export const requestReasonSchema = z.enum(['contract-needed', 'capability-needed']);
 
 /** A continued invocation: the point it continues from, why, and the briefs appended since its session's previous invocation. */
 export const continueRelationSchema = z.object({

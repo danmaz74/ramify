@@ -3,6 +3,7 @@ import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkpointPolicies, allProjectChecks } from '../checks/checkpoint.js';
 import { commandTimeouts, defaultLimits, defaultRunPolicy, discoverNestedPackages, nestedPackageDepth } from '../run/policy.js';
 import { runPolicySchema } from '../run/records.js';
+import { RunService, type RunServiceOptions } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -22,9 +23,14 @@ afterEach(async () => {
 });
 
 describe('the captured commands', () => {
+  test('production constructor refuses policy injection before creating a service', async () => {
+    await expect(RunService.open({ policy: () => defaultRunPolicy({ projectRoot: '/project', nested: [] }) } as unknown as RunServiceOptions))
+      .rejects.toThrow('Production run policy is fixed');
+  });
   test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
-    expect(policy.version).toBe('run-policy/4');
+    expect(policy.version).toBe('run-policy/5');
+    expect(policy.limits.maxIterationsPerCapabilityTask).toBe(24);
     expect(policy.limits.nonfunctionalRoundsPerPlan).toBe(3);
     // The first trial's review policy and reconciliation bound (Plan 12).
     expect(policy.reviews).toEqual({ version: 'review-policy/1', kinds: ['code', 'scope', 'design'], concurrency: 2, queue: 12, retries: 1, attemptMs: 600_000, settleMs: 900_000, maxConcerns: 20 });
@@ -68,7 +74,7 @@ describe('the captured commands', () => {
     expect(policy.limits).toEqual(defaultLimits);
     expect(defaultLimits).toMatchObject({
       repairRoundsPerIteration: 3, repairRoundsPerWorkItemGate: 3, infrastructureRetriesPerGate: 2,
-      forkRetriesPerRequest: 2, budgetReturnsPerIteration: 3, sessionReconstructionsPerWork: 2,
+      forkRetriesPerRequest: 2, budgetReturnsPerIteration: 6, sessionReconstructionsPerWork: 2,
       cycleReplansPerWorkItem: 1, rejectedSubmissionsPerTurn: 3, rejectedToolInputsPerTurn: 3,
       readinessRecoveries: 2, stopSettleMs: 30_000, writerSettleMs: 30_000,
       invocationIdleMs: 300_000, invocationAbsoluteMs: 3_600_000,

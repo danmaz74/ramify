@@ -329,6 +329,30 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  // Plan 16: the new-run capability path is driven in its own service tests.
+  { union: 'run log.type', values: ['capability-requested', 'capability-qualified', 'capability-delegated'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'run log.type', values: ['capability-plan-revised', 'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
+  { union: 'run log.type', values: ['capability-coordinator-resumed', 'capability-assignment-interrupted'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within the same assignment' },
+  { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-verification-started', 'capability-handed-back'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'run log.type', values: ['capability-verification-failed'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23 CA34: request, design, consultation and failed verification remain distinct from registry capability' },
+  { union: 'run log.type', values: ['capability-stopped'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20 CA32: restart with a B writer lacking confirmed release stops the stack and frontier' },
+  { union: 'run log.type', values: ['writer-process-registered'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20: a registered real process group survives a service crash and is settled before any successor work' },
+  { union: 'run log[session-opened].data.role', values: ['capability-architect'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'run log[session-opened].data.requestedBy.reason', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-qualification'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-returned'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'run log[invocation-started].data.continues.reason', values: ['capability-coordination'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry' },
+  { union: 'run log[capability-qualified].data.outcome', values: ['satisfied'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA02: local architect finds an existing API and the same engineer verifies it' },
+  { union: 'run log[capability-qualified].data.outcome', values: ['request-placement'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'run log[capability-qualified].data.outcome', values: ['unresolved'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'an unresolved qualification returns through the global architect and the same local architect' },
+  { union: 'run log[capability-assignment-settled].data.outcome', values: ['accepted'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
+  { union: 'run log[capability-assignment-settled].data.outcome', values: ['partial'], file: 'subs/harness/src/tests/capability-state.test.ts', test: 'refuses handback while an assignment is unfinished or failed' },
+  { union: 'run log[capability-review-recorded].data.outcome', values: ['passed', 'failed'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'submission engineer.kind', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['none-known'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['insufficient'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'submission engineer[capability-needed].request.examples[].designation', values: ['pseudocode'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
+  { union: 'query events.events[].refs[].kind', values: ['capability-request', 'capability-task', 'capability-assignment'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23: capability event references identify requests, tasks and assignments' },
   // A path outside every module, assigned as outside-modules and written through the guard.
   { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].purpose', values: ['outside-modules'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
   { union: 'record ramify-agent.iteration-assignment/1.scope.extra[].kind', values: ['file'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'the engineer writes it through the guard, and the gate runs its test on a run of its own' },
@@ -649,6 +673,14 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  {
+    union: 'run log[capability-assignment-settled].data.outcome', values: ['failed', 'interrupted'],
+    reason: 'Current driven capability runs recover interrupted writers into a later settlement or stop the stack; no test commits these terminal settlement outcomes yet.',
+  },
+  {
+    union: 'submission engineer[capability-needed].request.examples[].designation', values: ['executable'],
+    reason: 'Current capability service fixtures submit pseudocode examples; no driven engineer submission yet marks an example executable.',
+  },
   {
     union: 'query analysis.analysis[accepted].planEvidence.status', values: ['unavailable'],
     reason: 'Legacy coverage unavailability is exercised at the record helper boundary, but the current query suite does not construct an accepted legacy run for this projection branch.',

@@ -262,7 +262,7 @@ describe('K3: exact-owner and included-subtree selections at gate time', () => {
 });
 
 describe('X1a: an engineer reaches its context budget', () => {
-  test('it returns with its report, no compaction is recorded, and the third return exhausts the bound', async () => {
+  test('it returns with its report, no compaction is recorded, and the sixth return exhausts the bound', async () => {
     const root = await target();
     const budgetTurn = [
       { kind: 'compaction' as const, reason: 'threshold' as const, tokensBefore: 130_000, tokensAfter: 40_000 },
@@ -274,14 +274,18 @@ describe('X1a: an engineer reaches its context budget', () => {
     const { service, runId, scripted } = await run(root, {
       'initial-architect': [submit(analysis([entry('review-note', notes)]))],
       'local-architect': [submit(assign(notes, {}, outline())), submit(requestCompletion())],
-      engineer: [budgetTurn, budgetTurn, budgetTurn],
+      engineer: Array(6).fill(budgetTurn),
     }, [unchanged, unchanged]);
 
     expect(onlyRun(service, 'review-notes').state, JSON.stringify(onlyRun(service, 'review-notes').failure)).toBe('completed');
     const result = await readResult(root, runId, 'wi-001', 1);
+    const job = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.record), 'utf8')) as
+      { policy: { limits: { budgetReturnsPerIteration: number } } };
+    const capturedBound = job.policy.limits.budgetReturnsPerIteration;
+    expect(capturedBound).toBe(6);
     expect(result.outcome).toBe('partial');
-    expect(result.invocations).toHaveLength(3);
-    expect(result.findings.some(finding => finding.includes('return 3 of 3'))).toBe(true);
+    expect(result.invocations).toHaveLength(capturedBound);
+    expect(result.findings.some(finding => finding.includes(`return ${capturedBound} of ${capturedBound}`))).toBe(true);
     expect(result.commit).toBeNull();
 
     for (const [index, invocation] of result.invocations.entries()) {
@@ -292,7 +296,8 @@ describe('X1a: an engineer reaches its context budget', () => {
       expect(outcome.budget).toEqual({ threshold: 140_000, observed: 200_000, reportDelivered: true });
 
       // A fresh session does not reset the counter: each return after the
-      // first is its own fresh session, and the third is still the third.
+      // first is its own fresh session, and the sixth still exhausts the
+      // captured bound.
       const record = JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.invocation(invocation)), 'utf8')) as {
         session: { requested: string; actual: string }; attempt: number;
       };

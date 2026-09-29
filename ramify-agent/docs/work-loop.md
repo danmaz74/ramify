@@ -1,9 +1,10 @@
 # The work loop as a state machine
 
-**Status:** Proposed. It replaces the work-loop section of the
-[draft architecture](architecture.md) and extends
-[Plan 1](plans/01-implementation-map/main-plan.md)'s job model. Nothing here is
-implemented.
+**Status:** Superseded proposal. Its fake-first state machine extends the
+[draft architecture](architecture.md) and [Plan 1](plans/01-implementation-map/main-plan.md)'s
+job model. The current implementation design is the
+[autonomous implementation loop](architecture/autonomous-implementation-loop.md).
+Nothing in this proposal is claimed as implemented.
 
 This document designs the harness's control loop under the
 [harness principles](harness.principles.md). Agents make every semantic

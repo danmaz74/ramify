@@ -313,23 +313,21 @@ describe('a single engineer session', () => {
     expect(events.filter(event => event.type === 'submission').map(event => (event.type === 'submission' ? event.accepted : null))).toEqual([false, true]);
   }, 120_000);
 
-  test('unsuitable and contract-needed are recorded and answered, and no further session starts', async () => {
+  test('unsuitable and capability-needed are recorded and answered, and no further session starts', async () => {
     const root = await project();
-    const contractNeeded = {
-      kind: 'contract-needed',
-      need: {
-        capability: 'note-limit',
-        useCases: ['a note longer than the limit is refused'],
-        inputs: ['the note text'],
-        outputs: ['whether the note is acceptable'],
-        sideEffects: [],
+    const capabilityNeeded = {
+      kind: 'capability-needed',
+      request: {
+        need: 'Refuse a note longer than the provider limit.',
+        usage: [{ path: notesSource, use: 'The note validator calls the limit provider.', prospective: false }],
         constraints: [],
-        existingEvidence: [],
+        knownInterface: { kind: 'none-known' },
+        examples: [{ title: 'Long note', code: 'expect(validateNote(longNote)).toBe(false)', designation: 'pseudocode' }],
       },
       summary: 'The limit is owned by another module.',
     };
 
-    for (const input of [unsuitableScope('The limit lives elsewhere.'), contractNeeded]) {
+    for (const input of [unsuitableScope('The limit lives elsewhere.'), capabilityNeeded]) {
       const { result, agent, git } = await session(root, [{ kind: 'submit', input }]);
       const summary = finished(result);
       expect(result.exitStatus).toBe(0);

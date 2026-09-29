@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { modulePathSchema, sha256Schema } from '../interfaces/protocol/evidence.js';
 import { invocationOutcomeSchema } from '../run/records.js';
-import { engineerSubmissionKinds, engineerSubmissionSchema } from '../work/engineer.js';
+import { capabilityEngineerSubmissionKinds, engineerSubmissionKinds, engineerSubmissionSchema } from '../work/engineer.js';
 import { testSelectionPolicySchema } from '../work/iterations.js';
 
 /*
@@ -95,7 +95,7 @@ export const sessionOutcomeSchema = z.object({
   interruption: z.enum(['idle-timeout', 'absolute-timeout', 'stopped-by-caller', 'adapter-fault']).optional(),
   error: z.string().optional(),
   /** The accepted submission's kind and the hash of `submission.json`; null when none was accepted. */
-  submission: z.object({ kind: z.enum(engineerSubmissionKinds), hash: sha256Schema }).strict().nullable(),
+  submission: z.object({ kind: z.enum([...new Set([...engineerSubmissionKinds, ...capabilityEngineerSubmissionKinds])]), hash: sha256Schema }).strict().nullable(),
   rejectedSubmissions: z.int().nonnegative(),
   standingViolations: z.array(standingViolationSchema),
   settled: invocationOutcomeSchema.shape.settled,

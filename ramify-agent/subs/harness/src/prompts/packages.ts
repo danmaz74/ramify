@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import type { Role } from '../interfaces/protocol/runs.js';
 import { initialAnalysisJsonSchema, initialAnalysisToolName } from '../analysis/submission.js';
-import { localArchitectJsonSchema, localArchitectSubmissionKinds, localArchitectToolName } from '../work/submission.js';
-import { engineerJsonSchema, engineerSubmissionKinds, engineerToolName } from '../work/engineer.js';
+import { capabilityLocalArchitectJsonSchema, localArchitectJsonSchema, localArchitectSubmissionKinds, localArchitectToolName } from '../work/submission.js';
+import { capabilityEngineerJsonSchema, engineerJsonSchema, engineerSubmissionKinds, capabilityEngineerSubmissionKinds, engineerToolName } from '../work/engineer.js';
+import { capabilityActionSchema } from '../capability/submission.js';
 import { forkJsonSchema, forkSubmissionKinds, forkToolName } from '../architecture/submission.js';
 import { contractJsonSchema, contractSubmissionKinds, contractToolName } from '../contracts/submission.js';
 import { orientationJsonSchema, orientationToolName, reviewJsonSchema, reviewToolName } from '../reviews/submission.js';
@@ -40,9 +42,14 @@ const forkSystemFile = fileURLToPath(new URL('./global-fork.system.md', import.m
 const forkProcedureFile = fileURLToPath(new URL('./global-fork.procedure.md', import.meta.url));
 const localSystemFile = fileURLToPath(new URL('./local-architect.system.md', import.meta.url));
 const localProcedureFile = fileURLToPath(new URL('./local-architect.procedure.md', import.meta.url));
+const capabilityLocalProcedureFile = fileURLToPath(new URL('./local-architect-capability.procedure.md', import.meta.url));
 const reconciliationProcedureFile = fileURLToPath(new URL('./reconciliation.procedure.md', import.meta.url));
 const engineerSystemFile = fileURLToPath(new URL('./engineer.system.md', import.meta.url));
 const engineerProcedureFile = fileURLToPath(new URL('./engineer.procedure.md', import.meta.url));
+const capabilityEngineerSystemFile = fileURLToPath(new URL('./engineer-capability.system.md', import.meta.url));
+const capabilityEngineerProcedureFile = fileURLToPath(new URL('./engineer-capability.procedure.md', import.meta.url));
+const capabilityArchitectSystemFile = fileURLToPath(new URL('./capability-architect.system.md', import.meta.url));
+const capabilityArchitectProcedureFile = fileURLToPath(new URL('./capability-architect.procedure.md', import.meta.url));
 const contractSystemFile = fileURLToPath(new URL('./contract-engineer.system.md', import.meta.url));
 const contractProcedureFile = fileURLToPath(new URL('./contract.procedure.md', import.meta.url));
 const reviewerSystemFile = fileURLToPath(new URL('./reviewer.system.md', import.meta.url));
@@ -136,16 +143,20 @@ export type ExtractionTurn = 'intake' | 'principles' | 'check';
 
 export interface PromptPackageOptions {
   readonly skillDirectory?: string | undefined;
+  /** Set only by the internal capability test composition before rollout. */
+  readonly capabilityWorkflow?: boolean | undefined;
 }
 
 /** The versions of the packages this iteration ships. */
 export const initialArchitectPackage = 'initial-architect/3';
 export const catalogExtractorPackage = 'catalog-extractor/1';
 export const globalForkPackage = 'global-fork/4';
-export const localArchitectPackage = 'local-architect/8';
+export const localArchitectPackage = 'local-architect/9';
 export const contextSelectorPackage = 'context-selector/2';
 export const engineerPackage = 'engineer/4';
-export const contractEngineerPackage = 'contract-engineer/2';
+export const capabilityEngineerPackage = 'engineer/6';
+export const capabilityArchitectPackage = 'capability-architect/1';
+export const contractEngineerPackage = 'contract-engineer/3';
 export const reviewerPackage = 'reviewer/4';
 export const failureAnalystPackage = 'failure-analyst/1';
 export const nonfunctionalCoordinatorPackage = 'nonfunctional-coordinator/2';
@@ -165,7 +176,8 @@ export async function loadPromptPackages(options: PromptPackageOptions = {}): Pr
     ['local-architect', await loadLocalArchitect(options)],
     ['context-selector', await loadContextSelector(options)],
     ['engineer', await loadEngineer(options)],
-    ['contract-engineer', await loadContractEngineer(options)],
+    ...(options.capabilityWorkflow !== false ? [['capability-architect', await loadCapabilityArchitect(options)] as const] : []),
+    ...(options.capabilityWorkflow === false ? [['contract-engineer', await loadContractEngineer(options)] as const] : []),
     ['reviewer', await loadReviewer(options)],
     ['failure-analyst', await loadFailureAnalyst(options)],
     ['nonfunctional-coordinator', await loadNonfunctionalCoordinator(options)],
@@ -264,11 +276,13 @@ async function loadLocalArchitect(options: PromptPackageOptions): Promise<Loaded
   const workOrientationSchema = `${JSON.stringify(workOrientationJsonSchema, null, 2)}\n`;
   const loaded = await loadPackage({
     role: 'local-architect',
-    name: localArchitectPackage,
+    name: options.capabilityWorkflow === false ? 'local-architect/8' : localArchitectPackage,
     systemFile: localSystemFile,
-    procedureFile: localProcedureFile,
-    schema: localArchitectJsonSchema,
-    submissionKinds: [...localArchitectSubmissionKinds, 'reconciliation', 'work-orientation'],
+    procedureFile: options.capabilityWorkflow === false ? localProcedureFile : capabilityLocalProcedureFile,
+    schema: options.capabilityWorkflow === false ? localArchitectJsonSchema : capabilityLocalArchitectJsonSchema,
+    submissionKinds: options.capabilityWorkflow === false
+      ? [...localArchitectSubmissionKinds, 'reconciliation', 'work-orientation']
+      : ['assign', 'request-placement', 'request-completion', 'unresolved', 'reconciliation', 'work-orientation'],
     extraFiles: [
       describe(reconciliationProcedureFile, reconciliation, 'procedure'),
       { path: 'reconciliation.schema.json', hash: sha256(reconciliationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(reconciliationSchema) },
@@ -296,11 +310,21 @@ function loadContextSelector(options: PromptPackageOptions): Promise<LoadedPacka
 function loadEngineer(options: PromptPackageOptions): Promise<LoadedPackage> {
   return loadPackage({
     role: 'engineer',
-    name: engineerPackage,
-    systemFile: engineerSystemFile,
-    procedureFile: engineerProcedureFile,
-    schema: engineerJsonSchema,
-    submissionKinds: [...engineerSubmissionKinds],
+    name: options.capabilityWorkflow === false ? engineerPackage : capabilityEngineerPackage,
+    systemFile: options.capabilityWorkflow === false ? engineerSystemFile : capabilityEngineerSystemFile,
+    procedureFile: options.capabilityWorkflow === false ? engineerProcedureFile : capabilityEngineerProcedureFile,
+    schema: options.capabilityWorkflow === false ? engineerJsonSchema : capabilityEngineerJsonSchema,
+    submissionKinds: options.capabilityWorkflow === false ? [...engineerSubmissionKinds] : [...capabilityEngineerSubmissionKinds],
+    options,
+  });
+}
+
+function loadCapabilityArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
+  return loadPackage({
+    role: 'capability-architect', name: capabilityArchitectPackage,
+    systemFile: capabilityArchitectSystemFile, procedureFile: capabilityArchitectProcedureFile,
+    schema: z.toJSONSchema(capabilityActionSchema),
+    submissionKinds: capabilityActionSchema.options.map(option => option.shape.kind.value),
     options,
   });
 }
@@ -491,6 +515,10 @@ export function renderReconciliationPrompt(loaded: LoadedPackage, projectRoot: s
  */
 export function renderEngineerPrompt(loaded: LoadedPackage, projectRoot: string, commandTimeoutMs: number = shellMaxTimeoutMs, workingDirectory: string = projectRoot): string {
   return render(loaded, projectRoot, engineerToolName, { commandTimeoutMs: String(commandTimeoutMs), workingDirectory });
+}
+
+export function renderCapabilityArchitectPrompt(loaded: LoadedPackage, projectRoot: string): string {
+  return render(loaded, projectRoot, 'submit_capability_action');
 }
 
 /** The rendered system prompt of one contract sub-session, with its command maximum. It is never stored either. */

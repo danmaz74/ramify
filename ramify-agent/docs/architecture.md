@@ -1,6 +1,8 @@
 # Harness architecture
 
-**Status:** Early draft. High level only; every part is open to change.
+**Status:** Superseded early draft. Its fake-first work loop describes an
+earlier proposal. The current implementation design is the
+[autonomous implementation loop](architecture/autonomous-implementation-loop.md).
 
 This document turns the [harness principles](harness.principles.md) into a
 first architecture. The first version does not implement every principle;

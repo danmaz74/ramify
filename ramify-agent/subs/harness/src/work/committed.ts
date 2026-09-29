@@ -13,6 +13,12 @@ import {
   consumerRequirementSchema, contractRecordSchema, providerObligationSchema,
   type ConsumerRequirement, type ContractRecord, type ProviderObligation,
 } from '../contracts/records.js';
+import {
+  capabilityAssignmentSchema, capabilityExchangeSchema, capabilityHandbackSchema, capabilityPlanSchema,
+  capabilityRequestSchema, capabilityTaskSchema,
+  type CapabilityAssignment, type CapabilityExchange, type CapabilityHandback, type CapabilityPlan,
+  type CapabilityRequest, type CapabilityTask,
+} from '../capability/records.js';
 
 /*
  * The records a run has committed, read from the log rather than from the
@@ -56,6 +62,12 @@ export interface CommittedRecords {
   readonly obligations: ReadonlyMap<string, ProviderObligation>;
   /** Every consumer requirement at its highest committed revision. */
   readonly requirements: ReadonlyMap<string, ConsumerRequirement>;
+  readonly capabilityRequests: ReadonlyMap<string, CapabilityRequest>;
+  readonly capabilityTasks: ReadonlyMap<string, CapabilityTask>;
+  readonly capabilityPlans: ReadonlyMap<string, readonly CapabilityPlan[]>;
+  readonly capabilityExchanges: ReadonlyMap<string, readonly CapabilityExchange[]>;
+  readonly capabilityAssignments: ReadonlyMap<string, CapabilityAssignment>;
+  readonly capabilityHandbacks: ReadonlyMap<string, CapabilityHandback>;
 }
 
 /** A record the log holds whose body no longer satisfies its schema. */
@@ -90,6 +102,12 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
   const contracts = new Map<string, ContractRecord>();
   const obligations = new Map<string, ProviderObligation>();
   const requirements = new Map<string, ConsumerRequirement>();
+  const capabilityRequests = new Map<string, CapabilityRequest>();
+  const capabilityTasks = new Map<string, CapabilityTask>();
+  const capabilityPlans = new Map<string, CapabilityPlan[]>();
+  const capabilityExchanges = new Map<string, CapabilityExchange[]>();
+  const capabilityAssignments = new Map<string, CapabilityAssignment>();
+  const capabilityHandbacks = new Map<string, CapabilityHandback>();
 
   for (const entry of entries) {
     for (const record of entry.transaction.records) {
@@ -169,6 +187,48 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
           if (current === undefined || value.revision >= current.revision) requirements.set(value.id, value);
           break;
         }
+        case 'ramify-agent.capability-request/1': {
+          const value = parse(capabilityRequestSchema, record.body, record.path);
+          if (capabilityRequests.has(value.id)) throw new CommittedRecordError(record.path, ['An original request is immutable']);
+          capabilityRequests.set(value.id, value);
+          break;
+        }
+        case 'ramify-agent.capability-task/1': {
+          const value = parse(capabilityTaskSchema, record.body, record.path);
+          if (capabilityTasks.has(value.id)) throw new CommittedRecordError(record.path, ['A task identity is immutable']);
+          capabilityTasks.set(value.id, value);
+          break;
+        }
+        case 'ramify-agent.capability-plan/1': {
+          const value = parse(capabilityPlanSchema, record.body, record.path);
+          const list = capabilityPlans.get(value.task) ?? [];
+          if (value.revision !== list.length + 1) throw new CommittedRecordError(record.path, ['Plan revisions are consecutive and immutable']);
+          list.push(value);
+          capabilityPlans.set(value.task, list);
+          break;
+        }
+        case 'ramify-agent.capability-exchange/1': {
+          const value = parse(capabilityExchangeSchema, record.body, record.path);
+          const list = capabilityExchanges.get(value.id) ?? [];
+          if (list.length > 0 && (list.length !== 1 || list[0]?.answer !== null || value.answer === null)) {
+            throw new CommittedRecordError(record.path, ['An exchange has one question and at most one answer']);
+          }
+          list.push(value);
+          capabilityExchanges.set(value.id, list);
+          break;
+        }
+        case 'ramify-agent.capability-assignment/1': {
+          const value = parse(capabilityAssignmentSchema, record.body, record.path);
+          if (capabilityAssignments.has(value.id)) throw new CommittedRecordError(record.path, ['An assignment is immutable']);
+          capabilityAssignments.set(value.id, value);
+          break;
+        }
+        case 'ramify-agent.capability-handback/1': {
+          const value = parse(capabilityHandbackSchema, record.body, record.path);
+          if (capabilityHandbacks.has(value.task)) throw new CommittedRecordError(record.path, ['A handback is immutable']);
+          capabilityHandbacks.set(value.task, value);
+          break;
+        }
         default:
           break;
       }
@@ -189,6 +249,12 @@ export function committedRecords(entries: readonly ReplayedLine[]): CommittedRec
     contracts,
     obligations,
     requirements,
+    capabilityRequests,
+    capabilityTasks,
+    capabilityPlans,
+    capabilityExchanges,
+    capabilityAssignments,
+    capabilityHandbacks,
   };
 }
 

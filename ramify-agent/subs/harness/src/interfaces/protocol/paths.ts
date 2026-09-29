@@ -45,6 +45,9 @@ export const protocolPaths = {
   runWorkItems: (planId: string, runId: string): string => `${run(planId, runId)}/work-items`,
   runWorkItem: (planId: string, runId: string, workItem: string): string => `${run(planId, runId)}/work-items/${encodeURIComponent(workItem)}`,
   runCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/capabilities`,
+  /** Durable capability tasks at a committed run version, separate from registry capability progress. */
+  runCapabilityTasks: (planId: string, runId: string, version: number): string =>
+    withQuery(`${run(planId, runId)}/capability-tasks`, { version }),
   /** The initial analysis's module associations beside the capabilities verified at their current owners. */
   runModuleCapabilities: (planId: string, runId: string): string => `${run(planId, runId)}/module-capabilities`,
   /** Every tracked acceptance scenario with its state and the gates it ran in. */

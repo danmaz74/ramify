@@ -197,6 +197,30 @@ export const runEventSchema = z.discriminatedUnion('type', [
     checkFindings: checkFindingEventsField,
   }).strict()),
   event('candidate-bound-to-gate', z.object({ candidate: text, assessment: text, gate: text, commit: text, tree: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/) }).strict()),
+  /** Plan 16 coordination records are committed with these events. The
+   * original request and each revision remain separate immutable records. */
+  event('capability-requested', z.object({ request: text, parent: text, assignment: text, invocation: text }).strict()),
+  event('capability-qualified', z.object({ request: text, invocation: text,
+    outcome: z.enum(['satisfied', 'request-placement', 'unresolved']), evidence: z.array(text) }).strict()),
+  event('capability-delegated', z.object({ task: text, request: text, parent: text, invocation: text, planRevision: z.literal(1) }).strict()),
+  event('capability-plan-revised', z.object({ task: text, revision: z.int().positive(), basedOn: z.int().positive(), invocation: text }).strict()),
+  event('capability-coordinator-resumed', z.object({ task: text, invocation: text, session: sessionIdSchema }).strict()),
+  event('capability-exchange-opened', z.object({ task: text, exchange: text, invocation: text }).strict()),
+  event('capability-exchange-answered', z.object({ task: text, exchange: text, invocation: text }).strict()),
+  event('capability-assigned', z.object({ task: text, assignment: text, sequence: z.int().positive(), invocation: text }).strict()),
+  event('capability-assignment-interrupted', z.object({ task: text, assignment: text, invocation: text,
+    cause: text, candidateTree: text, attempt: z.int().positive() }).strict()),
+  event('capability-assignment-settled', z.object({ task: text, assignment: text, outcome: z.enum(['accepted', 'partial', 'failed', 'interrupted']),
+    mutated: z.array(text).optional(), outsideScope: z.array(text).optional(), endingTree: text.optional(),
+    unfinished: z.array(text).optional() }).strict()),
+  event('capability-candidate-accepted', z.object({ task: text, gate: text, tree: text,
+    planRevision: z.int().positive(), assignments: z.array(text).min(1), review: text }).strict()),
+  event('capability-review-recorded', z.object({ task: text, gate: text, tree: text,
+    planRevision: z.int().positive(), outcome: z.enum(['passed', 'failed']), review: text }).strict()),
+  event('capability-verification-started', z.object({ task: text, invocation: text }).strict()),
+  event('capability-verification-failed', z.object({ task: text, finding: text }).strict()),
+  event('capability-handed-back', z.object({ task: text, handback: text, invocation: text }).strict()),
+  event('capability-stopped', z.object({ task: text, reason: text }).strict()),
   /**
    * The run was started with its review stop: after the analysis is
    * accepted it waits, holding the project, for `analysis-approved` or a
@@ -545,6 +569,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
   event('work-item-completed', z.object({ workItem: text, gate: text, unresolved: unresolvedField.optional() }).strict()),
   /** Appended before a writer starts; the one writer of the run holds it. */
   event('writer-acquired', z.object({ invocation: text, scopeRevision: z.int().nonnegative().nullable() }).strict()),
+  /** Persisted before the detached wrapper is allowed to start its command. */
+  event('writer-process-registered', z.object({ invocation: text, pid: z.int().positive(), identity: text.nullable() }).strict()),
   /** `confirmed: false` blocks every writer and every gate that follows. */
   event('writer-released', z.object({ invocation: text, confirmed: z.boolean(), groupsKilled: z.int().nonnegative() }).strict()),
   /** The durable intent of a verified committing gate's commit-and-audit effect. */

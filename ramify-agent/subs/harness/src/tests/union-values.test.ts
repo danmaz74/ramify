@@ -30,7 +30,7 @@ import {
 import { forkSubmissionKinds, forkSubmissionSchema } from '../architecture/submission.js';
 import { deviationLayout, deviationSchemas } from '../deviations/records.js';
 import { localArchitectSubmissionSchema, localArchitectSubmissionKinds } from '../work/submission.js';
-import { engineerSubmissionSchema, engineerSubmissionKinds, unsuitableReasonSchema } from '../work/engineer.js';
+import { engineerSubmissionSchema, engineerSubmissionKinds, capabilityEngineerSubmissionKinds, unsuitableReasonSchema } from '../work/engineer.js';
 import { assignableKindSchema, assignmentBodySchema } from '../work/assignment.js';
 import {
   extraPurposeSchema, iterationAssignmentSchema, iterationKindSchema, iterationLayout,
@@ -89,6 +89,10 @@ describe('the run log', () => {
     expect(types).toEqual([
       'job-started', 'session-opened', 'invocation-started', 'invocation-ended', 'session-finished', 'analysis-accepted',
       'document-manifest-committed', 'work-orientation-recorded', 'context-selection-recorded', 'context-package-append-requested', 'context-package-appended', 'context-package-prompt-bound', 'candidate-prepared', 'nonfunctional-phase-started', 'nonfunctional-assessed', 'nonfunctional-investigated', 'nonfunctional-repair-assigned', 'nonfunctional-repair-committed', 'nonfunctional-round-closed', 'nonfunctional-deviation-recorded', 'candidate-bound-to-gate',
+      'capability-requested', 'capability-qualified', 'capability-delegated', 'capability-plan-revised', 'capability-coordinator-resumed',
+      'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-interrupted',
+      'capability-assignment-settled', 'capability-candidate-accepted', 'capability-review-recorded',
+      'capability-verification-started', 'capability-verification-failed', 'capability-handed-back', 'capability-stopped',
       'review-requested', 'analysis-approved',
       'readiness-passed', 'readiness-failed',
       'scenarios-materializing', 'scenarios-materialized',
@@ -104,7 +108,7 @@ describe('the run log', () => {
       'provider-conformed', 'requirement-verified',
       'evidence-reopened', 'revision-needed', 'dependency-cycle-detected',
       'work-item-completed',
-      'writer-acquired', 'writer-released',
+      'writer-acquired', 'writer-process-registered', 'writer-released',
       'gate-started', 'gate-committing', 'gate-command-started', 'gate-command-waiting', 'gate-attempted', 'check-findings-recorded',
       'review-request-recorded', 'review-attempt-started', 'review-orientation-recorded', 'review-attempt-finished',
       'reconciliation-started', 'reconciliation-assessed', 'reconciliation-brief-appended', 'reconciliation-refused',
@@ -115,10 +119,10 @@ describe('the run log', () => {
   });
 
   test('every lineage reason is named, and each relation is read back on the event that carries it', () => {
-    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected']);
+    expect(continueReasonSchema.options).toEqual(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']);
     expect(forkReasonSchema.options).toEqual(['placement-request', 'scope-review', 'design-orientation', 'reconciliation', 'unresolved-request', 'context-selection']);
     expect(replaceReasonSchema.options).toEqual(['reconstructed', 'context-rebuilt']);
-    expect(requestReasonSchema.options).toEqual(['contract-needed']);
+    expect(requestReasonSchema.options).toEqual(['contract-needed', 'capability-needed']);
     expect(degradeRelationSchema.shape.requested.options).toEqual(['continue', 'fork']);
 
     const base = { jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z' };
@@ -465,8 +469,9 @@ describe('the records this iteration establishes', () => {
 
   test('every member of the engineer submission, and the two unsuitable reasons offered', () => {
     const kinds = engineerSubmissionSchema.options.map(option => option.shape.kind.value);
-    expect(kinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'contract-needed']);
-    expect([...engineerSubmissionKinds]).toEqual(kinds);
+    expect(kinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'contract-needed', 'capability-needed']);
+    expect([...engineerSubmissionKinds]).toEqual(kinds.filter(kind => kind !== 'capability-needed'));
+    expect([...capabilityEngineerSubmissionKinds]).toEqual(kinds.filter(kind => kind !== 'contract-needed'));
     // `obligation-change` and `unplaced-need` have no iteration that can act
     // on them yet, so the role never sees them and no run can produce one.
     // `provider-cannot-conform` gained its producer with the
@@ -859,7 +864,7 @@ describe('the protocol vocabulary', () => {
       expect(['forbidden', 'allowed']).toContain(policy.compaction);
       expect(policy.reportReserveTokens).toBeGreaterThan(0);
     }
-    expect(roleSchema.options).toEqual(['initial-architect', 'catalog-extractor', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
+    expect(roleSchema.options).toEqual(['initial-architect', 'catalog-extractor', 'global-fork', 'local-architect', 'engineer', 'contract-engineer', 'capability-architect', 'reviewer', 'failure-analyst', 'context-selector', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer']);
   });
 
   test('every failure reason and every phase is named', () => {
@@ -925,6 +930,9 @@ describe('the run protocol a client reads', () => {
       ['invocation-started', { invocation: 'inv-0001', role: 'engineer', session: 'ses-0001', work: {}, start: 'opened' }],
       ['revision-needed', { obligation: r, iteration: 'wi-002.i01', consumerWorkItem: 'wi-001' }],
       ['scenario-implemented', { scenario: 'sc-001', gate: 'ga-0003' }],
+      ['capability-requested', { request: 'need-001', parent: 'wi-001', assignment: 'wi-001.i01', invocation: 'inv-0003' }],
+      ['capability-delegated', { task: 'cap-001', request: 'need-001', parent: 'wi-001', invocation: 'inv-0003', planRevision: 1 }],
+      ['capability-assigned', { task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0004' }],
     ];
     const kinds = new Set(events.flatMap(([type, data], index) =>
       projectEvent(runEventSchema.parse({ sequence: index + 1, jobId: '20260920T101500Z-3f9a1c', at: '2026-09-20T10:15:00.000Z', type, data })).refs.map(ref => ref.kind)));
@@ -1029,6 +1037,25 @@ function sampleData(type: RunEvent['type']): unknown {
     'nonfunctional-round-closed': { round: 1, record: 'round-001', outcome: 'exhausted' },
     'nonfunctional-deviation-recorded': { deviation: 'pd-001', nfr: 'nfr-001', assessment: 'nfa-001', checkFinding: 'cf-0001', checkFindings: [] },
     'candidate-bound-to-gate': { candidate: 'cand-001', assessment: 'nfa-001', gate: 'ga-0004', commit: 'c', tree: 'a'.repeat(40) },
+    'capability-requested': { request: 'need-001', parent: 'wi-001', assignment: 'wi-001.i01', invocation: 'inv-0003' },
+    'capability-qualified': { request: 'need-001', invocation: 'inv-0004', outcome: 'satisfied', evidence: ['existing API'] },
+    'capability-delegated': { task: 'cap-001', request: 'need-001', parent: 'wi-001', invocation: 'inv-0004', planRevision: 1 },
+    'capability-plan-revised': { task: 'cap-001', revision: 2, basedOn: 1, invocation: 'inv-0005' },
+    'capability-coordinator-resumed': { task: 'cap-001', invocation: 'inv-0005', session: 'ses-0005' },
+    'capability-exchange-opened': { task: 'cap-001', exchange: 'ex-001', invocation: 'inv-0005' },
+    'capability-exchange-answered': { task: 'cap-001', exchange: 'ex-001', invocation: 'inv-0006' },
+    'capability-assigned': { task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0005' },
+    'capability-assignment-interrupted': { task: 'cap-001', assignment: 'cap-001.i01', invocation: 'inv-0007',
+      cause: 'budget reached', candidateTree: 'a'.repeat(40), attempt: 1 },
+    'capability-assignment-settled': { task: 'cap-001', assignment: 'cap-001.i01', outcome: 'accepted' },
+    'capability-candidate-accepted': { task: 'cap-001', gate: 'ga-0005', tree: 'a'.repeat(40),
+      planRevision: 2, assignments: ['cap-001.i01'], review: 'cr-001' },
+    'capability-review-recorded': { task: 'cap-001', gate: 'ga-0005', tree: 'a'.repeat(40),
+      planRevision: 2, outcome: 'passed', review: 'cr-001' },
+    'capability-verification-started': { task: 'cap-001', invocation: 'inv-0005' },
+    'capability-verification-failed': { task: 'cap-001', finding: 'The consumer test fails' },
+    'capability-handed-back': { task: 'cap-001', handback: 'hb-001', invocation: 'inv-0005' },
+    'capability-stopped': { task: 'cap-001', reason: 'Stopped by the operator' },
     'review-requested': {},
     'analysis-approved': { command, reviewer: 'r', note: null, duringRun: false },
     'readiness-passed': { attempt: 1, gate: 'ga-0001' },
@@ -1069,6 +1096,7 @@ function sampleData(type: RunEvent['type']): unknown {
     'dependency-cycle-detected': { members: ['a', 'b'], requirements: [], workItems: [], closedBy: 'wi-001', detection: 1 },
     'work-item-completed': { workItem: 'wi-001', gate: 'ga-0004' },
     'writer-acquired': { invocation: 'inv-0003', scopeRevision: 1 },
+    'writer-process-registered': { invocation: 'inv-0003', pid: 1234, identity: 'boot:42' },
     'writer-released': { invocation: 'inv-0003', confirmed: false, groupsKilled: 0 },
     'gate-started': { gate: 'ga-0001', checkpoint: 'readiness' },
     'gate-committing': { gate: 'ga-0001', checkpoint: 'final' },

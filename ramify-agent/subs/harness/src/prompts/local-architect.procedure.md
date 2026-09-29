@@ -67,8 +67,9 @@ write.
 - `assignment.externalCapabilities` names behavior other modules own that
   this iteration uses or requests. Each must be in the registry, with the
   owner the registry gives it.
-- `outline` is a new revision of your outline, where this assignment revises
-  the plan. Leave it out to keep the revision you last committed.
+- Include `outline` on the first assignment so the work item has a plan. On a
+  later assignment, include it to revise the plan or leave it out to keep the
+  last committed revision.
 - `localDecisions` records the placement you decided yourself, with what
   each one registers. It is `[]` when you decided none. See below for what
   is yours to decide.

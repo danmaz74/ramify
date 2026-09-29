@@ -105,7 +105,7 @@ export type TranscriptPoint = z.infer<typeof transcriptPointSchema>;
 /** A continued start: the point it continues from, why, and the briefs appended since the previous invocation. */
 export const transcriptContinuesSchema = z.object({
   from: transcriptPointSchema,
-  reason: z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected']),
+  reason: z.enum(['placement-answered', 'iteration-closed', 'completion-refused', 'repair', 'reconciliation', 'deviation-recorded', 'environment-resumed', 'context-selected', 'capability-qualification', 'capability-returned', 'capability-coordination']),
   briefs: z.array(text),
 }).strict();
 /** A forked start: the source point, why, the context generation where it forked the architect context, and the briefs held at the point. */
@@ -118,10 +118,11 @@ export const transcriptForkSchema = z.object({
 /** The session a new one took the place of, and why. */
 export const transcriptReplacesSchema = z.object({ session: text, reason: z.enum(['reconstructed', 'context-rebuilt']) }).strict();
 /** The invocation whose result asked for a session, and why. */
-export const transcriptRequestedBySchema = z.object({ invocation: text, reason: z.enum(['contract-needed']) }).strict();
+export const transcriptRequestedBySchema = z.object({ invocation: text, reason: z.enum(['contract-needed', 'capability-needed']) }).strict();
 
 /** The work an invocation belongs to, as the run log records it. */
-export const transcriptWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional() }).strict();
+export const transcriptWorkSchema = z.object({ workItem: text.optional(), iteration: text.optional(), request: text.optional(),
+  capabilityTask: text.optional(), capabilityAssignment: text.optional() }).strict();
 
 /** A session start, in the port's terms: what was requested, and what an invocation's end says was actual. */
 export const transcriptStartModeSchema = z.enum(['fresh', 'continue', 'fork']);

@@ -64,6 +64,10 @@ const map: ExecutionMapSnapshot = { ...canvasMap, tree, moduleMap,
   coverage: { ...canvasMap.coverage, modules: { shown: 6, total: 6 }, moduleRelations: { shown: 6, total: 6 } } };
 function client(snapshot: ExecutionMapSnapshot = map): ProtocolClient { return { getExecutionMap: async () => snapshot,
   getExecutionCapability: async () => capabilityDetail, getExecutionScenario: async () => scenarioDetail,
+  getCapabilityTasks: async (_planId: string, _runId: string, version: number) => ({
+    schema: 'capability-tasks/1', version, terminal: { state: 'running', reason: null, message: null },
+    requests: [], tasks: [], stack: [],
+  }),
   getGate: async () => ({ commit: null, audited: null, evidence: null, commands: [] }),
 } as unknown as ProtocolClient; }
 function view(snapshot: ExecutionMapSnapshot = map) { render(<ExecutionMapArea client={client(snapshot)} planId="p" runId="r" version={42} events={[]} onOpenGate={vi.fn()} />); }
@@ -128,7 +132,7 @@ test('the two maps keep independent pan and zoom state and expose a narrow drawe
 test('unavailable current tree stays explicit without false line zeroes or a fabricated hierarchy', async () => {
   view({ ...canvasMap, moduleMap: { ...canvasMap.moduleMap,
     proposed: [{ module: 'project/proposed', parent: 'project', directory: 'subs/proposed', element: 'capability:theme-tokens' }] } });
-  expect((await screen.findByRole('status')).textContent).toContain('Current module tree unavailable: No current tree.');
+  expect((await screen.findByText(/Current module tree unavailable: No current tree/)).textContent).toContain('Current module tree unavailable: No current tree.');
   expect(screen.queryByRole('tree', { name: 'Current modules hierarchy' })).toBeNull();
   expect(screen.getByLabelText('Proposed modules').textContent).toContain('project/proposed');
   const area = screen.getByLabelText('Companion modules map');

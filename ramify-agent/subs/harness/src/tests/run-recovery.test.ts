@@ -211,6 +211,7 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'outline-revised': return types.includes('outline-revised');
     case 'iteration-assigned': return types.includes('iteration-assigned');
     case 'writer-acquired': return types.includes('writer-acquired');
+    case 'writer-process-registered': return types.includes('writer-process-registered');
     case 'writer-released': return types.includes('writer-released');
     case 'iteration-closed': return types.includes('iteration-closed');
     case 'work-item-completed': return types.includes('work-item-completed');
@@ -238,6 +239,17 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'evidence-reopened': return types.includes('evidence-reopened');
     case 'revision-needed': return types.includes('revision-needed');
     case 'dependency-cycle-detected': return types.includes('dependency-cycle-detected');
+    case 'capability-assignment-interrupted': return types.includes('capability-assignment-interrupted');
+    case 'capability-coordinator-resumed': return types.includes('capability-coordinator-resumed');
+    case 'capability-verification-started': return types.includes('capability-verification-started');
+    case 'capability-source-captured': return types.includes('invocation-ended');
+    case 'capability-exchange-opened': return types.includes('capability-exchange-opened');
+    case 'capability-exchange-answered': return types.includes('capability-exchange-answered');
+    case 'capability-gate-recorded': return types.includes('gate-attempted');
+    case 'capability-review-recorded': return types.includes('capability-review-recorded');
+    case 'capability-handed-back': return types.includes('capability-handed-back');
+    case 'capability-assignment-settled': return types.includes('capability-assignment-settled');
+    case 'capability-assigned': return types.includes('capability-assigned');
     case 'nonfunctional-phase-started':
     case 'nonfunctional-repair-assigned':
     case 'nonfunctional-repair-committed':

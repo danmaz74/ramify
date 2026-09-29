@@ -81,11 +81,13 @@ describe('compaction during a run', () => {
     expect(localCompaction[0]!.data).toEqual({ trigger: 'overflow', succeeded: true, before: 140_000, after: null });
   }, 300_000);
 
-  test('compaction is allowed for both architect roles by policy, and forbidden for every writer', () => {
+  test('production compaction is allowed for coordinating architects and forbidden for writers', () => {
     const policy = defaultRunPolicy({ projectRoot: '/work/project', nested: [] });
     expect(policy.context['initial-architect']).toMatchObject({ compaction: 'allowed' });
     expect(policy.context['local-architect']).toMatchObject({ compaction: 'allowed' });
-    for (const role of ['global-fork', 'engineer', 'contract-engineer'] as const) {
+    expect(policy.context['capability-architect']).toMatchObject({ compaction: 'allowed' });
+    expect(policy.context['contract-engineer']).toBeUndefined();
+    for (const role of ['global-fork', 'engineer'] as const) {
       expect(policy.context[role]).toMatchObject({ compaction: 'forbidden' });
     }
   });

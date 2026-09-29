@@ -7,6 +7,7 @@ import type { ProtocolClient } from './client.js';
 import type { ExecutionMapSnapshot } from './execution-map-client.js';
 import { cardWidth, estimatedCardHeight, executionLayout, runBandKey, settlePositions } from './execution-map-layout.js';
 import { ExecutionModules } from './execution-modules.js';
+import { CapabilityTasksArea } from './capability-tasks.js';
 import { executionMapVisualTokens as tokens } from './execution-map-tokens.js';
 import { waitingLabel } from './decision-waits.js';
 import { RoleIcon } from './session-role.js';
@@ -61,7 +62,7 @@ function moduleText(node: ExecutionNode, byKey: ReadonlyMap<string, ExecutionNod
     const item = byKey.get(`work-item:${node.subject.workItem}`);
     return item?.kind === 'work-item' && item.module !== null ? item.module : moduleNotRecorded;
   }
-  if (node.kind === 'session' && (node.reach.kind === 'work-item' || node.reach.kind === 'module')) return node.reach.module ?? moduleNotRecorded;
+  if (node.kind === 'session' && (node.reach.kind === 'work-item' || node.reach.kind === 'module' || node.reach.kind === 'capability-task')) return node.reach.module ?? moduleNotRecorded;
   if (node.modules.length) return node.modules.map(relation => `${relation.module} (${relation.role})`).join(', ');
   if ((node.kind === 'gate' && node.subject.workItem === null) || (node.kind === 'session' && node.reach.kind === 'run')) return 'Run-wide';
   return moduleNotRecorded;
@@ -503,6 +504,7 @@ function ExecutionMapAreaRun({ client, planId, runId, version, events, onOpenGat
         positions={positions} onPositions={onPositions} viewport={viewport} onViewport={onViewport} waitingWorkItems={waitingWorkItems} /></ReactFlowProvider>
         : <p>Loading execution map…</p>}
     {query.state.status === 'failed' && map && <p role="alert">Could not refresh execution map: {query.state.error.message}</p>}
+    <CapabilityTasksArea client={client} planId={planId} runId={runId} version={version} onOpenGate={onOpenGate} />
     <TranscriptWorkspace client={client} planId={planId} runId={runId} nodes={map?.nodes ?? []} windows={windows}
       onOpen={openSession} onChange={changeWindow} onClose={closeWindow}
       onFocusMap={id => setFocusRequest({ id, nonce: Date.now() + Math.random() })} />

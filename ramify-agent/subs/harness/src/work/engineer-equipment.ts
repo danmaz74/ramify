@@ -69,6 +69,7 @@ export interface Equipment {
 export interface EngineerEquipmentInputs {
   /** External command execution. Tests script outcomes; actual process tests use the default. */
   readonly commandExecution?: CommandRunner | undefined;
+  readonly registerProcessGroup?: ((invocation: string, pid: number, identity: string | null) => Promise<void>) | undefined;
   readonly projectRoot: string;
   /** The port session's cwd; built-in writes and the shell resolve relative paths here. */
   readonly workingDirectory?: string | undefined;
@@ -191,7 +192,13 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
     // A command run for the session is the harness's work and not the
     // session's silence, so each one holds the idle bound for its own
     // timeout while it runs.
-    const commandExecution = heldCommands(inputs.commandExecution ?? runCommand, session.hold);
+    const held = heldCommands(inputs.commandExecution ?? runCommand, session.hold);
+    const commandExecution: CommandRunner = request => held({
+      ...request,
+      ...(inputs.registerProcessGroup === undefined ? {} : {
+        registerProcessGroup: (pid: number, identity: string | null) => inputs.registerProcessGroup!(session.invocation, pid, identity),
+      }),
+    });
 
     shellJudge = new ToolInputJudge({
       tool: shellToolName,

@@ -123,6 +123,11 @@ export const localArchitectSubmissionKinds = ['assign', 'request-placement', 're
 
 /** The schema the agent's tool is given, taken from the same definition that validates. */
 export const localArchitectJsonSchema = z.toJSONSchema(localArchitectSubmissionSchema) as JsonSchema;
+/** New-run tool surface excludes the historical provider-yield action. */
+export const capabilityLocalArchitectJsonSchema = z.toJSONSchema(z.discriminatedUnion('kind', [
+  localArchitectSubmissionSchema.options[0]!, localArchitectSubmissionSchema.options[1]!,
+  localArchitectSubmissionSchema.options[2]!, localArchitectSubmissionSchema.options[4]!,
+])) as JsonSchema;
 
 export const localArchitectToolName = 'submit_work_item_result';
 
@@ -206,6 +211,11 @@ export function validateLocalArchitect(input: unknown, evidence: WorkEvidence): 
   }
   const outline = shape.value.outline;
   const errors = [
+    ...(outline === undefined && evidence.outline == null ? [{
+      path: 'outline',
+      message: 'The first assignment needs an outline; there is no committed outline to reuse',
+      expected: 'an outline for this work item',
+    }] : []),
     ...(outline === undefined ? [] : outlineErrors(outline, evidence)),
     ...localDecisionErrors(shape.value.localDecisions, placementEvidence(evidence), 'localDecisions'),
     ...assignmentErrors(shape.value.assignment, {

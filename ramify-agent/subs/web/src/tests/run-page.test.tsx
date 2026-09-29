@@ -273,6 +273,17 @@ test('the overview shows notices first: the module created, then every cycle, re
   expect(notices[1]!.textContent).toContain('resolved');
 });
 
+test('CA24: Run page keeps historical contract views and names an empty capability-task view', async () => {
+  const old = stubRun();
+  old.capabilityTasks = { schema: 'capability-tasks/1', version: old.snapshot.version,
+    terminal: { state: 'completed', reason: null, message: null }, requests: [], tasks: [], stack: [] };
+  const client = clientWith(old);
+  render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Capability tasks' }));
+  expect(await screen.findByText(/Historical contract work remains in its original views/)).toBeTruthy();
+  expect(client.calls).toContain(`getCapabilityTasks:${runId}:${old.snapshot.version}`);
+});
+
 test('overview presents the harness verdict with its exact candidate tree and audited gate commit', async () => {
   const run = stubRun();
   run.mergeReadiness = { runId, version: run.snapshot.version, readiness: {

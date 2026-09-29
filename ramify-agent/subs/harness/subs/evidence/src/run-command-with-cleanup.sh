@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Copied verbatim from cucumber-viz 0.7.0, scripts/run-command-with-cleanup.sh.
-# Same author; licensed here under GPL-3.0 with ramify-agent. Run by run-command.ts beside it.
+# Based on cucumber-viz 0.7.0, scripts/run-command-with-cleanup.sh.
+# Same author; licensed here under GPL-3.0 with ramify-agent.
+# The start barrier lets the parent durably register the detached group
+# before the requested command is allowed to execute.
 
 set -uo pipefail
 
@@ -14,20 +16,16 @@ KILL_MODE="single"
 
 cleanup_child() {
   local pid="${1:-}"
-  if [ -z "$pid" ]; then
-    return
-  fi
-
+  if [ -z "$pid" ]; then return; fi
   if [ "$KILL_MODE" = "group" ]; then
     kill -TERM -- "-$pid" 2>/dev/null || true
     sleep 0.2
     kill -KILL -- "-$pid" 2>/dev/null || true
-    return
+  else
+    kill -TERM "$pid" 2>/dev/null || true
+    sleep 0.2
+    kill -KILL "$pid" 2>/dev/null || true
   fi
-
-  kill -TERM "$pid" 2>/dev/null || true
-  sleep 0.2
-  kill -KILL "$pid" 2>/dev/null || true
 }
 
 handle_signal() {
@@ -35,22 +33,23 @@ handle_signal() {
   wait "$CHILD_PID" 2>/dev/null || true
   exit 143
 }
-
 trap handle_signal TERM INT
 
 if command -v setsid >/dev/null 2>&1; then
   KILL_MODE="group"
-  setsid "$@" &
+  setsid bash -c 'IFS= read -r start || exit 125; [ "$start" = start ] || exit 125; exec "$@"' _ "$@" <&0 &
 else
-  "$@" &
+  # Without setsid there is no independently killable group to register.
+  bash -c 'IFS= read -r start || exit 125; [ "$start" = start ] || exit 125; exec "$@"' _ "$@" <&0 &
 fi
 CHILD_PID=$!
+if [ "$KILL_MODE" = "group" ]; then
+  printf 'RAMIFY_GROUP:%s\n' "$CHILD_PID" >&2
+else
+  printf 'RAMIFY_GROUP:0\n' >&2
+fi
 
 wait "$CHILD_PID"
 EXIT_CODE=$?
-
-# Some commands exit while leaving descendants behind. Kill the whole process
-# group after completion so the caller never gets stuck on leaked children.
 cleanup_child "$CHILD_PID"
-
 exit "$EXIT_CODE"

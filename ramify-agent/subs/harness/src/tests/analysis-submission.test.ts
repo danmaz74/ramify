@@ -514,7 +514,7 @@ describe('the scripted fake\'s demonstration, which `serve --agent fake` runs', 
 
 describe('the prompt package', () => {
   test('offers exactly the submission members this iteration produces', async () => {
-    const { manifest } = await loadPromptPackages();
+    const { manifest } = await loadPromptPackages({ capabilityWorkflow: false });
     expect(Object.keys(manifest.packages).sort()).toEqual(['catalog-extractor', 'context-selector', 'contract-engineer', 'engineer', 'failure-analyst', 'global-fork', 'initial-architect', 'local-architect', 'nonfunctional-coordinator', 'nonfunctional-repair-engineer', 'reviewer']);
     const initial = manifest.packages['initial-architect']!;
     expect(initial.package).toBe('initial-architect/3');
@@ -550,7 +550,7 @@ describe('the prompt package', () => {
     // The contract sub-session is an engineer invocation with the contract
     // skill, and the skill is a file of its package like any other.
     const contract = manifest.packages['contract-engineer']!;
-    expect(contract.package).toBe('contract-engineer/2');
+    expect(contract.package).toBe('contract-engineer/3');
     expect(contract.submissionKinds).toEqual(['established', 'incomplete']);
     expect(contract.files.some(file => file.kind === 'skill' && file.path.endsWith('contract.skill.md'))).toBe(true);
     expect(contract.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -572,6 +572,16 @@ describe('the prompt package', () => {
     expect(analyst.submissionKinds).toEqual(['failure-analysis']);
     expect(analyst.files.filter(file => file.kind !== 'skill').map(file => file.path.split('/').at(-1)).sort())
       .toEqual(['failure-analysis.procedure.md', 'failure-analysis.schema.json', 'failure-analyst.system.md']);
+  });
+
+  test('new runs offer capability coordination without the retired contract package', async () => {
+    const { manifest } = await loadPromptPackages();
+    expect(manifest.packages['contract-engineer']).toBeUndefined();
+    expect(manifest.packages['capability-architect']?.package).toBe('capability-architect/1');
+    expect(manifest.packages['engineer']?.submissionKinds).toEqual(['completion-proposed', 'partial', 'unsuitable', 'capability-needed']);
+    expect(manifest.packages['local-architect']?.submissionKinds).toEqual([
+      'assign', 'request-placement', 'request-completion', 'unresolved', 'reconciliation', 'work-orientation',
+    ]);
   });
 
   test('asks for the entry assignments, which become the work items', async () => {
