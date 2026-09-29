@@ -119,6 +119,7 @@ describe('in-place suite checks', () => {
     controller.abort();
     const attempt = await pending;
     expect(attempt.commands[0]).toMatchObject({ outcome: 'not-verified', notVerified: 'interrupted' });
+    expect(attempt.commands[0]?.lockWaitMs).toBeGreaterThan(0);
     await expect(readFile(marker, 'utf8')).rejects.toThrow();
     f.release();
     await f.holder;

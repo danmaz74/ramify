@@ -80,6 +80,8 @@ export async function gateDiagnostics(
   gate: GateAttempt,
   audience: GateAudience,
   names: ReadonlyMap<string, string> = new Map(),
+  /** The exact lock provider lines recorded before commands began, by one-based position. */
+  waiting: ReadonlyMap<number, string> = new Map(),
 ): Promise<GateDiagnostics> {
   const summary: string[] = [];
   let findings: HookFinding[] = [];
@@ -87,8 +89,13 @@ export async function gateDiagnostics(
   // named once, after it: they report nothing about the source.
   const skipped = gate.commands.filter(command => command.notVerified === 'setup-failed');
   const blocking = gate.commands.find(command => command.kind === 'setup' && command.outcome !== 'passed');
-  for (const command of gate.commands) {
+  for (const [index, command] of gate.commands.entries()) {
     if (command.notVerified === 'setup-failed') continue;
+    const line = waiting.get(index + 1);
+    if (line !== undefined || command.lockWaitMs !== undefined) {
+      const duration = command.lockWaitMs === undefined ? '' : ` for ${command.lockWaitMs} ms`;
+      summary.push(`- \`${command.kind}\` waited${duration} for the machine test lock${line === undefined ? '' : `: ${line}`}`);
+    }
     const outcome = command.outcome === 'not-verified'
       ? `not verified (${command.notVerified ?? 'unknown'})`
       : command.outcome;

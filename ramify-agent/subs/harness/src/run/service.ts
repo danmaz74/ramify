@@ -9138,7 +9138,10 @@ export class RunService {
    */
   private async diagnosticsOf(run: Run, gate: GateAttempt, audience: GateAudience = 'engineer'): Promise<{ id: string; cause: string | null; summary: string[] }> {
     const { records } = trackedScenarios(run.log.ledger.replay());
-    const diagnostics = await gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])));
+    const waiting = new Map(run.log.all('gate-command-waiting')
+      .filter(event => event.data.gate === gate.id)
+      .map(event => [event.data.position, event.data.line] as const));
+    const diagnostics = await gateDiagnostics(gate, audience, new Map(records.map(record => [record.id, record.name])), waiting);
     const composition = compositionLines(gate, records);
     return { ...diagnostics, summary: [...diagnostics.summary, ...composition] };
   }

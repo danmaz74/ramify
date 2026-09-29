@@ -51,7 +51,7 @@ export function testLockedRunner(
         },
         override,
       );
-      if (result.status === 'cancelled') return emptyRun(request.outputFile, { kind: 'cancelled' });
+      if (result.status === 'cancelled') return emptyRun(request.outputFile, { kind: 'cancelled' }, waiting ? Date.now() - start : undefined);
       if (result.status === 'wait-exceeded') return emptyRun(request.outputFile, {
         kind: 'runner-error', error: {
           kind: 'test-lock-wait-exceeded', message: `Waited ${result.waitedMs} ms for the machine test lock`,

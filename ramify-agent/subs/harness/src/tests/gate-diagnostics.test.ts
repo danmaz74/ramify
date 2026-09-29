@@ -86,6 +86,20 @@ async function attempt(checks: readonly PlannedCheck[], writeScope?: readonly st
 }
 
 describe('a Ramify check that failed at a gate', () => {
+  test('a failed gate briefing attributes queued time to the machine lock with the recorded provider line', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-cwd-'));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const base = await attempt([{ kind: 'tests', command: prints('failed assertion\n', 1, directory), attribution: 'in-scope' }]);
+    const gate = { ...base, commands: [{ ...base.commands[0]!, elapsedMs: 17, lockWaitMs: 120_000 }] };
+    const line = 'Waiting for another test run (fixture)';
+    const briefed = await gateDiagnostics(gate, 'engineer', new Map(), new Map([[1, line]]));
+    expect(briefed.summary.slice(0, 2)).toEqual([
+      `- \`tests\` waited for 120000 ms for the machine test lock: ${line}`,
+      '- `tests`: failed, exit 1; the end of what it printed:',
+    ]);
+    expect(briefed.summary).toContain('      failed assertion');
+  });
+
   test('its findings attribute the cause, and it returns to the local architect although they are in scope', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'ramify-agent-gate-cwd-'));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
