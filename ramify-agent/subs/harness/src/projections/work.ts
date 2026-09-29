@@ -261,6 +261,7 @@ export function gateOf(view: RunView, id: string): GateView {
     commit: gate.commit,
     audited: gate.audited,
     evidence: gate.evidence === null ? null : { ...gate.evidence },
+    ...(gate.provider === undefined ? {} : { provider: gate.provider }),
     verdict: gate.verdict,
     cause: gate.cause,
     next: gate.next,
@@ -279,6 +280,7 @@ export function gateOf(view: RunView, id: string): GateView {
     commands: gate.commands.map(command => ({
       kind: command.kind,
       name: command.name ?? null,
+      ...(command.providerCheckId === undefined ? {} : { providerCheckId: command.providerCheckId }),
       argv: [...command.command.argv],
       cwd: command.command.cwd,
       startedAt: command.startedAt,

@@ -76,6 +76,19 @@ describe('a gate attempt', () => {
     const view = runView(constructedRun([{ type: 'job-started', data: {} }]));
     expect(() => gateOf(view, 'ga-0009')).toThrow(ProjectionError);
   });
+
+  test('complete provider evidence survives durable decoding and the browser projection', () => {
+    const diagnostics = ['first failure', 'x'.repeat(20_000), 'last independent failure'];
+    const provider = { result: { status: 'fail', composition: { status: 'indeterminate', reason: 'prior evidence unavailable' } },
+      checks: [{ checkId: 'unit-tests', counts: { passed: 3, failed: 2 }, diagnostics,
+        artifacts: [{ path: 'gates/ga-0001/provider/complete.json', available: true }] }] };
+    const body = { ...attempt('tail only'), provider, commands: attempt('tail only').commands.map(command =>
+      ({ ...command, providerCheckId: 'unit-tests' })) };
+    const view = runView(constructedRun([{ type: 'gate-attempted', data: {}, records: [{ path: 'gates/ga-0001/attempt.json', body }] }]));
+    const projected = gateViewSchema.parse(gateOf(view, 'ga-0001'));
+    expect(projected.provider).toEqual(provider);
+    expect(projected.commands[0]?.providerCheckId).toBe('unit-tests');
+  });
 });
 
 describe('the snapshot a person reads', () => {

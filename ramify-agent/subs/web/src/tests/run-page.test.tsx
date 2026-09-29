@@ -680,6 +680,21 @@ test('an unavailable metric reads unavailable with its known subtotal, never zer
 
 // Acceptance scenarios: the review, Approve and the scenario list.
 
+test('the gate shows complete provider diagnostics beyond its bounded output tail', async () => {
+  const run = stubRun();
+  const original = run.gates!['ga-0001']!;
+  const provider = { result: { status: 'fail', reason: 'inherited failure' }, checks: [{ id: 'unit-tests',
+    counts: { failed: 2, passed: 7 }, failures: [{ name: 'first failure', message: 'x'.repeat(20_000) },
+      { name: 'last independent failure', message: 'separate assertion' }],
+    artifacts: [{ path: 'gates/ga-0001/provider/report.json', available: false, reason: 'retention unavailable' }] }] };
+  run.gates!['ga-0001'] = gateViewSchema.parse({ ...original, provider });
+  render(<RunPage client={clientWith(run)} planId="review-notes" runId={runId} interval={60_000} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Checks' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'ga-0001' }));
+  const gate = await screen.findByLabelText('Gate ga-0001');
+  expect(within(gate).getByLabelText('Complete provider evidence').textContent).toBe(JSON.stringify(provider, null, 2));
+});
+
 test('the Scenarios area lists every tracked scenario with its state, origin, work item, file and the gates that ran it', async () => {
   const client = clientWith(stubRun());
   render(<RunPage client={client} planId="review-notes" runId={runId} interval={60_000} />);

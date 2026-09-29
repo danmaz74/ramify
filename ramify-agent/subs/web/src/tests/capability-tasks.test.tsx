@@ -76,3 +76,20 @@ test('a slow old response cannot replace the newer task and plan revision', asyn
   expect(screen.queryByText(/awaiting A engineer/)).toBeNull();
   expect(screen.getAllByText(/revision 3/)).toHaveLength(2);
 });
+
+test('an accepted shared iteration shows its commit and review coverage while task handback remains pending', async () => {
+  const data = response(2, 'repair');
+  const task = data.tasks[0]!;
+  const updated = capabilityTasksResponseSchema.parse({ ...data, tasks: [{ ...task, assignments: [{
+    ...task.assignments[0], status: 'accepted', result: { outcome: 'accepted', gate: 'ga-002', commit: 'candidate-commit', findings: [] },
+    reviews: [{ id: 'rq-001', kind: 'code', result: 'complete' }, { id: 'rq-002', kind: 'design', result: null }],
+  }] }] });
+  const openGate = vi.fn();
+  render(<CapabilityTasksArea client={client(async () => updated)} planId="p" runId="r" version={2} onOpenGate={openGate} />);
+  expect(await screen.findByText('candidate-commit')).toBeTruthy();
+  expect(screen.getByText(/code review coverage: complete/)).toBeTruthy();
+  expect(screen.getByText(/design review coverage: pending/)).toBeTruthy();
+  expect(screen.getByText('No accepted handback is recorded.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'ga-002' }));
+  expect(openGate).toHaveBeenCalledWith('ga-002');
+});

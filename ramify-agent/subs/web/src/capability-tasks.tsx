@@ -32,7 +32,14 @@ function Task({ task, onOpenWorkItem, onOpenGate }: { task: CapabilityTaskView;
     </details>
     {task.consultations.length > 0 && <section><h4>Consultations</h4><ul>{task.consultations.map(item => <li key={item.id}><code>{item.id}</code>: {item.question} · {item.answer === null ? 'awaiting A engineer' : `answered: ${item.answer}`}{item.objections.length ? `; objections: ${item.objections.join('; ')}` : ''}</li>)}</ul></section>}
     <section><h4>Assignments</h4>{task.assignments.length === 0 ? <p>No owner assignment yet.</p>
-      : <ul>{task.assignments.map(item => <li key={item.id}><code>{item.id}</code> · {item.owner} · {item.status}: {item.purpose}{item.failures.length > 0 && <ul>{item.failures.map((failure, index) => <li key={index} className="failure">{failure}</li>)}</ul>}</li>)}</ul>}
+      : <ul>{task.assignments.map(item => <li key={item.id}><code>{item.id}</code> · {item.owner} · {item.status}: {item.purpose}
+        {item.result && <p>Iteration result: {item.result.outcome}. Commit {item.result.commit === null ? 'none recorded' : <code>{item.result.commit}</code>}.
+          {item.result.gate && <> Gate {onOpenGate ? <button type="button" onClick={() => onOpenGate(item.result!.gate!)}>{item.result.gate}</button> : <code>{item.result.gate}</code>}.</>}</p>}
+        {item.reviews && item.reviews.length > 0 && <ul>{item.reviews.map(review => <li key={review.id}>
+          <code>{review.id}</code> · {review.kind} review coverage: {review.result ?? 'pending'}
+        </li>)}</ul>}
+        {item.failures.length > 0 && <ul>{item.failures.map((failure, index) => <li key={index} className="failure">{failure}</li>)}</ul>}
+      </li>)}</ul>}
       {pending.length > 0 && <p className="warn">Pending or provisional: {pending.map(item => item.id).join(', ')}.</p>}
     </section>
     {task.children.length > 0 && <p>Nested tasks: {task.children.join(', ')}{task.activeChild ? `; waiting for ${task.activeChild}` : ''}.</p>}

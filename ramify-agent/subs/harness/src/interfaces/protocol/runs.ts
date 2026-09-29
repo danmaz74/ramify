@@ -1093,6 +1093,8 @@ export const gateViewSchema = z.object({
   commit: text.nullable(),
   audited: text.nullable(),
   evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
+  /** Complete producer evidence, including diagnostic details and artifact references. Absent on historical attempts. */
+  provider: z.object({ result: z.unknown(), checks: z.unknown() }).strict().optional(),
   verdict: gateVerdictSchema,
   cause: gateCauseSchema.nullable(),
   next: gateNextSchema,
@@ -1114,6 +1116,7 @@ export const gateViewSchema = z.object({
     kind: z.enum(['setup', 'ramify-check', 'type-check', 'tests', 'conformance', 'scenarios']),
     /** A setup command's declared name, such as `build`; null for every other command and an unnamed one. */
     name: text.nullable(),
+    providerCheckId: text.optional(),
     argv: z.array(z.string()),
     cwd: text,
     startedAt: z.string(),

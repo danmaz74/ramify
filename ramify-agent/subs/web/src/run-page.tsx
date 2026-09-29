@@ -651,6 +651,12 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                   : <><span>run ref <code>{data.evidence.runRef}</code></span>; <span>report commit <code>{data.evidence.reportCommit}</code></span>; <span>tree ref <code>{data.evidence.treeRef}</code></span></>}</dd>
               </div>
             </dl>
+            {data.provider === undefined
+              ? <p className="muted">Complete provider diagnostics are unavailable for this historical attempt.</p>
+              : <details><summary>Complete provider report and diagnostics</summary>
+                <p>Producer results, counts, qualifications and artifact references are shown as recorded.</p>
+                <pre aria-label="Complete provider evidence">{JSON.stringify(data.provider, null, 2)}</pre>
+              </details>}
             {data.guardedChanges.length > 0 && (
               <ul>{data.guardedChanges.map(change => <li key={change.path}>Guarded change <code>{change.path}</code>{change.after === null ? ' (deleted)' : ''}: {change.authorizedBy ? `authorized by ${change.authorizedBy.id}@${change.authorizedBy.revision}` : 'not authorized'}</li>)}</ul>
             )}
@@ -660,6 +666,7 @@ function GateDetail({ client, planId, runId, version, gate }: AreaProps & { read
                   ? 'not run, because a setup command before it did not pass'
                   : <>{command.outcome}{command.notVerified ? ` (${command.notVerified})` : ''}, exit {command.exitCode ?? 'none'}, {command.elapsedMs} ms</>}</p>
                 <p className="muted"><code>{command.argv.join(' ')}</code></p>
+                {command.providerCheckId && <p className="muted">Provider check <code>{command.providerCheckId}</code>.</p>}
                 {command.selection && <p className="muted">Selection ({command.selection.policy}): {counted(command.selection.resolved.length, 'file')}{command.selection.resolved.length ? `: ${command.selection.resolved.join(', ')}` : ''}</p>}
                 <p className="muted">Output: {command.output.bytes} bytes in <code>{command.output.path}</code>; the last {Math.min(command.output.bytes, 8192)} are shown.</p>
                 {(command.stopped !== null || command.outputIncomplete) && <p className="muted">{stoppedText(command.stopped, command.outputIncomplete)}</p>}
