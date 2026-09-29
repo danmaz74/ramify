@@ -1,0 +1,34 @@
+# Iteration 7: production rollout and live acceptance result
+
+**Status:** implementation committed; live delivery acceptance **open** as of 2026-09-29. The execution branch is `feat/plan16-capability-architect` in `/tmp/ramify-plan16-capability-architect`. Its source is separate from the original checkout's unrelated work. See the [implementation report](../implementation-report.md) for revision and audit boundaries.
+
+## Production path
+
+New runs capture policy/5 and compose the fresh capability workflow. Historical contract/fake records remain readable; an incomplete policy/4 run is explicitly interrupted on reopen. The original A work item suspends while a fresh capability architect owns the task, coordinates scoped engineers, verifies combined work and hands back. A dedicated CA24 test now reopens an actual incomplete policy/4 run and observes refusal without changing its captured record (1/1 passed). Scripted and service fixtures cover the other CA01–CA34 behavior documented in iterations 1–6; they are not live Pi semantic acceptance.
+
+The baseline audit on `d957b286` passed (run `e9078690-222d-4818-a4c8-d594125d5437`). A full Plan 16 audit of implementation revision `491e3fd5` passed all six requested checks (run `b6c64ea4-4225-4327-8b37-59361eafa0a0`, ref `refs/audited/runs/2026-09-29T04-16-05Z-491e3fd50`). Later recovery and acceptance-test commits need an audit of their exact final revision; the earlier audit does not certify them.
+
+## Real Pi runs
+
+All production starts used the production run entry point. The consumer-first retries used `openai-codex/gpt-6-sol:medium` and isolated toolkit worktrees. The ledger, prompt, invocation, source and gate records are retained under each target's `plans/plan16-bounded-denials/.harness/jobs/<run ID>/`. A start is counted here even if it ended during setup or analysis; this is not a count of completed trials.
+
+| Start | Run ID and target | Observed outcome |
+| --- | --- | --- |
+| Provider-first 1 | `20260928T145623Z-aba0fc`, `/tmp/ramify-plan16-live-target` | `project-config-invalid` at v40. |
+| Provider-first 2 | `20260928T151035Z-bdb15c`, same target | `readiness-failed` at v49. |
+| Provider-first 3 | `20260928T153951Z-b43702`, same target | Internal failure at v270: a work assignment had no outline. |
+| Consumer-first initial | `20260928T180800Z-4915cf`, `/tmp/ramify-plan16-consumer-first-target` | `readiness-failed` at v49. |
+| Retry 1 | `20260928T183332Z-26f52b`, `/tmp/ramify-plan16-consumer-first-retry-target` | `writer-unsettled` at v88 after an interruption; not a clean stop. |
+| Retry 2 | `20260928T203027Z-04b0b1`, `/tmp/ramify-plan16-consumer-first-retry2-target` | Controlled `limit-exceeded` at v194, with the original stale root assertion, pending source/results and five pending scenarios retained. CA35 passes; no handback. |
+| Retry 3 | `20260928T223727Z-edfc85`, `/tmp/ramify-plan16-consumer-first-retry3-target` | `invalid-submission` at v257 after a capability architect context return exposed a harness recovery defect; no handback. The defect was fixed in `618ee03f`. |
+| Retry 4 | `20260929T011751Z-2f6360`, `/tmp/ramify-plan16-consumer-first-retry4-target` | `limit-exceeded` at v282: cap-001 used its 12 assignments before the valid next root repair; no handback. The captured default was raised to 24 in `491e3fd5`. |
+| Retry 5 setup start | `20260929T040931Z-607761`, `/tmp/ramify-plan16-consumer-first-retry5-target` | Operator-stopped during analysis at v10 because interrupted preparation left untracked `ramify-agent/node_modules.partial`, making the source manifest dirty. That directory was moved outside the target before the clean start. |
+| Retry 5 clean start | `20260929T041024Z-f2a4ca`, same target | Terminal `invalid-submission` at v171 on 2026-09-29 05:55:42 UTC. The final capability architect invocation had no tokens and reported `Codex error: The usage limit has been reached`. No review, handback or A continuation. |
+
+The clean retry 5 reached the real capability task. The requesting CLI engineer submitted a structured need; the fresh capability architect consulted A, assigned Analysis and CLI, and revised the capability plan through revision 4. Scoped engineers submitted partial results. Analysis reported a combined four-file, 83-test pass, a 34-file Analysis-suite pass and type-check pass on tree `431b1918`. The architect kept reference failures unclassified after its next engineer could not produce a valid Git-backed baseline comparison. Its final combined work-item gate `ga-0003` failed with cause `outside-assignment`: root tests had 4 failures and 2,285 passes, including CLI output expectations for the new diagnostic and two daemon timeouts. Type-check, Ramify check and the 43-file Analysis/CLI scoped suite passed. The scenario command selected zero scenarios; all four tracked scenarios remained pending. The architect's next call hit the provider usage limit before a repair decision. These gates do not establish CA27.
+
+The retry-2 terminal browser was captured at `/tmp/ramify-plan16-consumer-first-retry2-browser-limit-stop/run.png`. Retry-5 browser captures include initial, work-started, capability-active, provider-active and provider-repair views under `/tmp/ramify-plan16-consumer-first-retry5-browser-*/run.png`; the final handback view cannot be captured because no handback occurred. These were served production views, not just component renders.
+
+## Verdict and remaining work
+
+**CA35 passes** on retry 2: a bounded real Pi stop retained unfinished state without false acceptance. **CA27 is open**: none of the ten starts has an explicit verified capability handback followed by A continuing. The original five-code feature is outside this bounded acceptance and remains unaccepted. The final-source full audit and final handback browser witness are also open. CA20 still lacks a service-level witness for a registered process group surviving restart: the current shell runner does not persist the group ID through the run service. The isolated CA20 branch is unfinished and is not integrated. CA26 now has invalid action, port-input, preview-counter, reconstruction and architect-budget witnesses; a dedicated capability repair-round exhaustion witness is still open. The external Pi provider usage limit blocks another real trial until usage is available.

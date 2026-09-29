@@ -1,7 +1,9 @@
 # Plan 16: a fresh architect coordinates each requested capability
 
-**Date:** 2026-09-28. **Status:** proposed implementation plan; no implementation
-or acceptance claimed. **Source inspected:** `5a1934aa844c5ab95013653f15c7aeb422690b13`
+**Date:** 2026-09-28. **Status:** implementation in progress; final acceptance
+remains open. [Iteration 7 results](iterations/iteration7-results.md) and the
+[implementation report](implementation-report.md) distinguish committed code,
+audits and the two live gates. **Source inspected:** `5a1934aa844c5ab95013653f15c7aeb422690b13`
 with the existing uncommitted prompt and documentation edits preserved.
 This inspection state is not the execution baseline; the clean-baseline
 prerequisite below must be completed before iteration 1.

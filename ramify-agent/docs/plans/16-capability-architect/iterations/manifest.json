@@ -1,6 +1,6 @@
 {
   "plan": "../main-plan.md",
-  "status": "proposed",
+  "status": "in-progress",
   "iterations": [
     { "id": "1", "file": "01-records.md", "dependsOn": [] },
     { "id": "2", "file": "02-delegation.md", "dependsOn": ["1"] },
