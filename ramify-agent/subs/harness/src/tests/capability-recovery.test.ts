@@ -78,8 +78,7 @@ test('CA19: retry refuses a changed staged or untracked candidate and preserves 
   expect((await git(fixture.root, 'show', ':subs/a/src/caller.ts')).trim()).toContain('changedIndex = true');
 });
 
-for (const exhaustAfterRestart of [false, true]) {
-test(`CA18 CA26 CA29: a lost B writer keeps dirty source and ${exhaustAfterRestart ? 'exhausts its captured reconstruction bound after restart' : 'reconstructs within the same assignment'}`, async () => {
+async function lostBWriterCase(exhaustAfterRestart: boolean): Promise<void> {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -172,8 +171,12 @@ test(`CA18 CA26 CA29: a lost B writer keeps dirty source and ${exhaustAfterResta
     }
   }
   await opened.service.settled('need', receipt.jobId);
-}, 45_000);
 }
+
+test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within the same assignment',
+  () => lostBWriterCase(false), 45_000);
+test('CA18 CA26 CA29: a lost B writer keeps dirty source and exhausts its captured reconstruction bound after restart',
+  () => lostBWriterCase(true), 45_000);
 
 test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry', async () => {
   const fixture = await copyCapabilityFixture();
