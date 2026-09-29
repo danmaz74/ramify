@@ -1126,6 +1126,8 @@ export class RunService {
     if (policy === undefined || state === undefined || state.settledBy !== null) return false;
     if (this.ignoring(run) || run.reviews?.accepting !== true) return false;
     const request = reviewRequestSchema.parse(this.committedBody(run, reviewLayout.request(id)));
+    const recovered = await this.recoverAcceptedReview(run, request, state);
+    if (recovered !== null) return recovered;
     const kind = request.key.kind;
     const attempt = reviewAttemptId(id, state.attempts.length + 1);
     const queuedAt = state.attempts.at(-1)?.finished?.at ?? state.recordedAt;
@@ -1242,6 +1244,62 @@ export class RunService {
     return committed === 'committed';
   }
 
+  /** Finish an accepted reader turn whose terminal review record was interrupted.
+   * Its submitted bytes and settled outcome are durable; the candidate is
+   * immutable, so concern grounds are recovered from that same audited tree. */
+  private async recoverAcceptedReview(
+    run: Run, request: ReviewRequest, state: ReturnType<typeof reviewStateOf> extends ReadonlyMap<string, infer R> ? R : never,
+  ): Promise<boolean | null> {
+    const pending = state.attempts.at(-1);
+    if (pending?.started === null || pending?.started === undefined || pending.finished !== null) return null;
+    const invocation = pending.started.invocation;
+    const ended = run.log.all('invocation-ended').find(event => event.data.invocation === invocation);
+    if (ended?.data.ended !== 'submitted') return null;
+    const outcome = invocationOutcomeSchema.safeParse(this.committedBody(run, runLayout.outcome(invocation)));
+    const bytes = await readIfExists(run.path(runLayout.submission(invocation)));
+    if (ended.data.submission === null || bytes === undefined || sha256(bytes) !== ended.data.submission ||
+      !outcome.success || outcome.data.submission?.hash !== ended.data.submission ||
+      outcome.data.disposition !== 'applied' || !outcome.data.settled.confirmed || outcome.data.session === undefined) {
+      await this.fail(run, 'recovery-exhausted', `Reviewer ${invocation} has no authenticated accepted submission for ${pending.id}`);
+      return false;
+    }
+    const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+    const { schema: _schema, ...body } = raw;
+    const parsed = reviewSubmissionSchema.safeParse(body);
+    if (raw.schema !== 'ramify-agent.review-submission/1' || !parsed.success) {
+      await this.fail(run, 'recovery-exhausted', `Reviewer ${invocation} has an invalid accepted submission for ${pending.id}`);
+      return false;
+    }
+    const submission = parsed.data;
+    const snapshot = await openCandidateSnapshot(this.candidates, this.projectRoot,
+      { commit: request.key.candidate, base: request.base });
+    const read = new Map<string, string>();
+    for (const concern of submission.concerns) {
+      if (concern.ground === null) continue;
+      const resolved = resolveSnapshotPath(snapshot, concern.ground.path);
+      if (!resolved.ok || resolved.kind !== 'file') {
+        await this.fail(run, 'recovery-exhausted', `Reviewer ${invocation}'s accepted ground is unavailable in ${request.key.candidate}`);
+        return false;
+      }
+      const text = await this.candidates.readBlob(this.projectRoot, request.key.candidate, resolved.path);
+      read.set(resolved.path, `sha256:${sha256(text)}`);
+    }
+    const bindings = submission.concerns.length === 0 ? []
+      : await this.concernBindings(run, request, snapshot, { read: () => read }, submission);
+    const result: ReviewResult = submission.missing.length === 0
+      ? { result: 'complete', inspected: submission.inspected.map(path => ({ path })), concerns: submission.concerns.length }
+      : { result: 'partial', inspected: submission.inspected.map(path => ({ path })),
+        missing: submission.missing.map(entry => ({ path: entry.path, reason: entry.reason })), concerns: submission.concerns.length };
+    const previous = state.attempts.at(-2);
+    const attempt = {
+      id: pending.id, request: request.id, queuedAt: previous?.finished?.at ?? state.recordedAt,
+      requestedStart: requestedStartOf(request),
+      startedAt: pending.started.at, invocation, session: pending.started.session,
+      actualStart: outcome.data.session.mode === 'fork' ? 'fork' as const : 'fresh' as const,
+    };
+    return await this.finishReview(run, request, attempt, result, true, submission, bindings) === 'committed';
+  }
+
   /**
    * The ground, credibility and modules of each concern of a valid
    * submission, in concern order. The ground is the file the reviewer named,
@@ -1251,7 +1309,7 @@ export class RunService {
    * candidate whose module declarations cannot be read leaves only that
    * fallback, with a warning.
    */
-  private async concernBindings(run: Run, request: ReviewRequest, snapshot: CandidateSnapshot, tools: SnapshotTools, submission: ReviewSubmission): Promise<ConcernBinding[]> {
+  private async concernBindings(run: Run, request: ReviewRequest, snapshot: CandidateSnapshot, tools: Pick<SnapshotTools, 'read'>, submission: ReviewSubmission): Promise<ConcernBinding[]> {
     const index = await candidateModuleIndex(this.candidates, this.projectRoot, snapshot).catch(error => {
       this.warn(`Run ${run.record.jobId}: the module declarations of ${request.key.candidate} could not be read, so ${request.id}'s concerns name only their work item's module: ${message(error)}`);
       return null;
@@ -4425,8 +4483,11 @@ export class RunService {
       await this.fail(run, 'recovery-exhausted', `Capability ${activeId} lacks a delegation or coordinator basis`);
       return false;
     }
+    const reconciliationSessions = new Set(run.log.all('session-opened')
+      .filter(event => event.data.fork?.reason === 'reconciliation').map(event => event.data.session));
     const latest = [...run.log.all('invocation-started')].reverse().find(event => event.data.role === 'capability-architect' &&
-      event.data.work.capabilityTask === activeId && event.data.work.request === request.id);
+      event.data.work.capabilityTask === activeId && event.data.work.request === request.id &&
+      !reconciliationSessions.has(event.data.session));
     if (this.capabilityBudgetReturns(run, activeId) >= run.record.policy.limits.budgetReturnsPerIteration) {
       await this.fail(run, 'limit-exceeded', `Capability architect of ${activeId} exhausted its captured context-budget return bound; unfinished task remains`);
       return false;
@@ -9976,6 +10037,21 @@ export class RunService {
     taskOwner?: string,
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${item.id} gate cannot run`);
+    // A crash after the attempt was recorded may replay the exact completion
+    // action. Reuse only that action's durable gate; another proposal can
+    // change scenario obligations even when the source tree is unchanged.
+    const owner = taskOwner ?? item.id;
+    const candidate = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    for (const event of [...run.log.all('gate-attempted')].reverse()) {
+      const recorded = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate)));
+      if (!recorded.success || recorded.data.checkpoint !== 'work-item' ||
+        recorded.data.subject?.workItem !== owner || recorded.data.proposedBy !== invocation ||
+        recorded.data.verdict !== 'passed' ||
+        recorded.data.audited === null) continue;
+      if (await this.candidates.commitTree(this.projectRoot, recorded.data.audited) !== candidate) continue;
+      if (!await this.recordScenarioPasses(run, recorded.data)) return null;
+      return recorded.data;
+    }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const taskScenarios = taskOwner === undefined ? undefined : await this.scenarioInputs(run);
     const relevant = taskOwner === undefined ? undefined : new Set(
@@ -10848,7 +10924,10 @@ export class RunService {
     for (const scenario of passed) {
       const state = states.get(scenario);
       if (state === 'declared') await this.write(run, { type: 'scenario-implemented', data: { scenario, gate: attempt.id } }, this.integrationItemsDue(run, scenario));
-      else if (state === 'bound') await this.write(run, { type: 'scenario-bound-passed', data: { scenario, gate: attempt.id } });
+      else if (state === 'bound') {
+        if (run.log.all('scenario-bound-passed').some(event => event.data.scenario === scenario && event.data.gate === attempt.id)) continue;
+        await this.write(run, { type: 'scenario-bound-passed', data: { scenario, gate: attempt.id } });
+      }
       else continue;
       if (this.ignoring(run)) return false;
     }
