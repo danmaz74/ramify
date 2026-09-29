@@ -230,8 +230,27 @@ describe('CF06 and CF07: a crash at every review, reconciliation and CheckFindin
         const appended = after.slice(cut).map(line => line.event);
         for (const event of appended) {
           expect(recoveryAppends.has(event.type), `${context}: recovery appended ${event.type}`).toBe(true);
-          // No producer runs again: recovery carries no CheckFinding event.
-          expect(carriedCheckFindings(event), `${context}: ${event.type}`).toEqual([]);
+          const findings = carriedCheckFindings(event);
+          if (findings.length === 0) continue;
+          // A reviewer already submitted and settled before the crash may
+          // have its exact pending attempt completed without another agent.
+          // No other recovery completion may originate CheckFindings.
+          expect(event.type, `${context}: CheckFindings came from ${event.type}`).toBe('review-attempt-finished');
+          if (event.type !== 'review-attempt-finished') continue;
+          const started = prefix.map(line => line.event).find(prior => prior.type === 'review-attempt-started' &&
+            prior.data.attempt === event.data.attempt);
+          expect(started, `${context}: ${event.data.attempt} had no committed start`).toBeDefined();
+          if (started?.type !== 'review-attempt-started') continue;
+          expect(prefix.map(line => line.event).find(prior => prior.type === 'invocation-ended' &&
+            prior.data.invocation === started.data.invocation), `${context}: ${event.data.attempt} had no accepted end`)
+            .toMatchObject({ data: { ended: 'submitted', submission: expect.any(String) } });
+          const original = golden.find(line => line.event.type === 'review-attempt-finished' &&
+            line.event.data.attempt === event.data.attempt)?.event;
+          expect(original, `${context}: ${event.data.attempt} was not in the original run`).toBeDefined();
+          if (original?.type === 'review-attempt-finished') {
+            expect(event.data, `${context}: ${event.data.attempt} changed its accepted result`).toEqual(original.data);
+            expect(findings, `${context}: ${event.data.attempt} changed CheckFindings`).toEqual(carriedCheckFindings(original));
+          }
         }
         const events = after.map(line => line.event);
         // Exactly once: every identity at most once, and the CheckFinding events replay.
