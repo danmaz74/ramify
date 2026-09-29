@@ -248,9 +248,10 @@ repository's build, test, audit, or dependency-rule tooling.
 
 1. Bump `version` in `package.json` and the root entries of `package-lock.json`.
 2. Commit the change.
-3. Audit that commit with `audit/plan7-affected-modules.request.json`, or the
-   request that succeeds it:
-   `ramify-audit audit --request audit/plan7-affected-modules.request.json --cwd . --json`.
+3. Audit that commit using its committed `ramify-audit.json`:
+   `ramify-agent/node_modules/.bin/ramify-audit audit --cwd . --full --json`.
+   The CLI reads the checks and workspace configuration from the commit being
+   audited. Its full audit must pass before publishing.
 4. From a clean checkout of the audited commit, run `npm publish`. Its
    `prepublishOnly` script runs `npm run build`, and `publishConfig` sends the
    package to https://npm.braimax.com.

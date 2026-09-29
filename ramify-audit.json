@@ -1,29 +1,4 @@
 {
-  "protocolVersion": 1,
-  "requestId": "plan7-affected-modules",
-  "repositoryPath": ".",
-  "source": {
-    "kind": "existing-commit",
-    "revision": "HEAD"
-  },
-  "selector": {
-    "id": "full",
-    "version": "1",
-    "config": {}
-  },
-  "universeId": "ramify-toolkit-plan7-affected-modules",
-  "coverageClaim": {
-    "scope": "repository",
-    "change": "plan7-affected-modules",
-    "validation": "post-commit"
-  },
-  "workspaceMode": "existing-worktree",
-  "registeredExecutorIds": [],
-  "metadata": {
-    "plan": "Plan 7: affected modules from retained dependency facts",
-    "derivedFrom": "ramify-agent/audit/toolkit-run-fixes.request.json",
-    "note": "Runs in the existing checkout because the toolkit tests need the built dist/ and linked root dependencies."
-  },
   "checks": [
     {
       "id": "patch-integrity",
@@ -157,5 +132,17 @@
         "toolkit-build"
       ]
     }
-  ]
+  ],
+  "ignorePaths": [
+    "scripts/probes/**"
+  ],
+  "workspace": {
+    "preparation": "nodejs",
+    "options": {
+      "packageDirectories": [
+        "",
+        "examples/collection-review"
+      ]
+    }
+  }
 }

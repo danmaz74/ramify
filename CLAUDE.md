@@ -112,6 +112,13 @@ toolkit owners, including owned tests. The independent scripts, site and example
 have separate compiler scopes. The [iteration 15 completion report](docs/plans/done/iteration-1-project-verifier/iterations/iteration15-results.md)
 records acceptance evidence and remaining limitations.
 
+The toolkit audit is defined by the committed root `ramify-audit.json` and runs
+from a clean commit with `ramify-agent/node_modules/.bin/ramify-audit audit
+--cwd . --json`. Use `--full` for the release audit. `check:self` and
+`check:reference` use disposable batch sessions so an audit leaves no resident
+daemon behind. The nested `ramify-agent/ramify-audit.json` defines that
+project's own audit; invoke it with `--project-root ramify-agent --cwd .`.
+
 ## Implementation Architecture
 
 The [architecture overview](docs/architecture/README.md) indexes the implementation

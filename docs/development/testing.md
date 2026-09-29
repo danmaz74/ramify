@@ -52,7 +52,7 @@ example/site packages with `npm --prefix <directory> ci` as needed.
 | `dist/src/ramify check --changed <path>... [--deadline <ms>] [--format json]` | Run the bounded hook check against the resident daemon: exit 0 without findings, 1 with findings or an invalid revision, 2 when not checked; never a batch fallback. Scripted runs own their `RAMIFY_ENDPOINT_DIR`. `examples/hooks/claude-code-post-write.mjs` maps a Claude Code post-write hook to it. |
 | `dist/src/ramify materialize [--view <api\|architect>]... [--from <path> \| --all] [--root <dir>]` | Refresh generated views through the resident daemon from one synchronized revision, in one transaction. Without `--view`, one module's or the whole project's foreign-API view (`src[/tests]/.ramify/`), exactly as Plan 2A; `--view architect` publishes the project's [architect view](../architecture/architect-view.spec.md) at `.ramify-architect/` after waiting for the revision's dependency facts, and `--from`/`--all` require `--view api`. Exit 0 on complete publication, 1 for an invalid project, 2 unavailable, superseded, partial or incompatible service, 130 on interrupt; never a batch fallback. Search the generated, gitignored views with the `rg` commands in [`AGENTS.md`](../../AGENTS.md#foreign-api-discovery). |
 | `dist/src/ramify affected [<module-id>...] [--path <path>]... [--root <dir>] [--batch] [--format human\|json]` | Select the changed, dependent and test modules for module and path seeds, from the resident daemon's synchronized revision or, with `--batch`, a fresh session. JSON is one `ramify.affected-cli/1` document. Exit 0 for any answer, including one widened to all modules, 1 for an invalid project, unknown module ID or invalid seed, 2 unavailable, 130 on interrupt; the resident form never falls back to batch. Scripted resident runs own their `RAMIFY_ENDPOINT_DIR`. |
-| `npm run check:self`, `npm run check:reference` | Check all fifteen toolkit owners or fifteen reference owners, including owned tests. Both commands use the resident default; isolate their endpoint and stop the owned daemon after verification. |
+| `npm run check:self`, `npm run check:reference` | Check all fifteen toolkit owners or fifteen reference owners, including owned tests. Both commands use disposable batch sessions. |
 | `npm run type-check` | Type-check toolkit source and scripts. |
 | `npm test` | Run toolkit Vitest tests; append `-- <test-file>` for a focused run. |
 | `npm run reference:cases` | Validate the reference catalogue and harness using their separate test configuration. |
@@ -89,9 +89,10 @@ remain unchanged; a composed receipt identifies their original inputs separately
 from the current checkout. Other plans retain their own acceptance contracts.
 
 See [resident verification readiness](resident-verification.md) for current
-command availability and the endpoint isolation convention. `check:self`,
-`check:reference` and every `ramify check`, including `--changed`, use the
-resident daemon. Every scripted resident run, harness or measurement sets an
+command availability and the endpoint isolation convention. The toolkit's
+`check:self` and `check:reference` scripts use `--batch`; other `ramify check`
+invocations use the resident daemon unless they pass `--batch`. Every scripted
+resident run, harness or measurement sets an
 owned `RAMIFY_ENDPOINT_DIR`, stops its daemon with that build's
 `dist/src/ramify daemon stop` in `finally` and fails if it survives. An implicit
 batch result cannot satisfy a resident instance.

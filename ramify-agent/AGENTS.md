@@ -35,6 +35,10 @@ repository.
   is the only writer of durable state and owns the public contracts of the
   behavior it implements; the web module projects files and forwards commands,
   and receives only those contracts.
+- Its audit checks live in committed `ramify-audit.json`. From the repository
+  root, run `ramify-agent/node_modules/.bin/ramify-audit audit --project-root
+  ramify-agent --cwd . --json`; the CLI reads the configuration from the
+  audited commit and publishes evidence under this project's own refs.
 - The toolkit's writing conventions apply to documents here: expose and
   receive, never grant or route; behavioral terms for what Ramify derives,
   capability for what an agent ascribes.

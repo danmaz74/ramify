@@ -38,6 +38,11 @@ the registry `.npmrc` names, not the surrounding checkout. To take a new
 toolkit release, run `npm install --save-exact ramify.ts@<version>` and commit
 the manifest and lockfile.
 
+The project's suite audit uses the committed `ramify-audit.json`. From the
+repository root, run `ramify-agent/node_modules/.bin/ramify-audit audit
+--project-root ramify-agent --cwd . --json`. The audited commit supplies the
+checks; audit evidence is stored under ramify-agent's own refs.
+
 ```sh
 npm install
 npm run type-check

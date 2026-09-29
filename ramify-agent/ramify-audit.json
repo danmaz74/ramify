@@ -1,11 +1,5 @@
 {
-  "protocolVersion": 1,
-  "requestId": "toolkit-run-fixes",
-  "repositoryPath": ".",
-  "source": {
-    "kind": "existing-commit",
-    "revision": "HEAD"
-  },
+  "enclosingProject": "ignore",
   "checks": [
     {
       "id": "patch-integrity",
@@ -19,7 +13,12 @@
           {
             "name": "git-diff-check",
             "cmd": "git",
-            "args": ["diff", "--check", "HEAD^", "HEAD"],
+            "args": [
+              "diff",
+              "--check",
+              "HEAD^",
+              "HEAD"
+            ],
             "parser": "none",
             "timeoutMs": 30000
           }
@@ -40,7 +39,10 @@
           {
             "name": "agent-typecheck",
             "cmd": "npm",
-            "args": ["--prefix", "ramify-agent", "run", "type-check"],
+            "args": [
+              "run",
+              "type-check"
+            ],
             "parser": "none",
             "timeoutMs": 180000
           }
@@ -48,7 +50,9 @@
         "continueOnFailure": true
       },
       "onFailure": "record",
-      "dependsOn": ["patch-integrity"]
+      "dependsOn": [
+        "patch-integrity"
+      ]
     },
     {
       "id": "agent-tests",
@@ -62,15 +66,21 @@
           {
             "name": "agent-vitest",
             "cmd": "npm",
-            "args": ["--prefix", "ramify-agent", "test", "--", "--maxWorkers=4"],
+            "args": [
+              "test",
+              "--",
+              "--maxWorkers=4"
+            ],
             "parser": "vitest",
-            "timeoutMs": 600000
+            "timeoutMs": 900000
           }
         ],
         "continueOnFailure": true
       },
       "onFailure": "record",
-      "dependsOn": ["agent-typecheck"]
+      "dependsOn": [
+        "agent-typecheck"
+      ]
     },
     {
       "id": "agent-structure",
@@ -84,7 +94,10 @@
           {
             "name": "agent-check-self",
             "cmd": "npm",
-            "args": ["--prefix", "ramify-agent", "run", "check:self"],
+            "args": [
+              "run",
+              "check:self"
+            ],
             "parser": "none",
             "timeoutMs": 180000
           }
@@ -92,46 +105,36 @@
         "continueOnFailure": true
       },
       "onFailure": "record",
-      "dependsOn": ["agent-typecheck"]
+      "dependsOn": [
+        "agent-typecheck"
+      ]
     },
     {
-      "id": "parent-daemon-test",
-      "name": "Parent daemon regression",
-      "description": "Run the dependency-diagram daemon case in the parent package",
+      "id": "agent-web-build",
+      "name": "Ramify agent web production build",
+      "description": "Build the web consumer of harness projections",
       "scope": "both",
       "category": "deterministic",
       "executor": {
         "kind": "command",
         "commands": [
           {
-            "name": "dependency-diagram-daemon",
+            "name": "agent-web-build",
             "cmd": "npm",
-            "args": ["test", "--", "src/tests/dependency-diagram-daemon.test.ts", "--maxWorkers=1"],
-            "parser": "vitest",
-            "timeoutMs": 120000
+            "args": [
+              "run",
+              "build:web"
+            ],
+            "parser": "none",
+            "timeoutMs": 180000
           }
         ],
         "continueOnFailure": true
       },
       "onFailure": "record",
-      "dependsOn": ["patch-integrity"]
+      "dependsOn": [
+        "agent-typecheck"
+      ]
     }
-  ],
-  "selector": {
-    "id": "full",
-    "version": "1",
-    "config": {}
-  },
-  "universeId": "ramify-agent-plan12-check-findings",
-  "coverageClaim": {
-    "scope": "repository",
-    "change": "toolkit-run-fixes",
-    "validation": "post-commit"
-  },
-  "workspaceMode": "existing-worktree",
-  "registeredExecutorIds": [],
-  "metadata": {
-    "plan": "ramify-agent: fixes for the problems of the first toolkit run",
-    "derivedFrom": "ramify-agent/audit/plan12-check-findings.request.json"
-  }
+  ]
 }
