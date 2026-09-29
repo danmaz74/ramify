@@ -1536,11 +1536,8 @@ export class RunService {
     }, settles);
   }
 
-  /**
-   * Finishes every unsettled request, or those named, as not verified: an
-   * attempt a reader started and never finished, whose later result is then
-   * fenced, or a new one that never started. Each settles its request.
-   */
+  /** Finishes unsettled requests. A durable accepted reader submission is
+   * completed first; only a turn with no accepted result becomes not verified. */
   private async finishUnsettledReviews(
     run: Run,
     why: (request: ReturnType<typeof unsettledRequests>[number], running: boolean) => { readonly reason: NotVerifiedReason; readonly detail: string },
@@ -1553,6 +1550,11 @@ export class RunService {
       const parsed = reviewRequestSchema.safeParse(body);
       if (!parsed.success) {
         this.warn(`Run ${run.record.jobId}: review request ${state.id} cannot be read, so it was left unsettled`);
+        continue;
+      }
+      const accepted = await this.recoverAcceptedReview(run, parsed.data, state);
+      if (accepted !== null) {
+        if (accepted) finishedIds.push(state.attempts.at(-1)!.id);
         continue;
       }
       const open = state.attempts.find(entry => entry.started !== null && entry.finished === null);
@@ -1664,10 +1666,10 @@ export class RunService {
 
   /**
    * Recovery of a run's reviews: every request an accepted iteration is owed
-   * and has not is recorded once, and every request left unsettled is
-   * finished as not verified, since a recovered run is interrupted and runs
-   * nothing more. An attempt whose reader was running is one whose session
-   * was lost with the harness.
+   * and has not is recorded once. An accepted reader submission is replayed;
+   * every request still unsettled is finished as not verified, since an
+   * interrupted run starts no new reader. An unaccepted attempt whose reader
+   * was running lost its session with the harness.
    */
   private async recoverReviews(run: Run): Promise<string[]> {
     if (run.record.policy.reviews === undefined) return [];
