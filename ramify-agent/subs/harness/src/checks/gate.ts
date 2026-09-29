@@ -11,6 +11,7 @@ import type {
 } from './records.js';
 import { gateAttemptSchema } from './records.js';
 import { verifyChecks } from './verify.js';
+import { PausableDeadline } from '../run/pausable-deadline.js';
 import type { PlannedCheck, VerificationFailure } from './verify.js';
 
 /*
@@ -72,6 +73,7 @@ export interface GateRequest {
   readonly signal?: AbortSignal | undefined;
   /** Called as each command starts; a gate run in place passes it to its executor. */
   readonly started?: GateCommandStarted | undefined;
+  readonly waiting?: ((command: import('./execution.js').GateCommandStart, line: string) => Promise<void>) | undefined;
 }
 
 /** A verified gate whose commands may now be executed over a chosen revision. */
@@ -132,10 +134,12 @@ export async function executePreparedGate(
   sourceCommit: string,
   commit: string | null,
   started: GateCommandStarted | undefined = prepared.request.started,
+  waiting: GateRequest['waiting'] = prepared.request.waiting,
 ): Promise<GateAttempt> {
   const { request, checkpoint } = prepared;
-  const bound = AbortSignal.timeout(prepared.timeoutMs);
-  const signal = request.signal === undefined ? bound : AbortSignal.any([request.signal, bound]);
+  const bound = new PausableDeadline(prepared.timeoutMs);
+  const signal = request.signal === undefined ? bound.signal : AbortSignal.any([request.signal, bound.signal]);
+  try {
   const executionResult = await execution.run(request.checks, {
       directory: request.directory,
       classify,
@@ -153,8 +157,13 @@ export async function executePreparedGate(
       },
       signal,
       ...(started === undefined ? {} : { started }),
+      ...(waiting === undefined ? {} : { waiting }),
+      pauseForTestLock: () => bound.pause(),
     });
   return finishGate(prepared, executionResult, commit);
+  } finally {
+    bound.dispose();
+  }
 }
 
 async function finishGate(prepared: PreparedGate, executionResult: CheckExecutionResult, commit: string | null): Promise<GateAttempt> {
@@ -264,6 +273,7 @@ function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scen
     ...(check.selection === undefined ? {} : { selection: check.selection }),
     startedAt: run.startedAt,
     elapsedMs: run.elapsedMs,
+    ...(run.lockWaitMs === undefined ? {} : { lockWaitMs: run.lockWaitMs }),
     output: { path: outputFile, bytes: run.output.bytes, truncated: run.output.truncated, tail: run.output.tail },
     ...(scenarios === undefined ? {} : { scenarios }),
   };

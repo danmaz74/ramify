@@ -8288,6 +8288,7 @@ export class RunService {
         git: this.git,
         head,
         started: this.commandStarted(run, gateId, 'readiness'),
+        waiting: this.commandWaiting(run, gateId, 'readiness'),
       });
 
       if (result.attempt.verdict === 'passed' && result.gate !== null) {
@@ -8576,7 +8577,7 @@ export class RunService {
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
         const attempt = await executePreparedGate(this.options.checkExecution, prepared, sourceCommit, commit,
-          this.commandStarted(run, identity.id, prepared.checkpoint));
+          this.commandStarted(run, identity.id, prepared.checkpoint), this.commandWaiting(run, identity.id, prepared.checkpoint));
         if (attempt.audited !== null && attempt.audited !== sourceCommit) {
           throw new Error(`Gate ${attempt.id} audited ${attempt.audited}, expected ${sourceCommit}`);
         }
@@ -8736,6 +8737,19 @@ export class RunService {
         await this.write(run, { type: 'gate-command-started', data: { gate, checkpoint, ...command } });
       } catch (error) {
         this.warn(`Run ${run.record.jobId}: the start of command ${command.position} of gate ${gate} was not recorded: ${message(error)}`);
+      }
+    };
+  }
+
+  private commandWaiting(run: Run, gate: string, checkpoint: Checkpoint): NonNullable<import('../checks/gate.js').GateRequest['waiting']> {
+    return async (command, line) => {
+      if (command.kind !== 'tests' && command.kind !== 'scenarios') return;
+      try {
+        await this.write(run, { type: 'gate-command-waiting', data: {
+          gate, checkpoint, kind: command.kind, position: command.position, total: command.total, line,
+        } });
+      } catch (error) {
+        this.warn(`Run ${run.record.jobId}: the wait of command ${command.position} of gate ${gate} was not recorded: ${message(error)}`);
       }
     };
   }

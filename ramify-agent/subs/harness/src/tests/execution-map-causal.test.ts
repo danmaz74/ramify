@@ -136,6 +136,11 @@ describe('execution map causal projection', () => {
     expect(running.current.runningGate).toBe('gate:ga-readiness');
     expect(running.current.gateCommand).toMatchObject({ kind: 'type-check', position: 2, total: 4 });
     expect(running.current.gateCommand?.source.sequence).toBe(running.runVersion);
+    const queued = projected([started, { type: 'gate-command-waiting', data: {
+      gate: 'ga-readiness', checkpoint: 'readiness', kind: 'tests', position: 3, total: 4,
+      line: 'Waiting for another test run (fixture)',
+    } }]);
+    expect(queued.current.gateCommand).toMatchObject({ kind: 'tests', waitingLine: 'Waiting for another test run (fixture)', position: 3 });
     const ended = projected([started, command(1, 'tests'),
       { type: 'readiness-failed', data: { attempt: 1, gate: 'ga-readiness', step: 'baseline-tests', detail: 'failure', recovery: null, final: true } }]);
     expect(ended.current).toEqual({ awaitedSession: null, runningGate: null, source: null });

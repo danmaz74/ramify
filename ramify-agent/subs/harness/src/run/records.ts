@@ -844,6 +844,7 @@ export const gateAttemptSchema = z.object({
     selection: testSelectionSchema.optional(),
     startedAt: z.string(),
     elapsedMs: z.int().nonnegative(),
+    lockWaitMs: z.int().nonnegative().optional(),
     exitCode: z.int().nullable(),
     outcome: z.enum(['passed', 'failed', 'not-verified']),
     notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed', 'audit-unselected']).optional(),

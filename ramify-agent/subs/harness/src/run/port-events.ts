@@ -4,6 +4,7 @@ import type { InvocationTranscript } from '../transcripts/recorder.js';
 import type { ExcursionWatcher } from './excursions.js';
 import type { ObservationLog } from './observations.js';
 import type { InvocationOutcome } from './records.js';
+import { PausableDeadline } from './pausable-deadline.js';
 
 /*
  * What one session's port events leave in its observation log and its
@@ -218,6 +219,9 @@ export class InvocationBounds {
   private readonly reachedListeners: Array<(bound: 'idle-timeout' | 'absolute-timeout') => void> = [];
   /** The time each held command may run until, with the margin. */
   private readonly holds = new Set<{ readonly until: number }>();
+  private absolute: PausableDeadline | undefined;
+  private readonly pendingAbsolutePauses = new Set<{ release?: () => void }>();
+  private completed = false;
 
   constructor(private readonly limits: InvocationLimits, private readonly marginMs = commandHoldMarginMs) {}
 
@@ -259,13 +263,31 @@ export class InvocationBounds {
     };
   }
 
+  /** Machine test lock waiting spends no invocation running budget. */
+  pauseAbsoluteForTestLock(): () => void {
+    if (this.completed) return () => undefined;
+    const pause = { release: this.absolute?.pause() };
+    this.pendingAbsolutePauses.add(pause);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.pendingAbsolutePauses.delete(pause);
+      pause.release?.();
+    };
+  }
+
   /** The session's outcome, or `stopped` once a bound was reached and the settle wait ran out. */
   async outcome(session: AgentSession): Promise<SessionOutcome> {
     this.session = session;
     const expiry = new Promise<void>(resolve => { this.expired = resolve; });
     this.armed = true;
     this.touch();
-    const absoluteTimer = setTimeout(() => this.expire('absolute-timeout'), this.limits.invocationAbsoluteMs);
+    const absolute = new PausableDeadline(this.limits.invocationAbsoluteMs);
+    this.absolute = absolute;
+    for (const pause of this.pendingAbsolutePauses) pause.release = absolute.pause();
+    const onAbsolute = () => this.expire('absolute-timeout');
+    absolute.signal.addEventListener('abort', onAbsolute, { once: true });
     try {
       return await Promise.race([
         session.outcome,
@@ -274,7 +296,12 @@ export class InvocationBounds {
     } finally {
       this.armed = false;
       clearTimeout(this.idleTimer);
-      clearTimeout(absoluteTimer);
+      absolute.signal.removeEventListener('abort', onAbsolute);
+      absolute.dispose();
+      this.absolute = undefined;
+      for (const pause of this.pendingAbsolutePauses) pause.release = undefined;
+      this.pendingAbsolutePauses.clear();
+      this.completed = true;
     }
   }
 

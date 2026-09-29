@@ -47,12 +47,16 @@ describe('in-place suite checks', () => {
     expect(nonSuite.verdict).toBe('passed');
     expect(await readFile(nonSuite.commands[0]!.output.path, 'utf8')).toBe('1');
     const starts: string[] = [];
+    const waiting: string[] = [];
     const pending = runGate(createInPlaceCheckExecution(f.lock), 'readiness', {
       id: 'test-later', projectRoot: f.root, directory: join(f.root, 'test'), head: 'HEAD',
       checks: [{ kind: 'tests', command }], started: async started => { starts.push(started.kind); },
+      waiting: async (_command, line) => { waiting.push(line); },
     });
     await new Promise(resolve => setTimeout(resolve, 60));
     expect(starts).toEqual([]);
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0]).toContain('Waiting for another test run');
     f.release();
     await f.holder;
     const attempt = await pending;
@@ -60,6 +64,7 @@ describe('in-place suite checks', () => {
     expect(starts).toEqual(['tests']);
     expect(await readFile(attempt.commands[0]!.output.path, 'utf8')).toBe('1');
     expect(attempt.commands[0]!.command.env).toContain('RAMIFY_AUDIT_TEST_LOCK_HELD');
+    expect(attempt.commands[0]!.lockWaitMs).toBeGreaterThan(0);
   });
 
   test('focused shell and run_scope_tests finish while a suite holds the private lock', async () => {

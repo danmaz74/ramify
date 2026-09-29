@@ -2,7 +2,7 @@ import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { checkpointPolicies, planScenarioCheck, type PlannedScenario, type ScenarioCheckInputs } from '../checks/checkpoint.js';
 import type { CheckExecutionPort } from '../checks/execution.js';
 import { prepareGate, runGate } from '../checks/gate.js';
@@ -29,7 +29,28 @@ const tracked = ['sc-001', 'sc-002', 'sc-003', 'sc-004', 'sc-005', 'sc-006', 'sc
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(cleanups.splice(0).map(cleanup => cleanup()));
+});
+
+test('a scenario check reports lock wait apart from its running time', async () => {
+  vi.useFakeTimers();
+  const root = await directory();
+  const command = checkCommand({ argv: ['fixture'], cwd: root, timeoutMs: 1000 });
+  const result = await runScenarioCheck({
+    command,
+    plan: { mode: 'quick', selection: { kind: 'all' }, strict: true, dryRun: false, support: [], runs: [],
+      setup: command, teardown: null, runTimeoutMs: 1000, tracked: [] },
+    projectRoot: root, attemptDirectory: root, outputFile: join(root, 'scenario.log'), signal: new AbortController().signal,
+    runner: async () => {
+      await vi.advanceTimersByTimeAsync(900);
+      return { outcome: { kind: 'completed', exitCode: 0 }, startedAt: new Date().toISOString(),
+        elapsedMs: 0, lockWaitMs: 900,
+        output: { path: null, bytes: 0, truncated: false, tail: '' }, stdout: '', stderr: '' };
+    },
+  });
+  expect(result.run.lockWaitMs).toBe(900);
+  expect(result.run.elapsedMs).toBe(0);
 });
 
 async function directory(): Promise<string> {

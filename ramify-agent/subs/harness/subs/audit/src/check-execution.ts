@@ -28,6 +28,8 @@ import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
 import { runScenarioCheck } from '../../../src/checks/scenario-check.js';
 import { testLockedRunner, type TestLockOverride } from './test-lock.js';
+import type { TestLockHooks } from './test-lock.js';
+import { PausableDeadline } from '../../../src/run/pausable-deadline.js';
 import type { PlannedCheck } from '../../../src/checks/verify.js';
 
 const executorId = 'ramify-agent.gate-check';
@@ -123,6 +125,13 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
       }
       const records = new Map<string, GateCommandRecord>();
       const definitions = await checkDefinitions(checks, mapping, baseGit, request.context.sourceCommit, request.signal, request.context.auditAllTests);
+      const bound = new PausableDeadline(request.context.timeoutMs);
+      const signal = AbortSignal.any([request.signal, bound.signal]);
+      const pauseWait = () => {
+        const resumeAudit = bound.pause();
+        const resumeGate = request.pauseForTestLock?.();
+        return () => { resumeAudit(); resumeGate?.(); };
+      };
       const bridge = createInProcessRegisteredExecutorBridge({
         [executorId]: async (registered, signal) => {
           if (registered.checkId === harnessCheckId) return harnessSummary(request);
@@ -138,7 +147,20 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           const owner = { repositoryPath: mapping.repositoryRoot, runId, checkId: registered.checkId, command: check.command.argv.join(' ') };
           let announced = false;
           const start = async () => { if (announced) return; announced = true; await request.started?.(commandStart(checks, index)); };
-          const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, {}, options.testLock) : runCommand;
+          let releaseWait: (() => void) | undefined;
+          let announcedWait = false;
+          const hooks: TestLockHooks = {
+            waiting: async line => {
+              releaseWait ??= pauseWait();
+              if (!announcedWait) {
+                announcedWait = true;
+                await request.waiting?.(commandStart(checks, index), line);
+              }
+            },
+            acquired: () => { releaseWait?.(); releaseWait = undefined; },
+            settled: () => { releaseWait?.(); releaseWait = undefined; },
+          };
+          const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, hooks, options.testLock) : runCommand;
           if (!suite) await start();
           const outputFile = checkOutputPath(request.directory, index, check);
           const auditedProjectRoot = registered.workingDirectory;
@@ -240,8 +262,6 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         validateOwnership: baseLease.validateOwnership.bind(baseLease),
       };
       const service = createAuditService({ git, processExecutor, registeredExecutors: bridge, executionLease });
-      const bound = AbortSignal.timeout(request.context.timeoutMs);
-      const signal = AbortSignal.any([request.signal, bound]);
       let preparation: AuditRequest['workspacePreparation'];
       try {
         preparation = workspacePreparationOf({
@@ -252,9 +272,10 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
           setup: checks.slice(0, setupCount),
         });
       } catch (error) {
+        bound.dispose();
         return executionFailure(await infrastructureRecords(checks, request, { kind: 'audit-plan', message: errorMessage(error) }));
       }
-      const result = await service.run(auditRequest(definitions, request, mapping, runId, preparation), signal);
+      const result = await service.run(auditRequest(definitions, request, mapping, runId, preparation), signal).finally(() => bound.dispose());
       if (recordedWorkspace.current !== null) await options.workspaceOwnership.recordWorkspaceCleaned(recordedWorkspace.current);
       // After workspace intent is recorded, library results may name the
       // isolated worktree even though its finally block has removed it.

@@ -227,10 +227,10 @@ function Detail({ node, map, client, planId, runId, onOpenGate, onOpenSession }:
             : <p>No recorded gate result.</p>}</> : <p>Full scenario unavailable: {scenario.state.data.detail.reason}</p>)}
       {scenario.state.status === 'failed' && <p role="alert">Could not read scenario: {scenario.state.error.message}</p>}</>}
     {node.kind === 'gate' && <><p>Verdict {node.verdict ?? 'running'}{node.audit !== 'not-applicable' ? `; audit ${node.audit}` : ''}{node.repairRound > 0 ? `; repair round ${node.repairRound}` : ''}; cause {node.cause ?? 'none'}.</p>
-      {node.active ? <p>The gate is running{map.current.runningGate === node.key && map.current.gateCommand ? `: ${gateStep(map.current.gateCommand)}` : ''}; its full check result will be available when this attempt settles.</p>
+      {node.active ? <p>The gate is running{map.current.runningGate === node.key && map.current.gateCommand ? `: ${map.current.gateCommand.waitingLine ?? gateStep(map.current.gateCommand)}` : ''}; its full check result will be available when this attempt settles.</p>
         : <button type="button" onClick={() => onOpenGate(node.key.slice('gate:'.length))}>Open full check and audit detail</button>}
       {gate.state.status === 'ready' && gate.state.data && <><p>Attempt commit {gate.state.data.commit ?? 'none'}; audited commit {gate.state.data.audited ?? 'none'}; audit evidence {gate.state.data.evidence?.runRef ?? 'not published'}.</p>
-        {gate.state.data.commands.map((command, i) => <div key={i} className="command"><p>{command.kind}: {command.outcome}; exit {command.exitCode ?? 'none'}; {command.elapsedMs} ms.</p>
+        {gate.state.data.commands.map((command, i) => <div key={i} className="command"><p>{command.kind}: {command.outcome}; exit {command.exitCode ?? 'none'}; {command.elapsedMs} ms running{command.lockWaitMs === undefined ? '' : `; ${command.lockWaitMs} ms waiting for the machine test lock`}.</p>
           <pre aria-label={`Output tail of ${command.kind}`}>{command.output.tail}</pre></div>)}</>}
       {gate.state.status === 'failed' && <p role="alert">Could not read gate: {gate.state.error.message}</p>}</>}
     {node.kind === 'session' && <button type="button" onClick={() => onOpenSession(key.slice('session:'.length))}>Open transcript of {node.label}</button>}
@@ -378,7 +378,8 @@ function Canvas({ map, events, client, planId, runId, onOpenGate, selected, onSe
       hasChildren: hasChildren.has(p.key),
       awaitingDecision: byKey.get(p.key)?.kind === 'work-item' && waitingWorkItems.has(p.key.slice('work-item:'.length)),
       startedAt: startedAt(p.key),
-      step: p.key === map.current.runningGate && map.current.gateCommand ? gateStep(map.current.gateCommand) : null,
+      step: p.key === map.current.runningGate && map.current.gateCommand
+        ? map.current.gateCommand.waitingLine ?? gateStep(map.current.gateCommand) : null,
       module: (() => { const node = byKey.get(p.key); return node ? moduleText(node, byKey) : ''; })(),
       repairFrom: repairFrom(p.key),
       onSelect: jump, onToggle: toggle }, draggable: false, selectable: true }));

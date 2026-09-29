@@ -283,6 +283,7 @@ export function gateOf(view: RunView, id: string): GateView {
       cwd: command.command.cwd,
       startedAt: command.startedAt,
       elapsedMs: command.elapsedMs,
+      ...(command.lockWaitMs === undefined ? {} : { lockWaitMs: command.lockWaitMs }),
       exitCode: command.exitCode,
       outcome: command.outcome,
       notVerified: command.notVerified ?? null,

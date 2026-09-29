@@ -194,6 +194,8 @@ export interface GateCommandRecord {
   readonly selection?: TestSelection;
   readonly startedAt: string;
   readonly elapsedMs: number;
+  /** Machine test lock wait before the process started, when one occurred. */
+  readonly lockWaitMs?: number;
   readonly exitCode: number | null;
   readonly outcome: 'passed' | 'failed' | 'not-verified';
   readonly notVerified?: NotVerified;

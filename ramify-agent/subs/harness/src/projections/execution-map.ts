@@ -407,15 +407,17 @@ export function executionCoreOf(view: RunView): ExecutionCoreIndex {
   // The step a running gate is on: the last command of that gate that
   // started after the gate did.
   const command = runningGate === undefined ? undefined : [...view.events].reverse().find(event =>
-    event.type === 'gate-command-started' && event.data.gate === runningGate.data.gate && event.sequence > runningGate.sequence);
+    (event.type === 'gate-command-started' || event.type === 'gate-command-waiting') &&
+    event.data.gate === runningGate.data.gate && event.sequence > runningGate.sequence);
   const current: ExecutionCoreIndex['current'] = {
     awaitedSession: awaited === undefined ? null : key('session', awaited.session),
     runningGate: runningGate === undefined ? null : key('gate', runningGate.data.gate),
     source: runningGate !== undefined ? eventSource(view, runningGate.sequence) : awaited !== undefined ? eventSource(view, awaited.sequence) : null,
-    ...(command?.type === 'gate-command-started'
+    ...(command?.type === 'gate-command-started' || command?.type === 'gate-command-waiting'
       ? { gateCommand: {
         kind: command.data.kind,
-        ...(command.data.name === undefined ? {} : { name: command.data.name }),
+        ...(command.type === 'gate-command-started' && command.data.name !== undefined ? { name: command.data.name } : {}),
+        ...(command.type === 'gate-command-waiting' ? { waitingLine: command.data.line } : {}),
         position: command.data.position, total: command.data.total, source: eventSource(view, command.sequence),
       } }
       : {}),

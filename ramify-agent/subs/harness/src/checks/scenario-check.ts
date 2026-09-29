@@ -98,6 +98,7 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
   const started = Date.now();
   const log: string[] = [];
   const outcomes: CommandOutcome[] = [];
+  let lockWaitMs = 0;
   const receivedEnvironment = new Set<string>();
   const failures: string[] = [];
 
@@ -107,6 +108,7 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
     const run = await runner({ argv: argv.map(rebase), cwd: projectRoot, env, timeoutMs, signal });
     log.push(`$ ${argv.join(' ')}\n${restore(`${run.stdout}${run.stderr}`)}`);
     outcomes.push(run.outcome);
+    lockWaitMs += run.lockWaitMs ?? 0;
     for (const name of run.receivedEnvironment ?? []) receivedEnvironment.add(name);
     return run;
   };
@@ -207,7 +209,8 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
     run: {
       outcome: combinedOutcome(outcomes),
       startedAt,
-      elapsedMs: Date.now() - started,
+      elapsedMs: Math.max(0, Date.now() - started - lockWaitMs),
+      ...(lockWaitMs > 0 ? { lockWaitMs } : {}),
       ...(receivedEnvironment.size === 0 ? {} : { receivedEnvironment: [...receivedEnvironment].sort() }),
       output: {
         path: execution.outputFile,

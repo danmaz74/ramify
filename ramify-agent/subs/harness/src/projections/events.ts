@@ -241,6 +241,11 @@ function describe(event: RunEvent): [string, Ref[]] {
         `Gate ${event.data.gate} (${event.data.checkpoint}): ${commandLabels[event.data.kind]}${event.data.name === undefined ? '' : ` "${event.data.name}"`} started, command ${event.data.position} of ${event.data.total}`,
         ref('gate', event.data.gate),
       ];
+    case 'gate-command-waiting':
+      return [
+        `Gate ${event.data.gate} (${event.data.checkpoint}): ${event.data.line}, command ${event.data.position} of ${event.data.total}`,
+        ref('gate', event.data.gate),
+      ];
     case 'gate-attempted': {
       const carried = event.data.checkFindings?.length ?? 0;
       const refused = event.data.scenarioFindings?.refused;

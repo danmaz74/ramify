@@ -230,6 +230,7 @@ export const executionGateCommandSchema = z.object({
   name: text.optional(),
   position: z.int().positive(),
   total: z.int().positive(),
+  waitingLine: text.optional(),
   source: executionSourceRefSchema,
 }).strict().refine(v => v.position <= v.total, 'A command lies within its gate');
 export type ExecutionGateCommand = z.infer<typeof executionGateCommandSchema>;

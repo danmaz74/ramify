@@ -62,6 +62,7 @@ export interface ReadinessRequest {
   readonly signal?: AbortSignal | undefined;
   /** Called as each command of the baseline gate starts. */
   readonly started?: GateCommandStarted | undefined;
+  readonly waiting?: import('../checks/gate.js').GateRequest['waiting'];
 }
 
 /** What one readiness attempt established, with the gate that ran the baseline. */
@@ -136,6 +137,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
     checks,
     ...(request.signal === undefined ? {} : { signal: request.signal }),
     ...(request.started === undefined ? {} : { started: request.started }),
+    ...(request.waiting === undefined ? {} : { waiting: request.waiting }),
   });
 
   steps.push(setupStep(gate.commands.slice(0, setup.length)));

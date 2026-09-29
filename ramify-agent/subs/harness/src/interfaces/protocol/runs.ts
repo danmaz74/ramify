@@ -1116,6 +1116,7 @@ export const gateViewSchema = z.object({
     cwd: text,
     startedAt: z.string(),
     elapsedMs: count,
+    lockWaitMs: count.optional(),
     exitCode: z.int().nullable(),
     outcome: gateVerdictSchema,
     notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed', 'audit-unselected']).nullable(),

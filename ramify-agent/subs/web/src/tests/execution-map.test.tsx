@@ -413,6 +413,19 @@ test('a running gate card and its detail name the command it is on', async () =>
   expect(canvas.querySelectorAll('.execution-gate-step')).toHaveLength(1);
 });
 
+test('a queued gate card and detail show the machine test lock wait', async () => {
+  const line = 'Waiting for another test run (fixture)';
+  const running = { ...map, nodes: [...map.nodes, readiness], current: { awaitedSession: null, runningGate: readiness.key, source: readiness.sourceRefs[0]!,
+    gateCommand: { kind: 'tests' as const, position: 1, total: 4, waitingLine: line,
+      source: { kind: 'run-event' as const, id: 'ev-9', sequence: 9, revision: null } } } };
+  const c = { ...client(), getExecutionMap: async () => running } as ProtocolClient;
+  render(<ExecutionMapArea client={c} planId="nested-provider-map" runId="run-scripted-map" version={42} events={[]} onOpenGate={vi.fn()} />);
+  const card = within(await screen.findByLabelText('Zoomable execution canvas')).getByRole('button', { name: /^Readiness gate ga-0001, gate/ });
+  expect([...card.querySelectorAll('small')].map(item => item.textContent)).toContain(line);
+  fireEvent.click(card);
+  expect(await screen.findByText(`The gate is running: ${line}; its full check result will be available when this attempt settles.`)).toBeTruthy();
+});
+
 test('a running gate on a setup command names it the build when the project named it build, and the setup otherwise', async () => {
   const onCommand = async (gateCommand: NonNullable<ExecutionMapSnapshot['current']['gateCommand']>) => {
     const running = { ...map, nodes: [...map.nodes, readiness], current: { awaitedSession: null, runningGate: readiness.key, source: readiness.sourceRefs[0]!, gateCommand } };

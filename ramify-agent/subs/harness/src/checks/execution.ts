@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
-import { testLockedRunner, type TestLockOverride } from '../../subs/audit/src/test-lock.js';
+import { testLockedRunner, type TestLockHooks, type TestLockOverride } from '../../subs/audit/src/test-lock.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
 import type { CheckCommand, CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
@@ -33,6 +33,10 @@ export interface CheckExecutionRequest {
    * an earlier one was interrupted, is not announced.
    */
   readonly started?: GateCommandStarted | undefined;
+  /** One lock wait, before a command starts. */
+  readonly waiting?: ((command: GateCommandStart, line: string) => Promise<void>) | undefined;
+  /** Pauses the caller's bound; release is called on every wait exit. */
+  readonly pauseForTestLock?: (() => () => void) | undefined;
 }
 
 /** One command of a gate as it starts: its kind and its place among the gate's commands, counted from one. */
@@ -136,7 +140,20 @@ export function createInPlaceCheckExecution(testLock?: TestLockOverride): CheckE
         announced = true;
         await request.started?.(commandStart(checks, index));
       };
-      const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, {}, testLock) : runCommand;
+      let releaseWait: (() => void) | undefined;
+      let announcedWait = false;
+      const hooks: TestLockHooks = {
+        waiting: async line => {
+          releaseWait ??= request.pauseForTestLock?.();
+          if (!announcedWait) {
+            announcedWait = true;
+            await request.waiting?.(commandStart(checks, index), line);
+          }
+        },
+        acquired: () => { releaseWait?.(); releaseWait = undefined; },
+        settled: () => { releaseWait?.(); releaseWait = undefined; },
+      };
+      const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, hooks, testLock) : runCommand;
       if (!suite) await start();
       if (check.scenarios !== undefined) {
         const outcome = await runScenarioCheck({

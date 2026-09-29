@@ -566,6 +566,12 @@ export const runEventSchema = z.discriminatedUnion('type', [
     position: z.int().positive(),
     total: z.int().positive(),
   }).strict()),
+  /** A test command is queued for the machine lock. Its line is the provider's own wording. */
+  event('gate-command-waiting', z.object({
+    gate: text, checkpoint: text,
+    kind: z.enum(['tests', 'scenarios']),
+    position: z.int().positive(), total: z.int().positive(), line: text,
+  }).strict()),
   /**
    * A gate finished and commits its one complete `GateAttempt`. A committing
    * gate of a work item also carries what its scenario check means for the
