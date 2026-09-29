@@ -4361,6 +4361,10 @@ export class RunService {
     }
     const latest = [...run.log.all('invocation-started')].reverse().find(event => event.data.role === 'capability-architect' &&
       event.data.work.capabilityTask === activeId && event.data.work.request === request.id);
+    if (this.capabilityBudgetReturns(run, activeId) >= run.record.policy.limits.budgetReturnsPerIteration) {
+      await this.fail(run, 'limit-exceeded', `Capability architect of ${activeId} exhausted its captured context-budget return bound; unfinished task remains`);
+      return false;
+    }
     let point: string | undefined;
     let session: SessionId | undefined;
     let reconstructedFrom: SessionId | undefined;
@@ -4406,8 +4410,13 @@ export class RunService {
       }
     }
     if (reconstructedFrom !== undefined) {
+      const budgetSessions = new Set(run.log.all('invocation-ended')
+        .filter(event => event.data.ended === 'context-budget-reached')
+        .map(event => run.log.all('invocation-started').find(start => start.data.invocation === event.data.invocation)?.data.session)
+        .filter((value): value is SessionId => value !== undefined));
       const spent = run.log.all('session-opened').filter(event => event.data.role === 'capability-architect' &&
-        event.data.work.capabilityTask === activeId && event.data.replaces !== undefined).length;
+        event.data.work.capabilityTask === activeId && event.data.replaces !== undefined &&
+        !budgetSessions.has(event.data.replaces.session)).length;
       if (spent >= run.record.policy.limits.sessionReconstructionsPerWork) {
         await this.fail(run, 'limit-exceeded', `Capability ${activeId} lost its coordinator after ${spent} reconstructions; original unfinished task remains`);
         return false;
@@ -7048,6 +7057,7 @@ export class RunService {
     let coordinatorBasis = resume?.basis ?? originInvocation;
     let progress = resume?.progress ?? '';
     let pendingAction = resume?.replay;
+    let reconstructedFrom = resume?.reconstructedFrom;
     const lastAnswer = [...records.capabilityExchanges.values()].flatMap(entries => entries)
       .filter(entry => entry.task === task.id && entry.answer !== null).at(-1)?.answer;
     const answerOutcome = lastAnswer === undefined || lastAnswer === null ? undefined :
@@ -7129,16 +7139,17 @@ export class RunService {
           `Provider entry outlines: ${JSON.stringify(providerItems.map(entry => ({ item: entry.id, outline: records.outlines.get(entry.id) ?? [] })), null, 2)}`,
           `Read the live source at ${request.original.usage.map(use => use.path).join(', ')} and its tests. The snapshot at ${request.source.snapshot} records the suspension tree.`,
           `# Selected plan package ${selectedHash}\n\n${selected}`,
+          ...(progress === '' ? [] : [`Progress from the last turn: ${progress}`]),
         ] : [`Selected plan package ${selectedHash} was delivered in full in the earlier turn; it is unchanged.`,
           `Current plan: ${JSON.stringify(plan)}`, `Progress from the last turn: ${progress}`]),
         'Before requesting handback, use read_capability_evidence to identify the current candidate and configuration. Update each original case with the exact executed test path, candidate and configuration; explain any corrected expectation with independent evidence. The combined gate and reviewer will check them again.',
       ].join('\n\n'),
       start: coordinatorPoint === undefined ? { mode: 'fresh' } : { mode: 'continue', ref: coordinatorPoint },
       ...(coordinatorPoint === undefined || coordinatorSession === undefined
-        ? resume?.reconstructedFrom === undefined
+        ? reconstructedFrom === undefined
           ? { requestedBy: { invocation: originInvocation, reason: 'capability-needed' as const } }
-          : { replaces: { session: resume.reconstructedFrom, reason: 'reconstructed' as const },
-            degraded: { requested: 'continued' as const, reason: 'The capability architect session was lost; durable current request, plan and evidence were supplied to a fresh session.' } }
+          : { replaces: { session: reconstructedFrom, reason: 'reconstructed' as const },
+            degraded: { requested: 'continued' as const, reason: 'The prior capability architect session ended; durable current request, plan and evidence were supplied to a fresh session.' } }
         : { session: coordinatorSession, continuing: 'capability-coordination' as const }),
       toolName: 'submit_capability_action', description: 'Record the next action for this capability task.',
       inputSchema: z.toJSONSchema(capabilityActionSchema) as JsonSchema,
@@ -7149,12 +7160,34 @@ export class RunService {
           : { ok: false, errors: checked.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message,
             expected: issue.kind === 'state' ? 'current task authority' : 'the action schema' })) };
       },
-      scope: { write: null, measurement: null, size: null }, keep: () => kept,
+      scope: { write: null, measurement: null, size: null },
+      keep: ended => ended === 'context-budget-reached' ? finished('not-kept') : kept,
       equip: () => ({ builtinTools: ['read', 'grep', 'ls'], tools }),
     });
     const replayed = pendingAction !== undefined;
     pendingAction = undefined;
     if (this.ignoring(run)) return null;
+    if (action.ended === 'context-budget-reached') {
+      const returns = this.capabilityBudgetReturns(run, task.id);
+      progress = `context budget return ${returns}: ${JSON.stringify({ prior: progress,
+        report: action.lastText?.slice(0, 3000) ?? null, outcome: runLayout.outcome(action.id) })}`;
+      coordinatorBasis = action.id;
+      coordinatorPoint = undefined;
+      coordinatorSession = undefined;
+      reconstructedFrom = action.session;
+      await this.write(run, { type: 'capability-coordinator-resumed', data: {
+        task: task.id, invocation: action.id, session: action.session,
+      } });
+      await this.afterWrite('capability-coordinator-resumed', run.record.jobId);
+      if (this.ignoring(run)) return null;
+      if (returns >= run.record.policy.limits.budgetReturnsPerIteration) {
+        await this.fail(run, 'limit-exceeded',
+          `Capability architect of ${task.id} exhausted its captured context-budget return bound; unfinished task remains`,
+          [runLayout.outcome(action.id)]);
+        return null;
+      }
+      continue;
+    }
     if (action.ended !== 'submitted') {
       await this.fail(run, 'invalid-submission', `The capability architect of ${task.id} did not submit an action`);
       return null;
@@ -9889,6 +9922,16 @@ export class RunService {
     return run.log.all('invocation-ended')
       .filter(event => event.data.ended === 'context-budget-reached')
       .filter(event => records.invocations.get(event.data.invocation)?.work.iteration === iteration)
+      .length;
+  }
+
+  /** Context-budget returns belong to the durable capability task, including
+   * turns reconstructed into fresh coordinator sessions. */
+  private capabilityBudgetReturns(run: Run, task: string): number {
+    const records = committedRecords(run.log.ledger.replay());
+    return run.log.all('invocation-ended')
+      .filter(event => event.data.ended === 'context-budget-reached')
+      .filter(event => records.invocations.get(event.data.invocation)?.work.capabilityTask === task)
       .length;
   }
 

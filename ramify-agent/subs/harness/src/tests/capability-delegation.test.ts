@@ -20,7 +20,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 const a = 'capability-coordination/a';
 const b = 'capability-coordination/b';
 
-function script(starts: string[], capabilityPrompts: string[] = [], qualification: 'placement' | 'unresolved' = 'placement'): Script {
+function script(starts: string[], capabilityPrompts: string[] = [], qualification: 'placement' | 'unresolved' = 'placement', budgetReturns = 0, reviseBeforeBudget = false): Script {
   let localTurns = 0;
   let capabilityTurns = 0;
   let qualificationTurns = 0;
@@ -65,11 +65,21 @@ function script(starts: string[], capabilityPrompts: string[] = [], qualificatio
     if (spec.role === 'capability-architect') {
       capabilityPrompts.push(spec.prompt);
       capabilityTurns += 1;
-      const ids = /Use task (cap-\d+), planRevision 1 and invocation (inv-\d+)/u.exec(spec.prompt);
+      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt);
       if (!ids) throw new Error('Capability prompt lost its task basis');
-      if (capabilityTurns === 1) return submit({ kind: 'partial', task: ids[1], planRevision: 1, invocation: ids[2],
+      const basis = { task: ids[1], planRevision: Number(ids[2]), invocation: ids[3] };
+      if (capabilityTurns <= budgetReturns) return [
+        ...(reviseBeforeBudget && capabilityTurns === 1 ? [{ kind: 'tool' as const, tool: 'update_capability_plan', input: {
+          task: basis.task, basedOn: basis.planRevision, invocation: basis.invocation,
+          reason: 'The captured request needs a source-aware result',
+          changes: { proposedInterface: 'B returns fact text with its source' },
+        } }] : []),
+        { kind: 'context', tokens: 200_000, window: null },
+        { kind: 'message', text: 'The capability remains unfinished at my context budget.' },
+      ];
+      if (capabilityTurns === budgetReturns + 1) return submit({ kind: 'partial', ...basis,
         progress: 'Read A source and B entry context', unfinished: ['Coordinate B and A assignments'] });
-      return submit({ kind: 'assign', task: ids[1], planRevision: 1, invocation: ids[2], owner: b,
+      return submit({ kind: 'assign', ...basis, owner: b,
         purpose: 'Provide richer fact', approach: 'Extend B fact API', requirementRefs: [], intendedEvidence: ['A consumes the new B fact'] });
     }
     return [];
@@ -142,6 +152,78 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   const finished = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
   expect(finished.filter(event => event.type === 'job-stopped')).toHaveLength(1);
   expect(finished.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+}, 30_000);
+
+test('a capability architect budget return reconstructs a fresh session with the current task and plan', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const starts: string[] = [];
+  const prompts: string[] = [];
+  const opened = await openCapabilityRuns(fixture.root, {
+    git: gitService, script: script(starts, prompts, 'placement', 1, true), inputs: treeInputs(),
+    readinessExecution: directReadinessExecution(),
+  });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
+    event.type === 'capability-assigned' || event.type === 'job-failed'));
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(events.some(event => event.type === 'job-failed')).toBe(false);
+  const startsForTask = events.filter(event => event.type === 'invocation-started' && event.data.role === 'capability-architect');
+  expect(startsForTask).toHaveLength(3);
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual([
+    'capability-architect:submit_capability_action:fresh',
+    'capability-architect:submit_capability_action:fresh',
+    'capability-architect:submit_capability_action:continue',
+  ]);
+  expect(prompts[1]).toContain('Original request:');
+  expect(prompts[1]).toContain('# Selected plan package ');
+  expect(prompts[1]).toContain('Current plan:');
+  expect(prompts[1]).toContain('context budget');
+  expect(prompts[1]).toContain('planRevision 2');
+  expect(prompts[1]).toContain('B returns fact text with its source');
+  const first = startsForTask[0];
+  const second = startsForTask[1];
+  if (first?.type !== 'invocation-started' || second?.type !== 'invocation-started') throw new Error('Missing capability architect invocations');
+  expect(second.data.session).not.toBe(first.data.session);
+  const budget = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    `invocations/${first.data.invocation}/outcome.json`), 'utf8')) as { ended: string; budget?: { reportDelivered: boolean } };
+  expect(budget).toMatchObject({ ended: 'context-budget-reached', budget: { reportDelivered: true } });
+  expect(events.some(event => event.type === 'capability-handed-back')).toBe(false);
+  let stopped = false;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const version = opened.service.getRun('need', receipt.jobId)!.version;
+    try { await opened.service.execute(stopRun('need', receipt.jobId, version)); stopped = true; break; }
+    catch (error) { if (!String(error).includes('at version')) throw error; }
+  }
+  expect(stopped).toBe(true);
+  await opened.service.settled('need', receipt.jobId);
+}, 30_000);
+
+test('exhausted capability architect budget returns leave the task unfinished without handback', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const starts: string[] = [];
+  const opened = await openCapabilityRuns(fixture.root, {
+    git: gitService, script: script(starts, [], 'placement', 3), inputs: treeInputs(),
+    readinessExecution: directReadinessExecution(),
+  });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'));
+  await opened.service.settled('need', receipt.jobId);
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const terminal = events.find(event => event.type === 'job-failed');
+  expect(terminal?.type === 'job-failed' ? terminal.data.reason : null).toBe('limit-exceeded');
+  expect(events.filter(event => event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')).toHaveLength(3);
+  expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(0);
+  expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+  expect(events.filter(event => event.type === 'work-item-completed')).toHaveLength(0);
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(Array(3).fill('capability-architect:submit_capability_action:fresh'));
 }, 30_000);
 
 test('historical test composition cannot create a policy/5 run', async () => {

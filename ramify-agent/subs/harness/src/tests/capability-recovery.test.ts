@@ -222,6 +222,78 @@ test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect wit
   await second.service.settled('need', receipt.jobId);
 }, 60_000);
 
+test('a restart after a capability architect budget return reconstructs from committed task state', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const a = 'capability-coordination/a';
+  const b = 'capability-coordination/b';
+  let frozen = false;
+  let architectTurns = 0;
+  const starts: string[] = [];
+  const script: Script = spec => {
+    starts.push(`${spec.role}:${spec.submission.name}:${spec.session.mode}`);
+    if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
+    if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
+    if (spec.submission.name === 'submit_capability_qualification') {
+      const ids = /Use request (need-\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      return submit({ kind: 'delegate-capability', request: ids[1], invocation: ids[2], provider: b,
+        placementReason: 'B owns the fact', constraints: [], requirementRefs: [] });
+    }
+    if (spec.role === 'engineer') return submit({ kind: 'capability-needed', summary: 'A needs source', request: {
+      need: 'B fact with source for A', usage: [{ path: 'subs/a/src/caller.ts', use: 'Display source', prospective: false }],
+      constraints: [], knownInterface: { kind: 'none-known' },
+      examples: [{ title: 'source shown', code: 'expect(renderA()).toContain("B")', designation: 'pseudocode' }],
+    } });
+    if (spec.role === 'capability-architect') {
+      architectTurns += 1;
+      const ids = /Use task (cap-\d+), planRevision (\d+) and invocation (inv-\d+)/u.exec(spec.prompt)!;
+      if (architectTurns === 1) return [
+        { kind: 'context', tokens: 200_000, window: null },
+        { kind: 'message', text: 'The capability task is unfinished at my context budget.' },
+      ];
+      return submit({ kind: 'assign', task: ids[1], planRevision: Number(ids[2]), invocation: ids[3],
+        owner: b, purpose: 'Provide B source', approach: 'Update B owned source',
+        requirementRefs: [], intendedEvidence: ['A uses B source'] });
+    }
+    return [];
+  };
+  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    afterWrite: async (write: string, runId: string) => {
+      if (write !== 'capability-coordinator-resumed' || frozen) return;
+      const events = await runEventsOnDisk(fixture.root, 'need', runId);
+      const latest = events.at(-1);
+      if (latest?.type === 'capability-coordinator-resumed' && events.some(event =>
+        event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')) {
+        frozen = true;
+        await freeze();
+      }
+    } };
+  const first = await openCapabilityRuns(fixture.root, options);
+  const receipt = await first.service.execute(startRun('need'));
+  await until(() => frozen, 30_000);
+  await staleCrashLock(fixture.root);
+  const second = await openCapabilityRuns(fixture.root, options);
+  cleanups.push(() => second.service.close());
+  await until(() => (second.service.events('need', receipt.jobId) ?? []).some(event =>
+    event.type === 'capability-assigned' || event.type === 'job-failed'), 30_000);
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(events.some(event => event.type === 'job-failed')).toBe(false);
+  expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
+  expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual([
+    'capability-architect:submit_capability_action:fresh',
+    'capability-architect:submit_capability_action:fresh',
+  ]);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = second.service.events('need', receipt.jobId)!;
+    try { await second.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
+    catch (error) { if (!String(error).includes('at version') || attempt === 19) throw error; }
+  }
+  await second.service.settled('need', receipt.jobId);
+}, 60_000);
+
 test('CA19: accepted qualification before delegation replays one decision after restart', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
