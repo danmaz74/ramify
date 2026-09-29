@@ -109,6 +109,7 @@ export const capabilityRecoveryBoundaries = {
   'capability-exchange-answered': 'capability-recovery.test.ts',
   'capability-gate-recorded': 'capability-acceptance.integration.test.ts',
   'capability-review-recorded': 'capability-acceptance.integration.test.ts',
+  'capability-handed-back': 'capability-dependencies.test.ts',
   'capability-assignment-settled': 'capability-dependencies.test.ts',
   'capability-assigned': 'capability-recovery.test.ts',
   'capability-assignment-interrupted': 'capability-recovery.test.ts',

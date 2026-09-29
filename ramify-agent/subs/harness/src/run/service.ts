@@ -56,7 +56,7 @@ import { userCheckFindingChange, userRejectionCode } from '../check-findings/use
 import type { CheckFindingUserCommand } from '../interfaces/protocol/check-findings.js';
 import { canonicalJson } from '../jobs/commands.js';
 import {
-  concernKey, reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas,
+  concernKey, reviewAttemptId, reviewAttemptSchema, reviewLayout, reviewOrientationSchema, reviewRequestId, reviewRequestSchema, reviewSchemas, reviewSubmissionSchema,
   type ForkPoint, type NotVerifiedReason, type OrientationSubmission, type ReviewAttempt, type ReviewOrientation, type ReviewRequest,
   type ReviewResult, type ReviewSubmission, type ReviewSubmissionRecord,
 } from '../reviews/records.js';
@@ -302,6 +302,7 @@ export type RunWrite =
   | 'capability-exchange-answered'
   | 'capability-gate-recorded'
   | 'capability-review-recorded'
+  | 'capability-handed-back'
   | 'capability-assignment-settled'
   | 'capability-assigned'
   | 'candidate-prepared'
@@ -7448,16 +7449,54 @@ export class RunService {
       missing: Array<{ path: string; reason: string }>; findings: string[] }>;
     for (const kind of review === undefined ? ['code', 'scope', 'design'] as const : []) {
       const reviewerTools = snapshotTools(snapshot, this.candidates, this.projectRoot);
+      const systemPrompt = renderReviewerPrompt(loaded, '(audited capability candidate)', kind);
+      const prompt = [`Review ${kind} for capability ${task.id} against plan revision ${plan.revision}.`,
+        `The original request and examples: ${JSON.stringify(request.original)}`,
+        `Current plan and case dispositions: ${JSON.stringify(plan)}`,
+        `Assignment owners, scopes and candidate trees: ${JSON.stringify(assignments)}`,
+        `Combined gate ${gate.id} checked tree ${snapshot.tree}; independently judge real provider/consumer behavior, compatibility, expected values, scope and design.`,
+        `The diff from ${request.source.acceptedBase} includes the requesting A engineer\'s inherited partial source.`,
+        `Changed paths: ${snapshot.changes.map(change => change.path).join(', ')}`].join('\n\n');
+      // The prompt binds the review kind, gate, audited tree, plan revision and
+      // current assignment basis. An accepted submission can precede the one
+      // aggregate review record, so reuse its authenticated judgment on replay.
+      const promptHash = inputsHash([systemPrompt, prompt]);
+      const prior = [...run.log.all('invocation-started')].reverse().find(started => {
+        if (started.data.role !== 'reviewer' || started.data.work.workItem !== task.parent.id) return false;
+        const ended = run.log.all('invocation-ended').find(event => event.data.invocation === started.data.invocation);
+        if (ended?.data.ended !== 'submitted' || ended.data.submission === null) return false;
+        const recorded = this.committedBody(run, runLayout.invocation(started.data.invocation)) as Invocation | null;
+        return recorded?.prompt.hash === loaded.hash && recorded.prompt.inputsHash === promptHash;
+      });
+      if (prior !== undefined) {
+        const ended = run.log.all('invocation-ended').find(event => event.data.invocation === prior.data.invocation);
+        const outcome = this.committedBody(run, runLayout.outcome(prior.data.invocation)) as InvocationOutcome | null;
+        const bytes = await readIfExists(run.path(runLayout.submission(prior.data.invocation)));
+        let raw: Record<string, unknown> | null = null;
+        let parsed: ReturnType<typeof reviewSubmissionSchema.safeParse> | null = null;
+        try {
+          raw = bytes === undefined ? null : JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+          if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+            const { schema: _schema, ...body } = raw;
+            parsed = reviewSubmissionSchema.safeParse(body);
+          }
+        } catch { /* A damaged accepted submission fails authentication below. */ }
+        if (ended?.data.ended !== 'submitted' || ended.data.submission === null || bytes === undefined ||
+          sha256(bytes) !== ended.data.submission || outcome?.submission?.hash !== ended.data.submission ||
+          outcome.disposition !== 'applied' || !outcome.settled.confirmed ||
+          raw?.schema !== 'ramify-agent.review-submission/1' || parsed?.success !== true) {
+          await this.fail(run, 'recovery-exhausted', `Capability ${task.id} has an unauthenticated accepted ${kind} review`);
+          return null;
+        }
+        const value = parsed.data;
+        assessments.push({ kind, invocation: prior.data.invocation, inspected: value.inspected, missing: value.missing,
+          findings: [...value.concerns.map(concern => concern.summary),
+            ...value.missing.map(entry => `${entry.path}: ${entry.reason}`)] });
+        continue;
+      }
       const reviewed = await this.runInvocation<ReviewSubmission>(run, agent, {
         role: 'reviewer', work: { workItem: task.parent.id }, attempt: assessments.length + 1, loaded,
-        systemPrompt: renderReviewerPrompt(loaded, '(audited capability candidate)', kind),
-        prompt: [`Review ${kind} for capability ${task.id} against plan revision ${plan.revision}.`,
-          `The original request and examples: ${JSON.stringify(request.original)}`,
-          `Current plan and case dispositions: ${JSON.stringify(plan)}`,
-          `Assignment owners, scopes and candidate trees: ${JSON.stringify(assignments)}`,
-          `Combined gate ${gate.id} checked tree ${snapshot.tree}; independently judge real provider/consumer behavior, compatibility, expected values, scope and design.`,
-          `The diff from ${request.source.acceptedBase} includes the requesting A engineer\'s inherited partial source.`,
-          `Changed paths: ${snapshot.changes.map(change => change.path).join(', ')}`].join('\n\n'),
+        systemPrompt, prompt,
         start: { mode: 'fresh' }, toolName: reviewToolName, description: reviewSubmissionDescription,
         inputSchema: reviewJsonSchema, submissionSchema: 'ramify-agent.review-submission/1',
         validate: input => validateReview(input, { snapshot, inspected: reviewerTools.inspected(),
@@ -7528,6 +7567,7 @@ export class RunService {
     await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-handed-back', data: {
       task: task.id, handback: task.id, invocation,
     } }, [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handback }]));
+    await this.afterWrite('capability-handed-back', run.record.jobId);
     return { handedBack: true, guidance: `Capability ${task.id} accepted at ${snapshot.tree}. ${action.summary}. Use ${action.interfaces.map(entry => `${entry.symbols.join(', ')} at ${entry.path}: ${entry.use}`).join('; ')}. Continue the original assignment from the current candidate; its remaining goal stays open.` };
   }
 
@@ -7602,6 +7642,7 @@ export class RunService {
     await run.mutex.run(() => commitCapabilityTransition(run.log, { type: 'capability-handed-back', data: {
       task: task.id, handback: task.id, invocation: started.data.invocation,
     } }, [{ path: capabilityLayout.handback(task.id), id: task.id, revision: 1, body: handback }]));
+    await this.afterWrite('capability-handed-back', run.record.jobId);
     return true;
   }
 

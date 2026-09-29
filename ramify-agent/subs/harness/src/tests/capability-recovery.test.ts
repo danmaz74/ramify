@@ -13,7 +13,7 @@ import { copyCapabilityFixture, fixtureRequest, openCapabilityRuns } from './hel
 import { temporaryDirectory } from './helpers/fixture.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
-import { freeze, git, initRepository, runEventsOnDisk, staleCrashLock, startRun, stopRun, until } from './helpers/runs.js';
+import { freeze, git, initRepository, runEventsOnDisk, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -78,7 +78,8 @@ test('CA19: retry refuses a changed staged or untracked candidate and preserves 
   expect((await git(fixture.root, 'show', ':subs/a/src/caller.ts')).trim()).toContain('changedIndex = true');
 });
 
-test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within the same assignment', async () => {
+for (const exhaustAfterRestart of [false, true]) {
+test(`CA18 CA26 CA29: a lost B writer keeps dirty source and ${exhaustAfterRestart ? 'exhausts its captured reconstruction bound after restart' : 'reconstructs within the same assignment'}`, async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);
   await initRepository(fixture.root);
@@ -88,6 +89,7 @@ test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within
   let engineerTurns = 0;
   let architectTurns = 0;
   const prompts: string[] = [];
+  let frozen = false;
   const script: Script = spec => {
     if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a)]));
     if (spec.submission.name === 'submit_work_item_result') return submit(assign(a, {}, outline()));
@@ -105,6 +107,7 @@ test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within
       } });
       prompts.push(spec.prompt);
       if (engineerTurns === 2) return [edit('fact.ts', "return 'old';", "return 'old from B';"), { kind: 'end', message: 'Context lost before submission' }];
+      if (exhaustAfterRestart) return [{ kind: 'end', message: 'Context lost again before submission' }];
       return submit({ kind: 'completion-proposed', summary: 'B returns source', findings: [] });
     }
     if (spec.role === 'capability-architect') {
@@ -116,13 +119,39 @@ test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within
     }
     return [];
   };
-  const opened = await openCapabilityRuns(fixture.root, { git: gitService, script,
-    inputs: treeInputs(), readinessExecution: directReadinessExecution() });
-  cleanups.push(() => opened.service.close());
+  const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    ...(exhaustAfterRestart ? {
+      policy: (root: string) => ({ ...testPolicy(root), limits: {
+        ...testPolicy(root).limits, sessionReconstructionsPerWork: 1,
+      } }),
+      afterWrite: async (write: string) => {
+        if (write === 'capability-assignment-interrupted' && !frozen) { frozen = true; await freeze(); }
+      },
+    } : {}) };
+  let opened = await openCapabilityRuns(fixture.root, options);
   const receipt = await opened.service.execute(startRun('need'));
+  if (exhaustAfterRestart) {
+    await until(() => frozen, 30_000);
+    await staleCrashLock(fixture.root);
+    opened = await openCapabilityRuns(fixture.root, options);
+  }
+  cleanups.push(() => opened.service.close());
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === 'capability-assignment-settled' || event.type === 'job-failed'), 30_000);
+    event.type === (exhaustAfterRestart ? 'job-failed' : 'capability-assignment-settled') || event.type === 'job-failed'), 30_000);
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  if (exhaustAfterRestart) {
+    const failed = events.find(event => event.type === 'job-failed');
+    expect(failed?.type === 'job-failed' ? failed.data.reason : null).toBe('limit-exceeded');
+    expect(failed?.type === 'job-failed' ? failed.data.message : '').toContain('ended without a result');
+    expect(events.filter(event => event.type === 'capability-assignment-interrupted' &&
+      event.data.assignment === 'cap-001.i01')).toHaveLength(2);
+    expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
+    expect(events.filter(event => event.type === 'capability-assignment-settled')).toHaveLength(0);
+    expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+    expect(await readFile(join(fixture.root, 'subs/b/src/fact.ts'), 'utf8')).toContain('old from B');
+    await opened.service.settled('need', receipt.jobId);
+    return;
+  }
   expect(events.filter(event => event.type === 'job-failed')).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(1);
   const interrupted = events.filter(event => event.type === 'capability-assignment-interrupted');
@@ -144,6 +173,7 @@ test('CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within
   }
   await opened.service.settled('need', receipt.jobId);
 }, 45_000);
+}
 
 test('CA05 CA19 CA22 CA32: service restart reconstructs the active architect without dispatching the B entry', async () => {
   const fixture = await copyCapabilityFixture();

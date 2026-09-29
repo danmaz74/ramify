@@ -12,7 +12,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
-import { initRepository, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
+import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -22,7 +22,8 @@ const d = 'capability-coordination/d';
 const p = 'capability-coordination';
 
 async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 'restart' | 'verify-restart' |
-  'gate-restart' | 'review-restart'): Promise<void> {
+  'gate-restart' | 'gate-intent-restart' | 'gate-committing-restart' |
+  'review-restart' | 'review-submission-restart'): Promise<void> {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   await mkdir(join(fixture.root, 'subs/a/src/tests/steps'), { recursive: true });
   await writeFile(join(fixture.root, 'subs/a/src/tests/steps/capability.steps.js'), [
@@ -91,7 +92,9 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       if (owner === a) return submit({ kind: 'completion-proposed', summary: 'A integrated the real B result', findings: [] },
         write('caller.ts', "import { readFact } from '../../b/src/fact.js';\nexport function renderA(): string { const fact = readFact(); return `Fresh fact: ${fact.text} from ${fact.source}`; }\n"),
         write('tests/caller.test.ts', "import { expect, test } from 'vitest';\nimport { renderA } from '../caller.js';\ntest('A renders the source', () => expect(renderA()).toBe(renderA()));\n"));
-      if (mode === 'restart' || mode === 'verify-restart' || mode === 'gate-restart' || mode === 'review-restart') return resuming
+      if (mode === 'restart' || mode === 'verify-restart' || mode === 'gate-restart' ||
+        mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
+        mode === 'review-restart' || mode === 'review-submission-restart') return resuming
         ? submit({ kind: 'completion-proposed', summary: 'A resumed after restart with the accepted result', findings: [] })
         : [{ kind: 'wait', ms: 60_000 }];
       if (mode === 'deferred') return submit({ kind: 'completion-proposed', summary: 'A resumed with the accepted result', findings: [] });
@@ -122,7 +125,8 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       architect += 1;
       if (architect > 9) {
         if (mode === 'drift') { driftFeedback = spec.prompt; return [{ kind: 'wait', ms: 60_000 }]; }
-        if (mode === 'gate-restart' || mode === 'review-restart') return submit({ task, planRevision: Number(revision), invocation,
+        if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
+          mode === 'review-restart' || mode === 'review-submission-restart') return submit({ task, planRevision: Number(revision), invocation,
           kind: 'request-handback', summary: 'B result is integrated in A and compatible with D',
           coverage: [{ case: 'need-001.ex01', evidence: ['subs/a/src/tests/caller.test.ts'] }],
           interfaces: [{ path: 'subs/b/src/fact.ts', symbols: ['readFact', 'FactResult'], use: 'Call readFact and render its source' }],
@@ -159,6 +163,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     return [];
   };
   let closingVerification: Promise<void> | undefined;
+  let frozenFault = false;
   let closeVerification: (() => Promise<void>) | undefined;
   let activeService: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
   const options = { git: gitService, script: scripted, inputs: treeInputs(),
@@ -167,11 +172,24 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       const event = activeService?.events('need', runId)?.at(-1);
       const gate = activeService?.events('need', runId)?.filter(entry => entry.type === 'gate-attempted').at(-1);
       const boundary = mode === 'verify-restart' && write === 'capability-verification-started' ||
+        mode === 'gate-intent-restart' && write === 'gate-attempted' &&
+          event?.type === 'gate-committing' && event.data.gate === 'ga-0004' ||
+        mode === 'gate-committing-restart' && write === 'gate-committing' &&
+          event?.type === 'gate-committing' && event.data.gate === 'ga-0004' ||
         mode === 'gate-restart' && write === 'capability-gate-recorded' &&
           gate?.type === 'gate-attempted' && gate.data.gate === 'ga-0004' && gate.data.verdict === 'passed' ||
+        mode === 'review-submission-restart' && write === 'invocation-ended' && reviewer === 9 &&
+          event?.type === 'invocation-ended' && event.data.ended === 'submitted' &&
+          (activeService?.events('need', runId) ?? []).some(started => started.type === 'invocation-started' &&
+            started.data.invocation === event.data.invocation && started.data.role === 'reviewer') ||
         mode === 'review-restart' && write === 'capability-review-recorded' && event?.type === 'capability-review-recorded' &&
           event.data.outcome === 'passed' && event.data.planRevision >= 2;
-      if (boundary && closingVerification === undefined) closingVerification = closeVerification?.();
+      if (boundary && !frozenFault && closingVerification === undefined) {
+        if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart' || mode === 'review-submission-restart') {
+          frozenFault = true;
+          await freeze();
+        } else closingVerification = closeVerification?.();
+      }
     },
     policy: root => {
       const base = testPolicy(root);
@@ -183,21 +201,27 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       } };
     } } satisfies Parameters<typeof openCapabilityRuns>[1];
   const opened = await openCapabilityRuns(fixture.root, options);
-  cleanups.push(() => opened.service.close());
+  if (mode !== 'gate-intent-restart' && mode !== 'gate-committing-restart' && mode !== 'review-submission-restart') {
+    cleanups.push(() => opened.service.close());
+  }
   activeService = opened.service;
   closeVerification = () => opened.service.close();
   const receipt = await opened.service.execute(startRun('need'));
-  if (mode === 'verify-restart' || mode === 'gate-restart' || mode === 'review-restart') {
-    await until(() => closingVerification !== undefined, 120_000).catch(async error => {
+  if (mode === 'verify-restart' || mode === 'gate-restart' || mode === 'gate-intent-restart' ||
+    mode === 'gate-committing-restart' || mode === 'review-restart' || mode === 'review-submission-restart') {
+    await until(() => frozenFault || closingVerification !== undefined, 120_000).catch(async error => {
       const current = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
       throw new Error(`${String(error)}; architect ${architect}; gates ${JSON.stringify(current.filter(event => event.type === 'gate-attempted'))}; tail ${JSON.stringify(current.slice(-12))}`);
     });
-    await closingVerification;
+    if (frozenFault) await staleCrashLock(fixture.root);
+    else await closingVerification;
     const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     if (mode === 'verify-restart') expect(before.filter(event => event.type === 'capability-verification-started')).toHaveLength(1);
     expect(before.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
     const gates = before.filter(event => event.type === 'gate-attempted').length;
+    const committing = before.filter(event => event.type === 'gate-committing' && event.data.gate === 'ga-0004').length;
     const reviews = before.filter(event => event.type === 'capability-review-recorded').length;
+    const reviewerStarts = before.filter(event => event.type === 'invocation-started' && event.data.role === 'reviewer').length;
     resuming = true;
     const reopened = await openCapabilityRuns(fixture.root, options);
     cleanups.push(() => reopened.service.close());
@@ -206,9 +230,21 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-15))).toHaveLength(0);
     expect(after.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
-    expect(after.filter(event => event.type === 'gate-attempted'), JSON.stringify({ before: before.slice(-12), after: after.slice(-18) })).toHaveLength(gates);
-    if (mode !== 'gate-restart') expect(after.filter(event => event.type === 'capability-review-recorded'),
-      JSON.stringify({ before: before.slice(-12), after: after.slice(-18) })).toHaveLength(reviews);
+    expect(after.filter(event => event.type === 'gate-attempted'), JSON.stringify({ before: before.slice(-12), after: after.slice(-18) }))
+      .toHaveLength(gates + (mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ? 1 : 0));
+    if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart') {
+      expect(after.filter(event => event.type === 'gate-committing' && event.data.gate === 'ga-0004')).toHaveLength(committing || 1);
+      expect(after.filter(event => event.type === 'gate-attempted' && event.data.gate === 'ga-0004')).toHaveLength(1);
+    }
+    const reviewEvents = after.filter(event => event.type === 'capability-review-recorded');
+    if (mode === 'verify-restart' || mode === 'review-restart') expect(reviewEvents).toHaveLength(reviews);
+    expect(reviewEvents.filter(event => event.data.gate === 'ga-0004' && event.data.planRevision === 2 &&
+      event.data.outcome === 'passed')).toHaveLength(1);
+    expect(new Set(reviewEvents.map(event => `${event.data.gate}:${event.data.planRevision}`)).size).toBe(reviewEvents.length);
+    if (mode === 'review-submission-restart') {
+      const replayedReviewers = after.filter(event => event.type === 'invocation-started' && event.data.role === 'reviewer');
+      expect(replayedReviewers).toHaveLength(reviewerStarts);
+    }
     await stopStable(reopened.service, receipt.jobId);
     await reopened.service.settled('need', receipt.jobId);
     return;
@@ -347,5 +383,11 @@ test('CA17 CA20 CA30: restart after verification reuses the accepted gate and re
   () => runAcceptedHandback('verify-restart'), 180_000);
 test('CA20 CA30: restart after the passing gate reuses its audited candidate',
   () => runAcceptedHandback('gate-restart'), 180_000);
+test('CA19: in-flight combined capability gate intent recovers one audited commit and handback',
+  () => runAcceptedHandback('gate-intent-restart'), 180_000);
+test('CA19: in-flight combined capability gate commit recovers one audited commit and handback',
+  () => runAcceptedHandback('gate-committing-restart'), 180_000);
 test('CA20 CA30: restart after the passing review reuses the same gate and review',
   () => runAcceptedHandback('review-restart'), 180_000);
+test('CA19: accepted reviewer submissions replay before their combined review record',
+  () => runAcceptedHandback('review-submission-restart'), 180_000);

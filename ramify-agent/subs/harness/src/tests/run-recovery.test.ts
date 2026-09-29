@@ -246,6 +246,7 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'capability-exchange-answered': return types.includes('capability-exchange-answered');
     case 'capability-gate-recorded': return types.includes('gate-attempted');
     case 'capability-review-recorded': return types.includes('capability-review-recorded');
+    case 'capability-handed-back': return types.includes('capability-handed-back');
     case 'capability-assignment-settled': return types.includes('capability-assignment-settled');
     case 'capability-assigned': return types.includes('capability-assigned');
     case 'nonfunctional-phase-started':

@@ -277,7 +277,7 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
 
 for (const boundary of ['request-placement', 'unresolved'] as const) {
 for (const restartBoundary of boundary === 'request-placement'
-  ? ['none', 'placement-intent', 'fork-accepted', 'fork-partial'] as const : ['none', 'fork-accepted'] as const) {
+  ? ['none', 'placement-intent', 'fork-accepted', 'fork-partial', 'qualification-accepted'] as const : ['none', 'fork-accepted'] as const) {
 test(`CA21 CA32: nested ${boundary} returns a global decision before child delegation${restartBoundary === 'none' ? '' : ` after ${restartBoundary} restart`}`, async () => {
   const fixture = await copyCapabilityFixture(true);
   const cleanups: Array<() => Promise<void>> = [fixture.remove];
@@ -357,6 +357,16 @@ test(`CA21 CA32: nested ${boundary} returns a global decision before child deleg
             await freeze();
           }
         }
+        if (restartBoundary === 'qualification-accepted' && write === 'invocation-ended' && nestedTurns === 2) {
+          const events = await runEventsOnDisk(fixture.root, 'need', runId);
+          const ended = events.at(-1);
+          if (ended?.type === 'invocation-ended' && events.some(started => started.type === 'invocation-started' &&
+            started.data.invocation === ended.data.invocation && started.data.role === 'capability-architect' &&
+            started.data.work.capabilityTask === 'cap-001' && started.data.work.request === 'need-002')) {
+            frozen = true;
+            await freeze();
+          }
+        }
       } };
     const first = await openCapabilityRuns(fixture.root, options);
     const receipt = await first.service.execute(startRun('need'));
@@ -395,7 +405,8 @@ test(`CA21 CA32: nested ${boundary} returns a global decision before child deleg
 }
 }
 
-test('CA21 CA32: a real C child gate and review hand back to the suspended B writer', async () => {
+for (const restartAfterHandback of [false, true]) {
+test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfterHandback ? ' after service restart' : ''}`, async () => {
   const fixture = await copyCapabilityFixture(true);
   const cleanups: Array<() => Promise<void>> = [fixture.remove];
   try {
@@ -417,6 +428,7 @@ test('CA21 CA32: a real C child gate and review hand back to the suspended B wri
     let candidate = '';
     let config = '';
     let returnedPrompt = '';
+    let frozenHandback = false;
     let service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
     const script: Script = spec => {
       if (spec.role === 'initial-architect') return submit(analysis([entry('a-reads-b', a), entry('b-entry', b)]));
@@ -489,6 +501,11 @@ test('CA21 CA32: a real C child gate and review hand back to the suspended B wri
     const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
       checkExecution: createLocalCommandCheckExecution(),
       afterWrite: async (event: string, runId: string) => {
+        if (restartAfterHandback && event === 'capability-handed-back' && !frozenHandback &&
+          service?.events('need', runId)?.at(-1)?.type === 'capability-handed-back') {
+          frozenHandback = true;
+          await freeze();
+        }
         if (event !== 'capability-assignment-settled') return;
         const settled = service?.events('need', runId)?.at(-1);
         if (settled?.type !== 'capability-assignment-settled' || settled.data.assignment !== 'cap-002.i02') return;
@@ -505,10 +522,19 @@ test('CA21 CA32: a real C child gate and review hand back to the suspended B wri
           typeCheck: checkCommand({ argv: [join(process.cwd(), 'node_modules/.bin/tsc'), '--noEmit', '-p', 'tsconfig.json'], cwd: root, timeoutMs: 30_000 }),
         } };
       } } satisfies Parameters<typeof openCapabilityRuns>[1];
-    const opened = await openCapabilityRuns(fixture.root, options);
+    let opened = await openCapabilityRuns(fixture.root, options);
     service = opened.service;
-    cleanups.push(() => opened.service.close());
     const receipt = await opened.service.execute(startRun('need'));
+    if (restartAfterHandback) {
+      await until(() => frozenHandback, 120_000);
+      const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+      expect(before.filter(event => event.type === 'capability-handed-back' && event.data.task === 'cap-002')).toHaveLength(1);
+      expect(before.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01')).toHaveLength(0);
+      await staleCrashLock(fixture.root);
+      opened = await openCapabilityRuns(fixture.root, options);
+      service = opened.service;
+    }
+    cleanups.push(() => opened.service.close());
     await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
       event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01') ||
       (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'), 120_000);
@@ -532,3 +558,4 @@ test('CA21 CA32: a real C child gate and review hand back to the suspended B wri
     for (const cleanup of cleanups.reverse()) await cleanup();
   }
 }, 180_000);
+}
