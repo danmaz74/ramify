@@ -329,11 +329,12 @@ async function observedInComposedRuns(): Promise<Map<unknown, Set<string>>> {
  * becoming a second copy of the test that owns them.
  */
 const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly file: string; readonly test: string }> = [
+  { union: 'record ramify-agent.iteration-assignment/1.coordination.kind', values: ['capability-task'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
   // Plan 16: the new-run capability path is driven in its own service tests.
   { union: 'run log.type', values: ['capability-requested', 'capability-qualified', 'capability-delegated'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log.type', values: ['capability-plan-revised', 'capability-exchange-opened', 'capability-exchange-answered', 'capability-assigned', 'capability-assignment-settled'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
-  { union: 'run log.type', values: ['capability-coordinator-resumed', 'capability-assignment-interrupted'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA18 CA26 CA29: a lost B writer keeps dirty source and reconstructs within the same assignment' },
-  { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-verification-started', 'capability-handed-back'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
+  { union: 'run log.type', values: ['capability-coordinator-resumed'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA18 CA26 CA29: an ended B writer keeps dirty source and closes partial through ordinary failure analysis' },
+  { union: 'run log.type', values: ['capability-verification-started', 'capability-handed-back'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
   { union: 'run log.type', values: ['capability-verification-failed'], file: 'subs/harness/src/tests/capability-tasks-projection.test.ts', test: 'CA23 CA34: request, design, consultation and failed verification remain distinct from registry capability' },
   { union: 'run log.type', values: ['capability-stopped'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20 CA32: restart with a B writer lacking confirmed release stops the stack and frontier' },
   { union: 'run log.type', values: ['writer-process-registered'], file: 'subs/harness/src/tests/capability-recovery.test.ts', test: 'CA20: a registered real process group survives a service crash and is settled before any successor work' },
@@ -346,7 +347,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[capability-qualified].data.outcome', values: ['request-placement'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'run log[capability-qualified].data.outcome', values: ['unresolved'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'an unresolved qualification returns through the global architect and the same local architect' },
   { union: 'run log[capability-assignment-settled].data.outcome', values: ['accepted'], file: 'subs/harness/src/tests/capability-assignments.test.ts', test: 'CA06–CA10 CA28–CA30: consultation stays read-only and B, D, P, A receive task-owned scopes' },
-  { union: 'run log[capability-assignment-settled].data.outcome', values: ['partial'], file: 'subs/harness/src/tests/capability-state.test.ts', test: 'refuses handback while an assignment is unfinished or failed' },
+  { union: 'run log[capability-assignment-settled].data.outcome', values: ['partial'], file: 'subs/harness/src/tests/capability-state.test.ts', test: 'refuses an active assignment but preserves partial history for the verifier' },
   { union: 'run log[capability-review-recorded].data.outcome', values: ['passed', 'failed'], file: 'subs/harness/src/tests/capability-acceptance.integration.test.ts', test: 'CA08 CA11–CA15 CA17 CA25 CA30: real multi-owner migration, repair, handback and linked revision' },
   { union: 'submission engineer.kind', values: ['capability-needed'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
   { union: 'submission engineer[capability-needed].request.knownInterface.kind', values: ['none-known'], file: 'subs/harness/src/tests/capability-delegation.test.ts', test: 'CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and keeps A and B separate' },
@@ -547,7 +548,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'run log[gate-command-waiting].data.kind', values: ['tests', 'scenarios'], file: 'subs/harness/src/tests/gate-progress.test.ts', test: 'a composed readiness records the provider wait for tests and scenarios before their commands start' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['infrastructure'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['outside-assignment'], file: 'subs/harness/src/tests/no-rewind.test.ts', test: 'the work-item gate returns it to the local architect, who assigns the owner that failed' },
   { union: 'record ramify-agent.gate-attempt/3.cause', values: ['guarded-change'], file: 'subs/harness/src/tests/breaking-work.test.ts', test: 'an unauthorized edit of the test-runner configuration is guarded-change, and the same edit under a recorded revision passes' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.selection.kind', values: ['identity'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'a passing identity run: the profile written outside the project, its argv, and a summary that passes' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].scenarios.scenarios[].status', values: ['passed', 'failed', 'undefined', 'pending', 'ambiguous'], file: 'subs/harness/src/tests/scenario-check.test.ts', test: 'all-untagged: every tracked failure by ID, the project\'s own by count, and the pending one excluded' },
@@ -595,9 +595,6 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'query scenarios.scenarios[].state', values: ['bound'], file: 'subs/harness/src/tests/scenario-projections.test.ts', test: 'every state, the entry\'s work item, an integration scenario without its work item yet, and no gate that did not run it' },
   // Where a failed gate's cause was read from: a Ramify report in a driven
   // run, a declared tsc output and both together at a gate of their own.
-  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings'], file: 'subs/harness/src/tests/gate-diagnostics.test.ts', test: 'the iteration returns to the local architect, whose briefing carries the finding itself' },
-  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'every error in the engineer\'s own write scope is in scope, and the engineer repairs it' },
-  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings-and-type-check-errors'], file: 'subs/harness/src/tests/type-check-attribution.test.ts', test: 'beside a failed Ramify check, both attribute the cause, and the local architect answers the module violation' },
   { union: 'run log[analysis-accepted].data.warnings[].kind', values: ['names-view-symbol', 'names-view-file', 'sub-scenario-shares-no-step', 'duplicate-architect-steps'], file: 'subs/harness/src/tests/analysis-scenarios.test.ts', test: 'with an architect view: a module\'s own directory and testing area, and every warning, by scenario ID' },
   // An engineer that ends without a result returns to its architect, digested and analyzed first.
   { union: 'run log[session-opened].data.role', values: ['failure-analyst'], file: 'subs/harness/src/tests/engineer-failures.test.ts', test: 'is digested and analyzed before its architect is briefed, which raises the bound, and the next engineer\'s shell takes the larger timeout' },
@@ -673,6 +670,11 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
+  { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-assignment-interrupted'],
+    reason: 'Historical capability-only transitions remain readable; current policy records ordinary iteration gates, review requests and invocation endings instead.' },
+  { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings', 'type-check-errors', 'ramify-findings-and-type-check-errors'],
+    reason: 'Historical inferred repair ownership remains readable; current gates retain provider diagnostics and agents decide the repair owner without this field.' },
   {
     union: 'run log[capability-assignment-settled].data.outcome', values: ['failed', 'interrupted'],
     reason: 'Current driven capability runs recover interrupted writers into a later settlement or stop the stack; no test commits these terminal settlement outcomes yet.',
@@ -812,7 +814,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
   },
   {
     union: 'record ramify-agent.gate-attempt/3.commands[].selection.policy', values: ['all-project'],
-    reason: 'An all-project checkpoint attaches no TestSelection to its commands (iteration 4, deviation 10), and the breaking gate\'s probe is an owned-by-scope selection (iteration 10), so no recorded selection has this policy.',
+    reason: 'An all-project checkpoint attaches no TestSelection to its commands (iteration 4, deviation 10), so no recorded selection has this policy; current gates do not run scope probes.',
   },
   {
     union: 'record ramify-agent.gate-attempt/3.cause', values: ['invalid-session'],

@@ -1,5 +1,20 @@
 # harness
 
+Local and capability architects submit the same complete assignment body. The
+shared builder and iteration executor prepare each selected owner's current
+ordinary/testing API views, enforce scope, capture candidate commits, run the
+same checks, return repairs to the engineer and request the same reviews.
+Capability coordination adds the consumer/provider context and a task owner for
+sequence, limits, nested dependencies and final handback. Partial or failed
+iterations remain partial or failed even after later work succeeds.
+
+Both architects inspect source and Git through the same read-only tools. Current
+results point to common iteration, gate and review records; there is no full
+capability-history replay tool or model-authored source/configuration hash.
+The harness retains complete `ramify-audit` evidence and diagnoses no repair
+owner from an error's location. The browser exposes the same producer report.
+
+
 Serves one Ramify project to its clients and owns every durable record of the
 work done on it: it is the only writer of run state, its records and its
 events. It reads the project's plans, drives implementation runs through the
@@ -120,11 +135,10 @@ hiding or measured complexity justifies it.
     discovery that failed are each a reason the attempt records.
   - `checkpoint.ts`: what each checkpoint requires beyond the type check and
     the complete Ramify check, which every one of them runs: which tests, and
-    whether a pass is followed by the harness's commit. It is mechanical and
-    hardcoded; no submission carries it and no agent chooses it. An
-    `all-project` checkpoint that follows an assignment also runs that
-    assignment's own selection beside the project's tests, which is what
-    tells a failure inside the last scope from one outside it. The
+    whether it audits a candidate commit. It is mechanical and hardcoded;
+    no submission carries it and no agent chooses it. Required commands run
+    once; there is no additional scope probe. The engineer diagnoses the
+    complete provider evidence and requests another owner when needed. The
     project's setup commands, which `ramify-agent.json` declares in `setup`,
     lead every checkpoint's plan as commands of kind `setup`.
   - `selection.ts`: resolving a policy against the tree as it stands. Each
@@ -242,8 +256,9 @@ hiding or measured complexity justifies it.
     `job.json` beside the policy, with the reason where it is missing or
     invalid; and what readiness asks of a valid one: the modules' test areas
     its support code must match, and whether each mode's commands resolve.
-    Its optional `typeCheck.output` declares the format the type check
-    prints, which committing gates read error locations from, and its
+    Its optional `typeCheck.output` retains the declared output format for
+    historical configuration compatibility; the harness does not parse error
+    locations to assign repair ownership. Its
     optional `timeouts` the gate command timeouts, which `start-run`
     captures into the policy in place of the harness's own
     (`withProjectTimeouts` in `policy.ts`). Its optional `setup` declares
@@ -260,7 +275,7 @@ hiding or measured complexity justifies it.
     dependencies where an audited gate links the project's `node_modules`,
     before any command runs, since ramify-audit would refuse it at every
     audited gate.
-  - `gates.ts`: a checkpoint of a run and the commit that follows a pass,
+  - `gates.ts`: a checkpoint of a run and the candidate commit audited before acceptance,
     with the message the harness writes mechanically from records.
   - `inputs.ts`: the evidence seam. A run's lifecycle, its log and its
     recovery do not depend on how the evidence is obtained, so a test of the
@@ -1116,8 +1131,10 @@ pi actually made and what the snapshot tools answered.
   included; `job-completed` requires a passing `final` attempt whose
   scenario check passed every one in full mode, and an empty work queue
   alone never satisfies it. A change to the working
-  directory blocks nothing: the gate runs the checks where they are and, on a
-  pass, the harness commits. The commit is the ledger's external effect,
+  directory blocks nothing: a committing gate first captures a candidate
+  commit, then audits that exact source. A failed candidate remains inspectable
+  in Git; only a passing applicable gate establishes acceptance. The commit
+  is the ledger's external effect,
   keyed by the gate attempt, and a repeat after a crash finds it by its
   `Ramify-Gate` trailer.
 - **Recovery.** On start, each run replays its log, every record file that is

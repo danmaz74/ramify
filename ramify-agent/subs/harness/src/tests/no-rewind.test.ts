@@ -28,9 +28,8 @@ vi.mock('node:child_process', async original =>
  * adds work writes new files and rewrites none.
  *
  * The same run shows what a failure outside the last engineer's scope does:
- * the work item's own gate runs the whole project beside that assignment's
- * own selection, and a failure that only the whole project sees returns to
- * the local architect rather than to the engineer.
+ * the work item's own gate runs the whole project once, and its failure
+ * returns to the active architect, who chooses the next scoped assignment.
  *
  * Which files each gate selects is the harness's own work over the tree.
  * What the runner reports for them, and what Git reports for each commit,
@@ -236,17 +235,17 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
       .filter(event => event.type === 'gate-attempted' && (event.data as { checkpoint: string }).checkpoint === 'work-item')
       .map(event => readGate(root, runId, (event.data as { gate: string }).gate)));
 
-    // The first work-item gate ran the whole project beside the last
-    // assignment's own selection. The project's tests failed and that
-    // selection passed, so the failure is outside the assignment.
+    // The task-completion failure returns to the architect without a scope
+    // probe or inferred owner. The scripted architect diagnoses the report.
     const returned = workItemGates[0]!;
     expect(returned.verdict).toBe('failed');
-    expect(returned.cause).toBe('outside-assignment');
-    expect(returned.next).toBe('return-to-local-architect');
-    const probe = returned.commands.find(command => command.selection !== undefined)!;
-    expect(probe.outcome).toBe('passed');
-    expect(probe.selection!.resolved).toEqual([`${notesDirectory}/src/tests/notes.test.ts`]);
-    expect(returned.commands.filter(command => command.kind === 'tests' && command.selection === undefined)[0]!.outcome).toBe('failed');
+    expect(returned.cause).toBe('in-scope');
+    expect(returned.attribution).toBeUndefined();
+    expect(returned.next).toBe('repair');
+    const testCommands = returned.commands.filter(command => command.kind === 'tests');
+    expect(testCommands).toHaveLength(1);
+    expect(testCommands[0]!.outcome).toBe('failed');
+    expect(testCommands[0]!.output.tail).toContain('expected 400 to be 500');
 
     // The architect assigned the owner that failed, and the work item's gate
     // then passed.
