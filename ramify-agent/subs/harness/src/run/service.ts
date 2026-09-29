@@ -9392,6 +9392,7 @@ function gateOperation(prepared: PreparedGate, message: string): GateOperation {
         ...check,
         kind: check.kind as 'setup' | 'ramify-check' | 'type-check' | 'tests' | 'scenarios',
       })),
+      ...(request.auditAllTests === undefined ? {} : { auditAllTests: request.auditAllTests }),
       selection: {
         policy: request.selection?.policy ?? 'all-project',
         exactOwners: [...(request.selection?.exactOwners ?? [])],

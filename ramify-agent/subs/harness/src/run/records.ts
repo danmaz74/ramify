@@ -896,6 +896,7 @@ export const gateOperationSchema = z.object({
     directory: text,
     head: z.string(),
     checks: z.array(verifiedPlannedCheckSchema),
+    auditAllTests: checkCommandSchema.optional(),
     selection: z.object({
       policy: z.enum(['owned-by-scope', 'all-project']),
       exactOwners: z.array(z.string()),

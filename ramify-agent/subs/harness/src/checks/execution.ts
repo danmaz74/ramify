@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
-import type { CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
+import type { CheckCommand, CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
 import { runScenarioCheck } from './scenario-check.js';
 import type { PlannedCheck } from './verify.js';
 
@@ -72,6 +72,7 @@ export interface CheckExecutionContext {
   };
   /** Project-relative package directories whose installed dependencies are linked. */
   readonly dependencyDirectories: readonly string[];
+  readonly auditAllTests?: CheckCommand | undefined;
   /** Harness-owned findings included beside command checks in external evidence. */
   readonly harness: {
     readonly guardedChanges: readonly CheckHarnessGuardedChange[];

@@ -144,9 +144,9 @@ export function scopedTestChecks(commands: ProjectCommands, tests: ResolvedTests
  * recorded on the attempt, so a reader sees that an included subtree really
  * contributed tests and an empty list is visible.
  */
-export function scopedChecks(commands: ProjectCommands, tests: ResolvedTests, scenarios?: PlannedCheck | undefined, auditSelection = false): PlannedCheck[] {
+export function scopedChecks(commands: ProjectCommands, tests: ResolvedTests, scenarios?: PlannedCheck | undefined): PlannedCheck[] {
   return [
-    ...scopedTestChecks(commands, tests).map(check => auditSelection ? { ...check, command: commands.allTests } : check),
+    ...scopedTestChecks(commands, tests),
     { kind: 'type-check', command: commands.typeCheck, attribution: 'project' },
     { kind: 'ramify-check', command: commands.ramifyCheck, attribution: 'project' },
     ...(scenarios === undefined ? [] : [scenarios]),

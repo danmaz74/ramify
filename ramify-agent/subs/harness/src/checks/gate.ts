@@ -6,7 +6,7 @@ import { checkOutputPath } from './execution.js';
 import { typeCheckAttribution } from './type-check-output.js';
 import type { CheckExecutionPort, CheckExecutionResult, GateCommandStarted } from './execution.js';
 import type {
-  AcceptedCommit, CheckCommandKind, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
+  AcceptedCommit, CheckCommand, CheckCommandKind, Checkpoint, GateAttempt, GateAttemptId, GateAttribution, GateCause,
   GateCommandRecord, GateNext, GateRuleRecord, NotVerified, RecordReference, ScenarioCheckSummary,
 } from './records.js';
 import { gateAttemptSchema } from './records.js';
@@ -35,6 +35,8 @@ export interface GateRequest {
   /** The run branch's head when the commands ran. */
   readonly head: AcceptedCommit;
   readonly checks: readonly PlannedCheck[];
+  /** The project's whole-suite command, persisted so a scoped audit can hand Ramify the selection. */
+  readonly auditAllTests?: CheckCommand | undefined;
   /** The checkpoint's selection, kept separate from any all-project scope probe. */
   readonly selection?: {
     readonly policy: 'owned-by-scope' | 'all-project';
@@ -145,6 +147,7 @@ export async function executePreparedGate(
         sourceCommit,
         selection: request.selection ?? { policy: 'all-project', exactOwners: [], subtrees: [] },
         dependencyDirectories: request.dependencyDirectories ?? [],
+        ...(request.auditAllTests === undefined ? {} : { auditAllTests: request.auditAllTests }),
         harness: { guardedChanges: prepared.guardedChanges, rules: prepared.rules },
         timeoutMs: prepared.timeoutMs,
       },

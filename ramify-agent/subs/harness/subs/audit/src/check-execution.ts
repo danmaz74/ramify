@@ -119,7 +119,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
         }));
       }
       const records = new Map<string, GateCommandRecord>();
-      const definitions = await checkDefinitions(checks, mapping, baseGit, request.context.sourceCommit, request.signal);
+      const definitions = await checkDefinitions(checks, mapping, baseGit, request.context.sourceCommit, request.signal, request.context.auditAllTests);
       const bridge = createInProcessRegisteredExecutorBridge({
         [executorId]: async (registered, signal) => {
           if (registered.checkId === harnessCheckId) return harnessSummary(request);
@@ -169,7 +169,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
             argv: command.argv,
             cwd: command.cwd,
             env: { ...checkCommandEnvironment(check.command), ...testRun?.environment },
-            timeoutMs: check.command.timeoutMs,
+            timeoutMs: testRun === undefined ? check.command.timeoutMs : request.context.auditAllTests?.timeoutMs ?? check.command.timeoutMs,
             signal,
           });
           const mapped = await writeMappedRun(run, outputFile, mapping, worktreeRoot);
@@ -398,11 +398,13 @@ function leadingSetup(checks: readonly PlannedCheck[]): number {
 /** The audit's checks: every planned check but the setup commands, which its preparation runs, and the harness's rules. */
 async function checkDefinitions(
   checks: readonly PlannedCheck[], mapping: PathMapping, git: GitExecutorPort, commit: string, signal: AbortSignal,
+  auditAllTests?: PlannedCheck['command'],
 ): Promise<CheckDefinition[]> {
   const planned: CheckDefinition[] = [];
   for (const [index, check] of checks.entries()) {
     if (check.kind === 'setup') continue;
-    const vitest = check.kind === 'tests' && await isVitestCommand(check.command, mapping, git, commit, signal);
+    const testCommand = check.kind === 'tests' && check.selection !== undefined ? auditAllTests ?? check.command : check.command;
+    const vitest = check.kind === 'tests' && await isVitestCommand(testCommand, mapping, git, commit, signal);
     planned.push({
       id: checkId(index, check),
       name: `${check.kind} ${index + 1}`,
@@ -414,9 +416,9 @@ async function checkDefinitions(
         ...(vitest ? {
           acceptsNarrowing: true,
           testCommand: {
-            name: 'tests', cmd: check.command.argv[0]!, args: check.command.argv.slice(1),
-            parser: 'vitest' as const, timeoutMs: check.command.timeoutMs,
-            env: { ...check.command.envAdditions },
+            name: 'tests', cmd: testCommand.argv[0]!, args: testCommand.argv.slice(1),
+            parser: 'vitest' as const, timeoutMs: testCommand.timeoutMs,
+            env: { ...testCommand.envAdditions },
           },
         } : {}),
       },
