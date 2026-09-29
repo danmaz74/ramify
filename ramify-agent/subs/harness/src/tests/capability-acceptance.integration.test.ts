@@ -23,7 +23,7 @@ const p = 'capability-coordination';
 
 async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 'restart' | 'verify-restart' |
   'gate-restart' | 'gate-intent-restart' | 'gate-committing-restart' |
-  'review-restart' | 'review-submission-restart' | 'repair-exhaustion'): Promise<void> {
+  'review-restart' | 'review-submission-restart' | 'concern-submission-restart' | 'repair-exhaustion'): Promise<void> {
   const fixture = await copyCapabilityFixture(); cleanups.push(fixture.remove);
   await mkdir(join(fixture.root, 'subs/a/src/tests/steps'), { recursive: true });
   await writeFile(join(fixture.root, 'subs/a/src/tests/steps/capability.steps.js'), [
@@ -99,7 +99,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
         write('tests/caller.test.ts', "import { expect, test } from 'vitest';\nimport { renderA } from '../caller.js';\ntest('A renders the source', () => expect(renderA()).toBe(renderA()));\n"));
       if (mode === 'restart' || mode === 'verify-restart' || mode === 'gate-restart' ||
         mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
-        mode === 'review-restart' || mode === 'review-submission-restart') return resuming
+        mode === 'review-restart' || mode === 'review-submission-restart' || mode === 'concern-submission-restart') return resuming
         ? submit({ kind: 'completion-proposed', summary: 'A resumed after restart with the accepted result', findings: [] })
         : [{ kind: 'wait', ms: 60_000 }];
       if (mode === 'deferred') return submit({ kind: 'completion-proposed', summary: 'A resumed with the accepted result', findings: [] });
@@ -227,13 +227,17 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
           event?.type === 'invocation-ended' && event.data.ended === 'submitted' &&
           (activeService?.events('need', runId) ?? []).some(started => started.type === 'invocation-started' &&
             started.data.invocation === event.data.invocation && started.data.role === 'reviewer') ||
+        mode === 'concern-submission-restart' && write === 'invocation-ended' && reviewer === 1 &&
+          event?.type === 'invocation-ended' && event.data.ended === 'submitted' &&
+          (activeService?.events('need', runId) ?? []).some(started => started.type === 'invocation-started' &&
+            started.data.invocation === event.data.invocation && started.data.role === 'reviewer') ||
         mode === 'review-restart' && write === 'gate-attempted' && reviewer >= 2 &&
           event?.type === 'gate-committing' && event.data.checkpoint === 'work-item';
       if (boundary && !frozenFault && closingVerification === undefined) {
         targetGateId = event?.type === 'gate-committing' ? event.data.gate
           : gate?.type === 'gate-attempted' && gate.data.checkpoint === 'work-item' ? gate.data.gate : undefined;
         if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
-          mode === 'review-restart' || mode === 'review-submission-restart') {
+          mode === 'review-restart' || mode === 'review-submission-restart' || mode === 'concern-submission-restart') {
           frozenFault = true;
           await freeze();
         } else closingVerification = closeVerification?.();
@@ -250,14 +254,15 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     } } satisfies Parameters<typeof openCapabilityRuns>[1];
   const opened = await openCapabilityRuns(fixture.root, options);
   if (mode !== 'gate-restart' && mode !== 'gate-intent-restart' && mode !== 'gate-committing-restart' &&
-    mode !== 'review-restart' && mode !== 'review-submission-restart') {
+    mode !== 'review-restart' && mode !== 'review-submission-restart' && mode !== 'concern-submission-restart') {
     cleanups.push(() => opened.service.close());
   }
   activeService = opened.service;
   closeVerification = () => opened.service.close();
   const receipt = await opened.service.execute(startRun('need'));
   if (mode === 'verify-restart' || mode === 'gate-restart' || mode === 'gate-intent-restart' ||
-    mode === 'gate-committing-restart' || mode === 'review-restart' || mode === 'review-submission-restart') {
+    mode === 'gate-committing-restart' || mode === 'review-restart' || mode === 'review-submission-restart' ||
+    mode === 'concern-submission-restart') {
     await until(() => frozenFault || closingVerification !== undefined, 120_000).catch(async error => {
       const current = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
       throw new Error(`${String(error)}; architect ${architect}; gates ${JSON.stringify(current.filter(event => event.type === 'gate-attempted'))}; tail ${JSON.stringify(current.slice(-12))}`);
@@ -281,8 +286,9 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     expect(after.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
     const alreadyPassedTaskGate = before.some(event => event.type === 'gate-attempted' &&
       event.data.checkpoint === 'work-item' && event.data.verdict === 'passed');
+    const expectedNewGates = mode === 'concern-submission-restart' ? 2 : alreadyPassedTaskGate ? 0 : 1;
     expect(after.filter(event => event.type === 'gate-attempted'), JSON.stringify({ before: before.slice(-12), after: after.slice(-18) }))
-      .toHaveLength(gates + (alreadyPassedTaskGate ? 0 : 1));
+      .toHaveLength(gates + expectedNewGates);
     if (mode === 'gate-intent-restart' || mode === 'gate-committing-restart') {
       expect(targetGateId).toBeDefined();
       expect(after.filter(event => event.type === 'gate-committing' && event.data.gate === targetGateId)).toHaveLength(committing || 1);
@@ -291,13 +297,28 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     const reviewEvents = after.filter(event => event.type === 'review-attempt-finished');
     if (mode === 'verify-restart' || mode === 'review-restart') expect(reviewEvents).toHaveLength(reviews);
     expect(after.filter(event => event.type === 'review-request-recorded').length).toBeGreaterThan(0);
-    if (mode === 'review-submission-restart') {
-      const replayedReviewers = after.filter(event => event.type === 'invocation-started' && event.data.role === 'reviewer');
-      expect(replayedReviewers, JSON.stringify({ before: before.filter(event => event.type.startsWith('review-') ||
+    if (mode === 'review-submission-restart' || mode === 'concern-submission-restart') {
+      const replayedReviewers = after.filter((event): event is Extract<typeof event, { type: 'invocation-started' }> =>
+        event.type === 'invocation-started' && event.data.role === 'reviewer');
+      const originalReviewers = before.filter((event): event is Extract<typeof event, { type: 'invocation-started' }> =>
+        event.type === 'invocation-started' && event.data.role === 'reviewer');
+      const sameReviewers = mode === 'concern-submission-restart'
+        ? replayedReviewers.filter(event => event.data.work.iteration === originalReviewers[0]?.data.work.iteration)
+        : replayedReviewers;
+      expect(sameReviewers, JSON.stringify({ before: before.filter(event => event.type.startsWith('review-') ||
         (event.type === 'invocation-started' && event.data.role === 'reviewer') ||
         event.type === 'invocation-ended').slice(-14), after: after.filter(event => event.type.startsWith('review-') ||
         (event.type === 'invocation-started' && event.data.role === 'reviewer') ||
-        event.type === 'invocation-ended').slice(-16) })).toHaveLength(reviewerStarts);
+        event.type === 'invocation-ended').slice(-16) })).toHaveLength(mode === 'concern-submission-restart' ? 1 : reviewerStarts);
+      if (mode === 'concern-submission-restart') {
+        const firstRequest = before.find(event => event.type === 'review-request-recorded');
+        if (firstRequest?.type !== 'review-request-recorded') throw new Error('The concern review request was not recorded');
+        const finished = after.filter((event): event is Extract<typeof event, { type: 'review-attempt-finished' }> =>
+          event.type === 'review-attempt-finished' && event.data.request === firstRequest.data.request);
+        expect(finished).toHaveLength(1);
+        expect(finished[0]?.data.attempt).toBe(`${firstRequest.data.request}.a01`);
+        expect(finished[0]?.data.checkFindings.filter(finding => finding.type === 'check-finding-opened')).toHaveLength(1);
+      }
     }
     await stopStable(reopened.service, receipt.jobId);
     await reopened.service.settled('need', receipt.jobId);
@@ -482,5 +503,7 @@ test('CA20 CA30: restart after the passing review reuses the same gate and revie
   () => runAcceptedHandback('review-restart'), 180_000);
 test('CA19: accepted reviewer submissions replay before their combined review record',
   () => runAcceptedHandback('review-submission-restart'), 180_000);
+test('CA19: a submitted reviewer concern replays into one exact pending attempt and CheckFinding',
+  () => runAcceptedHandback('concern-submission-restart'), 180_000);
 test('CA26: failed combined gates exhaust the captured repair bound with the first cause and no handback',
   () => runAcceptedHandback('repair-exhaustion'), 180_000);
