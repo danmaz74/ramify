@@ -197,6 +197,12 @@ describe('audit-backed gate execution', () => {
     }];
     const full = (await auditGate(fixture, checks, 'ga-vitest-full', { checkpoint: 'final', auditAllTests })).attempt;
     expect(full.auditOverall).toBe('pass');
+    const fullChecks = (full.provider as { checks: Record<string, { vitest?: { reason: string; files: Array<{ path: string; state: string }> } }> }).checks;
+    expect(fullChecks['check-01-tests']?.vitest).toMatchObject({ reason: 'passed' });
+    expect(fullChecks['check-01-tests']?.vitest?.files).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'subs/producer/src/tests/value.test.ts', state: 'passed' }),
+      expect.objectContaining({ path: 'subs/consumer/src/tests/compute.test.ts', state: 'passed' }),
+    ]));
 
     await writeFile(join(fixture.projectRoot, 'subs/producer/src/value.ts'), 'export const value = 2;\n');
     git(fixture.repositoryRoot, ['add', 'subs/producer/src/value.ts']);

@@ -2,9 +2,40 @@
 
 [Plan 18](main-plan.md) · [Acceptance](acceptance.md)
 
-**Status:** inspected baseline plus required integration contract; no new API is
-claimed to exist. Inspected 2026-09-29 against installed ramify-audit **0.3.0**
-and provider commit `2e6f6cecf80dcc52ac2530aca095a8a097acf6ad`.
+**Status:** baseline inventory below was inspected 2026-09-29 against
+ramify-audit **0.3.0** and provider commit
+`2e6f6cecf80dcc52ac2530aca095a8a097acf6ad`. The implemented contract is
+ramify-audit **0.3.2**, source commit
+`3cb7acf248f0efa183dc67dcb71104a4a37f76a1`, pinned exactly by the
+consumer. The baseline tables remain as the gap analysis that led to the
+released operations.
+
+## Released public additions used by the consumer
+
+- `dispatchCheck(request, options?: CheckDispatcherOptions)` executes parsed
+  checks over the current working tree without publishing a commit audit.
+  `testLockMode: 'focused'` leaves focused diagnostics free of the suite lock;
+  suite execution retains the default lock.
+- `parseCucumberReportedCommand({rawMessages, workingDirectory, projectRoot?,
+  exitCode, output, durationSeconds?, outputIncomplete?})` parses each actual
+  host profile stream; `aggregateCommandResults([{name, result}], options?)`
+  builds the producer's one check result. Parsed final scenarios include
+  identity, tags, outcome and step definition locations. Malformed or absent
+  reporter messages fail explicitly with unknown counts. Published command
+  summaries retain exact raw NDJSON artifact paths, retrievable through
+  `readPublishedAuditArtifact(reportCommit, artifactPath, repositoryPath)`.
+- `findCompletedAuditRequest({repositoryPath, projectRoot?, requestId,
+  sourceCommit, git?})` retrieves a completed request by its exact durable
+  identity for pre-acknowledgement recovery.
+- `CommandCheckResult.vitest` exposes provider-reported run reason and executed
+  file identities `{project, path, state}`. A file is passing execution evidence
+  only when the command and run passed and its state is `passed`. This field
+  was added in **0.3.2**; all prior signatures above were released in **0.3.1**.
+
+The provider audit for the 0.3.2 release passed at
+`refs/audited/runs/2026-09-29T15-35-50Z-3cb7acf24`, report
+`8754c97c4453b3c5ab4f48f0255a9c10b3c1e00a`. See
+[iteration 2 results](iteration2-results.md) for consumer evidence and limits.
 
 ## Existing public surface
 
