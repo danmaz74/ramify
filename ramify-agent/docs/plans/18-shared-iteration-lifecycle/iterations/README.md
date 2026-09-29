@@ -18,8 +18,9 @@ subsequent iterations follow [manifest.json](manifest.json).
 
 Implemented source is distinct from accepted live behavior. The full source
 audit passed at `4d95dad9`; the iteration 6 ledger retains the conditions that
-the single trial did not exercise. This branch has not been merged into the
-authoring checkout.
+the first trial did not exercise. The implementation was merged into the
+authoring checkout at `3feba772`; one further usual-use-case trial is authorized
+and its result remains open.
 
 Each executed iteration writes iterationN-results.md with source and package
 identities, implemented acceptance rows, commands/results and remaining limits.

@@ -5,6 +5,11 @@ passed; production acceptance remains open. The one authorized real-Pi trial
 stopped at readiness because its target dependencies were incompletely prepared,
 before any engineer assignment. See [iteration 6 evidence](iteration6-results.md)
 for exact revisions, audit results, trial failures and unobserved acceptance cases.
+On 2026-09-29 the user authorized delivery and one further trial. The implementation
+was fast-forwarded into `/ramify`'s `ramify-agent` branch at `3feba772`, preserving
+unrelated local edits. Its runtime source is identical to audited `4d95dad9`.
+A Sol agent is preparing the additional usual-use-case trial with the missing
+nested dependencies and CLI launcher checked before launch; its result remains open.
 The user requested this plan after reviewing the
 Plan 16 retry 7 run and confirming that capability assignments must behave
 exactly like ordinary assignments, with the architect's consumer/provider
@@ -19,6 +24,8 @@ consumer-first self-explaining-denials use case after implementation. Preserve
 that input and report which live acceptance observations it establishes. Use
 deterministic tests for controlled stop/recovery; do not launch a second live
 trial or silently widen the usual use case to claim every acceptance row.
+The later retry authorization above permits one additional fresh run after
+merging; it does not authorize automatic retries or a changed use case.
 
 [Provider contract](provider-contract.md) · [Acceptance](acceptance.md) ·
 [Iterations](iterations/README.md)
