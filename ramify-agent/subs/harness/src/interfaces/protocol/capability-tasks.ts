@@ -7,9 +7,9 @@ const text = z.string().min(1);
 const ref = z.object({ id: text, revision: z.int().nonnegative() }).strict();
 const coverage = z.discriminatedUnion('state', [
   z.object({ state: z.literal('unresolved'), reason: text }).strict(),
-  z.object({ state: z.literal('exercised'), tests: z.array(text), candidate: text, configuration: text }).strict(),
+  z.object({ state: z.literal('exercised'), tests: z.array(text), candidate: text.optional(), configuration: text.optional() }).strict(),
   z.object({ state: z.literal('corrected'), reason: text, evidence: z.array(text), decidedBy: text,
-    tests: z.array(text), candidate: text, configuration: text }).strict(),
+    tests: z.array(text), candidate: text.optional(), configuration: text.optional() }).strict(),
 ]);
 
 export const capabilityTaskViewSchema = z.object({
@@ -37,7 +37,11 @@ export const capabilityTaskViewSchema = z.object({
       evidence: z.array(text) }).strict()), openQuestions: z.array(text), requirementRefs: z.array(text) }).strict(),
   assignments: z.array(z.object({ id: text, owner: text, purpose: text, approach: text,
     status: z.enum(['active', 'accepted', 'partial', 'failed', 'interrupted']), intendedEvidence: z.array(text),
-    failures: z.array(text) }).strict()),
+    failures: z.array(text),
+    result: z.object({ outcome: z.enum(['accepted', 'partial', 'unsuitable', 'exhausted', 'superseded']),
+      gate: text.nullable(), commit: text.nullable(), findings: z.array(text) }).strict().nullable().optional(),
+    reviews: z.array(z.object({ id: text, kind: z.enum(['code', 'scope', 'design']),
+      result: z.enum(['complete', 'partial', 'not-verified']).nullable() }).strict()).optional() }).strict()),
   consultations: z.array(z.object({ id: text, question: text, references: z.array(text),
     answer: text.nullable(), objections: z.array(text) }).strict()),
   children: z.array(text),

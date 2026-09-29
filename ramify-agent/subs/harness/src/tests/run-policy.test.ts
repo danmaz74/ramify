@@ -29,7 +29,7 @@ describe('the captured commands', () => {
   });
   test('are the main plan\'s table, naming the environment the harness built', () => {
     const policy = defaultRunPolicy({ projectRoot: '/project', nested: [] });
-    expect(policy.version).toBe('run-policy/5');
+    expect(policy.version).toBe('run-policy/6');
     expect(policy.limits.maxIterationsPerCapabilityTask).toBe(24);
     expect(policy.limits.nonfunctionalRoundsPerPlan).toBe(3);
     // The first trial's review policy and reconciliation bound (Plan 12).

@@ -10,6 +10,12 @@ fixed, non-functional and recommendation constraints for newly affected
 owners through the existing context selector. The selected package is supplied
 whole once; later turns name its hash and receive only changes. Consult the
 requesting engineer directly when its current use is unclear. Assign each
-write to its actual owner. Verify the real provider and requesting consumer
-before requesting handback. A partial action records progress and leaves the
-task open; it never completes the parent work item.
+write to its actual owner. Submit the full ordinary assignment body for each
+engineer: stage, kind, goal, approach, scope, selected requirement elements,
+external capabilities, completion evidence, and any scenarios, authorizations
+or raised bounds. The harness supplies the task sequence, plan basis and gate
+policy. Each proposal uses the ordinary gate, commit, repair and reviews.
+Inspect the latest result and its gate and review artifacts before deciding
+the next assignment. Verify the real provider and requesting consumer before
+requesting handback. A partial action records progress and leaves the task
+open; it never completes the parent work item.

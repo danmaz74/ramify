@@ -1,6 +1,7 @@
 import type { CapabilityTasksResponse, CapabilityTaskView } from '../interfaces/protocol/capability-tasks.js';
 import { replayCapabilityState } from '../capability/state.js';
 import { capabilityReviewSchema } from '../capability/records.js';
+import { reviewStateOf } from '../reviews/state.js';
 import { ProjectionError, type RunView } from './inputs.js';
 
 /** Current task meaning comes from the event reducer; immutable content comes
@@ -35,19 +36,29 @@ export function capabilityTasksOf(view: RunView): CapabilityTasksResponse {
       return { gate: event.data.gate, planRevision: event.data.planRevision,
         outcome: event.data.outcome, findings: parsed.data.findings };
     });
-    const gateAttempts = [...view.gates.values()].filter(entry => entry.body.proposedBy !== null &&
-      view.records.invocations.get(entry.body.proposedBy)?.work.capabilityTask === record.id);
-    const gates = [...new Set([...gateAttempts.map(entry => entry.body.id), ...taskEvents.flatMap(event =>
+    const taskAssignments = [...view.records.assignments.values()].filter(item =>
+      item.coordination?.kind === 'capability-task' && item.coordination.id === record.id);
+    const assignmentIds = new Set(taskAssignments.map(item => item.id));
+    const gateAttempts = [...view.gates.values()].filter(entry =>
+      (entry.body.proposedBy !== null && view.records.invocations.get(entry.body.proposedBy)?.work.capabilityTask === record.id) ||
+      (entry.body.subject.iteration !== undefined && assignmentIds.has(entry.body.subject.iteration)));
+    const sharedGates = [...view.records.results.values()].filter(result =>
+      result.coordination?.kind === 'capability-task' && result.coordination.id === record.id && result.gate !== null)
+      .map(result => result.gate!);
+    const gates = [...new Set([...gateAttempts.map(entry => entry.body.id), ...sharedGates, ...taskEvents.flatMap(event =>
       event.type === 'capability-review-recorded' || event.type === 'capability-candidate-accepted' ? [event.data.gate] : [])])];
     const verificationFailed = taskEvents.filter(event => event.type === 'capability-verification-failed')
       .map(event => event.type === 'capability-verification-failed' ? event.data.finding : '');
     const gateFailures = gateAttempts.filter(entry => entry.body.verdict !== 'passed')
-      .map(entry => `${entry.body.id}: ${entry.body.verdict}${entry.body.attribution?.outside.length
-        ? `; outside assignment: ${entry.body.attribution.outside.join(', ')}` : ''}`);
+      .map(entry => `${entry.body.id}: ${entry.body.verdict}${entry.body.cause === null ? '' : `; ${entry.body.cause}`}`);
     const lastVerification = [...taskEvents].reverse().find(event => event.type === 'capability-review-recorded' ||
       event.type === 'capability-verification-failed' || event.type === 'capability-candidate-accepted' ||
       event.type === 'capability-verification-started');
-    const assignments = [...view.records.capabilityAssignments.values()].filter(item => item.task === record.id)
+    const ordinaryReviews = [...reviewStateOf(view.events).values()];
+    const reviewFailures = ordinaryReviews.filter(entry => assignmentIds.has(entry.iteration))
+      .flatMap(entry => entry.attempts.filter(attempt => attempt.finished !== null &&
+        attempt.finished.result !== 'complete').map(attempt => `${entry.id}/${attempt.id}: ${attempt.finished!.result}`));
+    const legacyAssignments = [...view.records.capabilityAssignments.values()].filter(item => item.task === record.id)
       .sort((left, right) => left.sequence - right.sequence).map(item => ({
         id: item.id, owner: item.owner, purpose: item.purpose, approach: item.approach,
         status: current.assignments.get(item.id) ?? 'active' as const, intendedEvidence: item.intendedEvidence,
@@ -55,6 +66,23 @@ export function capabilityTasksOf(view: RunView): CapabilityTasksResponse {
           ? [event.data.cause] : event.type === 'capability-assignment-settled' && event.data.assignment === item.id
             ? event.data.unfinished ?? [] : []),
       }));
+    const sharedAssignments = taskAssignments
+      .sort((left, right) => (left.coordination?.kind === 'capability-task' ? left.coordination.sequence : 0) -
+        (right.coordination?.kind === 'capability-task' ? right.coordination.sequence : 0))
+      .map(item => {
+        const result = view.records.results.get(item.id);
+        return { id: item.id, owner: 'module' in item.scope.base ? item.scope.base.module : item.scope.base.modules.join(', '),
+          purpose: item.goal, approach: item.approach, status: current.assignments.get(item.id) ?? 'active' as const,
+          intendedEvidence: [item.completionEvidence], failures: [...(result?.findings ?? []),
+            ...gateAttempts.filter(gate => gate.body.subject.iteration === item.id && gate.body.verdict !== 'passed')
+              .map(gate => `${gate.body.id}: ${gate.body.cause ?? gate.body.verdict}`),
+            ...reviewFailures.filter(failure => ordinaryReviews.some(review => review.iteration === item.id && failure.startsWith(`${review.id}/`)))],
+          result: result === undefined ? null : { outcome: result.outcome, gate: result.gate, commit: result.commit, findings: result.findings },
+          reviews: ordinaryReviews.filter(entry => entry.iteration === item.id).map(entry => ({ id: entry.id, kind: entry.kind,
+            result: entry.attempts.find(attempt => attempt.id === entry.settledBy)?.finished?.result ?? null })),
+        };
+      });
+    const assignments = [...legacyAssignments, ...sharedAssignments];
     const consultations = [...view.records.capabilityExchanges.values()].flatMap(revisions => {
       const exchange = revisions.at(-1);
       return exchange?.task === record.id ? [{ id: exchange.id, question: exchange.question, references: exchange.references,
@@ -80,8 +108,9 @@ export function capabilityTasksOf(view: RunView): CapabilityTasksResponse {
       activeChild: current.activeChild,
       verification: { status: handback ? 'passed' : current.status === 'verifying' ? 'running'
         : lastVerification?.type === 'capability-verification-failed' ||
-          (lastVerification?.type === 'capability-review-recorded' && lastVerification.data.outcome === 'failed') ? 'failed' : 'pending',
-        gates, reviews, findings: [...verificationFailed, ...gateFailures] },
+          (lastVerification?.type === 'capability-review-recorded' && lastVerification.data.outcome === 'failed') ||
+          (gateAttempts.length > 0 && gateAttempts.at(-1)!.body.verdict !== 'passed') ? 'failed' : 'pending',
+        gates, reviews, findings: [...verificationFailed, ...gateFailures, ...reviewFailures] },
       handback: handback ? { summary: handback.summary, returnedTree: handback.returnedTree,
         deltaFromSuspension: handback.deltaFromSuspension, interfaces: handback.interfaces,
         limitations: handback.limitations,

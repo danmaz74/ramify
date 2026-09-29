@@ -44,7 +44,7 @@ describe('capability state and authority', () => {
     const previous = { version: 'run-policy/4', limits: {
       maxIterationsPerWorkItem: 12, maxWorkItems: 64, maxInvocationsPerRun: 400,
     } } as RunPolicy;
-    expect(() => captureCapabilityLimits(previous)).toThrow('run-policy/5');
+    expect(() => captureCapabilityLimits(previous)).toThrow('run-policy/6');
     const policy = capabilityPolicyFrom(previous);
     const limits = captureCapabilityLimits(policy);
     expect(limits).toEqual({ maxAssignments: 12, maxWorkUnits: 64, maxInvocations: 400 });
@@ -71,7 +71,7 @@ describe('capability state and authority', () => {
     expect(returned.tasks.get('cap-001')?.activeAssignment).toBe('cap-001.i01');
   });
 
-  it('refuses handback while an assignment is unfinished or failed', () => {
+  it('refuses an active assignment but preserves partial history for the verifier', () => {
     const assigned = [...begin(), event(3, { type: 'capability-assigned', data: {
       task: 'cap-001', assignment: 'cap-001.i01', sequence: 1, invocation: 'inv-0002',
     } })];
@@ -83,9 +83,10 @@ describe('capability state and authority', () => {
       task: 'cap-001', assignment: 'cap-001.i01', outcome: 'partial',
     } }));
     const partial = replayCapabilityState(assigned);
-    expect(() => transitionCapabilityState(partial, event(5, { type: 'capability-verification-started', data: {
+    const verifying = transitionCapabilityState(partial, event(5, { type: 'capability-verification-started', data: {
       task: 'cap-001', invocation: 'inv-0002',
-    } }))).toThrow('unfinished or failed assignments');
+    } }));
+    expect(verifying.tasks.get('cap-001')?.status).toBe('verifying');
   });
 
   it('rejects stale plan revisions and inactive coordinator invocations', () => {

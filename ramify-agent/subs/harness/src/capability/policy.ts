@@ -1,7 +1,7 @@
 import type { RunPolicy } from '../run/records.js';
 
 /** The policy version captured by every new production run. */
-export const capabilityRunPolicyVersion = 'run-policy/5';
+export const capabilityRunPolicyVersion = 'run-policy/6';
 
 export interface CapabilityLimits {
   readonly maxAssignments: number;
@@ -13,7 +13,7 @@ export interface CapabilityLimits {
  * defaults, and owner changes, repairs and reconstruction cannot reset them. */
 export function captureCapabilityLimits(policy: RunPolicy): CapabilityLimits {
   if (policy.version !== capabilityRunPolicyVersion || policy.limits.maxIterationsPerCapabilityTask === undefined) {
-    throw new Error('Capability coordination requires a captured run-policy/5 task limit');
+    throw new Error('Capability coordination requires a captured run-policy/6 task limit');
   }
   return {
     maxAssignments: policy.limits.maxIterationsPerCapabilityTask,

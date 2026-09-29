@@ -34,6 +34,8 @@ export interface ReconciliationPacket {
   readonly laterRoundMinimumRisk: string;
   /** The work item's module, within which this architect may waive. */
   readonly module: string;
+  readonly owner?: 'work item' | 'capability task';
+  readonly capabilityContext?: { readonly consumer: string; readonly provider: string };
   readonly requests: readonly PacketRequest[];
   readonly attention: readonly CheckFindingDetailView[];
   readonly others: readonly CheckFindingSummary[];
@@ -50,7 +52,8 @@ export function reconciliationMessage(packet: ReconciliationPacket): string {
   const lines: string[] = [
     `# Reconciliation ${basis.id} of ${basis.workItem} — round ${basis.round} of at most ${packet.limit}`,
     '',
-    'The work item requested completion. Assess the CheckFindings below together, in one submission.',
+    `The ${packet.owner ?? 'work item'} requested completion. Assess the CheckFindings below together, in one submission.`,
+    ...(packet.capabilityContext === undefined ? [] : ['', `This task coordinates consumer module \`${packet.capabilityContext.consumer}\` and provider module \`${packet.capabilityContext.provider}\`. Read both owners' source and tests before deciding a correction. The module below is the requesting work item's waiver authority, not a limit on task design or assignments.`]),
     '',
     '## Source',
     '',
@@ -68,7 +71,7 @@ export function reconciliationMessage(packet: ReconciliationPacket): string {
     '## Review coverage',
     '',
   ];
-  if (packet.requests.length === 0) lines.push('No review was requested of this work item\'s iterations.');
+  if (packet.requests.length === 0) lines.push(`No review was requested of this ${packet.owner ?? 'work item'}'s iterations.`);
   for (const request of packet.requests) {
     lines.push(`- \`${request.request}\`: ${request.kind} review of \`${request.iteration}\` (candidate \`${request.candidate}\`), attempt ${request.attempt === null ? 'none' : `\`${request.attempt}\``}: ${request.result}`);
   }
@@ -78,7 +81,7 @@ export function reconciliationMessage(packet: ReconciliationPacket): string {
   for (const detail of packet.attention) lines.push(...checkFindingSection(detail));
 
   if (packet.others.length > 0) {
-    lines.push('## Other CheckFindings of this work item', '');
+    lines.push(`## Other CheckFindings of this ${packet.owner ?? 'work item'}`, '');
     lines.push('A relation may name them. They need no disposition here.', '');
     for (const summary of packet.others) {
       lines.push(`- \`${summary.id}\` revision ${summary.revision}, ${summary.standing} (${summary.reason}): ${summary.title}`);
@@ -87,7 +90,7 @@ export function reconciliationMessage(packet: ReconciliationPacket): string {
   }
 
   if (packet.iterations.length > 0) {
-    lines.push('## Iterations of this work item', '');
+    lines.push(`## Iterations of this ${packet.owner ?? 'work item'}`, '');
     for (const iteration of packet.iterations) lines.push(`- \`${iteration.id}\`${iteration.outcome === null ? '' : ` (${iteration.outcome})`}: ${iteration.goal}`);
     lines.push('');
   }

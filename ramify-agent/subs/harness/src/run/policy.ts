@@ -17,7 +17,7 @@ import { reviewPolicyVersion, roles, runPolicySchema, type CapturedProjectConfig
  */
 
 /** New runs use capability coordination. Earlier policy versions remain readable. */
-export const runPolicyVersion = 'run-policy/5';
+export const runPolicyVersion = 'run-policy/6';
 
 /** The bounds of the main plan's policy table. */
 export const defaultLimits: RunPolicy['limits'] = {

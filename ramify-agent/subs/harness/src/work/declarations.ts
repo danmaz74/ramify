@@ -20,6 +20,8 @@ import type { SubmissionError } from '../run/submissions.js';
 export interface DeclarationContext {
   /** The entry capability the work item implements; null for any other work item. */
   readonly entry: string | null;
+  /** A capability task can assign one iteration across several real owners. */
+  readonly entries?: readonly string[] | undefined;
   /**
    * The integration scenario an integration work item binds, which is the
    * one scenario it may declare; null or absent for every other work item.
@@ -31,9 +33,10 @@ export interface DeclarationContext {
 /** The scenarios of one work item: its entry's, or an integration work item's one scenario; none for any other. */
 export function ownScenarios(context: DeclarationContext): string[] {
   const integration = context.integration ?? null;
+  const entries = context.entries ?? (context.entry === null ? [] : [context.entry]);
   return integration !== null
     ? [integration]
-    : context.records.filter(record => record.kind === 'entry' && record.entry !== null && record.entry === context.entry).map(record => record.id);
+    : context.records.filter(record => record.kind === 'entry' && record.entry !== null && entries.includes(record.entry)).map(record => record.id);
 }
 
 /** Every reason the declared IDs cannot be accepted, each at its path. */
@@ -70,12 +73,13 @@ export function declarationErrors(ids: readonly string[], context: DeclarationCo
       });
       return;
     }
-    if (context.entry === null) {
+    const entries = context.entries ?? (context.entry === null ? [] : [context.entry]);
+    if (entries.length === 0) {
       errors.push({ path: at, message: `This work item implements no entry capability, so it declares no scenario; ${id} belongs to ${record.entry ?? 'no entry'}`, expected });
       return;
     }
-    if (record.entry !== context.entry) {
-      errors.push({ path: at, message: `${id} is a scenario of ${record.entry ?? 'no entry'}, not of ${context.entry}, which this work item implements`, expected });
+    if (record.entry === null || !entries.includes(record.entry)) {
+      errors.push({ path: at, message: `${id} is a scenario of ${record.entry ?? 'no entry'}, not of ${entries.join(', ')}, which this work item implements`, expected });
     }
   });
   return errors;

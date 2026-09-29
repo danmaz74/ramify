@@ -45,12 +45,6 @@ export interface CheckpointRequest {
   readonly subject?: GateAttempt['subject'] | undefined;
   /** For an `owned-by-scope` checkpoint: the selection resolved anew from the current tree. */
   readonly tests?: ResolvedTests | undefined;
-  /**
-   * For an `all-project` checkpoint that follows an assignment: that
-   * assignment's own selection, run beside the project's tests. Its outcome
-   * is what tells a failure inside the last scope from one outside it.
-   */
-  readonly scopeProbe?: ResolvedTests | undefined;
   /** The guarded files as the assignment captured them. */
   readonly guarded?: readonly { readonly path: string; readonly hash: string }[] | undefined;
   /**
@@ -131,7 +125,7 @@ function gateRequest(request: CheckpointRequest, dependencyDirectories: readonly
   });
   const scenarioCheck = scenarios !== undefined && 'check' in scenarios ? scenarios.check : undefined;
   const planned = request.tests === undefined
-    ? allProjectChecks(request.policy.commands, policy, request.scopeProbe, scenarioCheck)
+    ? allProjectChecks(request.policy.commands, policy, scenarioCheck)
     : scopedChecks(request.policy.commands, request.tests, scenarioCheck);
   const output = request.typeCheckOutput;
   const checks = [

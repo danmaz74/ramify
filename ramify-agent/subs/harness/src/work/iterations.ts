@@ -127,6 +127,12 @@ export const iterationAssignmentSchema = z.object({
   id: text,
   workItem: text,
   outline: recordRefSchema,
+  /** The issuing coordinator; a capability task has its own sequence and limit. */
+  coordination: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('work-item'), id: text }).strict(),
+    z.object({ kind: z.literal('capability-task'), id: text, sequence: z.int().positive(), plan: recordRefSchema,
+      startingTree: text, startingPaths: z.array(z.object({ path: text, hash: z.string().nullable() }).strict()) }).strict(),
+  ]).optional(),
   stage: z.int().nonnegative(),
   kind: iterationKindSchema,
   goal: text,
@@ -249,6 +255,7 @@ export type FailureDigest = z.infer<typeof failureDigestSchema>;
 export const iterationResultSchema = z.object({
   schema: z.literal('ramify-agent.iteration-result/1'),
   iteration: text,
+  coordination: iterationAssignmentSchema.shape.coordination,
   outcome: z.enum(['accepted', 'partial', 'unsuitable', 'exhausted', 'superseded']),
   /** Every attempt, in order. */
   invocations: z.array(text),

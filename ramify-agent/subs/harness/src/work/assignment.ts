@@ -155,6 +155,8 @@ export interface AssignmentEvidence {
   readonly registry: ReadonlyMap<string, RegistryEntry>;
   /** The outline in force: the one this submission carries, or the last committed revision. */
   readonly outline: Pick<OutlineBody, 'decomposition' | 'stages' | 'breakingChanges'> | null;
+  /** Capability tasks use their own plan as the design basis. */
+  readonly capabilityCompatibility?: readonly string[] | undefined;
   /** The agreements this work item consumes, which are the ones it may revise. */
   readonly contracts?: ReadonlySet<string> | undefined;
   /** The guarded paths of this project, which are the only ones an authorization can name. */
@@ -284,7 +286,7 @@ export function assignmentErrors(body: AssignmentBody, evidence: AssignmentEvide
   // A breaking iteration exists because the outline records a break. Without
   // one there is no guarantee being changed, and the kind is a claim rather
   // than a plan.
-  if (body.kind === 'breaking' && (evidence.outline?.breakingChanges ?? []).length === 0) {
+  if (body.kind === 'breaking' && (evidence.outline?.breakingChanges.length ?? evidence.capabilityCompatibility?.length ?? 0) === 0) {
     errors.push({
       path: 'assignment.kind',
       message: 'A breaking iteration works a guarantee the outline records as broken, and this work item\'s outline records none',

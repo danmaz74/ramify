@@ -319,14 +319,19 @@ function loadEngineer(options: PromptPackageOptions): Promise<LoadedPackage> {
   });
 }
 
-function loadCapabilityArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
-  return loadPackage({
+async function loadCapabilityArchitect(options: PromptPackageOptions): Promise<LoadedPackage> {
+  const reconciliation = await readFile(reconciliationProcedureFile, 'utf8');
+  const reconciliationSchema = `${JSON.stringify(reconciliationJsonSchema, null, 2)}\n`;
+  const loaded = await loadPackage({
     role: 'capability-architect', name: capabilityArchitectPackage,
     systemFile: capabilityArchitectSystemFile, procedureFile: capabilityArchitectProcedureFile,
     schema: z.toJSONSchema(capabilityActionSchema),
-    submissionKinds: capabilityActionSchema.options.map(option => option.shape.kind.value),
+    submissionKinds: [...capabilityActionSchema.options.map(option => option.shape.kind.value), 'reconciliation'],
+    extraFiles: [describe(reconciliationProcedureFile, reconciliation, 'procedure'),
+      { path: 'reconciliation.schema.json', hash: sha256(reconciliationSchema), kind: 'submission-schema', bytes: Buffer.byteLength(reconciliationSchema) }],
     options,
   });
+  return { ...loaded, reconciliation: { procedure: withoutVersionComment(reconciliation).trim(), submissionSchema: reconciliationSchema } };
 }
 
 /**

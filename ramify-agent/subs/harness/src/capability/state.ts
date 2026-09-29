@@ -168,7 +168,7 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
     }
     case 'capability-verification-started': {
       const current = coordinating(event.data.task, event.data.invocation);
-      if ([...current.assignments.values()].some(result => result !== 'accepted')) return fail('unfinished or failed assignments prevent verification');
+      if ([...current.assignments.values()].some(result => result === 'active')) return fail('active assignment prevents verification');
       if (current.activeChild !== null) return fail('unfinished child task prevents verification');
       update(current, { status: 'verifying' });
       break;
@@ -183,7 +183,8 @@ export function transitionCapabilityState(previous: CapabilityState, event: Capa
       const { task, handback, invocation } = event.data;
       const current = active(task);
       if (current.status !== 'verifying' || current.coordinatorInvocation !== invocation) return fail('verified coordinator authority is required');
-      if (current.activeAssignment || current.activeChild || [...current.assignments.values()].some(result => result !== 'accepted')) {
+      if (current.activeAssignment || current.activeChild ||
+        [...current.assignments.values()].some(result => result === 'active')) {
         return fail('unfinished work prevents handback');
       }
       update(current, { status: 'handed-back', handback });
@@ -224,7 +225,7 @@ export function capabilityHandbackReadiness(task: CapabilityTask, request: Capab
   if (task.request !== request.id || plan.task !== task.id || state.id !== task.id) failures.push('Task, request and plan references differ');
   if (state.status !== 'verifying') failures.push('Task is not verifying');
   if (plan.revision !== state.planRevision) failures.push('Plan revision is stale');
-  if (state.activeAssignment || [...state.assignments.values()].some(outcome => outcome !== 'accepted')) failures.push('Assignments are unfinished');
+  if (state.activeAssignment || [...state.assignments.values()].some(outcome => outcome === 'active')) failures.push('An assignment is active');
   if (state.activeChild) failures.push('A child task is unfinished');
   for (const example of request.original.examples) {
     const useCase = plan.useCases.find(item => item.id === example.id);

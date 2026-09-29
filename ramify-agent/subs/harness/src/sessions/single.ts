@@ -275,7 +275,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const loaded = packages.get('engineer');
   if (loaded === undefined) return notStarted('No prompt package is loaded for the engineer.');
 
-  const views = await iterationApiViews(ramify, projectRoot, initial, [entry.module]);
+  const views = await iterationApiViews(ramify, projectRoot, initial, scope.base);
   const head = await git.currentHead(projectRoot);
   const guardedFiles = await captureGuardedFiles(projectRoot);
   const alreadyChanged = await git.changedPaths(projectRoot).catch(() => [] as string[]);

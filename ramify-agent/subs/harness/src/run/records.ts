@@ -697,6 +697,8 @@ export const invocationSchema = z.object({
     size: scopeSizeSchema.nullable(),
   }).strict(),
   writer: z.boolean(),
+  /** Exact candidate tree before a writer started; legacy records omit it. */
+  candidateBefore: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u).optional(),
   supersedes: text.optional(),
   /** The latest passed committing checkpoint's audited hash when it started, or the run base before one exists. */
   base: z.string(),
@@ -740,6 +742,8 @@ export const invocationOutcomeSchema = z.object({
   }).strict(),
   /** Writers only: uncommitted changed paths outside the write scope when it settled. */
   outsideScope: z.array(z.string()),
+  /** Exact candidate tree after this writer settled; legacy records omit it. */
+  candidateAfter: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u).optional(),
   usage: z.union([usageSchema, z.object({ unavailable: text }).strict()]),
   elapsedMs: z.int().nonnegative(),
   error: z.string().optional(),
@@ -833,6 +837,8 @@ export const gateAttemptSchema = z.object({
   commit: z.string().nullable(),
   audited: z.string().nullable(),
   evidence: z.object({ runRef: text, reportCommit: text, treeRef: text }).strict().nullable(),
+  /** Exact producer result and published check payload; absent on historical attempts. */
+  provider: z.object({ result: z.unknown(), checks: z.unknown() }).strict().optional(),
   guardedChanges: z.array(z.object({
     path: text,
     before: z.string(),
@@ -843,6 +849,7 @@ export const gateAttemptSchema = z.object({
   rules: z.array(gateRuleSchema).optional(),
   commands: z.array(z.object({
     kind: checkKindSchema,
+    providerCheckId: text.optional(),
     /** A setup command's declared name. */
     name: text.optional(),
     command: checkCommandSchema,
@@ -865,7 +872,7 @@ export const gateAttemptSchema = z.object({
   /** The checkpoint's scenario check had nothing to run; not a failure. */
   scenarios: z.literal('none-selected').optional(),
   verdict: z.enum(['passed', 'failed', 'not-verified']),
-  cause: z.enum(['in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']).nullable(),
+  cause: z.enum(['check-failed', 'in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']).nullable(),
   /**
    * Where a failed Ramify check's own findings and a failed type check's
    * errors lie, against the write scope the attempt followed. Absent for an

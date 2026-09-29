@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { modulePathSchema } from '../interfaces/protocol/evidence.js';
 import { elementIdSchema } from '../../subs/plan-evidence/src/interfaces/catalog.js';
 import { capabilityPlanContentSchema, capabilityPlanSchema, type CapabilityPlan } from './records.js';
+import { assignmentBodySchema } from '../work/assignment.js';
 
 /** Agent judgments are explicit values. Validation checks form and current
  * authority; it never infers whether prose, code or an expected result is true. */
@@ -13,9 +14,7 @@ const action = <T extends string, S extends z.ZodRawShape>(kind: T, fields: S) =
 export const capabilityActionSchema = z.discriminatedUnion('kind', [
   action('consult-consumer', { question: text, sections: z.array(text).min(1), references: z.array(text) }),
   action('assign', {
-    owner: modulePathSchema, purpose: text, approach: text,
-    includedChildren: z.array(modulePathSchema).optional(),
-    requirementRefs: z.array(elementIdSchema), intendedEvidence: z.array(text).min(1),
+    assignment: assignmentBodySchema,
   }),
   action('delegate-capability', { request: text, provider: modulePathSchema, placementReason: text, constraints: z.array(text) }),
   action('request-placement', { problem: text, evidence: z.array(text).min(1) }),
