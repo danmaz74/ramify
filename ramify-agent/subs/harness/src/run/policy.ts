@@ -25,7 +25,9 @@ export const defaultLimits: RunPolicy['limits'] = {
   repairRoundsPerWorkItemGate: 3,
   infrastructureRetriesPerGate: 2,
   forkRetriesPerRequest: 2,
-  budgetReturnsPerIteration: 3,
+  // Retry 7 reached three coordinator context returns while semantic review
+  // still had an actionable Model-owned repair. Keep a finite captured bound.
+  budgetReturnsPerIteration: 6,
   sessionReconstructionsPerWork: 2,
   cycleReplansPerWorkItem: 1,
   rejectedSubmissionsPerTurn: 3,

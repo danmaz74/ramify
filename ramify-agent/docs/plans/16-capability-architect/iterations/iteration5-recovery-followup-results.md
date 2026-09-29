@@ -33,3 +33,15 @@ The corrected reviewer baseline and candidate were run in separate worktrees. Th
 - CA26 has capability-specific invalid final submission, port-input, preview-counter, reconstruction, architect-budget and combined-gate repair-bound witnesses. These scripted fixtures do not establish live model judgment.
 - The original addendum did not have a process-level CA20 witness. Iteration 7 later integrated the dedicated real-process restart case in `capability-recovery.test.ts`; see [iteration 7 results](iteration7-results.md) for its platform scope and result.
 - The live Pi, external semantic audit and served-browser gates remain separate Plan 16 iteration 7 evidence.
+
+## Later captured-policy follow-up
+
+Retry 7 reached its third capability-architect context-budget return while the
+reviewed candidate still had an actionable Model-owned repair. New policy/5
+runs now capture a finite bound of **6** context-budget returns per capability
+task. The retry 7 job retains its original bound of 3 in `job.json`; this
+change cannot resume or reinterpret that failed run. The scripted exhaustion
+witness in `capability-delegation.test.ts` now reads the captured bound from
+`job.json` and verifies that the sixth return stops with `limit-exceeded`, no
+assignment, no handback, and no completed work item. This policy change does
+not establish CA27 delivery or resolve the semantic review findings.

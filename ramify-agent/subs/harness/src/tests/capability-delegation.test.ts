@@ -210,7 +210,7 @@ test('exhausted capability architect budget returns leave the task unfinished wi
   await installMiniRunner(fixture.root);
   const starts: string[] = [];
   const opened = await openCapabilityRuns(fixture.root, {
-    git: gitService, script: script(starts, [], 'placement', 3), inputs: treeInputs(),
+    git: gitService, script: script(starts, [], 'placement', 6), inputs: treeInputs(),
     readinessExecution: directReadinessExecution(),
   });
   cleanups.push(() => opened.service.close());
@@ -218,13 +218,17 @@ test('exhausted capability architect budget returns leave the task unfinished wi
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'job-failed'));
   await opened.service.settled('need', receipt.jobId);
   const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  const job = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'job.json'), 'utf8')) as
+    { policy: { limits: { budgetReturnsPerIteration: number } } };
+  const capturedBound = job.policy.limits.budgetReturnsPerIteration;
+  expect(capturedBound).toBe(6);
   const terminal = events.find(event => event.type === 'job-failed');
   expect(terminal?.type === 'job-failed' ? terminal.data.reason : null).toBe('limit-exceeded');
-  expect(events.filter(event => event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')).toHaveLength(3);
+  expect(events.filter(event => event.type === 'invocation-ended' && event.data.ended === 'context-budget-reached')).toHaveLength(capturedBound);
   expect(events.filter(event => event.type === 'capability-assigned')).toHaveLength(0);
   expect(events.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
   expect(events.filter(event => event.type === 'work-item-completed')).toHaveLength(0);
-  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(Array(3).fill('capability-architect:submit_capability_action:fresh'));
+  expect(starts.filter(start => start.startsWith('capability-architect:'))).toEqual(Array(capturedBound).fill('capability-architect:submit_capability_action:fresh'));
 }, 30_000);
 
 for (const mode of ['preview-then-correct', 'invalid-submissions', 'invalid-port-inputs'] as const) {

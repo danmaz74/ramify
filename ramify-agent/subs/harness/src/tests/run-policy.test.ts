@@ -74,7 +74,7 @@ describe('the captured commands', () => {
     expect(policy.limits).toEqual(defaultLimits);
     expect(defaultLimits).toMatchObject({
       repairRoundsPerIteration: 3, repairRoundsPerWorkItemGate: 3, infrastructureRetriesPerGate: 2,
-      forkRetriesPerRequest: 2, budgetReturnsPerIteration: 3, sessionReconstructionsPerWork: 2,
+      forkRetriesPerRequest: 2, budgetReturnsPerIteration: 6, sessionReconstructionsPerWork: 2,
       cycleReplansPerWorkItem: 1, rejectedSubmissionsPerTurn: 3, rejectedToolInputsPerTurn: 3,
       readinessRecoveries: 2, stopSettleMs: 30_000, writerSettleMs: 30_000,
       invocationIdleMs: 300_000, invocationAbsoluteMs: 3_600_000,
