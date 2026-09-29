@@ -1,7 +1,11 @@
 # Plan 18: one iteration lifecycle with producer-owned audit evidence
 
-**Date:** 2026-09-29. **Status:** implementation in progress; acceptance remains
-open. The user requested this plan after reviewing the
+**Date:** 2026-09-29. **Status:** implementation committed and full source audit
+passed; production acceptance remains open. The one authorized real-Pi trial
+stopped at readiness because its target dependencies were incompletely prepared,
+before any engineer assignment. See [iteration 6 evidence](iteration6-results.md)
+for exact revisions, audit results, trial failures and unobserved acceptance cases.
+The user requested this plan after reviewing the
 Plan 16 retry 7 run and confirming that capability assignments must behave
 exactly like ordinary assignments, with the architect's consumer/provider
 knowledge being the difference. On the same date, the user authorized merging
