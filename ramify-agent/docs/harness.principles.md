@@ -208,6 +208,15 @@ that must be understood together at that abstraction level; it is assessed
 qualitatively rather than computed from source size. That assessment guides
 the choice. Work decomposition is not 1:1 with module decomposition.
 
+### Every Engineer Uses the Same Iteration Lifecycle
+
+The issuing architect's context differs; assignment preparation, engineer tools,
+API views, gates, candidate commits, reviews, repair and recovery do not. A
+capability architect knows both consumer and provider and returns a verified
+bounded result to its caller. It uses the ordinary executor and result records.
+Architects inspect source, Git and targeted result artifacts; a parallel history
+replay tool does not replace those existing inspection surfaces.
+
 ### Horizontal Work Uses Separate Agents Joined by a Contract
 
 Implementation in different branches uses separate scoped engineers. A fresh

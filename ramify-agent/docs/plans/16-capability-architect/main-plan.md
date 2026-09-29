@@ -1,5 +1,11 @@
 # Plan 16: a fresh architect coordinates each requested capability
 
+**Execution correction:** [Plan 18](../18-shared-iteration-lifecycle/main-plan.md)
+replaces the separate capability engineer lifecycle with the ordinary assignment,
+preparation, gate, review and recovery path, including generated foreign API views.
+Plan 16's trial reports and acceptance status below remain historical evidence;
+the correction does not retroactively accept those runs.
+
 **Date:** 2026-09-28. **Status:** implementation in progress; final acceptance
 remains open. [Iteration 7 results](iterations/iteration7-results.md) and the
 [implementation report](implementation-report.md) distinguish committed code,

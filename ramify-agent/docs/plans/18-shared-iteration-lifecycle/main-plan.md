@@ -1,12 +1,20 @@
 # Plan 18: one iteration lifecycle with producer-owned audit evidence
 
-**Date:** 2026-09-29. **Status:** proposed implementation plan; no implementation
-or acceptance is claimed. The user requested this plan after reviewing the
+**Date:** 2026-09-29. **Status:** implementation in progress; acceptance remains
+open. The user requested this plan after reviewing the
 Plan 16 retry 7 run and confirming that capability assignments must behave
 exactly like ordinary assignments, with the architect's consumer/provider
 knowledge being the difference. On the same date, the user authorized merging
 Plan 19 into this plan and explicitly required the missing generated API-view
-preparation to be fixed. Plan 19 is absorbed; implementation is not started.
+preparation to be fixed. Plan 19 is absorbed. Implementation is authorized in
+`/tmp/ramify-plan18-shared-lifecycle`, integrating Plan 16 and Plan 17 at
+`c622acf9`; the approved combined plan was recorded at `cf221987`.
+
+The user requested exactly one new real-Pi trial of the established
+consumer-first self-explaining-denials use case after implementation. Preserve
+that input and report which live acceptance observations it establishes. Use
+deterministic tests for controlled stop/recovery; do not launch a second live
+trial or silently widen the usual use case to claim every acceptance row.
 
 [Provider contract](provider-contract.md) · [Acceptance](acceptance.md) ·
 [Iterations](iterations/README.md)

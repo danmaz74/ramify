@@ -840,39 +840,28 @@ do not substitute for harness-run completion checks. The local architect still
 assesses whether the result fulfills its goal; passing commands alone does not
 prove semantic acceptance.
 
-The MVP hardcodes a small check policy and supports a known test runner rather
-than introducing configurable check workflows or dependency-based test
-selection. All gates include a complete Ramify check and the target project's
-hardcoded type-check command. Behavioral test selection is mechanical:
+Ordinary and capability architects issue the same assignment body and use
+one iteration executor. Capability coordination adds consumer/provider context
+and return routing; it does not add another engineer lifecycle. Before every
+engineer invocation, the common preparation refreshes and briefs each selected
+owner's ordinary and testing foreign API views, separately, with actual paths,
+coverage and unavailable reasons. Included child subtrees are included in this
+preparation. Architect-view metadata cannot certify these views.
 
-| Checkpoint | Required behavioral tests |
-| --- | --- |
-| Ordinary engineering iteration | All tests owned by modules in its assigned write scope. |
-| Capability assignment | Tests owned by its assigned module scope; the combined task gate also verifies current provider and requesting-consumer behavior. |
-| Breaking-change iteration | All project tests. |
-| Local architect proposes work-item completion | All project tests. |
-| Final run completion | All project tests and the original feature acceptance checks. |
+The common gate commits the candidate before checking it. A commit records a
+candidate, not an accepted iteration. A passing gate closes the ordinary result
+and schedules ordinary reviews; explicit partial work remains partial. Task
+completion uses the common project-check and review-reconciliation machinery,
+then returns to the suspended consumer assignment. It does not complete the
+consumer's broader goal or a provider's independently queued entry.
 
-Since Plan 10 each committing gate also runs the scenario check its
-checkpoint plans in [acceptance scenarios](acceptance-scenarios.md#the-scenario-check),
-and the final run completion's feature acceptance checks are the plan's
-tracked scenarios, run in full mode.
-
-For an ordinary iteration, the scope means the assigned module's own tests
-plus all tests in each included child subtree. An artifact at a common
-ancestor includes that ancestor's own tests, not every descendant's tests
-unless those descendants are also included in the scope. Merely reading a
-provider does not include its tests. Selection does not shrink to changed files
-or expand through an inferred impact graph. Include both module-owned
-`src/tests/` and tests in included modules classified as testing, according to
-the supported runner's discovery rules. Missing required commands or an empty
-selection where tests are required cannot silently pass.
-
-The capability task's combined gate and review cover required provider and
-requesting-consumer behavior across owners. A provisional assignment failure
-remains evidence, not accepted migration. The architect records test revisions
-against original examples and current guarantees. No engineer can remove or
-weaken those guarantees to make a failing gate pass.
+Plan 17 owns partial/full audit selection, locking and evidence reuse. The
+harness captures obligations and authorized scopes; ramify-audit executes checks
+and supplies complete runner results, executed file identities, failures and
+artifacts. A task handback checks real provider and consumer execution evidence
+from that public report. It does not run a supplemental scope probe or infer
+repair ownership from diagnostic paths. Required scenarios belong to the
+bounded delegated goal; unrelated pending consumer scenarios stay pending.
 
 Capture the check commands, selection policy and required evidence obligations
 before the assignment starts. The engineer may add or update tests to implement
@@ -904,9 +893,9 @@ work-item completion requested -> global checking -> completed work item
 
 The harness pauses implementation writes while checking and records the
 invocation, check commands, working directory, source/input identity, exit
-outcomes, timing and output references. Return concise failure diagnostics and
-references to full logs to the engineer. After repairs, rerun the gate's full
-required check set; selective result reuse is deferred. Source changes after a
+outcomes, timing and output references. Return all relevant producer failure diagnostics and
+references to the complete report and logs to the engineer. After repairs, run
+the required checks under the shared audit selection and freshness policy. Source changes after a
 check invalidate its result for completion. Persist passing evidence and the
 accepted result before releasing dependent work; do not mark a session complete
 and then depend on another response from it to finish publication.
@@ -915,9 +904,8 @@ An append-only history of gate attempts is sufficient for the MVP. Each attempt
 records its iteration and invocation, tested input identity, commands and
 outcomes, log references, repair round and resulting transition. A later pass
 supersedes an earlier failure for completion only for the inputs it verified;
-the failure remains available for diagnosis and KPIs. The harness derives the
-current verdict from this history. There are no per-finding identities,
-adjudication decisions, waivers or separate finding-resolution workflow.
+the failure remains available for diagnosis and KPIs. The harness records the producer verdict and its source identity. Immediate
+check repair remains separate from the existing review CheckFindings lifecycle.
 
 Repair uses a bounded, durable attempt counter. A context-budget return follows
 the normal partial-result handoff; a fresh session does not reset the counter.
@@ -930,10 +918,10 @@ Use a few explicit failure categories to select recovery:
 
 | Failure | Next action |
 | --- | --- |
-| Failed assertion, type error or Ramify violation within scope | Return diagnostics to the engineer for bounded repair. |
+| Failed assertion, type error or Ramify violation | Return complete producer diagnostics to the engineer for bounded repair. The engineer decides whether a scope or design decision is needed. |
 | Runner failure, unavailable daemon or other execution infrastructure failure | Harness attempts bounded infrastructure recovery; do not ask the engineer to repair application code without evidence of a code defect. |
 | Invalid or lost agent session | Replace or reconstruct the session from durable records after settling its tools; preserve outstanding work and repair counters. |
-| Engineer session that ends without a result: an idle or absolute bound, a provider error, an adapter fault, a session that stops on its own, or rejected submissions at their bound | After its writer settles, preserve provisional source, record the failure digest and reconstruct a scoped engineer for the same capability assignment. A structured result and current gates are still required; an unconfirmed settlement blocks replacement work. |
+| Engineer session that ends without a result: an idle or absolute bound, a provider error, an adapter fault, a session that stops on its own, or rejected submissions at their bound | After its writer settles, preserve provisional source and record the ordinary partial result with its failure digest. Return it to the issuing architect under ordinary recovery bounds. A persisted result is replayed after restart without dispatching another writer; an unconfirmed settlement blocks replacement work. |
 | Required change outside the assignment or to an established obligation | Return to the local architect for a scoped assignment or recorded obligation revision. |
 
 An invocation's idle bound measures the session's silence, not the harness's
