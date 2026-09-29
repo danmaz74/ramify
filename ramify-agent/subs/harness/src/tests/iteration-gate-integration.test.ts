@@ -89,7 +89,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
 
     const [failed, repaired] = iterationGates as [GateAttempt, GateAttempt];
     expect(failed.verdict).toBe('failed');
-    expect(failed.cause).toBe('in-scope');
+    expect(failed.cause).toBe('check-failed');
     expect(failed.next).toBe('repair');
     expect(failed.repairRound).toBe(0);
     expect(failed.commit).not.toBeNull();

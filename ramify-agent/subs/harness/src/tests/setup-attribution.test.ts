@@ -77,7 +77,7 @@ describe('a setup command that did not pass at a gate', () => {
       ['tests', 'not-verified', 'setup-failed'],
       ['type-check', 'not-verified', 'setup-failed'],
     ]);
-    expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'in-scope', 'repair']);
+    expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'check-failed', 'repair']);
     expect(gate.commands[0]).toMatchObject({ name: 'build', exitCode: 2 });
 
     const briefed = await gateDiagnostics(gate, 'engineer');
@@ -104,7 +104,7 @@ describe('a setup command that did not pass at a gate', () => {
 
   test('at a work-item gate, one that exited non-zero follows the work item\'s own next step, with no probe to tell scope', async () => {
     const gate = await attempt({ stderr: `${buildError}\n`, outcome: { kind: 'completed', exitCode: 2 } }, 'work-item');
-    expect([gate.verdict, gate.cause]).toEqual(['failed', 'in-scope']);
+    expect([gate.verdict, gate.cause]).toEqual(['failed', 'check-failed']);
     const briefed = await gateDiagnostics(gate, 'local-architect');
     expect(briefed.summary[0]).toContain('the setup command "build"');
   });
@@ -179,7 +179,7 @@ describe('the declared setup over a run', () => {
     const attempts = await Promise.all(ids.map(async id =>
       JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const iteration = attempts.filter(gate => gate.checkpoint === 'iteration');
-    expect(iteration.map(gate => [gate.verdict, gate.cause, gate.next])).toEqual([['failed', 'in-scope', 'repair'], ['passed', null, 'accept']]);
+    expect(iteration.map(gate => [gate.verdict, gate.cause, gate.next])).toEqual([['failed', 'check-failed', 'repair'], ['passed', null, 'accept']]);
     // Every committing gate ran the declared setup first; the first found the build broken and ran nothing after it.
     for (const gate of attempts) expect(gate.commands[0]).toMatchObject({ kind: 'setup', name: 'build' });
     expect(iteration[0]!.commands.slice(1).every(command => command.notVerified === 'setup-failed')).toBe(true);
@@ -188,7 +188,7 @@ describe('the declared setup over a run', () => {
     // The engineer's repair was briefed with the command, its exit code and what it printed.
     const engineers = opened.agent!.sessions.filter(session => session.spec.role === 'engineer');
     const repair = engineers.at(-1)!.spec.prompt;
-    expect(repair).toContain(`Attempt \`${iteration[0]!.id}\` (in-scope). What ran, and what it reported:`);
+    expect(repair).toContain(`Attempt \`${iteration[0]!.id}\` (check-failed). What ran, and what it reported:`);
     expect(repair).toContain('- `setup`, the setup command "build" (`node scripts/build.mjs`): failed, exit 2');
     expect(repair).toContain(buildError);
     expect(repair).toContain('- not run, because the setup command "build"');

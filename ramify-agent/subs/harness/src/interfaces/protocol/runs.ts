@@ -716,7 +716,7 @@ export type WorkItemListResponse = z.infer<typeof workItemListResponseSchema>;
 
 export const gateVerdictSchema = z.enum(['passed', 'failed', 'not-verified']);
 export const gateCheckpointSchema = z.enum(['readiness', 'iteration', 'contract', 'breaking-iteration', 'work-item', 'final']);
-export const gateCauseSchema = z.enum(['in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']);
+export const gateCauseSchema = z.enum(['check-failed', 'in-scope', 'infrastructure', 'timeout', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown']);
 export const gateNextSchema = z.enum(['accept', 'repair', 'retry-infrastructure', 'return-to-local-architect', 'exhausted']);
 
 const gateSummary = z.object({

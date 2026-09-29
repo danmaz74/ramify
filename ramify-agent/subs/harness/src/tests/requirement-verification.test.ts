@@ -430,7 +430,7 @@ describe('P2: the contract gate rejects a fake under a production-looking name',
     // Nothing the harness spawned failed: the verdict is the rule's.
     expect(first.commands.every(command => command.outcome === 'passed')).toBe(true);
     // The rule is the engineer's to repair, so the attempt's cause is in-scope.
-    expect(first.cause).toBe('in-scope');
+    expect(first.cause).toBe('check-failed');
     expect(first.commit).not.toBeNull();
     expect(first.audited).toBe(first.commit);
     expect(first.evidence).not.toBeNull();

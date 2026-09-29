@@ -491,7 +491,7 @@ describe('the rule at a run\'s contract gate', () => {
     // Every command passed; the verdict is the rule's, and the repair is the engineer's.
     expect(first!.verdict).toBe('failed');
     expect(first!.commands.every(command => command.outcome === 'passed')).toBe(true);
-    expect(first!.cause).toBe('in-scope');
+    expect(first!.cause).toBe('check-failed');
     expect(first!.next).toBe('repair');
     const parity = first!.rules!.find(rule => rule.rule === 'fake-exposure-parity')!;
     expect(parity.outcome).toBe('failed');

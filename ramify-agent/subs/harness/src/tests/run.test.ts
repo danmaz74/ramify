@@ -200,7 +200,7 @@ describe('an implementation run with no entry capabilities', () => {
     // The unchanged tree needs no new commit, but its current revision was
     // audited and the failing attempt records that identity and evidence.
     const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as { verdict: string; cause: string; commit: string | null; audited: string | null; evidence: unknown };
-    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'in-scope', commit: null, audited: expect.any(String), evidence: expect.any(Object) });
+    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: expect.any(String), evidence: expect.any(Object) });
   }, 120_000);
 
   test('a run stopped mid-invocation ends stopped, and the late submission is rejected', async () => {

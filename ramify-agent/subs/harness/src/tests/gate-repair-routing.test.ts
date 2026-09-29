@@ -72,7 +72,7 @@ describe('a failed type check at an iteration gate', () => {
     const gate = await iterationGate(root, { command: prints(printed, 1, root), output: 'tsc' });
 
     expect(gate.verdict).toBe('failed');
-    expect(gate.cause).toBe('in-scope');
+    expect(gate.cause).toBe('check-failed');
     expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
     expect(gate.commands[1]!.output.path).toBeTruthy();
@@ -83,7 +83,7 @@ describe('a failed type check at an iteration gate', () => {
     const gate = await iterationGate(root, {
       command: prints('error TS5023: Unknown compiler option.\n', 1, root, true), output: 'tsc',
     }, null);
-    expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'in-scope', 'repair']);
+    expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'check-failed', 'repair']);
     expect(gate.attribution).toBeUndefined();
   });
 
@@ -98,6 +98,6 @@ describe('a failed type check at an iteration gate', () => {
     const report = JSON.stringify({ schemaVersion: 'ramify.check/1', outcome: 'findings', findings: [finding] });
     const gate = await iterationGate(root, { command: prints(run4, 1, root), output: 'tsc' }, [scope], report);
     expect(gate.commands.filter(command => command.outcome === 'failed').map(command => command.kind)).toEqual(['type-check', 'ramify-check']);
-    expect([gate.cause, gate.next]).toEqual(['in-scope', 'repair']);
+    expect([gate.cause, gate.next]).toEqual(['check-failed', 'repair']);
   });
 });

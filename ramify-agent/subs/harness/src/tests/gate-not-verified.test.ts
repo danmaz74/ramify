@@ -158,7 +158,7 @@ describe('a gate that cannot run what its checkpoint requires', () => {
     const last = await gate(failing, { repairRound: 1, limits: { repairRounds: 2 } });
 
     expect(first.verdict).toBe('failed');
-    expect(first.cause).toBe('in-scope');
+    expect(first.cause).toBe('check-failed');
     expect(first.next).toBe('repair');
     expect(last.next).toBe('exhausted');
     expect(first.commands[0]?.exitCode).toBe(2);

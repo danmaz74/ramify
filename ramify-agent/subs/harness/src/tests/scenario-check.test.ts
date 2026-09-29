@@ -447,7 +447,7 @@ describe('the verdict', () => {
     expect(command.exitCode).toBe(0);
     expect(command.scenarios?.failures).toHaveLength(1);
     expect(command.scenarios?.failures[0]).toMatch(/^sc-002 failed: the shelf lists 2 books/);
-    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'in-scope', next: 'repair' });
+    expect(attempt).toMatchObject({ verdict: 'failed', cause: 'check-failed', next: 'repair' });
     expect(command.output.tail).toContain('- sc-002 failed');
   });
 

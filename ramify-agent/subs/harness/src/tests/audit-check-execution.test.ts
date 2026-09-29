@@ -659,7 +659,7 @@ describe('the project\'s setup commands in the audited worktree', () => {
         ['type-check', 'not-verified', 'setup-failed', null],
       ]);
       expect(gate.commands[0]!.output.tail).toContain('error TS2304: Cannot find name x.');
-      expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'in-scope', 'repair']);
+      expect([gate.verdict, gate.cause, gate.next]).toEqual(['failed', 'check-failed', 'repair']);
     }
     expect(attempt.evidence).toBeNull();
     expect(attempt.audited).toBeNull();

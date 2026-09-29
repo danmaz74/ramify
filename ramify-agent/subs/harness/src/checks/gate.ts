@@ -57,7 +57,7 @@ export interface GateRequest {
   /**
    * Rules the caller verified over the tree, such as the fake-naming rule of
    * a contract gate. A failed rule fails the attempt and is the engineer's to
-   * repair, so the attempt's cause is `in-scope`.
+   * repair, so the attempt's cause is `check-failed`.
    */
   readonly rules?: readonly GateRuleRecord[] | undefined;
   /** The run's bounds, where the caller has them; without them no attempt is exhausted. */
@@ -324,7 +324,7 @@ function causeOf(
   // The engineer diagnoses every failed check and requests another owner when
   // repair exceeds its authority. A diagnostic path or test location is evidence,
   // not a decision about who receives the failed iteration.
-  return commands.some(command => command.outcome === 'failed') || ruleFailed ? 'in-scope' : 'unknown';
+  return commands.some(command => command.outcome === 'failed') || ruleFailed ? 'check-failed' : 'unknown';
 }
 
 function nextOf(
@@ -337,7 +337,7 @@ function nextOf(
     const bound = request.limits?.infrastructureRetries;
     return bound !== undefined && (request.infrastructureAttempt ?? 0) + 1 >= bound ? 'exhausted' : 'retry-infrastructure';
   }
-  if (cause === 'in-scope') {
+  if (cause === 'check-failed' || cause === 'in-scope') {
     const bound = request.limits?.repairRounds;
     return bound !== undefined && (request.repairRound ?? 0) + 1 >= bound ? 'exhausted' : 'repair';
   }

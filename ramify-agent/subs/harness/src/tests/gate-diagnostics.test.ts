@@ -147,7 +147,7 @@ describe('a Ramify check that failed at a gate', () => {
 
     expect(gate.verdict).toBe('failed');
     // Every finding lies inside the write scope, so the failure is in scope.
-    expect(gate.cause).toBe('in-scope');
+    expect(gate.cause).toBe('check-failed');
     expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
 
@@ -167,7 +167,7 @@ describe('a Ramify check that failed at a gate', () => {
       { kind: 'ramify-check', command: prints(checkReport([notVisible('subs/other/src/mcp.ts', 4)]), 1, directory), attribution: 'project' },
     ], [scope]);
 
-    expect(gate.cause).toBe('in-scope');
+    expect(gate.cause).toBe('check-failed');
     expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
   }, 60_000);
@@ -182,7 +182,7 @@ describe('a Ramify check that failed at a gate', () => {
       { kind: 'ramify-check', command: prints(checkReport([]), 0, directory), attribution: 'project' },
     ], [scope]);
 
-    expect(gate.cause).toBe('in-scope');
+    expect(gate.cause).toBe('check-failed');
     expect(gate.attribution).toBeUndefined();
     expect(gate.next).toBe('repair');
 
@@ -274,7 +274,7 @@ describe('a module violation at the iteration gate, over a run', () => {
     const attempts = await Promise.all(ids.map(async id =>
       JSON.parse(await readFile(runPath(root, 'review-notes', runId, runLayout.gate(id)), 'utf8')) as GateAttempt));
     const failed = attempts.find(gate => gate.subject.iteration === 'wi-001.i01')!;
-    expect([failed.cause, failed.next]).toEqual(['in-scope', 'repair']);
+    expect([failed.cause, failed.next]).toEqual(['check-failed', 'repair']);
     expect(failed.attribution).toBeUndefined();
 
     const result = JSON.parse(await readFile(

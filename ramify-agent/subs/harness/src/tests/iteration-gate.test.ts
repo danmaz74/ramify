@@ -166,7 +166,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     const exhausted = iterationGates.filter(gate => gate.subject.iteration === 'wi-001.i01');
     expect(exhausted.map(gate => gate.repairRound)).toEqual([0, 1, 2]);
     expect(exhausted.map(gate => gate.next)).toEqual(['repair', 'repair', 'exhausted']);
-    expect(exhausted.every(gate => gate.cause === 'in-scope')).toBe(true);
+    expect(exhausted.every(gate => gate.cause === 'check-failed')).toBe(true);
     // Each failing attempt was audited over the revision it stood on, which
     // is the run's own boundary: none of them committed one of its own.
     expect(exhausted.map(gate => gate.commit)).toEqual([null, null, null]);
@@ -178,7 +178,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(result.commit).toBeNull();
     expect(result.invocations).toHaveLength(3);
     // The cause the architect receives is the first attempt's, not the last.
-    expect(result.findings.some(finding => finding.includes(`in-scope at gate ${exhausted[0]!.id}`))).toBe(true);
+    expect(result.findings.some(finding => finding.includes(`check-failed at gate ${exhausted[0]!.id}`))).toBe(true);
     // The repair iteration the architect then assigned is the one accepted,
     // and it is the only one whose commit boundary answered a revision.
     const repaired = await readResult(root, runId, 'wi-001', 2);

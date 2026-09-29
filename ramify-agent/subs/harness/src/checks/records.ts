@@ -160,13 +160,12 @@ export interface GateAttribution {
 }
 
 /**
- * What a verdict is attributed to. It derives from the runner error, the
- * timeout, the exit codes, a Ramify report's own locations and those of a
- * type check's errors in a format the project declared; never from any
- * other output text.
+ * Why a gate did not pass. `check-failed` records a command or rule failure
+ * without assigning its location or repair owner. `in-scope` and
+ * `outside-assignment` remain readable for historical attempts.
  */
 export type GateCause =
-  | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
+  | 'check-failed' | 'in-scope' | 'infrastructure' | 'timeout' | 'invalid-session'
   | 'outside-assignment' | 'guarded-change' | 'unknown';
 
 /** What the harness does with the attempt. */
