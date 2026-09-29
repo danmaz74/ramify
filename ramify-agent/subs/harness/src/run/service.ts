@@ -7402,7 +7402,7 @@ export class RunService {
       if (resolution === null) return null;
       progress = `Boundary decision returned to capability task ${task.id}: ${JSON.stringify(resolution)}`;
     } else if (chosen.kind === 'request-handback') {
-      const result = await this.verifyCapabilityHandback(run, agent, packages, item, task, request, plan, chosen, action);
+      const result = await this.verifyCapabilityHandback(run, agent, packages, item, task, request, plan, chosen, action, replayed);
       if (result === null) return null;
       if (result.handedBack) return { kind: 'satisfied', guidance: result.guidance };
       progress = `Handback refused for ${task.id}: ${result.guidance}`;
@@ -7526,6 +7526,7 @@ export class RunService {
     request: CapabilityRequest, plan: CapabilityPlan,
     action: Extract<CapabilityAction, { kind: 'request-handback' }>,
     completion: InvocationResult<CapabilityAction>,
+    replayed: boolean,
   ): Promise<{ readonly handedBack: boolean; readonly guidance: string;
     readonly coordinator?: { readonly point: string | undefined; readonly session: SessionId | undefined; readonly invocation: string } } | null> {
     const invocation = completion.id;
@@ -7596,7 +7597,7 @@ export class RunService {
       return null;
     }
     const gate = await this.workItemGate(run, item, invocation, failedTaskGates.length,
-      `Capability ${task.id}: ${action.summary}`, latestAccepted, task.id);
+      `Capability ${task.id}: ${action.summary}`, latestAccepted, task.id, replayed);
     if (gate === null) return null;
     if (gate.verdict !== 'passed' || gate.audited === null) {
       if (failedTaskGates.length + 1 > gateLimit) {
@@ -10037,22 +10038,25 @@ export class RunService {
     summary: string,
     lastAssignment: IterationAssignment | undefined,
     taskOwner?: string,
+    replayed = false,
   ): Promise<GateAttempt | null> {
     run.writer.requireSettled(`The ${item.id} gate cannot run`);
     // A crash after the attempt was recorded may replay the exact completion
     // action. Reuse only that action's durable gate; another proposal can
     // change scenario obligations even when the source tree is unchanged.
-    const owner = taskOwner ?? item.id;
-    const candidate = (await this.git.previewCandidateTree(this.projectRoot)).tree;
-    for (const event of [...run.log.all('gate-attempted')].reverse()) {
-      const recorded = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate)));
-      if (!recorded.success || recorded.data.checkpoint !== 'work-item' ||
-        recorded.data.subject?.workItem !== owner || recorded.data.proposedBy !== invocation ||
-        recorded.data.verdict !== 'passed' ||
-        recorded.data.audited === null) continue;
-      if (await this.candidates.commitTree(this.projectRoot, recorded.data.audited) !== candidate) continue;
-      if (!await this.recordScenarioPasses(run, recorded.data)) return null;
-      return recorded.data;
+    if (replayed) {
+      let candidate: string | undefined;
+      const owner = taskOwner ?? item.id;
+      for (const event of [...run.log.all('gate-attempted')].reverse()) {
+        const recorded = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(event.data.gate)));
+        if (!recorded.success || recorded.data.checkpoint !== 'work-item' ||
+          recorded.data.subject?.workItem !== owner || recorded.data.proposedBy !== invocation ||
+          recorded.data.verdict !== 'passed' || recorded.data.audited === null) continue;
+        candidate ??= (await this.git.previewCandidateTree(this.projectRoot)).tree;
+        if (await this.candidates.commitTree(this.projectRoot, recorded.data.audited) !== candidate) continue;
+        if (!await this.recordScenarioPasses(run, recorded.data)) return null;
+        return recorded.data;
+      }
     }
     const gateId = gateAttemptId(this.gateCount(run) + 1);
     const taskScenarios = taskOwner === undefined ? undefined : await this.scenarioInputs(run);
