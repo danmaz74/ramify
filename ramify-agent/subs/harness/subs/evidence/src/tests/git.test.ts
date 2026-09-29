@@ -28,7 +28,7 @@ describe('the real Git adapter', { timeout: 30_000 }, () => {
       await repository.write('src/change.ts', 'original\n');
       await repository.write('src/delete.ts', 'delete me\n');
       await repository.git('add', '.');
-      await repository.git('commit', '-m', 'inspection baseline');
+      await repository.git('-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '-m', 'inspection baseline');
       await repository.write('src/change.ts', 'staged\n');
       await repository.git('add', 'src/change.ts');
       await repository.write('src/change.ts', 'unstaged\n');
