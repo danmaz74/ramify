@@ -204,6 +204,9 @@ export function engineerEquipment(inputs: EngineerEquipmentInputs): EngineerEqui
       maxTimeoutMs,
       workingDirectory,
       judge: input => shellJudge!.judge(input, session.callId(shellToolName)),
+      refused: async explanation => {
+        await session.observations.record({ type: 'activity', data: { activity: { kind: 'tool-error', callId: session.callId(shellToolName), tool: shellToolName, error: explanation } } });
+      },
       outputFile: call => inputs.outputPath('shell', session.invocation, call),
       // The call itself is already an `activity` observation holding
       // the command text, recorded from the port's own event before

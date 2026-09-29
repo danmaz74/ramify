@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runCommand } from '../../subs/evidence/src/run-command.js';
+import { testLockedRunner, type TestLockOverride } from '../../subs/audit/src/test-lock.js';
 import type { CommandRun } from '../../subs/evidence/src/run-command.js';
 import { checkCommandEnvironment } from './records.js';
 import type { CheckCommand, CheckCommandKind, Checkpoint, GateCommandRecord, GateEvidence, GateRuleRecord, ScenarioCheckSummary, TestSelectionPolicy } from './records.js';
@@ -112,7 +113,8 @@ export interface CheckExecutionResult {
  * not passed, no later command runs, and each is recorded as not run
  * because of it.
  */
-export const inPlaceCheckExecution: CheckExecutionPort = {
+export function createInPlaceCheckExecution(testLock?: TestLockOverride): CheckExecutionPort {
+  return {
   async run(checks, request) {
     const commands: GateCommandRecord[] = [];
     const startedAt = new Date().toISOString();
@@ -126,7 +128,16 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
         continue;
       }
 
-      await request.started?.(commandStart(checks, index));
+      const suite = check.kind === 'tests' || check.kind === 'scenarios';
+      const owner = { repositoryPath: request.context.projectRoot, runId: request.context.runId, checkId: `${check.kind}-${index + 1}`, command: check.command.argv.join(' ') };
+      let announced = false;
+      const start = async () => {
+        if (announced) return;
+        announced = true;
+        await request.started?.(commandStart(checks, index));
+      };
+      const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, {}, testLock) : runCommand;
+      if (!suite) await start();
       if (check.scenarios !== undefined) {
         const outcome = await runScenarioCheck({
           command: check.command,
@@ -135,6 +146,7 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
           attemptDirectory: request.directory,
           outputFile,
           signal: request.signal,
+          runner: suite ? runner : undefined,
         });
         const record = request.classify(check, outcome.run, outputFile, outcome.summary);
         commands.push(record);
@@ -142,7 +154,7 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
         continue;
       }
 
-      const run = await runCommand({
+      const run = await runner({
         argv: check.command.argv,
         cwd: check.command.cwd,
         env: checkCommandEnvironment(check.command),
@@ -157,7 +169,10 @@ export const inPlaceCheckExecution: CheckExecutionPort = {
     }
     return { commands, audited: null, evidence: null };
   },
-};
+  };
+}
+
+export const inPlaceCheckExecution: CheckExecutionPort = createInPlaceCheckExecution();
 
 /** The stable log name of one planned check. */
 export function checkOutputPath(directory: string, index: number, check: PlannedCheck): string {

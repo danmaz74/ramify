@@ -76,6 +76,10 @@ export interface CommandRun {
   /** ISO 8601, taken when the command was spawned. */
   readonly startedAt: string;
   readonly elapsedMs: number;
+  /** Time spent waiting for the shared suite lock, when this command waited. */
+  readonly lockWaitMs?: number;
+  /** Actual child environment names, when a wrapper added variables at spawn time. */
+  readonly receivedEnvironment?: readonly string[];
   readonly output: CommandOutput;
   /** What the command wrote to standard output, up to the output cap. */
   readonly stdout: string;
@@ -143,6 +147,7 @@ const allowedNames = new Set([
   'GIT_CONFIG_GLOBAL',
   'GIT_CONFIG_SYSTEM',
   'GIT_CONFIG_NOSYSTEM',
+  'RAMIFY_AUDIT_TEST_LOCK_HELD',
 ]);
 
 /** Variable name prefixes a child inherits whole. */

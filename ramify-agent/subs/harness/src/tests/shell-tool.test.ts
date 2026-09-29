@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -69,6 +69,28 @@ async function shellIn(directory: string, options: { readonly bound?: number } =
 }
 
 describe('the shell tool', () => {
+  test('refuses a whole suite before counting or spawning any chained command', async () => {
+    const directory = await workspace();
+    await writeFile(join(directory, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
+    let spawned = false;
+    const refusals: string[] = [];
+    const tool = createShellTool({
+      workingDirectory: directory,
+      judge: async () => ({ ok: true }),
+      outputFile: call => join(directory, `${call}.log`),
+      starting: async () => {}, ended: async () => {},
+      refused: async text => { refusals.push(text); },
+      commandExecution: async () => { spawned = true; throw new Error('must not spawn'); },
+    });
+    const result = await tool.definition.execute({ command: 'touch before && npm test' }, new AbortController().signal);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain('Refused, nothing ran: `npm test`');
+    expect(result.text).toContain('run_scope_tests');
+    expect(refusals).toHaveLength(1);
+    expect(tool.calls).toBe(0);
+    expect(spawned).toBe(false);
+    await expect(stat(join(directory, 'before'))).rejects.toThrow();
+  });
   test('runs the command it is given and answers its exit code, its tail and its output file', async () => {
     const directory = await workspace();
     const { tool, recorded } = await shellIn(directory);

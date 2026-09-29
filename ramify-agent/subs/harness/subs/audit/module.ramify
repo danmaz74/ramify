@@ -5,3 +5,4 @@ module audit
 // parent receives only its own check-execution implementation and the durable
 // workspace-ownership callback contract. No ramify-audit type crosses.
 expose-src createAuditCheckExecution, AuditCheckExecutionOptions, AuditWorkspaceOwnershipRecorder, IntendedAuditWorkspace from "check-execution.ts" to parent
+expose-src testLockedRunner, TestLockOwner, TestLockHooks, TestLockOverride from "test-lock.ts" to parent

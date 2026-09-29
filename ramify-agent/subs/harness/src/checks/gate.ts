@@ -260,7 +260,7 @@ function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scen
   const base = {
     kind: check.kind,
     ...(check.name === undefined ? {} : { name: check.name }),
-    command: check.command,
+    command: run.receivedEnvironment === undefined ? check.command : { ...check.command, env: [...run.receivedEnvironment] },
     ...(check.selection === undefined ? {} : { selection: check.selection }),
     startedAt: run.startedAt,
     elapsedMs: run.elapsedMs,

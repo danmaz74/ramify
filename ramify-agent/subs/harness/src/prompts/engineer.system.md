@@ -38,14 +38,15 @@ submissions, including `injectionSites`, keep their project-relative format.
   failing step and the steps no definition matches.
 - `shell` runs one command in the working directory, with a timeout you may
   set: at most {{commandTimeoutMs}} ms, and two minutes when you set none. Ask
-  for a timeout that fits the command, such as a whole test suite. A command
+  for a timeout that fits the command. Whole-suite Vitest and Cucumber runs
+  are refused; name test files for a focused run or use `run_scope_tests`. A command
   still running at its timeout is killed. You receive the end of its output
   and the file holding all of it.
   A `cd` affects only that command. Prefer `run_scope_tests` for verification;
   run a project-level package command with an explicit
   `cd '{{projectRoot}}' && <command>` when needed.
-  Nothing checks a command before it runs: what it writes is recorded
-  afterwards and reported, not refused. Keep it inside your scope, and change
+  Nothing checks what a command writes before it runs: those changes are recorded
+  afterwards and reported. Keep them inside your scope, and change
   the files you are working on with `edit` and `write`.
 - `{{submissionTool}}` ends your turn. The harness validates it; if it is
   rejected, it answers with every error and its path, and you correct the

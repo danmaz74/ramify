@@ -2,6 +2,9 @@ import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
 import type { JsonSchema, ToolDefinition, ToolResult } from '../../subs/agent/src/interfaces/port.js';
 import { childEnvironment, runCommand, type CommandOutcome } from '../../subs/evidence/src/run-command.js';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { classifyShellTestRun, shellTestDirectories } from './shell-tests.js';
 
 /*
  * The engineer's shell.
@@ -10,7 +13,9 @@ import { childEnvironment, runCommand, type CommandOutcome } from '../../subs/ev
  * the implementation's own is withheld: what it receives is this harness
  * tool, run through the lifted executor. The command gets its own process
  * group, a built environment, a bounded timeout and an 8 KiB tail; the
- * complete output is a file beside the invocation's observations.
+ * complete output is a file beside the invocation's observations. Direct
+ * whole-suite Vitest and Cucumber runs are refused before any chained
+ * command starts; focused runs use this ordinary command boundary.
  *
  * Its environment is `childEnvironment`'s allowlist, the same one every other
  * child of the harness gets, and this is a decision and not an omission: the
@@ -95,6 +100,8 @@ export interface ShellOptions {
   readonly starting: (call: ShellCall) => Promise<void>;
   /** Records how the call ended. */
   readonly ended: (call: ShellCall, result: ShellResult) => Promise<void>;
+  /** Records a refused whole-suite command as an observation. */
+  readonly refused?: ((explanation: string) => Promise<void>) | undefined;
   /** The longest one command may run; the shell's own maximum when absent. */
   readonly maxTimeoutMs?: number | undefined;
 }
@@ -136,6 +143,7 @@ export function createShellTool(options: ShellOptions): ShellTool {
       'built environment. The complete output is kept in a file; you receive the last 8 KiB of it.',
       'What this writes passes no write guard: it is observed afterwards, and a change outside your scope is',
       'reported rather than prevented. Stay inside your scope here as you do with `edit` and `write`.',
+      'Whole-suite Vitest and Cucumber runs are refused. Name test files or use `run_scope_tests`.',
       `A command runs for ${defaultTimeoutMs} ms unless \`timeoutMs\` asks for more, up to ${maxTimeoutMs} ms.`,
     ].join(' '),
     inputSchema: z.toJSONSchema(inputSchema) as JsonSchema,
@@ -149,6 +157,27 @@ export function createShellTool(options: ShellOptions): ShellTool {
       const judged = await options.judge(input);
       if (!judged.ok) return { isError: true, text: judged.text };
       const request = inputSchema.parse(input);
+      const testScripts: Record<string, string | null> = {};
+      for (const directory of shellTestDirectories(request.command, options.workingDirectory)) {
+        let candidate = directory;
+        testScripts[directory] = null;
+        while (true) {
+          try {
+            const manifest = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8')) as { scripts?: { test?: unknown } };
+            testScripts[directory] = typeof manifest.scripts?.test === 'string' ? manifest.scripts.test : null;
+            break;
+          } catch { /* npm searches parent directories for the package too. */ }
+          const parent = dirname(candidate);
+          if (parent === candidate) break;
+          candidate = parent;
+        }
+      }
+      const testRun = classifyShellTestRun(request.command, { workingDirectory: options.workingDirectory, testScripts });
+      if (testRun.kind === 'whole-suite') {
+        const explanation = `Refused, nothing ran: \`${testRun.segment}\` runs the project's whole test suite (${testRun.reason}). The whole suite is not run from \`shell\`: it runs through ramify-audit at the gates, a full run takes minutes and waits behind every other suite run on this machine, and it verifies far more than this iteration is judged on. Call \`run_scope_tests\` to run the tests this iteration is judged on. To run particular tests, name their files: \`npx vitest run <path/to/file.test.ts> …\` or \`npm test -- <path/to/file.test.ts>\`. Watch mode is refused for the same reason: it never ends on its own.`;
+        await options.refused?.(explanation);
+        return { isError: true, text: explanation };
+      }
 
       calls += 1;
       const call: ShellCall = {

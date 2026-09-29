@@ -98,6 +98,7 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
   const started = Date.now();
   const log: string[] = [];
   const outcomes: CommandOutcome[] = [];
+  const receivedEnvironment = new Set<string>();
   const failures: string[] = [];
 
   await mkdir(posix.join(attemptDirectory, 'scenarios'), { recursive: true });
@@ -106,6 +107,7 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
     const run = await runner({ argv: argv.map(rebase), cwd: projectRoot, env, timeoutMs, signal });
     log.push(`$ ${argv.join(' ')}\n${restore(`${run.stdout}${run.stderr}`)}`);
     outcomes.push(run.outcome);
+    for (const name of run.receivedEnvironment ?? []) receivedEnvironment.add(name);
     return run;
   };
 
@@ -206,6 +208,7 @@ export async function runScenarioCheck(execution: ScenarioCheckExecution): Promi
       outcome: combinedOutcome(outcomes),
       startedAt,
       elapsedMs: Date.now() - started,
+      ...(receivedEnvironment.size === 0 ? {} : { receivedEnvironment: [...receivedEnvironment].sort() }),
       output: {
         path: execution.outputFile,
         bytes: bytes.byteLength,

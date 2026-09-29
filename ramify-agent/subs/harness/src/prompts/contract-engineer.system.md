@@ -38,8 +38,10 @@ in your tool calls resolve against it.
   it stands on every call, so a test you have just written runs.
 - `shell` runs one command in the working directory, with a timeout you may
   set: at most {{commandTimeoutMs}} ms, and two minutes when you set none.
-  Nothing checks a command before it runs: what it writes is recorded
-  afterwards and reported, not refused.
+  Whole-suite Vitest and Cucumber runs are refused; name test files for a
+  focused run or use `run_scope_tests`.
+  Nothing checks what a command writes before it runs: those changes are
+  recorded afterwards and reported.
 - `{{submissionTool}}` ends your turn. The harness validates it; if it is
   rejected, it answers with every error and its path, and you correct the
   submission and call the tool again.

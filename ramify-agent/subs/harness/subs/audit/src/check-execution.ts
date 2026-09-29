@@ -27,6 +27,7 @@ import type { CheckExecutionPort, CheckExecutionRequest } from '../../../src/che
 import { checkCommandEnvironment } from '../../../src/checks/records.js';
 import type { GateCommandRecord } from '../../../src/checks/records.js';
 import { runScenarioCheck } from '../../../src/checks/scenario-check.js';
+import { testLockedRunner, type TestLockOverride } from './test-lock.js';
 import type { PlannedCheck } from '../../../src/checks/verify.js';
 
 const executorId = 'ramify-agent.gate-check';
@@ -72,6 +73,8 @@ export interface AuditWorkspaceOwnershipRecorder {
 
 export interface AuditCheckExecutionOptions {
   readonly workspaceOwnership: AuditWorkspaceOwnershipRecorder;
+  /** Tests substitute a private lock so they never take the machine lock. */
+  readonly testLock?: TestLockOverride;
 }
 
 /**
@@ -131,7 +134,12 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
             };
           }
           const [index, check] = planned;
-          await request.started?.(commandStart(checks, index));
+          const suite = check.kind === 'tests' || check.kind === 'scenarios';
+          const owner = { repositoryPath: mapping.repositoryRoot, runId, checkId: registered.checkId, command: check.command.argv.join(' ') };
+          let announced = false;
+          const start = async () => { if (announced) return; announced = true; await request.started?.(commandStart(checks, index)); };
+          const runner = suite ? testLockedRunner(async input => { await start(); return runCommand(input); }, owner, {}, options.testLock) : runCommand;
+          if (!suite) await start();
           const outputFile = checkOutputPath(request.directory, index, check);
           const auditedProjectRoot = registered.workingDirectory;
           const worktreeRoot = mapping.projectPrefix === '' ? auditedProjectRoot
@@ -149,6 +157,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
               rebase: argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot),
               restore: text => mapping.restoreText(text, worktreeRoot),
               signal,
+              runner: suite ? runner : undefined,
             });
             const record = request.classify(check, outcome.run, outputFile, outcome.summary);
             records.set(registered.checkId, record);
@@ -165,7 +174,7 @@ export function createAuditCheckExecution(options: AuditCheckExecutionOptions): 
               ? check.command.argv.map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot))
               : [testRun.command, ...testRun.args].map(argument => mapping.rebaseProjectArgument(argument, auditedProjectRoot)),
           };
-          const run = await runCommand({
+          const run = await runner({
             argv: command.argv,
             cwd: command.cwd,
             env: { ...checkCommandEnvironment(check.command), ...testRun?.environment },

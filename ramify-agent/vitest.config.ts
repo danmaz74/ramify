@@ -17,6 +17,7 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
+          setupFiles: ['src/tests/vitest-test-lock.ts'],
           include: ['src/tests/**/*.test.ts', 'subs/**/src/**/*.test.ts'],
           exclude: ['subs/web/**'],
         },
@@ -27,6 +28,7 @@ export default defineConfig({
         test: {
           name: 'web',
           environment: 'jsdom',
+          setupFiles: ['src/tests/vitest-test-lock.ts'],
           include: ['subs/web/src/**/*.test.{ts,tsx}'],
           // React Flow's store imports React too: zustand is inlined with it,
           // and the CommonJS selector shim zustand imports is prebundled, since
