@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCapabilityPlanRevision, validateCapabilityAction, validateCapabilityPlanUpdate, type CapabilityActionBasis } from '../capability/submission.js';
 import { fixturePlan } from './helpers/capability.js';
+import { capabilityPlanSchema } from '../capability/records.js';
 
 const basis: CapabilityActionBasis = {
   task: 'cap-001', planRevision: 2, coordinatorInvocation: 'inv-0003', state: 'coordinating',
@@ -17,8 +18,7 @@ describe('capability submission', () => {
     expect(result.valid).toBe(false);
     if (!result.valid) {
       expect(result.issues.every(issue => issue.kind === 'structure')).toBe(true);
-      expect(result.issues.map(issue => issue.path.join('.'))).toContain('owner');
-      expect(result.issues.map(issue => issue.path.join('.'))).toContain('purpose');
+      expect(result.issues.map(issue => issue.path.join('.'))).toContain('assignment');
     }
     expect(basis).toEqual(before);
   });
@@ -47,7 +47,7 @@ describe('capability submission', () => {
     const correction = { task: previous.task, basedOn: 1, invocation: 'inv-0002', reason: 'Independent test corrected the oracle',
       changes: { useCases: [{ ...previous.useCases[0]!, expectedBehavior: 'Corrected value', coverage: {
         state: 'corrected' as const, reason: 'Wrong unit', evidence: ['review-1'], decidedBy: 'inv-0002',
-        tests: ['a-format'], candidate: 'tree-2', configuration: 'vitest-1',
+        tests: ['a-format'],
       } }] },
     };
     const next = buildCapabilityPlanRevision(previous, correction);
@@ -55,5 +55,16 @@ describe('capability submission', () => {
     expect(next.useCases[0]?.id).toBe(previous.useCases[0]?.id);
     expect(previous.useCases[0]?.coverage.state).toBe('unresolved');
     expect(() => buildCapabilityPlanRevision(previous, { ...correction, changes: { useCases: [] } })).toThrow();
+  });
+
+  it('SI13 asks agents for test associations without source hashes while retaining historical coverage records', () => {
+    const previous = fixturePlan();
+    const useCase = { ...previous.useCases[0]!, coverage: { state: 'exercised' as const, tests: ['subs/a/src/tests/use.test.ts'] } };
+    const update = { task: basis.task, basedOn: basis.planRevision, invocation: basis.coordinatorInvocation,
+      reason: 'Real consumer case executed', changes: { useCases: [useCase] } };
+    expect(validateCapabilityPlanUpdate(update, basis).valid).toBe(true);
+    const historical = { ...useCase, coverage: { ...useCase.coverage, candidate: 'old-tree', configuration: 'old-config' } };
+    expect(validateCapabilityPlanUpdate({ ...update, changes: { useCases: [historical] } }, basis).valid).toBe(false);
+    expect(capabilityPlanSchema.parse({ ...previous, useCases: [historical] }).useCases[0]!.coverage).toEqual(historical.coverage);
   });
 });
