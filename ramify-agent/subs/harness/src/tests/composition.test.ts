@@ -529,7 +529,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-attempt/3.rules[].outcome', values: ['failed'], file: 'subs/harness/src/tests/requirement-verification.test.ts', test: 'a file without .fake, an export without Fake and a re-export that drops it each fail the gate' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].outcome', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.gate-attempt/3.verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['check-failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.gate-attempt/3.next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['timeout'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a test command that never answers is not-verified with cause timeout, and one infrastructure retry follows' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['runner-error'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'records a runner error with the structured error the spawn gave it' },
@@ -558,7 +558,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.iteration-result/1.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'query work-item.iterations[].result.outcome', values: ['exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'query work-item.iterations[].gates[].verdict', values: ['failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
-  { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
+  { union: 'query work-item.iterations[].gates[].cause', values: ['check-failed'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'query work-item.iterations[].gates[].next', values: ['repair', 'exhausted'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a gate that fails three times exhausts and returns the original cause to the local architect' },
   { union: 'record ramify-agent.placement-decision/1.outcome', values: ['create'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the first creates a capability and revises its hypothesis; the second inherits its brief and reuses the entry' },
   { union: 'record ramify-agent.placement-decision/1.outcome', values: ['extract'], file: 'subs/harness/src/tests/placement.test.ts', test: 'it names what it affects, and the consequence reaches that work item before its own turn' },
@@ -670,7 +670,8 @@ const projections: ReadonlyArray<readonly [query: string, record: string]> = [
  * a producer, so the list can neither hide a new gap nor outlive a closed one.
  */
 const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: readonly string[]; readonly reason: string }> = [
-  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
+  { union: 'query work-item.iterations[].gates[].cause', values: ['in-scope'], reason: 'Historical iterations may project the former in-scope cause; new ordinary gates record the neutral check-failed cause without owner attribution.' },
+  { union: 'record ramify-agent.gate-attempt/3.cause', values: ['in-scope', 'outside-assignment'], reason: 'Historical gates retain this inferred attribution, but current gates no longer assign failure ownership from locations or scope probes.' },
   { union: 'run log.type', values: ['capability-candidate-accepted', 'capability-review-recorded', 'capability-assignment-interrupted'],
     reason: 'Historical capability-only transitions remain readable; current policy records ordinary iteration gates, review requests and invocation endings instead.' },
   { union: 'record ramify-agent.gate-attempt/3.attribution.basis', values: ['ramify-findings', 'type-check-errors', 'ramify-findings-and-type-check-errors'],
@@ -789,7 +790,7 @@ const withoutProducer: ReadonlyArray<{ readonly union: string; readonly values: 
     reason: 'A run started on pi. No pi session ran in this environment: there is no pi login, so the real trial (T2) was not run and nothing produced it. It is produced only by a real `serve --agent pi` run.',
   },
   {
-    union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['in-scope', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown', 'session-lost'],
+    union: 'record ramify-agent.infrastructure-recovery/1.cause', values: ['check-failed', 'in-scope', 'invalid-session', 'outside-assignment', 'guarded-change', 'unknown', 'session-lost'],
     reason: 'An InfrastructureRecovery is written only by readiness, whose recoveries have three causes. The gate\'s own infrastructure retry reruns the gate and writes no recovery record, and a reconstructed session is recorded on the invocation, so these causes, shared with GateAttempt.cause and the session vocabulary, have no writer.',
   },
   {

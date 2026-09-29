@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { checkCommand } from '../checks/records.js';
 import type { GateAttempt } from '../checks/records.js';
 import { iterationLayout, type IterationAssignment, type IterationResult } from '../work/iterations.js';
 import { runLayout } from '../run/records.js';
@@ -14,7 +15,7 @@ import {
   shell, submit, treeInputs, write, type Turn,
 } from './helpers/iterations.js';
 import {
-  onlyRun, openRuns, runEventsOnDisk, runPath, startRun,
+  onlyRun, openRuns, runEventsOnDisk, runPath, startRun, testPolicy,
 } from './helpers/runs.js';
 import { createLocalCommandCheckExecution } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
@@ -391,6 +392,11 @@ async function run(
     git: scripted.git,
     ...(final === undefined ? {} : { candidates: final.candidates }),
     readinessExecution: directReadinessExecution(),
+    policy: projectRoot => { const policy = testPolicy(projectRoot); return { ...policy, commands: { ...policy.commands,
+      allTests: checkCommand({ argv: [join(projectRoot, 'node_modules/.bin/vitest'), 'run',
+        `${dirA}/src/tests/adapters.test.ts`, `${dirC}/src/tests/outcome.test.ts`,
+        `${dirP}/src/tests/result.test.ts`, `${dirV}/src/tests/panel.test.ts`], cwd: projectRoot, timeoutMs: 30_000 }),
+    } }; },
     ...options,
   });
   cleanups.push(() => opened.service.close());
@@ -529,9 +535,9 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
         unchanged,
       ],
       finalHead: 'revision-03',
-    });
+    }, { checkExecution: createLocalCommandCheckExecution() });
 
-    expect(onlyRun(service, plan).state).toBe('completed');
+    expect(onlyRun(service, plan).state, JSON.stringify({ tail: (await runEventsOnDisk(root, plan, runId)).slice(-8), gates: (await gates(root, runId)).map(gate => ({ id: gate.id, verdict: gate.verdict, commands: gate.commands.map(command => ({ kind: command.kind, outcome: command.outcome, output: command.output.tail.slice(-1000) })) })) })).toBe('completed');
 
     // Three accepted iterations, each one a breaking iteration.
     const assignments = await Promise.all([1, 2, 3].map(number => readAssignment(root, runId, 'wi-001', number)));
@@ -554,8 +560,7 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
 
     // Every accepted boundary: one breaking-iteration gate, passed, with the
     // project's own tests, the type check, the complete Ramify check, the
-    // project's untagged scenarios in quick mode and the probe over this
-    // iteration's own modules, each of them run.
+    // project's untagged scenarios in quick mode. The test command runs once.
     const attempts = await gates(root, runId);
     const breaking = attempts.filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking).toHaveLength(3);
@@ -563,22 +568,14 @@ describe('K7: a breaking feature is isolated into iterations that are green at e
       expect(attempt.verdict).toBe('passed');
       expect(attempt.cause).toBeNull();
       expect(attempt.guardedChanges).toEqual([]);
-      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'scenarios', 'tests']);
+      expect(attempt.commands.map(command => command.kind)).toEqual(['tests', 'type-check', 'ramify-check', 'scenarios']);
       for (const command of attempt.commands) expect(command.outcome).toBe('passed');
-      // The last command is the probe: the files of this iteration's own
-      // modules, resolved from the tree as it then stood and really run.
-      const probe = attempt.commands.at(-1)!;
-      expect(probe.selection).toBeDefined();
-      expect(probe.selection!.resolved.length).toBeGreaterThan(0);
-      expect(probe.exitCode).toBe(0);
-    }
-    // The two broad boundaries really ran all four owners' tests.
-    for (const attempt of breaking.slice(1)) {
-      const resolved = attempt.commands.at(-1)!.selection!.resolved;
-      expect(resolved.some(file => file.includes('attribution/src/tests'))).toBe(true);
-      expect(resolved.some(file => file.includes('core/src/tests'))).toBe(true);
-      expect(resolved.some(file => file.includes('views/src/tests'))).toBe(true);
-      expect(resolved.some(file => file.includes('pure/src/tests'))).toBe(true);
+      const tests = attempt.commands.filter(command => command.kind === 'tests');
+      expect(tests).toHaveLength(1);
+      expect(tests[0]!.exitCode).toBe(0);
+      for (const owner of [dirA, dirC, dirP, dirV]) {
+        expect(tests[0]!.command.argv.some(argument => argument.startsWith(`${owner}/src/tests/`))).toBe(true);
+      }
     }
     // The work item's own gate, all-project, closes it.
     expect(attempts.filter(attempt => attempt.checkpoint === 'work-item').every(attempt => attempt.verdict === 'passed')).toBe(true);
@@ -648,19 +645,19 @@ describe('the breaking-iteration boundary is not green by default', () => {
       }],
     }, { checkExecution: createLocalCommandCheckExecution() });
 
-    expect(onlyRun(service, plan).state).toBe('completed');
+    expect(onlyRun(service, plan).state, JSON.stringify({ tail: (await runEventsOnDisk(root, plan, runId)).slice(-8), gates: (await gates(root, runId)).map(gate => ({ id: gate.id, verdict: gate.verdict, commands: gate.commands.map(command => ({ kind: command.kind, outcome: command.outcome, output: command.output.tail.slice(-1000) })) })) })).toBe('completed');
     const breaking = (await gates(root, runId)).filter(attempt => attempt.checkpoint === 'breaking-iteration');
     expect(breaking.map(attempt => attempt.verdict)).toEqual(['failed', 'passed']);
-    // The failure is the probe's: the consumers' own tests really ran over
+    // The required whole-project test command ran the consumers over
     // the committed unadapted tree and failed with evidence bound to it.
     const refused = breaking[0]!;
-    expect(refused.cause).toBe('in-scope');
+    expect(refused.cause).toBe('check-failed');
     expect(refused.next).toBe('repair');
     expect(refused.commit).not.toBeNull();
     expect(refused.audited).toBe(refused.commit);
     expect(refused.evidence).not.toBeNull();
-    expect(refused.commands.at(-1)!.outcome).toBe('failed');
-    expect(refused.commands.at(-1)!.output.tail).toContain('not ok');
+    expect(refused.commands.find(command => command.kind === 'tests')!.outcome).toBe('failed');
+    expect(refused.commands.find(command => command.kind === 'tests')!.output.tail).toContain('not ok');
     // Only the adapted state is accepted, after one repair round.
     expect(breaking[1]!.repairRound).toBe(1);
     expect(breaking[1]!.commit).toBe('revision-02');
@@ -771,7 +768,7 @@ describe('K6: the gate is not satisfied by weakening what it checks', () => {
       diffs: [{ from: materialized, to: 'revision-02', changes: [{ status: 'M', path: 'vitest.config.ts' }] }],
     });
 
-    expect(onlyRun(service, plan).state).toBe('completed');
+    expect(onlyRun(service, plan).state, JSON.stringify({ tail: (await runEventsOnDisk(root, plan, runId)).slice(-8), gates: (await gates(root, runId)).map(gate => ({ id: gate.id, verdict: gate.verdict, commands: gate.commands.map(command => ({ kind: command.kind, outcome: command.outcome, output: command.output.tail.slice(-1000) })) })) })).toBe('completed');
     const attempts = await gates(root, runId);
     const iterationGates = attempts.filter(attempt => attempt.checkpoint === 'iteration');
     expect(iterationGates).toHaveLength(2);
@@ -926,7 +923,7 @@ describe('a break discovered during work', () => {
       finalHead: 'revision-01',
     });
 
-    expect(onlyRun(service, plan).state).toBe('completed');
+    expect(onlyRun(service, plan).state, JSON.stringify({ tail: (await runEventsOnDisk(root, plan, runId)).slice(-8), gates: (await gates(root, runId)).map(gate => ({ id: gate.id, verdict: gate.verdict, commands: gate.commands.map(command => ({ kind: command.kind, outcome: command.outcome, output: command.output.tail.slice(-1000) })) })) })).toBe('completed');
 
     // The report closed the iteration and nothing else. No gate ran for it,
     // and nothing was committed.

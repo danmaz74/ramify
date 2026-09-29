@@ -239,7 +239,7 @@ describe('K2: a failure outside the last engineer\'s scope', () => {
     // probe or inferred owner. The scripted architect diagnoses the report.
     const returned = workItemGates[0]!;
     expect(returned.verdict).toBe('failed');
-    expect(returned.cause).toBe('in-scope');
+    expect(returned.cause).toBe('check-failed');
     expect(returned.attribution).toBeUndefined();
     expect(returned.next).toBe('repair');
     const testCommands = returned.commands.filter(command => command.kind === 'tests');
