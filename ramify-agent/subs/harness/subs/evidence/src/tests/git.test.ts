@@ -1,7 +1,7 @@
-import { chmod, writeFile } from 'node:fs/promises';
+import { chmod, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GitError, gitCandidateSource as candidate, gitService as git } from '../git.js';
+import { GitError, gitCandidateSource as candidate, gitService as git, inspectGit } from '../git.js';
 import { symlink } from 'node:fs/promises';
 import { testRepository, withoutGitConfiguration } from './helpers/git.js';
 import type { TestRepository } from './helpers/git.js';
@@ -22,6 +22,39 @@ async function withRepository(check: (repository: TestRepository) => Promise<voi
 }
 
 describe('the real Git adapter', { timeout: 30_000 }, () => {
+  it('inspects committed, staged, unstaged, deleted and untracked source without changing files, index or refs', async () => {
+    await withRepository(async repository => {
+      const root = repository.root;
+      await repository.write('src/change.ts', 'original\n');
+      await repository.write('src/delete.ts', 'delete me\n');
+      await repository.git('add', '.');
+      await repository.git('commit', '-m', 'inspection baseline');
+      await repository.write('src/change.ts', 'staged\n');
+      await repository.git('add', 'src/change.ts');
+      await repository.write('src/change.ts', 'unstaged\n');
+      await rm(join(root, 'src/delete.ts'));
+      await repository.write('src/new.ts', 'untracked\n');
+      const before = await readFile(join(root, '.git/index'));
+      const refs = await repository.git('show-ref');
+      const status = await inspectGit(root, { operation: 'status' });
+      expect(status).toContain('MM src/change.ts');
+      expect(status).toContain(' D src/delete.ts');
+      expect(status).toContain('?? src/new.ts');
+      expect(await inspectGit(root, { operation: 'diff' })).toContain('+unstaged');
+      const staged = await inspectGit(root, { operation: 'diff', staged: true });
+      expect(staged).toContain('+staged');
+      expect(staged).not.toContain('+unstaged');
+      expect(await inspectGit(root, { operation: 'log', limit: 1 })).toContain('inspection baseline');
+      expect(await inspectGit(root, { operation: 'show', paths: ['src/change.ts'] })).toContain('+original');
+      await expect(inspectGit(root, { operation: 'show', revision: '--output=changed' })).rejects.toThrow('Invalid Git revision');
+      await expect(inspectGit(root, { operation: 'diff', paths: ['../outside'] })).rejects.toThrow('project-relative');
+      expect(await readFile(join(root, '.git/index'))).toEqual(before);
+      expect(await repository.git('show-ref')).toBe(refs);
+      expect(await readFile(join(root, 'src/change.ts'), 'utf8')).toBe('unstaged\n');
+      expect(await readFile(join(root, 'src/new.ts'), 'utf8')).toBe('untracked\n');
+    });
+  });
+
   it('creates and resumes a run branch, commits with its own policy, and recovers exact commit identities', async () => {
     await withRepository(async repository => {
       const root = repository.root;

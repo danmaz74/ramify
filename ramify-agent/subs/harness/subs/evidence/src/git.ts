@@ -508,6 +508,42 @@ export interface CandidateSource {
 /** The process-backed candidate source. */
 export const gitCandidateSource: CandidateSource = { commitTree, treeEntries, readBlob, grepTree, diffNameStatus, diffPatch };
 
+/** Fixed read-only Git operations for coordinating architects. No caller supplies command flags. */
+export interface GitInspection {
+  readonly operation: 'status' | 'diff' | 'log' | 'show';
+  readonly revision?: string;
+  readonly to?: string;
+  readonly staged?: boolean;
+  readonly paths?: readonly string[];
+  readonly limit?: number;
+}
+
+export async function inspectGit(root: string, request: GitInspection, signal?: AbortSignal): Promise<string> {
+  for (const revision of [request.revision, request.to]) {
+    if (revision !== undefined && !/^[A-Za-z0-9][A-Za-z0-9_./~^@{}-]*$/u.test(revision)) throw new Error('Invalid Git revision');
+  }
+  const paths = request.paths ?? [];
+  if (paths.some(path => path === '' || path.startsWith('/') || path.includes('\\') || path.includes('\0') || path.split('/').includes('..'))) {
+    throw new Error('Git paths must be project-relative without parent traversal');
+  }
+  const limit = request.limit ?? 20;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('Git log limit must be between 1 and 100');
+  let args: string[];
+  switch (request.operation) {
+    case 'status': args = ['status', '--porcelain=v1', '--untracked-files=all']; break;
+    case 'diff':
+      if (request.to !== undefined && request.staged) throw new Error('A staged diff cannot name a destination revision');
+      args = ['diff', '--no-ext-diff', '--no-textconv', '--no-color', ...(request.staged ? ['--cached'] : []), request.revision ?? 'HEAD', ...(request.to === undefined ? [] : [request.to])];
+      break;
+    case 'log': args = ['log', '--no-color', '--format=medium', `-n${limit}`, request.revision ?? 'HEAD']; break;
+    case 'show': args = ['show', '--no-ext-diff', '--no-textconv', '--no-color', '--format=medium', request.revision ?? 'HEAD']; break;
+    default: throw new Error('Unknown Git inspection operation');
+  }
+  // status must not refresh the real index; disable configured helpers as well.
+  const result = await gitOk(root, ['--no-pager', '--no-optional-locks', '--literal-pathspecs', '-c', 'core.fsmonitor=false', ...args, '--', ...paths], signal);
+  return result.stdout;
+}
+
 /**
  * The external Git boundary. Inject scripted answers in consumer tests;
  * never reproduce repository behavior in a test double. Each function keeps

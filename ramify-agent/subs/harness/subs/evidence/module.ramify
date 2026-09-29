@@ -36,4 +36,5 @@ expose-src CandidateSource, gitCandidateSource, TreeEntry, TreeMatch, commitTree
 
 // Consumers inject this boundary; real Git integration tests live with the adapter.
 expose-src GitService, gitService, currentHead, runBranchName from "git.ts" to parent
+expose-src GitInspection, inspectGit from "git.ts" to parent
 expose-src CandidateTreePreview, previewCandidateTree from "candidate-tree.ts" to parent
