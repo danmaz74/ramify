@@ -32,7 +32,13 @@ export function testLockedRunner(
 ): CommandRunner {
   return async request => {
     let waiting = false;
-    const start = Date.now();
+    let waitStartedAt: number | undefined;
+    let waitEndedAt: number | undefined;
+    let acquiredWaitMs: number | undefined;
+    const measuredWait = () => acquiredWaitMs ?? (waitStartedAt === undefined
+      ? undefined : Math.max(0, (waitEndedAt ?? Date.now()) - waitStartedAt));
+    const onAbort = () => { if (waitStartedAt !== undefined && waitEndedAt === undefined) waitEndedAt = Date.now(); };
+    request.signal?.addEventListener('abort', onAbort, { once: true });
     try {
       const result = await withMachineTestLock(
         async environment => {
@@ -45,16 +51,21 @@ export function testLockedRunner(
           ...(request.signal === undefined ? {} : { signal: request.signal }),
           onWaiting: async wait => {
             waiting = true;
+            waitStartedAt ??= Date.now();
             await hooks.waiting?.(describeTestLockWait(wait));
           },
-          onAcquired: async acquired => { await hooks.acquired?.(acquired.waitedMs); },
+          onAcquired: async acquired => {
+            waitEndedAt = Date.now();
+            acquiredWaitMs = acquired.waitedMs;
+            await hooks.acquired?.(acquired.waitedMs);
+          },
         },
         override,
       );
-      if (result.status === 'cancelled') return emptyRun(request.outputFile, { kind: 'cancelled' }, waiting ? Date.now() - start : undefined);
+      if (result.status === 'cancelled') return emptyRun(request.outputFile, { kind: 'cancelled' }, measuredWait());
       if (result.status === 'wait-exceeded') return emptyRun(request.outputFile, {
         kind: 'runner-error', error: {
-          kind: 'test-lock-wait-exceeded', message: `Waited ${result.waitedMs} ms for the machine test lock`,
+          kind: 'test-lock-wait-exceeded', message: `Waited ${result.waitedMs} ms for the machine test lock${result.holder ? ` held by pid ${result.holder.pid} for ${result.holder.repositoryPath}` : ''}`,
         },
       }, result.waitedMs);
       const run = result.value;
@@ -70,11 +81,12 @@ export function testLockedRunner(
       }
       return { ...run, ...(result.lock === 'held' && result.waitedMs > 0 ? { lockWaitMs: result.waitedMs } : {}) };
     } catch (error) {
-      if (request.signal?.aborted) return emptyRun(request.outputFile, { kind: 'cancelled' });
+      if (request.signal?.aborted) return emptyRun(request.outputFile, { kind: 'cancelled' }, measuredWait());
       return emptyRun(request.outputFile, {
         kind: 'runner-error', error: { kind: 'test-lock', message: error instanceof Error ? error.message : String(error) },
-      }, waiting ? Date.now() - start : undefined);
+      }, measuredWait());
     } finally {
+      request.signal?.removeEventListener('abort', onAbort);
       if (waiting) await hooks.settled?.();
     }
   };
