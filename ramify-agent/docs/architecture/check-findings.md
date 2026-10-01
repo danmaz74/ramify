@@ -182,6 +182,14 @@ These are semantic fields, not a final TypeScript schema.
 | `risk` | High, medium or low: the harm if the concern is real. The reporter proposes it; the assessing architect may correct it, and the correction is a recorded decision. |
 | `ground`, `credibility` | What grounds the signal, named by the reporter as a reference the harness can classify: a principles document, the original plan, a frozen scenario, an approved requirement, an agent's test or documentation, or nothing. Credibility is derived by the harness from that provenance and from whether an objective signal was reproduced; a reporter cannot declare it. |
 | `modules` | The modules the evidence concerns, derived by the harness from the report's locations on the report's own source tree, or the owner work item's module when no location falls inside a module. Used for presentation and for waive authority, never for identity. |
+| `project` | On a report: the nested project whose audit produced it, as that project's root relative to the run's project root, or none for the run's own project. Set by the audit integration from ramify-audit's per-project result, never by a reviewer. Part of the issue key's scope. |
+
+A report from a nested project's audit keeps its locations relative to the
+run's project root. Its `modules` are derived as for any report and therefore
+name the module of the run's project that owns the nested project's tree;
+the nested project's own module names never appear there, since they belong
+to another module tree. Waive authority and presentation follow `modules`
+unchanged, and presentation shows the project root as a label.
 
 The child receives immutable source references and compares them for identity;
 the harness retains the concrete commit/tree, document revision or file/hash
@@ -206,8 +214,8 @@ Recognition has three steps, each answering a different question:
    The same key with different content is rejected. This prevents a replayed
    callback or crash recovery from creating a second CheckFinding.
 2. **Did this producer identify the same obligation again?** A trusted
-   producer may supply a stable issue key within one owner and verification
-   scope: for example, test identity plus unchanged assertion/obligation
+   producer may supply a stable issue key within one owner, project and
+   verification scope: for example, test identity plus unchanged assertion/obligation
    version, or a structural rule plus the same affected symbol and rule
    version. The harness validates that key against the producer's real
    output. If it names exactly one existing CheckFinding, append a new report to

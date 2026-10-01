@@ -71,7 +71,9 @@ An objective signal is **fixed** only when the same check passes again on the
 candidate being accepted, with the same assertion and comparable inputs and
 environment. A different test passing, a changed or deleted test, or an
 agent's assurance does not fix it. A runner crash, timeout or missing result
-is an execution gap, not a pass and not a failure. Changing the test itself is
+is an execution gap, not a pass and not a failure. A signal from a nested
+project's audit is fixed only by the same check passing in that project; a
+check of the same name in the run's own project settles nothing for it. Changing the test itself is
 a change to the obligation, with its own authority. Flaky tests get bounded,
 focused reruns that keep every attempt and distinguish **reproduced**,
 **intermittent** and **inconclusive**; a later pass never erases the earlier
@@ -161,7 +163,9 @@ conflicting text and revision, the options and the consequence of each.
 
 Presentation orders signals by risk, then credibility, then recency, and
 groups them by the modules their evidence concerns, so that the global view
-shows for each module how many signals are unsettled. A non-low risk signal
+shows for each module how many signals are unsettled. A signal from a nested
+project's audit names that project and concerns the module that owns its
+tree. A non-low risk signal
 left unresolved because it surfaced in the latest review is marked distinctly;
 it must not hide inside a count.
 

@@ -1,11 +1,13 @@
 # Project boundary and whole-tree ownership
 
-**Date:** 2026-09-30. **Status:** decided, not implemented. It records the
-decisions of the 2026-09-30 design discussion. Once implemented, it changes the
+**Date:** 2026-09-30, revised 2026-10-01. **Status:** decided, not
+implemented. It records the decisions of the 2026-09-30 design discussion and
+the 2026-10-01 simplification that removed the nested-project kind. Once
+implemented, it changes the
 [module description principles](../model/module-description.principles.md),
 the [CLI invocation contract](cli-invocation.spec.md#files-outside-modules),
 the harness's write-scope and test-selection rules in ramify-agent, and
-ramify-audit's treatment of nested projects. Until then those documents stand.
+ramify-audit's treatment of nested trees. Until then those documents stand.
 Syntax and plan breakdown are left to the implementation plan.
 
 ## 1. Why
@@ -34,8 +36,9 @@ configuration and unselected files are silent.
   repository host files.
 - Write permission works at module level. An agent that may edit a module's
   code may edit that module's configuration, documentation and other owned
-  files, and may not edit anyone else's.
-- The only exceptions are declared nested trees, of three kinds, in section 5.
+  files, and may not edit anyone else's. An owned-ignored tree is written
+  only where an assignment includes it, per section 10.
+- The only exceptions are declared nested trees, of two kinds, in section 5.
   Part of the project means belongs to a module; not part of the project
   means as if it did not exist.
 - Ramify gives every guarantee such a system can give and no more. Where a
@@ -91,40 +94,37 @@ the parent's, and is analyzed as the parent's.
 ## 5. Nested trees
 
 A module declares each nested tree in its own description, by directory
-relative to the module, with one of three kinds. The statements are part of
+relative to the module, with one of two kinds. The statements are part of
 the description grammar, beside the exposure statements; their exact syntax
 is the implementation plan's.
 
 | Kind | Part of the project | Owned and written by the declaring module | Analyzed |
 | --- | --- | --- | --- |
-| `nested-project` | yes | yes | in its own evaluation, as a Ramify root |
 | `owned-ignored` | yes | yes | never |
-| `external` | no | no | never, by this project |
-
-**`nested-project`.** A dependent sub-project: it uses the enclosing project
-and depends on it, and it can be detached as its own project. Example
-projects and fixture projects are nested projects. The directory must hold a
-valid root description of its own, which Ramify verifies. Nothing inside it
-changes on declaration, and detaching it is deleting the declaration and
-moving the directory. In the enclosing view it is a node of kind `project`
-whose parent is the declaring module, whose name is its own root name and
-whose purpose is read from its README. It has no source areas, no tags and
-no exposure in either direction, and it is not a child for `expose-sub`. Its
-own modules exist only in its own evaluation, where the enclosing project is
-an ordinary external package.
+| `external` | no | no | never |
 
 **`owned-ignored`.** A directory the declaring module owns whose contents
 Ramify never interprets. It is needed only where the contents look like
 source or descriptions: sample `.ts` inputs for a parser test, a captured
-project fragment, a spike. Plain data needs no declaration, since by
+project fragment, a spike, or a complete project such as an example or a
+fixture project. Plain data needs no declaration, since by
 containment it is already owned and never inventoried. The directory may lie
 anywhere in the declaring module's own contents, including beneath
 `src/tests/`, and not inside a child module. Ramify verifies only that it
 exists and lies where it may. Discovery does not enter it, so a description
 inside it is neither a stray nor a description-in-src error; none of its
 files is inventoried, compiled by Ramify, checked, watched or listed in the
-architect view. Ownership, write scope and test selection are unchanged by the
-declaration.
+architect view. Ownership is unchanged by the declaration; the tree is left
+out of test selection, per section 9, and out of an ordinary assignment's
+write scope, per section 10.
+
+**A project inside an ignored tree.** An example project is data to the
+enclosing project: the declaring module owns it, its tests may read it, and
+Ramify sees none of its descriptions, modules or imports. It is a project
+only from its own directory, where `ramify`, the audit and the harness run
+on it as on any root, with the enclosing project an ordinary external
+package. The enclosing project records nothing about that, and detaching the
+tree is deleting the declaration and moving the directory.
 
 The declaration is an analysis gap by design, bounded by these rules:
 
@@ -151,13 +151,13 @@ inside the toolkit checkout is external. Discovery does not enter it, nobody
 in a run of the enclosing project writes it, and changes there affect
 nothing here.
 
-**Rules common to all three.** The directory lies beneath the declaring
-module's directory and outside every child module. A `nested-project` or
-`owned-ignored` directory must exist; an `external` one need not, since a
-scratch directory or a tool cache is absent in a fresh checkout and is as if
-it did not exist either way. A `nested-project` or `external` directory lies
-outside the declaring module's `src/`; only `owned-ignored` may lie beneath
-`src/tests/`. Discovery does not descend into any of them.
+**Rules common to both.** The directory lies beneath the declaring
+module's directory and outside every child module. An `owned-ignored`
+directory must exist; an `external` one need not, since a scratch directory
+or a tool cache is absent in a fresh checkout and is as if it did not exist
+either way. An `external` directory lies outside the declaring module's
+`src/`; only `owned-ignored` may lie beneath `src/tests/`. Discovery does not
+descend into either.
 
 **Migration diagnostic.** The current discovery convention, a directory
 outside `src/` and `subs/` with its own `tsconfig.json` and no file selected
@@ -171,8 +171,8 @@ Nothing is dropped silently, and migration is guided.
 
 The model has one evaluation, the enclosing project's, and one rule:
 
-- Code in the tree is analyzed. An import from it that resolves into a
-  `nested-project`, `owned-ignored` or `external` tree, other than by package
+- Code in the tree is analyzed. An import from it that resolves into an
+  `owned-ignored` or `external` tree, other than by package
   resolution through `node_modules`, is a definite finding. Relative paths
   and workspace links are both caught. A subtree the project needs to import
   belongs under `subs/` as a child, or is an external package.
@@ -185,19 +185,15 @@ bare specifier through a `node_modules` directory, never where the real file
 ends up: a linked dependency resolves to a real path inside the enclosing
 tree and still counts as a package import.
 
-**The package boundary.** From the TypeScript and JavaScript point of view a
-nested project is its own package: its own manifest, its own dependency
-resolution and its own compiler program. It reaches the enclosing project
-only through the enclosing project's package. Across packages the specifier
-is a bare package name resolved through `node_modules`, and the enclosing
-package's `exports` map decides which subpaths exist. Node and TypeScript
-under NodeNext both refuse a subpath the map does not list, so the
-dependent's public API is enforced by the toolchain and Ramify does not model
-the exports map. Whether a dependent honors that, rather than aliasing into
-the enclosing project's internals, is not verified: in the dependent's own
-check such an import is the existing outside-scope analysis limit, visible
-and nonblocking. This is a named convention, and a reverse rule can be added
-later without changing anything decided here.
+**The package boundary.** A project inside an ignored tree is its own
+package: its own manifest, dependency resolution and compiler program. It
+reaches the enclosing project only through the enclosing project's package,
+by a bare specifier whose subpaths the package's `exports` map decides. Node
+and TypeScript under NodeNext refuse an unlisted subpath, so that API is
+enforced by the toolchain and Ramify does not model the exports map. Whether
+a dependent honors it, rather than aliasing into the enclosing project's
+internals, is not verified: in the dependent's own check such an import is
+the existing outside-scope analysis limit. This is a named convention.
 
 Current state in this checkout: ramify-agent depends on the toolkit through
 the registry and imports a listed entry. The site aliases
@@ -236,81 +232,52 @@ the model depends on it, and without a repository or without `git` it is
 simply absent. The special case for `.reference-work` in discovery is
 removed; the toolkit declares that directory instead.
 
-## 8. Auditing a project with nested projects
+## 8. Auditing
 
-An audit of a project is delegated to its nested projects: each is audited
-as an independent project, and nothing is composed into the enclosing
-record. Structure stays in the descriptions; which nested projects an audit
-also runs is audit policy and lives in `ramify-audit.json`, beside the
-project's checks, ignore list and workspace preparation. This also serves
-projects that are not Ramify projects, which have no description to declare
-anything in.
+By default an audit covers one project and knows no other, and no record
+ever composes another project's verdict.
 
-The configuration lists the nested projects an audit of the project also
-audits:
-
-```json
-{
-  "nestedProjects": ["examples/collection-review", "site"]
-}
-```
-
-Rules:
-
-- A listed root must be declared a `nested-project` by the project's
-  descriptions when the project is a Ramify project. Listing an undeclared
-  directory, or one declared `external`, is a configuration error, so the
-  two files never disagree silently.
-- A listed project must have its own audit definition. Its checks and
-  commands are its own; the enclosing runner never touches its files.
-- The enclosing audit audits the enclosing project only: its own checks,
-  its own ignore list, its own reuse lookup and its own record. Paths
-  beneath a declared nested project, listed or not, are removed from its
-  change set, since they are that project's. A change beneath a nested project alone leaves
-  the enclosing record reusable; a change to the enclosing project alone
-  leaves each nested project's reuse to that project.
-- For each listed nested project, the driver requests an independent audit
-  of it in the same mode, partial or full. That audit applies the nested
-  project's own ignore list, reuse rule and unpinned-dependency rule, and
-  writes its record under the nested project's own key. A nested project
-  inside a nested project is that project's to delegate in turn, so the
-  scheme is recursive with no special case.
-- The caller sees the conjunction: one exit code, and one report naming the
-  enclosing project and each nested project with its verdict and whether it
-  ran or was reused. No record claims coverage it did not run, and no
-  enclosing record cites a nested verdict that could go stale.
-- An unchanged listed project costs a manifest read and one ref lookup: its
-  own changes since are empty, no module is selected, and its existing
-  record for the same tree is reused.
-- A listed project whose manifest depends on the enclosing project through a
-  workspace, file or link specifier is an unpinned dependent, and ramify-audit
-  already counts the enclosing project's impacting changes as its own. Those
-  paths resolve to none of its modules, so it re-runs its whole ledger, in
-  either mode. This is the price of being live against the enclosing source,
-  chosen in the dependent's manifest; a dependent that consumes the built
-  package at a pinned version costs nothing until it upgrades.
-- A declared nested project that is not listed is not audited, and the
-  report names it as skipped. Absent key: none audited, every declared
-  nested project named. A consumer asking whether a commit is audited for
-  the enclosing project and a nested one queries each project's status,
-  which the per-project refs support.
+- A change beneath an `owned-ignored` tree belongs to the owning module and
+  is classified by the project's policy like any owned non-source file. A
+  project whose tests do not read the tree names it in the ignore list.
 - An `external` tree's paths are removed, replacing the marker file for
   Ramify projects. The marker stays for projects that are not Ramify
   projects.
-- An `owned-ignored` tree needs nothing: its changes belong to the owning
-  module and are classified by the project's policy like any owned non-source
-  file.
+- A project inside an ignored tree is audited only by invoking the audit on
+  it, with its own definition, change set, reuse lookup and record.
+  ramify-audit's existing project-root and unpinned-dependency rules apply
+  there unchanged.
 
-The driver is ramify-audit's `audit` command, so a person gets one
-invocation and one exit code. The harness invokes the same command at its
-gates and records the conjunction in its own gate record, as it does for
-several checks today.
+**Nested audits, on request.** A nested project, for the audit, is a
+directory beneath the project root that carries its own audit definition and
+is neither inside an `external` tree nor opted out by its marker. Nothing in
+a description declares it, and an ignored tree without a definition is plain
+data. An `audit` invocation given the nested flag, in either mode, also
+audits every nested project:
+
+- Each nested audit runs in the enclosing audit's prepared checkout, after
+  the enclosing checks, so its checks can use the enclosing project's build
+  under audit.
+- Each uses its own definition and writes its own record under its own key;
+  nothing is composed into the enclosing record. A nested project's own
+  nested projects are audited in turn.
+- The caller gets one exit code and one result naming each project with its
+  root, its verdict, whether it ran or was reused, and its failures.
+
+Without the flag the audit is as above, so partial audits during a plan pay
+nothing. The harness passes the flag at a plan's final gate, and a person
+passes it for a release audit.
+
+**Deferred.** During a plan, nothing verifies that an example still passes
+under the changed toolkit until the final gate. A test owned by the module
+that owns the tree, running the project's own analysis on it, would move
+that earlier and is left to a later decision.
 
 ## 9. Test selection by ownership
 
 Selecting a module for testing selects every test-shaped file the module
 owns: the files beneath its directory, minus the subtrees of its children
-under `subs/` and minus its declared nested trees of all three kinds. An
+under `subs/` and minus its declared nested trees of both kinds. An
 `owned-ignored` tree is excluded because it may hold test-shaped fixtures
 that must not run. Root selection therefore covers the root's `src/tests/`
 and any root-owned tooling tests alike, and a child with a misplaced
@@ -321,8 +288,7 @@ and follows areas.
 
 Which modules are selected is unchanged: the dependency closure over import
 facts for an audit, and the owner plus explicitly included child subtrees
-for an iteration's scoped run. Tree position selects nothing by itself, and
-a nested project is outside the closure, per section 8.
+for an iteration's scoped run. Tree position selects nothing by itself.
 
 **Through Vitest, without file lists.** The command names directories, not
 files, using two facilities verified in Vitest 4.1.11:
@@ -383,8 +349,9 @@ favors, or remain a separately declared command in the audit definition.
   becomes a diagnostic, and the ignored-but-walked warning of section 7 is
   added to the CLI check.
 - The inventory adds owned compiler source outside `src/` and nothing else.
-- The architect view lists nested projects as nodes of kind `project` and
-  each module's ignored trees.
+- The architect view lists each module's ignored trees.
+- A changed check naming a path inside an ignored tree reports it as not
+  analyzed, never as passed.
 - Compiler-selected source inside an `owned-ignored` tree is a warning.
 - The affected query answers every in-project path by containment; widening
   for an unowned path applies only outside the project.
@@ -392,17 +359,38 @@ favors, or remain a separately declared command in the audit definition.
   findings or silence per sections 4 to 7. The outside-scope analysis limit
   remains for an import resolving outside the root other than through a
   package.
-- The version 1 description grammar gains the three nested-tree statements.
+- The version 1 description grammar gains the two nested-tree statements.
 - Production selection is unchanged: it consumes resolved areas, and owned
   non-source files are not production.
-- The CLI's root selection climb stops at a declared nested project's root,
-  as it stops today at a description outside `subs/`.
+- The CLI's root selection is unchanged: the climb stops at a description
+  outside `subs/`, so an invocation from inside an ignored tree selects the
+  project there.
 
 ### ramify-agent harness
 
 - A module scope is the module's directory minus its children's subtrees and
-  its `external` trees. `nested-project` and `owned-ignored` trees are inside
-  the declaring module's scope. The `outside-modules` purpose, the per-file
+  its nested trees of both kinds.
+- An assignment may include an `owned-ignored` tree of its module, named by
+  the local architect with a reason, as it names included children: the tree
+  is wholly included or wholly excluded. The iteration, its gate and its
+  records are otherwise ordinary, so a change to the module and the matching
+  change to the tree form one candidate. There is no separate iteration kind
+  and no new action: an engineer that finds it needs the tree asks its
+  architect or submits `unsuitable` with reason `scope`.
+- An assignment that includes a tree carries instructions for it: the tree
+  is not part of the project's module system, the write hook does not
+  analyze it, its meaning is defined by the owner's tests and README, content
+  those tests expect is not repaired even where it looks wrong, and where the
+  tree is a project of its own, its instructions apply and its commands run
+  from its directory.
+- The write hook relays Ramify's not-analyzed answer for a path inside an
+  ignored tree.
+- The final gate invokes the audit with the nested flag of section 8 and
+  records the result ramify-audit reports for each project. A CheckFinding
+  from a nested audit names its project and concerns the module that owns the
+  tree, as the agent's CheckFinding documents define.
+- Substantial work on a project inside an ignored tree is a run rooted in
+  that project, not an assignment of the enclosing one. The `outside-modules` purpose, the per-file
   outside suites and the hook's suppression of outside warnings are removed.
   The audit adapter's whole-suite substitution stays for the scoped tests
   check, whose narrowing by affected modules it exists for; it no longer has
@@ -424,19 +412,20 @@ favors, or remain a separately declared command in the audit definition.
 - The scoped run of an iteration resolves each selected module's tests by
   section 9, with the same Vitest recipe as the audit, so harness and audit
   select identically.
-- Nested packages come from the audit configuration's list, not from a
-  manifest walk. Readiness installs the listed projects; gates invoke the
-  delegating audit of section 8 and record the conjunction, without a
-  separate nested-tests switch.
-- The agent's fixture projects are nested projects of the module whose tests
+- The manifest walk for nested packages and the readiness run of their
+  tests are removed, with the nested-tests switch: a package inside an
+  ignored tree is data to the run. The packages whose installed dependencies
+  readiness requires and a gate's worktree links are the package directories
+  of the audit configuration's workspace preparation, since the project's
+  tests may need them to read the tree.
+- The agent's fixture projects are ignored trees of the module whose tests
   read them, which means moving them beneath the harness module.
 
 ### ramify-audit
 
-- Section 8 in full: the `audit` command delegates to listed nested
-  projects, records stay strictly per project, and no record composes
-  another project's verdict. Widening for `unowned-path` is reserved for
-  paths outside the project.
+- Section 8: `external` paths are removed from the change set, and
+  widening for `unowned-path` is reserved for paths outside the project.
+  The nested flag of section 8 is added to the `audit` command.
 - Narrowed Vitest commands follow section 9: directory filters and
   exclusions in place of the current module `src` paths and root file
   lists, plus the coverage comparison of expected and run files.
@@ -445,10 +434,9 @@ favors, or remain a separately declared command in the audit definition.
 
 Toolkit:
 
-- Declare `site/` and `examples/collection-review/` as nested projects,
-  and list them in the audit configuration as the release audit requires.
-  The site gains a root description and, separately, should consume the
-  package through its exports.
+- Declare `site/` and `examples/collection-review/` `owned-ignored` trees of
+  the root. Separately, the site should consume the package through its
+  exports.
 - Declare `ramify-agent/` external, and every ignored directory the warning
   of section 7 would otherwise name: `.reference-work/`, `.history/`, which
   holds editor copies of source files that would be analyzed as the root's
@@ -461,175 +449,144 @@ Toolkit:
 
 ramify-agent:
 
-- Move `fixtures/` beneath the harness module and declare each fixture a
-  nested project. Declare source-shaped test fixtures such as the scenarios
-  sample project `owned-ignored`, and exclude them from the compiler
+- Move `fixtures/` beneath the harness module and declare each fixture
+  `owned-ignored`, as well as source-shaped test fixtures such as the
+  scenarios sample project, and exclude them from the compiler
   configuration, which selects them today, or the warning of section 5
   names them. `scripts/` becomes root-owned analyzed
   code. `spikes/` becomes `owned-ignored` or is deleted.
 
-## 12. Decisions of 2026-09-30
+## 12. Decisions
+
+Of 2026-09-30, as revised on 2026-10-01:
 
 1. Owned code outside `src/` is analyzed as the owner's importer.
-2. Three kinds of nested tree: `nested-project`, `owned-ignored`,
-   `external`. A data-only directory is not made a project; plain data needs
-   no declaration.
+2. Two kinds of nested tree: `owned-ignored` and `external`. A data-only
+   directory needs no declaration.
 3. The declarations are statements in the enclosing module's description.
 4. Nothing is derived from the repository's ignore rules. A project declares
    the directories Ramify must not enter; a warning names ignored
    directories it would still enter.
 5. Analyzed code must not import from any nested tree; the reverse direction
    is not checked.
-6. Nested projects an audit also runs are listed in `ramify-audit.json`;
-   the audit delegates to each as an independent audit in its own mode and
-   reports the conjunction, composing nothing into its own record; an
-   unchanged one costs a ref lookup; an unpinned dependent re-runs by
-   ramify-audit's existing rule. The dependency reading is thereby already
-   in place.
-7. Test selection follows ownership, through Vitest directory filters and
+6. Test selection follows ownership, through Vitest directory filters and
    exclusions rather than file lists, with the test-first mandate of
    section 9.
 
+Of 2026-10-01:
+
+7. There is no `nested-project` kind. An example or fixture project is an
+   `owned-ignored` tree of the enclosing project and a project only from its
+   own directory. The earlier `nestedProjects` list is dropped.
+8. An audit given the nested flag also audits every nested project, found
+   by its own audit definition, inside the enclosing audit's prepared
+   checkout and with separate records. The harness uses it at a plan's final
+   gate. Earlier verification through an owned test is deferred.
+9. In the harness, an ignored tree is written only by an assignment that
+   includes it, with tree-specific instructions; there is no dedicated
+   iteration kind. Until the final gate, nothing beyond the owner's tests
+   verifies such an edit.
+10. The harness links dependencies for the audit configuration's package
+    directories instead of walking for manifests.
+
 ## 13. Proposed principles and glossary entries
 
-What this document adds to the principles documents and their glossaries,
-once its open issues are settled, grouped by project. Principles are rules;
-glossary entries are definitions. Each list runs from the most impactful
-down, and each entry names its document and whether it is new or updates an
-existing statement. Three principles are provisional on the issues raised
-against section 8 and section 9.
+Proposed additions and updates to the owning documents, once the open issues
+are settled. Glossary entries define terms; principles state design rules.
+Shared terms have one definition, reused by the other projects. Detailed
+implementation recipes, diagnostics and migration guidance remain in sections 3 to 11;
+unchanged principles are not repeated here. Provisional qualifications remain
+attached to the affected entries.
 
 ### Ramify
 
-Principles:
-
-1. **Whole-tree ownership.** Every path beneath the project root belongs to
-   exactly one module: the nearest enclosing module, minus the subtrees of
-   its children under `subs/` and minus its declared nested trees. The root
-   owns what no child owns. *Module description, updates the rule that a
-   module owns only its `src/` and its two declaration files.*
-2. **Boundary imports.** An import from analyzed source that resolves into
-   a nested tree of any kind, other than by package resolution, is a
-   violation. Code in nested trees is not analyzed, and what it imports is
-   not evaluated. *Cross-module importability, new.*
-3. **Not part of the project.** Exactly the always-excluded paths and the
-   declared external trees are outside the project. Nothing is derived
-   from the repository's ignore rules. *Module description, updates the
-   caller-supplied discovery exclusions.*
-4. **Auxiliary source is ordinary source.** Compiler source a module owns
-   outside its `src/` is analyzed as that module's ordinary source: same
-   tags, same testing isolation, same need for exposure. It is never
-   exposable. *Module description and cross-module importability, new.*
-5. **Nested trees are declared by their owner.** A module declares its
-   nested trees in its own description, and discovery does not enter them.
-   A nested project's own root description is verified, nothing in it
-   changes on declaration, and detaching it is deleting the declaration.
-   *Module description, new.*
-6. **The package is the boundary.** A nested project reaches the enclosing
-   project only through the enclosing package. Ramify does not model the
-   package's exports map; that guarantee is the toolchain's. Whether an
-   import crossed a boundary is judged by how it resolved, never by the
-   real path it reached. *Cross-module importability and TypeScript source
-   interpretation, new.*
-7. **Ownership is not inventory.** Ownership is answered from the path and
-   the tree. Ramify reads and fingerprints only descriptions, READMEs,
-   manifests, configuration, compiler source and referenced resources;
-   other owned files are never listed. *Module description, new.*
-8. **An ignored tree is bounded.** An owned-ignored tree is declared only
-   where owned contents look like source or descriptions; plain data needs
-   no declaration. Compiler-selected source inside it is a warning, and
-   what a runner executes there is not Ramify's to prevent. *Module
-   description, new.*
-9. **Undeclared projects are layout errors.** An undeclared directory
-   outside every module's own directory that holds a root description or
-   a package manifest is a layout error naming the declaration to add.
-   *Module description, updates the compiler-configuration convention.*
-10. **Boundaries are evidence.** The architect view shows nested projects
-    as nodes and lists each module's ignored trees, so an agent sees where
-    analysis stops. Absence inside those trees is not evidence. *Module
-    architect principles, new.*
-11. **Outside the root is a limit.** An import resolving outside the
-    project root other than through a package remains an analysis limit.
-    *TypeScript source interpretation, unchanged, restated for contrast
-    with principle 2.*
-
 Glossary entries, in the model glossary:
 
-1. **Owned contents.** Everything beneath a module's directory except the
-   subtrees of its children under `subs/` and its declared nested trees.
-2. **Nested tree.** A directory a module declares in its description as one
-   of three kinds: nested project, owned-ignored tree or external tree.
-   Discovery does not enter it.
-3. **Nested project.** A nested tree that is owned by the declaring module
-   and is a Ramify project of its own, with its own root description,
-   package and evaluation.
-4. **External tree.** A nested tree that is not part of the project: not
-   owned, not entered, as if it did not exist.
-5. **Owned-ignored tree.** A nested tree owned by the declaring module whose
-   contents Ramify never interprets.
+1. **Owned contents.** All paths beneath a module's directory except child
+   module subtrees, declared external trees and always-excluded paths;
+   owned-ignored trees remain included.
+   *Updates “Files belonging to a module” rather than adding a second
+   ownership definition.*
+2. **Nested tree.** A directory declared in its enclosing module's
+   description as an owned-ignored tree or an external tree.
+3. **Owned-ignored tree.** An owned nested tree whose contents are excluded
+   from Ramify interpretation.
+4. **External tree.** A nested tree outside the enclosing project's
+   ownership and analysis.
+5. **Always-excluded path.** A path in repository metadata, installed
+   packages, compiler-configured output directories or Ramify's generated
+   directories, outside the enclosing project's ownership and analysis.
 6. **Auxiliary source.** Compiler source a module owns outside its `src/`.
-7. **Package resolution.** Resolution of a bare specifier through a
-   `node_modules` directory, whatever real path it reaches.
-8. **Always-excluded path.** The repository's metadata directory, installed
-   packages, the compiler configuration's output directories and Ramify's
-   own generated paths.
-9. **Containment.** The basis on which a path is attributed to a module by
-   position alone, without an inventory entry.
+7. **Containment.** Attribution of a path to its nearest enclosing module
+   within the project's declared boundaries, independently of inventory.
+8. **Package resolution.** Resolution of a bare specifier through a
+   `node_modules` directory, regardless of the resolved real path.
+
+Principles:
+
+1. **Ownership covers the whole project.** Every in-project path must have
+   exactly one module owner, determinable by containment without an inventory
+   entry. Inventory only analysis inputs. Repository ignore rules must not
+   change ownership or analysis boundaries. *Module description, updates
+   ownership and discovery rules.*
+2. **Discovery respects declared boundaries.** Do not descend into nested
+   trees. Report undeclared projects as layout errors and compiler-selected source in
+   owned-ignored trees as warnings. Plain data needs no ignored-tree
+   declaration. *Module description, new; replaces the implicit
+   compiler-configuration boundary.*
+3. **All owned source obeys its owner's rules.** Apply ordinary source tags,
+   testing isolation and importability rules to auxiliary source. Auxiliary
+   source cannot be exposed. *Module description and cross-module
+   importability, new.*
+4. **Imports respect project boundaries.** Imports from analyzed source into
+   any nested tree must use package resolution. Package status follows
+   resolution, not the resolved real path. A project inside an ignored tree
+   uses the enclosing package by convention; its exports are enforced by the
+   toolchain.
+   *Cross-module importability and TypeScript source interpretation, new.*
+5. **Evidence makes analysis boundaries visible.** Architectural evidence
+   must identify owned-ignored trees. Absence of evidence
+   within an unanalyzed tree proves nothing about its contents. *Module
+   architect principles, new.*
 
 ### ramify-audit
 
-Principles, as entries in its decision list:
-
-1. **One audit per project.** An audit covers one project root. It
-   delegates to listed nested projects as independent audits in the same
-   mode, reports the conjunction, and composes nothing across projects.
-   *New.*
-2. **Nested paths are theirs.** Paths beneath a declared nested project are
-   removed from the enclosing change set, and an unpinned dependent counts
-   the enclosing project's impacting changes as its own. *New; provisional
-   on the test-input question.*
-3. **Selection goes through the runner.** Narrowing names directories, not
-   files: a filter per selected module and an exclusion per unselected
-   module beneath one, plus every nested tree, on every run. *New;
-   provisional on the mandated Vitest test and on full-run exclusions.*
-4. **Selection is covered.** A selected file the runner did not run is a
-   coverage note, never a silent pass. *New.*
-
 Glossary entries:
 
-1. **Unpinned dependent.** A nested project whose manifest depends on the
-   enclosing project through a workspace, file or link specifier.
-2. **Test-shaped file.** A file whose name matches the audit's test
-   pattern, such as a `.test.ts` suffix; a selection convention, not a
-   classification.
-3. **Test input.** A nested tree the enclosing project's own tests read.
-   *Provisional.*
+1. **Test-shaped file.** A file whose name matches the configured
+   test-selection pattern, independently of its Ramify source classification.
+
+Principles, as entries in its decision list:
+
+1. **Test selection follows ownership.** Select modules by dependency
+   impact, not ancestry alone. Run their test-shaped files, excluding
+   unselected modules' owned contents and all declared nested trees. Let the
+   runner discover files within those boundaries. *New; the directory-filter recipe
+   remains provisional on the mandated Vitest test and full-run exclusions.*
+2. **Test selection is verified.** Compare expected test-shaped files with
+   files actually run; report omissions as coverage notes. *New.*
 
 ### ramify-agent
 
-Principles, in the harness principles:
-
-1. **Every agent scope is a cut on the module tree.** A module scope is the
-   module's owned contents. Write permission at module level covers the
-   module's configuration and documentation, there is no write purpose for
-   files no module owns, and guarded configuration is an authorization rule
-   within a scope, never a second ownership. *Updates the existing
-   statement.*
-2. **Tests follow ownership.** A module's tests are the test-shaped files it
-   owns. Which modules are selected comes from the scope, the owner plus its
-   included children, or from the audit's dependency closure. Tree position
-   selects nothing by itself. *New.*
-3. **Nested projects verify themselves.** A nested project is verified
-   through its own definition and commands. The enclosing runner never runs
-   its files, and the harness takes the list from the audit configuration
-   rather than from a walk. *New.*
-
 Glossary entries, in the harness glossary:
 
-1. **Test-shaped file.** As in ramify-audit; the harness's selection uses
-   the same pattern.
-2. **Included child.** A child module whose whole subtree an assignment's
-   scope names; a scope includes a child entirely or not at all.
+1. **Included child.** A child module whose entire subtree is included in an
+   assignment's scope.
+2. **Included tree.** An owned-ignored tree of the assigned module that is
+   included, whole, in an assignment's scope.
+
+Reuse the model glossary's ownership terms and ramify-audit's definition of
+**test-shaped file**, without redefining them in the harness glossary.
+
+Principles, in the harness principles:
+
+1. **Write authority follows module ownership.** A module assignment covers
+   all its owned contents except owned-ignored trees; child subtrees and
+   owned-ignored trees require explicit scope inclusion. Guarded configuration restricts authorization within that
+   ownership. *Updates “Every Agent Scope Is a Cut on the Module Tree”.*
+2. **Verification follows scope and audit policy.** Select the assignment's
+   module and included children using the audit's ownership-based test policy.
+   *New.*
 
 ## 14. Verified current state
 
