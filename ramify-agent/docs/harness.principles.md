@@ -59,6 +59,25 @@ agent or at least an LLM. Regexes, keyword matching and similar heuristics
 cannot decide the meaning of free text or substitute for that judgment.
 Deterministic parsing remains appropriate for explicitly structured inputs.
 
+### ramify-audit Owns Check Execution Evidence
+
+The harness always uses ramify-audit's public integration for the check data
+and execution capabilities it provides. Results, individual failures,
+selection, coverage, timing and provenance come from that producer. The
+harness preserves the evidence and its qualifications; it does not build a
+parallel runner, parser, failure tally or verdict for information ramify-audit
+already supplies. Missing provider information is an explicit integration gap,
+not permission to invent a replacement fact.
+
+The agent doing the work receives the relevant failures and their complete
+diagnostics, investigates them and makes the repairs. It asks its architect
+when it needs a scope or architectural decision. The harness does not infer
+repair responsibility from test locations, failure counts or comparison with
+a second test run. It records evidence, enforces execution and write
+boundaries, and requires the producer's applicable verification result before
+accepting work. Agent judgment cannot turn a failed or incomplete required
+check into a pass.
+
 ### Bounded Context Is What Makes Agents Efficient
 
 Here, search space means the information available for an invocation to
