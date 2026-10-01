@@ -236,7 +236,7 @@ A kind supplies five things and no control flow:
 | Actor | An agent or a person. |
 | Scope | The cut on the module tree the item reads and the cut it may change. |
 | Brief | A pure function of the item and the run's state. |
-| Outcomes | The subset of the [closed set](harness.principles.md#a-small-closed-set-of-outcomes-is-the-whole-protocol) the kind may report, each with a payload schema. |
+| Outcomes | The subset of the [closed set](harness.spec.md#a-small-closed-set-of-outcomes-is-the-whole-protocol) the kind may report, each with a payload schema. |
 | Expansion | A pure function from an outcome to the items it adds. |
 
 | Kind | Actor | Scope | Goal reached means |

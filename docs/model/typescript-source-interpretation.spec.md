@@ -1,16 +1,15 @@
-# TypeScript Source Interpretation Principles
+# TypeScript Source Interpretation Specification
 
-**Status:** Active specification. The source interpretations and reporting
-policy below are definitive. The source-analysis integration is not implemented;
-the current evaluator also predates the resolved tag registry and same-module
-test areas. Specification status does not establish implementation support.
+**Status:** Active specification. Whole-tree ownership, auxiliary-source and
+package-boundary interpretation were adopted on 2026-10-01 and are not yet
+implemented. Specification status does not establish implementation support.
 
 ## Purpose
 
 Define how TypeScript source becomes the symbol-and-binding questions answered
-by the [Cross-Module Importability Principles](cross-module-importability.principles.md).
+by the [Cross-Module Importability Specification](cross-module-importability.spec.md).
 The [Glossary](glossary.md) defines the model's vocabulary, and
-[Directory Structure And Module Description Principles](module-description.principles.md)
+[Directory Structure And Module Description Specification](module-description.spec.md)
 defines ownership discovery and the `module.ramify` format.
 
 Those documents remain authoritative in their scopes. This document preserves
@@ -30,7 +29,7 @@ lazy-loading workflows; it does not prove exhaustive runtime dependency closure.
 - Fail definite violations while reporting analysis limits as nonblocking
   coverage notes by default.
 
-## Principles
+## Specification
 
 ### Source Interpretation Produces Individual Import Questions
 
@@ -38,6 +37,12 @@ The integration receives the application source set, its valid ownership and
 exposure model, its resolved tag registry, and the TypeScript project
 configuration used to resolve its source. Compiler-loaded dependencies do not
 automatically join that source set.
+
+The analyzed source set includes owned compiler source outside `src/`, even
+when the root compiler configuration does not select it, and excludes declared
+nested trees and always-excluded paths. Path ownership alone does not establish
+analysis coverage. A changed-file check of excluded contents reports that they
+were not analyzed, never that their source checks passed.
 
 For each supported source construct, it produces a set of requests:
 
@@ -71,6 +76,11 @@ symbol is owned by the importing module.
 nested `src/tests/` area; interface vocabulary remains ordinary source. These
 areas share ownership and module-scoped visibility. Children are declared
 under `subs/`; neither nested directory creates a child module.
+
+Analyzed owned compiler source outside `src/` is auxiliary source and uses the
+module's ordinary profile. A test-shaped filename there does not create a
+testing area. Source inside an excluded tree receives no interpretation in
+this evaluation.
 
 The module header classifies ordinary source. Its `src/tests/` always carries
 `testing` plus every required-importer tag in that header, as defined by the
@@ -106,6 +116,9 @@ A same-owner forwarding export still identifies its
 original binding, even across these two areas. Neither operation changes
 that binding's source origin or tag requirements; `expose-sub` forwards a
 child's exposure without claiming ownership.
+
+Auxiliary originals cannot be exposed. Follow same-owner forwarding aliases
+to enforce this restriction even when the selected export is beneath `src/`.
 
 A non-testing source area cannot import or re-export testing-classified
 application source or resources, even within the same module and even as
@@ -157,9 +170,32 @@ areas and one original defining area cannot be established, report the binding
 as unverifiable rather than choosing the less restrictive area. Shared resource
 type declarations do not create shared ownership or change resource origin.
 Compiler resolution errors and ambiguous exports must not be resolved by arbitrarily
-choosing a declaration. References through compiled copies of application code
+choosing a declaration. Except for established package resolution, references
+through compiled copies of application code
 must map back to their original bindings or be reported as unverifiable; a
 compiled copy does not turn application code into an external dependency.
+
+### Package Resolution Determines The Project Boundary
+
+Retain how a specifier resolved, not only the final real path. A bare specifier
+resolved through `node_modules` into an installed package is an external
+package import, including when a link's real target lies within the project.
+A bare spelling alone is insufficient: an alias directly into project source
+does not establish package resolution.
+
+An import from analyzed source that resolves into an `owned-ignored` or
+`external` tree without package resolution is a definite finding. Relative
+paths, aliases and workspace links do not bypass this rule. Apply it to
+type-only imports and symbol-free loads as well as selected values; shared
+ownership with an ignored tree does not create an exemption. Do not analyze
+imports originating inside either kind of excluded tree.
+
+Package exports are enforced by the consuming toolchain, not modeled as
+Ramify exposure. A project within an ignored tree uses the enclosing package
+by convention. In that project's own evaluation, a direct import outside its
+root without package resolution remains an outside-scope analysis limit;
+Ramify does not certify the convention. Unresolved targets remain coverage
+limits rather than being assumed external or treated as definite violations.
 
 ### Resource Bindings Belong To The Resolved Resource
 
@@ -341,7 +377,7 @@ as a Vite glob using the actual project configuration and resolved targets.
 It must check every selected original without widening a named selection to
 all exports. Without that adapter, report unsupported macro access as a
 nonblocking coverage note. No eager rewrite or generated registration layer is
-required by these principles.
+required by this specification.
 
 ### Import Types Produce No Runtime Load
 
@@ -365,8 +401,9 @@ and discarded dynamic-import results do not need dummy exported functions or
 a new file-level exposure declaration. An explicit registration API is an
 application design option, not a Ramify requirement.
 
-Resolve known application targets and apply testing-source isolation even
-when no symbol is selected. Non-testing source loading testing-classified
+Resolve known application targets and apply testing-source isolation and
+project-boundary restrictions even when no symbol is selected. Non-testing
+source loading testing-classified
 source is denied, including same-owner loads. An unknown target or source
 area remains unverifiable. Established external targets follow the scope
 rules below. Any selected bindings still require their ordinary symbol checks.
@@ -393,7 +430,7 @@ does not certify runtime closure.
 
 ### A Declared Signature Names Its Companions
 
-The [companion rule](cross-module-importability.principles.md#exposure-requires-available-signature-companions)
+The [companion rule](cross-module-importability.spec.md#exposure-requires-available-signature-companions)
 reads an exported original's declared signature syntactically, from the
 original's declarations. Each named identifier resolves through forwarding
 aliases to its original binding.
@@ -451,7 +488,9 @@ directories named `testing` or `ui` do not establish a source area.
 | `import x = require(...)`, `export =`, and CommonJS `require`/export patterns | No cross-module interpretation is specified in this profile. Report potentially cross-module application access as unverifiable. Proven same-owner access retains the model's exemption only after the adopted testing-origin restriction passes; unknown source origin cannot be assumed non-testing. |
 | Triple-slash references | Interpret as compiler inputs, not as requests for every symbol in the referenced file. They create no Ramify exposure and cannot silently change application ownership. |
 | Ambient declarations and module/global augmentations | Resource shims follow the adopted resource rule. Other external declarations remain outside the application tree. Application constructs that introduce shared globals, ambiguous ownership, or dependencies not representable by the requests above are unverifiable in this profile. |
-| Packages, built-ins, and standard-library declarations outside the application | Outside the application symbol-exposure model. Report that scope explicitly; do not fabricate an owning Ramify module. Browser-safety verification may still inspect runtime dependencies. |
+| Established package resolution, built-ins, and standard-library declarations | Outside the application symbol-exposure model, including installed links whose real targets lie within the project. Report that scope explicitly; do not fabricate an owning Ramify module. Browser-safety verification may still inspect runtime dependencies. |
+| An import into a declared nested tree without package resolution | A definite project-boundary violation, including type-only and symbol-free imports. |
+| An import outside the project root without package resolution | An outside-scope analysis limit, not an allowed import or an established package import. |
 | Stylesheets, JSON, and other non-code resources | Bindings belong to the resolved resource's owner and source area, with identities specific to that resource and names from its effective TypeScript export description. Ordinary exposure, tag, and testing-origin rules apply. A shim alone proves neither resource existence nor external status. Unestablished targets, source areas, or export descriptions are unverifiable. Symbol-free loads retain testing-source isolation without a general load ban. See the [resource principle](#resource-bindings-belong-to-the-resolved-resource). |
 | Tool-specific loaders or macros, including Jiti calls and Vite globs | Use a supported adapter to resolve actual targets and selections, or report the unsupported portion as unverifiable. Do not interpret an arbitrary `.import()` method as native ESM import. |
 | Unresolved specifier or original binding | Unverifiable, even when the compiler accepts it through an uninformative declaration or an `any` type. |
@@ -467,10 +506,12 @@ target external simply because resolution failed.
 
 Report these outcomes separately, retaining the source file and location:
 
-- **Allowed:** the identified application symbol request and its source-origin
-  checks pass, or a fully resolved symbol-free load passes its origin check.
-- **Denied:** an identified request fails an importability rule or violates
-  testing-source isolation. Identify the source/resource or symbol and rule.
+- **Allowed:** the identified application symbol request, source-origin and
+  project-boundary checks pass, or a fully resolved symbol-free load passes
+  its origin and project-boundary checks.
+- **Denied:** an identified request fails an importability rule, violates
+  testing-source isolation or crosses a declared nested-tree boundary without
+  package resolution. Identify the source/resource or symbol and rule.
 - **Unverifiable:** resolution or supported interpretation is insufficient.
   Identify the construct and what could not be established.
 - **Outside scope:** the target is established to be outside the application
@@ -494,7 +535,6 @@ harness requiring that stage must fail its capability check; this differs from
 a supported checker completing with documented analysis limits. Diagnostics
 do not create exposure declarations or dependency allowlists.
 
-The current evaluator answers the earlier module-level symbol questions only;
-it does not yet implement the resolved tag registry, source-area classification,
-or testing-source isolation. No TypeScript source checker is implemented.
-Adopting this specification does not establish support for these source forms.
+The adopted auxiliary-source and project-boundary changes are not yet
+implemented. Adopting these rules does not establish runtime support; report
+unsupported or unrun analysis explicitly.

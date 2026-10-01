@@ -18,25 +18,28 @@ When working under `ramify/`, ignore the usual cucumber-viz rules:
 
 ## Authoritative Model Documents
 
-The importability model is defined by two internal documents:
+The importability model is defined by these internal documents:
 
 - [Cross-Module Importability Principles](docs/model/cross-module-importability.principles.md)
-  contains the complete rules.
+  defines the foundational commitments.
+- [Cross-Module Importability Specification](docs/model/cross-module-importability.spec.md)
+  contains the detailed rules.
 - [Glossary](docs/model/glossary.md) defines their vocabulary.
 
 Read these before changing the model, its implementation, or its documentation.
 The website teaches the model through explanations and examples. It must
 conform to these documents, as must the evaluator, diagrams, and other tools.
-Keep the authoritative rules in the principles document and the vocabulary
-in its companion glossary.
+Keep foundational commitments in principles, detailed rules in specifications,
+and vocabulary in the glossary. Both principles and specifications are authoritative.
 
-Change a principles document only when its model, format or source-interpretation
-rules need to change or require a necessary clarification. Tooling scope, CLI
-behavior and implementation choices belong in architecture documents and plans;
-a definitive tooling decision does not by itself require a principles edit.
+Change a principles document only when a foundational commitment needs to change
+or requires a necessary clarification. Exact model, format and source-interpretation
+rules belong in specifications. Tooling scope, CLI behavior and implementation
+choices belong in architecture specifications and plans; a definitive tooling
+decision does not by itself require a principles edit.
 
 The concrete representation is defined separately in
-[Directory Structure And Module Description Principles](docs/model/module-description.principles.md).
+[Directory Structure And Module Description Specification](docs/model/module-description.spec.md).
 It specifies the required `src/` and `subs/` layout, with optional same-owner
 `src/tests/` and `src/interfaces/`, and the formal `module.ramify` version 1
 language. Modules may occur only beneath `subs/`. The module header classifies
@@ -81,7 +84,7 @@ source, including same-owner access and forwarding paths. Other same-owner
 imports retain their exemption from exposure and symbol-tag checks. No per-file
 or glob classification overrides are part of this model.
 
-[TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
+[TypeScript Source Interpretation Specification](docs/model/typescript-source-interpretation.spec.md)
 defines the definitive source interpretation, including testing-source isolation.
 Resource ownership and binding identity follow the resolved resource, export
 names come from its effective TypeScript export description, and ordinary
@@ -199,6 +202,10 @@ results and docs-maintenance edits:
   belongs in the principles document.
 - Assume common computer-science concepts such as trees, roots and siblings;
   state only what Ramify does with them.
+- `.principles.md` files state short, durable commitments. `.spec.md` files
+  define precise model or behavioral contracts, including rules, exceptions,
+  formats and outcomes. Glossaries define terms; plans describe implementation
+  and migration. Document kind does not establish approval or implementation.
 - Principle statements stay short. Other documents reference principles
   documents, never the reverse; fold a new principle into the document where
   it belongs rather than adding a file.

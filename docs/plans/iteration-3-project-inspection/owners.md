@@ -8,7 +8,7 @@ separately by the gates. [contracts.md](contracts.md) holds the exact
 signatures and wire schemas, [scope.md](scope.md) the consumer, spelling,
 availability and detail decisions and [subcases.md](subcases.md) the executable
 instances. The definitive
-[description principles](../../model/module-description.principles.md) and
+[description specification](../../model/module-description.spec.md) and
 [importability principles](../../model/cross-module-importability.principles.md)
 remain authoritative, and
 [Plan 1 owners](../done/iteration-1-project-verifier/owners.md) and

@@ -80,7 +80,7 @@ Source paths in the evidence below are relative to `/ramify`.
    Add destinations to the move map, require existing artifacts, and reject
    duplicate snapshots beneath an owner.
 5. **Important — JSDoc coverage.** The source specification at
-   `docs/model/typescript-source-interpretation.principles.md:354-358` includes
+   `docs/model/typescript-source-interpretation.spec.md:354-358` includes
    supported JSDoc import-type expressions. The reference compiler options in
    `examples/collection-review/tsconfig.json:4-27` do not enable JavaScript
    analysis, and iteration 11 had no explicit JSDoc fixture. Parameterize

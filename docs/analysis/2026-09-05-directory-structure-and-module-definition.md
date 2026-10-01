@@ -1,7 +1,7 @@
 # Directory Structure and Module Definition File
 
 **Status:** Superseded for directory structure and module descriptions by
-[Directory Structure And Module Description Principles](../model/module-description.principles.md).
+[Directory Structure And Module Description Specification](../model/module-description.spec.md).
 The YAML format and other proposals below are not the adopted format.
 This analysis also predates the adopted `ui` tag and module-owned `tests/`
 area; its module-only classification discussion is historical.

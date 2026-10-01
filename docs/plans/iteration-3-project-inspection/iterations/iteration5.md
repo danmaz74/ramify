@@ -44,7 +44,7 @@ iteration adds no type, no declaration line and no owner exposure.
   [contract map](../../reference-project/contract-map.md): the
   `workspace/contracts` importer counts `incoming-by-importer-owner` asserts
   and the sibling-branch exposure `ineffective-exposure-explained` used.
-- [Module-description principles](../../../model/module-description.principles.md):
+- [Module-description specification](../../../model/module-description.spec.md):
   the `expose-src`, `expose-sub` and destination syntax the proposal renders.
 
 ## Deliverables

@@ -66,7 +66,7 @@ Verified against source on 2026-09-21, branch `ramify-agent` at `2395497`.
 Recheck at iteration 1.
 
 - The model rejects implicit exposure in writing:
-  [module-description.principles.md](../../model/module-description.principles.md)
+  [module-description.specification.md](../../model/module-description.spec.md)
   says a wildcard does not expose "types merely referenced by a selected
   binding's signature", and [daemon.md](../../architecture/daemon.md) says
   "there is no automatic signature-type exposure". Plans 1 to 3 keep a
@@ -363,11 +363,11 @@ originals with an effective exposure.
   one section, "Exposure Requires Available Signature Companions", after
   "Type-Only Imports Retain Coupling Restrictions".
 - [Glossary](../../model/glossary.md): "Signature companion".
-- [Module description principles](../../model/module-description.principles.md):
+- [Module description specification](../../model/module-description.spec.md):
   the wildcard paragraph keeps its statement and names the rule; the
   validation section gains a third table, conditions that leave the
   description valid and fail a check.
-- [Source interpretation principles](../../model/typescript-source-interpretation.principles.md):
+- [Source interpretation specification](../../model/typescript-source-interpretation.spec.md):
   one section stating what a declared signature names and the two analysis
   limits.
 - [daemon.md](../../architecture/daemon.md): the companion facts and exposure

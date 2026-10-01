@@ -41,7 +41,7 @@ re-verified there.
   Measurement and acceptance, ML06.
   [Roadmap](../../../roadmap.md): the Plan 3 brief, its status and handoff
   rows.
-- [Module-description principles](../../../model/module-description.principles.md)
+- [Module-description specification](../../../model/module-description.spec.md)
   for the final review of every added declaration line.
 - Source: every `module.ramify` this plan touched, root's `module.ramify`,
   `scripts/validate-final-contracts.ts` and `scripts/reference-harness/completion-cases.ts`;

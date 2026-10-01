@@ -309,7 +309,7 @@ missing behavior, and integrates them in the consumer. It fixes integration
 issues until the relevant consumer tests pass against the fake and the fake
 passes the conformance tests. Existing behavior remains real.
 
-The session applies the [fake-naming principle](../harness.principles.md#fakes-are-explicitly-named):
+The session applies the [fake-naming principle](../harness.spec.md#fakes-are-explicitly-named):
 fake files use `.fake` before the language extension and exported fake
 implementations, factories and classes include `Fake`. Re-exports preserve
 that designation. For example, `send-email.fake.ts` exports

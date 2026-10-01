@@ -39,7 +39,7 @@ several vocabularies, with the provenance principle arriving last.
 This analysis was requested to read those documents together: to list what
 the system already had, what the day added, where the pieces contradict each
 other, and what to do about it under the
-[cost rule of the CheckFinding principles](../check-findings.principles.md#working-a-signal-is-a-cost-spend-where-the-return-is-highest).
+[cost rule of the CheckFinding specification](../check-findings.spec.md#working-a-signal-is-a-cost-spend-where-the-return-is-highest).
 It answers before any of the new mechanisms is implemented, so that the
 sealed-edit plan and the resumed Plan 12 iterations start from one model of
 file authority rather than four. It is a reading of documents and of the

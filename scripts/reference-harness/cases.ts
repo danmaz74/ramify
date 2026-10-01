@@ -212,10 +212,10 @@ export const referenceCases: readonly ReferenceCase[] = [
     baselineWitness: {
       kind: 'document',
       paths: [
-        `${model}/module-description.principles.md`,
+        `${model}/module-description.spec.md`,
         'docs/architecture/cli-invocation.spec.md',
       ],
-      note: 'The principles define invalid descriptions and source claims; the CLI contract defines outside-source warnings.',
+      note: 'The specification defines invalid descriptions and source claims; the CLI contract defines outside-source warnings.',
     },
   },
   {
@@ -233,8 +233,8 @@ export const referenceCases: readonly ReferenceCase[] = [
     implementation: 'absent',
     baselineWitness: {
       kind: 'document',
-      paths: [`${model}/module-description.principles.md`],
-      note: 'The required-layout principle, including the rule that a missing `src/` is created rather than substituted.',
+      paths: [`${model}/module-description.spec.md`],
+      note: 'The required-layout specification, including the rule that a missing `src/` is created rather than substituted.',
     },
   },
   {
@@ -252,7 +252,7 @@ export const referenceCases: readonly ReferenceCase[] = [
     implementation: 'absent',
     baselineWitness: {
       kind: 'document',
-      paths: [`${model}/module-description.principles.md`],
+      paths: [`${model}/module-description.spec.md`],
       note: 'The identifier rules for declared names, grouping directories and reparenting.',
     },
   },
@@ -291,7 +291,7 @@ export const referenceCases: readonly ReferenceCase[] = [
     implementation: 'absent',
     baselineWitness: {
       kind: 'document',
-      paths: [`${model}/module-description.principles.md`],
+      paths: [`${model}/module-description.spec.md`],
       note: 'The discovery principle that fixes the version 1 symlink policy.',
     },
   },
@@ -587,8 +587,8 @@ export const referenceCases: readonly ReferenceCase[] = [
     implementation: 'absent',
     baselineWitness: {
       kind: 'document',
-      paths: [`${model}/cross-module-importability.principles.md`],
-      note: 'The registry principle that fixes the two rule kinds and the reserved `testing` definition.',
+      paths: [`${model}/cross-module-importability.spec.md`],
+      note: 'The registry specification that fixes the two rule kinds and the reserved `testing` definition.',
     },
   },
   {
@@ -759,8 +759,8 @@ export const referenceCases: readonly ReferenceCase[] = [
     implementation: 'absent',
     baselineWitness: {
       kind: 'document',
-      paths: [`${model}/cross-module-importability.principles.md`],
-      note: 'The principle separating the source-origin restriction from a same-owner symbol-tag check.',
+      paths: [`${model}/cross-module-importability.spec.md`],
+      note: 'The specification separating the source-origin restriction from a same-owner symbol-tag check.',
     },
   },
   {

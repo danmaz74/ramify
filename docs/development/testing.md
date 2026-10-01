@@ -27,7 +27,7 @@ incremental results: two paths using the same engine can share a bug.
 
 ## Source and fixture placement
 
-Follow the [test layout](../model/module-description.principles.md): `src/tests/`
+Follow the [test layout](../model/module-description.spec.md): `src/tests/`
 inside an owner, or ordinary `src/` in a separate testing module for additional
 tags. Include both in test discovery and production exclusions, and expose
 shared helpers through the channels open to testing source.

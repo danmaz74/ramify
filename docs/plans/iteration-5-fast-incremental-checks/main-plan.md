@@ -77,7 +77,7 @@ requires.
 
 | Document | Role |
 | --- | --- |
-| [Importability principles](../../model/cross-module-importability.principles.md), [glossary](../../model/glossary.md), [module descriptions](../../model/module-description.principles.md), [TypeScript interpretation](../../model/typescript-source-interpretation.principles.md) | Definitive rules the session enforces unchanged; this plan adds no importability rule. |
+| [Importability principles](../../model/cross-module-importability.principles.md), [glossary](../../model/glossary.md), [module descriptions](../../model/module-description.spec.md), [TypeScript interpretation](../../model/typescript-source-interpretation.spec.md) | Definitive rules the session enforces unchanged; this plan adds no importability rule. |
 | [Daemon and analysis](../../architecture/daemon.md) | Fast incremental check requirement, invalidation table, revisions, freshness, DA01–DA18. Revised by iteration 13 as [scope.md](scope.md#document-revisions) lists. |
 | [Processes and clients](../../architecture/processes-and-clients.md) | Process split, service boundary, command roles, PC01–PC10. |
 | [Memory lifecycle](../../architecture/memory-lifecycle.md) | Retention and measurement policy, ML01–ML08; gains the compiler server as a bounded cost. |

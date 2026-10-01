@@ -16,7 +16,7 @@ exports.
 
 ## Read first
 
-- [Module-description principles](../../../../model/module-description.principles.md):
+- [Module-description specification](../../../../model/module-description.spec.md):
   exposure forms, `src/interfaces/` wildcard rules, `expose-sub`, tag
   clauses, collision rules.
 - Main plan: Descriptions and model, the `LinkedDescriptions` row of the

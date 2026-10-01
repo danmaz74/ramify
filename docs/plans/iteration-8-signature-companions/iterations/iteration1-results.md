@@ -22,10 +22,10 @@ with the implementation.
   carries the symbol beyond its companion, that Ramify never supplies the exposure, and that a violation leaves
   the model valid.
 - [Glossary](../../../model/glossary.md): "Signature companion", after "Module-exposed symbol".
-- [Module description principles](../../../model/module-description.principles.md): the wildcard paragraph keeps
+- [Module description specification](../../../model/module-description.spec.md): the wildcard paragraph keeps
   its statement and names the rule; the validation section gains a third table, "leave the description valid and
   fail a check", with the one condition.
-- [Source interpretation principles](../../../model/typescript-source-interpretation.principles.md): the section
+- [Source interpretation specification](../../../model/typescript-source-interpretation.spec.md): the section
   "A Declared Signature Names Its Companions", before "Scope And Unsupported Forms", with the harvesting table,
   the arrow/function-expression and explicit-annotation rules, the exclusions and the two analysis limits.
 

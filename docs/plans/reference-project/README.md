@@ -177,7 +177,7 @@ without a purpose paragraph is reported explicitly; the adapter does not borrow
 text from another owner. H03 exercises these results, and the Phase 5 tour uses
 the returned descriptions and links to the full READMEs.
 
-This follows the [module README convention](../../model/module-description.principles.md#module-documentation-lives-in-its-readme).
+This follows the [module README convention](../../model/module-description.spec.md#module-documentation-lives-in-its-readme).
 Ramify modules remain valid without READMEs; every reference-baseline owner
 needs a purpose paragraph for the tour. Documentation retrieval adds no
 `module.ramify` field and does not affect ownership, exposure, or tags.
@@ -292,10 +292,10 @@ their own listeners/browser; they never control an unrelated development server.
 
 The [principles](../../model/cross-module-importability.principles.md) now make
 the two-kind tag registry, kind-based export/test policies, and same-owner
-`src/tests/` classification definitive. The [description grammar](../../model/module-description.principles.md)
+`src/tests/` classification definitive. The [description grammar](../../model/module-description.spec.md)
 accepts registered tag names and interface-file wildcards beneath the owner's
 `src/interfaces/`. Cases E07–E09 cover their full expansion, path restrictions,
-original identities, tags, and contract growth. The [source profile](../../model/typescript-source-interpretation.principles.md)
+original identities, tags, and contract growth. The [source profile](../../model/typescript-source-interpretation.spec.md)
 adopts explicit namespace/lazy selections, permits symbol-free loads subject
 to testing-source isolation, and distinguishes definite failures from
 nonblocking analysis limits. These are specification commitments, not evidence
@@ -312,7 +312,7 @@ Phase 0 also maps the [README purpose convention](#module-purpose-and-documentat
 to H03's adapter inputs and outputs. This is a documentation contract with no
 new description-language field.
 
-T03 exercises the definitive [unmarked-interface rule](../../model/typescript-source-interpretation.principles.md#explicit-bindings-are-classified-individually):
+T03 exercises the definitive [unmarked-interface rule](../../model/typescript-source-interpretation.spec.md#explicit-bindings-are-classified-individually):
 retain written import form but use type-only availability for a purely type
 original. Exposure, required-importer tags, and testing-origin checks still
 apply. An unmarked runtime-bearing class or function retains the value check.

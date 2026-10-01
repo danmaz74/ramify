@@ -2,6 +2,9 @@
 
 **Status:** Proposed
 
+The whole-tree scope and verification rules adopted on 2026-10-01 are
+normative design decisions; their implementation remains pending.
+
 ## Purpose
 
 Define the principles of a harness that helps agents implement features in a
@@ -123,6 +126,19 @@ context management. Every requirement in a context is applied more weakly as the
 grows, until it is ignored, so including all of them in every prompt dilutes each of them.
 Various strategies can be used.
 
+### Principles Guide Implementation; Specifications Constrain the Plan
+
+Principles apply throughout implementation. Relevant principles guide each
+assignment and are assessed against the resulting candidate.
+
+Specifications are checked against the plan at the beginning for compatibility,
+missing obligations and required specification changes. The relevant obligations
+enter the reviewed plan and its acceptance requirements. Implementation follows
+that plan; there is no separate recurring review against the specification set.
+
+When implementation materially changes the plan, revisit only the affected
+specifications. Both document kinds remain authoritative and may be consulted
+when needed. A compatible plan does not prove that its implementation conforms.
 
 ### Plans Are Incomplete; the System Adapts
 
@@ -147,13 +163,6 @@ Early analysis forecasts needs across the plan for two purposes:
 
 Forecasts and actual decisions remain separate. A forecast informs later
 choices but does not, by itself, create work or establish a contract.
-
-When a concrete need arises, reuse the responsible agent's oriented context
-with the new evidence, through continuation or a fork carrying accumulated
-decision briefs. It considers the immediate need alongside forecast needs
-elsewhere, earlier decisions and current findings. Anticipated consumers inform
-the design, but their requirements remain provisional until examined during
-their own work. Considering them does not by itself coordinate their execution.
 
 Forecasts, decisions and their rationale are recorded in the repository.
 Session continuity aims to reduce the token cost of repeated orientation and
@@ -266,16 +275,6 @@ case's behavioral requirement. Changing tests alone cannot erase it.
 
 ### Fakes Are Explicitly Named
 
-Fake implementation files use a `.fake` suffix before the language extension,
-such as `send-email.fake.ts`. Exported fake implementations, factories and
-classes include `Fake` in their names, such as `createSendEmailFake`.
-Re-exports preserve that designation rather than exposing a fake under a
-production-looking name.
-
-Shared contracts keep behavior-oriented names, such as `SendEmail`, because
-both the fake and the real provider implement them. The implementing
-assignment and its gate check the naming convention when a fake is used.
-
 Explicit names make fakes recognizable in source and generated architectural
 evidence. A contract and fake can establish a capability's intended placement;
 their presence does not establish that its real implementation is ready.
@@ -318,7 +317,9 @@ tests that verify them. The harness is built for that reality: it cannot have
 everything reviewed, so it weighs an artifact by its provenance, never by its
 kind or its wording.
 
-Principles documents and the original plan count as human-reviewed. What a
+Principles documents, approved specifications and the original plan count as
+human-reviewed. Moving an approved requirement from principles to a specification
+preserves its review provenance. What a
 person approved, such as the accepted analysis and its frozen scenarios, and
 what is derived directly from human-reviewed material weigh more than what an
 agent derived on its own. Scarce human and agent attention goes where the
@@ -411,15 +412,6 @@ Feature-level tests at the common ancestor decide completion.
 An agent resolves ordinary failures itself: compile errors, failing tests and
 violations reported by Ramify's checks.
 
-Each role submits from a closed action union. A requesting engineer can
-propose completion, report partial work or request a capability. The local
-architect qualifies reuse or delegates. The capability architect consults,
-revises its plan, assigns scoped work, delegates a nested need, records a
-placement conflict or requests handback. An accepted submission changes the
-orchestration; it does not claim that implementation is accepted. Read,
-plan-update and prevalidation tools have explicit recorded effects but do not
-complete work. The harness applies only accepted actions and current gates.
-
 A request that cannot be satisfied because of how the gate or the harness runs
 is an environment problem: it is reported to the operator, never answered as a
 placement or a deviation.
@@ -441,11 +433,6 @@ An engineer that ends without a result ends its iteration, not the run. Its
 local architect decides what comes next; only what the harness itself cannot
 continue from ends the run.
 
-The harness reports the failure pre-analyzed: a digest of what it already
-holds, then a model's analysis, so the decision needs no transcript. A bound
-that proves too tight is the architect's to raise, within the policy's
-ceilings.
-
 ### Agent Invocations Should Be Considered Idempotent
 
 When an agent gets interrupted for any reason, we should always be able to
@@ -460,29 +447,6 @@ Orientation is the largest fixed cost of a session: an architect reading the
 architect view, an engineer learning its module. An agent asked again about
 the same scope should not pay it again. A new invocation may continue, or
 fork from, an earlier session of the same role and scope.
-
-Fork an oriented session for independent tasks. It starts from the point where
-the earlier session was oriented, before it took up any one task, so the reused
-context stays bounded and several questions can start from it at once.
-
-When successive tasks benefit from shared orientation but produce substantial
-exploratory context, execute each task in a fork of the updated long-lived
-context. The fork can make decisions within its assigned authority and returns
-a concise brief of its conclusions, rationale, corrected assumptions and
-required follow-ups, referencing the durable records.
-
-Append that brief to the long-lived context without invoking the model. The
-next invocation receives the accumulated updates; detailed searches and tool
-results remain in the fork. Tasks whose decisions depend on one another must
-receive the preceding accepted decisions before starting.
-
-Continuity can come from accumulated decision briefs as well as from continuing
-the full conversation. Use direct continuation when its continuity is more
-valuable than isolating task exploration. Forks limit accumulated context but
-do not necessarily reduce total tokens or latency.
-
-Each request supplies relevant new findings; context reuse does not
-automatically reveal changes in the repository.
 
 A reused context is a cache, never the sole authority for decisions or progress.
 Any invocation must succeed from a fresh session and the repository alone.

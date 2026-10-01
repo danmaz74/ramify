@@ -119,7 +119,7 @@ again.
 ### Fake naming
 
 The contract gate verifies the
-[fake-naming rule](../../../harness.principles.md#fakes-are-explicitly-named)
+[fake-naming rule](../../../harness.spec.md#fakes-are-explicitly-named)
 itself, over the source and never over the submission: what generated
 architectural evidence will show is the source. A declared fake file whose
 name lacks `.fake`, an export of a `.fake` file whose name lacks `Fake`, and

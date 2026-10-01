@@ -303,7 +303,7 @@ Three consequences:
 
 - The engineer's session ends when it reports, and its next run would pay for
   orientation again. This is the main case for
-  [reusing an oriented context](../harness.principles.md#an-oriented-context-is-reused-never-required):
+  [reusing an oriented context](../harness.spec.md#an-oriented-context-is-reused-never-required):
   the next run continues from the session that already knows the module.
 - The engineer's own stub is not a contract. It is provisional, confined to
   the consumer, and replaced during the contract iteration. Nothing is ever
@@ -437,7 +437,7 @@ run would have paused there for the person.
    is to be observed.
 3. **The cost of one estimate per capability.** Each estimate forks from the
    forecast session at the point where it was oriented, under the principle
-   that [an oriented context is reused](../harness.principles.md#an-oriented-context-is-reused-never-required),
+   that [an oriented context is reused](../harness.spec.md#an-oriented-context-is-reused-never-required),
    so it pays for the question and not for the orientation. The same holds
    for an engineer returning to its module to replace a fake. Unmeasured.
 4. **Where the interface, the conformance tests and the fake live**, so that

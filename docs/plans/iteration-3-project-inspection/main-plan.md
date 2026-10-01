@@ -77,7 +77,7 @@ work and are not implemented here.
 
 | Document | Role |
 | --- | --- |
-| [Importability principles](../../model/cross-module-importability.principles.md), [glossary](../../model/glossary.md), [module descriptions](../../model/module-description.principles.md), [TypeScript interpretation](../../model/typescript-source-interpretation.principles.md) | Definitive rules the availability listing applies unchanged; this plan adds no importability rule. Availability is evaluated for a source area, never for a module alone. |
+| [Importability principles](../../model/cross-module-importability.principles.md), [glossary](../../model/glossary.md), [module descriptions](../../model/module-description.spec.md), [TypeScript interpretation](../../model/typescript-source-interpretation.spec.md) | Definitive rules the availability listing applies unchanged; this plan adds no importability rule. Availability is evaluated for a source area, never for a module alone. |
 | [Daemon and analysis](../../architecture/daemon.md) | Service operation families, module inspection and explanations, revision and freshness guarantees, DA12–DA14. Revised by iteration 11 as [scope.md](scope.md#document-revisions) lists. |
 | [Processes and clients](../../architecture/processes-and-clients.md) | Command roles for `inspect` and `explain`, the terminating-command fallback rule, PC03 and PC07. Gains the `available` command in iteration 11. |
 | [Memory lifecycle](../../architecture/memory-lifecycle.md) | ML06: detail expansion and result serialization within budgets; unavailable enrichment distinguishable from empty data. |

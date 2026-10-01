@@ -48,7 +48,7 @@ here.
   for the parallel plan's own package.
 - [Project-explorer reuse analysis](../../../analysis/project-explorer-reuse.md):
   the declaration extractor and surface renderer P3-1 imitates.
-- [Module-description principles](../../../model/module-description.principles.md)
+- [Module-description specification](../../../model/module-description.spec.md)
   for the manual review of the declaration lines this plan adds.
 
 ## Deliverables

@@ -46,7 +46,7 @@ or daemon code is written here.
 - The [spike results](../../../../scripts/spikes/fast-check/RESULTS.md) and the
   existing `scripts/probes/fast-check/README.md`, which records what the
   throwaway measurements do and do not establish.
-- [Module-description principles](../../../model/module-description.principles.md)
+- [Module-description specification](../../../model/module-description.spec.md)
   for the manual review of the six declaration lines this plan adds and the
   one it removes.
 

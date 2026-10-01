@@ -24,7 +24,7 @@ limits. None of the cases requires an exhaustive runtime closure proof.
 ## Ownership and layout
 
 Module validity follows the
-[module-description principles](../../model/module-description.principles.md).
+[module-description specification](../../model/module-description.spec.md).
 The outside-module warning expectations follow the
 [CLI invocation contract](../../architecture/cli-invocation.spec.md#files-outside-modules).
 

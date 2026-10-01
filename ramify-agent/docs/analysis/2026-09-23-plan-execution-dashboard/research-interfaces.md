@@ -72,7 +72,7 @@ Both were read only.
 | Concept | Definition | Where the concrete form is defined |
 |---|---|---|
 | Exposure | A module exposes a visible symbol to `parent` or to `descendants`. Re-exposing is the same operation. | `T/docs/model/glossary.md:181-197` |
-| Owned exposure | `expose-src` (relative to `src/`) and `expose-test` (relative to `src/tests/`). | `T/docs/model/module-description.principles.md:458-551` |
+| Owned exposure | `expose-src` (relative to `src/`) and `expose-test` (relative to `src/tests/`). | `T/docs/model/module-description.spec.md:458-551` |
 | Child re-exposure | `expose-sub` names a direct child, and `*` forwards that child's effective to-parent contract. | same, `:609-660` |
 | Interface directory | `src/interfaces/`: ordinary source with no automatic exposure. `expose-src * from "interfaces/x.ts"` selects every export of that one file. | glossary `:70-80`; principles `:272-286`, `:553-607` |
 | Signature companion | A project original named by a symbol's declared signature. Every exposure must make it visible wherever it makes the symbol visible, and each companion's required-importer tags must also be tags of the symbol. | glossary `:199-202`; `T/CLAUDE.md` |

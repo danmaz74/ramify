@@ -51,8 +51,8 @@
       ]
     },
     {
-      "path": "docs/model/module-description.principles.md",
-      "id": "docs/model/module-description.principles.md#principles-md",
+      "path": "docs/model/module-description.spec.md",
+      "id": "docs/model/module-description.spec.md#principles-md",
       "ruleId": "principles-md",
       "score": 0.93,
       "selectedBy": [

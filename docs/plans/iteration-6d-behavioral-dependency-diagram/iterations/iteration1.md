@@ -21,7 +21,7 @@ iterations use as the hook-isolation witness.
 - `subs/analysis/subs/typescript/src/interfaces/dependency-behavior.ts`.
 - `subs/analysis/subs/typescript/src/tests/dependency-behavior.test.ts`.
 - `subs/analysis/src/tests/dependency-behavior-capability.test.ts`.
-- [TypeScript source interpretation](../../../model/typescript-source-interpretation.principles.md)
+- [TypeScript source interpretation](../../../model/typescript-source-interpretation.spec.md)
   for original and access identity; this iteration does not revise it.
 
 ## Deliverables

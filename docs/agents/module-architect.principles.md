@@ -2,6 +2,8 @@
 
 **Status:** Active
 
+The boundary-evidence requirement adopted 2026-10-01 is not yet implemented.
+
 ## Purpose
 
 Define what Ramify provides to an agent reasoning about a project's whole
@@ -76,6 +78,13 @@ Ramify provides compact project-wide evidence first, ordered by facts such
 as exposure and observed use, and deterministic drill-down into more
 detailed evidence. Source inspection is a fallback when that evidence is
 insufficient.
+
+### Evidence Makes Analysis Boundaries Visible
+
+Architectural evidence identifies each module's owned-ignored trees without
+listing or interpreting their contents. Absence of evidence within an
+unanalyzed tree proves nothing about its contents. Module ownership, analysis
+coverage and observed behavior remain distinct facts.
 
 ### One Revision Per Project State
 

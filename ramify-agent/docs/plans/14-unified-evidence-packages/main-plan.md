@@ -1,7 +1,7 @@
 # Plan 14: the element catalog and one package creator for every prompt
 
 **Date:** 2026-09-26, rewritten the same day to adhere to the
-[plan context catalog principles](../../architecture/plan-context-catalog.principles.md).
+[plan context catalog specification](../../architecture/plan-context-catalog.spec.md).
 **Status:** iterations 1–4 implemented on the `ramify-agent` branch; the
 [implementation record](#implementation-record) lists where the code departs
 from this text, and the [contract appendix](contract-appendix.md) holds the
@@ -80,7 +80,7 @@ architect's context, not the selection itself, which ran once in 54 seconds.
 
 ## What binds this plan
 
-The [plan context catalog principles](../../architecture/plan-context-catalog.principles.md)
+The [plan context catalog specification](../../architecture/plan-context-catalog.spec.md)
 decide the catalog's purpose, its five kinds of element, the granularity of
 an element, the fidelity it promises, what stays exact, how a package is
 selected and when, and what a consumer may rely on. This plan implements

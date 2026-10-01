@@ -50,9 +50,9 @@ The following specifications govern every mode of execution:
 
 - [Importability principles](../model/cross-module-importability.principles.md)
   and [glossary](../model/glossary.md): ownership, exposure, tags and source areas.
-- [Module descriptions](../model/module-description.principles.md): filesystem
+- [Module descriptions](../model/module-description.spec.md): filesystem
   layout, version 1 declarations, exact selections and wildcard expansion.
-- [TypeScript interpretation](../model/typescript-source-interpretation.principles.md):
+- [TypeScript interpretation](../model/typescript-source-interpretation.spec.md):
   original bindings, resources, supported accesses and coverage reporting.
 
 The daemon adds no import permission, consumer dependency declaration, task
@@ -266,7 +266,7 @@ the whole declaration is invalid. Importing foreign types to describe an owned
 interface is allowed when those types are themselves importable. Types that a
 foreign consumer needs to import explicitly require their own exposure paths;
 there is no automatic signature-type exposure. The
-[companion rule](../model/cross-module-importability.principles.md#exposure-requires-available-signature-companions)
+[companion rule](../model/cross-module-importability.spec.md#exposure-requires-available-signature-companions)
 makes the owner state those paths: an exposure whose symbol's signature names a
 project type that the same step leaves out fails the check at that statement.
 

@@ -103,10 +103,10 @@ Verified in source on 2026-09-21. Paths are relative to the toolkit root.
   `docs/architecture/daemon.md:711-715` already requires "location,
   importer/area, original owner and binding/resource, source-origin evidence,
   relevant exposure declarations and the failed rule";
-  `docs/model/typescript-source-interpretation.principles.md:420-443`
+  `docs/model/typescript-source-interpretation.spec.md:420-443`
   requires a denial to "identify the source/resource or symbol and rule" and
   an unverifiable construct to say "what could not be established";
-  `docs/model/module-description.principles.md:897-899` requires the
+  `docs/model/module-description.spec.md:897-899` requires the
   description file, location and failed reference or rule.
 
 ## Decisions for contract review

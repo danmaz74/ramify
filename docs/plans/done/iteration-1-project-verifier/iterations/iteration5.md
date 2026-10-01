@@ -15,7 +15,7 @@ instances against real files.
 
 ## Read first
 
-- [Module-description principles](../../../../model/module-description.principles.md):
+- [Module-description specification](../../../../model/module-description.spec.md):
   layout, `src/`, `subs/`, `src/tests/`, `src/interfaces/`, containment,
   symlink policy and the README convention.
 - [CLI invocation](../../../../architecture/cli-invocation.spec.md): selecting the

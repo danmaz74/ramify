@@ -1,0 +1,311 @@
+{
+  "date": "2026-10-01",
+  "vitestVersion": "4.1.11",
+  "provenance": "Original isolated direct-Vitest runs from this proposal review, archived from the retained temporary directories. No runs were repeated to create this archive. stdout and stderr are preserved verbatim. Expected ownership selections are independent of Vitest process success.",
+  "limits": [
+    "Exercises directory filters, exclusions and reporter file selection only.",
+    "Does not exercise ramify-audit, its machine lock, report aggregation, multiple runner configurations or partial-audit evidence composition.",
+    "Implementation must retain executable acceptance tests."
+  ],
+  "reproduction": "Materialize a group fixture.files map in an empty temporary directory. For each command, replace the originalRoot with that directory and /ramify/node_modules/vitest/vitest.mjs with the installed Vitest 4.1.11 entry. Run from the fixture directory. Compare reporter testResults names, relative to that directory, with expectedFiles; a zero exit code alone is insufficient.",
+  "groups": [
+    {
+      "name": "original-recipe",
+      "originalRoot": "/tmp/ramify-boundary-review-y_pnfkd2",
+      "files": {
+        "vitest.config.mjs": "export default { test: { globals: true, include: ['**/*.test.ts'], maxWorkers: 1 } };\n",
+        "src/tests/root.test.ts": "test('runs', () => {});\n",
+        "subs/a/src/tests/a.test.ts": "test('runs', () => {});\n",
+        "subs/a/subs/b/src/tests/b.test.ts": "test('runs', () => {});\n",
+        "subs/a/subs/b/subs/c/src/tests/c.test.ts": "test('runs', () => {});\n",
+        "subs/a/subs/b/subs/d/src/tests/d.test.ts": "test('runs', () => {});\n",
+        "subs/cli/src/tests/cli.test.ts": "test('runs', () => {});\n",
+        "subs/cli-extra/src/tests/sibling.test.ts": "test('runs', () => {});\n"
+      },
+      "cases": [
+        {
+          "name": "child-control",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-review-y_pnfkd2",
+            "--config",
+            "/tmp/ramify-boundary-review-y_pnfkd2/vitest.config.mjs",
+            "--reporter=json",
+            "subs/cli/"
+          ],
+          "expectedFiles": [
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "actualFiles": [
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "selectionMatchesExpected": true,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790857315705,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9588970000000074,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857315835,\"endTime\":1790857315835.959,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/cli/src/tests/cli.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "root-plus-child",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-review-y_pnfkd2",
+            "--config",
+            "/tmp/ramify-boundary-review-y_pnfkd2/vitest.config.mjs",
+            "--reporter=json",
+            "subs/cli/",
+            "--exclude",
+            "subs/cli-extra/**",
+            "--exclude",
+            "subs/a/**"
+          ],
+          "expectedFiles": [
+            "src/tests/root.test.ts",
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "actualFiles": [
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "selectionMatchesExpected": false,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790857316145,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9640509999999978,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857316272,\"endTime\":1790857316272.964,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/cli/src/tests/cli.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "selected-grandchild",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-review-y_pnfkd2",
+            "--config",
+            "/tmp/ramify-boundary-review-y_pnfkd2/vitest.config.mjs",
+            "--reporter=json",
+            "subs/a/",
+            "subs/a/subs/b/subs/c/",
+            "--exclude",
+            "subs/a/subs/b/!(subs)/**",
+            "--exclude",
+            "subs/a/subs/b/*"
+          ],
+          "expectedFiles": [
+            "subs/a/src/tests/a.test.ts",
+            "subs/a/subs/b/subs/c/src/tests/c.test.ts"
+          ],
+          "actualFiles": [
+            "subs/a/src/tests/a.test.ts"
+          ],
+          "selectionMatchesExpected": false,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790857316580,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9555959999999999,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857316706,\"endTime\":1790857316706.9556,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/a/src/tests/a.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "grandchild-control",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-review-y_pnfkd2",
+            "--config",
+            "/tmp/ramify-boundary-review-y_pnfkd2/vitest.config.mjs",
+            "--reporter=json",
+            "subs/a/subs/b/subs/c/"
+          ],
+          "expectedFiles": [
+            "subs/a/subs/b/subs/c/src/tests/c.test.ts"
+          ],
+          "actualFiles": [
+            "subs/a/subs/b/subs/c/src/tests/c.test.ts"
+          ],
+          "selectionMatchesExpected": true,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790857348481,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9736609999999928,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857348612,\"endTime\":1790857348612.9736,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/a/subs/b/subs/c/src/tests/c.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "extended-only",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-review-y_pnfkd2",
+            "--config",
+            "/tmp/ramify-boundary-review-y_pnfkd2/vitest.config.mjs",
+            "--reporter=json",
+            "subs/a/",
+            "subs/a/subs/b/subs/c/",
+            "--exclude",
+            "subs/a/subs/b/!(subs)/**"
+          ],
+          "expectedFiles": [
+            "subs/a/src/tests/a.test.ts",
+            "subs/a/subs/b/subs/c/src/tests/c.test.ts"
+          ],
+          "actualFiles": [
+            "subs/a/src/tests/a.test.ts",
+            "subs/a/subs/b/subs/c/src/tests/c.test.ts",
+            "subs/a/subs/b/subs/d/src/tests/d.test.ts"
+          ],
+          "selectionMatchesExpected": false,
+          "stdout": "{\"numTotalTestSuites\":3,\"numPassedTestSuites\":3,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":3,\"numPassedTests\":3,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790857348921,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9739580000000103,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857349160,\"endTime\":1790857349160.9739,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/a/src/tests/a.test.ts\"},{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9673080000000027,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857349048,\"endTime\":1790857349048.9673,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/a/subs/b/subs/c/src/tests/c.test.ts\"},{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.988593999999992,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790857349272,\"endTime\":1790857349272.9885,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-review-y_pnfkd2/subs/a/subs/b/subs/d/src/tests/d.test.ts\"}]}\n",
+          "stderr": ""
+        }
+      ]
+    },
+    {
+      "name": "corrected-recipe",
+      "originalRoot": "/tmp/ramify-boundary-correction-w0_4gdis",
+      "files": {
+        "vitest.config.mjs": "export default { test: { globals: true, include: ['**/*.test.ts'], maxWorkers: 1 } };\n",
+        "external/project/foreign.test.ts": "test('runs', () => {});\n",
+        "fixtures/owned/fixture.test.ts": "test('runs', () => {});\n",
+        "src/tests/root.test.ts": "test('runs', () => {});\n",
+        "src/tmp/scratch.test.ts": "test('runs', () => {});\n",
+        "subs/cli/external/project/foreign.test.ts": "test('runs', () => {});\n",
+        "subs/cli/fixtures/owned/fixture.test.ts": "test('runs', () => {});\n",
+        "subs/cli/src/tests/cli.test.ts": "test('runs', () => {});\n",
+        "subs/cli/src/tmp/scratch.test.ts": "test('runs', () => {});\n",
+        "subs/cli/subs/g/src/tests/g.test.ts": "test('runs', () => {});\n",
+        "subs/cli/subs/u/src/tests/u.test.ts": "test('runs', () => {});\n",
+        "subs/cli-extra/src/tests/sibling.test.ts": "test('runs', () => {});\n"
+      },
+      "cases": [
+        {
+          "name": "root-and-child",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-correction-w0_4gdis",
+            "--config",
+            "/tmp/ramify-boundary-correction-w0_4gdis/vitest.config.mjs",
+            "--reporter=json",
+            "--exclude",
+            "**/src/tmp/**",
+            "--exclude",
+            "fixtures/owned/**",
+            "--exclude",
+            "external/**",
+            "--exclude",
+            "subs/cli/fixtures/owned/**",
+            "--exclude",
+            "subs/cli/external/**",
+            "--exclude",
+            "subs/cli-extra/**",
+            "--exclude",
+            "subs/cli/subs/g/**",
+            "--exclude",
+            "subs/cli/subs/u/**"
+          ],
+          "expectedFiles": [
+            "src/tests/root.test.ts",
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "actualFiles": [
+            "src/tests/root.test.ts",
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "selectionMatchesExpected": true,
+          "stdout": "{\"numTotalTestSuites\":2,\"numPassedTestSuites\":2,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":2,\"numPassedTests\":2,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790859303022,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":1.2750390000000067,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790859303152,\"endTime\":1790859303153.2751,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-correction-w0_4gdis/src/tests/root.test.ts\"},{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9808340000000015,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790859303262,\"endTime\":1790859303262.9807,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-correction-w0_4gdis/subs/cli/src/tests/cli.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "child-control",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-correction-w0_4gdis",
+            "--config",
+            "/tmp/ramify-boundary-correction-w0_4gdis/vitest.config.mjs",
+            "--reporter=json",
+            "subs/cli/",
+            "--exclude",
+            "**/src/tmp/**",
+            "--exclude",
+            "subs/cli/fixtures/owned/**",
+            "--exclude",
+            "subs/cli/external/**",
+            "--exclude",
+            "subs/cli/subs/g/**",
+            "--exclude",
+            "subs/cli/subs/u/**"
+          ],
+          "expectedFiles": [
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "actualFiles": [
+            "subs/cli/src/tests/cli.test.ts"
+          ],
+          "selectionMatchesExpected": true,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790859303571,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9644640000000066,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790859303704,\"endTime\":1790859303704.9644,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-correction-w0_4gdis/subs/cli/src/tests/cli.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "disconnected-root-group",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-correction-w0_4gdis",
+            "--config",
+            "/tmp/ramify-boundary-correction-w0_4gdis/vitest.config.mjs",
+            "--reporter=json",
+            "--exclude",
+            "**/src/tmp/**",
+            "--exclude",
+            "fixtures/owned/**",
+            "--exclude",
+            "external/**",
+            "--exclude",
+            "subs/cli/**",
+            "--exclude",
+            "subs/cli-extra/**"
+          ],
+          "expectedFiles": [
+            "src/tests/root.test.ts"
+          ],
+          "actualFiles": [
+            "src/tests/root.test.ts"
+          ],
+          "selectionMatchesExpected": true,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790859304007,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":0.9746209999999991,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790859304133,\"endTime\":1790859304133.9746,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-correction-w0_4gdis/src/tests/root.test.ts\"}]}\n",
+          "stderr": ""
+        },
+        {
+          "name": "disconnected-grandchild-group",
+          "command": [
+            "node",
+            "/ramify/node_modules/vitest/vitest.mjs",
+            "run",
+            "--root",
+            "/tmp/ramify-boundary-correction-w0_4gdis",
+            "--config",
+            "/tmp/ramify-boundary-correction-w0_4gdis/vitest.config.mjs",
+            "--reporter=json",
+            "subs/cli/subs/g/",
+            "--exclude",
+            "**/src/tmp/**"
+          ],
+          "expectedFiles": [
+            "subs/cli/subs/g/src/tests/g.test.ts"
+          ],
+          "actualFiles": [
+            "subs/cli/subs/g/src/tests/g.test.ts"
+          ],
+          "selectionMatchesExpected": true,
+          "stdout": "{\"numTotalTestSuites\":1,\"numPassedTestSuites\":1,\"numFailedTestSuites\":0,\"numPendingTestSuites\":0,\"numTotalTests\":1,\"numPassedTests\":1,\"numFailedTests\":0,\"numPendingTests\":0,\"numTodoTests\":0,\"snapshot\":{\"added\":0,\"failure\":false,\"filesAdded\":0,\"filesRemoved\":0,\"filesRemovedList\":[],\"filesUnmatched\":0,\"filesUpdated\":0,\"matched\":0,\"total\":0,\"unchecked\":0,\"uncheckedKeysByFile\":[],\"unmatched\":0,\"updated\":0,\"didUpdate\":false},\"startTime\":1790859304446,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"fullName\":\"runs\",\"status\":\"passed\",\"title\":\"runs\",\"duration\":1.0130039999999951,\"failureMessages\":[],\"meta\":{},\"tags\":[]}],\"startTime\":1790859304576,\"endTime\":1790859304577.013,\"status\":\"passed\",\"message\":\"\",\"name\":\"/tmp/ramify-boundary-correction-w0_4gdis/subs/cli/subs/g/src/tests/g.test.ts\"}]}\n",
+          "stderr": ""
+        }
+      ]
+    }
+  ]
+}

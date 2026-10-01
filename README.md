@@ -17,17 +17,18 @@ these modules. The rules are few: every cross-module import is closed by
 default, a module shares a symbol only with its parent or with its own
 subtree, and tags restrict, but never widen, what the tree allows. The model
 is specified in the
-[Cross-Module Importability Principles](docs/model/cross-module-importability.principles.md),
+[Cross-Module Importability Specification](docs/model/cross-module-importability.spec.md),
+under the [importability principles](docs/model/cross-module-importability.principles.md),
 with its vocabulary defined in the [Glossary](docs/model/glossary.md).
-The [Directory Structure And Module Description Principles](docs/model/module-description.principles.md)
-define the required `src/` and `subs/` layout, optional same-owner
+The [Directory Structure And Module Description Specification](docs/model/module-description.spec.md)
+defines the required `src/` and `subs/` layout, optional same-owner
 `src/tests/` and `src/interfaces/`, and the `module.ramify` language.
 `expose-src` selects owned exports relative to the module's `src/`, by name or
 with `*` for one explicitly named file beneath `src/interfaces/`;
 `expose-test` selects owned exports relative to its `src/tests/`;
 `expose-sub` selects, by name or `*`, the symbols a direct child exposes to it.
-The [TypeScript Source Interpretation Principles](docs/model/typescript-source-interpretation.principles.md)
-define resource ownership, testing-source isolation, and how TypeScript imports
+The [TypeScript Source Interpretation Specification](docs/model/typescript-source-interpretation.spec.md)
+defines resource ownership, testing-source isolation, and how TypeScript imports
 and source re-exports map to symbol checks. Source checking reports definite
 violations separately from nonblocking analysis limits.
 
@@ -165,8 +166,8 @@ usage, production selection, gate evidence and measurement commands.
 ## Layout
 
 - `docs/model/` - the importability principles and glossary, plus the
-  directory and module-description principles and the source interpretation
-  specification
+  importability, directory and module-description, and source interpretation
+  specifications
   (application-agnostic; travel with the project).
 - `docs/architecture/` - [implementation architecture](docs/architecture/README.md):
   the resident daemon, lightweight CLI, stdio MCP adapter, separate on-demand
@@ -225,7 +226,7 @@ Build output (`site/build/`, `site/.docusaurus/`) is git-ignored.
 | `/explorer` | A preview of the module dependency explorer |
 | `/glossary` | Definitions of the model's vocabulary |
 
-The website is didactical. The internal principles document and glossary
+The website is didactical. The internal principles, specifications and glossary
 together define the complete, authoritative model; the website and
 implementation must conform to them. The model, tags, and glossary pages
 point readers to these documents in `docs/model/`.

@@ -19,8 +19,8 @@ release, or establish implemented capabilities.
 
 The [importability principles](../model/cross-module-importability.principles.md),
 [glossary](../model/glossary.md),
-[module-description format](../model/module-description.principles.md) and
-[TypeScript interpretation](../model/typescript-source-interpretation.principles.md)
+[module-description format](../model/module-description.spec.md) and
+[TypeScript interpretation](../model/typescript-source-interpretation.spec.md)
 govern the data's meaning. Visualization introduces no additional import rules.
 
 ## Evidence and current implementation

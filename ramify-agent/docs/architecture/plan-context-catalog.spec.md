@@ -8,6 +8,11 @@ commit `0109c84c` revised, and the element catalog that
 Where those documents ask for more exactness than this one allows, this
 document wins.
 
+The 2026-10-01 document split preserves these contracts. Specifications inform
+initial plan review under
+[Principles Guide Implementation; Specifications Constrain the Plan](../harness.principles.md#principles-guide-implementation-specifications-constrain-the-plan).
+Specification discovery and that review remain implementation work.
+
 ## Why the catalog exists
 
 The catalog was created to deliver the relevant context to each agent in an efficient way. It is the bounded view of the plan that an agent works from,
@@ -25,13 +30,29 @@ source needs to state one requirement so that it can be understood,
 selected and honored on its own: a bullet, a paragraph, a table with its
 heading, or a whole section with its example and the qualifications that
 bound it. The interpretation of an exposure statement in the
-module-description principles, some 1,400 characters with an example and
-four qualifications, is one element; cut shorter it would be a rule without
+module-description specification, some 1,400 characters with an example and
+four qualifications, is one element when incorporated into a plan; cut shorter it would be a rule without
 the conditions that make it true. A Constraints list of five unrelated
 bullets is five elements, because each is selected and assessed apart from
 the others. Extraction places the cuts so that no element needs another to
 be read correctly, and a long element is the ordinary case, not an
 exception.
+
+## Specifications inform the reviewed plan
+
+At the beginning, review the plan against applicable specifications for
+compatibility, missing obligations and required specification changes. Carry
+the relevant obligations into the reviewed plan, retaining their source and
+the acceptance evidence the work must provide. A compatibility judgment alone
+does not supply those requirements.
+
+Those obligations enter the catalog as functional or non-functional requirements
+of the plan, according to their meaning. Specifications do not independently
+populate the fixed-requirement catalog or receive a separate recurring assessment
+against implementation. When a material change to the plan, including a recorded
+plan deviation, affects a specification, review that change against the affected
+specification and carry the resulting obligations through the plan's ordinary
+requirement and deviation handling.
 
 ## Five kinds of element
 

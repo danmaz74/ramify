@@ -166,7 +166,7 @@ touches was re-read at commit `71643d5` (the [verified starting
 point](main-plan.md#verified-starting-point)). All five previously proposed
 owned-exposure lines above are confirmed byte-for-byte correct against the
 current files and current grammar
-([format specification](../../model/module-description.principles.md)); none
+([format specification](../../model/module-description.spec.md)); none
 needed correction:
 
 | Owner | Line | Verdict |

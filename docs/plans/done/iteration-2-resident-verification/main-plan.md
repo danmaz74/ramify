@@ -64,7 +64,7 @@ requires.
 
 | Document | Role |
 | --- | --- |
-| [Importability principles](../../../model/cross-module-importability.principles.md), [glossary](../../../model/glossary.md), [module descriptions](../../../model/module-description.principles.md), [TypeScript interpretation](../../../model/typescript-source-interpretation.principles.md) | Definitive rules the daemon enforces unchanged; this plan adds no importability rule. |
+| [Importability principles](../../../model/cross-module-importability.principles.md), [glossary](../../../model/glossary.md), [module descriptions](../../../model/module-description.spec.md), [TypeScript interpretation](../../../model/typescript-source-interpretation.spec.md) | Definitive rules the daemon enforces unchanged; this plan adds no importability rule. |
 | [Daemon and analysis](../../../architecture/daemon.md) | Ownership tree, exposure paths, context identity, revisions, freshness, invalidation, service operations and DA01–DA18. |
 | [Processes and clients](../../../architecture/processes-and-clients.md) | Process split, shared service boundary, command roles, launch/shutdown/recovery contract, entry points and PC01–PC10. |
 | [Memory lifecycle](../../../architecture/memory-lifecycle.md) | Dependency boundaries, retention and backpressure policy, measurement recipe and ML01–ML08. |

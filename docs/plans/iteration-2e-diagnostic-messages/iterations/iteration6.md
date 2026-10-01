@@ -12,7 +12,7 @@ Every coverage note says which construct, what could not be established, and tha
 
 - Main plan: Contract rule 5.
 - `subs/analysis/subs/typescript/src/accesses.ts:160-410`, `catalog.ts:190-850`, `interfaces/source.ts:89-100`.
-- `docs/model/typescript-source-interpretation.principles.md:420-449`.
+- `docs/model/typescript-source-interpretation.spec.md:420-449`.
 
 ## Deliverables
 

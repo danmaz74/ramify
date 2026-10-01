@@ -42,8 +42,8 @@ same identities, facts and decisions in later plans.
 | Document | Role |
 | --- | --- |
 | [Importability principles](../../../model/cross-module-importability.principles.md) and [glossary](../../../model/glossary.md) | Definitive ownership, visibility, tags, source areas and testing-origin rules. |
-| [Module-description principles](../../../model/module-description.principles.md) | Definitive layout, version 1 grammar, exact paths, wildcards and README convention. |
-| [TypeScript interpretation](../../../model/typescript-source-interpretation.principles.md) | Definitive original resolution, resource identity, source forms and coverage policy. |
+| [Module-description specification](../../../model/module-description.spec.md) | Definitive layout, version 1 grammar, exact paths, wildcards and README convention. |
+| [TypeScript interpretation](../../../model/typescript-source-interpretation.spec.md) | Definitive original resolution, resource identity, source forms and coverage policy. |
 | [Architecture](../../../architecture/README.md) and [daemon design](../../../architecture/daemon.md) | Ownership boundaries, reusable engine, coherent inputs and later resident service. |
 | [Processes](../../../architecture/processes-and-clients.md), [memory](../../../architecture/memory-lifecycle.md) and [quick testing](../../../architecture/quick-testing.spec.md) | Entry-point separation, resource cleanup and real-service verification. |
 | [CLI invocation](../../../architecture/cli-invocation.spec.md) | Root and configuration discovery, scope, warnings, output and exit behavior of `ramify check`. |

@@ -5,9 +5,9 @@ iteration 1. This document freezes fixture causes and independent expectations;
 it does not establish implementation availability or architectural acceptance.
 The [main-plan matrix](main-plan.md#reference-acceptance-matrix),
 [reference contract map](../../reference-project/contract-map.md), and authoritative
-[description](../../../model/module-description.principles.md),
-[importability](../../../model/cross-module-importability.principles.md), and
-[source](../../../model/typescript-source-interpretation.principles.md) rules govern
+[description](../../../model/module-description.spec.md),
+[importability](../../../model/cross-module-importability.spec.md), and
+[source](../../../model/typescript-source-interpretation.spec.md) rules govern
 these records. The matrix's family mapping remains attached to every child
 instance; passing one instance never passes an entire family.
 

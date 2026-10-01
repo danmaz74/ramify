@@ -67,9 +67,10 @@ hosting for MCP is an optional extension; stdio is the initial MCP transport.
 
 Implementation architecture conforms to the
 [importability principles](../model/cross-module-importability.principles.md),
+[importability specification](../model/cross-module-importability.spec.md),
 [glossary](../model/glossary.md),
-[module-description format](../model/module-description.principles.md) and
-[TypeScript interpretation](../model/typescript-source-interpretation.principles.md).
+[module-description format](../model/module-description.spec.md) and
+[TypeScript interpretation](../model/typescript-source-interpretation.spec.md).
 Processes and package entry points are deployment boundaries; they confer no
 source-level importability. All toolkit runtime code remains inside declared
 owners, with legal exposure channels and source classifications.

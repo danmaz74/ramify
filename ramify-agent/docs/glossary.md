@@ -2,6 +2,9 @@
 
 **Status:** Proposed
 
+Included-scope vocabulary adopted 2026-10-01; the corresponding whole-tree
+scope implementation remains pending.
+
 ## Purpose
 
 Define the vocabulary of the [harness principles](harness.principles.md) and
@@ -11,6 +14,10 @@ and the design; this companion defines their terms.
 Ramify's own vocabulary is defined in the toolkit's
 [model glossary](../../docs/model/glossary.md) and
 [agents glossary](../../docs/agents/glossary.md) and is not repeated here.
+
+Use **test-shaped file** as defined in ramify-audit's
+glossary: `ramify-audit:docs/glossary.md#test-shaped-file`. This reference names
+the separate repository and does not require a sibling checkout.
 
 For search space, delivered-change complexity, token efficiency and their
 selected measurements, use the [metrics glossary](metrics/glossary.md).
@@ -224,6 +231,16 @@ and each invocation's end. It is raw output, never quoted in a record.
 A **point** is a place in a [session](#session) from which a later invocation
 may continue it or fork from it: the end of one of its invocations, or the
 result of one append to it.
+
+## Included child
+
+An **included child** is a child module whose entire subtree is included in
+an assignment's scope, subject to the scope's external and ignored-tree rules.
+
+## Included tree
+
+An **included tree** is an owned-ignored tree of an assigned module explicitly
+included, whole, in the assignment's scope.
 
 ## Vertical work
 

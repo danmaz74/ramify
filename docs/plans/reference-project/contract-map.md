@@ -483,7 +483,7 @@ half, and the harness runs it.
 ### Plan 8 — signature companions
 
 [Plan 8](../iteration-8-signature-companions/main-plan.md) enforces the
-[companion rule](../../model/cross-module-importability.principles.md#exposure-requires-available-signature-companions):
+[companion rule](../../model/cross-module-importability.spec.md#exposure-requires-available-signature-companions):
 an exposure must make the project symbols its symbol's declared signature names
 visible wherever it makes the symbol visible. The baseline had 23 violations, so
 the contract changed where the rule requires it; the principle that a wildcard or

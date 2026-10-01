@@ -33,7 +33,7 @@ scaled. No owner source, harness code or daemon code is written here.
 - Plan 1's [implemented contracts and Plan 2 starting requirements](../../iteration-1-project-verifier/iterations/iteration15-results.md#implemented-contracts-and-plan-2-starting-requirements)
   and its [probe record](../../iteration-1-project-verifier/probes.md) as
   the pattern for probe scripts and archived results.
-- [Module-description principles](../../../../model/module-description.principles.md)
+- [Module-description specification](../../../../model/module-description.spec.md)
   for the manual review of the two new declarations in owners.md.
 
 ## Deliverables

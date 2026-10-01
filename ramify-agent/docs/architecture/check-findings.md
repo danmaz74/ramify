@@ -499,7 +499,7 @@ assignment and the completion request; without the captured ref, the
 fallback below applies.
 
 The brief the reconciliation fork returns follows the
-[harness principle for focused architect forks](../harness.principles.md#an-oriented-context-is-reused-never-required):
+[harness principle for focused architect forks](../harness.spec.md#an-oriented-context-is-reused-never-required):
 the fork returns a concise brief of accepted decisions, which the harness
 appends to the parent context without another model call. Persist decisions
 first; the brief cites those durable records and is appended under an

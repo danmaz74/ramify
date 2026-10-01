@@ -3,6 +3,10 @@
 **Date:** 2026-09-24. **Status:** design analysis for a follow-up plan, not an
 implemented check or an implementation plan.
 
+**Decision, 2026-10-01:** Sealing will be implemented in ramify-agent and will
+cover both `.principles.md` and `.spec.md` files. Cucumber-viz sealing is
+deprecated for Ramify projects. This decision does not establish implementation.
+
 The [CheckFinding architecture](../architecture/check-findings.md) defines the
 shared issue lifecycle and work-item assessment used by this follow-up. Its
 proposed findings child owns disposition rules; seal hooks and save policy

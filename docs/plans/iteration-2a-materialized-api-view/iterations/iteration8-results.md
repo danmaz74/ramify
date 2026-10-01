@@ -426,7 +426,7 @@ final/transient generated paths for inventory and observation" per
 `owners.md`). `materialize` writes each target's catalog to
 `<owner-src>/.ramify/`. When an owner has no ordinary source of its own (a
 pure `expose-sub` aggregator — a legitimate, model-valid layout per
-[module-description.principles.md](../../../model/module-description.principles.md)'s
+[module-description.specification.md](../../../model/module-description.spec.md)'s
 "a module may omit `src/`"), its first materialize call *creates* that
 `src/` directory from nothing, purely to hold the generated catalog. The
 project acquisition step had already probed that path and recorded it

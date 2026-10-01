@@ -26,7 +26,7 @@ The view is derived documentation. It creates no visibility, availability,
 ownership, exposure or source dependency. The
 [importability principles](../model/cross-module-importability.principles.md)
 remain authoritative for those rules, and the
-[TypeScript interpretation](../model/typescript-source-interpretation.principles.md)
+[TypeScript interpretation](../model/typescript-source-interpretation.spec.md)
 remains authoritative for original bindings and export names.
 
 ## Scope

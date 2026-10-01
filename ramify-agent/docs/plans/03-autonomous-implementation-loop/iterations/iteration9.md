@@ -72,7 +72,7 @@ fake, no obligation.
 ### Fake naming
 
 The `contract` gate verifies the
-[fake-naming rule](../../../harness.principles.md#fakes-are-explicitly-named):
+[fake-naming rule](../../../harness.spec.md#fakes-are-explicitly-named):
 a fake file uses `.fake` before the language extension, an exported fake
 implementation, factory or class contains `Fake`, and a re-export preserves the
 designation. The shared contract keeps its behavior-oriented name. A violation

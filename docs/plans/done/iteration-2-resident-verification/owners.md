@@ -5,7 +5,7 @@ manual declaration review passed; direct implementation of the revised package
 was authorized on 2026-09-11. These are the required final declaration texts.
 Implementation and acceptance evidence are verified separately. See [contracts.md](contracts.md) and the
 [review record](probes.md#contract-review). The
-definitive [description principles](../../../model/module-description.principles.md)
+definitive [description specification](../../../model/module-description.spec.md)
 and [importability principles](../../../model/cross-module-importability.principles.md)
 remain authoritative. Plan 1's nine declarations are the
 [implemented starting point](../iteration-1-project-verifier/owners.md);

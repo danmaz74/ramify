@@ -459,7 +459,7 @@ After a run, its scenarios stay in their owner modules.
   of its own.
 - **Onboarding.** A module's scenarios state its behavior in readable form, as
   the principle that
-  [a module carries its own onboarding](../harness.principles.md#a-module-carries-its-own-onboarding)
+  [a module carries its own onboarding](../harness.spec.md#a-module-carries-its-own-onboarding)
   asks.
 
 ## What this changes

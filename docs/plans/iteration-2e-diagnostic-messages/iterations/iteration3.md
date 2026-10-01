@@ -12,7 +12,7 @@ Every parse and link message names the statement, what was found, what the forma
 
 - Main plan: Contract rules 1 to 5.
 - `subs/analysis/subs/descriptions/src/tokenize.ts:40-120`, `parse.ts:40-235`, `link.ts:20-170`, `interfaces/syntax.ts:13-25`, `interfaces/linking.ts:20-27`.
-- `docs/model/module-description.principles.md` sections on statement forms and `:861-899` on validation.
+- `docs/model/module-description.spec.md` sections on statement forms and `:861-899` on validation.
 - The reference harness's substring assertions in `scripts/reference-harness/project-cases.ts` and `linking-cases.ts`.
 
 ## Deliverables

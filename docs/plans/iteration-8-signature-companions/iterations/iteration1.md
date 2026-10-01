@@ -16,9 +16,9 @@ before any source fact exists to feed it.
 - [Importability principles](../../../model/cross-module-importability.principles.md),
   whole; [glossary](../../../model/glossary.md) entries Reach,
   Module-visible symbol and Type-availability;
-  [module description principles](../../../model/module-description.principles.md)
+  [module description specification](../../../model/module-description.spec.md)
   sections "Interface-File Wildcards", "Exposure Evaluation Is Grounded" and
-  "Validation Distinguishes"; [source interpretation principles](../../../model/typescript-source-interpretation.principles.md)
+  "Validation Distinguishes"; [source interpretation specification](../../../model/typescript-source-interpretation.spec.md)
   sections "Explicit Bindings Are Classified Individually" and "Scope And
   Unsupported Forms".
 - `CLAUDE.md` writing conventions.

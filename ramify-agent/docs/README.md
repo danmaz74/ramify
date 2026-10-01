@@ -3,8 +3,12 @@
 Design documents for the separate agent harness:
 
 - [Harness principles](harness.principles.md)
+- [Harness specification](harness.spec.md), scope, verification, scratch,
+  preparation, session behavior and pending specification discovery and sealing
 - [CheckFinding principles](check-findings.principles.md), proposed rules for
   evidence, agent judgment, automatic resolution and user attention
+- [CheckFinding specification](check-findings.spec.md), classification,
+  credibility, settlement, correction rounds and presentation
 - [CheckFinding architecture](architecture/check-findings.md), proposed CheckFinding
   module, background reviews, durable dispositions and work-item reconciliation
 - [Decomposition hypothesis 3](decomposition/dan-hypothesis-3.md), initial draft:
@@ -161,8 +165,8 @@ Design documents for the separate agent harness:
   proposed: the four-kind element catalog extracted in bounded turns and
   checked by an agent, and one package creator that every prompt carrying
   plan or principle material uses; rewritten 2026-09-26 to adhere to the
-  catalog principles
-- [The plan context catalog: purpose and fidelity](architecture/plan-context-catalog.principles.md),
+  catalog specification
+- [The plan context catalog: purpose and fidelity](architecture/plan-context-catalog.spec.md),
   Dan's decisions of 2026-09-26: the catalog is the bounded view an agent works
   from, with four kinds of element, kept as faithful as the technology allows
   and not more; a fork of the warmed-up local architect selects the

@@ -1,14 +1,13 @@
 # Project boundary and whole-tree ownership
 
-**Date:** 2026-09-30, revised 2026-10-01. **Status:** decided, not
-implemented. It records the decisions of the 2026-09-30 design discussion and
-the 2026-10-01 simplification that removed the nested-project kind. Once
-implemented, it changes the
-[module description principles](../model/module-description.principles.md),
-the [CLI invocation contract](cli-invocation.spec.md#files-outside-modules),
-the harness's write-scope and test-selection rules in ramify-agent, and
-ramify-audit's treatment of nested trees. Until then those documents stand.
-Syntax and plan breakdown are left to the implementation plan.
+**Date:** 2026-09-30, revised 2026-10-01. **Status:** adopted in the owning
+principles, specifications and glossaries on 2026-10-01; not implemented. This document records
+the design decisions, implementation recipes and migration guidance. Section 13
+links to the authoritative principles, specifications and vocabulary. The existing CLI and
+runtime contracts describe current behavior until their implementations and
+contracts are migrated. Nested-tree statement syntax must be completed in the
+module-description specification before parser implementation; the implementation
+plan schedules that work and the remaining delivery.
 
 ## 1. Why
 
@@ -31,16 +30,18 @@ configuration and unselected files are silent.
 
 - Every file beneath the project root belongs to exactly one module: the
   nearest enclosing module, minus the subtrees of its children under `subs/`
-  and minus its declared nested trees. The root is a module and owns what no
-  child owns, including the project's configuration, documentation and
+  and minus its declared external trees and the unowned paths of section 7.
+  Owned-ignored trees and scratch directories retain their module owner.
+  The root is a module and owns what no child owns, including the project's
+  configuration, documentation and
   repository host files.
 - Write permission works at module level. An agent that may edit a module's
   code may edit that module's configuration, documentation and other owned
   files, and may not edit anyone else's. An owned-ignored tree is written
   only where an assignment includes it, per section 10.
-- The only exceptions are declared nested trees, of two kinds, in section 5.
-  Part of the project means belongs to a module; not part of the project
-  means as if it did not exist.
+- Declared nested trees, in section 5, and always-excluded paths, in section 7,
+  define the exclusions. Exclusion from Ramify analysis does not by itself
+  remove module ownership for audit attribution or authorize a write.
 - Ramify gives every guarantee such a system can give and no more. Where a
   rule can rest only on a convention, the convention is accepted and named.
 
@@ -48,8 +49,11 @@ configuration and unselected files are silent.
 
 Owning a file does not mean inventorying it. Ownership is a function of the
 path alone, answered from the module tree and the declared boundaries, for a
-file that exists, one about to be created or one just deleted. The inventory
-keeps exactly what the analysis reads and fingerprints: descriptions,
+file that exists, one about to be created or one just deleted. ramify-audit
+uses that ownership to attribute changes and select verification. Ramify's
+source checks apply only to analyzed files; ownership alone does not make a
+file analyzed. The harness separately enforces assignment write authority.
+The inventory keeps exactly what the analysis reads and fingerprints: descriptions,
 READMEs, package manifests, configuration, compiler source and referenced
 resources. Documentation, plans and other inert owned files are never listed,
 never hashed and never watched.
@@ -153,8 +157,8 @@ nothing here.
 
 **Rules common to both.** The directory lies beneath the declaring
 module's directory and outside every child module. An `owned-ignored`
-directory must exist; an `external` one need not, since a scratch directory
-or a tool cache is absent in a fresh checkout and is as if it did not exist
+directory must exist; an `external` one need not, since a tool's output
+directory or cache is absent in a fresh checkout and is as if it did not exist
 either way. An `external` directory lies outside the declaring module's
 `src/`; only `owned-ignored` may lie beneath `src/tests/`. Discovery does not
 descend into either.
@@ -202,7 +206,7 @@ in [docusaurus.config.ts](../../site/docusaurus.config.ts). The example
 project imports nothing from the toolkit; it is a check target, not a
 dependent.
 
-## 7. Not part of the project
+## 7. Analysis exclusions
 
 Nothing is derived from the repository's ignore rules. It is the project's
 responsibility to declare the directories Ramify must not enter. A path is
@@ -211,12 +215,31 @@ from the tree and the descriptions, so every checkout agrees whatever its
 local exclude files say:
 
 1. Always excluded: the repository's metadata directory, installed packages,
-   the compiler configuration's output directories and Ramify's own generated
-   paths.
+   the compiler configuration's output directories, Ramify's own generated
+   paths and each module's scratch directory, below.
 2. A declared `external` tree, per section 5: not owned, as if it did not
-   exist. Scratch directories, tool caches and build outputs that are not the
+   exist. Tool output directories, caches and build outputs that are not the
    compiler's are declared this way.
 3. A declared `owned-ignored` tree, per section 5: owned, never entered.
+
+Always-excluded paths other than module scratch directories are outside
+module ownership. Scratch directories belong to their module and are
+writable within that module's assignment scope; their
+exclusion concerns Ramify analysis and test selection.
+
+**Scratch directory.** The directory `tmp` directly beneath a module's
+`src/` is that module's scratch directory: a place for throwaway files such
+as comparison checkouts, logs and helper scripts, inside the subtree an agent
+scoped to the module works in. It is always excluded, at that position only:
+Ramify never enters it, inventories nothing in it and reports nothing about
+its contents, whatever they look like, so nothing there is analyzed or
+reaches a production build. A module therefore cannot keep source at
+`src/tmp`. Before scratch is used, the harness adds any missing rules to the
+project's `.gitignore`, preserving existing rules and avoiding duplicates.
+This also applies to scratch directories of newly introduced modules. The
+project remains responsible for an exclusion in the compiler configuration,
+which otherwise selects `src/`. Compiler-selected source inside a scratch directory
+is a warning that names the exclusion to add.
 
 An undeclared unversioned directory is an ordinary owned directory: it is
 walked for descriptions, and compiler source inside it is analyzed as the
@@ -248,6 +271,43 @@ ever composes another project's verdict.
   ramify-audit's existing project-root and unpinned-dependency rules apply
   there unchanged.
 
+**Project-wide inputs.** Root ownership alone does not
+select every module: the affected query follows reverse imports, not tree
+ancestry. Each project's `ramify-audit.json` may declare `fullAuditPaths`,
+beside `ignorePaths`, to name shared inputs whose changes require a full audit.
+For example, these fields can accompany the project's existing checks:
+
+```json
+{
+  "fullAuditPaths": [
+    "ramify-audit.json",
+    "package.json",
+    "package-lock.json",
+    "tsconfig*.json",
+    "vitest.config.*",
+    "test-setup/**"
+  ]
+}
+```
+
+The list uses the existing project-relative path-pattern syntax: `*` matches
+within one segment and a `**` segment matches zero or more segments. Omission
+means an empty list. Within the project's change set, any matching addition,
+modification or deletion forces a full audit instead of affected-module
+selection; a rename checks both its old and new path. A match takes precedence
+over `ignorePaths`. Other changes follow the ordinary audit policy.
+
+The audit reads the list from the audited commit and records its normalized
+value with the evidence. Reuse and partial-audit baseline compatibility include
+that value, so changing the list invalidates incompatible evidence and requires
+a new full baseline. This is audit policy: it changes neither module ownership
+nor Ramify's source checks and adds nothing to `module.ramify`.
+
+For example, changing `vitest.config.ts` under this policy forces a full audit,
+while changing `scripts/format-report.ts` follows ordinary owner and dependency
+selection. `fullAuditPaths` is a new field to implement in ramify-audit; the
+current configuration parser does not accept it yet.
+
 **Nested audits, on request.** A nested project, for the audit, is a
 directory beneath the project root that carries its own audit definition and
 is neither inside an `external` tree nor opted out by its marker. Nothing in
@@ -277,8 +337,9 @@ that earlier and is left to a later decision.
 
 Selecting a module for testing selects every test-shaped file the module
 owns: the files beneath its directory, minus the subtrees of its children
-under `subs/` and minus its declared nested trees of both kinds. An
-`owned-ignored` tree is excluded because it may hold test-shaped fixtures
+under `subs/`, its declared nested trees of both kinds and always-excluded
+paths, including scratch directories. An `owned-ignored` tree is excluded
+because it may hold test-shaped fixtures
 that must not run. Root selection therefore covers the root's `src/tests/`
 and any root-owned tooling tests alike, and a child with a misplaced
 sibling `tests/` directory has those tests run with the child. Selection is
@@ -286,9 +347,10 @@ the audit's and the harness's business, where a name convention such as
 `.test.ts` is acceptable; it is not classification, which stays Ramify's
 and follows areas.
 
-Which modules are selected is unchanged: the dependency closure over import
-facts for an audit, and the owner plus explicitly included child subtrees
-for an iteration's scoped run. Tree position selects nothing by itself.
+For a partial audit, modules are selected by the dependency closure over
+import facts; a `fullAuditPaths` match instead forces a full audit, per section
+8. An iteration's scoped run selects the owner plus explicitly included child
+subtrees. Tree position selects nothing by itself.
 
 **Through Vitest, without file lists.** The command names directories, not
 files, using two facilities verified in Vitest 4.1.11:
@@ -299,47 +361,89 @@ files, using two facilities verified in Vitest 4.1.11:
 - `--exclude` is a repeatable option adding globs to the configuration's
   exclude list, and an exclusion wins over a filter.
 
-For a selection of modules, one invocation carries: one positional filter
-per selected module, its directory with a trailing slash, and none for the
-root, since no filter means all files; one `--exclude` per child module of a
-selected module that is not itself selected, covering that child's own
-contents; one `--exclude` per declared nested tree of a selected module; and
-the audit's reporters as today. Exact file lists never appear on the
-command line.
+Partition selected modules into groups connected by selected parent-child
+relationships. Each group has one highest selected module. An unselected
+module separates a selected descendant into another group. Run one invocation
+per group, combining their test evidence for the audit or scoped run.
 
-**The subtlety.** Where an unselected child has a selected descendant, the
-child's exclusion must cover its own contents and not its `subs/`. Globs
-cannot subtract, but picomatch's extended syntax can express it, as
-`subs/cli/!(subs)/**` together with `subs/cli/*`. Vitest globs through
-picomatch, where that syntax is on by default. The fallback is one
-invocation per group of selected modules not nested inside an unselected
-one, each with plain `**` exclusions; the closure rarely produces that
-shape.
+This pays Vitest startup once per group, per runner configuration. Under the
+audit's command execution policy, each invocation separately acquires the
+machine test lock and may wait for it. No bound on the number of groups or
+claim about how often a disconnected selection occurs is assumed. One tests
+check may therefore produce several command results and reporter summaries;
+each invocation needs its own summary artifact. Combine them while retaining
+command identity, failures, incomplete results, execution time and lock wait.
+A later passing invocation cannot replace an earlier failure or missing report.
+
+Each invocation carries one positional filter: the group's highest module's
+directory with a trailing slash. If that module is the project root, omit
+all positional filters, including filters for selected children, so root-owned
+tests remain selected. Add one `--exclude <directory>/**` for every unselected
+direct child of every module in the group, excluding that child's entire
+subtree. A selected descendant beneath it runs in its own group. Also exclude
+every declared nested tree of the group's modules and every module's scratch
+directory, and include the audit's reporters as today. Exact file lists never
+appear on the command line.
+
+The earlier extended-glob recipe was rejected by the 2026-10-01 Vitest 4.1.11
+probe: `subs/cli/!(subs)/**` together with `subs/cli/*` also excluded a selected
+grandchild. Separate invocations with whole-subtree exclusions passed the
+isolated selection probe, including root-plus-child selection. The
+[probe archive](evidence/project-boundary-2026-10-01/probe.json) records the
+fixture contents, exact commands, expected and observed files, original
+stdout and stderr, reproduction instructions and limits. These were direct
+Vitest runs; they do not verify audit report aggregation or machine locking.
 
 **Mandate: test first.** Before any plan relies on this recipe, a test
 against the pinned Vitest must establish, on a fixture tree with a root, a
-child, a grandchild, a sibling whose name extends the child's, and one
-nested tree of each kind: that the trailing-slash filter excludes the
-sibling; that the exclusions remove the unselected child and every nested
-tree; that the extended-glob exclusion keeps a selected grandchild under an
-unselected child; and that the reporter's summary lists exactly the
-expected files. If the extended glob fails, the fallback is adopted and the
-recipe's text here is corrected. No selection code is written before that
+child, a selected grandchild and an unselected sibling grandchild, a sibling
+whose name extends the child's, one nested tree of each kind and scratch
+files: that the trailing-slash filter excludes the sibling; that root and
+child selected together retain both owners' tests; that exclusions remove
+unselected modules, nested trees and scratch files; and that a selected
+grandchild under an unselected child runs in a separate group. The combined
+reporter summaries must list exactly the expected files, each once. The
+isolated probe supports the recipe; the implementation must retain these
+cases as executable acceptance. No selection code is written before that
 test passes.
 
-**Two conditions.** The project's Vitest include must cover test-shaped
-files anywhere in the tree, with nested trees and unversioned paths
-excluded; a filter only narrows what the configuration includes, and
-`--passWithNoTests` would hide an omission. And the audit verifies it: the
-tracked files under each selected module, exclusions applied, compared with
-the reporter's summary of files that ran, give a coverage note naming any
-test the runner did not select. That list is internal to the comparison and
-never part of the command. This is the guarantee the harness's per-file
-outside suites were reaching for, obtained without extra runs.
+**Two conditions.** The runner configurations of the project's declared
+test commands must collectively include the required test-shaped files,
+with nested trees and unversioned paths excluded. Each command's filters
+only narrow its configuration's include; `--passWithNoTests` would hide an
+omission. The main Vitest configuration need not include files that another
+declared test command runs.
+
+The audit builds one expected list from tracked test-shaped files owned by
+the selected modules, with the ownership exclusions applied. It compares
+that list with the union of files actually run across all required declared
+test commands and their invocation groups, normalized to project-relative
+paths. A file run by a separate declared check satisfies file coverage even
+when it is absent from the main Vitest summary. Merely declaring that check
+does not remove its files from the expected list or prove that they ran.
+Keep check, command and runner-configuration identity in the evidence: every
+required command must complete, and coverage by another command cannot hide
+its failure or incomplete report. Group invocations of one command must not
+duplicate files; intentional runs under different declared configurations
+remain separate execution evidence.
+
+A required file absent from the combined evidence cannot yield a passing
+audit: run the full suite or report the result indeterminate, as the existing
+partial-audit principle requires. Here a full suite includes all required
+declared test commands and runner configurations, not just the main Vitest
+command. If it still omits a required test, the result remains indeterminate.
+The expected list is internal to the comparison and never part of the
+command. This verifies selection without per-file test invocations.
 
 Tests needing their own runner configuration, as the reference harness does
 today, either fold into the main configuration, which the broad include
-favors, or remain a separately declared command in the audit definition.
+favors, or run as a separately declared command in the audit definition.
+For example, a reference-harness file in that command's summary is covered
+even though the main toolkit summary omits it. Having a separate runner
+configuration or package script alone is insufficient: migration must include
+the command in the audit definition and in scoped verification when its tests
+are required. Today's toolkit audit definition does not yet run the separate
+reference-harness command.
 
 ## 10. Consequences by layer
 
@@ -353,6 +457,8 @@ favors, or remain a separately declared command in the audit definition.
 - A changed check naming a path inside an ignored tree reports it as not
   analyzed, never as passed.
 - Compiler-selected source inside an `owned-ignored` tree is a warning.
+- `tmp` directly beneath a module's `src/` is always excluded, and
+  compiler-selected source inside it is a warning.
 - The affected query answers every in-project path by containment; widening
   for an unowned path applies only outside the project.
 - The outside-module-source warning is retired; its cases become ownership,
@@ -390,8 +496,22 @@ favors, or remain a separately declared command in the audit definition.
   from a nested audit names its project and concerns the module that owns the
   tree, as the agent's CheckFinding documents define.
 - Substantial work on a project inside an ignored tree is a run rooted in
-  that project, not an assignment of the enclosing one. The `outside-modules` purpose, the per-file
-  outside suites and the hook's suppression of outside warnings are removed.
+  that project, not an assignment of the enclosing one.
+- The harness ensures scratch directories are ignored by Git before use,
+  adding missing rules to the project's `.gitignore` without duplicating or
+  replacing existing rules. This setup responsibility applies even when the
+  engineer's assignment does not include the project root.
+- The harness creates the assigned module's scratch directory when an
+  iteration starts, and the engineer writes its throwaway files there, inside
+  its scope. When the iteration closes, whatever its outcome, the harness
+  removes every module's scratch directory, so nothing there outlives the
+  iteration; what must be kept goes through the result or the evidence
+  records. The directory lasts through the iteration's repairs and
+  corrections and is kept when an interrupted iteration resumes; readiness
+  removes any left by an earlier run. Files a person put there are removed
+  with the rest.
+- The `outside-modules` purpose, the per-file outside suites and the hook's
+  suppression of outside warnings are removed.
   The audit adapter's whole-suite substitution stays for the scoped tests
   check, whose narrowing by affected modules it exists for; it no longer has
   a per-file check to misapply to.
@@ -401,9 +521,12 @@ favors, or remain a separately declared command in the audit definition.
   harness principles.
 - A change to an owned non-source file is the owner's change and is
   selected like any other: the owner's tests and those of its transitive
-  importers, through the affected query's dependency closure. At the root
-  that is the whole project. This is a convention, not a derivation: Ramify
-  follows imports, not filesystem reads, so a module that opens the file by
+  importers, through the affected query's dependency closure. This also
+  applies at the root and does not imply whole-project selection; the audit
+  widens to a full audit for a `fullAuditPaths` match, per section 8.
+  Selection by the import graph is a convention,
+  not a derivation: Ramify follows imports, not filesystem reads, so a module
+  that opens the file by
   path while importing nothing from its owner, or a descendant that imports
   nothing from it, is not selected. The full audit every 25 changes and at
   plan end bounds that case, as it bounds every partial audit. The project's
@@ -426,11 +549,25 @@ favors, or remain a separately declared command in the audit definition.
 - Section 8: `external` paths are removed from the change set, and
   widening for `unowned-path` is reserved for paths outside the project.
   The nested flag of section 8 is added to the `audit` command.
+- The optional `fullAuditPaths` list in `ramify-audit.json` forces a full
+  audit for matching changes, before ignore filtering or affected-module
+  selection. Its committed, normalized value is recorded and participates in
+  evidence reuse and partial-audit baseline compatibility.
 - Narrowed Vitest commands follow section 9: directory filters and
   exclusions in place of the current module `src` paths and root file
-  lists, plus the coverage comparison of expected and run files.
+  lists. One tests check may execute several groups, each with its own
+  machine-lock acquisition, command result and summary artifact. Aggregate
+  those results without losing failures or incomplete evidence, then compare
+  expected files with the union of run files across all required declared
+  test commands, including commands with separate runner configurations.
 
 ## 11. Migration of the two projects
+
+The harness adds the scratch ignore rules to each project's `.gitignore`;
+both projects add the compiler exclusions for scratch directories.
+Once ramify-audit supports `fullAuditPaths`, each project adds
+its shared configuration and dependency inputs to that list in its own
+`ramify-audit.json`.
 
 Toolkit:
 
@@ -488,105 +625,35 @@ Of 2026-10-01:
    verifies such an edit.
 10. The harness links dependencies for the audit configuration's package
     directories instead of walking for manifests.
+11. `tmp` directly beneath a module's `src/` is the module's scratch
+    directory, always excluded. The harness adds missing scratch rules to the
+    project's `.gitignore` before use, including for new modules, and preserves
+    existing rules. It creates the assigned module's
+    scratch directory when an iteration starts and removes every module's
+    when the iteration closes.
+12. Each project declares shared inputs in the optional `fullAuditPaths` list
+    in `ramify-audit.json`. A matching change forces a full audit, taking
+    precedence over `ignorePaths`. The list is read from the audited commit,
+    recorded with the evidence and included in reuse and baseline compatibility.
 
-## 13. Proposed principles and glossary entries
+## 13. Adopted principles, specifications and glossary entries
 
-Proposed additions and updates to the owning documents, once the open issues
-are settled. Glossary entries define terms; principles state design rules.
-Shared terms have one definition, reused by the other projects. Detailed
-implementation recipes, diagnostics and migration guidance remain in sections 3 to 11;
-unchanged principles are not repeated here. Provisional qualifications remain
-attached to the affected entries.
+The owning documents now contain the decisions adopted on 2026-10-01. Their
+adoption does not establish runtime support. Detailed implementation recipes,
+diagnostics and migration guidance remain in sections 3 to 11; the exact
+nested-tree statement syntax and executable acceptance remain implementation
+work. Shared terms have one definition and are reused by consumers.
+Repository-qualified references name separate repositories, not sibling checkouts.
 
-### Ramify
-
-Glossary entries, in the model glossary:
-
-1. **Owned contents.** All paths beneath a module's directory except child
-   module subtrees, declared external trees and always-excluded paths;
-   owned-ignored trees remain included.
-   *Updates “Files belonging to a module” rather than adding a second
-   ownership definition.*
-2. **Nested tree.** A directory declared in its enclosing module's
-   description as an owned-ignored tree or an external tree.
-3. **Owned-ignored tree.** An owned nested tree whose contents are excluded
-   from Ramify interpretation.
-4. **External tree.** A nested tree outside the enclosing project's
-   ownership and analysis.
-5. **Always-excluded path.** A path in repository metadata, installed
-   packages, compiler-configured output directories or Ramify's generated
-   directories, outside the enclosing project's ownership and analysis.
-6. **Auxiliary source.** Compiler source a module owns outside its `src/`.
-7. **Containment.** Attribution of a path to its nearest enclosing module
-   within the project's declared boundaries, independently of inventory.
-8. **Package resolution.** Resolution of a bare specifier through a
-   `node_modules` directory, regardless of the resolved real path.
-
-Principles:
-
-1. **Ownership covers the whole project.** Every in-project path must have
-   exactly one module owner, determinable by containment without an inventory
-   entry. Inventory only analysis inputs. Repository ignore rules must not
-   change ownership or analysis boundaries. *Module description, updates
-   ownership and discovery rules.*
-2. **Discovery respects declared boundaries.** Do not descend into nested
-   trees. Report undeclared projects as layout errors and compiler-selected source in
-   owned-ignored trees as warnings. Plain data needs no ignored-tree
-   declaration. *Module description, new; replaces the implicit
-   compiler-configuration boundary.*
-3. **All owned source obeys its owner's rules.** Apply ordinary source tags,
-   testing isolation and importability rules to auxiliary source. Auxiliary
-   source cannot be exposed. *Module description and cross-module
-   importability, new.*
-4. **Imports respect project boundaries.** Imports from analyzed source into
-   any nested tree must use package resolution. Package status follows
-   resolution, not the resolved real path. A project inside an ignored tree
-   uses the enclosing package by convention; its exports are enforced by the
-   toolchain.
-   *Cross-module importability and TypeScript source interpretation, new.*
-5. **Evidence makes analysis boundaries visible.** Architectural evidence
-   must identify owned-ignored trees. Absence of evidence
-   within an unanalyzed tree proves nothing about its contents. *Module
-   architect principles, new.*
-
-### ramify-audit
-
-Glossary entries:
-
-1. **Test-shaped file.** A file whose name matches the configured
-   test-selection pattern, independently of its Ramify source classification.
-
-Principles, as entries in its decision list:
-
-1. **Test selection follows ownership.** Select modules by dependency
-   impact, not ancestry alone. Run their test-shaped files, excluding
-   unselected modules' owned contents and all declared nested trees. Let the
-   runner discover files within those boundaries. *New; the directory-filter recipe
-   remains provisional on the mandated Vitest test and full-run exclusions.*
-2. **Test selection is verified.** Compare expected test-shaped files with
-   files actually run; report omissions as coverage notes. *New.*
-
-### ramify-agent
-
-Glossary entries, in the harness glossary:
-
-1. **Included child.** A child module whose entire subtree is included in an
-   assignment's scope.
-2. **Included tree.** An owned-ignored tree of the assigned module that is
-   included, whole, in an assignment's scope.
-
-Reuse the model glossary's ownership terms and ramify-audit's definition of
-**test-shaped file**, without redefining them in the harness glossary.
-
-Principles, in the harness principles:
-
-1. **Write authority follows module ownership.** A module assignment covers
-   all its owned contents except owned-ignored trees; child subtrees and
-   owned-ignored trees require explicit scope inclusion. Guarded configuration restricts authorization within that
-   ownership. *Updates “Every Agent Scope Is a Cut on the Module Tree”.*
-2. **Verification follows scope and audit policy.** Select the assignment's
-   module and included children using the audit's ownership-based test policy.
-   *New.*
+| Owner | Authoritative document | Adopted content |
+| --- | --- | --- |
+| Ramify model | [Model glossary](../model/glossary.md) | Whole-tree owned contents, nested trees, exclusions, scratch, auxiliary source, containment and package resolution. |
+| Ramify layout | [Module description specification](../model/module-description.spec.md) | Path ownership, explicit discovery boundaries, auxiliary-source rules and non-exposable auxiliary originals. Nested-tree statement syntax remains pending. |
+| Ramify imports | [Importability specification](../model/cross-module-importability.spec.md) | Ownership, auxiliary-source classification and imports across project boundaries. |
+| Ramify source interpretation | [TypeScript source specification](../model/typescript-source-interpretation.spec.md) | Resolution provenance, linked packages, nested-tree violations and explicit excluded analysis. |
+| Ramify architectural evidence | [Module architect principles](../agents/module-architect.principles.md) | Visible owned-ignored boundaries without claims about their contents. |
+| ramify-audit | `ramify-audit:docs/partial-audit.spec.md` and `ramify-audit:docs/glossary.md` | Ownership-based selection, combined required-command evidence, full-audit inputs and separate nested-project evidence; test-shaped files and full-audit paths. |
+| ramify-agent | [Harness specification](../../ramify-agent/docs/harness.spec.md) and [glossary](../../ramify-agent/docs/glossary.md) | Ownership-based write authority, included children and trees, verification by audit policy and scratch lifetime. |
 
 ## 14. Verified current state
 

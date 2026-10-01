@@ -43,7 +43,7 @@ resource paths or the intended owner automatically.
    scope of any automated transformation and review its proposed edits.
 2. Update source, declarations and related references together. Check exposure
    channels, interface wildcard expansion and forwarding aliases against the
-   [format specification](../model/module-description.principles.md).
+   [format specification](../model/module-description.spec.md).
 3. Type-check and test affected consumers, then run available Ramify checks.
    Use `npm run check:self` to verify current toolkit ownership and exposures.
 

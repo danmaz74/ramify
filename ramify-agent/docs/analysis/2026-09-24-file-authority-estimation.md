@@ -26,7 +26,7 @@ The harness principle [Trust Follows Provenance](../harness.principles.md#trust-
 already gives more weight to human-reviewed material and its direct
 derivatives. [An Executable Specification Is a Translation](../harness.principles.md#an-executable-specification-is-a-translation)
 explains why a test's interpretation does not replace the semantic
-specification. The [CheckFinding principles](../check-findings.principles.md#credibility-follows-provenance)
+specification. The [CheckFinding specification](../check-findings.spec.md#credibility-follows-provenance)
 apply provenance to the credibility of findings.
 
 The [earlier authority analysis](2026-09-24-file-authority-and-provenance.md#one-classification-used-twice)

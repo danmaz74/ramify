@@ -305,14 +305,14 @@ exposure channels. Generating coarse visibility may be useful, but the adapter
 must retain Ramify checking instead of claiming exact equivalence. Forbidden
 imports should be reported, not silently dropped to create an incomplete build.
 [Bazel visibility](https://bazel.build/concepts/visibility),
-[Ramify importability](../model/cross-module-importability.principles.md).
+[Ramify importability](../model/cross-module-importability.spec.md).
 
 **Bazel packages are additional boundaries.** Adding BUILD files changes package
 membership and recursive globs. A per-module package layout can align with
 Ramify's separate `src/` and `subs/` ownership, but existing packages, grouped
 compilation and generated files require explicit treatment.
 [Bazel glob behavior](https://bazel.build/reference/be/functions#glob),
-[Ramify layout](../model/module-description.principles.md).
+[Ramify layout](../model/module-description.spec.md).
 
 ## A practical integration shape
 

@@ -14,7 +14,7 @@ becomes a located request, the model decides it, and the decision keeps its evid
 
 ## Read first
 
-- [TypeScript interpretation principles](../../../../model/typescript-source-interpretation.principles.md):
+- [TypeScript interpretation specification](../../../../model/typescript-source-interpretation.spec.md):
   explicit bindings classified individually, forwarding, `.js` substitution,
   aliases, written form versus checked form, symbol-free loads and their
   testing-origin checks.

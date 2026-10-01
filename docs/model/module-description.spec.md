@@ -1,24 +1,26 @@
-# Directory Structure And Module Description Principles
+# Directory Structure And Module Description Specification
 
-**Status:** Active specification; filesystem loading and parsing are not yet
-implemented in the toolkit. The existing evaluator also predates the resolved
-tag registry and separate classification of module-owned `src/tests/` source.
+**Status:** Active specification. Whole-tree ownership and declared nested-tree
+boundaries were adopted on 2026-10-01 and are not yet implemented. Nested-tree
+semantics are adopted; their concrete syntax is pending and must be completed
+in this specification before parser implementation. The implementation plan
+schedules that work. The exposure grammar below remains specified independently.
 
 **Format version:** 1
 
 ## Purpose
 
-Define the required directory structure and the complete syntax and interpretation
+Define the required directory structure and the specified syntax and interpretation
 of `module.ramify`, the file that declares a Ramify module and its exposures.
 This document is authoritative for the concrete format.
 
-The [Cross-Module Importability Principles](cross-module-importability.principles.md)
+The [Cross-Module Importability Specification](cross-module-importability.spec.md)
 and [Glossary](glossary.md) remain authoritative for importability semantics
 and vocabulary. This format records those rules. It adds no exposure channel,
 tag rule, or consumer dependency requirement.
 
 The separate
-[TypeScript Source Interpretation Principles](typescript-source-interpretation.principles.md)
+[TypeScript Source Interpretation Specification](typescript-source-interpretation.spec.md)
 defines how resources, consumer imports, and source re-exports are resolved
 and checked, including testing-source isolation and bounded analysis coverage.
 It does not change this document's declaration grammar.
@@ -37,7 +39,7 @@ It does not change this document's declaration grammar.
 - Give parsers and validators one precise interpretation of every declaration.
 - Preserve original symbol identity and tags across aliases and exposure chains.
 
-## Principles
+## Specification
 
 ### A Description File Establishes A Directory Boundary
 
@@ -55,13 +57,17 @@ directory. A directory without a description file is an ordinary directory,
 including when it groups several modules. It introduces no module or ancestry
 level. No `parent` or `children` declaration overrides physical containment.
 
-For a file `f` in the application tree, its owner is the deepest module
-directory containing `f`. Every application source file must additionally
-lie under its owner's `src/`, including `src/tests/` and `src/interfaces/`.
-These directories belong to the same module; neither is a submodule.
-Attribution of a file outside that source root does
-not make its placement valid. Descriptions, documentation, and other
-non-implementation files may live at the module root.
+Every in-project path has exactly one module owner: its nearest enclosing
+module, excluding child-module subtrees, declared external trees and
+always-excluded paths other than the module's scratch directory. Owned-ignored
+trees remain owned. The root owns configuration, documentation and other paths
+that no child owns. Ownership is determined for existing, new and deleted
+paths without requiring an inventory entry.
+
+Ownership does not imply analysis or write permission. Inventory only inputs
+the analysis reads and fingerprints; inert owned files need not be listed,
+hashed or watched. Repository ignore rules change neither ownership nor
+analysis boundaries.
 
 A present but invalid description is an invalid boundary declaration. A
 loader must report it; it must not silently omit the module and attribute
@@ -84,27 +90,29 @@ check, separate from description parsing and source checks.
 ### Discovery Covers The Application Tree
 
 Discovery visits the selected application root recursively and validates the
-placement of every description. Every non-root module must lie strictly
-beneath its parent's `subs/`, optionally through ordinary grouping directories.
+placement of every description outside excluded trees. Every non-root module
+must lie strictly beneath its parent's `subs/`, optionally through ordinary
+grouping directories.
 The `src/` and `subs/` containers themselves are not module roots. No module
-description may occur anywhere inside a module's `src/`, including its
-`src/tests/` and `src/interfaces/` directories.
+description interpreted by this evaluation may occur inside a module's
+`src/`, including its `src/tests/` and `src/interfaces/` directories.
 
-Discovery must detect misplaced descriptions, including those inside `src/`
+Within the discovered tree, detect misplaced descriptions, including those inside `src/`
 or outside `subs/`, and report layout errors. It must not ignore
 them as ordinary files. Existing projects must adopt this layout before their
 descriptions can be accepted; adding marker files alone is not sufficient.
 
-The caller supplies the application source set and discovery exclusions for
-installed dependencies, generated outputs, and independent projects. These
-are project inputs, not per-module ownership globs. Each application source
-file must lie within the selected root and outside excluded directories.
-Excluded files cannot be referenced as application-owned exports. Application
-implementation must not be excluded merely to bypass the required layout.
-Repository build configuration and tooling may be outside the application
-source set; executable application code and its same-owner tests and helpers
-belong in the owning module's `src/`, with the classification of their source
-area. The nested `src/tests/` area has its own testing profile.
+Discovery exclusions are the declared nested trees and always-excluded paths.
+Never infer an independent project boundary merely from a `tsconfig.json` or
+from the root compiler's selection. An undeclared directory that is not a
+module's own directory and contains a root description or package manifest is
+a layout error. An excluded description is not interpreted by this evaluation.
+
+Analyze all owned compiler source outside those exclusions, including source
+the compiler configuration did not select. Auxiliary source uses its owner's
+ordinary classification. Compiler-resolution limitations remain explicit
+coverage notes; omitting owned source from the compiler configuration does
+not exempt it from analysis.
 
 A TypeScript dependency or standard-library file does not become application
 source merely because the compiler loads it. Treatment of external packages
@@ -116,7 +124,7 @@ The caller also supplies one resolved tag registry for the entire evaluation;
 omission uses Ramify's default registry. Validate it before interpreting any
 module's tag declarations. Registry definitions are project-level input, never
 local declarations or overrides in `module.ramify`. The registry contract is
-specified by the importability principles; its configuration serialization
+specified by the importability specification; its configuration serialization
 and explicit default-replacement operation are outside this version 1 grammar.
 
 The selected root must be a real directory, not a symlink. Directory symlinks
@@ -124,6 +132,42 @@ are not traversed during discovery. A symbolic-link description file or a
 `from` path traversing a symlink is a validation error in version 1. Filesystem
 aliases must not introduce alternative ownership trees or permit a reference
 to escape its checked boundary.
+
+### Declared Nested Trees Bound Interpretation
+
+The following semantics are adopted. Concrete declaration syntax remains pending.
+
+A module declares each nested tree in its own description, using a directory
+relative to the module and one of two kinds: `owned-ignored` or `external`.
+The directory must lie beneath that module and outside every child module.
+An `owned-ignored` directory must exist; an `external` directory need not.
+External trees must lie outside the declaring module's `src/`; owned-ignored
+trees may lie within owned source, including `src/tests/`.
+
+Do not descend into either kind. Owned-ignored contents retain their owner but
+are never inventoried, compiled by Ramify, checked or watched. External contents
+have no owner in this evaluation. Plain data needs no declaration. A project
+within an owned-ignored tree is data to the enclosing evaluation and a separate
+project when selected as its own root.
+
+Warn about compiler-selected source within an owned-ignored tree. A declaration
+does not prevent another runner or tool from executing the tree's contents;
+that limitation is a convention, not a Ramify guarantee. Imports into declared
+nested trees follow the source-interpretation boundary rule.
+
+The declarations extend version 1 beside exposure statements. Their exact
+tokens and grammar are not yet specified; implementations must not invent
+syntax from the kind names alone. Complete the grammar in this specification
+before implementing or claiming syntax validation for these declarations.
+
+### Always-Excluded Paths Do Not Enter Analysis
+
+Exclude repository metadata, installed packages, compiler-configured output
+directories, Ramify's generated paths and `tmp` directly beneath each module's
+`src/`. These paths are unowned except for module scratch directories.
+Scratch contents are not analyzed. Warn when compiler configuration selects
+source there. Repository ignore settings neither create nor remove these
+exclusions.
 
 ### The Required Layout Separates Own Source And Submodules
 
@@ -166,34 +210,20 @@ to the same module and may contain ordinary subdirectories, but no declared
 submodules. Tests have a distinct classification; `interfaces/` retains the
 ordinary source classification. Helpers and resources follow their source area.
 `subs/` contains child modules, optionally through ordinary grouping
-directories, and no loose parent-owned application source. Each child repeats
-the same separation in its own directory.
+directories. Loose compiler source beneath `subs/` outside a child module
+belongs to the parent as auxiliary source. Each child repeats the same
+separation in its own directory.
 
-For every application source file `f` and module `M`, a valid layout satisfies:
-
-> `owner(f) = M` if and only if `f` is beneath `<M>/src/`.
+Source beneath `<M>/src/` belongs to `M` unless excluded from ownership;
+the converse does not hold, since ownership also includes auxiliary source
+and non-source files outside `src/`.
 
 A leaf may omit `subs/`; a module may omit `src/tests/` or `src/interfaces/`
 when it has no files for that directory. A module with files only beneath
 `src/tests/` has testing source but no ordinary implementation source.
-If its `src/` is absent on disk, tooling must
-create that exact directory before launching implementation work; it must
-never substitute the module root or `subs/` as the implementation scope.
 Descriptions and module documentation live alongside `src/` and `subs/`.
-A sibling `<module>/tests/` or `<module>/interfaces/` is not an owned source
-location.
-
-An implementation agent's working directory and default code-search root
-are the module's `src/`, including its tests and interface vocabulary. A
-production-only search must exclude testing-classified source: `src/tests/`
-and the ordinary `src/` of modules tagged `testing`. The launcher
-must supply the module description,
-relevant documentation, and permitted contracts as initial context. Expanding
-reads beyond that scope is deliberate navigation; write authority is checked
-separately. A directory layout alone is not a write-access control mechanism.
-Work on the module's owned tests uses its `src/tests/` scope without entering child
-implementations. If that scope is absent, create that exact directory before
-launching work there; do not substitute a child module or the module root.
+A sibling `<module>/tests/` or `<module>/interfaces/` is owned but has no
+special classification or exposure role; compiler source there is auxiliary.
 
 Adding a new child leaves existing parent source in place. Extracting an
 ordinary implementation directory into a child requires moving its source
@@ -215,6 +245,12 @@ including `src/interfaces/`. Omission means the empty set. The fixed
 `src/tests/` area has a fixed derived profile: `testing` plus every header tag
 whose resolved kind is required importer. Required-symbol tags are not inherited.
 This profile cannot be overridden or extended.
+
+Auxiliary source uses the ordinary profile, including testing isolation and
+all tag rules. It may access same-owner internals under the usual exemption;
+foreign symbols need ordinary exposure. Auxiliary originals cannot be exposed,
+including through forwarding aliases beneath `src/`. A test-shaped filename
+outside `src/tests/` does not create testing classification.
 
 Classify a file beneath `src/tests/` with the test profile before applying
 the ordinary `src/` profile. The two areas are disjoint even though their
@@ -267,7 +303,7 @@ Non-testing-classified source cannot import or re-export testing-classified
 source, including same-owner source, forwarding paths, and runtime loads.
 Other same-owner imports remain free of exposure and symbol-tag checks. This
 source isolation is specified by the importability and source interpretation
-principles; it is not an additional exposure destination.
+specifications; it is not an additional exposure destination.
 
 ### Interface Vocabulary Belongs Inside The Owned Source Root
 
@@ -312,6 +348,8 @@ name nor identifier assigns tags or confers importability.
 
 A version 1 description contains a version header, one module declaration,
 and zero or more `expose-src`, `expose-test`, or `expose-sub` statements.
+The adopted extension also declares nested trees beside those statements;
+its syntax remains pending.
 It is parsed as data and never executed.
 There are no expressions, variables, imports, includes, conditional blocks,
 or configuration inheritance.
@@ -332,7 +370,7 @@ Comments explain architectural intent. Tools editing this file must preserve
 authored comments and report the resulting ownership, classification, or
 exposure changes. The format does not prescribe an approval workflow.
 
-### The Language Has One Formal Grammar
+### Specified Version 1 Exposure Grammar
 
 Files are UTF-8, optionally beginning with one UTF-8 byte-order mark. Keywords
 are case-sensitive. Line endings may be LF or CRLF; a final newline is optional.
@@ -349,8 +387,9 @@ Before applying the following grammar, the parser:
 4. Terminates each remaining line with one LF, including a final line that
    originally had no newline.
 
-The EBNF below describes that normalized input. Commas outside quotes mean
-concatenation, `|` means alternatives, `{ ... }` means zero or more repetitions,
+The EBNF below describes the specified exposure language; the adopted
+nested-tree statement extension is pending syntax definition. Commas outside
+quotes mean concatenation, `|` means alternatives, `{ ... }` means zero or more repetitions,
 and `[ ... ]` means optional. Quoted text denotes a literal token. The special
 terminals `BARE-NAME`, `BARE-MODULE-NAME`, `STRING`, `SPACE`, `TAB`, and `LF`
 are defined immediately below the grammar.
@@ -523,11 +562,13 @@ substitution, extension probing, implicit `index.ts`, or search for a file
 exporting the selected name. Each selection identifies an exact export name
 of that target, including `default` for a default export. The target file and
 the selected export must both belong directly to the declaring module.
+The original binding must be defined beneath that owner's `src/`; forwarding
+an auxiliary original through a file beneath `src/` cannot make it exposable.
 
 A resource file in the application source set is a valid `expose-src` or
 `expose-test` target, subject to the same root, path, and ownership constraints
 as other targets. Its export names and original binding identities follow the adopted
-[resource interpretation](typescript-source-interpretation.principles.md#resource-bindings-belong-to-the-resolved-resource).
+[resource interpretation](typescript-source-interpretation.spec.md#resource-bindings-belong-to-the-resolved-resource).
 The effective declaration describing the resource supplies its export names;
 for JSON, TypeScript supplies the export description itself. A shim does not
 change the resource's owner or merge its bindings with another resource's.
@@ -567,7 +608,7 @@ vocabulary, but the selector does not impose a separate ban on function exports.
 It neither discovers other files nor exposes types merely referenced by a
 selected binding's signature. Those types are the binding's signature
 companions, and the
-[companion rule](cross-module-importability.principles.md#exposure-requires-available-signature-companions)
+[companion rule](cross-module-importability.spec.md#exposure-requires-available-signature-companions)
 requires the owner to expose them by their own statements.
 
 Eligibility is checked after the ordinary path normalization and ownership
@@ -584,8 +625,9 @@ Expansion produces the pairs `(exported name, original symbol)` that named
 selections of all the file's exports would produce, with names unchanged.
 Every selected original must belong to the declaring module. A same-owner
 forwarding alias is valid and preserves the original binding and its tags,
-even if that binding is defined outside `src/interfaces/`. A foreign-owned
-forwarding export makes the declaration invalid; expansion must not silently
+even if that binding is defined outside `src/interfaces/`, provided it remains
+beneath the owner's `src/`. A foreign-owned forwarding export makes the
+declaration invalid; expansion must not silently
 skip it or assign ownership. Resource exports follow the same effective export
 description and resource-identity rules as named selections. An incomplete or
 ambiguous export description cannot yield a valid partial expansion.
@@ -742,7 +784,8 @@ expansion can copy existing names and identities but cannot invent an origin.
 ### Tags Are Assigned Once Per Original Symbol
 
 The module header's optional `tagged` clause declares the module's complete
-tag set and classifies its ordinary `src/` area, including `src/interfaces/`.
+tag set and classifies its ordinary source, including `src/interfaces/` and
+auxiliary source.
 Omission means the empty set. The fixed derived profile classifies the nested
 `src/tests/` area, as described above. Neither profile classifies separately
 owned submodules.
@@ -851,7 +894,7 @@ evaluation finite and independent of statement order. Sets combine duplicate
 exposures without adding permissions. An empty wildcard contributes neither
 a name nor an exposure and is valid.
 
-These sets determine visibility under the importability principles. A module
+These sets determine visibility under the importability specification. A module
 also receives ancestor exposures to descendants, but needs no statement to
 receive them. The grammar has no ancestor-provider form because forwarding
 those symbols would add no visibility. Tag compatibility is checked for
@@ -874,8 +917,9 @@ application model from descriptions containing them:
 | An unquoted reserved keyword used as a name | Keywords cannot identify exports, aliases, modules, or children without quoting |
 | Invalid module name or duplicate sibling name | Module identity is ambiguous |
 | Missing root description or an invalid nested description | The ownership tree cannot be accepted |
-| A module declared inside `src/` (including tests or interfaces), at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
-| A file outside a module's `src/` included as that module's application source | The file is outside the module's source areas; other project files merely present outside them do not invalidate module descriptions |
+| An interpreted module declared inside `src/` (including tests or interfaces), at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
+| An exposure selecting an original defined in auxiliary source | Auxiliary originals cannot be exposed, including through forwarding aliases |
+| A nested-tree declaration outside its owner's contents, an external tree beneath `src/`, or a missing owned-ignored directory | The declared boundary is invalid |
 | Missing source path, excluded target, symlink traversal, escape from the statement's `src/` or `src/tests/` root, or a non-file target | The source reference has no valid application target |
 | A source file owned by another module or a foreign forwarding export claimed as owned | Source references cannot transfer ownership |
 | An `expose-sub` name that is not a declared direct child | The reference does not identify a permitted provider |
@@ -963,9 +1007,9 @@ diagnostics for TypeScript source forms separately from the `module.ramify`
 parser. Analysis limits in a completed source check are nonblocking by default;
 invalid descriptions or registries still fail model validation.
 
-The existing evaluator accepts constructed module trees with the earlier
-module-only classification model; it does not yet support the resolved registry,
-distinguish owned `src/` and `src/tests/` importers, enforce testing-source isolation,
-discover directories, parse this language, or resolve TypeScript exports.
-Those integrations must implement this specification before tooling can
-claim support for `module.ramify` version 1.
+The adopted whole-tree ownership, auxiliary-source and nested-tree rules are
+not yet implemented. Specification adoption does not establish parser or
+checker support; the nested-tree syntax must be specified before implementation.
+
+Tooling must identify the version 1 features it implements and report missing
+required analysis explicitly.

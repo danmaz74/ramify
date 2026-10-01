@@ -17,7 +17,7 @@ toolkit source moves and no checker code is written here.
   Reports and exit behavior, Reference acceptance matrix.
 - [Daemon architecture](../../../../architecture/daemon.md): Ramify's ownership
   tree, Responsibilities and public contracts, Exposure paths.
-- [Module-description principles](../../../../model/module-description.principles.md)
+- [Module-description specification](../../../../model/module-description.spec.md)
   in full; the other model documents as the drafts require.
 - [Reference contract map](../../../reference-project/contract-map.md) for the
   exposure statement IDs the matrix names.

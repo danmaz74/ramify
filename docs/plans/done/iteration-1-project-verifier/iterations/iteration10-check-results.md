@@ -14,8 +14,8 @@
   "reasoning": "Reviewed all four selected constraints. Nine focused tests pass, but a compiler-backed probe confirms one resolution contradiction introduced by the diff. No other concrete contradictions were established. No repository files were edited.",
   "issues": [
     {
-      "constraintPath": "docs/model/typescript-source-interpretation.principles.md",
-      "constraintId": "docs/model/typescript-source-interpretation.principles.md#principles-md",
+      "constraintPath": "docs/model/typescript-source-interpretation.spec.md",
+      "constraintId": "docs/model/typescript-source-interpretation.spec.md#principles-md",
       "ruleId": "principles-md",
       "severity": "important",
       "issue": "In subs/analysis/subs/typescript/src/resolution.ts:131, the new .jsx substitution list places .js before .jsx and changes relative-import resolution incorrectly. Reproduced with src/use.ts importing './init.jsx', plain scripts at both src/init.js and src/init.jsx, and no TypeScript counterparts. With allowJs/checkJs enabled, jsx: 'preserve', and bundler resolution, TypeScript 7.0.2 exits successfully and its trace resolves src/init.jsx. The real analysis pipeline instead targets src/init.js and reports a checked, allowed symbol-free load with empty coverage. The previous .jsx substitution list selected src/init.jsx.",
@@ -42,8 +42,8 @@
       ]
     },
     {
-      "path": "docs/model/module-description.principles.md",
-      "id": "docs/model/module-description.principles.md#principles-md",
+      "path": "docs/model/module-description.spec.md",
+      "id": "docs/model/module-description.spec.md#principles-md",
       "ruleId": "principles-md",
       "score": 0.64,
       "selectedBy": [
@@ -51,8 +51,8 @@
       ]
     },
     {
-      "path": "docs/model/typescript-source-interpretation.principles.md",
-      "id": "docs/model/typescript-source-interpretation.principles.md#principles-md",
+      "path": "docs/model/typescript-source-interpretation.spec.md",
+      "id": "docs/model/typescript-source-interpretation.spec.md#principles-md",
       "ruleId": "principles-md",
       "score": 1,
       "selectedBy": [

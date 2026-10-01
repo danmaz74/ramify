@@ -9,7 +9,7 @@ adds or removes. Implementation and acceptance evidence are verified
 separately by the gates. [contracts.md](contracts.md) holds the exact
 signatures and wire schemas, [scope.md](scope.md) the lifecycle decisions
 and [subcases.md](subcases.md) the executable instances. The definitive
-[description principles](../../model/module-description.principles.md) and
+[description specification](../../model/module-description.spec.md) and
 [importability principles](../../model/cross-module-importability.principles.md)
 remain authoritative. Plan 1's nine declarations and Plan 2's eleven-owner
 completion are the implemented starting point:

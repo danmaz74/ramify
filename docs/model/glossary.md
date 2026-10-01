@@ -2,17 +2,20 @@
 
 **Status:** Active
 
+Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01;
+the corresponding tooling changes are not yet implemented.
+
 ## Purpose
 
 Define the authoritative vocabulary for the
-[Cross-Module Importability Principles](cross-module-importability.principles.md).
-The principles document contains the complete rules; this companion defines
-their terms. Together, these two internal documents define the model. The
+[Cross-Module Importability Specification](cross-module-importability.spec.md).
+The specification contains the detailed rules; this companion defines
+their terms. Together with the principles, these documents define the model. The
 website's glossary is a reader-facing copy and must conform to these
 definitions.
 
 The concrete directory layout and declaration language are defined in
-[Directory Structure And Module Description Principles](module-description.principles.md).
+[Directory Structure And Module Description Specification](module-description.spec.md).
 
 ## ramify module
 
@@ -26,15 +29,55 @@ module, which is a single file.
 
 ## Files belonging to a module
 
-We say that a file **belongs** to a module when that file is contained by that module's
-declared `src/` directory, including `src/tests/` and `src/interfaces/`.
-The concrete layout places child modules under `subs/`; no part of `src/`
-may contain another module declaration.
+A module's **owned contents** are all paths beneath its directory except
+child-module subtrees, declared external trees and always-excluded paths
+other than its scratch directory; owned-ignored trees remain included.
+
+## Nested tree
+
+A **nested tree** is a directory declared in its enclosing module's
+description as an owned-ignored tree or an external tree.
+
+## Owned-ignored tree
+
+An **owned-ignored tree** is an owned nested tree whose contents are excluded
+from Ramify interpretation.
+
+## External tree
+
+An **external tree** is a nested tree outside the enclosing project's
+ownership and analysis.
+
+## Always-excluded path
+
+An **always-excluded path** is a path in repository metadata, installed
+packages, compiler-configured output directories, Ramify's generated
+directories or a module's scratch directory, excluded from Ramify analysis.
+
+## Scratch directory
+
+A **scratch directory** is the module-owned directory `tmp` directly beneath
+its `src/`, for throwaway files excluded from Ramify analysis.
+
+## Auxiliary source
+
+**Auxiliary source** is compiler source a module owns outside its `src/`.
+
+## Containment
+
+**Containment** is attribution of a path to its nearest enclosing module
+within the project's declared boundaries, independently of inventory.
+
+## Package resolution
+
+**Package resolution** is resolution of a bare specifier through a
+`node_modules` directory, regardless of the resolved real path.
 
 ## Source area
 
-A module's **source areas** are ordinary source under `src/` excluding
-`src/tests/`, and the optional testing source under `src/tests/`.
+A module's **source areas** classify analyzed owned source as ordinary or
+testing. Ordinary source includes source under `src/` outside `src/tests/`
+and auxiliary source; testing source is under the optional `src/tests/`.
 They share one owner and the same module-scoped visibility, but can have
 different importer classifications. A source area is not a child module and
 creates no exposure channel.
@@ -52,9 +95,8 @@ module's header. Its optional `src/tests/` still uses the fixed derived profile.
 The separate owner needs ordinary exposure and tag compatibility to import
 another owner's symbols, including its parent's private exports.
 
-Every owned source file uses exactly one area's classification: the profile for
-`src/tests/` takes precedence over the ordinary profile of its containing `src/`
-directory.
+Every analyzed owned source file uses exactly one area's classification: the
+profile for `src/tests/` takes precedence over the ordinary profile.
 An arbitrary nested directory or a `*.test.ts` filename does not create another
 area or override its tags. A test-looking file under `src/` but outside
 `src/tests/` has the ordinary source classification. There are no per-file
@@ -180,8 +222,8 @@ always in its reach; every other module is added by exposure.
 
 ## Module-exposed symbol
 
-A module M can **expose** any symbol S which is visible in M. The exposure can be
-one of two types:
+A module M can **expose** a symbol S visible in M whose original is not
+auxiliary source. The exposure can be one of two types:
 
 - Expose to parent: S becomes exposed to M's parent
 - Expose to descendants: S becomes exposed to all of M's descendants
@@ -209,8 +251,9 @@ module's declared tag set and classifies the module's ordinary source.
 
 ## Module tagging
 
-Tags assigned in a module header classify its ordinary `src/` area. By default,
-a module has no tags. Its same-module `src/tests/` area follows the separate
+Tags assigned in a module header classify its ordinary source, including
+auxiliary source. By default, a module has no tags. Its same-module `src/tests/`
+area follows the separate
 test-area profile rules, retaining every required-importer tag in the module
 header. Submodules declare their own tags; module tags are not inherited by
 child modules.
