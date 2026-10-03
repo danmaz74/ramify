@@ -210,7 +210,15 @@ interrupted. `--changed`, `--since` and `--deadline` do not apply.
 
 ### Hook and complete checks
 
-`check` has three forms with distinct roles.
+`check` has three forms with distinct roles. They apply the same rules to the
+same project and differ only in how they reach the result. Whenever the hook
+check answers, its findings and exit code are exactly those the complete check
+would report on the project as it stands after the change. It is quicker only
+because it analyzes the change against the daemon's retained baseline instead
+of analyzing the whole project again. It never judges the named paths alone,
+and a named path the complete check does not analyze cannot change its result.
+When it cannot establish that result within its bounds, it answers not checked
+with exit 2; it never substitutes an approximate result.
 
 | Form | Role | Waits for | Answers not checked |
 | --- | --- | --- | --- |
