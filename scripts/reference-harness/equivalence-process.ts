@@ -20,7 +20,8 @@ export async function readTrace(path: string): Promise<TraceEvent[]> {
   let content: string;
   try { content = await readFile(path, 'utf8'); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
-  return content.split('\n').filter(Boolean).map(line => JSON.parse(line) as TraceEvent);
+  // The daemon appends whole lines; an unterminated tail is still being written.
+  return content.slice(0, content.lastIndexOf('\n') + 1).split('\n').filter(Boolean).map(line => JSON.parse(line) as TraceEvent);
 }
 export interface SequenceProcess {
   /** The installed Node entry. The process probe observes Node only, never the compiled client. */
