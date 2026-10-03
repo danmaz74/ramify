@@ -16,7 +16,7 @@ import { ModelDiagramSvg } from '../ModelDiagram.js';
 
 /**
  * The checked-in SVGs are the emitter's output, and this file is what keeps
- * them honest: it renders exactly what `scripts/emit-diagrams.ts` renders and
+ * them honest: it renders exactly what `subs/presentation/scripts/emit-diagrams.ts` renders and
  * compares the result to the file on disk, byte for byte.
  *
  * Two things are therefore checked at once - that a diagram still emits what is

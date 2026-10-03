@@ -3,7 +3,9 @@
  *
  * This independent build tool renders
  * the same React component the site embeds, with no selection, once per
- * checked-in diagram definition:
+ * checked-in diagram definition. It is presentation's own source outside
+ * `src/`, classified with presentation's ordinary profile, so it imports this
+ * owner's components and definitions as same-owner source:
  *
  * - `site/static/diagrams/model-core.svg` - the shop, the retired first
  *   diagram (`subs/presentation/src/diagrams/shop.ts`): structure and propagation with
@@ -53,9 +55,9 @@ import {
   type DiagramDefinition,
   type FocusDiagramDefinition,
   type TreeDiagramDefinition,
-} from '../subs/presentation/src/index.js';
+} from '../src/index.js';
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 interface Emission {
   /** Path relative to the project root. */

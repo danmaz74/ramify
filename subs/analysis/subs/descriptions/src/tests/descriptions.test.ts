@@ -188,7 +188,8 @@ const toolkit: readonly Fixture[] = [
     src(['DependencyBoundaryFact', 'DependencyDiagramFacts', 'DependencyDiagramOutcome', 'TestFileReferences', 'TestReferenceFacts',
       'TestReferenceOutcome'], 'interfaces/dependency-diagram.ts'),
     src(['BehavioralDependencyMetrics'], 'interfaces/modularity.ts'),
-    src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts')] },
+    src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts'),
+    sub(['parseDescription'], 'descriptions'), sub(['readPurpose'], 'project')] },
   { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['readRootMarker'], 'parse.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
@@ -197,7 +198,7 @@ const toolkit: readonly Fixture[] = [
     src(['listAvailableOriginals'], 'availability.ts', browser),
     src(['listCompanionViolations'], 'companions.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts'), src(['classifyProjectPath'], 'ownership.ts')] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts'), src(['classifyProjectPath'], 'ownership.ts'), src(['readPurpose'], 'purpose.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
       src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
       src(['describeSymbolDetails', 'DeclarationInputs'], 'symbol-details.ts'), src('*', 'interfaces/dependency-behavior.ts')] },
@@ -216,6 +217,8 @@ const toolkit: readonly Fixture[] = [
     sub(['AnalysisDriver', ...contextNames, 'ContextManagerOptions', 'ContextManager', 'ApiViewQueryLimits', 'WatchBatch',
       'ApiViewRequest', 'ContextApiViewOutcome', 'ContextDependencyFactsOutcome', 'CaptureTimings', 'CaptureWork', 'AffectedRequest',
       'ContextAffectedOutcome', ...controlledNames], 'contexts'),
+    src(['describeRuntime', 'runtimeIdentityPath', 'RuntimeIdentity'], 'discovery.ts'),
+    src(['dependencyWait'], 'service.ts'),
   ] },
   { path: 'subs/daemon/subs/contexts/', name: 'contexts', tags: [], statements: [
     src(['createContextManager'], 'context-manager.ts'),

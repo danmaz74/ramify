@@ -57,3 +57,8 @@ expose-src BehavioralDependencyMetrics from "interfaces/modularity.ts" to parent
 // process runner that root implements.
 expose-src analyzeDependencyDiagram from "dependency-analyzer.ts" to parent
 expose-src * from "interfaces/dependency-analyzer.ts" to parent
+
+// A20: the description parser and the README purpose reader, received from
+// descriptions and project, for the root's final-contract validation.
+expose-sub parseDescription from descriptions to parent
+expose-sub readPurpose from project to parent

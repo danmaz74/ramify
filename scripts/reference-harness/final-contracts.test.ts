@@ -31,7 +31,8 @@ describe('Plan 2 final contract validator', () => {
     // selection arrives as a layer that names the plan which reviewed it.
     for (const [name, owner] of archived) expect(layered.get(name)!.document).toBe(owner.document);
     expect(layered.get('daemon')!.layers!.map(layer => layer.plan))
-      .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)']);
+      .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)',
+        'Phase 1 project boundaries (root tooling access)']);
     for (const owner of layered.values()) for (const layer of owner.layers ?? []) expect(layer.plan.trim()).not.toBe('');
   });
 

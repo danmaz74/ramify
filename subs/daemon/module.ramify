@@ -16,3 +16,7 @@ expose-src startDaemon from "start-daemon.ts" to parent
 expose-src * from "interfaces/daemon.ts" to parent
 // N5: neutral context vocabulary, ports and controlled test ports relayed unchanged.
 expose-sub AnalysisDriver, ContextId, GenerationId, RevisionId, LeaseId, ContextToken, ContextSetup, ContextSelection, InputFingerprints, RevisionCause, ContextRevision, ContextState, SynchronizationState, ContextStatus, ExpectedContent, Freshness, FreshnessRecord, CheckRequest, CheckDelta, UnavailableReason, Unavailable, CheckOutcome, ExplorerDetailsRequest, ContextExplorerDetailsOutcome, DependencyDiagramRequest, ContextDependencyDiagramOutcome, ReplyTimings, OpenOutcome, ContextEvent, SubscriptionHandle, WatchEvent, WatcherHandle, WatcherPort, ClockPort, ContextBudgets, ContextManagerOptions, ContextManager, ApiViewQueryLimits, WatchBatch, ApiViewRequest, ContextApiViewOutcome, ContextDependencyFactsOutcome, CaptureTimings, CaptureWork, AffectedRequest, ContextAffectedOutcome, createControlledWatcher, createControlledClock, ControlledWatcher, ControlledClock from contexts to parent
+// N6: the runtime identity that the root's production build writes and discovery reads.
+expose-src describeRuntime, runtimeIdentityPath, RuntimeIdentity from "discovery.ts" to parent
+// N7: the configured dependency wait, which the root's Plan 2B measurement records against its budget.
+expose-src dependencyWait from "service.ts" to parent

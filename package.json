@@ -62,7 +62,7 @@
     "type-check": "tsc --noEmit && tsc -p tsconfig.portable.json && tsc -p tsconfig.scripts.json && tsc -p scripts/reference-harness/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "diagrams": "tsx scripts/emit-diagrams.ts",
+    "diagrams": "tsx subs/presentation/scripts/emit-diagrams.ts",
     "site:dev": "npm --prefix site run start -- --port 4300",
     "site:build": "npm --prefix site run build",
     "site:serve": "npm --prefix site run serve -- --port 4301",

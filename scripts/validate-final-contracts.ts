@@ -408,6 +408,26 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 5: what the root's scripts import
+  // from other owners. Daemon exposes the runtime identity the production
+  // build writes and the dependency wait the Plan 2B measurement records;
+  // analysis re-exposes this script's description parser and README purpose
+  // reader to the root. Root re-exposes none of them.
+  { plan: 'Phase 1 project boundaries (root tooling access)',
+    added: {
+      'subs/analysis/': [
+        'expose-sub parseDescription from descriptions to parent',
+        'expose-sub readPurpose from project to parent',
+      ].join('\n'),
+      'subs/analysis/subs/project/': [
+        'expose-src readPurpose from "purpose.ts" to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-src describeRuntime, runtimeIdentityPath, RuntimeIdentity from "discovery.ts" to parent',
+        'expose-src dependencyWait from "service.ts" to parent',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** The expected selections: the archived list, then each named layer in turn.

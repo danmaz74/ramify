@@ -32,7 +32,7 @@ const apiViewLimits: ApiViewQueryLimits = {
 
 /** Plan 2B's dependency wait for the architect view, on the service clock: the pause after
  * each busy answer, and the limit of the whole wait from its first request. */
-export const dependencyWait = Object.freeze({ intervalMs: 250, limitMs: 125_000 });
+export const dependencyWait: Readonly<{ intervalMs: number; limitMs: number }> = Object.freeze({ intervalMs: 250, limitMs: 125_000 });
 
 /** How the dependency wait ended: facts to render with, or no publication at all. */
 type DependencyWait =
