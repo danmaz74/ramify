@@ -180,7 +180,7 @@ describe('revision capture timings', () => {
 });
 
 describe('BD23: service capability negotiation', () => {
-  const welcome = (capabilities: readonly string[]) => ({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1',
+  const welcome = (capabilities: readonly string[]) => ({ type: 'welcome', welcome: { protocol: 'ramify.ipc/2',
     instance: { instanceId: 'daemon-1', pid: 1, version: '0.0.0', engine: 'engine', buildKey: '0000000000000000' },
     capabilities, limits: { maxRequestBytes: 1, maxResponseBytes: 1, leaseMs: 1, pingMs: 1 } } });
   it('accepts the dependencyDiagram capability beside the existing capabilities and still rejects unknown names', () => {
@@ -204,5 +204,55 @@ describe('BD23: service capability negotiation', () => {
     expect(decodeMessage(encodeMessage(message as never))).toEqual(message);
     for (const name of ['affected-modules', 'Affected', 'affect']) expect(() => encodeMessage(welcome([name]) as never))
       .toThrow('Invalid IPC message schema');
+  });
+});
+
+describe('ramify.ipc/2: the strict context-status scope carries its ownership table', () => {
+  const token = { context: `ctx/1:${'b'.repeat(64)}`, generation: 'gen/1:00000000-0000-4000-8000-000000000001' };
+  const ownership = {
+    modules: [{ id: 'app', parent: null, directory: '.' }, { id: 'app/a', parent: 'app', directory: 'subs/a' }],
+    exclusions: [{ kind: 'output', directory: 'dist', owner: null }, { kind: 'external', directory: 'external-project', owner: null },
+      { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' },
+      { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' }],
+  };
+  const scope = { root: '/project', selection: 'given', invokedFrom: '/project', configuration: '/project/tsconfig.json',
+    walkedAreas: ['src', 'src/tests'], independentScopes: [], ownership };
+  const status = (value: unknown) => ({ token, selection: { root: '/project', scope: 'whole-project', configuration: 'discover',
+    setup: { registry: 'registry', capabilities: [] } }, scope: value, state: 'warm', synchronization: 'synchronized', published: null,
+  lastValid: null, pending: { requests: 0, changedPaths: 0, analysisRunning: false }, history: { retained: 0, bytes: 0, oldest: null },
+  retainedBytes: 0, leases: { subscriptions: 0, requests: 0 }, watcher: 'active', openedAt: 1, lastActivityAt: 1, level: 'warm',
+  session: null, demoting: false, unresponsiveSince: null });
+  const event = (value: unknown) => ({ type: 'event', seq: 1, subscription: 'subscription-1',
+    event: { type: 'status-changed', token, current: status(value), coalesced: 0 } });
+
+  it('round-trips a scope with modules and owned and unowned exclusions, and a null scope', () => {
+    for (const value of [scope, { ...scope, ownership: { modules: [], exclusions: [] } }, null]) {
+      expect(decodeMessage(encodeMessage(event(value) as never))).toEqual(event(value));
+    }
+  });
+
+  it('rejects a scope without its ownership table or with a malformed one', () => {
+    const { ownership: _ownership, ...missing } = scope;
+    const exclusion = (value: unknown) => ({ ...scope, ownership: { ...ownership, exclusions: [value] } });
+    for (const value of [missing, { ...scope, ownership: null }, { ...scope, ownership: { modules: [] } },
+      { ...scope, ownership: { ...ownership, extra: [] } },
+      { ...scope, ownership: { ...ownership, modules: [{ id: 'app', directory: '.' }] } },
+      { ...scope, ownership: { ...ownership, modules: [{ id: 'app', parent: 1, directory: '.' }] } },
+      exclusion({ kind: 'scratch', directory: 'src/tmp', owner: null }), exclusion({ kind: 'owned-ignored', directory: 'x', owner: null }),
+      exclusion({ kind: 'external', directory: 'x', owner: 'app' }), exclusion({ kind: 'packages', directory: 'node_modules', owner: 'app' }),
+      exclusion({ kind: 'ignored', directory: 'x', owner: null }), exclusion({ kind: 'output', directory: 1, owner: null }),
+      exclusion({ kind: 'output', directory: 'dist' })]) {
+      expect(() => encodeMessage(event(value) as never)).toThrow('Invalid IPC message schema');
+    }
+  });
+
+  it('accepts only the version 2 protocol in a welcome', () => {
+    const welcome = (protocol: string) => ({ type: 'welcome', welcome: { protocol,
+      instance: { instanceId: 'daemon-1', pid: 1, version: '0.0.0', engine: 'engine', buildKey: '0000000000000000' },
+      capabilities: ['contexts'], limits: { maxRequestBytes: 1, maxResponseBytes: 1, leaseMs: 1, pingMs: 1 } } });
+    expect(decodeMessage(encodeMessage(welcome('ramify.ipc/2') as never))).toEqual(welcome('ramify.ipc/2'));
+    for (const protocol of ['ramify.ipc/1', 'ramify.ipc/0', 'ramify.ipc/3']) {
+      expect(() => encodeMessage(welcome(protocol) as never)).toThrow('Invalid IPC message schema');
+    }
   });
 });

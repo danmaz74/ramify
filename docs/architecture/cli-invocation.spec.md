@@ -225,7 +225,7 @@ opens the project context and requests synchronized freshness from the
 resident daemon, and never falls back to batch. `--batch` answers from a fresh
 session over the same root, with the same capabilities as `check --batch`, in
 the same process seam, and disposes it. `--format json` prints one
-`ramify.affected-cli/1` document with the root, the mode, the revision's
+`ramify.affected-cli/2` document with the root, the mode, the revision's
 sequence (null in batch) and input identity, and the selection; failures use
 `ramify.cli/1`. It exits 0 for any answer, including one widened to all
 modules, 1 for an invalid project, an unknown module ID or an invalid seed,

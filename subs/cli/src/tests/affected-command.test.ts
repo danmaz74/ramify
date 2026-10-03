@@ -70,7 +70,7 @@ async function expectReleased(quick: QuickEnvironment): Promise<void> {
 }
 
 describe('affected command through the real resident service (A7-10)', { timeout: 60_000 }, () => {
-  it('A7-10:json-document: prints one ramify.affected-cli/1 document with root, resident mode, revision and selection', async () => {
+  it('A7-10:json-document: prints one ramify.affected-cli/2 document with root, resident mode, revision and selection', async () => {
     const f = await fixture();
     try {
       const requests: AffectedParams[] = [];
@@ -83,10 +83,10 @@ describe('affected command through the real resident service (A7-10)', { timeout
         freshness: { mode: 'synchronized', expect: [] }, modules: [], paths: ['subs/core/src/interfaces/api.ts'] }]);
       const document = JSON.parse(result.stdout) as AffectedDocument;
       expect(Object.keys(document)).toEqual(['schemaVersion', 'root', 'mode', 'revision', 'ramifyVersion', 'selection']);
-      expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/1', root: f.root, mode: 'resident', ramifyVersion: '0.1.2' });
+      expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/2', root: f.root, mode: 'resident', ramifyVersion: '0.1.2' });
       expect(document.revision.sequence).toEqual(expect.any(Number));
       expect(document.revision.inputId).toMatch(/.+/);
-      expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/1', inputId: document.revision.inputId,
+      expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: document.revision.inputId,
         paths: [{ path: 'subs/core/src/interfaces/api.ts', module: 'example/core', basis: 'inventory' }],
         changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
         selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',

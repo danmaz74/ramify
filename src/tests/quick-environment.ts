@@ -50,7 +50,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
   const stopListener = service.onStop(value => { stopped = value; });
   const through = (message: WireMessage) => decodeMessage(encodeMessage(message));
   function record(): DaemonRecord {
-    return { schemaVersion: 'ramify.daemon-record/1', ...instance, protocol: 'ramify.ipc/1',
+    return { schemaVersion: 'ramify.daemon-record/1', ...instance, protocol: 'ramify.ipc/2',
       socket: '/quick', startedAt, state: stopped ? 'stopped' : 'running', stopped };
   }
   const connect: ServiceConnector = async options => {
@@ -60,10 +60,10 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
     const lease = service.lease(randomUUID());
     let closed = false, seq = 0;
     const requests = new Map<string, AbortController>();
-    const hello = through({ type: 'hello', handshake: { protocol: 'ramify.ipc/1',
+    const hello = through({ type: 'hello', handshake: { protocol: 'ramify.ipc/2',
       client: { name: 'quick', version: instance.version }, buildKey: instance.buildKey, engine: instance.engine } });
     if (hello.type !== 'hello') throw new Error('Unexpected quick handshake');
-    const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/1', instance,
+    const welcome = through({ type: 'welcome', welcome: { protocol: 'ramify.ipc/2', instance,
       capabilities: ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views', 'affected'],
       limits: { maxRequestBytes: daemonBudgets.maxRequestBytes, maxResponseBytes: daemonBudgets.maxResponseBytes,
         leaseMs: daemonBudgets.leaseMs, pingMs: daemonBudgets.pingMs } } });

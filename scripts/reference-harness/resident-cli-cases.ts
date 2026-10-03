@@ -87,7 +87,7 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
         const subcase = instance.subcase;
         if (['status-none', 'status-no-start', 'stop-none'].includes(subcase)) {
           const result = await command(p, root, ['daemon', subcase === 'stop-none' ? 'stop' : 'status', '--format', 'json'], a, subcase, 0);
-          a.equal('empty endpoint has no invented record', JSON.parse(result.stdout), { schemaVersion: 'ramify.daemon-status/1', running: false, record: null });
+          a.equal('empty endpoint has no invented record', JSON.parse(result.stdout), { schemaVersion: 'ramify.daemon-status/2', running: false, record: null });
           if (subcase === 'stop-none') a.equal('human absent stop is idempotent', (await p.run(root, ['daemon', 'stop'])).stdout, 'no daemon running\n');
           const events = await readTrace(p.traceFile);
           a.equal('status and stop never launch or listen', events.filter(event => ['spawn', 'listen', 'bind'].includes(event.event)), []);

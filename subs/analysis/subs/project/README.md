@@ -54,6 +54,19 @@ interface eligibility; export expansion, tag assignment and linking arrive in
 iteration 7. README purpose is the first top-level prose paragraph with inline
 formatting rendered as text, or an explicit missing-file/no-paragraph state.
 
+Every inventory's `scope.ownership` is the revision's immutable ownership
+table: the modules, each module's scratch directory `src/tmp`, the compiler
+configuration's output directories and the declared nested trees, byte-ordered
+by directory. `classifyProjectPath` answers the owner of one canonical
+project-relative path from that table alone, without reads or existence checks:
+the first exclusion reached from the root wins, owned-ignored and scratch paths
+keep their owner, and repository, package and generated segments are excluded
+wherever they occur. Declarations are decoded and normalized against their
+module; one that escapes, lies in a child module, overlaps another, places an
+external tree under `src/` or names an always-excluded path contributes no
+exclusion. Discovery does not yet prune declared trees, validate them on the
+filesystem or report invalid declarations.
+
 `isRamifyGeneratedSegment` reserves the generated view names at any depth:
 `.ramify` and `.ramify-architect`, and their publisher siblings
 `.ramify.tmp-<suffix>`, `.ramify.old-<suffix>`, `.ramify-architect.tmp-<suffix>`

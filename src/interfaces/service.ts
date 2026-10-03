@@ -71,7 +71,7 @@ export interface DaemonStatus {
   readonly version: string;
   readonly engine: string;
   readonly buildKey: string;
-  readonly protocol: 'ramify.ipc/1';
+  readonly protocol: 'ramify.ipc/2';
   readonly startedAt: number;
   readonly state: 'running' | 'stopping';
   readonly connections: number;

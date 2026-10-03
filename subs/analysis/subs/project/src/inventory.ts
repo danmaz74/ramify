@@ -1,12 +1,13 @@
-import { basename, join, relative } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import { Capture } from './capture.js';
 import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
+import { buildProjectOwnership, reservedSegmentKind } from './ownership.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import type { DescriptionParser } from '../../descriptions/src/interfaces/syntax.js';
 import type { ConfigurationData } from './configuration-data.js';
-import type { ExactReference, InventoryFile, InventoryModule, OutsideSourceWarning, ProjectInventory, ProjectIssue, ProjectScope } from './interfaces/project.js';
+import type { ExactReference, InventoryFile, InventoryModule, OutsideSourceWarning, ProjectInventory, ProjectIssue, ProjectOwnership, ProjectScope } from './interfaces/project.js';
 
 const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
 /** Compiler-visible source, as distinct from an owned resource. */
@@ -18,7 +19,8 @@ type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[]; meta
   & ({ status: 'complete' } | { status: 'failed'; error: unknown });
 
 export function excludedDirectory(path: string, config: ConfigurationData): boolean {
-  if (['.git', 'node_modules', 'bower_components', 'jspm_packages'].includes(basename(path))) return true;
+  const reserved = reservedSegmentKind(basename(path));
+  if (reserved === 'repository' || reserved === 'packages') return true;
   if ([config.options.outDir, config.options.declarationDir]
     .some(directory => typeof directory === 'string' && within(directory, path))) return true;
   // Only generated scratch conventions use an explicit directory exclusion.
@@ -27,6 +29,16 @@ export function excludedDirectory(path: string, config: ConfigurationData): bool
   return basename(path) === '.reference-work' && config.exclusions.some(exclusion =>
     exclusion.patterns.some(pattern => pattern === '**/.reference-work'
       || join(exclusion.directory, pattern) === path));
+}
+/**
+ * The scope's ownership table for these modules: their declarations, scratch
+ * directories and the configuration's output directories. Reads nothing.
+ */
+export function scopeOwnership(root: string, modules: readonly InventoryModule[], config: ConfigurationData): ProjectOwnership {
+  const outputs = [config.options.outDir, config.options.declarationDir]
+    .filter((directory): directory is string => typeof directory === 'string')
+    .map(directory => relative(root, resolve(root, directory)).split(sep).join('/') || '.');
+  return buildProjectOwnership(modules, outputs).ownership;
 }
 /** One warning per first path entry, in byte order, for outside selected source. */
 export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): readonly OutsideSourceWarning[] {
@@ -38,7 +50,7 @@ export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): re
   return [...groups].sort(([a], [b]) => byteOrder(a, b))
     .map(([entry, files]) => ({ code: 'outside-module-source' as const, entry, count: files.length, files }));
 }
-export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'independentScopes'>,
+export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'independentScopes' | 'ownership'>,
   config: ConfigurationData, parse: DescriptionParser, previousMetadata?: Metadata): Promise<InventoryRead> {
   const metadata: Metadata = {};
   let metadataReused = true;
@@ -65,7 +77,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   function snapshot(): ProjectInventory {
     return freeze({
       scope: { ...scope, walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
-        independentScopes: independentScopes.sort(byteOrder) },
+        independentScopes: independentScopes.sort(byteOrder), ownership: scopeOwnership(capture.root, modules, config) },
       modules: modules.sort((a, b) => byteOrder(a.directory, b.directory)),
       files: files.sort((a, b) => byteOrder(a.path, b.path)), references, outsideModuleFiles,
       warnings: outsideSourceWarnings(outsideModuleFiles),

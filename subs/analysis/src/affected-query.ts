@@ -188,7 +188,7 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
   const changedModules = listed(seedIds);
   const affectedModules = listed([...reached].filter(id => !seedIds.has(id)));
   return { status: 'answered', result: {
-    schemaVersion: 'ramify.affected/1', inputId: facts.inputId, paths: pathSeeds, changedModules, affectedModules,
+    schemaVersion: 'ramify.affected/2', inputId: facts.inputId, paths: pathSeeds, changedModules, affectedModules,
     testModules: widening.length ? listed(modules.keys()) : listed(reached),
     selection: widening.length ? 'all-modules' : 'dependency-closure', widening, scope: facts.scope,
     coverage: { status: partial ? 'partial' : 'complete', notes: [...facts.coverage].sort(locatedOrder) },

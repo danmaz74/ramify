@@ -48,14 +48,14 @@ export async function watchCommand(args: { readonly root?: string; readonly form
     control.signal?.throwIfAborted();
     if (!result.ok) throw serviceFailure(result.error);
     if (result.value.status === 'unavailable' && result.value.reason === 'evicted-revision') {
-      publish({ schemaVersion: 'ramify.watch/1', event: 'revision-evicted', revision, coalesced },
+      publish({ schemaVersion: 'ramify.watch/2', event: 'revision-evicted', revision, coalesced },
         `Revision ${revision.sequence} (evicted before it could be read)`);
     } else if (result.value.status === 'reported' && result.value.published && result.value.report && result.value.revision.revision === revision.revision) {
       const report = result.value.report;
       const human = `Revision ${revision.sequence} (${revision.cause}; ${revision.checked.path}; checked ${revision.checked.files.length} files, ${revision.checked.accesses} accesses; ${revision.timings.total.toFixed(1)} ms)\n`
         + formatHuman(report, `resident (daemon ${connection.daemon.instance.pid}; context ${revision.token.context}; revision ${revision.sequence}; published)`)
           .split('\n').slice(3).join('\n').trimEnd();
-      publish({ schemaVersion: 'ramify.watch/1', event: 'revision', revision, coalesced, report }, human);
+      publish({ schemaVersion: 'ramify.watch/2', event: 'revision', revision, coalesced, report }, human);
     } else throw new CliFailure('unavailable', 'Published revision could not be read', result.value);
     lastSequence = revision.sequence;
   }
@@ -72,7 +72,7 @@ export async function watchCommand(args: { readonly root?: string; readonly form
     subscription = subscribed.value.subscription;
     const current = subscribed.value.current;
     lastSequence = 0;
-    publish({ schemaVersion: 'ramify.watch/1', event: 'status', current },
+    publish({ schemaVersion: 'ramify.watch/2', event: 'status', current },
       `Watching ${current.selection.root} (context ${token.context}, generation ${token.generation})`);
     if (current.published) await render(current.published, 0);
   }
@@ -97,7 +97,7 @@ export async function watchCommand(args: { readonly root?: string; readonly form
         const event = queue.shift();
         if (!event) { await pause(); continue; }
         if (event.type === 'context-evicted') {
-          publish({ schemaVersion: 'ramify.watch/1', event: 'evicted', reason: event.reason },
+          publish({ schemaVersion: 'ramify.watch/2', event: 'evicted', reason: event.reason },
             `Context ${event.token.context} evicted (${event.reason})`);
           if (reopenCount++ > 0) throw new CliFailure('unavailable', 'Watched context was evicted repeatedly', event);
           if (subscription) await connection.unsubscribe({ subscription });
@@ -106,7 +106,7 @@ export async function watchCommand(args: { readonly root?: string; readonly form
           await subscribe();
           environment.stderr(`Context reopened with generation ${token!.generation}\n`);
         } else if (event.type === 'revision-published') await render(event.revision, event.coalesced);
-        else publish({ schemaVersion: 'ramify.watch/1', event: 'status', current: event.current },
+        else publish({ schemaVersion: 'ramify.watch/2', event: 'status', current: event.current },
           `Status: ${event.current.state}; ${event.current.synchronization}; watcher ${event.current.watcher}`);
       } catch (error) {
         control.signal?.throwIfAborted();

@@ -13,7 +13,46 @@ export interface ProjectScope {
   readonly configuration: string;
   readonly walkedAreas: readonly string[];
   readonly independentScopes: readonly string[];
+  /** The revision's containment and exclusion facts; `classifyProjectPath` reads them. */
+  readonly ownership: ProjectOwnership;
 }
+/** One module of the ownership table. Directories are project-relative, `'.'` for the root. */
+export interface PathOwner {
+  readonly id: string;
+  readonly parent: string | null;
+  readonly directory: string;
+}
+/**
+ * A directory Ramify does not enter. Only `owned-ignored` and `scratch`
+ * exclusions keep an owner; every other kind is unowned.
+ */
+export interface ProjectExclusion {
+  readonly kind: 'owned-ignored' | 'external' | 'scratch' | 'repository' | 'packages' | 'output' | 'generated';
+  readonly directory: string;
+  readonly owner: string | null;
+}
+/**
+ * Immutable, revision-bound path ownership: the modules and the rooted
+ * exclusions (declared trees, module scratch directories and configured
+ * output directories), each byte-ordered by directory. Repository, package
+ * and generated exclusions are canonical segment rules of the classifier,
+ * so they apply wherever such a segment occurs, present or not.
+ */
+export interface ProjectOwnership {
+  readonly modules: readonly PathOwner[];
+  readonly exclusions: readonly ProjectExclusion[];
+}
+/**
+ * The ownership of one canonical project-relative path. An owned path may lie
+ * in an owned-ignored tree or a scratch directory, named by `exclusion`;
+ * ownership alone never states that a path was inventoried or checked.
+ */
+export type PathOwnership =
+  | { readonly status: 'owned'; readonly module: string; readonly directory: string;
+      readonly exclusion: ProjectExclusion | null }
+  | { readonly status: 'excluded'; readonly module: null; readonly exclusion: ProjectExclusion }
+  | { readonly status: 'outside-project'; readonly module: null }
+  | { readonly status: 'invalid-path'; readonly message: string };
 export interface CapturedInput {
   readonly path: string;
   readonly role: 'description' | 'readme' | 'source' | 'resource'

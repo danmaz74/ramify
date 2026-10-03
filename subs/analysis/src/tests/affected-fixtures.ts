@@ -10,7 +10,7 @@ import type { AffectedFacts } from '../affected-query.js';
  * provider's file. Expected answers are written by hand in the tests.
  */
 export const scope: ProjectScope = { root: '/project', selection: 'given', invokedFrom: '/project', configuration: 'tsconfig.json',
-  walkedAreas: [], independentScopes: [] };
+  walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } };
 
 const location = (file: string) => ({ file, start: 0, end: 1, line: 1, column: 1 });
 const sourceRoot = (directory: string): string => directory === '.' ? 'src' : `${directory}/src`;

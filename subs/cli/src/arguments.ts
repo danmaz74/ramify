@@ -63,7 +63,7 @@ outside every module widens the answer to all modules, as does partial
 coverage; the widening reasons are printed. Without --batch it is a
 synchronized resident query that never falls back to batch; --batch answers
 from a fresh session that trusts no daemon state. --format json prints one
-ramify.affected-cli/1 document. --changed, --since and --deadline do not apply.
+ramify.affected-cli/2 document. --changed, --since and --deadline do not apply.
 
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in

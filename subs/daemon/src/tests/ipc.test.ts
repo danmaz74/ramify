@@ -371,7 +371,7 @@ import { createMeasureDriver } from './measure-driver.js';
       // The one-module fixture: the seed module changed, nothing depends on it, and the unowned
       // manifest path widens the test selection to every module.
       const root = { id: 'example', directory: '.' };
-      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/1',
+      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/2',
         paths: [{ path: 'package.json', module: null, basis: 'none' }, { path: 'src/index.ts', module: 'example', basis: 'inventory' }],
         changedModules: [root], affectedModules: [], testModules: [root], selection: 'all-modules', widening: ['unowned-path'],
         analysisCheck: 'passed' });
@@ -439,10 +439,10 @@ import { createMeasureDriver } from './measure-driver.js';
     let blocking = true;
     const driver = createMeasureDriver({ modules: [], files: [], outsideModuleFiles: [] }, false, {
       affected: async (query, control) => {
-        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/1',
+        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/2',
           inputId: 'input/1:scripted', paths: [], changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure',
           widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json',
-            walkedAreas: [], independentScopes: [] }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
+            walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
         signals.push(control!.signal!);
         return new Promise(resolve => control!.signal!.addEventListener('abort', () => resolve({ status: 'cancelled' }), { once: true }));
       },

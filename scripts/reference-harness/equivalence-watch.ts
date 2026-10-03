@@ -35,7 +35,7 @@ export async function withLiveWatch<T>(processes: SequenceProcess, root: string,
         // read may finish one line and also contain bytes from the next one.
         assert.ok(Buffer.byteLength(line) <= 32 * 1024 ** 2 + 65536, 'Watch line exceeds response bound');
         const value = object(JSON.parse(line));
-        assert.equal(value.schemaVersion, 'ramify.watch/1', 'Watch must emit versioned JSON lines');
+        assert.equal(value.schemaVersion, 'ramify.watch/2', 'Watch must emit versioned JSON lines');
         queuedBytes += Buffer.byteLength(line);
         assert.ok(queued.length < 256 && queuedBytes <= 64 * 1024 ** 2, 'Watch evidence consumer fell behind');
         queued.push({ value, arrivedAt: performance.now(), bytes: Buffer.byteLength(line) });

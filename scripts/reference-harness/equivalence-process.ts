@@ -90,7 +90,7 @@ export async function withSequenceProcess<T>(operation: (processes: SequenceProc
         assert.equal(outcome.stderr, '');
         assert.equal(outcome.code, 0, `Resident prerequisite unavailable: daemon status exited ${outcome.code}: ${outcome.stdout}`);
         const status = object(JSON.parse(outcome.stdout));
-        assert.equal(status.schemaVersion, 'ramify.daemon-status/1');
+        assert.equal(status.schemaVersion, 'ramify.daemon-status/2');
         return status;
       },
       check: async (root, batch) => {

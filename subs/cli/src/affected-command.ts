@@ -36,7 +36,7 @@ export function formatAffected(document: AffectedDocument): string {
 
 function print(environment: CliEnvironment, format: 'human' | 'json', mode: 'resident' | 'batch', sequence: number | null,
   selection: AffectedSelection): CliExitCode {
-  const document: AffectedDocument = { schemaVersion: 'ramify.affected-cli/1', root: selection.scope.root, mode,
+  const document: AffectedDocument = { schemaVersion: 'ramify.affected-cli/2', root: selection.scope.root, mode,
     revision: { sequence, inputId: selection.inputId }, ramifyVersion: environment.version, selection };
   environment.stdout(format === 'json' ? JSON.stringify(document) + '\n' : formatAffected(document));
   // An all-modules answer is complete and conservative; consumers read `selection` and `widening`.

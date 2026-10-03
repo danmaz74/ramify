@@ -55,7 +55,7 @@ const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedS
   'DescriptionSelection', 'ExposureStatement', 'NestedTreeStatement', 'DescriptionStatement', 'DescriptionDocument',
   'ParsedDescription', 'DescriptionParser'];
 
-const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
+const projectNames = ['ProjectRequest', 'ProjectScope', 'PathOwner', 'ProjectExclusion', 'ProjectOwnership', 'PathOwnership', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
 // Plan 8: the observer's signature companions travel with it, so the root relays the sink too.
@@ -146,7 +146,7 @@ const toolkit: readonly Fixture[] = [
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
     sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),
-    sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'analysis', descendants),
+    sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath', 'classifyProjectPath'], 'analysis', descendants),
     sub([...sourceNames, ...symbolDetailNames], 'analysis', descendants),
     sub([...analysisNames, ...apiViewNames], 'analysis', descendants),
     sub(measurementNames, 'analysis', descendants),
@@ -180,7 +180,7 @@ const toolkit: readonly Fixture[] = [
       'AnalysisDriver', 'WatchBatch', 'CaptureTimings', 'CaptureWork', 'AffectedRequest', 'ContextAffectedOutcome'], 'daemon', descendants),
     sub(['connectDaemon', 'selectEndpoint', 'readDaemonRecord'], 'daemon', descendants),
   ] },
-  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'),
+  { path: 'subs/analysis/', name: 'analysis', tags: [], statements: [sub('*', 'model', both), sub([...syntaxNames, ...linkingNames], 'descriptions', both), sub([...projectNames, ...observerNames, 'isRamifyGeneratedPath', 'classifyProjectPath'], 'project', both), sub([...sourceNames, ...symbolDetailNames], 'typescript', both), src(['validateProject'], 'validation.ts'), src('*', 'interfaces/analysis.ts'), src(['acquireInventory'], 'inventory.ts'), src(['createAnalysisSession'], 'session.ts'), src(['analyzeProject'], 'analyze-project.ts'), src(['resolveProject'], 'resolve-project.ts'), src('*', 'interfaces/session.ts'), src(['openRetainedSession'], 'retained-session.ts'),
     src('*', 'interfaces/measurements.ts'),
     src('*', 'interfaces/affected.ts'),
     src('*', 'interfaces/architect-view.ts'), sub(['ExportKind', 'ExportBehavior', 'TestTitleLimits'], 'typescript'),
@@ -197,7 +197,7 @@ const toolkit: readonly Fixture[] = [
     src(['listAvailableOriginals'], 'availability.ts', browser),
     src(['listCompanionViolations'], 'companions.ts', browser),
   ] },
-  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts')] },
+  { path: 'subs/analysis/subs/project/', name: 'project', tags: [], statements: [src(['readProject'], 'read-project.ts'), src('*', 'interfaces/project.ts'), src(['resolveProjectRoot'], 'resolve-root.ts'), src(['observeProject'], 'observer.ts'), src(['isRamifyGeneratedPath'], 'generated-path.ts'), src(['classifyProjectPath'], 'ownership.ts')] },
   { path: 'subs/analysis/subs/typescript/', name: 'typescript', tags: [], statements: [src(['createSourceAnalysis'], 'source-analysis.ts'), src('*', 'interfaces/source.ts'), src(['createAccessInterpreter'], 'access-interpreter.ts'),
       src(['describeFiles', 'assembleCatalog'], 'descriptions.ts'), src(['createRetainedSourceAnalysis'], 'retained-source-analysis.ts'),
       src(['describeSymbolDetails', 'DeclarationInputs'], 'symbol-details.ts'), src('*', 'interfaces/dependency-behavior.ts')] },

@@ -275,9 +275,9 @@ export function createScriptedDriver() {
  * nothing depends on them. The fake computes no dependency closure. */
 export function scriptedSelection(inputId: string, modules: readonly string[]): AffectedSelection {
   const changed = modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` }));
-  return { schemaVersion: 'ramify.affected/1', inputId, paths: [], changedModules: changed, affectedModules: [], testModules: changed,
+  return { schemaVersion: 'ramify.affected/2', inputId, paths: [], changedModules: changed, affectedModules: [], testModules: changed,
     selection: 'dependency-closure', widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture',
-      configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [] },
+      configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } },
     coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' };
 }
 export async function flush(): Promise<void> { for (let index = 0; index < 80; index++) await Promise.resolve(); }

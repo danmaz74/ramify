@@ -70,7 +70,7 @@ export function validateRecord(value: unknown, endpoint: EndpointSelection): Dae
     'socket', 'startedAt', 'state', 'stopped']) || value.schemaVersion !== 'ramify.daemon-record/1'
     || !text(value.instanceId) || !Number.isSafeInteger(value.pid) || (value.pid as number) <= 0
     || value.buildKey !== endpoint.buildKey || !text(value.version) || !text(value.engine)
-    || value.protocol !== 'ramify.ipc/1' || value.socket !== endpoint.socket || !timestamp(value.startedAt)
+    || value.protocol !== 'ramify.ipc/2' || value.socket !== endpoint.socket || !timestamp(value.startedAt)
     || !['starting', 'running', 'stopped'].includes(value.state as string)) {
     throw new Error(`Malformed or foreign daemon record: ${endpoint.record}`);
   }

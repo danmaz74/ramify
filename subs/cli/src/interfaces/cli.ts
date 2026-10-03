@@ -57,21 +57,21 @@ export interface CheckDocument {
   readonly exitCode: 0 | 1 | 2;
 }
 export type WatchLine =
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'status'; readonly current: ContextStatus }
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'revision'; readonly revision: ContextRevision;
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'status'; readonly current: ContextStatus }
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'revision'; readonly revision: ContextRevision;
       readonly coalesced: number; readonly report: AnalysisReport }
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'revision-evicted';
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'revision-evicted';
       readonly revision: ContextRevision; readonly coalesced: number }
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'evicted' | 'stopped' | 'unavailable';
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'evicted' | 'stopped' | 'unavailable';
       readonly reason: string };
 export type DaemonStatusDocument =
-  | { readonly schemaVersion: 'ramify.daemon-status/1'; readonly running: true; readonly status: DaemonStatus }
-  | { readonly schemaVersion: 'ramify.daemon-status/1'; readonly running: false;
+  | { readonly schemaVersion: 'ramify.daemon-status/2'; readonly running: true; readonly status: DaemonStatus }
+  | { readonly schemaVersion: 'ramify.daemon-status/2'; readonly running: false;
       readonly record: DaemonRecord | null };
 /** One `ramify affected --format json` answer. `revision.sequence` is the resident
  * revision's sequence and null for a batch session. */
 export interface AffectedDocument {
-  readonly schemaVersion: 'ramify.affected-cli/1';
+  readonly schemaVersion: 'ramify.affected-cli/2';
   readonly root: string;
   readonly mode: 'resident' | 'batch';
   readonly revision: { readonly sequence: number | null; readonly inputId: string };

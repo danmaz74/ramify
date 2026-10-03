@@ -25,7 +25,7 @@ export interface AffectedPathSeed {
 }
 export type AffectedWideningReason = 'unowned-path' | 'partial-coverage';
 export interface AffectedSelection {
-  readonly schemaVersion: 'ramify.affected/1';
+  readonly schemaVersion: 'ramify.affected/2';
   /** The revision's observed-input identity; the answer describes exactly these inputs. */
   readonly inputId: string;
   readonly paths: readonly AffectedPathSeed[];

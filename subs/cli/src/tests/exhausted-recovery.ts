@@ -57,11 +57,11 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
           recoveries.push(authorization); events.push('recovery-exhausted');
           if (reason === 'stopped') return { status: 'stopped', record: {
             schemaVersion: 'ramify.daemon-record/1', ...actual.daemon.instance,
-            protocol: 'ramify.ipc/1', socket: '/quick', startedAt: quick.clock.now(), state: 'stopped',
+            protocol: 'ramify.ipc/2', socket: '/quick', startedAt: quick.clock.now(), state: 'stopped',
             stopped: { at: quick.clock.now(), reason: 'explicit', requestId: 'recovery-stop' },
           } };
           return { status: 'unavailable', attempts: 3, reason: reason === 'incompatible'
-            ? { kind: 'incompatible', client: 'ramify.ipc/1', daemon: 'ramify.ipc/2' }
+            ? { kind: 'incompatible', client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' }
             : { kind: 'failure', message: 'Reconnect and restart attempts exhausted' } };
         },
         async closeContext(params) { closeContextCalls++; return actual.closeContext(params); },

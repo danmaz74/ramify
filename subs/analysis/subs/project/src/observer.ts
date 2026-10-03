@@ -3,7 +3,7 @@ import type { Capture } from './capture.js';
 import { acquireProject } from './read-project.js';
 import type { AcquiredProject } from './read-project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, within } from './data.js';
-import { excludedDirectory, inventoryFileKind, outsideSourceWarnings } from './inventory.js';
+import { excludedDirectory, inventoryFileKind, outsideSourceWarnings, scopeOwnership } from './inventory.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
@@ -315,7 +315,8 @@ class Observer implements ProjectObserver {
     }
     const inventory: ProjectInventory = freeze({
       scope: { ...this.#inventory.scope,
-        walkedAreas: nextModules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder) },
+        walkedAreas: nextModules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
+        ownership: scopeOwnership(this.#capture.root, nextModules, this.#configurationData) },
       modules: nextModules, files: nextFiles, references,
       outsideModuleFiles: this.#inventory.outsideModuleFiles,
       warnings: outsideSourceWarnings(this.#inventory.outsideModuleFiles),

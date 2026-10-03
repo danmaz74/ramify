@@ -76,7 +76,7 @@ export function unresolvedOpen(message: string): OpenOutcome {
 
 function record(reason: 'explicit' | 'idle' | 'failed'): DaemonRecord {
   return { schemaVersion: 'ramify.daemon-record/1', instanceId: 'fake', pid: 1, buildKey: '0000000000000000',
-    version: '0.0.0', engine: 'fake', protocol: 'ramify.ipc/1', socket: '/fake', startedAt: 0, state: 'stopped',
+    version: '0.0.0', engine: 'fake', protocol: 'ramify.ipc/2', socket: '/fake', startedAt: 0, state: 'stopped',
     stopped: { at: 0, reason, requestId: null } };
 }
 

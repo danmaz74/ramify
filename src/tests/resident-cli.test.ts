@@ -230,7 +230,7 @@ describe('resident CLI status and eviction stream', () => {
         deliver!({ type: 'context-evicted', token: { ...first.current.token, generation: `gen/1:${randomUUID()}` }, reason: 'pressure' });
         await until(() => lines.some(line => line.event === 'evicted'));
         const index = lines.findIndex(line => line.event === 'evicted');
-        expect(lines[index]).toEqual({ schemaVersion: 'ramify.watch/1', event: 'evicted', reason: 'pressure' });
+        expect(lines[index]).toEqual({ schemaVersion: 'ramify.watch/2', event: 'evicted', reason: 'pressure' });
         await until(() => lines.slice(index + 1).some(line => line.event === 'status'));
         controller.abort(); expect(await running).toBe(130);
         const status = await quick.service.daemonStatus();

@@ -121,7 +121,7 @@ describe('changed check command', { timeout: 30_000 }, () => {
 
   it.each(['failure', 'incompatible', 'explicit-stop'] as const)('keeps %s connections explicit with one compact document and no batch', async kind => {
     const reason: DisconnectReason = kind === 'failure' ? { kind, message: 'failed startup' }
-      : kind === 'incompatible' ? { kind, client: 'ramify.ipc/1', daemon: 'ramify.ipc/2' } : { kind, requestId: null };
+      : kind === 'incompatible' ? { kind, client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' } : { kind, requestId: null };
     const result = await command('/project', async () => ({ status: 'unavailable', attempts: 3, reason, message: 'Unavailable' }));
     expect([result.code, result.stdout.length, result.stderr, result.batchCalls]).toEqual([2, 1, [], 0]);
     expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/1', outcome: 'not-checked',

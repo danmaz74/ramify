@@ -318,7 +318,8 @@ export class ReportDraft {
             registry: { ...this.echo.registry, id: prefix(this.echo.registry.id), definitions: [] },
             capabilities: [...new Set(this.echo.capabilities)].slice(0, 15) };
             if (this.scope) this.scope = { ...this.scope, root: prefix(this.scope.root), invokedFrom: prefix(this.scope.invokedFrom),
-              configuration: prefix(this.scope.configuration), walkedAreas: [], independentScopes: [] };
+              configuration: prefix(this.scope.configuration), walkedAreas: [], independentScopes: [],
+              ownership: { modules: [], exclusions: [] } };
             // For a caller-supplied limit smaller than the mandatory JSON
             // envelope itself, only the fixed control reserve can be returned.
             this.diagnostics.splice(0, this.diagnostics.length, { ...limitDiagnostic, location: null, related: [],

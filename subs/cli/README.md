@@ -41,7 +41,7 @@ snapshot before returning; a resident report drops it when printed. It requires
 `--format json` and is rejected with `--changed`.
 
 `watch` subscribes to context events and fetches each reported revision by its
-exact id. JSON output is one `ramify.watch/1` object per line; an evicted report
+exact id. JSON output is one `ramify.watch/2` object per line; an evicted report
 has an explicit `revision-evicted` line. A bounded queue coalesces replaceable
 updates. Recovery resubscribes once after unexpected loss, and context eviction
 allows one reopen. SIGINT releases the subscription and exits 130.

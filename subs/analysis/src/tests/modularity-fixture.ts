@@ -161,7 +161,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
   };
   const requested = spec.behavior === undefined ? baseCapabilities : [...baseCapabilities, 'dependency-behavior' as const];
   const scope = { root: '/fixture', selection: 'given' as const, invokedFrom: '/fixture', configuration: '/fixture/tsconfig.json',
-    walkedAreas: areas.map(item => item.root), independentScopes: spec.independentScopes ?? [] };
+    walkedAreas: areas.map(item => item.root), independentScopes: spec.independentScopes ?? [], ownership: { modules: [], exclusions: [] } };
   return {
     schemaVersion: 'ramify.analysis/2', runId: 'random', inputId: 'input-1',
     request: { project: { cwd: '/fixture', scope: 'whole-project', configuration: 'discover' }, registry, capabilities: requested,

@@ -20,7 +20,7 @@ const sub = (id: string) => ({ id, directory: `subs/${id}` });
 describe('affected-module projection: graph (A7-01)', () => {
   it('A7-01:chain: A->B->C seeded at C selects A and B as affected and A, B, C as tests', () => {
     expect(select(chain(), ['c'])).toEqual({
-      schemaVersion: 'ramify.affected/1', inputId: 'input/1', paths: [],
+      schemaVersion: 'ramify.affected/2', inputId: 'input/1', paths: [],
       changedModules: [sub('c')], affectedModules: [sub('a'), sub('b')], testModules: [sub('a'), sub('b'), sub('c')],
       selection: 'dependency-closure', widening: [], scope, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
     });

@@ -155,10 +155,20 @@ function selection(value: unknown): boolean {
   return shape(value, ['root', 'scope', 'configuration', 'setup']) && string(value.root) && value.scope === 'whole-project'
     && value.configuration === 'discover' && shape(value.setup, ['registry', 'capabilities']) && string(value.setup.registry) && strings(value.setup.capabilities);
 }
+// Owned-ignored and scratch exclusions carry their owner; every other kind is unowned.
+const ownedExclusions = ['owned-ignored', 'scratch'];
+const unownedExclusions = ['external', 'repository', 'packages', 'output', 'generated'];
+function ownership(value: unknown): boolean {
+  return shape(value, ['modules', 'exclusions']) && Array.isArray(value.modules) && value.modules.every(module =>
+    shape(module, ['id', 'parent', 'directory']) && string(module.id) && (module.parent === null || string(module.parent)) && string(module.directory))
+    && Array.isArray(value.exclusions) && value.exclusions.every(exclusion => shape(exclusion, ['kind', 'directory', 'owner'])
+      && string(exclusion.directory) && (ownedExclusions.includes(exclusion.kind as string) ? string(exclusion.owner)
+        : unownedExclusions.includes(exclusion.kind as string) && exclusion.owner === null));
+}
 function scope(value: unknown): boolean {
-  return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'independentScopes'])
+  return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'independentScopes', 'ownership'])
     && string(value.root) && ['given', 'found'].includes(value.selection as string) && string(value.invokedFrom) && string(value.configuration)
-    && strings(value.walkedAreas) && strings(value.independentScopes);
+    && strings(value.walkedAreas) && strings(value.independentScopes) && ownership(value.ownership);
 }
 function outcome(value: unknown): boolean {
   return shape(value, ['execution', 'check', 'coverage']) && ['completed', 'invalid', 'incomplete', 'unavailable'].includes(value.execution as string)
@@ -235,7 +245,7 @@ export function validateWireMessage(input: unknown): WireMessage {
       && string(value.handshake.protocol) && string(value.handshake.buildKey) && string(value.handshake.engine)
       && shape(value.handshake.client, ['name', 'version']) && string(value.handshake.client.name) && string(value.handshake.client.version); break;
     case 'welcome': valid = shape(value, ['type', 'welcome']) && shape(value.welcome, ['protocol', 'instance', 'capabilities', 'limits'])
-      && value.welcome.protocol === 'ramify.ipc/1' && instance(value.welcome.instance)
+      && value.welcome.protocol === 'ramify.ipc/2' && instance(value.welcome.instance)
       && Array.isArray(value.welcome.capabilities) && value.welcome.capabilities.every(item => ['contexts', 'check', 'subscribe', 'daemon-control', 'materialize', 'measure', 'explorerDetails', 'dependencyDiagram', 'materialize-views', 'affected'].includes(item))
       && shape(value.welcome.limits, ['maxRequestBytes', 'maxResponseBytes', 'leaseMs', 'pingMs'])
       && Object.values(value.welcome.limits).every(item => integer(item) && item > 0); break;

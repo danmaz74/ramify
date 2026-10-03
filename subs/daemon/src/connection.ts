@@ -98,7 +98,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
   const decoder = createFrameDecoder(64 * 1024, receive);
   const abort = () => { fail({ kind: 'closed' }); socket.destroy(); };
   const timeout = setTimeout(() => { fail({ kind: 'failure', message: 'Daemon handshake timed out' }); socket.destroy(); }, handshakeMs);
-  socket.on('connect', () => send({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', client: options.client,
+  socket.on('connect', () => send({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', client: options.client,
     buildKey: endpoint.buildKey, engine: options.engine } }));
   socket.on('data', bytes => { try { decoder.push(typeof bytes === 'string' ? Buffer.from(bytes) : bytes); } catch (error) {
     const reason: DisconnectReason = { kind: 'failure', message: (error as Error).message };

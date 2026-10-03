@@ -17,7 +17,7 @@ writeFileSync(prefix + '.pid', String(process.pid));
 appendFileSync(prefix + '.launches', String(process.pid) + '\\n');
 const record = { schemaVersion: 'ramify.daemon-record/1', instanceId: 'fake-' + process.pid,
   pid: process.pid, buildKey: args['--build-key'], version: args['--version'], engine: args['--engine'],
-  protocol: 'ramify.ipc/1', socket: prefix + '.sock', startedAt: Date.now(), state: 'running', stopped: null };
+  protocol: 'ramify.ipc/2', socket: prefix + '.sock', startedAt: Date.now(), state: 'running', stopped: null };
 const server = createServer(socket => socket.end());
 server.listen(record.socket, () => {
   writeFileSync(prefix + '.tmp', JSON.stringify(record), { mode: 0o600 });
@@ -64,7 +64,7 @@ export async function writeRuntimeIdentity(packageRoot: string) {
 
 export function daemonRecord(endpoint: EndpointSelection, overrides: Partial<DaemonRecord> = {}): DaemonRecord {
   return { schemaVersion: 'ramify.daemon-record/1', instanceId: 'owner-test', pid: process.pid,
-    buildKey: endpoint.buildKey, version: '1', engine: 'fake-engine', protocol: 'ramify.ipc/1', socket: endpoint.socket,
+    buildKey: endpoint.buildKey, version: '1', engine: 'fake-engine', protocol: 'ramify.ipc/2', socket: endpoint.socket,
     startedAt: 100, state: 'running', stopped: null, ...overrides };
 }
 

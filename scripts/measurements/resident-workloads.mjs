@@ -190,7 +190,7 @@ async function slowSubscriber(host, token) {
   try {
     const greeted = new Promise((resolve, reject) => { welcome = { resolve, reject }; });
     await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
-    send({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', client: { name: 'measurement-slow-reader', version: host.instance.version },
+    send({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', client: { name: 'measurement-slow-reader', version: host.instance.version },
       buildKey: host.instance.buildKey, engine } });
     await wait(greeted);
     const request = (op, params) => {

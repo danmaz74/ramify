@@ -376,6 +376,22 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 3: the scope's ownership table names
+  // its module, exclusion and result types, which travel with `ProjectScope`
+  // as signature companions, beside the one classifier over that table.
+  { plan: 'Phase 1 project boundaries (path ownership)',
+    added: {
+      './': [
+        'expose-sub PathOwner, ProjectExclusion, ProjectOwnership, PathOwnership, classifyProjectPath from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub PathOwner, ProjectExclusion, ProjectOwnership, PathOwnership, classifyProjectPath from project to parent, descendants',
+      ].join('\n'),
+      'subs/analysis/subs/project/': [
+        'expose-src classifyProjectPath from "ownership.ts" to parent',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** The expected selections: the archived list, then each named layer in turn.

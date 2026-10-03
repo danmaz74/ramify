@@ -30,7 +30,7 @@ add('I2-14:framing-roundtrip', async assertions => {
   try {
     const client = await fixture.connect(), context = await opened(fixture, client), report = await checked(client, context.token, 'roundtrip');
     const messages: WireMessage[] = [
-      { type: 'hello', handshake: { protocol: 'ramify.ipc/1', client: { name: 'reference', version: '0.0.0' }, buildKey: fixture.endpoint.buildKey, engine: fixture.environment.service.instance.engine } },
+      { type: 'hello', handshake: { protocol: 'ramify.ipc/2', client: { name: 'reference', version: '0.0.0' }, buildKey: fixture.endpoint.buildKey, engine: fixture.environment.service.instance.engine } },
       { type: 'welcome', welcome: client.daemon },
       { type: 'reject', daemon: fixture.environment.service.instance, error: { code: 'incompatible', message: 'test mismatch', details: { client: 'old' } } },
       { type: 'request', id: '1', op: 'check', params: { token: context.token } },
@@ -110,7 +110,7 @@ add('I2-14:handshake-incompatible', async assertions => {
   try {
     for (const [index, change] of [{ protocol: 'ramify.ipc/0' }, { buildKey: 'ffffffffffffffff' }].entries()) {
       const raw = await fixture.raw(false);
-      raw.socket.write(encodeJsonFrame({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', buildKey: fixture.endpoint.buildKey,
+      raw.socket.write(encodeJsonFrame({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', buildKey: fixture.endpoint.buildKey,
         engine: fixture.environment.service.instance.engine, client: { name: 'test', version: 'old' }, ...change } }, 4096));
       await raw.closed;
       assertions.ok(`mismatch ${index} rejects while naming both versions`, raw.messages.some(value => value.type === 'reject'

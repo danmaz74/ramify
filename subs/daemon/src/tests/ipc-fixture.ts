@@ -48,7 +48,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
     socket.on('data', bytes => decoder.push(typeof bytes === 'string' ? Buffer.from(bytes) : bytes));
     const closed = new Promise<void>(resolve => socket.once('close', () => { decoder.dispose(); sockets.delete(socket); resolve(); }));
     await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
-    if (hello) socket.write(encodeMessage({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', buildKey,
+    if (hello) socket.write(encodeMessage({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', buildKey,
       engine: environment.service.instance.engine, client: { name: 'ipc-test', version: packageVersion } } }));
     return { socket, messages, closed, send(message: WireMessage) { socket.write(encodeMessage(message)); } };
   }

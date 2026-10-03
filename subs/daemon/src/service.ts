@@ -615,7 +615,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         const contexts = observe();
         const memory = process.memoryUsage();
         const host = transportCounters(result);
-        return success({ ...options.instance, protocol: 'ramify.ipc/1', startedAt, state: stopping ? 'stopping' : 'running',
+        return success({ ...options.instance, protocol: 'ramify.ipc/2', startedAt, state: stopping ? 'stopping' : 'running',
           connections: host.connections || Math.max(0, clients.size - 1),
           subscriptions: [...clients.values()].reduce((sum, client) => sum + client.subscriptions.size, 0), contexts,
           budgets: options.budgets, counters: { ...counters, coalescedEvents: counters.coalescedEvents + host.coalescedEvents,
