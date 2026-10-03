@@ -2,6 +2,8 @@ import { lstat, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promi
 import { dirname, join } from 'node:path';
 import type { AnalysisReport } from '../../subs/analysis/src/interfaces/analysis.js';
 import { sequenceFixture } from './equivalence-sequences.js';
+import { signatureNoteKey } from './fixtures/plan2/project.js';
+import type { SignatureNoteKey } from './fixtures/plan2/project.js';
 import { coreDirectory, prepareReferenceEdits, vocabulary, workspaceDescription } from './fixtures/plan2/reference.js';
 import type { ProjectFixture } from './mutation.js';
 import { applyTextMutation, residentTextMutations } from './resident-mutations.js';
@@ -135,6 +137,19 @@ export function liveSteps(fixture: LiveFixture): readonly LiveStep[] {
 }
 
 const decisions = (report: AnalysisReport) => report.snapshot!.results.flatMap(result => result.decisions);
+/** Plan 8's companion rule notes once each exposed original whose declared
+ * signature leaves a type to inference; both vocabularies are wildcard-exposed.
+ * R declares every exposed signature (Plan 8 iteration 7), but its step 4 adds
+ * `sequenceProbeSchema = z.string()`, a call initializer, after line 46. The
+ * S100 overlay's `recordIdSchema` and step 4's `sequenceProbeSchema` are
+ * unannotated object literals; step 4 inserts its line 2 above recordIdSchema.
+ * The lists are in the report's located order. */
+function signatureNotes(fixture: LiveFixture, stepIndex: number): readonly SignatureNoteKey[] {
+  const probe: SignatureNoteKey = ['signature-inferred', paths.vocabulary, fixture === 'R' ? 47 : 2, 'sequenceProbeSchema'];
+  if (fixture === 'R') return stepIndex === 4 ? [probe] : [];
+  const recordId: SignatureNoteKey = ['signature-inferred', paths.vocabulary, stepIndex === 4 ? 3 : 2, 'recordIdSchema'];
+  return stepIndex === 4 ? [probe, recordId] : [recordId];
+}
 const originals = (report: AnalysisReport, binding: string, file?: string) => report.snapshot!.catalog!.originals
   .filter(original => original.id.binding === binding && (!file || original.origin.file === file));
 
@@ -146,8 +161,10 @@ export function assertLiveStep(fixture: LiveFixture, stepIndex: number, previous
   const name = `${fixture} step ${stepIndex}`;
   const expected = stepIndex === 6 ? [['not-visible', paths.validationSource, 'InspectionPort']]
     : stepIndex === 8 ? [['not-visible', 'src/assembly.ts', 'createCatalogRouter']] : [];
-  a.equal(`${name}: completed execution and complete coverage`, report.outcome,
-    { execution: 'completed', check: expected.length ? 'failed' : 'passed', coverage: 'complete' });
+  const notes = signatureNotes(fixture, stepIndex);
+  a.equal(`${name}: completed execution and coverage complete apart from signature notes`, report.outcome,
+    { execution: 'completed', check: expected.length ? 'failed' : 'passed', coverage: notes.length ? 'partial' : 'complete' });
+  a.equal(`${name}: exact independently expected coverage notes`, report.coverage.map(signatureNoteKey), notes);
   a.equal(`${name}: independent owner count`, report.summary.owners, fixture === 'R' ? 15 : 100);
   a.ok(`${name}: real permission results exist`, report.snapshot?.results.length && report.summary.allowed > 0);
   a.equal(`${name}: exact independently expected findings`, report.diagnostics.map(item => [item.code, item.location?.file, item.original?.binding]), expected);

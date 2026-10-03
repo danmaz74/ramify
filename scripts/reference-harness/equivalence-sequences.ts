@@ -2,7 +2,8 @@ import { lstat, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { materializeSynthetic } from '../measurements/materialize.js';
-import { createEditFixture } from './fixtures/plan2/project.js';
+import { createEditFixture, isSignatureNote, providerApi, providerValueNote, signatureNoteKey } from './fixtures/plan2/project.js';
+import type { SignatureNoteKey } from './fixtures/plan2/project.js';
 import { coreDirectory, prepareReferenceEdits, referenceEditFixture, vocabulary } from './fixtures/plan2/reference.js';
 import type { ProjectFixture } from './mutation.js';
 import { applyTextMutation, moveHistoryToTesting, residentTextMutations as edits } from './resident-mutations.js';
@@ -150,6 +151,18 @@ export async function applySequenceStep(root: string, step: SequenceStep): Promi
 }
 
 const decisions = (report: AnalysisReport) => report.snapshot!.results.flatMap(result => result.decisions);
+/** Plan 8's companion rule notes once each exposed original whose declared
+ * signature leaves a type to inference. R declares every exposed signature
+ * (Plan 8 iteration 7). S100's setup exposes m001's literal `value`
+ * (`export const value = 1;`, line 2), so its note is absent exactly while that
+ * exposure is removed. F's recipe exposes its own literal `value`; the merge
+ * adds `export const Type = 1;` to the exposed `Type`, an unannotated literal
+ * constant, noted at Type's first declaration, the interface on line 2. */
+function signatureNotes(fixture: EditSequence['fixture'], expected: SequenceStep['expected']): readonly SignatureNoteKey[] {
+  if (fixture === 'F') return expected === 'merge' ? [providerValueNote, ['signature-inferred', providerApi, 2, 'Type']] : [providerValueNote];
+  if (fixture === 'R' || ['s100-exposure', 's100-readme', 's100-source', 's100-testing'].includes(expected)) return [];
+  return [['signature-inferred', 'subs/m001/src/interfaces/api.ts', 2, 'value']];
+}
 const denied = (report: AnalysisReport) => decisions(report).filter(d => d.status === 'denied')
   .map(d => [d.question.importer.file, d.original?.id.binding, d.reason]);
 const routerDenial = ['src/assembly.ts', 'createCatalogRouter', 'not-visible'];
@@ -159,6 +172,7 @@ const routerDenial = ['src/assembly.ts', 'createCatalogRouter', 'not-visible'];
 export function assertSequenceReport(fixture: EditSequence['fixture'], step: SequenceStep | null,
   baseline: AnalysisReport, report: AnalysisReport, a: Assertions): void {
   const expected = step?.expected ?? 'baseline';
+  const notes = signatureNotes(fixture, expected);
   a.equal('completed execution', report.outcome.execution, 'completed');
   a.equal('independent owner count', report.summary.owners, fixture === 'R' ? 15 : fixture === 'S100' ? 100 : 3);
   a.ok('nonempty permission results', report.snapshot && decisions(report).length > 0);
@@ -166,14 +180,14 @@ export function assertSequenceReport(fixture: EditSequence['fixture'], step: Seq
     // A source move and its reversal change the captured directory stat
     // identity. This oracle checks restored semantics; the mode comparison
     // still compares every member, including inputId and captured inputs.
-    a.equal('restored S100 diagnostics and coverage', [report.diagnostics, report.coverage], [[], []]);
+    a.equal('restored S100 diagnostics and coverage', [report.diagnostics, report.coverage.map(signatureNoteKey)], [[], notes]);
     a.equal('restored S100 independent summary', report.summary, baseline.summary);
     a.equal('restored S100 permissions', report.snapshot!.results, baseline.snapshot!.results);
     a.equal('restored S100 expanded contracts', report.snapshot!.linked, baseline.snapshot!.linked);
     return;
   }
   if (expected === 'baseline') {
-    a.equal('baseline is clean', [report.diagnostics, report.coverage, report.summary.denied], [[], [], 0]);
+    a.equal('baseline is clean apart from signature notes', [report.diagnostics, report.coverage.map(signatureNoteKey), report.summary.denied], [[], notes, 0]);
     if (fixture === 'F') a.equal('unmarked Type starts type-only', decisions(report).map(d =>
       [d.question.selection?.request, d.status]), [['type-only', 'allowed']]);
     assertEquivalentReports(baseline, report);
@@ -191,8 +205,10 @@ export function assertSequenceReport(fixture: EditSequence['fixture'], step: Seq
   }
   if (['readme', 'readme-restored-tags'].includes(expected)) assertReferenceEditReport('readme-edit', baseline, report, a);
   const hasCoverage = ['coverage', 'coverage-wildcard', 'router-coverage'].includes(expected);
+  // Located order: `src/assembly.ts` sorts before every `subs/` note.
   a.equal('independent coverage locations', report.coverage.map(c => [c.code, c.location.file]),
-    hasCoverage ? [['unsupported-loader', 'src/assembly.ts']] : []);
+    [...hasCoverage ? [['unsupported-loader', 'src/assembly.ts']] : [], ...notes.map(([code, file]) => [code, file])]);
+  a.equal('independent signature notes', report.coverage.filter(isSignatureNote).map(signatureNoteKey), notes);
   if (hasCoverage) a.ok('macro coverage is located', report.coverage[0].location.line > 0 && report.coverage[0].location.column > 0);
   if (expected === 'wildcard' || expected === 'coverage-wildcard') {
     // Reuse the independently enumerated C1/W1 memberships even in the macro
@@ -207,7 +223,7 @@ export function assertSequenceReport(fixture: EditSequence['fixture'], step: Seq
   a.equal('exact independently expected denials', denied(report), expectedDenials);
   a.equal('diagnostics accompany only expected denials', report.diagnostics.length, expectedDenials.length);
   a.equal('check and coverage outcomes', [report.outcome.check, report.outcome.coverage],
-    [expectedDenials.length ? 'failed' : 'passed', hasCoverage ? 'partial' : 'complete']);
+    [expectedDenials.length ? 'failed' : 'passed', hasCoverage || notes.length ? 'partial' : 'complete']);
   if (['source', 'configuration'].includes(expected)) {
     a.ok('new source original is present', report.snapshot!.catalog!.originals.some(o => o.id.binding === 'residentSequenceValue'));
     a.equal('source/config edit preserves existing permissions', report.snapshot!.results, baseline.snapshot!.results);

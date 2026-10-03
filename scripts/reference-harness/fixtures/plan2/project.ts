@@ -8,6 +8,18 @@ export const laterFile = 'subs/consumer/src/later.ts';
 export const laterImport = "import { later } from './later.js'; void later;\n";
 export const laterSource = 'export const later = 1;\n';
 
+/** A signature note as code, file, line and the original its message names. */
+export type SignatureNoteKey = readonly [code: string, file: string, line: number, binding: string | null];
+export const isSignatureNote = (note: { readonly code: string }): boolean => note.code.startsWith('signature-');
+export const signatureNoteKey = (note: { readonly code: string; readonly message: string; readonly location: { readonly file: string; readonly line: number } }): SignatureNoteKey =>
+  [note.code, note.location.file, note.location.line, /^`([^`]+)`/.exec(note.message)?.[1] ?? null];
+/** Plan 8's companion rule notes once each exposed original whose declared
+ * signature leaves a type to inference. The frozen F recipe exposes
+ * `export const value = 1;`, line 1 of the provider API: no annotation and no
+ * directly assigned callable, so its type is inferred. Every other exposed F
+ * original is an interface, an empty class or an annotated function. */
+export const providerValueNote: SignatureNoteKey = ['signature-inferred', providerApi, 1, 'value'];
+
 export type EditFixtureVariant = 'type-to-runtime-merge' | 'alias-identity'
   | 'config-change' | 'missing-file-appears';
 

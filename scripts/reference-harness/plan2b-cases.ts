@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { analyzeDependencyDiagram } from '../../subs/analysis/src/dependency-analyzer.js';
 import { renderArchitectView } from '../../subs/analysis/src/architect-render.js';
+import { architectMeasurements, measureApiViewBytes } from '../../subs/daemon/src/measurements.js';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.js';
 import type { SessionInputs } from '../../subs/analysis/src/interfaces/session.js';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
@@ -47,6 +48,12 @@ export const specifiedArchitectLimits = {
   details: { maxSignatureBytes: 240, maxDocumentationBytes: 280, maxOverloads: 4, maxResultBytes: 32 * 1024 ** 2 },
   tests: { maxTitleBytes: 240, maxTitlesPerRecord: 40, maxResultBytes: 16 * 1024 ** 2 },
   maxProjectionBytes: 64 * 1024 ** 2,
+} as const;
+/** Plan 2A's frozen API-view bounds (contracts.md, iteration 1), which Plan 2C's
+ * architect metrics measure view bytes under, transcribed independently of the daemon. */
+export const specifiedApiViewLimits = {
+  details: { maxSignatureBytes: 2048, maxDocumentationBytes: 512, maxOverloads: 8, maxResultBytes: 32 * 1024 ** 2 },
+  maxAreaBytes: 32 * 1024 ** 2, maxInvocationBytes: 256 * 1024 ** 2,
 } as const;
 
 export type ProjectKind = 'reference' | 'toolkit';
@@ -389,8 +396,10 @@ export async function structuralExpectation(root: string, modules: readonly Decl
     mismatches.push(`file set: missing ${expectedPaths.filter(path => !files.has(path)).join(', ') || 'none'}; unexpected ${actualPaths.filter(path => !expected.has(path)).join(', ') || 'none'}`);
   }
   const meta = JSON.parse(files.get('_meta.json') ?? '{}') as Record<string, unknown>;
+  // Plan 2C fixed the architect metrics policy as `measure`, and a materialized
+  // tree comes from a valid inventory, so its metrics are measured.
   for (const [key, value] of [['schema', 'ramify.architect-view/1'], ['revision', revision], ['input', inputId], ['modules', modules.length],
-    ['dependencies', 'measured'], ['dependencyScope', 'production'], ['testReferences', 'measured'], ['metrics', 'unavailable']] as const) {
+    ['dependencies', 'measured'], ['dependencyScope', 'production'], ['testReferences', 'measured'], ['metrics', 'measured']] as const) {
     if (meta[key] !== value) mismatches.push(`_meta.json ${key}: ${JSON.stringify(meta[key])}, expected ${JSON.stringify(value)}`);
   }
   if (!(files.get('README.md') ?? '').includes(`Revision ${revision} · input ${inputId}`)) mismatches.push('README.md does not name the revision and input');
@@ -510,14 +519,17 @@ export interface InProcessFacts {
   readonly projectionBytes: number;
   readonly timings: { readonly openMs: number; readonly queryMs: number; readonly analyzerMs: number };
   /** Renders the view for a revision identifier, which only the daemon's context names. */
-  render(revision: string): { readonly files: Map<string, string>; readonly modules: number; readonly records: number; readonly bytes: number };
+  render(revision: string): Promise<{ readonly files: Map<string, string>; readonly modules: number; readonly records: number; readonly bytes: number }>;
 }
 
 /**
  * The architect view's facts for `root` computed without the daemon: a
  * retained session opened in this process with the CLI's project request, the
- * architect query at its revision with the specified limits, and the
- * dependency analyzer called in process on that revision's report. Run it
+ * architect query at its revision with the specified limits, the dependency
+ * analyzer called in process on that revision's report, and Plan 2C's module
+ * metrics under the delivered `measure` policy: the revision's inventory
+ * measurements joined with the encoded bytes of the whole API view, rendered
+ * for the daemon's revision identifier under Plan 2A's frozen bounds. Run it
  * before any view exists under `root`: a resident compiler opened beside
  * generated directories records them as inputs (see iteration 8's results).
  */
@@ -543,13 +555,21 @@ export async function inProcessArchitectFacts(root: string): Promise<InProcessFa
       limits: { source: batchLimits.source, maxResultBytes: dependencyAnalyzerCapacity.maxResultBytes, deadlineMs: dependencyAnalyzerCapacity.analysisDeadlineMs } });
     const analyzerMs = performance.now() - analyzed;
     if (outcome.status !== 'ready') throw new Error(`The in-process analyzer answered ${JSON.stringify(outcome).slice(0, 400)}`);
+    const measured = await opened.session.measurements(sequence);
+    if (measured.status !== 'measured') throw new Error(`The in-process measurements answered ${JSON.stringify(measured).slice(0, 400)}`);
+    const apiView = await opened.session.apiView({ sequence, selection: { scope: 'all' }, ...specifiedApiViewLimits });
+    if (apiView.status !== 'projected') throw new Error(`The in-process API view query answered ${JSON.stringify(apiView).slice(0, 400)}`);
     const projection = query.projection;
     return {
       inputId: query.inputId, projectionBytes: projection.bytes, timings: { openMs, queryMs, analyzerMs },
-      render(revision) {
+      async render(revision) {
+        // The encoded API-view bytes name the revision, so they are measured for the daemon's identifier.
+        const views = await measureApiViewBytes(apiView.projection, revision,
+          { maxAreaBytes: specifiedApiViewLimits.maxAreaBytes, maxInvocationBytes: specifiedApiViewLimits.maxInvocationBytes });
+        if (views.status !== 'rendered') throw new Error(`The in-process API view measurement answered ${JSON.stringify(views).slice(0, 400)}`);
         const view = renderArchitectView({ revision, projection,
           dependencies: { state: 'measured', facts: outcome.diagram, testReferences: outcome.testReferences },
-          measurements: { state: 'unavailable', reason: 'analysis-failed' } });
+          measurements: architectMeasurements(measured.measurements, 'measured', views.views) });
         return { files: new Map(view.files.map(file => [file.path, file.text])), modules: view.modules, records: view.records, bytes: view.bytes };
       },
     };
@@ -650,7 +670,7 @@ export async function projectRun(daemon: OwnedDaemon, kind: ProjectKind, root: s
 
   let inProcess: ProjectRunEvidence['inProcess'] = null;
   if (facts) {
-    const expected = facts.render(revision);
+    const expected = await facts.render(revision);
     inProcess = { inputId: facts.inputId, difference: treeDifference(expected.files, tree.files), records: expected.records,
       bytes: expected.bytes, projectionBytes: facts.projectionBytes, timings: facts.timings };
   }

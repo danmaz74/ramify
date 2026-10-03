@@ -5,7 +5,7 @@ import { resolveProject } from '../../subs/analysis/src/index.js';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { createSessionDriver } from '../../src/resident-assembly.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
-import { consumerProbe, providerApi } from './fixtures/plan2/project.js';
+import { consumerProbe, isSignatureNote, providerApi, providerValueNote, signatureNoteKey } from './fixtures/plan2/project.js';
 import { prepareReferenceEdits, referenceEditFixture } from './fixtures/plan2/reference.js';
 import { applyTextMutation, residentTextMutations as edits } from './resident-mutations.js';
 import { assertReferenceEditReport } from './resident-expectations.js';
@@ -110,7 +110,7 @@ for (const variant of ['identical-inputs-equal', 'independent-negatives']) {
 }
 for (const variant of ['commonjs-module-target-limit', 'declare-global-note'] as const) {
   handlers.set(`I2-11:${variant}`, { kind: 'project', fixture: { kind: 'create', create: createProjectFixture },
-    baseline: async ({ root, assertions: a }) => { const run = await retainedReport(root); completed(run, a, 'baseline '); a.equal('baseline has no notes', run.report.coverage, []); },
+    baseline: async ({ root, assertions: a }) => { const run = await retainedReport(root); completed(run, a, 'baseline '); a.equal('baseline has only the recipe\'s value signature note', run.report.coverage.map(signatureNoteKey), [providerValueNote]); },
     mutate: async ({ root }) => {
       if (variant === 'commonjs-module-target-limit') {
         await put(root, 'subs/provider/src/api.ts', 'export const api = 1;\n');
@@ -120,8 +120,11 @@ for (const variant of ['commonjs-module-target-limit', 'declare-global-note'] as
     run: async ({ root, assertions: a }) => {
       const run = await retainedReport(root); completed(run, a); await equal(root, run, a);
       const code = variant === 'declare-global-note' ? 'shared-global' : 'unsupported-commonjs';
-      a.equal('inherited coverage outcome is preserved', run.report.coverage.map(n => n.code),
-        variant === 'declare-global-note' ? [code] : [code, 'unresolved-target']);
+      // Coverage is in located order: the consumer probe sorts before the
+      // provider API, and the appended `declare global` follows line 1's `value`.
+      a.equal('inherited coverage outcome is preserved beside the recipe\'s value note', run.report.coverage.map(n => n.code),
+        variant === 'declare-global-note' ? ['signature-inferred', code] : [code, 'unresolved-target', 'signature-inferred']);
+      a.equal('the recipe\'s value signature note is unchanged', run.report.coverage.filter(isSignatureNote).map(signatureNoteKey), [providerValueNote]);
       a.ok('coverage locates the source construct', run.report.coverage.every(n => n.location.line > 0 && n.location.column > 0));
       a.equal('ordinary exports remain usable and no testing-origin denial invented', run.report.diagnostics, []);
       if (variant === 'declare-global-note') a.ok('named export still checked', run.report.summary.allowed > 0);

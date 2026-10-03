@@ -45,8 +45,13 @@ for (const [subcase, fixture] of [['reference-sequence-live', 'R'], ['hundred-ow
             assertLiveStep(fixture, index + 1, previous.report, current.report, a);
             if (index === 0 || index === 1) a.equal(`${label}: one file and no permission work`, current.revision.checked,
               { path: 'unchanged-surface', files: [liveSequencePaths.coreCatalog], accesses: 0, modelRebuilt: false });
-            if (index === 2) a.equal(`${label}: only the new import is decided`, current.revision.checked,
-              { path: 'source', files: [liveSequencePaths.reviewsRouter], accesses: 1, modelRebuilt: false });
+            // A source revision decides each access of a re-interpreted file
+            // whose facts changed by value, location included. Since Plan 8
+            // iteration 7 (ff01212e) R's router imports ProtocolRouter on line
+            // 11, directly below the line 10 anchor, so the inserted import
+            // moves that one access too. S100's router has no access below it.
+            if (index === 2) a.equal(`${label}: only the new import and the accesses it moves are decided`, current.revision.checked,
+              { path: 'source', files: [liveSequencePaths.reviewsRouter], accesses: fixture === 'R' ? 2 : 1, modelRebuilt: false });
             if (index === 9) a.equal(`${label}: metadata performs no compiler or decision work`,
               [current.revision.checked, current.revision.timings.compiler, current.revision.timings.link, current.revision.timings.decide],
               [{ path: 'metadata', files: [], accesses: 0, modelRebuilt: false }, 0, 0, 0]);

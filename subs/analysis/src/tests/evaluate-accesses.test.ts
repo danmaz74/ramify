@@ -252,7 +252,7 @@ describe('analysis mapping of located static source requests', () => {
       'subs/consumer/src/tests/init.ts': 'globalThis.console.log(1);',
     }, async root => {
       const run = promisify(execFile)(process.execPath, [fileURLToPath(new URL('../../../../node_modules/typescript/lib/tsc.js', import.meta.url)),
-        '--noEmit', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
+        '--noEmit', '--pretty', 'false', '--project', join(root, 'tsconfig.json')], { cwd: root, timeout: 10_000 });
       if (relative) await expect(run).rejects.toMatchObject({ code: 1,
         stdout: expect.stringContaining("error TS2882: Cannot find module or type declarations for side-effect import of './init.js'") });
       else await expect(run).resolves.toMatchObject({ stdout: '', stderr: '' });
