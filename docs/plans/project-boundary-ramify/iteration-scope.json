@@ -1,0 +1,426 @@
+{
+  "schemaVersion": "ramify.phase1-iteration-scope/1",
+  "iterations": [
+    {
+      "index": 1,
+      "scope": "Toolkit-owned model/architecture documents and this plan only; no runtime edits.",
+      "sourceReads": [
+        "docs/architecture/project-boundary.proposal.md",
+        "docs/model/module-description.spec.md",
+        "docs/model/typescript-source-interpretation.spec.md",
+        "docs/architecture/cli-invocation.spec.md",
+        "ramify-audit.json",
+        "package.json"
+      ],
+      "exercisedCases": [
+        "PB1-01",
+        "PB1-02",
+        "PB1-03",
+        "PB1-04",
+        "PB1-20",
+        "PB1-35",
+        "PB1-40"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 2,
+      "scope": "Descriptions plus mechanical syntax type/exposure relays and affected test producers.",
+      "sourceReads": [
+        "subs/analysis/subs/descriptions/src/parse.ts",
+        "subs/analysis/subs/descriptions/src/tokenize.ts",
+        "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+        "subs/analysis/subs/descriptions/src/link.ts",
+        "subs/analysis/subs/project/src/references.ts"
+      ],
+      "exercisedCases": [
+        "PB1-01",
+        "PB1-02"
+      ],
+      "producerCases": [
+        "PB1-01",
+        "PB1-02"
+      ]
+    },
+    {
+      "index": 3,
+      "scope": "Project plus mechanical public ownership vocabulary relays through analysis/root.",
+      "sourceReads": [
+        "subs/analysis/subs/project/src/interfaces/project.ts",
+        "subs/analysis/subs/project/src/inventory.ts",
+        "subs/analysis/subs/project/src/generated-path.ts",
+        "subs/analysis/src/inventory.ts"
+      ],
+      "exercisedCases": [
+        "PB1-03",
+        "PB1-04",
+        "PB1-08",
+        "PB1-09",
+        "PB1-17",
+        "PB1-18",
+        "PB1-19"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 4,
+      "scope": "One toolkit-wide provenance type migration; behavioral implementations stay in their named owners.",
+      "sourceReads": [
+        "subs/analysis/subs/model/src/interfaces/model.ts",
+        "subs/analysis/subs/typescript/src/interfaces/source.ts",
+        "subs/analysis/subs/project/src/interfaces/project.ts",
+        "subs/analysis/src/interfaces/analysis.ts"
+      ],
+      "exercisedCases": [
+        "PB1-07",
+        "PB1-12",
+        "PB1-13",
+        "PB1-14",
+        "PB1-15",
+        "PB1-25"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 5,
+      "scope": "One tooling-access capability across supplying owners and their ancestor declarations; no consumer project edits.",
+      "sourceReads": [
+        "scripts/production-selection.ts",
+        "subs/analysis/src/index.ts",
+        "subs/analysis/module.ramify",
+        "module.ramify"
+      ],
+      "exercisedCases": [
+        "PB1-33"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 6,
+      "scope": "Root-owned scripts, measurements and compiler configuration that touch the reference harness tree. The harness is not relocated; edits inside `scripts/reference-harness/` are limited to what a moved helper requires.",
+      "sourceReads": [
+        "scripts/validate-final-contracts.ts",
+        "scripts/measurements/plan2b.mjs",
+        "scripts/measurements/plan2c.mjs",
+        "scripts/measurements/plan2a-platform.mjs",
+        "tsconfig.scripts.json",
+        "scripts/reference-harness/tsconfig.json",
+        "scripts/reference-harness/README.md",
+        "package.json"
+      ],
+      "exercisedCases": [
+        "PB1-32"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 7,
+      "scope": "Toolkit root-owned descriptions/configuration plus fixture-owner declarations; no agent/audit writes.",
+      "sourceReads": [
+        "module.ramify",
+        "tsconfig.json",
+        "tsconfig.scripts.json",
+        "tsconfig.portable.json",
+        "subs/analysis/subs/project/src/generated-path.ts",
+        "package.json"
+      ],
+      "exercisedCases": [
+        "PB1-03",
+        "PB1-05",
+        "PB1-09",
+        "PB1-11",
+        "PB1-32",
+        "PB1-40"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 8,
+      "scope": "Project acquisition and scope contracts; toolkit fixture/declaration corrections are limited to the new model.",
+      "sourceReads": [
+        "subs/analysis/subs/project/src/inventory.ts",
+        "subs/analysis/subs/project/src/references.ts",
+        "subs/analysis/subs/project/src/configuration.ts",
+        "subs/analysis/subs/project/src/capture.ts"
+      ],
+      "exercisedCases": [
+        "PB1-03",
+        "PB1-04",
+        "PB1-05",
+        "PB1-06",
+        "PB1-07",
+        "PB1-09",
+        "PB1-11",
+        "PB1-32",
+        "PB1-33"
+      ],
+      "producerCases": [
+        "PB1-03",
+        "PB1-04",
+        "PB1-05",
+        "PB1-06",
+        "PB1-07",
+        "PB1-09",
+        "PB1-11",
+        "PB1-32",
+        "PB1-33"
+      ]
+    },
+    {
+      "index": 9,
+      "scope": "TypeScript adapter and its captured-resolution interfaces.",
+      "sourceReads": [
+        "subs/analysis/subs/typescript/src/resolution.ts",
+        "subs/analysis/subs/typescript/src/catalog.ts",
+        "subs/analysis/subs/typescript/src/descriptions.ts",
+        "subs/analysis/subs/typescript/src/interfaces/source.ts"
+      ],
+      "exercisedCases": [
+        "PB1-14",
+        "PB1-15",
+        "PB1-16"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 10,
+      "scope": "Descriptions/model exposure validation capability with legal relays only.",
+      "sourceReads": [
+        "subs/analysis/subs/descriptions/src/link.ts",
+        "subs/analysis/subs/descriptions/src/interfaces/linking.ts",
+        "subs/analysis/subs/model/src/model.ts",
+        "subs/analysis/subs/model/src/interfaces/model.ts"
+      ],
+      "exercisedCases": [
+        "PB1-13"
+      ],
+      "producerCases": [
+        "PB1-13"
+      ]
+    },
+    {
+      "index": 11,
+      "scope": "Analysis decisions/report capability plus required strict serialization consumers.",
+      "sourceReads": [
+        "subs/analysis/src/analyze-project.ts",
+        "subs/analysis/src/report.ts",
+        "subs/analysis/src/report-data.ts",
+        "subs/analysis/src/interfaces/analysis.ts",
+        "subs/analysis/subs/model/src/decisions.ts",
+        "subs/analysis/src/evaluate-accesses.ts"
+      ],
+      "exercisedCases": [
+        "PB1-12",
+        "PB1-14",
+        "PB1-15",
+        "PB1-16"
+      ],
+      "producerCases": [
+        "PB1-12",
+        "PB1-14",
+        "PB1-15",
+        "PB1-16"
+      ]
+    },
+    {
+      "index": 12,
+      "scope": "Project observer/capture and neutral observation contracts.",
+      "sourceReads": [
+        "subs/analysis/subs/project/src/observer.ts",
+        "subs/analysis/subs/project/src/observations.ts",
+        "subs/analysis/subs/project/src/capture.ts",
+        "subs/analysis/subs/project/src/read-project.ts"
+      ],
+      "exercisedCases": [
+        "PB1-21",
+        "PB1-22",
+        "PB1-23",
+        "PB1-24"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 13,
+      "scope": "Analysis retained session capability over Project/TypeScript ports.",
+      "sourceReads": [
+        "subs/analysis/src/session-engine.ts",
+        "subs/analysis/src/session-revision.ts",
+        "subs/analysis/src/session-facts.ts",
+        "subs/analysis/src/interfaces/session.ts"
+      ],
+      "exercisedCases": [
+        "PB1-21",
+        "PB1-22",
+        "PB1-24"
+      ],
+      "producerCases": [
+        "PB1-21",
+        "PB1-22",
+        "PB1-24"
+      ]
+    },
+    {
+      "index": 14,
+      "scope": "Analysis affected selection plus mechanical root/daemon request-result relays.",
+      "sourceReads": [
+        "subs/analysis/src/affected-query.ts",
+        "subs/analysis/src/interfaces/affected.ts",
+        "subs/analysis/src/session-engine.ts",
+        "subs/analysis/src/session-messages.ts"
+      ],
+      "exercisedCases": [
+        "PB1-08",
+        "PB1-17",
+        "PB1-18",
+        "PB1-19"
+      ],
+      "producerCases": [
+        "PB1-08",
+        "PB1-17",
+        "PB1-18",
+        "PB1-19"
+      ]
+    },
+    {
+      "index": 15,
+      "scope": "Contexts through neutral AnalysisDriver/ownership ports, plus required type relays.",
+      "sourceReads": [
+        "subs/daemon/subs/contexts/src/interfaces/contexts.ts",
+        "subs/daemon/subs/contexts/src/context.ts",
+        "subs/daemon/subs/contexts/src/context-manager.ts",
+        "src/interfaces/service.ts"
+      ],
+      "exercisedCases": [
+        "PB1-20",
+        "PB1-23"
+      ],
+      "producerCases": []
+    },
+    {
+      "index": 16,
+      "scope": "Daemon/root dispatch capability, neutral watcher ports and all mechanical schema consumers.",
+      "sourceReads": [
+        "subs/daemon/src/codec.ts",
+        "subs/daemon/src/interfaces/daemon.ts",
+        "subs/daemon/src/context-types.ts",
+        "src/interfaces/service.ts",
+        "subs/daemon/subs/contexts/src/interfaces/contexts.ts"
+      ],
+      "exercisedCases": [
+        "PB1-23",
+        "PB1-25"
+      ],
+      "producerCases": [
+        "PB1-23",
+        "PB1-25"
+      ]
+    },
+    {
+      "index": 17,
+      "scope": "CLI plus root entry tests; Git advice stays outside analysis inputs.",
+      "sourceReads": [
+        "subs/cli/src/changed-command.ts",
+        "subs/cli/src/affected-command.ts",
+        "subs/cli/src/format.ts",
+        "subs/cli/src/interfaces/cli.ts",
+        "subs/cli/src/check-command.ts",
+        "subs/analysis/subs/project/src/resolve-root.ts"
+      ],
+      "exercisedCases": [
+        "PB1-10",
+        "PB1-20",
+        "PB1-26",
+        "PB1-30"
+      ],
+      "producerCases": [
+        "PB1-10",
+        "PB1-20",
+        "PB1-26",
+        "PB1-30"
+      ]
+    },
+    {
+      "index": 18,
+      "scope": "One revision-projection capability across analysis rendering, daemon publication and service-api DTO mapping.",
+      "sourceReads": [
+        "subs/analysis/src/architect-view.ts",
+        "subs/analysis/src/architect-render.ts",
+        "subs/analysis/src/interfaces/architect-view.ts",
+        "subs/analysis/src/module-measurements.ts",
+        "subs/service-api/src/project-view.ts"
+      ],
+      "exercisedCases": [
+        "PB1-27",
+        "PB1-28",
+        "PB1-29"
+      ],
+      "producerCases": [
+        "PB1-27",
+        "PB1-28",
+        "PB1-29"
+      ]
+    },
+    {
+      "index": 19,
+      "scope": "Toolkit-owned site/scripts/teaching documents and package dependencies only.",
+      "sourceReads": [
+        "site/docusaurus.config.ts",
+        "site/package.json",
+        "scripts/production-selection.ts",
+        "scripts/build-production.ts",
+        "docs/development/testing.md",
+        "docs/architecture/cli-invocation.spec.md"
+      ],
+      "exercisedCases": [
+        "PB1-31",
+        "PB1-34"
+      ],
+      "producerCases": [
+        "PB1-31",
+        "PB1-34"
+      ]
+    },
+    {
+      "index": 20,
+      "scope": "Toolkit integration acceptance; defects reopen named producers rather than expand this slice.",
+      "sourceReads": [
+        "docs/plans/project-boundary-ramify/acceptance.md",
+        "docs/plans/project-boundary-ramify/execution.md",
+        "subs/integration-tests/module.ramify",
+        "ramify-audit.json",
+        "package.json"
+      ],
+      "exercisedCases": [
+        "PB1-35",
+        "PB1-37",
+        "PB1-38"
+      ],
+      "producerCases": [
+        "PB1-35",
+        "PB1-37",
+        "PB1-38"
+      ]
+    },
+    {
+      "index": 21,
+      "scope": "Toolkit root artifact/receipt capability; no publication or consumer implementation in this planning task.",
+      "sourceReads": [
+        "docs/plans/project-boundary-ramify/handoff.md",
+        "docs/plans/project-boundary-ramify/fixtures.md",
+        "package.json",
+        "src/interfaces/batch.ts",
+        "subs/analysis/src/index.ts"
+      ],
+      "exercisedCases": [
+        "PB1-36",
+        "PB1-39",
+        "PB1-40"
+      ],
+      "producerCases": [
+        "PB1-36",
+        "PB1-39",
+        "PB1-40"
+      ]
+    }
+  ]
+}

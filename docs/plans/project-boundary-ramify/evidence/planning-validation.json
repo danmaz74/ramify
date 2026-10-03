@@ -1,0 +1,26 @@
+{
+  "kind": "planning-validation",
+  "date": "2026-10-03",
+  "implementationExecuted": false,
+  "iterations": 21,
+  "acceptanceCases": 40,
+  "markdownFiles": 31,
+  "resolvedLocalLinks": 310,
+  "currentSourceReadPointers": 103,
+  "dependencyOrder": "passed",
+  "caseCoverage": "passed",
+  "whitespace": "passed",
+  "fullAuditProbe": "passed-minimal-fixture-only",
+  "existingWorkDigest": null,
+  "protectedDocumentPolicy": {
+    "masterAndPhasePlan": "passed",
+    "iterationBriefs": 21,
+    "coordinatorHandoffRequirement": "passed",
+    "iteration1ExactPatchException": "passed",
+    "unrelatedWorkPreserved": true
+  },
+  "revalidatedAfter": "R2/R4/R6 decisions, owned-ignored reference harness, gate and version edits",
+  "resolvedAnchorLinks": 47,
+  "registerConsistency": "passed",
+  "existingWorkDigestNote": "not recomputed at revalidation; the original computation is not recorded"
+}

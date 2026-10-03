@@ -1,0 +1,132 @@
+{
+  "createdAt": "2026-10-03T00:00:00.000Z",
+  "planPath": "main-plan.md",
+  "iterations": [
+    {
+      "index": 1,
+      "file": "iteration1.md",
+      "title": "Contract adoption and gate readiness",
+      "parallelGroup": null
+    },
+    {
+      "index": 2,
+      "file": "iteration2.md",
+      "title": "Nested-tree parser and statement partition",
+      "parallelGroup": null
+    },
+    {
+      "index": 3,
+      "file": "iteration3.md",
+      "title": "Canonical path ownership provider",
+      "parallelGroup": null
+    },
+    {
+      "index": 4,
+      "file": "iteration4.md",
+      "title": "Auxiliary provenance vocabulary",
+      "parallelGroup": null
+    },
+    {
+      "index": 5,
+      "file": "iteration5.md",
+      "title": "Legal tooling access for root scripts",
+      "parallelGroup": null
+    },
+    {
+      "index": 6,
+      "file": "iteration6.md",
+      "title": "Reference harness boundary preparation",
+      "parallelGroup": null
+    },
+    {
+      "index": 7,
+      "file": "iteration7.md",
+      "title": "Toolkit declarations and compiler exclusions",
+      "parallelGroup": null
+    },
+    {
+      "index": 8,
+      "file": "iteration8.md",
+      "title": "Declared discovery and auxiliary input activation",
+      "parallelGroup": null
+    },
+    {
+      "index": 9,
+      "file": "iteration9.md",
+      "title": "Resolution provenance and boundary targets",
+      "parallelGroup": null
+    },
+    {
+      "index": 10,
+      "file": "iteration10.md",
+      "title": "Auxiliary original exposure enforcement",
+      "parallelGroup": null
+    },
+    {
+      "index": 11,
+      "file": "iteration11.md",
+      "title": "Batch boundary decisions and reports",
+      "parallelGroup": null
+    },
+    {
+      "index": 12,
+      "file": "iteration12.md",
+      "title": "Boundary-aware project observation",
+      "parallelGroup": null
+    },
+    {
+      "index": 13,
+      "file": "iteration13.md",
+      "title": "Retained whole-tree consistency",
+      "parallelGroup": null
+    },
+    {
+      "index": 14,
+      "file": "iteration14.md",
+      "title": "Containment-based affected provider",
+      "parallelGroup": null
+    },
+    {
+      "index": 15,
+      "file": "iteration15.md",
+      "title": "Context path dispositions and synchronization",
+      "parallelGroup": null
+    },
+    {
+      "index": 16,
+      "file": "iteration16.md",
+      "title": "Daemon wire and watcher integration",
+      "parallelGroup": null
+    },
+    {
+      "index": 17,
+      "file": "iteration17.md",
+      "title": "CLI boundary outputs and advisory diagnostics",
+      "parallelGroup": null
+    },
+    {
+      "index": 18,
+      "file": "iteration18.md",
+      "title": "Boundary-aware views and explorer projections",
+      "parallelGroup": null
+    },
+    {
+      "index": 19,
+      "file": "iteration19.md",
+      "title": "Site package consumption and runtime guides",
+      "parallelGroup": null
+    },
+    {
+      "index": 20,
+      "file": "iteration20.md",
+      "title": "Full semantic and regression qualification",
+      "parallelGroup": null
+    },
+    {
+      "index": 21,
+      "file": "iteration21.md",
+      "title": "Packed artifact and Phase 2 handoff",
+      "parallelGroup": null
+    }
+  ]
+}

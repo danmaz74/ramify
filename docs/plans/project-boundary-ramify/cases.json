@@ -1,0 +1,407 @@
+{
+  "schemaVersion": "ramify.project-boundary-phase1-cases/1",
+  "plan": "project-boundary-ramify",
+  "status": "planned",
+  "cases": [
+    {
+      "id": "PB1-01",
+      "title": "Valid statement grammar",
+      "expected": "Both kinds parse with preserved spans, comments and interleaved exposure statement indices; ordinary exposures retain their meaning.",
+      "producerIteration": 2,
+      "fixture": "grammar-lines",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-02",
+      "title": "Malformed statement grammar",
+      "expected": "Unquoted/empty directories, multiline strings, extra clauses, repeated headers and invalid encoding fail with located independent expected codes.",
+      "producerIteration": 2,
+      "fixture": "grammar-negative-lines",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-03",
+      "title": "Boundary layout validation",
+      "expected": "Escape, external-under-src, child overlap and a missing owned-ignored directory invalidate acquisition; absent external directories remain valid.",
+      "producerIteration": 8,
+      "fixture": "boundary-layout",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-04",
+      "title": "Declaration ambiguity and symlinks",
+      "expected": "Duplicate normalized or overlapping declarations and symlink traversal fail; equivalent nonoverlapping real directories pass.",
+      "producerIteration": 8,
+      "fixture": "boundary-layout",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-05",
+      "title": "Excluded discovery and separate roots",
+      "expected": "Neither ignored nor external descendants enter the enclosing model; an ignored project selected from its own root is evaluated independently.",
+      "producerIteration": 8,
+      "fixture": "provider-topology",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-06",
+      "title": "Undeclared project migration",
+      "expected": "A package/root description in an undeclared nonmodule directory is a named layout error; a tsconfig alone never silently stops discovery.",
+      "producerIteration": 8,
+      "fixture": "independent-config",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-07",
+      "title": "Auxiliary compiler source inventory",
+      "expected": "Owned selected and unselected compiler source outside src, including loose subs source, appears under its owner; external compiler dependencies do not become application files.",
+      "producerIteration": 8,
+      "fixture": "auxiliary-source",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-08",
+      "title": "Inert and nonexistent ownership",
+      "expected": "New/deleted inert paths have containment owners without inventory entries, content hashes or per-file subscriptions.",
+      "producerIteration": 14,
+      "fixture": "provider-topology",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-09",
+      "title": "Scratch location and ownership",
+      "expected": "Only tmp directly under each module src is excluded and owned; src/tests/tmp and tools/tmp remain ordinary analyzed source in their corresponding profiles.",
+      "producerIteration": 8,
+      "fixture": "provider-topology",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-10",
+      "title": "Git ignores do not define boundaries",
+      "expected": "Changing repository ignores changes optional advice only; owned unversioned compiler source remains analyzed with the same ownership rules.",
+      "producerIteration": 17,
+      "fixture": "git-advisory",
+      "tier": "cli-process",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-11",
+      "title": "Compiler-selected exclusion warnings",
+      "expected": "Compiler-selected files in owned-ignored and scratch yield distinct nonblocking warnings with bounded path evidence; correct compiler exclusions remove them.",
+      "producerIteration": 8,
+      "fixture": "compiler-selection",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-12",
+      "title": "Auxiliary importer profile",
+      "expected": "Ordinary same-owner access passes, legal foreign exposure passes, illegal foreign access and testing origins fail; test-shaped auxiliary filenames remain ordinary.",
+      "producerIteration": 11,
+      "fixture": "auxiliary-imports",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-13",
+      "title": "Auxiliary original exposure",
+      "expected": "Direct/forwarded auxiliary exposure and forged model input fail; a normal src original and its valid companions pass.",
+      "producerIteration": 10,
+      "fixture": "auxiliary-forwarding",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-14",
+      "title": "Nonpackage nested-tree imports",
+      "expected": "Value/type/symbol-free/namespace/lazy imports and re-exports into either tree by relative, alias or workspace-link routes are definite violations.",
+      "producerIteration": 11,
+      "fixture": "boundary-import-forms",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-15",
+      "title": "Installed linked package provenance",
+      "expected": "Established node_modules imports are external even at an ignored real target; a bare alias to that same target fails as a boundary import.",
+      "producerIteration": 11,
+      "fixture": "linked-package",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-16",
+      "title": "Outside and unresolved coverage",
+      "expected": "Nonpackage targets outside the root, unresolved targets and always-excluded targets retain explicit distinct coverage notes; none is labelled allowed or an established package.",
+      "producerIteration": 11,
+      "fixture": "resolution-limits",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-17",
+      "title": "Owner and reverse-import selection",
+      "expected": "a-owned paths select a/app/b in the written topology; root-owned inert edits select app only; isolated descendants are not selected by ancestry.",
+      "producerIteration": 14,
+      "fixture": "provider-topology",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-18",
+      "title": "Affected exclusions",
+      "expected": "External/reserved seeds select nothing with excluded basis; owned-ignored and scratch seeds select their owner and transitive importers.",
+      "producerIteration": 14,
+      "fixture": "provider-topology",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-19",
+      "title": "Affected additions deletions and renames",
+      "expected": "Absent/new/deleted paths and both rename sides resolve without reads; current child declarations change containment at the new revision; outside seeds alone cause unowned-path widening.",
+      "producerIteration": 14,
+      "fixture": "provider-topology",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-20",
+      "title": "Changed-check dispositions",
+      "expected": "Every answered request has the exit code and findings of a complete check on the same inputs. Ignored/scratch/inert paths say not-analyzed without changing the exit code: 0 on a healthy project, 1 with definite findings. Exit 2 only for not-checked paths, deadline or unavailable work.",
+      "producerIteration": 17,
+      "fixture": "changed-paths",
+      "tier": "cli-process",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-21",
+      "title": "Boundary structural invalidation",
+      "expected": "Adding/removing/changing declarations and removing an owned-ignored root reacquires or invalidates the model without stale passes; reincluded source is freshly captured.",
+      "producerIteration": 13,
+      "fixture": "boundary-revisions",
+      "tier": "retained",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-22",
+      "title": "Auxiliary incremental membership",
+      "expected": "Auxiliary edits/new files/deletions/forwarding changes produce independently expected findings and match fresh batch in hot and warm sessions.",
+      "producerIteration": 13,
+      "fixture": "auxiliary-revisions",
+      "tier": "retained",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-23",
+      "title": "Excluded and inert observation",
+      "expected": "Byte edits within ignored/scratch/inert files change no analysis inputs/facts and add no content observations or excluded watch registrations; boundary-root evidence remains observed.",
+      "producerIteration": 16,
+      "fixture": "observation-scale",
+      "tier": "ipc-process",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-24",
+      "title": "Invalidation cancellation and limits",
+      "expected": "Invalid boundaries cannot publish a valid partial model; deadline/cancellation/byte bounds report explicit incomplete or unavailable outcomes and dispose owned resources.",
+      "producerIteration": 13,
+      "fixture": "bounded-revisions",
+      "tier": "retained",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-25",
+      "title": "Schema and transport coherence",
+      "expected": "New report/affected/check/scope shapes round-trip through worker and real IPC; stale protocol peers reject coherently; strict codecs reject malformed new variants.",
+      "producerIteration": 16,
+      "fixture": "wire-shapes",
+      "tier": "ipc-process",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-26",
+      "title": "Git advisory behavior",
+      "expected": "Only ignored directories the selected project would enter warn; excluded dirs, no repo, absent Git and optional Git failure do not change source verdict; spaces/nested roots are safe.",
+      "producerIteration": 17,
+      "fixture": "git-advisory",
+      "tier": "cli-process",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-27",
+      "title": "Architect boundary visibility",
+      "expected": "Module metadata names both boundary kinds and owned-ignored omissions; ignored descendants contribute no symbols/files/tests; analyzed auxiliary originals are internal evidence.",
+      "producerIteration": 18,
+      "fixture": "provider-topology",
+      "tier": "materialization",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-28",
+      "title": "Foreign API projection",
+      "expected": "Only legal exposed originals appear; auxiliary/ignored originals never become foreign APIs; auxiliary from-selection uses the owner ordinary profile and excluded selection is refused.",
+      "producerIteration": 18,
+      "fixture": "api-projection",
+      "tier": "materialization",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-29",
+      "title": "Explorer and measurements",
+      "expected": "Source counts and byte sums include analyzed auxiliary source/resources exactly, exclude inert/ignored contents and remain revision-bound in explorer/browser projection.",
+      "producerIteration": 18,
+      "fixture": "projection-counts",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-30",
+      "title": "CLI root selection",
+      "expected": "Invocation from a nested own-root description selects that project; root climbing elsewhere and explicit roots retain the existing documented selection.",
+      "producerIteration": 17,
+      "fixture": "nested-root-selection",
+      "tier": "cli-process",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-31",
+      "title": "Production selection policy",
+      "expected": "Resolved testing profiles exclude testing modules/areas; ordinary auxiliary inputs are eligible; inert ownership adds no production files and declared trees/scratch never enter.",
+      "producerIteration": 19,
+      "fixture": "production-profiles",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-32",
+      "title": "Reference harness boundary",
+      "expected": "The harness tree is a root owned-ignored tree: none of its files enters the inventory, analysis or views, no analyzed toolkit source imports from it, no compiler-selected warning names it, and its test files and instances run unchanged under the unchanged command.",
+      "producerIteration": 8,
+      "fixture": "toolkit-checkout",
+      "tier": "reference-runner",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-33",
+      "title": "Legal toolkit scripting imports",
+      "expected": "Root scripts/measurements use exposed source APIs and cannot gain testing access from filename/configuration tricks; same-owner references remain legal.",
+      "producerIteration": 8,
+      "fixture": "tooling-import-inventory",
+      "tier": "self-check",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-34",
+      "title": "Site package consumption",
+      "expected": "Site builds from the candidate exported package entries with no source aliases; isolated NodeNext consumer rejects an unlisted internal subpath and accepts supported exports.",
+      "producerIteration": 19,
+      "fixture": "site-package",
+      "tier": "packed-install",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-35",
+      "title": "Full-mode and fallback gate",
+      "expected": "Existing audit full mode is explicitly requested and recorded; every gate runs reference separately; infrastructure fallback retains the failed attempt and all direct check evidence.",
+      "producerIteration": 20,
+      "fixture": "gate-candidate",
+      "tier": "full-gate",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-36",
+      "title": "Packed provider answers",
+      "expected": "An isolated install runs public typed API and batch/resident CLI against locally reconstructed topology and matches expected owners/exclusions/closure; no checkout source import is used.",
+      "producerIteration": 21,
+      "fixture": "isolated-package-topology",
+      "tier": "packed-install",
+      "finalQualificationIteration": 21,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-37",
+      "title": "Bounds and cleanup",
+      "expected": "Capacity limits yield explicit incomplete outcomes, with any raised limit recorded with its measurement; 10000 inert/5000 excluded files do not create captured content/watch growth; all owned processes/listeners are released.",
+      "producerIteration": 20,
+      "fixture": "observation-scale",
+      "tier": "integration",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-38",
+      "title": "Full regression and reference acceptance",
+      "expected": "Candidate full toolkit suite, explicit reference suite and required completed-plan acceptance chain execute with all required correctness cases passing, preserving failures and only valid evidence reuse; earlier timing targets are measured and reported as met or missed without failing the case.",
+      "producerIteration": 20,
+      "fixture": "gate-candidate",
+      "tier": "full-gate",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-39",
+      "title": "Revision-bound artifact receipt",
+      "expected": "Verified source/configuration/contract revisions, package version/digest, actual gate results and durable primary artifacts are bound in one handoff; a later changed tree is not silently certified.",
+      "producerIteration": 21,
+      "fixture": "handoff-archive",
+      "tier": "artifact",
+      "finalQualificationIteration": 21,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-40",
+      "title": "Phase boundaries",
+      "expected": "No Phase 1 edit/install touches audit or agent, no unsupported audit fields are added and no local artifact path is committed as a dependency.",
+      "producerIteration": 21,
+      "fixture": "scope-review",
+      "tier": "artifact",
+      "finalQualificationIteration": 21,
+      "status": "planned"
+    }
+  ]
+}

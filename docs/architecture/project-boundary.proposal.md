@@ -7,7 +7,10 @@ links to the authoritative principles, specifications and vocabulary. The existi
 runtime contracts describe current behavior until their implementations and
 contracts are migrated. Nested-tree statement syntax must be completed in the
 module-description specification before parser implementation; the implementation
-plan schedules that work and the remaining delivery.
+plan schedules that work and the remaining delivery. The
+[implementation plan](../plans/project-boundary-sequential/main-plan.md) contains the
+toolkit, audit and harness work packages and their acceptance gates, ordered
+Ramify first, then ramify-audit, then ramify-agent.
 
 ## 1. Why
 
@@ -61,12 +64,15 @@ never hashed and never watched.
 Consequences:
 
 - The affected query gains a `containment` basis beside `inventory`,
-  `declaration` and `area`. The `none` basis remains only for paths outside
-  the project.
+  `declaration` and `area`. Explicitly excluded unowned paths have an excluded
+  outcome and select nothing; they do not widen the query. The `none` basis
+  remains only for paths outside the project.
 - Discovery still visits every non-excluded directory, to find descriptions
-  and honor boundaries, and records no more files than today.
-- The inventory ceilings and the daemon's watch set are unchanged; no
-  ignore file becomes an influencing input.
+  and honor boundaries. Auxiliary compiler source adds analyzed inputs;
+  inert owned contents do not become inventory entries.
+- The inventory ceilings remain unchanged. Observation covers analysis inputs
+  and boundary validity, without per-file watches of inert or excluded contents;
+  no ignore file becomes an influencing input merely for ownership.
 - A directory of plain data needs no declaration of any kind. Section 5
   says when one is needed.
 
@@ -232,8 +238,9 @@ exclusion concerns Ramify analysis and test selection.
 as comparison checkouts, logs and helper scripts, inside the subtree an agent
 scoped to the module works in. It is always excluded, at that position only:
 Ramify never enters it, inventories nothing in it and reports nothing about
-its contents, whatever they look like, so nothing there is analyzed or
-reaches a production build. A module therefore cannot keep source at
+its contents, whatever they look like, so nothing there is analyzed by Ramify.
+Keeping it out of compiler builds requires the project's compiler exclusion.
+A module therefore cannot keep analyzed source at
 `src/tmp`. Before scratch is used, the harness adds any missing rules to the
 project's `.gitignore`, preserving existing rules and avoiding duplicates.
 This also applies to scratch directories of newly introduced modules. The
@@ -580,9 +587,11 @@ Toolkit:
   code, `.cucumber-viz/`, `.playwright-mcp/` and the planning-state
   directory beneath the done Plan 1. Ramify's generated views, `dist/` and
   `node_modules/` are always excluded and need no declaration.
-- Turn the reference harness into a testing module. Root scripts and
-  measurements become root-owned analyzed code, and the analysis module
-  exposes to the root what they import.
+- Declare the reference harness, `scripts/reference-harness/`, an
+  `owned-ignored` tree of the root, per decision 13. It keeps its location,
+  compiler configuration and runner; root scripts that import from it stop
+  doing so. Other root scripts and measurements become root-owned analyzed
+  code, and the analysis module exposes to the root what they import.
 
 ramify-agent:
 
@@ -635,6 +644,14 @@ Of 2026-10-01:
     in `ramify-audit.json`. A matching change forces a full audit, taking
     precedence over `ignorePaths`. The list is read from the audited commit,
     recorded with the evidence and included in reuse and baseline compatibility.
+
+Of 2026-10-03:
+
+13. The toolkit's reference harness is an `owned-ignored` tree of the root in
+    this migration, not a testing module and not a project of its own. Its
+    imports into toolkit internals stay unverified, as a declared and visible
+    gap. Making it a testing module, or a project consuming the toolkit's
+    package, is left to a later plan.
 
 ## 13. Adopted principles, specifications and glossary entries
 

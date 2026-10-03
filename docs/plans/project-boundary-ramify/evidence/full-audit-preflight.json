@@ -1,0 +1,191 @@
+{
+  "date": "2026-10-03",
+  "executable": "/ramify/ramify-agent/node_modules/.bin/ramify-audit",
+  "packageVersion": "0.3.2",
+  "executableSha256": "b4e3bbe8dc95273adc476e709749cf076302d8d05e9338ade88c5ddf8e681e28",
+  "fixtureRoot": "/tmp/ramify-pb1-audit-preflight-wyupmdnc",
+  "fixtureConfiguration": {
+    "workspace": "existing-worktree",
+    "checks": [
+      {
+        "id": "probe",
+        "name": "Full mode preflight",
+        "scope": "both",
+        "category": "deterministic",
+        "executor": {
+          "kind": "command",
+          "commands": [
+            {
+              "name": "probe",
+              "cmd": "node",
+              "args": [
+                "-e",
+                "console.log('PB1 full preflight')"
+              ],
+              "parser": "none",
+              "timeoutMs": 10000
+            }
+          ]
+        },
+        "onFailure": "record"
+      }
+    ]
+  },
+  "fixtureModule": "ramify 1\nmodule probe\n",
+  "command": [
+    "/ramify/ramify-agent/node_modules/.bin/ramify-audit",
+    "audit",
+    "--cwd",
+    "/tmp/ramify-pb1-audit-preflight-wyupmdnc",
+    "--full",
+    "--force",
+    "--json"
+  ],
+  "exitCode": 0,
+  "stdout": "{\n  \"status\": \"completed\",\n  \"requestId\": \"35c35312-bb96-4337-89ed-13e517d35586\",\n  \"runId\": \"46cdf27e-c273-4551-be1e-75e8c9132466\",\n  \"summary\": {\n    \"evidenceSchemaVersion\": 3,\n    \"execution\": {\n      \"requestId\": \"35c35312-bb96-4337-89ed-13e517d35586\",\n      \"runId\": \"46cdf27e-c273-4551-be1e-75e8c9132466\"\n    },\n    \"producer\": {\n      \"name\": \"ramify-audit\",\n      \"version\": \"0.3.2\"\n    },\n    \"applicabilityPolicy\": \"ramify-audit/v1\",\n    \"ignorePaths\": [],\n    \"coverage\": {\n      \"status\": \"declared\",\n      \"selector\": {\n        \"id\": \"full\",\n        \"version\": \"1\",\n        \"config\": {},\n        \"configDigest\": \"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\"\n      },\n      \"universe\": {\n        \"id\": \"project:.\",\n        \"digest\": \"sha256:9008e2fc310fe0ea53aab9d737d391c011b8d7d2f1fb846767fada8705be4d10\",\n        \"checkIds\": [\n          \"probe\"\n        ],\n        \"testUnitIds\": [\n          \"probe\"\n        ]\n      },\n      \"selection\": {\n        \"kind\": \"full\",\n        \"selectedCheckIds\": [\n          \"probe\"\n        ],\n        \"omittedCheckIds\": [],\n        \"selectedTestUnitIds\": [\n          \"probe\"\n        ],\n        \"omittedTestUnitIds\": []\n      },\n      \"claim\": {\n        \"configuration\": {\n          \"blob\": \"799a9865a8252313928eb6535a50838e88ee0b30\",\n          \"path\": \"ramify-audit.json\",\n          \"sourceCommit\": \"995b779dd7895357ff8e91fdd3e8285b0075d18a\"\n        },\n        \"scope\": \"repository\"\n      },\n      \"projectRoot\": \".\",\n      \"markerWarnings\": []\n    },\n    \"mode\": {\n      \"requestedMode\": \"full\",\n      \"resolution\": \"requested\",\n      \"executedMode\": \"full\"\n    },\n    \"overall\": \"pass\",\n    \"sourceCommit\": \"995b779dd7895357ff8e91fdd3e8285b0075d18a\",\n    \"sourceTree\": \"e2c9831d4d2342227e637e62092a0dd0d78056e8\",\n    \"sourceBranch\": \"master\",\n    \"auditedAt\": \"2026-10-03T06:12:03.845Z\",\n    \"durationSeconds\": 0.057,\n    \"checks\": {\n      \"probe\": {\n        \"commands\": {\n          \"probe\": {\n            \"durationSeconds\": 0.028,\n            \"output\": \"PB1 full preflight\",\n            \"passed\": true,\n            \"status\": \"pass\",\n            \"summary\": \"PB1 full preflight\"\n          }\n        },\n        \"durationSeconds\": 0.029,\n        \"output\": \"### probe [PASS]\\nPB1 full preflight\",\n        \"passed\": true,\n        \"status\": \"pass\",\n        \"summary\": \"probe: PASS\"\n      }\n    },\n    \"definitions\": {\n      \"digest\": \"sha256:f299bdfb4cb8e1c1ff28ddb26a90ba411496c1aa1a4fe07499f49e0a500e2180\",\n      \"manifest\": {\n        \"manifestVersion\": 1,\n        \"workingDirectory\": \".\",\n        \"checks\": [\n          {\n            \"id\": \"probe\",\n            \"dependsOn\": [],\n            \"requiresPackageScripts\": [],\n            \"executor\": {\n              \"kind\": \"command\",\n              \"parallel\": false,\n              \"mutex\": false,\n              \"continueOnFailure\": false,\n              \"commands\": [\n                {\n                  \"name\": \"probe\",\n                  \"cmd\": \"node\",\n                  \"args\": [\n                    \"-e\",\n                    \"console.log('PB1 full preflight')\"\n                  ],\n                  \"parser\": \"none\",\n                  \"contracts\": null,\n                  \"timeoutMs\": 10000,\n                  \"env\": {}\n                }\n              ]\n            }\n          }\n        ],\n        \"workspacePreparation\": null\n      }\n    }\n  },\n  \"refs\": {\n    \"reportCommit\": \"78639dce44187c042b46f9dc8e20dc77186ed590\",\n    \"runRef\": \"refs/audited/runs/2026-10-03T06-12-03Z-995b779dd\",\n    \"treeRef\": \"refs/audited/by-tree/e2c9831d4d2342227e637e62092a0dd0d78056e8\"\n  },\n  \"retrievalCommands\": [\n    \"git notes --ref=audit show 995b779dd7895357ff8e91fdd3e8285b0075d18a\",\n    \"git show refs/audited/runs/2026-10-03T06-12-03Z-995b779dd:reports/audit/summary.json\"\n  ],\n  \"composition\": {\n    \"verdict\": \"pass\",\n    \"scoped\": false,\n    \"chainDepth\": 0,\n    \"reportCommit\": \"78639dce44187c042b46f9dc8e20dc77186ed590\"\n  }\n}\n",
+  "stderr": "",
+  "result": {
+    "status": "completed",
+    "requestId": "35c35312-bb96-4337-89ed-13e517d35586",
+    "runId": "46cdf27e-c273-4551-be1e-75e8c9132466",
+    "summary": {
+      "evidenceSchemaVersion": 3,
+      "execution": {
+        "requestId": "35c35312-bb96-4337-89ed-13e517d35586",
+        "runId": "46cdf27e-c273-4551-be1e-75e8c9132466"
+      },
+      "producer": {
+        "name": "ramify-audit",
+        "version": "0.3.2"
+      },
+      "applicabilityPolicy": "ramify-audit/v1",
+      "ignorePaths": [],
+      "coverage": {
+        "status": "declared",
+        "selector": {
+          "id": "full",
+          "version": "1",
+          "config": {},
+          "configDigest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        },
+        "universe": {
+          "id": "project:.",
+          "digest": "sha256:9008e2fc310fe0ea53aab9d737d391c011b8d7d2f1fb846767fada8705be4d10",
+          "checkIds": [
+            "probe"
+          ],
+          "testUnitIds": [
+            "probe"
+          ]
+        },
+        "selection": {
+          "kind": "full",
+          "selectedCheckIds": [
+            "probe"
+          ],
+          "omittedCheckIds": [],
+          "selectedTestUnitIds": [
+            "probe"
+          ],
+          "omittedTestUnitIds": []
+        },
+        "claim": {
+          "configuration": {
+            "blob": "799a9865a8252313928eb6535a50838e88ee0b30",
+            "path": "ramify-audit.json",
+            "sourceCommit": "995b779dd7895357ff8e91fdd3e8285b0075d18a"
+          },
+          "scope": "repository"
+        },
+        "projectRoot": ".",
+        "markerWarnings": []
+      },
+      "mode": {
+        "requestedMode": "full",
+        "resolution": "requested",
+        "executedMode": "full"
+      },
+      "overall": "pass",
+      "sourceCommit": "995b779dd7895357ff8e91fdd3e8285b0075d18a",
+      "sourceTree": "e2c9831d4d2342227e637e62092a0dd0d78056e8",
+      "sourceBranch": "master",
+      "auditedAt": "2026-10-03T06:12:03.845Z",
+      "durationSeconds": 0.057,
+      "checks": {
+        "probe": {
+          "commands": {
+            "probe": {
+              "durationSeconds": 0.028,
+              "output": "PB1 full preflight",
+              "passed": true,
+              "status": "pass",
+              "summary": "PB1 full preflight"
+            }
+          },
+          "durationSeconds": 0.029,
+          "output": "### probe [PASS]\nPB1 full preflight",
+          "passed": true,
+          "status": "pass",
+          "summary": "probe: PASS"
+        }
+      },
+      "definitions": {
+        "digest": "sha256:f299bdfb4cb8e1c1ff28ddb26a90ba411496c1aa1a4fe07499f49e0a500e2180",
+        "manifest": {
+          "manifestVersion": 1,
+          "workingDirectory": ".",
+          "checks": [
+            {
+              "id": "probe",
+              "dependsOn": [],
+              "requiresPackageScripts": [],
+              "executor": {
+                "kind": "command",
+                "parallel": false,
+                "mutex": false,
+                "continueOnFailure": false,
+                "commands": [
+                  {
+                    "name": "probe",
+                    "cmd": "node",
+                    "args": [
+                      "-e",
+                      "console.log('PB1 full preflight')"
+                    ],
+                    "parser": "none",
+                    "contracts": null,
+                    "timeoutMs": 10000,
+                    "env": {}
+                  }
+                ]
+              }
+            }
+          ],
+          "workspacePreparation": null
+        }
+      }
+    },
+    "refs": {
+      "reportCommit": "78639dce44187c042b46f9dc8e20dc77186ed590",
+      "runRef": "refs/audited/runs/2026-10-03T06-12-03Z-995b779dd",
+      "treeRef": "refs/audited/by-tree/e2c9831d4d2342227e637e62092a0dd0d78056e8"
+    },
+    "retrievalCommands": [
+      "git notes --ref=audit show 995b779dd7895357ff8e91fdd3e8285b0075d18a",
+      "git show refs/audited/runs/2026-10-03T06-12-03Z-995b779dd:reports/audit/summary.json"
+    ],
+    "composition": {
+      "verdict": "pass",
+      "scoped": false,
+      "chainDepth": 0,
+      "reportCommit": "78639dce44187c042b46f9dc8e20dc77186ed590"
+    }
+  },
+  "limits": [
+    "Minimal fixture, not a toolkit audit.",
+    "No Ramify executable or node_modules exists in the fixture.",
+    "Does not prove full audit compatibility with the future Phase 1 toolkit revision."
+  ],
+  "installedPackageDigest": "sha256:a56775c9cdab14a76fe7bfabb2d9c034d5078c0449c5a637368bd568e6b3617b",
+  "installedPackageFileCount": 229
+}
