@@ -106,7 +106,21 @@ describe('complete model validation', () => {
     expect(() => explainVisibility(model, 'app/typo', symbol.id)).toThrow('Unknown module');
     expect(() => explainVisibility(model, root.id, { ...symbol.id, binding: 'absent' })).toThrow('Unknown original');
     expect(() => explainImport(model, question({ ...root.areas[0], profile: ['testing'] }, symbol))).toThrow('established source origin');
-    expect(() => explainImport(model, question(root, symbol, { target: { file: 'outside.ts', area: child.areas[0] } }))).toThrow('established source origin');
+    expect(() => explainImport(model, question(root, symbol, { target: { file: 'outside.ts', area: child.areas[0], auxiliary: false } }))).toThrow('established source origin');
+  });
+
+  // An origin beneath its owner's `src/` is not auxiliary source, so the flag
+  // must be false there; auxiliary origins are not yet established anywhere.
+  it('keeps an origin beneath src non-auxiliary and rejects one flagged auxiliary', () => {
+    const model = valid(buildModel(input));
+    const decision = explainImport(model, question(root, symbol));
+    expect(decision.status).toBe('allowed');
+    expect([decision.question.importer, decision.question.target].map(item => item.auxiliary)).toEqual([false, false]);
+    const flagged = { ...question(root, symbol).importer, auxiliary: true };
+    expect(() => explainImport(model, question(root, symbol, { importer: flagged }))).toThrow('established source origin');
+    expect(() => explainImport(model, question(root, symbol, { forwarding: [{ ...symbol.origin, auxiliary: true }] }))).toThrow('established source origin');
+    const result = buildModel({ ...input, originals: [{ ...symbol, origin: { ...symbol.origin, auxiliary: true } }] });
+    expect(result.status === 'invalid' && result.issues.map(issue => issue.code)).toContain('invalid-original');
   });
 });
 

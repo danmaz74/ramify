@@ -66,7 +66,7 @@ describe('kind-based value and type availability', () => {
         exposure(root, binding, ['descendants'], { provider: bridge.id })]),
     ]);
     const forwarded = explainImport(model, question(consumer, symbol, {
-      target: { file: 'subs/bridge/src/forward.ts', area: bridge.areas[0] }, forwarding: [symbol.origin],
+      target: { file: 'subs/bridge/src/forward.ts', area: bridge.areas[0], auxiliary: false }, forwarding: [symbol.origin],
     }));
     expect(forwarded).toMatchObject({ status: 'allowed', original: { id: symbol.id, tags: [] } });
     expect(forwarded.question.target.file).not.toBe(forwarded.original!.origin.file);
@@ -99,7 +99,7 @@ describe('testing origin precedes same-owner and tag exemptions', () => {
   });
 
   it.each(['target', 'forwarding', 'original'] as const)('checks the %s testing source, including ordinary forwarding of a testing original', (position) => {
-    const testingOrigin: SourceOrigin = { file: 'src/tests/barrel.ts', area: root.areas[1] };
+    const testingOrigin: SourceOrigin = { file: 'src/tests/barrel.ts', area: root.areas[1], auxiliary: false };
     const symbol = position === 'original' ? fixture : ordinary;
     const decision = explainImport(model, question(root, symbol, {
       target: position === 'target' ? testingOrigin : ordinary.origin,

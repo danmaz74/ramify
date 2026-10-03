@@ -154,7 +154,7 @@ function interpretAccesses(setup: AccessInterpretation,
     const entry = resolution.files.get(resolve(root, file));
     const area = entry && setup.areas.get(JSON.stringify([entry.owner, entry.area]));
     if (!entry || !area) throw new SourceFailure('unavailable', `Missing resolved source area for ${file}`);
-    return { file: entry.path, area };
+    return { file: entry.path, area, auxiliary: entry.placement === 'auxiliary' };
   };
   const location = (node: Node): SourceLocation => {
     const source = node.getSourceFile(), start = node.getStart();
@@ -171,7 +171,7 @@ function interpretAccesses(setup: AccessInterpretation,
   };
   const targetOf = (resolved: ResolvedModule, specifier: string): SourceTarget => {
     if (resolved.kind === 'application' && resolved.file) return { kind: 'application', origin: origin(resolved.file) };
-    if (resolved.kind === 'outside-module' && resolved.file) return { kind: 'outside-module', file: resolved.file };
+    if (resolved.kind === 'outside-project' && resolved.file) return { kind: 'outside-project', file: resolved.file };
     if (resolved.kind === 'external') {
       const source = resolved.file ? project.program.getSourceFile(resolve(root, resolved.file)) : undefined;
       return { kind: 'external', name: specifier, resolvedFile: resolved.file ? relative(root, resolved.file) : null,
@@ -213,7 +213,7 @@ function interpretAccesses(setup: AccessInterpretation,
     if (target.kind === 'unresolved' && form !== 'macro' && !(form === 'commonjs' && specifier === null)) coverageIds.push(limit(specifier === null ? 'nonliteral-target'
       : resolved?.kind === 'resource-target' ? 'resource-target' : 'unresolved-target',
     specifierNode ? location(specifierNode) : at, 'Cannot establish the accessed source or resource target'));
-    if (target.kind === 'outside-module') coverageIds.push(limit('outside-module-target', at,
+    if (target.kind === 'outside-project') coverageIds.push(limit('outside-module-target', at,
       `Accessed project file ${target.file} is outside every module source area`));
     if (deferred) coverageIds.push(limit(deferred.code, at, deferred.message));
     const selections: AccessSelection[] = [];

@@ -100,15 +100,15 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     ];
   });
   const inventoryFiles: InventoryFile[] = spec.files.map(file => ({ path: file.path, owner: file.owner, area: file.area ?? 'ordinary',
-    kind: file.kind ?? 'source', sha256: '0'.repeat(64), bytes: file.bytes ?? 10 }));
+    kind: file.kind ?? 'source', placement: 'src', sha256: '0'.repeat(64), bytes: file.bytes ?? 10 }));
   const accesses: SourceAccess[] = spec.accesses.map(access => {
     const location = { file: access.importer, start: 0, end: 1, line: 1, column: 1 };
     const target: SourceAccess['target'] = typeof access.target === 'string'
-      ? access.target === 'unresolved' ? { kind: 'unresolved' } : { kind: 'application', origin: { file: access.target, area: area(access.target) } }
+      ? access.target === 'unresolved' ? { kind: 'unresolved' } : { kind: 'application', origin: { file: access.target, area: area(access.target), auxiliary: false } }
       : 'external' in access.target ? { kind: 'external', resolution: 'package', name: access.target.external, resolvedFile: null }
-      : { kind: 'outside-module', file: access.target.outside };
+      : { kind: 'outside-project', file: access.target.outside };
     return {
-      id: access.id, location, importer: { file: access.importer, area: area(access.importer) }, specifier: 'x',
+      id: access.id, location, importer: { file: access.importer, area: area(access.importer), auxiliary: false }, specifier: 'x',
       form: 'import', selectionForm: 'named', runtimeLoad: access.runtime ?? true, target,
       selections: (access.selections ?? []).map(selection => ({
         location, exportedName: selection.name ?? selection.binding, localName: selection.binding,
@@ -124,14 +124,14 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       ? source.target.origin : source.importer, forwarding: [], selection: null };
     const decision = (file: string, binding: string, status: 'allowed' | 'denied', reason: ImportReason): ImportDecision => ({
       status, reason, question, visibility: null, requirements: [], checkedOrigins: [], blockingOrigins: [],
-      original: { id: originalId(file, binding), origin: { file, area: area(file) }, declarations: [], hasValue: true, hasType: false,
+      original: { id: originalId(file, binding), origin: { file, area: area(file), auxiliary: false }, declarations: [], hasValue: true, hasType: false,
         tags: [], tagEvidence: [], companions: { named: [], evidence: [], inferred: false, unresolved: 0 } } });
     const decisions = source.target.kind !== 'application' ? [] : access.decisions
       ? access.decisions.map(item => decision(item.file, item.binding, item.status, item.reason))
       : (access.selections ?? []).filter(selection => (selection.status ?? 'resolved') === 'resolved')
         .map(selection => decision(selection.file, selection.binding, 'allowed', 'exposed'));
     const outcome: AccessResult['outcome'] = access.outcome ?? (source.target.kind === 'external' ? 'external'
-      : source.target.kind === 'outside-module' ? 'outside-scope' : source.target.kind === 'unresolved' ? 'unverifiable'
+      : source.target.kind === 'outside-project' ? 'outside-scope' : source.target.kind === 'unresolved' ? 'unverifiable'
       : source.coverageIds.length ? 'mixed' : 'checked');
     return { accessId: access.id, decisions, outcome, diagnostics: [], coverage: source.coverageIds };
   });
@@ -153,7 +153,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     status: spec.behavior.status ?? 'completed',
     facts: spec.behavior.facts.map(fact => {
       const accesses = accessFacts(fact);
-      return { consumer: { file: fact.consumer, area: area(fact.consumer) }, original: originalId(fact.file, fact.binding),
+      return { consumer: { file: fact.consumer, area: area(fact.consumer), auxiliary: false }, original: originalId(fact.file, fact.binding),
         accessIds: accesses.map(item => item.accessId), accesses, classification: fact.classification,
         evidence: [], limitIds: fact.limitIds ?? [] };
     }),
@@ -175,7 +175,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       areas, inputs: documentationInputs,
       catalog: {
         originals: spec.originals.map(original => ({ id: originalId(original.file, original.binding),
-          origin: { file: original.file, area: area(original.file) }, declarations: [], hasValue: original.value ?? true,
+          origin: { file: original.file, area: area(original.file), auxiliary: false }, declarations: [], hasValue: original.value ?? true,
           hasType: !(original.value ?? true), companions: { named: [], evidence: [], inferred: false, unresolved: 0 } })),
         files: spec.files.map(file => ({ file: file.path, state: file.state ?? 'complete', exports: [], issueIds: file.issueIds ?? [],
           descriptionFiles: [] })),
@@ -271,7 +271,7 @@ export const diagramPaths = {
  * - `Shape` (type through B), `settings` (data through C, whose access carries a source limit).
  * - `Config`: non-behavioral through B and unknown through C.
  * - Controls without a diagram fact: an unused import, a same-owner call, a symbol-free load, external,
- *   outside-module and unresolved targets and a missing export.
+ *   outside-project and unresolved targets and a missing export.
  * - The test file calls `act` through B.
  */
 export const dependencyReportSpec: FixtureSpec = (() => {

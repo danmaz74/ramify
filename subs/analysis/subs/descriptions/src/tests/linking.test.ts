@@ -26,11 +26,11 @@ function fixture(child: string, root = 'expose-sub * from child to descendants',
   const id: OriginalId = { kind: 'code', owner: 'fixture/child', file: 'interfaces/api.ts', binding: 'value' };
   const location = { file, start: 13, end: 18, line: 1, column: 14 };
   return { registry, inventory: { scope: { root: '/fixture', invokedFrom: '/fixture', selection: 'given', configuration: 'tsconfig.json', walkedAreas: ['src', 'subs/child/src'], independentScopes: [], ownership: { modules: [], exclusions: [] } },
-    modules, files: [{ path: file, owner: 'fixture/child', area: 'ordinary', kind: 'source', sha256: 'fixture', bytes: 23 }],
+    modules, files: [{ path: file, owner: 'fixture/child', area: 'ordinary', kind: 'source', placement: 'src', sha256: 'fixture', bytes: 23 }],
     references: modules.flatMap(module => module.description.document.statements.filter((statement): statement is ExposureStatement => 'from' in statement && statement.kind !== 'expose-sub').map(statement => ({
       description: module.description.document.file, statement: statement.index, decoded: statement.from.value, normalized: file, status: 'file' as const, interfaceEligible: true,
     }))), outsideModuleFiles: [], warnings: [] },
-  catalog: { originals: [{ id, origin: { file, area: area.value[0]! }, declarations: [location], hasValue: true, hasType: false,
+  catalog: { originals: [{ id, origin: { file, area: area.value[0]!, auxiliary: false }, declarations: [location], hasValue: true, hasType: false,
     companions: { named: [], evidence: [], inferred: false, unresolved: 0 } }],
     files: [{ file, state: 'complete', exports: [{ name: 'value', original: id, namespace: null, forwarding: [] }], issueIds: [], descriptionFiles: [] }], coverage: [] } };
 }

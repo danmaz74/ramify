@@ -85,7 +85,7 @@ describe('resource-specific effective exports', () => {
     expect(testing).toEqual(resource('tests/testing.module.css'));
     expect(original(catalog, testing).origin).toEqual({ file: 'src/tests/testing.module.css', area: {
       owner: 'fixture', kind: 'tests', root: 'src/tests', profile: ['testing'],
-    } });
+    }, auxiliary: false });
   });
 
   it('does not invent absent resource export names from a broad class index signature', () => {

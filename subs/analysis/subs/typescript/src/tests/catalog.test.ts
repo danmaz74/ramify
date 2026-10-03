@@ -95,10 +95,10 @@ describe('compiler-derived code originals', () => {
     expect(forwarded.original).toEqual(code('original.ts', 'work'));
     expect(forwarded.forwarding).toContainEqual({ file: 'src/tests/bridge.ts', area: {
       owner: 'fixture', kind: 'tests', root: 'src/tests', profile: ['testing'],
-    } });
+    }, auxiliary: false });
     expect(original(catalog, forwarded.original).origin).toEqual({ file: 'src/original.ts', area: {
       owner: 'fixture', kind: 'ordinary', root: 'src', profile: ['browser'],
-    } });
+    }, auxiliary: false });
     expect(original(catalog, code('helpers/tests/ordinary.ts', 'stillOrdinary', 'fixture/child')).origin.area)
       .toEqual({ owner: 'fixture/child', kind: 'ordinary', root: 'subs/child/src', profile: ['ui'] });
   });

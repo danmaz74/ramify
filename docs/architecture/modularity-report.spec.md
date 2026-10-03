@@ -97,7 +97,7 @@ an application target the **target file** is `target.origin.file`.
 
 **Application occurrence.** An occurrence whose target kind is `application`.
 Only application occurrences form dependencies. External (`package`, `builtin`,
-`standard-library`), `outside-module` and `unresolved` occurrences are counted
+`standard-library`), `outside-project` and `unresolved` occurrences are counted
 separately and never contribute to an edge.
 
 **Original identity.** The triple `(kind, defining file, binding)` of an
@@ -156,7 +156,7 @@ and the ordinary source of testing-classified modules such as
 `integration-tests`. The **test subset** contains testing-classified source files.
 
 An occurrence passes a source filter when its importer file is in that subset.
-The same importer rule applies to external, outside-module and unresolved
+The same importer rule applies to external, outside-project and unresolved
 counts. The provider file is not filtered: a production occurrence targeting a
 testing-classified file is a check violation and remains counted, so the
 report never hides it.
@@ -252,10 +252,11 @@ provenance; their absence from the graph is not zero use.
 
 When project boundaries are implemented, inferred independent compiler scopes
 no longer exist: `omittedScopes` records the declared nested-tree directories
-instead, the `outside-module` target kind becomes `outside-project`, and owned
-compiler source outside `src/`, including scripts and probes, is analyzed as
-its owner's auxiliary source. The report's schema version advances with that
-shape change.
+instead, and owned compiler source outside `src/`, including scripts and
+probes, is analyzed as its owner's auxiliary source rather than counted as an
+`outside-project` target. The report's schema version advances with that
+shape change. Renaming the `outside-module` target kind to `outside-project`
+left the report's shape unchanged.
 
 Under candidate ownership, declarations are unchanged, so interface use is
 `unavailable` with reason `candidate-exposure`. Compare candidates with
@@ -556,7 +557,7 @@ A metric is partial when any of these holds:
 
 1. an occurrence in scope names a `coverageIds` entry;
 2. an occurrence in scope from a scope file has an `unresolved` or
-   `outside-module` target (counted in `unattributedAccesses`);
+   `outside-project` target (counted in `unattributedAccesses`);
 3. a selection of an application occurrence in scope has a status other than
    `resolved`; external selections never resolve to an original;
 4. a source file in scope has `FileExports.state` other than `complete`, or a

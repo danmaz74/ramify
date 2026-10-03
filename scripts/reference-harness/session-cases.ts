@@ -188,9 +188,9 @@ add('I1-29:outside-module-target', 'F', async ({ root }) => {
   locatedCoverage(context, report, 'outside-module-target', probe);
   context.assertions.equal('outside-source warning remains distinct from failures', report.warnings,
     [{ code: 'outside-module-source', entry: 'loose.ts', count: 1, files: ['loose.ts'] }]);
-  context.assertions.equal('outside-module application target has no invented permission or external scope',
+  context.assertions.equal('outside-project target has no invented permission or external scope',
     accessResult(report, probe, '../../../loose.js').map(item => [item.access.target, item.result.outcome, item.result.decisions]),
-    [[{ kind: 'outside-module', file: 'loose.ts' }, 'outside-scope', []]]);
+    [[{ kind: 'outside-project', file: 'loose.ts' }, 'outside-scope', []]]);
 });
 
 for (const id of ['I1-27:cancel/acquisition', 'I1-27:cancel/catalog', 'I1-27:read-failure',

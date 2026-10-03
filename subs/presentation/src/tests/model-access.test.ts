@@ -44,7 +44,7 @@ describe('teaching facts use the definitive model', () => {
     const original = example4Declaration.originals[0]!;
     const area = example4Declaration.modules.find(module => module.id === original.id.owner)!.areas.find(area => area.kind === 'tests')!;
     const changed = { ...original, id: { ...original.id, file: 'tests/fixture.ts' },
-      origin: { file: `${area.root}/fixture.ts`, area }, tags: ['testing'] };
+      origin: { file: `${area.root}/fixture.ts`, area, auxiliary: false }, tags: ['testing'] };
     const model = buildDiagramModel({ ...example4Declaration, originals: [changed], exposures: [] });
     expect(diagramImport(model, 'shared', 'shared', changed.id.binding).reason).toBe('testing-origin');
   });

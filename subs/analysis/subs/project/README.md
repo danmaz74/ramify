@@ -55,7 +55,10 @@ filesystem result from the parent capture through a single-operation protocol,
 with 1 MiB frames and sequential 192 KiB chunks. It opens no compiler program.
 Configuration scripts and application entries are never executed. Owned source
 is inventoried independently of compiler selection; selected outside-source
-files produce aggregated warnings. Unselected outside-source files are silent,
+files produce aggregated warnings. Each inventory file records its `placement`:
+`src`, `auxiliary` for owned compiler source outside `src/`, or
+`referenced-resource`. Acquisition inventories files beneath `src/` only, so
+every file is `src` until auxiliary source is inventoried. Unselected outside-source files are silent,
 but their misplaced descriptions remain errors. Independent configurations,
 installed dependencies and compiler output supply discovery boundaries; an
 arbitrary compiler source exclusion cannot hide an owner or a stray marker.

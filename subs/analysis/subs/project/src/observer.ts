@@ -366,7 +366,7 @@ class Observer implements ProjectObserver {
       if (!await this.#capture.hasExactEntry(path)) return 'structural';
       const area = within(join(moduleRoot, 'src/tests'), path) ? 'tests' : 'ordinary';
       const fileKind = inventoryFileKind(path);
-      files.set(label, { path: label, owner: module.id, area, kind: fileKind,
+      files.set(label, { path: label, owner: module.id, area, kind: fileKind, placement: 'src',
         ...await this.#capture.application(path, fileKind) });
       await this.#refreshAreas(module, modules);
       return 'created';

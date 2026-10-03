@@ -34,12 +34,12 @@ export const sourceFile = (module: { readonly id: string; readonly directory: st
 
 export function inventoryFile(path: string, owner: string, area: 'ordinary' | 'tests' = 'ordinary',
   kind: 'source' | 'resource' = 'source'): InventoryFile {
-  return { path, owner, area, kind, sha256: '0'.repeat(64), bytes: 1 };
+  return { path, owner, area, kind, placement: 'src', sha256: '0'.repeat(64), bytes: 1 };
 }
 
 export function origin(file: string, owner: string, kind: 'ordinary' | 'tests' = 'ordinary'): SourceOrigin {
   const area: SourceArea = { owner, kind, root: file.slice(0, file.lastIndexOf('/')), profile: kind === 'tests' ? ['testing'] : [] };
-  return { file, area };
+  return { file, area, auxiliary: false };
 }
 
 let accessCount = 0;

@@ -84,7 +84,7 @@ async function sampleEntries(model: RamifyModel, root: string, maxEntries: numbe
     const ordinaryArea = module.areas.find((a: SourceArea) => a.kind === 'ordinary');
     if (!ordinaryArea) continue;
     const importerFile = `${ordinaryArea.root}/__plan2a_probe__.ts`;
-    const importer: SourceOrigin = { file: importerFile, area: ordinaryArea };
+    const importer: SourceOrigin = { file: importerFile, area: ordinaryArea, auxiliary: false };
     const location = { file: importerFile, start: 0, end: 0, line: 1, column: 1 };
     for (const original of model.originals as readonly Original[]) {
       if (samples.length >= maxEntries) break;

@@ -119,7 +119,7 @@ export async function acquire(root: string): Promise<ProjectInputView> {
       const owner = modules.find(module => local.startsWith(`${module.areas[0]!.root}/`));
       if (!owner) return [];
       return [{ path: local, owner: owner.id, area: local.startsWith(`${owner.areas[1]!.root}/`) ? 'tests' as const : 'ordinary' as const,
-        kind: /\.(?:[cm]?[jt]sx?)$/.test(local) ? 'source' as const : 'resource' as const,
+        kind: /\.(?:[cm]?[jt]sx?)$/.test(local) ? 'source' as const : 'resource' as const, placement: 'src' as const,
         sha256: sha256(content), bytes: Buffer.byteLength(content) }];
     }).sort((a, b) => a.path.localeCompare(b.path)),
   };

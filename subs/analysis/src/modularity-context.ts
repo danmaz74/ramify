@@ -9,7 +9,7 @@ import type {
 } from './interfaces/modularity.js';
 import type { ModuleId, OriginalId, SourceOrigin } from '../subs/model/src/interfaces/model.js';
 import type { InventoryFile } from '../subs/project/src/interfaces/project.js';
-import type { CatalogOriginal, SourceAccess } from '../subs/typescript/src/interfaces/source.js';
+import type { CatalogOriginal, SourceAccess, SourceTarget } from '../subs/typescript/src/interfaces/source.js';
 import { measurementFileIsTesting } from './module-measurements.js';
 
 /**
@@ -146,7 +146,7 @@ export interface Occurrence {
   readonly access: SourceAccess;
   readonly importer: string;
   readonly consumer: ModuleId;
-  readonly kind: 'application' | 'external' | 'outside-module' | 'unresolved';
+  readonly kind: SourceTarget['kind'];
   /** Target file and its owner, for an application occurrence. */
   readonly target: string | null;
   readonly provider: ModuleId | null;
@@ -310,7 +310,10 @@ export function resolveOccurrence(access: SourceAccess, ownership: OwnershipReso
     symbols: sorted(selected.map(selection => originals.symbol(selection.original!, selection.exportedName))),
     originals: sorted(selected.map(selection => originals.identity(selection.original!))),
     limitIds: sorted(access.coverageIds),
-    unattributed: target.kind === 'unresolved' || target.kind === 'outside-module',
+    // Source analysis does not yet produce nested-tree or excluded targets;
+    // like unresolved and outside-project targets, they name no provider.
+    unattributed: target.kind === 'unresolved' || target.kind === 'outside-project'
+      || target.kind === 'nested-tree' || target.kind === 'excluded',
     // External selections never resolve to an original; only application selections bear on coverage.
     unresolvedSelection: target.kind === 'application' && access.selections.some(selection => selection.status !== 'resolved'),
   };

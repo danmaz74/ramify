@@ -9,11 +9,11 @@ const area = (owner: string, root: string) => ({ owner, kind: 'ordinary' as cons
 const providerArea = area('fixture/provider', 'subs/provider/src');
 const consumerArea = area('fixture/consumer', 'subs/consumer/src');
 const original = { kind: 'code' as const, owner: 'fixture/provider', file: 'api.ts', binding: 'Value' };
-const providerOrigin = { file: 'subs/provider/src/api.ts', area: providerArea };
-const consumerOrigin = { file: 'subs/consumer/src/use.ts', area: consumerArea };
+const providerOrigin = { file: 'subs/provider/src/api.ts', area: providerArea, auxiliary: false };
+const consumerOrigin = { file: 'subs/consumer/src/use.ts', area: consumerArea, auxiliary: false };
 const selection = (exportedName: string) => ({ location: location('subs/consumer/src/use.ts'), exportedName,
   localName: exportedName.toLowerCase(), original, request: 'value' as const, explicitType: false,
-  forwarding: [{ file: 'src/index.ts', area: area('fixture', 'src') }], status: 'resolved' as const });
+  forwarding: [{ file: 'src/index.ts', area: area('fixture', 'src'), auxiliary: false }], status: 'resolved' as const });
 const access = (id: string, target: unknown, selections: readonly unknown[] = [], coverageIds: readonly string[] = []) => ({
   id, location: location('subs/consumer/src/use.ts'), importer: consumerOrigin, specifier: id,
   form: 'import' as const, selectionForm: selections.length ? 'named' as const : 'none' as const,
@@ -29,7 +29,7 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
     access('package', { kind: 'external', resolution: 'package', name: 'react', resolvedFile: '/node_modules/react/index.js' }),
     access('builtin', { kind: 'external', resolution: 'builtin', name: 'node:fs', resolvedFile: null }),
     access('standard', { kind: 'external', resolution: 'standard-library', name: 'lib.es2022', resolvedFile: null }),
-    access('outside', { kind: 'outside-module', file: 'scripts/tool.ts' }),
+    access('outside', { kind: 'outside-project', file: 'scripts/tool.ts' }),
     access('unresolved', { kind: 'unresolved' }, [], ['coverage-target']),
   ];
   const results = accesses.map(item => ({ accessId: item.id,
@@ -121,11 +121,11 @@ describe('createProjectExplorerModel', () => {
       .map(item => item.target.kind === 'external' ? item.target.resolution : null)).toEqual([
         'package', 'builtin', 'standard-library',
       ]);
-    expect(reportAccesses.filter(item => item.target.kind === 'outside-module')).toHaveLength(1);
+    expect(reportAccesses.filter(item => item.target.kind === 'outside-project')).toHaveLength(1);
     expect(reportAccesses.filter(item => item.target.kind === 'unresolved')).toHaveLength(1);
     const omittedTargetLabels = reportAccesses.flatMap(item => item.target.kind === 'external'
       ? [item.target.name]
-      : item.target.kind === 'outside-module' ? [item.target.file]
+      : item.target.kind === 'outside-project' ? [item.target.file]
         : item.target.kind === 'unresolved' ? ['unresolved'] : []);
     expect(omittedTargetLabels).toEqual(['react', 'node:fs', 'lib.es2022', 'scripts/tool.ts', 'unresolved']);
     expect(reportAccesses.find(item => item.id === 'unresolved')?.coverageIds).toEqual(['coverage-target']);
@@ -140,7 +140,9 @@ describe('createProjectExplorerModel', () => {
     const roundTripped = JSON.parse(encoded) as unknown;
     expect(roundTripped).toEqual(first.view);
     const encodedBytes = Buffer.byteLength(encoded, 'utf8');
-    expect(encodedBytes).toBe(5_880);
+    // Each of the two projected selections carries one forwarding origin, and
+    // each origin's `,"auxiliary":false` member adds 18 bytes.
+    expect(encodedBytes).toBe(5_880 + 2 * 18);
     expect(encodedBytes).toBeLessThanOrEqual(8_485);
     const serializedKeys = new Set<string>();
     const serializedStrings = new Set<string>();

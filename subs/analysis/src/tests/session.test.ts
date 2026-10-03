@@ -239,7 +239,7 @@ describe('public disposable analysis session', () => {
     expect(report.summary).toMatchObject({ warnings: 1, coverageNotes: 1, external: 0, allowed: 0, denied: 0 });
     expect(report.warnings).toEqual([{ code: 'outside-module-source', entry: 'tools', count: 1, files: ['tools/outside.ts'] }]);
     expect(report.coverage).toEqual([expect.objectContaining({ code: 'outside-module-target', location: expect.objectContaining({ file: importer }) })]);
-    expect(report.snapshot!.accesses[0]!.target).toEqual({ kind: 'outside-module', file: 'tools/outside.ts' });
+    expect(report.snapshot!.accesses[0]!.target).toEqual({ kind: 'outside-project', file: 'tools/outside.ts' });
     expect(report.snapshot!.results[0]).toMatchObject({ outcome: 'outside-scope', decisions: [], diagnostics: [] });
   }), 15_000);
 

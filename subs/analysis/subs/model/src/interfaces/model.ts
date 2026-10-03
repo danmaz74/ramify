@@ -49,6 +49,11 @@ export type OriginalId =
 export interface SourceOrigin {
   readonly file: string;
   readonly area: SourceArea;
+  /**
+   * True only for owned compiler source outside its owner's `src/`, which
+   * keeps the owner's ordinary `area`; false for every origin beneath `src/`.
+   */
+  readonly auxiliary: boolean;
 }
 /** The project originals named by an original's declared signature. */
 export interface SignatureCompanions {

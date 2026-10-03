@@ -105,7 +105,10 @@ selections use the existing target-origin check without invented symbols.
 These limits do not suppress resolved selections.
 
 Iteration 12 records proven package and builtin scope separately from unresolved
-targets and project files outside modules. Vite globs, loader import methods,
+targets and project files outside modules, which are `outside-project` targets.
+The `nested-tree` and `excluded` target members, each with its exclusion, are
+declared but not yet produced. Every origin takes its `auxiliary` flag from the
+inventory file's placement. Vite globs, loader import methods,
 direct Jiti calls and CommonJS access/export patterns retain explicit coverage.
 They never become native ESM selections. Known CommonJS targets retain their source areas for
 analysis to apply testing-origin isolation.

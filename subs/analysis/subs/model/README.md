@@ -28,7 +28,10 @@ companion key.
 
 Module IDs use declared name chains. Original IDs use the original owner,
 source-relative file and lexical binding or resource binding. `SourceOrigin.file`
-and area roots are project-relative. Derived areas retain intended ordinary
+and area roots are project-relative. `SourceOrigin.auxiliary` marks owned
+compiler source outside its owner's `src/`, which keeps the ordinary area; the
+model establishes only origins beneath `src/`, so it requires the flag false and
+rejects an origin flagged auxiliary. Derived areas retain intended ordinary
 and tests roots even when the corresponding directory is absent. These pure
 operations neither read paths nor establish filesystem existence.
 

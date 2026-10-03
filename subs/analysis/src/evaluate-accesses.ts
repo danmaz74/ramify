@@ -2,10 +2,25 @@ import { createHash } from 'node:crypto';
 import { setImmediate } from 'node:timers/promises';
 import { explainImport, originalKey } from '../subs/model/src/index.js';
 import type { ImportDecision, Model, SourceLocation } from '../subs/model/src/interfaces/model.js';
-import type { SourceAccess } from '../subs/typescript/src/interfaces/source.js';
+import type { SourceAccess, SourceTarget } from '../subs/typescript/src/interfaces/source.js';
 import type { AccessResult, AnalysisDiagnostic } from './interfaces/analysis.js';
 
 const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+/**
+ * Every target kind names its outcome; only an application target can be
+ * `checked`. Source analysis does not yet produce nested-tree or excluded
+ * targets, so neither may pass as checked before its rule is enforced.
+ */
+function outcomeOf(target: SourceTarget, unknown: boolean, checked: boolean): AccessResult['outcome'] {
+  switch (target.kind) {
+    case 'application': return unknown ? checked ? 'mixed' : 'unverifiable' : 'checked';
+    case 'external': return 'external';
+    case 'outside-project': return 'outside-scope';
+    case 'unresolved': case 'nested-tree': case 'excluded': return 'unverifiable';
+    default: { const never: never = target; throw new TypeError(`Unknown source target ${JSON.stringify(never)}`); }
+  }
+}
 
 /** Analysis-owned request mapping, ready for the session's decide stage. Call
  * only with a model built from valid, linked descriptions of these inputs. */
@@ -84,9 +99,7 @@ function* evaluateSteps(model: Model, accesses: readonly SourceAccess[], maxDiag
       if (!access.selections.length && access.selectionForm === 'unknown') unknown = true;
     }
     const result: AccessResult = { accessId: access.id, decisions,
-      outcome: access.target.kind === 'external' ? 'external' : access.target.kind === 'outside-module' ? 'outside-scope'
-        : access.target.kind === 'unresolved' ? 'unverifiable' : unknown ? checked ? 'mixed' : 'unverifiable' : 'checked',
-      diagnostics: ids, coverage: access.coverageIds };
+      outcome: outcomeOf(access.target, unknown, checked), diagnostics: ids, coverage: access.coverageIds };
     collect?.result(result);
     results.push(result);
     yield;

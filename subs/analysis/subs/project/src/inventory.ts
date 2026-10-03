@@ -194,7 +194,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
           if (basename(path) === 'module.ramify') continue;
           const area = within(join(boundary.directory, 'src/tests'), path) ? 'tests' : 'ordinary';
           const fileKind = compilerSource.test(path) ? 'source' : 'resource';
-          files.push({ path: relative(capture.root, path), owner: boundary.module.id, area, kind: fileKind,
+          files.push({ path: relative(capture.root, path), owner: boundary.module.id, area, kind: fileKind, placement: 'src',
             ...await capture.application(path, fileKind) });
         }
         // POSIX symlinks are observed, never traversed during discovery. A linked

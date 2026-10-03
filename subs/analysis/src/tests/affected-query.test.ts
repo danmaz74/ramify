@@ -127,7 +127,7 @@ describe('affected-module projection: forwarding and shims', () => {
     const facts = graphFacts({ modules: { user: 'subs/user', core: 'subs/core' },
       accesses: [access(user, { kind: 'application', origin: origin('subs/core/src/core.ts', 'core') }, [], 'side-effect-import'),
         access(user, { kind: 'external', resolution: 'builtin', name: 'node:path', resolvedFile: null }),
-        access(user, { kind: 'outside-module', file: 'lib/helper.ts' }), access(user, { kind: 'unresolved' })] });
+        access(user, { kind: 'outside-project', file: 'lib/helper.ts' }), access(user, { kind: 'unresolved' })] });
     expect(ids(select(facts, ['core']).affectedModules)).toEqual(['user']);
     expect(ids(select(facts, ['user']).affectedModules)).toEqual([]);
   });

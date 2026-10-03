@@ -92,7 +92,7 @@ function resource(assertions: Assertions, catalog: SourceCatalog,
   const root = expected.file.slice(0, -expected.bindingFile.length - 1);
   assertions.equal(`${expected.file}: defining resource and source area`, original.origin, {
     file: expected.file, area: { owner: expected.owner, kind: 'ordinary', root,
-      profile: tags.length ? ['browser', 'ui'] : [] },
+      profile: tags.length ? ['browser', 'ui'] : [] }, auxiliary: false,
   });
   assertions.equal(`${expected.file}: runtime value exists`, original.hasValue, true);
   assertions.equal(`${expected.file}: default tags from defining area`,

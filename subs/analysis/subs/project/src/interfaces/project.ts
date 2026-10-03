@@ -84,6 +84,12 @@ export interface InventoryFile {
   readonly owner: string;
   readonly area: 'ordinary' | 'tests';
   readonly kind: 'source' | 'resource';
+  /**
+   * `src` beneath the owner's `src/`; `auxiliary` for owned compiler source
+   * outside it, classified as ordinary; `referenced-resource` for a resource
+   * outside it that an analysis stage reads, which is not auxiliary code.
+   */
+  readonly placement: 'src' | 'auxiliary' | 'referenced-resource';
   readonly sha256: string;
   readonly bytes: number;
 }

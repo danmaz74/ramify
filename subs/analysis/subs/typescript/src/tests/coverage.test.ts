@@ -13,7 +13,7 @@ describe('iteration 12 source coverage boundaries', () => {
       .toEqual([['value', 'resolved'], ['missing', 'missing-export']]);
   }), 30_000);
 
-  it('separates proven package and builtin scope from unresolved names and outside-module files', async () => withCatalog({
+  it('separates proven package and builtin scope from unresolved names and outside-project files', async () => withCatalog({
     'node_modules/pkg/package.json': '{"name":"pkg","type":"module","types":"./index.d.ts"}',
     'node_modules/pkg/index.d.ts': 'export declare const value: number;',
     'outside.ts': 'export const value = 2;',
@@ -21,7 +21,7 @@ describe('iteration 12 source coverage boundaries', () => {
   }, async ({ source }) => {
     const result = await source.accesses();
     expect(result.accesses.map(access => [access.specifier, access.target.kind])).toEqual([
-      ['pkg', 'external'], ['node:fs', 'external'], ['@application/missing', 'unresolved'], ['../outside.js', 'outside-module'],
+      ['pkg', 'external'], ['node:fs', 'external'], ['@application/missing', 'unresolved'], ['../outside.js', 'outside-project'],
     ]);
     expect(result.accesses[0].target).toMatchObject({ resolution: 'package' });
     expect(result.accesses[1].target).toMatchObject({ resolution: 'builtin' });

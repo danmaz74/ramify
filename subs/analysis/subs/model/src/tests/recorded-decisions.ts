@@ -1,7 +1,8 @@
 import type { Model, ImportQuestion, ImportDecision } from '../interfaces/model.js';
 
 // Recorded with the pre-iteration engine e0be049658b922ba6606172f1cf5166c01a49f1d;
-// Plan 8 added the empty `companions` field to each original.
+// Plan 8 added the empty `companions` field to each original; project
+// boundaries added `auxiliary: false` to each origin, all beneath `src/`.
 export const recorded: { model: Model; questions: readonly ImportQuestion[]; decisions: readonly ImportDecision[] } = {
   "model": {
     "registry": {
@@ -109,7 +110,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -140,7 +142,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -173,7 +176,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -257,7 +261,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/provider/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "location": {
         "file": "subs/provider/src/consumer.ts",
@@ -273,7 +278,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/provider/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "forwarding": [],
       "selection": {
@@ -294,7 +300,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/consumer/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "location": {
         "file": "subs/consumer/src/consumer.ts",
@@ -310,7 +317,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/provider/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "forwarding": [],
       "selection": {
@@ -331,7 +339,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/consumer/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "location": {
         "file": "subs/consumer/src/consumer.ts",
@@ -347,7 +356,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/provider/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "forwarding": [],
       "selection": {
@@ -368,7 +378,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/consumer/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "location": {
         "file": "subs/consumer/src/consumer.ts",
@@ -386,7 +397,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "profile": [
             "testing"
           ]
-        }
+        },
+        "auxiliary": false
       },
       "forwarding": [],
       "selection": {
@@ -407,7 +419,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/consumer/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "location": {
         "file": "subs/consumer/src/consumer.ts",
@@ -423,7 +436,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
           "kind": "ordinary",
           "root": "subs/consumer/src",
           "profile": []
-        }
+        },
+        "auxiliary": false
       },
       "forwarding": [],
       "selection": null
@@ -441,7 +455,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "target": {
           "file": "subs/provider/src/api.ts",
@@ -450,7 +465,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "forwarding": [],
         "location": {
@@ -484,7 +500,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -524,7 +541,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         {
           "file": "subs/provider/src/api.ts",
@@ -533,7 +551,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         }
       ],
       "blockingOrigins": []
@@ -549,7 +568,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/consumer/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "target": {
           "file": "subs/provider/src/api.ts",
@@ -558,7 +578,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "forwarding": [],
         "location": {
@@ -592,7 +613,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -659,7 +681,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         {
           "file": "subs/provider/src/api.ts",
@@ -668,7 +691,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         }
       ],
       "blockingOrigins": []
@@ -684,7 +708,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/consumer/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "target": {
           "file": "subs/provider/src/api.ts",
@@ -693,7 +718,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "forwarding": [],
         "location": {
@@ -727,7 +753,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -765,7 +792,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         {
           "file": "subs/provider/src/api.ts",
@@ -774,7 +802,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/provider/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         }
       ],
       "blockingOrigins": []
@@ -790,7 +819,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/consumer/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "target": {
           "file": "subs/provider/src/tests/helper.ts",
@@ -801,7 +831,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         },
         "forwarding": [],
         "location": {
@@ -837,7 +868,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         },
         "hasValue": true,
         "hasType": true,
@@ -868,7 +900,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         },
         {
           "file": "subs/provider/src/tests/helper.ts",
@@ -879,7 +912,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         }
       ],
       "blockingOrigins": [
@@ -892,7 +926,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         },
         {
           "file": "subs/provider/src/tests/helper.ts",
@@ -903,7 +938,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "profile": [
               "testing"
             ]
-          }
+          },
+          "auxiliary": false
         }
       ]
     },
@@ -918,7 +954,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/consumer/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "target": {
           "file": "subs/consumer/src/init.ts",
@@ -927,7 +964,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/consumer/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         },
         "forwarding": [],
         "location": {
@@ -950,7 +988,8 @@ export const recorded: { model: Model; questions: readonly ImportQuestion[]; dec
             "kind": "ordinary",
             "root": "subs/consumer/src",
             "profile": []
-          }
+          },
+          "auxiliary": false
         }
       ],
       "blockingOrigins": []

@@ -10,7 +10,7 @@ export interface CatalogHost {
   readonly resourceWitness: string;
 }
 export interface ResolvedModule {
-  readonly kind: 'application' | 'external' | 'outside-module' | 'unresolved' | 'resource-target';
+  readonly kind: 'application' | 'external' | 'outside-project' | 'unresolved' | 'resource-target';
   readonly module: CompilerSymbol | undefined;
   readonly file: string | null;
   readonly resource: InventoryFile | null;
@@ -129,7 +129,7 @@ export class Resolution {
       // paths substitution, even if that alternative happens to be a resource.
       return this.external(path)
         ? { kind: 'external', module, file: path, resource: null }
-        : { kind: 'outside-module', module, file: relative(this.inventory.scope.root, path), resource: null };
+        : { kind: 'outside-project', module, file: relative(this.inventory.scope.root, path), resource: null };
     }
     if (describedResources.length) {
       for (const path of describedResources) {
@@ -138,7 +138,7 @@ export class Resolution {
         if (owned?.kind === 'resource') return { kind: 'application', module, file: owned.path, resource: owned };
         return sourcePaths.every(path => this.external(path))
           ? { kind: 'external', module, file: path, resource: null }
-          : { kind: 'outside-module', module, file: relative(this.inventory.scope.root, path), resource: null };
+          : { kind: 'outside-project', module, file: relative(this.inventory.scope.root, path), resource: null };
       }
       return { kind: 'resource-target', module, file: null, resource: null };
     }
@@ -175,7 +175,7 @@ export class Resolution {
         const owned = this.files.get(resolve(selected));
         if (owned?.kind === 'source') return { kind: 'application', module, file: owned.path, resource: null };
         if (this.external(selected)) return { kind: 'external', module, file: selected, resource: null };
-        return { kind: 'outside-module', module, file: relative(this.inventory.scope.root, selected), resource: null };
+        return { kind: 'outside-project', module, file: relative(this.inventory.scope.root, selected), resource: null };
       }
     }
     for (const candidate of candidates) {
@@ -184,7 +184,7 @@ export class Resolution {
         return { kind: 'application', module, file: file.path, resource: file };
       }
       if (!file && exists(candidate)) {
-        return { kind: 'outside-module', module, file: relative(this.inventory.scope.root, candidate), resource: null };
+        return { kind: 'outside-project', module, file: relative(this.inventory.scope.root, candidate), resource: null };
       }
     }
     // Node's builtin resolver establishes these targets even when this project

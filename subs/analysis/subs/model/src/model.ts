@@ -22,9 +22,12 @@ function ownerOf(modules: readonly ModuleRecord[], id: string): ModuleRecord | u
   return index.get(id);
 }
 
-/** A supplied origin must use the area's actual profile, including tests precedence. */
+/**
+ * A supplied origin must use the area's actual profile, including tests
+ * precedence. It lies beneath its owner's `src/`, so it is not auxiliary.
+ */
 export function canonicalOrigin(modules: readonly ModuleRecord[], origin: SourceOrigin): SourceOrigin | undefined {
-  if (!origin || !validPath(origin.file) || !origin.area) return undefined;
+  if (!origin || !validPath(origin.file) || !origin.area || origin.auxiliary !== false) return undefined;
   const owner = ownerOf(modules, origin.area.owner);
   const ordinary = owner?.areas.find(({ kind }) => kind === 'ordinary');
   if (!ordinary || !origin.file.startsWith(`${ordinary.root}/`)) return undefined;
@@ -33,7 +36,7 @@ export function canonicalOrigin(modules: readonly ModuleRecord[], origin: Source
   const area = owner?.areas.find((candidate) => candidate.kind === kind);
   if (!area || origin.area.kind !== kind || origin.area.root !== area.root
     || !Array.isArray(origin.area.profile) || !sameNames(origin.area.profile, area.profile)) return undefined;
-  return { file: origin.file, area };
+  return { file: origin.file, area, auxiliary: false };
 }
 
 /**
