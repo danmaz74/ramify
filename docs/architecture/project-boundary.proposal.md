@@ -1,13 +1,14 @@
 # Project boundary and whole-tree ownership
 
 **Date:** 2026-09-30, revised 2026-10-01. **Status:** adopted in the owning
-principles, specifications and glossaries on 2026-10-01; not implemented. This document records
+principles, specifications and glossaries on 2026-10-01; the nested-tree
+statement syntax and the Ramify contracts the user accepted on 2026-10-03 were
+adopted in the owning specifications in commit `6d0c66f0`. Not implemented.
+This document records
 the design decisions, implementation recipes and migration guidance. Section 13
 links to the authoritative principles, specifications and vocabulary. The existing CLI and
 runtime contracts describe current behavior until their implementations and
-contracts are migrated. Nested-tree statement syntax must be completed in the
-module-description specification before parser implementation; the implementation
-plan schedules that work and the remaining delivery. The
+contracts are migrated. The
 [implementation plan](../plans/project-boundary-sequential/main-plan.md) contains the
 toolkit, audit and harness work packages and their acceptance gates, ordered
 Ramify first, then ramify-audit, then ramify-agent.
@@ -105,8 +106,8 @@ the parent's, and is analyzed as the parent's.
 
 A module declares each nested tree in its own description, by directory
 relative to the module, with one of two kinds. The statements are part of
-the description grammar, beside the exposure statements; their exact syntax
-is the implementation plan's.
+the description grammar, beside the exposure statements; their syntax is the
+version 1 grammar's `nested-tree-line` in the module description specification.
 
 | Kind | Part of the project | Owned and written by the declaring module | Analyzed |
 | --- | --- | --- | --- |
@@ -655,17 +656,22 @@ Of 2026-10-03:
 
 ## 13. Adopted principles, specifications and glossary entries
 
-The owning documents now contain the decisions adopted on 2026-10-01. Their
-adoption does not establish runtime support. Detailed implementation recipes,
-diagnostics and migration guidance remain in sections 3 to 11; the exact
-nested-tree statement syntax and executable acceptance remain implementation
-work. Shared terms have one definition and are reused by consumers.
+The owning documents now contain the decisions adopted on 2026-10-01. On
+2026-10-03 commit `6d0c66f0` adopted the
+[Ramify contracts](../plans/project-boundary-ramify/contracts.md) the user
+accepted: the nested-tree statement syntax and declaration validation in the
+module description specification, and their consequences in the source
+interpretation, CLI invocation, architect-view, materialized API-view and
+modularity-report specifications. Adoption does not establish runtime support.
+Detailed implementation recipes, diagnostics and migration guidance remain in
+sections 3 to 11; executable acceptance remains implementation work. Shared
+terms have one definition and are reused by consumers.
 Repository-qualified references name separate repositories, not sibling checkouts.
 
 | Owner | Authoritative document | Adopted content |
 | --- | --- | --- |
 | Ramify model | [Model glossary](../model/glossary.md) | Whole-tree owned contents, nested trees, exclusions, scratch, auxiliary source, containment and package resolution. |
-| Ramify layout | [Module description specification](../model/module-description.spec.md) | Path ownership, explicit discovery boundaries, auxiliary-source rules and non-exposable auxiliary originals. Nested-tree statement syntax remains pending. |
+| Ramify layout | [Module description specification](../model/module-description.spec.md) | Path ownership, explicit discovery boundaries, auxiliary-source rules and non-exposable auxiliary originals; nested-tree statement syntax and declaration validation, adopted 2026-10-03. |
 | Ramify imports | [Importability specification](../model/cross-module-importability.spec.md) | Ownership, auxiliary-source classification and imports across project boundaries. |
 | Ramify source interpretation | [TypeScript source specification](../model/typescript-source-interpretation.spec.md) | Resolution provenance, linked packages, nested-tree violations and explicit excluded analysis. |
 | Ramify architectural evidence | [Module architect principles](../agents/module-architect.principles.md) | Visible owned-ignored boundaries without claims about their contents. |

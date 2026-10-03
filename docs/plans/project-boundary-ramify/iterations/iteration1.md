@@ -40,7 +40,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 ## Deliverables
 
 1. Record the user's accepted R1–R6 decisions at a fixed contract revision and obtain coordinator authorization for the exact grammar/validation/schema/freshness patches before adopting them in the owning specifications. An entry the user has not accepted stops the iteration. Keep runtime support marked pending; model/architecture write scope does not authorize other protected edits.
-2. Inventory every changed schema and foreign signature companion, map producer/consumer/exposure changes, and preserve CLI root and production-selection policies. From that inventory, name the first iteration whose candidate changes the affected output the installed audit reads; gates switch from partial to full audits there.
+2. Inventory every changed schema and foreign signature companion, map producer/consumer/exposure changes, and preserve CLI root and production-selection policies. From that inventory, record the first iteration whose candidate the installed audit can no longer read; that finding is why every gate runs a full audit, per [execution.md](../execution.md#iteration-gates).
 3. Reconfirm the installed full-audit mode path, run the clean toolkit baseline and separate reference command, and retain baseline failures plus a concrete direct-fallback readiness receipt.
 4. Record the protected-document baseline and adoption rationale/approvals, prepare the coordinator's standalone comparison check before adoption edits, and retain the actual diff review and affected-authority handoff.
 
@@ -63,6 +63,7 @@ From the toolkit checkout:
 
 ```sh
 git diff --check
+npm run build
 flock /tmp/ramify-audit-tests.lock npm run reference:cases
 ```
 
@@ -74,7 +75,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-The receipt cites the user's decision for every R entry, names the audit-mode switch iteration and identifies baseline gaps, protected-file approvals and the coordinator's actual diff review. PB1 runtime cases remain unimplemented; do not mark them passed from document validation or the small audit probe.
+The receipt cites the user's decision for every R entry, records where the installed audit stops reading the affected answer and identifies baseline gaps, protected-file approvals and the coordinator's actual diff review. PB1 runtime cases remain unimplemented; do not mark them passed from document validation or the small audit probe.
 
 Record `iteration1-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

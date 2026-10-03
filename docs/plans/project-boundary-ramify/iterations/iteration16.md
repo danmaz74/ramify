@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 15](iteration15.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Daemon/root dispatch capability, neutral watcher ports and all mechanical schema consumers. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Daemon/root dispatch capability, neutral watcher ports, all mechanical schema consumers and the reference harness's expected values for wire, watch and status outputs this slice changes. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -12,11 +12,11 @@ editing; follow the [protected-document procedure](../execution.md#protected-pri
 
 ## Goal
 
-Implement the reviewed schema/protocol inventory through real worker/IPC/root service and strict codecs; reject malformed variants and old mismatched peers.
+Carry check request paths, classification sequence and dispositions through real worker/IPC/root service and strict codecs; reject malformed variants and mismatched peers.
 
 ## Read first
 
-- [Contracts](../contracts.md): Transport, observation and projections.
+- [Contracts](../contracts.md): Transport, observation and projections; Schema versions.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-23, PB1-25 and the independent
@@ -38,7 +38,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 ## Deliverables
 
-1. Implement the reviewed schema/protocol inventory through real worker/IPC/root service and strict codecs; reject malformed variants and old mismatched peers.
+1. Carry check request paths, classification sequence and dispositions through real worker/IPC/root service and strict codecs, extending `ramify.ipc/2`, `ramify.watch/2` and `ramify.daemon-status/2`, which advanced in iteration 3, per [schema versions](../contracts.md#schema-versions); reject malformed variants and mismatched peers. Update the harness's expected values under [iteration gates](../execution.md#iteration-gates).
 2. Supply scope exclusions to watcher registrations, prune declared/reserved roots, reconfigure on boundary changes and conservatively recapture across gaps.
 3. Add project-boundary-wire.test.ts and project-boundary-watcher.test.ts with real installed processes, recorded watcher registrations and cleanup assertions.
 

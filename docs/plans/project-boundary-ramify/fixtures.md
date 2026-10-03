@@ -36,7 +36,7 @@ app/                              module app tagged [dispatch]
   node_modules/sample/            installed link into a's ignored sample
 ```
 
-Root declarations, under the proposed grammar:
+Root declarations, under the adopted grammar:
 
 ```ramify
 ramify 1

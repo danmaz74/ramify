@@ -39,7 +39,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 ## Deliverables
 
-1. Declare site, examples/collection-review and scripts/reference-harness owned-ignored; ramify-agent external; declare .reference-work, .history, .cucumber-viz, .playwright-mcp and actual source-shaped generated/planning trees requiring boundaries.
+1. Declare site, examples/collection-review and scripts/reference-harness owned-ignored; ramify-agent external; declare .reference-work, .history, .cucumber-viz, .playwright-mcp and actual source-shaped generated/planning trees requiring boundaries. The kind of each absent tool directory, or whether it stays undeclared, waits on the user's answer to [open question 1](../main-plan.md#open-questions-for-the-user); do not choose one.
 2. Re-inventory all owned fixture-package and source-shaped data directories; add declarations at their owner. The harness's fixtures lie inside its ignored tree and need none. Do not infer boundaries from Git or tsconfig.
 3. Add scratch/compiler exclusions in all toolkit compiler scopes and runner configurations; keep source-area classifications and production exclusions. Preserve existing Git ignore rules; harness scratch lifecycle remains Phase 3.
 
@@ -58,6 +58,7 @@ From the toolkit checkout:
 
 ```sh
 npm run type-check
+npm run build
 flock /tmp/ramify-audit-tests.lock npm run reference:cases
 ```
 
@@ -69,7 +70,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-The declaration/compile inventory is ready for wider discovery; no unsupported audit fields or external project edits appear. Document absent/generated external directories explicitly.
+The declaration/compile inventory is ready for wider discovery; no unsupported audit fields or external project edits appear. Document how each absent or generated directory is treated, as the user decided.
 
 Record `iteration7-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

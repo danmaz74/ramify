@@ -11,9 +11,9 @@ points, contracts and bounded case slices, not entire source trees.
 | Iterations | Context boundary |
 | --- | --- |
 | 1 | Contract/specification and baseline review; no runtime implementation. |
-| 2–4 | Parser, one path-ownership provider and mechanical provenance migration are separate receipts. |
+| 2–4 | Parser, one path-ownership provider and mechanical provenance migration are separate receipts. Iterations 2 and 3 also carry the mechanical schema-identifier migrations of their first shape changes. |
 | 5–7 | Provider access for root scripts, severing analyzed imports into the harness tree and declarations/configuration are separate. The harness is not relocated and its bodies are not read beyond the helpers root scripts import. |
-| 8–11 | Discovery activation, resolution, exposure rejection and batch decisions each have independent expected fixtures. |
+| 8–11 | Discovery activation, resolution, exposure rejection and batch decisions each have independent expected fixtures. Iteration 8 also owns the modularity producer and three schema advances. |
 | 12–14 | Observation, retained recomputation and affected projection are separate ownership responsibilities. |
 | 15–18 | Context synchronization, daemon transport/watching, CLI and projections each have their own boundary tests. |
 | 19–21 | Package/teaching migration, executable qualification and packed delivery are separate. |

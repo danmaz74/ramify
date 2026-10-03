@@ -1,14 +1,13 @@
-# Phase 1 contract proposal
+# Phase 1 contracts
 
-**Status:** proposed for the user's review. These are implementation contracts,
-not claims of support. The user accepts or revises R1–R6 before iteration 1;
-iteration 1 records that revision and puts the precise rules in the owning
-specifications before iteration 2 implements them. Names below
-are proposed additions to existing interfaces, not discovered available APIs.
+**Status:** accepted by the user on 2026-10-03 and adopted in the owning
+specifications in iteration 1 (commit `6d0c66f0`); implementation pending.
+These are implementation contracts, not claims of support. Names below are
+planned additions to existing interfaces, not discovered available APIs.
 
 ## Review decisions
 
-| ID | Proposed decision | Review boundary |
+| ID | Decision | Review boundary |
 | --- | --- | --- |
 | R1 | Two standalone version 1 statements: `owned-ignored "directory"` and `external "directory"`. | Grammar, reserved names, spans, malformed input and statement ordering. |
 | R2 | Reject duplicate normalized directories and overlapping nested-tree declarations; reject symlink traversal, escapes, reserved exclusions and child-module overlap. | Decided 2026-10-03 as the simplest rule: any two declarations whose directories are equal or nested are an error, whatever their kinds, so at most one exclusion ever matches a path and no precedence rule exists. |
@@ -17,21 +16,22 @@ are proposed additions to existing interfaces, not discovered available APIs.
 | R5 | Decided 2026-10-03: correctness under the new rules comes first, optimization second. No rule is weakened to meet a limit or timing target. Capacity limits remain safety limits and are raised with a recorded measurement if the new rules need it. Earlier timing targets are measured and reported to the user at the end of the plan; missing one does not stop the plan. Inert/excluded contents never become inputs. | [Budgets](budgets.md), observation and cancellation coverage. |
 | R6 | Decided 2026-10-03: the reference harness stays at `scripts/reference-harness/` as an owned-ignored tree of the root, with its compiler configuration, runner and commands unchanged; analyzed toolkit code no longer imports from it. Site consumes packed toolkit exports. | No analyzed importer of the tree, package/build graph and preserved test inventory. |
 
-R2, R4 and R6 carry the user's decisions of 2026-10-03, and the user accepted
-R1 and R3 as drafted and decided R5 on the same day; no entry is an open question. For R3 the
-user confirmed that the path and the current declarations alone decide
-ownership, and that no backwards compatibility is kept: the version numbers
-change only so that an outdated reader fails clearly. R4 follows the user's decision of 2026-10-03: the changed check is the quick
-form of the complete check and, wherever it answers, gives exactly the result
-the complete check would give on the project after the change. It differs
-only in analyzing the change against the retained baseline. The rule is stated
-in the [CLI invocation specification](../../architecture/cli-invocation.spec.md#hook-and-complete-checks),
-added at the user's request; the not-analyzed dispositions below are the part
-iteration 1 still has to adopt there.
+The user accepted all six entries on 2026-10-03: R2, R4, R5 and R6 as decided
+in their rows, and R1 and R3 as drafted. For R3 the user confirmed that the path
+and the current declarations alone decide ownership, and that no backwards
+compatibility is kept: the version numbers change only so that an outdated
+reader fails clearly. Under R4 the changed check is the quick form of the
+complete check and, wherever it answers, gives exactly the result the complete
+check would give on the project after the change. It differs only in analyzing
+the change against the retained baseline. The rule and the per-path
+dispositions below are stated in the
+[CLI invocation specification](../../architecture/cli-invocation.spec.md#hook-and-complete-checks).
 
-The review receipt resolves all six entries to accepted concrete wording or a
-revised contract package. Adoption, implementation and acceptance are separate
-statuses. Changes to an accepted interface invalidate affected downstream receipts.
+Iteration 1 adopted the accepted wording in the owning specifications (commit
+`6d0c66f0`) and recorded the review receipt in
+[its results](iterations/iteration1-results.md). Runtime support and acceptance
+remain with the producing slices. Changes to an accepted interface invalidate
+affected downstream receipts.
 
 ## Description language and validation
 
@@ -254,9 +254,10 @@ shown as passing source checks.
 Upgrade `ramify.analysis`, `ramify.affected`, `ramify.affected-cli`,
 `ramify.check`, `ramify.watch`, `ramify.daemon-status`, architect projection/view/
 module schemas to version 2 wherever their existing payload shapes change.
-Use `ramify.ipc/2` for the strict daemon handshake and codec. Record the exact
-schema inventory in iteration 1, including nested worker messages, root service
-types, dependency reports, measurement results and browser DTOs. Unchanged
+Use `ramify.ipc/2` for the strict daemon handshake and codec. Iteration 1
+recorded the schema inventory, including nested worker messages, root service
+types, dependency reports, measurement results and browser DTOs;
+[schema versions](#schema-versions) places each version change. Unchanged
 formats retain their version. Reject mismatched wire peers coherently; no old
 schema decoder is implemented.
 
@@ -290,6 +291,50 @@ its own root, including when invoked within a nested project. Production
 selection still consumes resolved profiles; testing modules and nested testing
 areas are excluded, ordinary analyzed auxiliary inputs are eligible, and inert
 owned files are not production merely because they have an owner.
+
+## Schema versions
+
+A document's schema version advances in the slice that first changes its
+payload shape, so an outdated reader fails rather than misreads (R3). That
+slice changes the identifier and updates every toolkit reader in the same
+candidate: producers, CLI, batch process, daemon, the hook example, measurement
+scripts, toolkit tests and the reference harness's expected values. A document
+changes shape when one of its embedded values without its own schema
+identifier does, such as `ProjectScope` or report warnings. An envelope that
+carries a document with its own identifier, such as an IPC message or a watch
+line carrying an analysis report, advances that document's identifier
+instead; the envelope advances only when its own members change. The IPC
+protocol identifier covers the wire messages and the fields its strict codec
+decodes.
+
+Where an early slice changes a shape that a later slice changes again, the
+version advances once, at the first change, and the later slices extend
+that version, version 2 for all but the modularity report, before the
+phase's handoff. This is an alpha migration: no reader
+exists for the intermediate shapes, and only the final shape is handed off.
+
+| Document | Advances in | First shape change | Later slices extending it |
+| --- | --- | --- | --- |
+| `ramify.analysis/2` | 2 | The report snapshot's parsed descriptions gain the nested-tree statement member | 3 scope `ownership`; 4 origin, placement and target vocabulary; 8 `independentScopes` removed, `ProjectWarning`; 11 denied outcome, boundary diagnostics and excluded-target coverage |
+| `ramify.affected/2`, `ramify.affected-cli/2` | 3 | The selection's `scope` gains `ownership` | 8 `independentScopes` removed; 14 bases, seed status, exclusion and topology; 17 CLI output |
+| `ramify.watch/2`, `ramify.daemon-status/2` | 3 | Context status `scope` gains `ownership`; daemon status names `ramify.ipc/2` | 8 `independentScopes` removed; 15–17 check and status fields |
+| `ramify.ipc/2` | 3 | The strict codec's context-status scope gains `ownership` | 8 `independentScopes` removed; 15–16 check request paths, classification sequence and dispositions |
+| `ramify.check/2` | 8 | Embedded warnings become `ProjectWarning` | 11 boundary findings; 15 and 17 path dispositions replace `covered` |
+| `ramify.measure/2` | 8 | `outsideModuleFiles` retires | 18 measurement buckets |
+| `ramify.modularity/3` | 8 | `omittedScopes` lists declared nested trees instead of `independentScopes`; outside occurrences count `outside-project` targets, as the [modularity report specification](../../architecture/modularity-report.spec.md) requires | None |
+| `ramify.architect-module/2`, `ramify.architect-view/2`, `ramify.architect-projection/2` | 18 | Boundary metadata in module records | None |
+| `ramify.api-view`, `ramify.api-view-projection`, `ramify.explorer-*` | 18, only if the shape changes | Not expected | None |
+| `ramify.cli/1`, `ramify.production-files/1`, `ramify.daemon-record/1` and every other identifier | Unchanged | None | None |
+
+The daemon record keeps `ramify.daemon-record/1`; from iteration 3 its
+`protocol` member names `ramify.ipc/2`, which its reader already compares
+exactly. Iteration 4 renames `outside-module` to `outside-project` in
+`SourceTarget`, which extends `ramify.analysis/2`, and in the modularity
+producer's internal target kinds without changing the serialized modularity
+report. Toolkit tests use `ramify.ipc/2` as the incompatible-peer literal;
+iteration 3 replaces it with a literal no build produces. If a slice finds an
+earlier shape change than this table names, the version advances in that slice
+and the coordinator updates the table.
 
 ## Git advisory warning
 

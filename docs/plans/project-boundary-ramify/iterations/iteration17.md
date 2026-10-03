@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 16](iteration16.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** CLI plus root entry tests; Git advice stays outside analysis inputs. No changes beneath `ramify-agent/` or
+**Owners and write scope:** CLI plus root entry tests and the reference harness's expected values for CLI outputs this slice changes; Git advice stays outside analysis inputs. Specification changes only as proposed patches. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -12,11 +12,11 @@ editing; follow the [protected-document procedure](../execution.md#protected-pri
 
 ## Goal
 
-Emit reviewed check/affected JSON and human path dispositions/exit codes; preserve definite findings for mixed checks and retry stale classification at most once.
+Emit check/affected JSON and human path dispositions; the changed check's findings and exit code are those the complete check would give on the project after the change. Preserve definite findings for mixed checks and retry stale classification at most once.
 
 ## Read first
 
-- [Contracts](../contracts.md): Reports, affected queries and freshness; Git advisory warning.
+- [Contracts](../contracts.md): Reports, affected queries and freshness; Git advisory warning; Schema versions.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-10, PB1-20, PB1-26, PB1-30 and the independent
@@ -39,9 +39,9 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 ## Deliverables
 
-1. Emit reviewed check/affected JSON and human path dispositions/exit codes; preserve definite findings for mixed checks and retry stale classification at most once.
+1. Emit check/affected JSON and human path dispositions, replacing `covered`, and extend `ramify.check/2` and `ramify.affected-cli/2` per [schema versions](../contracts.md#schema-versions). Findings and exit code are those of the complete check on the project after the change: a not-analyzed path never changes the exit code, and exit 2 means the result could not be established. Preserve definite findings for mixed checks and retry stale classification at most once. Update the harness's expected values, such as Plan 5's `covered` assertions, under [iteration gates](../execution.md#iteration-gates).
 2. Implement NUL-safe ignored-but-walked Git advice without model/ownership influence; no repo/missing Git/optional command failure leaves source verdict intact.
-3. Add project-boundary-cli.test.ts in the root tests for real built batch/resident invocations, nested roots, outside seeds, whitespace paths and every exclusion/not-analyzed control. Update CLI spec/help.
+3. Add project-boundary-cli.test.ts in the root tests for real built batch/resident invocations, nested roots, outside seeds, whitespace paths and every exclusion/not-analyzed control. Update CLI help. Propose the CLI invocation specification edits, including its passages that still name `ramify.analysis/1`, to the coordinator as exact patches under the [protected-document procedure](../execution.md#protected-principles-and-specifications); do not edit the specification.
 
 ## Matrix rows executed here
 
@@ -70,7 +70,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-PB1-10/20/26/30 pass through actual CLI processes; no excluded content is labelled passed, and root selection remains documented behavior.
+PB1-10/20/26/30 pass through actual CLI processes; no excluded content is labelled passed, and root selection remains documented behavior. Selection for a project inside an owned-ignored tree beneath `subs/` follows the user's answer to [open question 2](../main-plan.md#open-questions-for-the-user).
 
 Record `iteration17-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 18](iteration18.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Toolkit-owned site/scripts/teaching documents and package dependencies only. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Toolkit-owned site/scripts/teaching documents and package dependencies only; protected specifications only as proposed patches. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -42,7 +42,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 1. Replace site aliases to toolkit internal source with supported candidate package exports and a root-prepared no-save/no-lock candidate install; commit no local artifact dependency path or invented registry integrity. Preserve a build order without a site-to-unbuilt-toolkit cycle or duplicated React runtime. Add the root script that packs the built candidate and installs it into the site, and make `site:build` run it first; `npm --prefix site ci` removes that install, so the build must not depend on an earlier manual step.
 2. Keep production selection driven by resolved profiles as source inventory widens; add production-boundary.test.ts for testing modules/areas, auxiliary code and inert exclusions.
 3. Set the package version to 0.2.0 in the manifest and lockfile, so the candidate qualified in iteration 20 already carries the version it is packed and later published under.
-4. Update active package/CLI/site/model guides and examples to implemented behavior; preserve historical receipts and revise current status accurately. Test an isolated NodeNext package consumer, including denied unlisted internals.
+4. Update active package/CLI/site/model guides and examples to implemented behavior; preserve historical receipts and revise current status accurately. Propose each `.principles.md` or `.spec.md` change, including status wording in `cli-invocation.spec.md`, to the coordinator as an exact patch under the [protected-document procedure](../execution.md#protected-principles-and-specifications); do not edit it. Test an isolated NodeNext package consumer, including denied unlisted internals.
 
 ## Matrix rows executed here
 

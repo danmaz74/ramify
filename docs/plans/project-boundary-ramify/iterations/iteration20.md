@@ -56,6 +56,7 @@ Execute the entire Final gate section of execution.md, not just the two commands
 From the toolkit checkout:
 
 ```sh
+npm run build
 flock /tmp/ramify-audit-tests.lock npm run reference:cases
 npm run check:reference
 ```

@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 14](iteration14.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Contexts through neutral AnalysisDriver/ownership ports, plus required type relays. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Contexts through neutral AnalysisDriver/ownership ports, plus required type relays and the reference harness's expected values for check outputs this slice changes. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -12,11 +12,12 @@ editing; follow the [protected-document procedure](../execution.md#protected-pri
 
 ## Goal
 
-Classify changed paths from revision-bound Project scope and separate not-analyzed from unobserved/stale source. No filesystem analysis or duplicated ownership algorithm lives in contexts.
+Give each changed path a `checked`, `not-analyzed` or `not-checked` disposition from revision-bound Project scope, so a changed check gives the result the complete check would give on the project after the change. No filesystem analysis or duplicated ownership algorithm lives in contexts.
 
 ## Read first
 
-- [Contracts](../contracts.md): Reports, affected queries and freshness.
+- [Contracts](../contracts.md): Reports, affected queries and freshness; Schema versions.
+- [CLI invocation specification](../../../architecture/cli-invocation.spec.md#hook-and-complete-checks): hook and complete checks.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-20, PB1-23 and the independent
@@ -37,9 +38,9 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 ## Deliverables
 
-1. Classify changed paths from revision-bound Project scope and separate not-analyzed from unobserved/stale source. No filesystem analysis or duplicated ownership algorithm lives in contexts.
+1. Classify each changed path from revision-bound Project scope as `checked`, `not-analyzed` or `not-checked`, separating not-analyzed paths from unobserved or stale source. Classify by containment before the configuration-file name rule in `context-manager.ts`: a package manifest, lockfile or `tsconfig*.json` inside an owned-ignored, external or other excluded tree is not-analyzed, never `configuration-changed` or not-checked. A not-analyzed path needs no content coverage and never changes the exit code. No filesystem analysis or duplicated ownership algorithm lives in contexts.
 2. Implement classification sequence, source-only content expectations, deletion evidence and classification-changed recovery; retain checked path/finding evidence in mixed requests.
-3. Add project-boundary-check.test.ts with excluded/inert/normal/deleted inputs and declaration-change races; verify content expectations do not admit excluded bytes.
+3. Add project-boundary-check.test.ts with excluded/inert/normal/deleted inputs, a package manifest inside an owned-ignored tree and declaration-change races; verify content expectations do not admit excluded bytes. These extend `ramify.ipc/2` and `ramify.check/2` without a new version, per [schema versions](../contracts.md#schema-versions); update the harness's expected values for any check output this slice changes under [iteration gates](../execution.md#iteration-gates).
 
 ## Matrix rows executed here
 

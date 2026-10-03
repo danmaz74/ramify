@@ -1,7 +1,8 @@
 # Phase 1: Ramify project boundaries
 
-**Date:** 2026-10-03. **Status:** draft implementation plan; contracts proposed,
-implementation and acceptance pending. **Coordinator:**
+**Date:** 2026-10-03. **Status:** implementation plan; contracts accepted and
+adopted in the owning specifications (commit `6d0c66f0`), implementation and
+acceptance pending. **Coordinator:**
 [project-boundary master plan](../project-boundary-sequential/main-plan.md).
 
 ## Runnable outcome
@@ -32,11 +33,10 @@ The adopted model documents and updated master plan are prerequisites, not
 evidence of runtime support. [Source state](source-state.md) records what was
 verified in this checkout; refresh it at execution.
 
-The user reviews decisions R1–R6 of the [contracts](contracts.md) before
-iteration 1 starts. R2, R4 and R6 already carry the user's decisions of
-2026-10-03. Iteration 1 adopts the accepted
-wording into the owning specifications and records the review receipt; it
-does not decide them. No implementation iteration starts before that receipt.
+The user reviewed and accepted decisions R1–R6 of the [contracts](contracts.md)
+on 2026-10-03. Iteration 1 adopted the accepted wording into the owning
+specifications (commit `6d0c66f0`) and recorded the review receipt in
+[its results](iterations/iteration1-results.md); it did not decide them.
 
 ## Agent coordination and protected documents
 
@@ -55,16 +55,18 @@ corrections may express already accepted decisions; foundational changes or
 new behavioral policy return to the user. A passing test gate cannot replace
 this review.
 
-Iteration 1's specification adoption covers only exact patches implementing
-reviewed R1–R6 decisions. Its model/architecture write scope is not blanket
-permission to edit protected documents. No principle change is expected.
-Later protected changes require their own rationale and authorization, with
-affected briefs and evidence updated after adoption.
+Iteration 1's specification adoption covered only exact patches implementing
+the accepted R1–R6 decisions. No principle change is expected. Later protected
+changes require their own rationale and authorization, with affected briefs and
+evidence updated after adoption. Iterations 17 and 19 propose their
+specification edits to the coordinator as exact patches; they do not edit a
+protected file.
 
 ## Contract and acceptance package
 
-- [Contracts](contracts.md): concrete proposed grammar, ownership, source,
-  report, freshness, transport and projection changes, with review decisions.
+- [Contracts](contracts.md): concrete accepted grammar, ownership, source,
+  report, freshness, transport and projection changes, with review decisions
+  and the slice where each schema version advances.
 - [Authority alignment](alignment.md): proposal-to-specification-to-acceptance
   mapping and document owners.
 - [Acceptance matrix](acceptance.md) and [case register](cases.json): independent
@@ -72,7 +74,7 @@ affected briefs and evidence updated after adoption.
 - [Fixture topology](fixtures.md): written reproducible provider expectations;
   consumer projects reconstruct it independently, without copying fixture files.
 - [Execution and gates](execution.md): coordinator-owned protected-document
-  baselines, approvals and handoff reviews; full-audit preflight, focused checks,
+  baselines, approvals and handoff reviews; full-audit gates, focused checks,
   explicit reference-command gates, direct-verification fallback and evidence.
 - [Budgets](budgets.md): correctness-first policy, current numeric capacities and resource cases.
 - [Handoff](handoff.md): immutable artifact, contract and receipt requirements
@@ -89,7 +91,7 @@ or new type alone cannot claim behavior.
 
 | Iteration | Capability / principal owner | Completion boundary |
 | --- | --- | --- |
-| [1](iterations/iteration1.md) | Contracts and verification readiness | User-accepted grammar/schema choices adopted in owning specs, baseline, audit-mode switch point and fallback recipe. |
+| [1](iterations/iteration1.md) | Contracts and verification readiness | User-accepted grammar/schema choices adopted in owning specs, schema inventory, full-audit baseline and fallback recipe. |
 | [2](iterations/iteration2.md) | Descriptions | New statement parser, spans and linker partition; existing exposure semantics retained. |
 | [3](iterations/iteration3.md) | Project ownership | One pure containment/exclusion provider and revision-bound boundary metadata. |
 | [4](iterations/iteration4.md) | Source provenance vocabulary | Auxiliary origin and boundary-target types propagated through toolkit producers and fixtures. |
@@ -111,6 +113,12 @@ or new type alone cannot claim behavior.
 | [20](iterations/iteration20.md) | Integration acceptance | All PB1 cases and full toolkit/reference regression on the exact candidate revision. |
 | [21](iterations/iteration21.md) | Artifact and handoff | Packed isolated-install smoke, digest-bound receipt, merge qualification and Phase 2 inputs. |
 
+The baseline at `33d8a739` is red: one toolkit test and nine reference
+instances fail ([iteration 1 results](iterations/iteration1-results.md#baseline-gate)).
+A baseline-repair slice, outside the numbered iterations and the manifest,
+repairs them before iteration 2 and passes the full gate, as
+[execution.md](execution.md#before-the-first-implementation-iteration) records.
+
 Provider work precedes consumer wiring. Iterations 3–7 prepare facts and legal
 imports before iteration 8 widens discovery. Interim slices may leave the
 whole-tree behavior incomplete, and record what later slices still lack, but
@@ -121,20 +129,37 @@ than turning the acceptance slice into an unrestricted repair assignment.
 
 ## Verification and phase completion
 
-Each iteration gate audits a clean committed candidate with the existing
-audit executable. Gates use the ordinary partial audit until the first
-iteration that changes the affected output, expected to be iteration 14, and
-explicit **full** mode from then on, as at the baseline and the final gate. A bounded executable probe of
+Every iteration gate audits a clean committed candidate with the existing
+audit executable in explicit **full** mode:
+`ramify-audit audit --cwd <checkout> --full --force --json`. Iteration 1 found
+that the installed audit stops reading the candidate's affected answer by
+iteration 8 at the latest, and at iteration 3 once that slice advances the
+affected schemas; a full audit takes about four minutes, so no gate uses the
+partial audit. A bounded executable probe of
 installed `ramify-audit@0.3.2` passed without any Ramify executable in its
 fixture; [the receipt](evidence/full-audit-preflight.json) proves that small
-case, not compatibility with the future toolkit. Iteration 1 and every candidate
-gate confirm the actual command/configuration used, following [execution.md](execution.md).
+case, not compatibility with the future toolkit. Every candidate gate confirms
+the actual command/configuration used, following [execution.md](execution.md#iteration-gates).
 
 Every iteration gate additionally runs `npm run reference:cases` explicitly,
 under the audit's machine test lock and its unchanged configuration. The toolkit audit definition does
 not acquire that check or new audit-policy fields in Phase 1. Focused tests are
 diagnostics; full regression, provider behavior, audit verdict and reference
 acceptance are recorded separately.
+
+R6 fixes the reference harness's location, commands and test inventory, not
+its expected values. A slice that changes an output the harness asserts, such
+as a schema identifier, warning or report field, updates the harness's expected
+values for that output in the same slice. It reasons each new expectation
+independently from the contracts, never by copying the candidate's output, and
+deletes or skips no case. Iterations 2–4, 8, 9, 11 and 14–18 are known to
+change asserted outputs; their briefs and the
+[scope manifest](iteration-scope.json) include those expected values.
+
+A document's schema version advances in the slice that first changes its
+payload shape, so an outdated reader fails rather than misreads (R3). Later
+slices extend that version before the phase's handoff; the
+[contracts](contracts.md#schema-versions) list where each version advances.
 
 Correctness under the new rules comes first: no rule is weakened to meet a
 limit or timing target, and a missed earlier timing target is reported to the
@@ -155,3 +180,35 @@ consumer can start against the local artifact, but its completion requires the
 published Ramify version, 0.2.0, and exact committed registry pin. Publication and any
 provider repair follow the [handoff lifecycle](handoff.md), not a compatibility
 implementation in this phase.
+
+## Open questions for the user
+
+These need the user's decision; the plan does not settle them.
+
+1. **Absent tool directories in iteration 7.** `.history`, `.cucumber-viz`,
+   `.playwright-mcp` and `.reference-work` are not always-excluded paths. The
+   [glossary](../../model/glossary.md#always-excluded-path) and the
+   [layout specification](../../model/module-description.spec.md#always-excluded-paths-do-not-enter-analysis)
+   name only repository metadata, installed packages, compiler-configured
+   output directories, Ramify's generated paths and module scratch
+   directories; the canonical generated-path predicate is a closed set of
+   `.ramify` and `.ramify-architect` forms, and the contracts add no category
+   and remove today's `.reference-work` special case. The proposal's
+   [toolkit migration](../../architecture/project-boundary.proposal.md#11-migration-of-the-two-projects)
+   lists all four among the directories to declare. Without a declaration,
+   discovery enters them. The audit's fresh checkout lacks all
+   four. An absent `owned-ignored` directory makes its declaration invalid; an
+   `external` one may be absent. Which kind does iteration 7 declare for each,
+   or do some stay undeclared? `examples/collection-review/.reference-work`
+   lies inside the declared example tree, so it needs no declaration and
+   cannot carry one.
+2. **Root selection inside an owned-ignored tree beneath `subs/`.** The
+   [proposal](../../architecture/project-boundary.proposal.md#ramify) says an
+   invocation inside an ignored tree selects the project there. The unchanged
+   [root climb](../../architecture/cli-invocation.spec.md#selecting-the-project)
+   advances past a candidate that lies strictly beneath its nearest
+   description-bearing ancestor's `subs/`. A project in an owned-ignored tree
+   declared beneath that `subs/` directory, outside every child module,
+   therefore joins the enclosing project unless selected with `--root`. Does
+   the climb change, or does the proposal's statement narrow to trees outside
+   `subs/`?
