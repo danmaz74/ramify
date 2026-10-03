@@ -8,7 +8,7 @@ import { validateProject } from '../subs/analysis/src/validation-entry.js';
 import { parseDescription } from '../subs/analysis/subs/descriptions/src/parse.js';
 import type { DescriptionDocument } from '../subs/analysis/subs/descriptions/src/interfaces/syntax.js';
 import { readPurpose } from '../subs/analysis/subs/project/src/purpose.js';
-import { validationInputs } from './reference-harness/linking-expectations.js';
+import { validationInputs } from './validation-inputs.js';
 
 interface SelectionManifest { readonly name: string; readonly tags: readonly string[]; readonly selections: readonly string[] }
 /** Compare atomic selections so grouping named statements creates no false drift. */

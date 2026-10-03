@@ -423,7 +423,7 @@ npm run measure:plan2a-platform
 ```
 
 Materializes the small, checked-in
-[`plan2a-materialize-fixture.ts`](../reference-harness/plan2a-materialize-fixture.ts)
+[`plan2a-materialize-fixture.ts`](plan2a-materialize-fixture.ts)
 through the real installed CLI and daemon, and records: the first publication,
 a real unchanged-repeat no-op, a real symlinked-target refusal, and a real
 rollback (a genuine `EACCES` fault forces a failed second publish; the earlier

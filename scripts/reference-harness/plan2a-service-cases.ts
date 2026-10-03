@@ -7,7 +7,7 @@ import { capabilities } from '../../subs/cli/src/command-support.js';
 import { dispatchServiceRequest } from '../../subs/daemon/src/service.js';
 import type { ContextToken } from '../../subs/daemon/src/context-types.js';
 import type { ApiViewSelection } from '../../subs/analysis/src/interfaces/session.js';
-import { writeMaterializeFixture } from './plan2a-materialize-fixture.js';
+import { writeMaterializeFixture } from '../measurements/plan2a-materialize-fixture.js';
 import type { InstanceHandler } from './runner.js';
 
 async function flush(): Promise<void> { for (let index = 0; index < 100; index++) await Promise.resolve(); }

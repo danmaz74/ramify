@@ -51,6 +51,29 @@ verification arguments exit 2. Earlier `--iteration N` commands retain their
 reviewed transitive prerequisite sets. The full gate's required membership
 always comes from the reviewed plan, never available handlers.
 
+## Project boundary
+
+This directory is an owned-ignored tree of the toolkit root: the root owns it,
+and Ramify does not inventory, analyze or view its files. The root description
+declares it with `owned-ignored "scripts/reference-harness"` from iteration 7
+of the project-boundary plan, and the checker honors the declaration from
+iteration 8. Its imports into toolkit internals, such as another owner's `src/`
+or `src/tests/` and the root's scripts, are a declared, unverified convention:
+no exposure makes them available and no check verifies them. The reverse
+direction is a rule: no analyzed toolkit source imports from this tree, and
+`tsconfig.scripts.json` does not select it. Helpers it shares with root scripts
+are root-owned and live outside it: `scripts/validation-inputs.ts`,
+`scripts/measurements/plan2a-materialize-fixture.ts` and
+`scripts/measurements/plan2b-views.ts`.
+
+The tree keeps its location, its own `tsconfig.json` (checked by
+`npm run type-check`) and `vitest.config.ts`, and the `reference:cases`,
+`reference:verify` and `reference:report` commands.
+
+`modularity-markdown.test.ts` tests the modularity probe's Markdown renderer,
+`scripts/probes/modularity/markdown.ts`, here because it uses analysis's
+testing fixture, which root scripts cannot import.
+
 ## Activating an assigned instance
 
 The [reviewed subcase list](../../docs/plans/done/iteration-1-project-verifier/subcases.md)

@@ -8,7 +8,7 @@ import type { CliEnvironment } from '../../subs/cli/src/interfaces/cli.js';
 import type { ServiceConnection, ServiceConnector } from '../../subs/daemon/src/interfaces/daemon.js';
 import { assertResidentTrace, readTrace, withSequenceProcess } from './equivalence-process.js';
 import { sessionModulePattern } from './plan5-completion-cases.js';
-import { writeMaterializeFixture } from './plan2a-materialize-fixture.js';
+import { writeMaterializeFixture } from '../measurements/plan2a-materialize-fixture.js';
 import { repositoryRoot } from './plan.js';
 import type { InstanceHandler } from './runner.js';
 

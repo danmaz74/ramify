@@ -4,8 +4,10 @@ import { dirname, join } from 'node:path';
 /**
  * A small, independently transcribed real project (not imported from any
  * production test fixture, matching iteration 5/7's own precedent) shared by
- * `plan2a-service-cases.ts` and `plan2a-cli-cases.ts`'s I2A-09/I2A-10 quick
- * and process handlers. Three modules:
+ * the reference harness's `plan2a-service-cases.ts` and `plan2a-cli-cases.ts`
+ * I2A-09/I2A-10 quick and process handlers and by `plan2a-platform.mjs`. It
+ * lives beside that measurement, outside the harness tree, so the measurement
+ * imports nothing from the tree. Three modules:
  *
  * - `lib` (`subs/lib`) exposes `widget` to its parent (the root).
  * - The root re-exposes `widget` to its descendants.

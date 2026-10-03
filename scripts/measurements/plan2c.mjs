@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { arch, cpus, platform, release, totalmem } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { packageRoot, pollDaemonStatus, runCommand } from './plan2a-fixtures.mjs';
-import { specifiedArchitectLimits } from '../reference-harness/plan2b-cases.ts';
+import { specifiedArchitectLimits } from './plan2b-views.ts';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.ts';
 import { createDefaultTagRegistry } from '../../subs/analysis/subs/model/src/index.ts';
 import { limits as batchLimits } from '../../src/batch.ts';

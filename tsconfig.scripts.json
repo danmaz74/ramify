@@ -17,6 +17,7 @@
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "dist", "site", "examples", "**/.reference-work",
-    // An independent package consumer with its own manifest, compiler scope and React.
-    "scripts/reference-harness/fixtures/module-tree-consumer"]
+    // The reference harness, with its package-consumer fixture, has its own compiler
+    // scope, scripts/reference-harness/tsconfig.json; no script here imports from it.
+    "scripts/reference-harness"]
 }
