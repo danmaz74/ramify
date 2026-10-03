@@ -10,7 +10,7 @@ async function fixture(run: (root: string, inputs: InventoryInputs) => Promise<v
   const root = await mkdtemp(join(tmpdir(), 'ramify-inventory-'));
   try {
     const files: Record<string, string> = {
-      'module.ramify': 'ramify 1\nmodule fixture tagged [browser]\n',
+      'module.ramify': 'ramify 1\nroot module fixture tagged [browser]\n',
       'package.json': '{"type":"module"}',
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', types: [] }, include: ['src', 'outside.ts'] }),
       'src/interfaces/api.ts': 'export interface Api { readonly name: string }',
@@ -75,7 +75,7 @@ describe('inventory analysis entry', () => {
   it('rejects forged registries before acquisition, and invalid headers without partial snapshots', async () => fixture(async (root, inputs) => {
     expect(await acquireInventory({ ...inputs, project: { ...inputs.project, root: join(root, 'absent') },
       registry: { ...inputs.registry, id: 'forged' } })).toMatchObject({ status: 'invalid', diagnostics: [{ code: 'invalid-registry' }] });
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture tagged [unknown]\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture tagged [unknown]\n');
     const result = await acquireInventory(inputs);
     expect(result).toMatchObject({ status: 'invalid', diagnostics: [{ code: 'unknown-tag', location: { file: 'module.ramify', line: 2 } }] });
     expect(result).not.toHaveProperty('snapshot');

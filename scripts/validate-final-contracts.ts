@@ -418,12 +418,13 @@ function expectedManifest(owner: ReviewedOwner): SelectionManifest {
  * as their plans reviewed them; every later change is attached as a layer that
  * names its plan. */
 export function layeredOwners(archived: ReadonlyMap<string, ReviewedOwner>): ReadonlyMap<string, ReviewedOwner> {
-  const header = (name: string, tags: readonly string[]) =>
-    `ramify 1\nmodule "${name}"${tags.length ? ` tagged [${[...tags].join(', ')}]` : ''}\n`;
+  // Only the project root, at `./`, carries the root marker; manifests compare names, tags and selections.
+  const header = (name: string, tags: readonly string[], directory: string) =>
+    `ramify 1\n${directory === './' ? 'root ' : ''}module "${name}"${tags.length ? ` tagged [${[...tags].join(', ')}]` : ''}\n`;
   const owners = new Map(archived);
   for (const owner of addedOwners) {
     assert.ok(!owners.has(owner.name), `${owner.plan} adds an owner the archived review already holds: ${owner.name}`);
-    owners.set(owner.name, { directory: owner.directory, purpose: owner.purpose, document: description(header(owner.name, owner.tags)) });
+    owners.set(owner.name, { directory: owner.directory, purpose: owner.purpose, document: description(header(owner.name, owner.tags, owner.directory)) });
   }
   const byDirectory = new Map([...owners].map(([name, owner]) => [owner.directory, name]));
   for (const layer of declarationLayers) {
@@ -432,7 +433,7 @@ export function layeredOwners(archived: ReadonlyMap<string, ReviewedOwner>): Rea
       assert.ok(name, `${layer.plan} layers onto an owner no review declares: ${directory}`);
       const owner = owners.get(name)!;
       const statements = (text: string | undefined) => text === undefined ? undefined
-        : description(header(owner.document.module.name, [...owner.document.module.tags]) + '\n' + text + '\n');
+        : description(header(owner.document.module.name, [...owner.document.module.tags], owner.directory) + '\n' + text + '\n');
       owners.set(name, { ...owner, layers: [...owner.layers ?? [],
         { plan: layer.plan, added: statements(layer.added?.[directory]), withdrawn: statements(layer.withdrawn?.[directory]) }] });
     }

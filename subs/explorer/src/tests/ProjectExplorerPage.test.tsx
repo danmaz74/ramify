@@ -73,7 +73,7 @@ describe('connected project explorer revision state', () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-connected-page-')));
     const put = async (path: string, value: string) => { await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), value); };
     try {
-      await put('module.ramify', 'ramify 1\nmodule fixture\nexpose-src value from "interfaces/api.ts" to descendants\n');
+      await put('module.ramify', 'ramify 1\nroot module fixture\nexpose-src value from "interfaces/api.ts" to descendants\n');
       await put('README.md', '# Fixture\n\nA connected page fixture.\n');
       await put('package.json', '{"type":"module"}');
       await put('tsconfig.json', JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true }, include: ['src', 'subs'] }));

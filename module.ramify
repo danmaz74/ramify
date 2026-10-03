@@ -1,5 +1,5 @@
 ramify 1
-module "ramify" tagged [dispatch]
+root module "ramify" tagged [dispatch]
 
 // R1: invocation vocabulary for the injected CLI operation.
 expose-src * from "interfaces/batch.ts" to descendants

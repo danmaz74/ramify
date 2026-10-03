@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
  */
 export const materializeFixtureFiles: Record<string, string> = {
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext', strict: true } }),
-  'module.ramify': 'ramify 1\nmodule "materialize-fixture"\n\nexpose-sub widget from lib to descendants\n',
+  'module.ramify': 'ramify 1\nroot module "materialize-fixture"\n\nexpose-sub widget from lib to descendants\n',
   'subs/lib/module.ramify': 'ramify 1\nmodule lib\n\nexpose-src widget from "api.ts" to parent\n',
   'subs/lib/src/api.ts': "export function widget(): string { return 'w'; }\n",
   'subs/app/module.ramify': 'ramify 1\nmodule app\n',

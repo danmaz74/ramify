@@ -21,7 +21,7 @@ afterEach(async () => { for (const environment of environments.splice(0)) await 
 async function fixture(dependencyDiagrams?: DependencyDiagramRunner) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-service-test-')); roots.push(root);
   await mkdir(join(root, 'src'));
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}');
   await writeFile(join(root, 'src/index.ts'), 'export const value = 1;\n');
   const environment = await createQuickEnvironment({}, dependencyDiagrams ? { dependencyDiagrams } : {}); environments.push(environment);
@@ -239,7 +239,7 @@ async function until(condition: () => boolean, what: string): Promise<void> {
 async function architectFixture(architectMetricsPolicy: 'measure' | 'omit' = 'measure', withChild = false) {
   const root = await mkdtemp(join(tmpdir(), 'ramify-materialize-views-')); roots.push(root);
   await mkdir(join(root, 'src/tests'), { recursive: true });
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'README.md'), '# Fixture\n\nThe fixture project.\n');
   await writeFile(join(root, 'tsconfig.json'), '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src","subs"]}');
   await writeFile(join(root, 'src/index.ts'), 'export function run(input: string): string { return input; }\nexport const value = 1;\n');

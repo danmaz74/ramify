@@ -31,7 +31,7 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
   let lost = false;
   try {
     await mkdir(join(root, 'src'));
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
     await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
       target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
     await writeFile(join(root, 'src/main.ts'), originalBytes);

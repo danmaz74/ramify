@@ -10,7 +10,7 @@ import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
  * no import. The reader's side has nothing to interpret, so only the script's
  * declaration keeps the check from claiming complete coverage. */
 const fixtureFiles = {
-  'module.ramify': 'ramify 1\nmodule fixture\n',
+  'module.ramify': 'ramify 1\nroot module fixture\n',
   'README.md': '# Fixture\n\nA script shares a global with a child owner.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',

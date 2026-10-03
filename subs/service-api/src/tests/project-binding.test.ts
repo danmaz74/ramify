@@ -27,7 +27,7 @@ async function fixture(run: (root: string) => Promise<void>): Promise<void> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-project-binding-')));
   try {
     for (const [path, value] of Object.entries({
-      'module.ramify': 'ramify 1\nmodule fixture\nexpose-src value from "interfaces/api.ts" to descendants\n',
+      'module.ramify': 'ramify 1\nroot module fixture\nexpose-src value from "interfaces/api.ts" to descendants\n',
       'README.md': '# Fixture\n\nA project binding fixture.\n',
       'package.json': '{"type":"module"}',
       'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true }, include: ['src', 'subs'] }),

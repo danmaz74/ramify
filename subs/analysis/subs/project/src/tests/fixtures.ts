@@ -10,11 +10,14 @@ export async function put(root: string, path: string, text: string | Uint8Array)
 }
 // Acquisition injects the text parser. These local provider tests supply a fixed
 // valid syntax fact; the reference harness separately exercises the real parser.
+// The root fact is the marked header `root module fixture` that fixture() writes.
 export const syntax: ProjectReadOptions['parse'] = (file) => ({ status: 'valid', document: {
-  file, version: 1, module: { name: file === 'module.ramify' ? 'fixture' : 'child', tags: [], span: { start: 9, end: 23, line: 2, column: 1 } }, tokens: [], statements: [],
+  file, version: 1, module: file === 'module.ramify'
+    ? { name: 'fixture', tags: [], root: { start: 9, end: 13, line: 2, column: 1 }, span: { start: 9, end: 28, line: 2, column: 1 } }
+    : { name: 'child', tags: [], root: null, span: { start: 9, end: 23, line: 2, column: 1 } }, tokens: [], statements: [],
 } });
 export async function fixture(root: string): Promise<void> {
-  await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+  await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
   await put(root, 'README.md', '# Fixture\n\nFixture purpose.\n');
   await put(root, 'package.json', '{"type":"module"}\n');
   await put(root, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},"include":["src"]}\n');
@@ -27,9 +30,10 @@ export async function fixture(root: string): Promise<void> {
  */
 export const declaration: ProjectReadOptions['parse'] = (file, text) => {
   const lines = text.split('\n');
-  const index = lines.findIndex(line => /^module\s/.test(line));
+  const index = lines.findIndex(line => /^(?:root\s+)?module\s/.test(line));
   const start = index < 0 ? 0 : lines.slice(0, index).reduce((total, line) => total + line.length + 1, 0);
-  const header = index < 0 ? null : /^module\s+"?([A-Za-z0-9_-]+)"?(?:\s+tagged\s+\[([^\]]*)\])?\s*$/.exec(lines[index]!);
+  const header = index < 0 ? null
+    : /^(root\s+)?module\s+"?([A-Za-z0-9_-]+)"?(?:\s+tagged\s+\[([^\]]*)\])?\s*$/.exec(lines[index]!);
   if (!header) {
     const line = Math.min(2, lines.length);
     const offset = lines.slice(0, line - 1).reduce((total, entry) => total + entry.length + 1, 0);
@@ -39,6 +43,7 @@ export const declaration: ProjectReadOptions['parse'] = (file, text) => {
         span: { start: offset, end: offset + word.length, line, column: 1 } }] };
   }
   return { status: 'valid', document: { file, version: 1, tokens: [], statements: [],
-    module: { name: header[1]!, tags: (header[2] ?? '').split(',').map(tag => tag.trim()).filter(Boolean),
+    module: { name: header[2]!, tags: (header[3] ?? '').split(',').map(tag => tag.trim()).filter(Boolean),
+      root: header[1] ? { start, end: start + 4, line: index + 1, column: 1 } : null,
       span: { start, end: start + lines[index]!.length, line: index + 1, column: 1 } } } };
 };

@@ -138,7 +138,7 @@ describe('project handler baseline, mutation and cleanup', () => {
   function projectHandler(baseline: Extract<InstanceHandler, { kind: 'project' }>['baseline']): InstanceHandler {
     return {
       kind: 'project', fixture: { kind: 'create', create: async (root) => {
-        await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+        await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
       } }, baseline,
       mutate: async ({ root }) => { await rm(join(root, 'module.ramify')); },
       run: async ({ root, request, assertions }) => {
@@ -153,7 +153,7 @@ describe('project handler baseline, mutation and cleanup', () => {
 
   it('checks the positive baseline, applies the edit and records the independent result', async () => {
     const handler = projectHandler(async ({ root, assertions }) => {
-      assertions.equal('baseline header', await readFile(join(root, 'module.ramify'), 'utf8'), 'ramify 1\nmodule fixture\n');
+      assertions.equal('baseline header', await readFile(join(root, 'module.ramify'), 'utf8'), 'ramify 1\nroot module fixture\n');
     });
     const report = await verify(5, providers(handler));
     const result = report.instances.find((item) => item.id === id)!;

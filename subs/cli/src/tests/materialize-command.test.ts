@@ -29,7 +29,7 @@ function recording(connect: ServiceConnector, hidden?: string) {
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-materialize-command-'));
   await mkdir(join(root, 'src'));
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
   await writeFile(join(root, 'src/main.ts'), 'export const value = 1;\n');
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 }, { dependencyDiagrams: failingRunner });

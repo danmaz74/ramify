@@ -287,7 +287,7 @@ Revision rev/1:architect · input input/1:architect
   "usedBy": [
     { "module": "fixture/core/engine", "behavioral": 0, "nonBehavioral": 1 }
   ],
-  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":2,"sourceBytes":175,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":215}},"subtree":{"production":{"sourceFiles":11,"sourceBytes":1713,"resourceFiles":4,"resourceBytes":110},"tests":{"sourceFiles":6,"sourceBytes":1017,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":13,"bytes":850}}}},
+  "metrics": {"state":"measured","views":{"state":"unavailable","reason":"not-requested"},"contextSize":{"exact":{"production":{"sourceFiles":2,"sourceBytes":175,"resourceFiles":0,"resourceBytes":0},"tests":{"sourceFiles":0,"sourceBytes":0,"resourceFiles":0,"resourceBytes":0},"documentation":{"files":2,"bytes":220}},"subtree":{"production":{"sourceFiles":11,"sourceBytes":1713,"resourceFiles":4,"resourceBytes":110},"tests":{"sourceFiles":6,"sourceBytes":1017,"resourceFiles":1,"resourceBytes":175},"documentation":{"files":13,"bytes":855}}}},
   "revision": "rev/1:architect"
 }
 

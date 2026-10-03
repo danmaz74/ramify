@@ -138,7 +138,7 @@ export const coverageGraph = (...coverage: SourceLimit[]): AffectedFacts => ({ .
  * declaration shim lives in `shims`.
  */
 export const formFiles: Record<string, string> = {
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src rootValue, RootType from "interfaces/api.ts" to descendants\n'
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src rootValue, RootType from "interfaces/api.ts" to descendants\n'
     + 'expose-sub * from p to descendants\n',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true, paths: { '@probe/*': ['./subs/lonely/src/*', './subs/p/src/*'] } }, include: ['src', 'subs'] }),

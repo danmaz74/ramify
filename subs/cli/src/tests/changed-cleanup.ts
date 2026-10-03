@@ -22,14 +22,14 @@ export async function changedCleanupWitness(fault: 'close-context' | 'close-conn
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
   const controller = new AbortController();
   const stdout: string[] = [], stderr: string[] = [], events: string[] = [];
-  const description = 'ramify 1\nmodule "InvalidName"\n';
+  const description = 'ramify 1\nroot module "InvalidName"\n';
   let connection: ServiceConnection | undefined;
   let received: Extract<CheckOutcome, { status: 'reported'; published: true }> | undefined;
   let closeCalls = 0, closeContextCalls = 0, openCalls = 0, checkCalls = 0, recoveries = 0, batchCalls = 0;
   let lost = false;
   try {
     await mkdir(join(root, 'src'));
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
     await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
       target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
     await writeFile(join(root, 'src/main.ts'), 'export const value = 1;\n');

@@ -16,7 +16,8 @@ function tree(index: number, kind: NestedTreeStatement['kind'], directory: strin
   return { index, kind, span, directory: { value: directory, span: { ...span, start: index } } };
 }
 function described(file: string, name: string, statements: readonly NestedTreeStatement[]): ParsedDescription {
-  return { status: 'valid', document: { file, version: 1, module: { name, tags: [], span }, tokens: [], statements } };
+  return { status: 'valid', document: { file, version: 1,
+    module: { name, tags: [], root: file === 'module.ramify' ? span : null, span }, tokens: [], statements } };
 }
 type ModuleInput = Pick<InventoryModule, 'id' | 'parent' | 'directory' | 'description'>;
 function module(id: string, parent: string | null, directory: string, statements: readonly NestedTreeStatement[] = []): ModuleInput {
@@ -275,7 +276,7 @@ describe('PB1-08/PB1-19: an acquired scope classifies absent and deleted paths w
   it('builds the scope table during acquisition and answers after the project is deleted', async () => {
     const documents: Readonly<Record<string, ModuleInput>> = Object.fromEntries(topology.map(item => [
       item.description.status === 'valid' ? item.description.document.file : '', item]));
-    for (const file of Object.keys(documents)) await put(root, file, 'ramify 1\n');
+    for (const file of Object.keys(documents)) await put(root, file, file === 'module.ramify' ? 'ramify 1\nroot module app\n' : 'ramify 1\n');
     await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { types: [], outDir: 'dist', module: 'ESNext', moduleResolution: 'bundler' },
       files: ['src/main.ts', 'subs/a/src/api.ts', 'subs/b/src/consumer.ts'] }));
     for (const file of ['src/main.ts', 'subs/a/src/api.ts', 'subs/b/src/consumer.ts']) await put(root, file, 'export {};\n');

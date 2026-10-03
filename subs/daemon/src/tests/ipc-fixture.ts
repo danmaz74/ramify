@@ -23,7 +23,7 @@ export async function ipcFixture(overrides: Partial<DaemonBudgets> = {}, publicC
   const directory = await mkdtemp('/tmp/ri-');
   const project = join(directory, 'project');
   await mkdir(join(project, 'src'), { recursive: true });
-  await writeFile(join(project, 'module.ramify'), 'ramify 1\nmodule example\n');
+  await writeFile(join(project, 'module.ramify'), 'ramify 1\nroot module example\n');
   await writeFile(join(project, 'README.md'), '# Example\n\nAn isolated IPC fixture.\n');
   await writeFile(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', types: [] }, include: ['src/**/*.ts'] }));
   await writeFile(join(project, 'src/index.ts'), 'export const value = 1;\n');

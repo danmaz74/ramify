@@ -20,7 +20,7 @@ beforeEach(async () => {
   temporary = await mkdtemp(join(tmpdir(), 'ramify-copy-'));
   sourceRoot = join(temporary, 'example');
   workRoot = join(sourceRoot, '.reference-work');
-  await put(join(sourceRoot, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await put(join(sourceRoot, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await put(join(sourceRoot, 'README.md'), '# Fixture\n\nTiny copy fixture.\n');
   await put(join(sourceRoot, 'package.json'), '{"type":"module"}');
   await put(join(sourceRoot, 'tsconfig.json'), '{"include":["src","subs/**/src"]}');

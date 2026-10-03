@@ -11,7 +11,7 @@ import { runCli } from '../run-cli.js';
 
 /** `example/app -> example/mid -> example/core`, where an arrow means "depends on", and an unrelated `example/lone`. */
 const files: Record<string, string> = {
-  'module.ramify': 'ramify 1\nmodule example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
+  'module.ramify': 'ramify 1\nroot module example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
   'README.md': '# Example\n\nAn affected-command fixture.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true },

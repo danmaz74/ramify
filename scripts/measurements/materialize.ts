@@ -21,7 +21,7 @@ export async function materializeSynthetic(destination: string, fixture: Synthet
   await mkdir(root, { recursive: false });
   const entries = [...files.entries()].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   const contentMapSha256 = createHash('sha256').update(JSON.stringify(entries)).digest('hex');
-  if (ownerCount === 100 && !exposures) assert.equal(contentMapSha256, 'd5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897');
+  if (ownerCount === 100 && !exposures) assert.equal(contentMapSha256, '1b20168da7aa947bd25364d6da2bc5e156d63e529997e6c527820e24573f7098');
   for (const [path, text] of entries) {
     await mkdir(dirname(join(root, path)), { recursive: true });
     await writeFile(join(root, path), text);

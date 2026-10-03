@@ -11,7 +11,7 @@ import type { AnalysisInputs, AnalysisReport, AnalysisRun } from '../index.js';
 import { createDefaultTagRegistry, resolveTagRegistry } from '../../subs/model/src/index.js';
 
 const fixtureFiles = {
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src publicValue from "interfaces/api.ts" to descendants\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src publicValue from "interfaces/api.ts" to descendants\n',
   'README.md': '# Fixture\n\nThis fixture exercises the public batch session.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
@@ -175,7 +175,7 @@ describe('public disposable analysis session', () => {
   }));
 
   it('marks malformed descriptions invalid and never checks a partial permission graph', async () => fixture(async (root, inputs) => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-test * from "api.ts" to parent\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-test * from "api.ts" to parent\n');
     const report = reported(await analyzeProject(inputs));
     expect(report.diagnostics).toContainEqual(expect.objectContaining({ code: 'invalid-selection', category: 'description',
       location: expect.objectContaining({ file: 'module.ramify', line: 3 }) }));
@@ -556,7 +556,7 @@ describe('iteration 12 constraint remediation', () => {
   it.each(Object.entries(selections).flatMap(([form, source]) => (['private', 'unpromised', 'allowed'] as const).map(permission => ({ form, source, permission }))))(
     'checks the $permission merged binding in $form empty nested destructuring', async ({ source, permission }) => fixture(async (root, inputs) => {
       await put(root, 'src/interfaces/api.ts', 'export function Merged(): void {}\nexport namespace Merged { export const member = 1; }\n');
-      await put(root, 'module.ramify', `ramify 1\nmodule fixture\n${permission === 'private' ? ''
+      await put(root, 'module.ramify', `ramify 1\nroot module fixture\n${permission === 'private' ? ''
         : `expose-src Merged from "interfaces/api.ts"${permission === 'allowed' ? ' tagged [browser]' : ''} to descendants\n`}`);
       await put(root, 'subs/consumer/module.ramify', 'ramify 1\nmodule consumer tagged [browser]\n');
       for (const pattern of ['Merged', 'Merged: {}']) {

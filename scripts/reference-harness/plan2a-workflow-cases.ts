@@ -247,7 +247,7 @@ export const plan2aWorkflowHandlers: ReadonlyMap<string, InstanceHandler> = new 
       const root = await mkdtemp(join(tmpdir(), 'plan2a-i11-negative-'));
       try {
         await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext', strict: true } }));
-        await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule f-root\n\nexpose-sub Widget from provider to descendants\n');
+        await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module f-root\n\nexpose-sub Widget from provider to descendants\n');
         await mkdir(join(root, 'subs/provider/src'), { recursive: true });
         await writeFile(join(root, 'subs/provider/module.ramify'), 'ramify 1\nmodule provider\n\nexpose-src Widget from "api.ts" to parent\n');
         await writeFile(join(root, 'subs/provider/src/api.ts'), 'export class Widget {\n  greet(): string { return \'hi\'; }\n}\n');

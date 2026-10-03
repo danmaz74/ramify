@@ -216,7 +216,7 @@ describe('acquisition limits and cancellation', () => {
     await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
     let calls = 0;
     const result = await read({ parse: (file, text) => {
-      writeFileSync(join(root, 'module.ramify'), `ramify 1\nmodule fixture\n// ${++calls}\n`);
+      writeFileSync(join(root, 'module.ramify'), `ramify 1\nroot module fixture\n// ${++calls}\n`);
       return syntax(file, text);
     } });
     expect(calls).toBe(3);
@@ -246,7 +246,7 @@ describe('acquisition limits and cancellation', () => {
     let calls = 0;
     const result = await read({ parse: (file, text) => {
       // This injected parser barrier is test-only; the real parser is pure.
-      if (!calls++) writeFileSync(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n// changed\n');
+      if (!calls++) writeFileSync(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n// changed\n');
       return syntax(file, text);
     } });
     expect(calls).toBe(2);
@@ -255,7 +255,7 @@ describe('acquisition limits and cancellation', () => {
   it('returns incomplete after the finite retry policy is exhausted', async () => {
     let calls = 0;
     const result = await read({ parse: (file, text) => {
-      writeFileSync(join(root, 'module.ramify'), `ramify 1\nmodule fixture\n// ${++calls}\n`);
+      writeFileSync(join(root, 'module.ramify'), `ramify 1\nroot module fixture\n// ${++calls}\n`);
       return syntax(file, text);
     } });
     expect(calls).toBe(3);

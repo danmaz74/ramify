@@ -88,7 +88,7 @@ handlers.set('I2A-02:tests-inventory-excluded', { kind: 'memory', run: async ({ 
 
 handlers.set('I2A-02:explicit-config-excluded', { kind: 'memory', run: async ({ assertions }) => {
   await withTemp('ramify-i2a02-cfg-', async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
     await put(root, 'README.md', '# fixture\n\nPurpose.\n');
     await put(root, 'package.json', '{"private":true,"type":"module"}\n');
     // The explicit `files` entry names a project-root path outside every
@@ -108,7 +108,7 @@ handlers.set('I2A-02:explicit-config-excluded', { kind: 'memory', run: async ({ 
 
 handlers.set('I2A-02:exposure-rejected', { kind: 'memory', run: async ({ assertions }) => {
   await withTemp('ramify-i2a02-exp-', async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src thing from ".ramify/thing.ts" to parent\nexpose-test other from ".ramify/other.ts" to parent\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src thing from ".ramify/thing.ts" to parent\nexpose-test other from ".ramify/other.ts" to parent\n');
     await put(root, 'README.md', '# fixture\n\nPurpose.\n');
     await put(root, 'package.json', '{"private":true,"type":"module"}\n');
     await put(root, 'tsconfig.json', '{"include":["src"]}\n');

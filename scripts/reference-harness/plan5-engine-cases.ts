@@ -29,6 +29,13 @@ export async function toolkitFixture(root: string): Promise<void> {
   await writeFile(archive, tar);
   const result = await command(repositoryRoot, 'tar', ['-xf', archive, '-C', root]);
   assert.equal(result.code, 0, result.stderr);
+  // The pinned root predates the root marker; mark the copy's module line
+  // before any acquisition, so both compared engines read the same marked root.
+  const description = join(root, 'module.ramify');
+  const pinned = await readFile(description, 'utf8');
+  const header = 'ramify 1\nmodule "ramify" tagged [dispatch]\n';
+  assert.ok(pinned.startsWith(header), 'Unexpected pinned toolkit root header');
+  await writeFile(description, `ramify 1\nroot ${pinned.slice('ramify 1\n'.length)}`);
   // The archive is outside the configured src/subs source roots.
   await symlink(join(repositoryRoot, 'node_modules'), join(root, 'node_modules'));
 }

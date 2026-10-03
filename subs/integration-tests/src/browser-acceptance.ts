@@ -68,7 +68,7 @@ async function put(root: string, path: string, value: string): Promise<void> {
 async function mutationProject(scratch: string): Promise<{ root: string; dispose(): Promise<void> }> {
   const root = await realpath(await mkdtemp(join(scratch, 'mutations-')));
   const files: Readonly<Record<string, string>> = {
-    'module.ramify': 'ramify 1\nmodule fixture\n',
+    'module.ramify': 'ramify 1\nroot module fixture\n',
     'README.md': '# Fixture\n\nOwns the mutation acceptance project.\n',
     'package.json': '{"type":"module"}\n',
     'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true }, include: ['src', 'subs'] }),
@@ -1827,7 +1827,7 @@ async function writeProject(scratch: string, name: string, files: Readonly<Recor
  */
 function forwardingProject(scratch: string): Promise<{ root: string; dispose(): Promise<void> }> {
   return writeProject(scratch, 'forwarding', {
-    'module.ramify': 'ramify 1\nmodule fixture\nexpose-sub act from b to descendants\nexpose-sub helper, loose from c to descendants\n',
+    'module.ramify': 'ramify 1\nroot module fixture\nexpose-sub act from b to descendants\nexpose-sub helper, loose from c to descendants\n',
     'README.md': '# Fixture\n\nOwns the forwarding acceptance project.\n',
     'package.json': '{"type":"module"}\n',
     'tsconfig.json': tsconfigFixture,
@@ -1863,7 +1863,7 @@ function consumerSource(edit: number, twice: boolean): string {
 /** `mutation` for Plan 6D: an isolated small project whose consumer edits publish new input IDs and counts. */
 function dependencyMutationProject(scratch: string): Promise<{ root: string; dispose(): Promise<void> }> {
   return writeProject(scratch, 'dependency-mutation', {
-    'module.ramify': 'ramify 1\nmodule fixture\nexpose-sub act, helper, Shape from provider to descendants\n',
+    'module.ramify': 'ramify 1\nroot module fixture\nexpose-sub act, helper, Shape from provider to descendants\n',
     'README.md': '# Fixture\n\nOwns the dependency mutation acceptance project.\n',
     'package.json': '{"type":"module"}\n',
     'tsconfig.json': tsconfigFixture,

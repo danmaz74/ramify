@@ -53,8 +53,9 @@ export type DescriptionStatement = ExposureStatement | NestedTreeStatement;
 export interface DescriptionDocument {
   readonly file: string;
   readonly version: 1;
+  /** `root` is the root marker's span, null when unmarked; `span` covers the whole module line from its first keyword. */
   readonly module: { readonly name: string; readonly tags: readonly string[];
-    readonly span: TextSpan };
+    readonly root: TextSpan | null; readonly span: TextSpan };
   readonly tokens: readonly DescriptionToken[];
   readonly statements: readonly DescriptionStatement[];
 }

@@ -2,7 +2,7 @@ import type { DescriptionIssue, DescriptionToken, TextSpan } from './interfaces/
 
 const keywords = new Set([
   'ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-ignored',
-  'external', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing',
+  'external', 'root', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing',
   'browser', 'ui',
 ]);
 const wordCharacter = /^[A-Za-z0-9_$-]$/;

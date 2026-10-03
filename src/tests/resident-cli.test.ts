@@ -114,7 +114,7 @@ describe('changed-file CLI through the real resident service', () => {
       expect(initial.exitCode).toBe(0);
       if (!initial.revision) throw new Error('Expected initial covering revision');
       const originalDescription = await readFile(join(root, 'module.ramify'), 'utf8');
-      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+      await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
       const deniedResult = await invokeResident(quick, root, [...args, '--since', initial.revision.id]);
       const denied = checkDocument(deniedResult);
       expect(denied).toMatchObject({ outcome: 'checked', execution: 'completed', exitCode: 1,
@@ -243,7 +243,7 @@ describe('resident CLI status and eviction stream', () => {
 describe('resident materialize with views (AV28)', () => {
   it('publishes the API and architect views in one transaction from one revision and prints the architect line', () => fixture(async root => {
     // A function the consumer calls in production and in its test, so dependencies and test references are both measured.
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
     await put(root, 'src/interfaces/api.ts', 'export const value: number = 1; export const privateValue = 2;\nexport function run(): number { return value; }\n');
     await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run();\n");
     await put(root, 'subs/consumer/src/tests/use.test.ts',
@@ -304,7 +304,7 @@ describe('resident materialize after another invocation form reached the context
     ['check from the root, then materialize naming the root from another directory', false, true],
     ['check --root ., then materialize from the root without --root', true, false],
   ] as const)('%s: the analyzer verifies the captured request and the view has measured dependencies', (_name, given, elsewhere) => fixture(async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value, run from "interfaces/api.ts" to descendants\n');
     await put(root, 'src/interfaces/api.ts', 'export const value: number = 1; export const privateValue = 2;\nexport function run(): number { return value; }\n');
     await put(root, 'subs/consumer/src/use.ts', "import { run } from '../../../src/interfaces/api.js'; run();\n");
     const runs: { readonly project: ProjectRequest; readonly report: AnalysisReport; readonly outcome: DependencyAnalyzerOutcome }[] = [];

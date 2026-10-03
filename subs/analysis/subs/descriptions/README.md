@@ -20,6 +20,10 @@ nested-tree statements, each holding one located decoded directory; indices
 count all statements in source order. The linker and exact source references
 read exposure statements only; nested-tree statements belong to project
 acquisition.
+The module header records the root marker's span when its line begins with
+`root`, and null otherwise; the header span then begins at the marker. The
+parser accepts a description either way and never decides which description
+is the project root. A `root` keyword anywhere else is malformed.
 Tokenization collects lexical errors throughout the input. Parsing recovers at
 physical line boundaries after a malformed clause; a lexically invalid line
 is not interpreted from its incomplete tokens. Duplicate tag/destination items

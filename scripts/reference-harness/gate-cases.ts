@@ -78,7 +78,7 @@ const toolkitFixture: Pick<ProjectHandler, 'kind' | 'fixture' | 'prepare' | 'bas
     await symlink(join(repositoryRoot, 'node_modules'), join(root, 'node_modules'));
     await symlink(join(referenceRoot, 'node_modules'), join(root, 'examples/collection-review/node_modules'));
   }, baseline: async ({ root, assertions }) => {
-    assertions.equal('toolkit copy keeps its declared root', (await readFile(join(root, 'module.ramify'), 'utf8')).split('\n').find(line => line.startsWith('module ')), 'module "ramify" tagged [dispatch]');
+    assertions.equal('toolkit copy keeps its declared root', (await readFile(join(root, 'module.ramify'), 'utf8')).split('\n').find(line => /^(?:root\s+)?module\s/.test(line)), 'root module "ramify" tagged [dispatch]');
     await compilerValid(root, assertions);
   }, mutate: unchanged,
 };

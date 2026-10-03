@@ -21,7 +21,7 @@ function valid<T>(result: ModelResult<T>): T {
 const files = {
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [] }, include: ['src', 'subs'] }),
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src safe from "interfaces/api.ts" tagged [browser] to descendants\nexpose-src unsafe, Contract from "interfaces/api.ts" to descendants\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src safe from "interfaces/api.ts" tagged [browser] to descendants\nexpose-src unsafe, Contract from "interfaces/api.ts" to descendants\n',
   'src/interfaces/api.ts': 'export const safe = 1; export const unsafe = 2; export interface Contract {} export const privateValue = 3;',
   'src/init.ts': 'globalThis.console.log(1);',
   'src/tests/init.ts': 'globalThis.console.log(2);',
@@ -68,7 +68,7 @@ describe('cancellable real-source decision batches', () => {
     const names = Array.from({ length: 256 }, (_, index) => `value${index}`);
     const probe = "import * as api from '../../../src/interfaces/api.js';\n" + names.map(name => `void api.${name};`).join('\n');
     const result = await stage(probe, {
-      'module.ramify': 'ramify 1\nmodule fixture\nexpose-src * from "interfaces/api.ts" tagged [browser] to descendants\n',
+      'module.ramify': 'ramify 1\nroot module fixture\nexpose-src * from "interfaces/api.ts" tagged [browser] to descendants\n',
       'src/interfaces/api.ts': files['src/interfaces/api.ts'] + '\n' + names.map(name => `export const ${name} = 1;`).join('\n'),
     }, compilerClean);
     const members = result.accesses.filter(access => access.importer.file === 'subs/consumer/src/probe.ts');

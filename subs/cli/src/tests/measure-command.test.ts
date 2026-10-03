@@ -15,7 +15,7 @@ async function put(root: string, path: string, value: string): Promise<void> {
 
 async function fixture() {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-measure-command-')));
-  await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+  await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
   await put(root, 'README.md', '# Fixture\n\nMeasured fixture.\n');
   await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' },
     include: ['src', 'subs', 'outside.ts'] }));
@@ -142,7 +142,7 @@ describe('measure command', { timeout: 60_000 }, () => {
       await put(f.root, 'src/.ramify-other/real.ts', 'export const similar = true;\n');
       await put(f.root, 'node_modules/pkg/index.ts', 'export const dependency = true;\n');
       await put(f.root, 'dist/output.ts', 'export const output = true;\n');
-      await put(f.root, 'examples/independent/module.ramify', 'ramify 1\nmodule independent\n');
+      await put(f.root, 'examples/independent/module.ramify', 'ramify 1\nroot module independent\n');
       await put(f.root, 'examples/independent/tsconfig.json', '{}\n');
       await put(f.root, 'examples/independent/src/own.ts', 'export const independent = true;\n');
       await symlink(join(f.root, 'outside.ts'), join(f.root, 'src/link.ts'));

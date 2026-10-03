@@ -47,7 +47,7 @@ export async function fixture(files: Readonly<Record<string, string>>, children:
   const root = await mkdtemp(join(tmpdir(), 'ramify-source-catalog-'));
   try {
     const contents = {
-      'module.ramify': 'ramify 1\nmodule fixture tagged [browser]\n',
+      'module.ramify': 'ramify 1\nroot module fixture tagged [browser]\n',
       'README.md': 'A real source catalog fixture.\n',
       'package.json': '{"type":"module"}\n',
       'tsconfig.json': JSON.stringify(configuration),
@@ -105,7 +105,7 @@ export async function acquire(root: string): Promise<ProjectInputView> {
         return { owner: id, kind, root: areaRoot, present: directories.has(resolve(root, areaRoot)) };
       }),
       description: { status: 'valid', document: { file: description, version: 1,
-        module: { name: owner.name, tags: owner.tags, span }, tokens: [], statements: [] } },
+        module: { name: owner.name, tags: owner.tags, root: owner.directory ? null : { ...span, end: 13 }, span }, tokens: [], statements: [] } },
       purpose: { state: 'missing-file', readme: owner.directory ? `${owner.directory}/README.md` : 'README.md' },
     };
   });

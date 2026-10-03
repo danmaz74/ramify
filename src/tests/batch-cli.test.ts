@@ -98,7 +98,7 @@ describe('CLI with real batch sessions', () => {
   }), 15_000);
 
   it('fails invalid descriptions with blocked checking as exit 1', async () => fixture(async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value from "missing.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value from "missing.ts" to descendants\n');
     const result = await invoke(root, ['check', '--batch', '--format', 'json']);
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(result.stdout)).toMatchObject({ outcome: { execution: 'invalid', check: 'failed' },

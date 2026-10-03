@@ -129,7 +129,8 @@ has `module.ramify`, a purpose `README.md` and its own `src/`, with optional
 `src/interfaces/` and `src/tests/`. Each edge below corresponds to placement under
 the parent's `subs/`. Brackets show module-header tags, not additional syntax.
 The root's declared name is `ramify`, a reserved word, so its header must quote
-the name as `module "ramify" tagged [dispatch]`.
+the name, and as the project root it carries the root marker:
+`root module "ramify" tagged [dispatch]`.
 
 ```text
 ramify [dispatch]                       CLI, daemon and batch entries; service vocabulary; assembly
@@ -253,7 +254,7 @@ At root, assuming analysis's to-parent contract includes these owned types:
 
 ```ramify
 ramify 1
-module "ramify" tagged [dispatch]
+root module "ramify" tagged [dispatch]
 
 expose-src * from "interfaces/service.ts" to descendants
 expose-sub AnalysisInputs, SourceChange, AnalysisSnapshot, AnalysisReport from analysis to descendants

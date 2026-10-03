@@ -320,6 +320,10 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
         if (result.status !== 'valid') throw new Error('Invalid authored description');
         const document = result.document;
         expect([document.file, document.version, document.module.name, document.module.tags]).toEqual([file, 1, fixture.name, fixture.tags]);
+        // Exactly the two project roots carry the marker, and the header span begins at it.
+        const { root: marker, span } = document.module;
+        expect(marker && text.slice(marker.start, marker.end)).toBe(fixture.path === '' ? 'root' : null);
+        expect(text.slice(span.start, span.end)).toMatch(fixture.path === '' ? /^root module / : /^module /);
         // A nested-tree statement compares by its kind and decoded directory.
         expect(document.statements.map((item) => 'directory' in item ? { kind: item.kind, directory: item.directory.value } : {
           kind: item.kind, names: item.selection.kind === 'wildcard' ? '*' : item.selection.names.map(({ name, alias }) => [name, alias]),

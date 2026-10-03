@@ -17,7 +17,7 @@ import { changedCleanupWitness } from './changed-cleanup.js';
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-changed-command-'));
   await mkdir(join(root, 'src'));
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
   await writeFile(join(root, 'src/main.ts'), 'export const value = 1;\n');
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
@@ -168,7 +168,7 @@ describe('changed check command', { timeout: 30_000 }, () => {
     const f = await fixture();
     try {
       expect((await command(f.root, f.quick.connect, ['--deadline', '5000'])).code).toBe(0);
-      await writeFile(join(f.root, 'module.ramify'), 'ramify 1\nmodule fixture\nexpose-src\n');
+      await writeFile(join(f.root, 'module.ramify'), 'ramify 1\nroot module fixture\nexpose-src\n');
       const result = await command(f.root, f.quick.connect, ['--deadline', '5000'], {}, 'module.ramify');
       expect([result.code, result.batchCalls, result.stderr]).toEqual([1, 0, []]);
       expect(result.document).toMatchObject({ outcome: 'checked', execution: 'invalid', reason: null,

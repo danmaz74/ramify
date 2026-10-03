@@ -37,7 +37,7 @@ describe('PB1-01: valid nested-tree statements', () => {
 
   it('parses both kinds interleaved with exposures, indexed among all statements with located directories', () => {
     const document = valid(text);
-    expect(document.module).toEqual({ name: 'app', tags: ['dispatch'], span: { start: 9, end: 37, line: 2, column: 1 } });
+    expect(document.module).toEqual({ name: 'app', tags: ['dispatch'], root: null, span: { start: 9, end: 37, line: 2, column: 1 } });
     expect(document.statements).toEqual([
       { index: 0, kind: 'owned-ignored', span: { start: 38, end: 69, line: 3, column: 1 },
         directory: { value: 'fixture-project', span: { start: 52, end: 69, line: 3, column: 15 } } },

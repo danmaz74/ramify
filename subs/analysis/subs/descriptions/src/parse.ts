@@ -8,7 +8,7 @@ import type { TokenLine } from './tokenize.js';
 const moduleName = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const exportName = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 // Keywords that remain valid tag names; the registry alone decides whether a tag exists.
-const specialTags = new Set(['testing', 'browser', 'ui', 'owned-ignored', 'external']);
+const specialTags = new Set(['testing', 'browser', 'ui', 'owned-ignored', 'external', 'root']);
 const through = (first: TextSpan, last: TextSpan): TextSpan => ({ ...first, end: last.end });
 
 // Recovery is at a physical line boundary, where every version 1 statement ends.
@@ -155,14 +155,21 @@ class LineParser {
     this.finish();
   }
 
+  /** The caller admits `root` here only when `module` follows it. */
   module(): DescriptionDocument['module'] {
     const first = this.take();
+    let root: TextSpan | null = null;
+    if (first.raw === 'root') {
+      root = first.span;
+      this.horizontal();
+      this.take();
+    }
     this.horizontal();
     const name = this.name(true);
     let tags: readonly string[] = [];
     if (this.is('tagged')) { this.horizontal(); tags = this.tags().values; }
     this.finish();
-    return { name: name.decoded, tags, span: through(first.span, this.previous.span) };
+    return { name: name.decoded, tags, root, span: through(first.span, this.previous.span) };
   }
 
   exposure(index: number): ExposureStatement {
@@ -230,7 +237,7 @@ export function parseDescription(file: string, text: string): ParsedDescription 
         if (significantLines !== 0) report('invalid-order', 'The version header must be the first statement.');
         versionSeen = true;
         if (!line.invalid) parser.version();
-      } else if (first.raw === 'module') {
+      } else if (first.raw === 'module' || (first.raw === 'root' && line.tokens[1]?.raw === 'module')) {
         if (moduleSeen) report('duplicate-header', 'The module header must occur exactly once.');
         if (!versionSeen || significantLines !== 1) report('invalid-order', 'The module header must follow the version header.');
         moduleSeen = true;
@@ -241,6 +248,8 @@ export function parseDescription(file: string, text: string): ParsedDescription 
       } else if (first.raw === 'owned-ignored' || first.raw === 'external') {
         if (!versionSeen || !moduleSeen) report('invalid-order', 'Nested-tree statements must follow both headers.');
         if (!line.invalid) statements.push(parser.nestedTree(statements.length));
+      } else if (first.raw === 'root') {
+        report('unknown-statement', 'The root marker belongs only immediately before module on the module line.');
       } else if (first.raw === 'tests' && line.tokens[1]?.raw === 'tagged') {
         report('test-profile-declaration', 'The testing profile has no declaration syntax.');
       } else report('unknown-statement', `Unknown statement ${first.raw}.`);

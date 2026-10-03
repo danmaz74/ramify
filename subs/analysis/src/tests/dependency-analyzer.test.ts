@@ -65,13 +65,13 @@ const limits: AnalysisLimits = {
 };
 const analyzerLimits: DependencyAnalyzerLimits = { source: limits.source, maxResultBytes: 16 * 1024 ** 2, deadlineMs: 120_000 };
 
-const module = (name: string, exposures = ''): Record<string, string> => ({
-  'module.ramify': `ramify 1\nmodule ${name}\n${exposures}`, 'README.md': `# ${name}\n\nA dependency analyzer fixture module.\n`,
+const module = (name: string, exposures = '', marker = ''): Record<string, string> => ({
+  'module.ramify': `ramify 1\n${marker}module ${name}\n${exposures}`, 'README.md': `# ${name}\n\nA dependency analyzer fixture module.\n`,
 });
 const within = (directory: string, files: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(files).map(([path, text]) => [`${directory}/${path}`, text]));
 const project = (files: Record<string, string>): Record<string, string> => ({
-  ...module('fixture'), 'package.json': '{"type":"module"}',
+  ...module('fixture', '', 'root '), 'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', types: [],
     strict: true, skipLibCheck: true }, include: ['src', 'subs'] }),
   ...files,

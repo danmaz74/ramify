@@ -48,7 +48,7 @@ describe('project resolution and captured configuration reuse', () => {
     const request = { cwd: root, scope: 'whole-project' as const, configuration: 'discover' as const };
     try {
       expect(await resolveProjectRoot(request)).toMatchObject({ status: 'unavailable', issues: [{ code: 'root-not-found' }] });
-      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+      await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
       expect(await resolveProjectRoot(request)).toMatchObject({ status: 'unavailable', issues: [{ code: 'configuration-not-found' }] });
       await fixture(root);
       await put(root, 'ref/tsconfig.json', '{"files":[]}');
@@ -179,13 +179,13 @@ describe('reused project-root resolution', () => {
       await unlink(join(root, 'tsconfig.json'));
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root, configuration: join(parent, 'tsconfig.json') });
       // A created description above makes `child` a descendant: the root moves.
-      await put(parent, 'module.ramify', 'ramify 1\nmodule parent\n');
+      await put(parent, 'module.ramify', 'ramify 1\nroot module parent\n');
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root: parent, configuration: join(parent, 'tsconfig.json') });
       // A deleted description on the climb: the root moves back.
       await unlink(join(parent, 'module.ramify'));
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root, configuration: join(parent, 'tsconfig.json') });
       // A description in the working directory is its nearest boundary: the root moves to it.
-      await put(root, 'src/module.ramify', 'ramify 1\nmodule moved\n');
+      await put(root, 'src/module.ramify', 'ramify 1\nroot module moved\n');
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root: join(root, 'src') });
       await unlink(join(root, 'src/module.ramify'));
       expect(await resolvedAgain()).toMatchObject({ status: 'resolved', root });
@@ -193,11 +193,11 @@ describe('reused project-root resolution', () => {
       await unlink(join(root, 'module.ramify'));
       const deleted = await spawned(() => resolveProjectRoot(request, undefined, [known]));
       expect(deleted.value).toMatchObject({ status: 'unavailable', issues: [{ code: 'root-not-found' }] });
-      await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+      await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
       known = await resolveProjectRoot(request);
       // The root description becomes a symlink: its kind answers differently and a fresh resolution refuses it.
       await rm(join(root, 'module.ramify'));
-      await put(work, 'elsewhere.ramify', 'ramify 1\nmodule fixture\n');
+      await put(work, 'elsewhere.ramify', 'ramify 1\nroot module fixture\n');
       await symlink(join(work, 'elsewhere.ramify'), join(root, 'module.ramify'));
       const linked = await spawned(() => resolveProjectRoot(request, undefined, [known]));
       expect(linked.helpers).toBe(0);

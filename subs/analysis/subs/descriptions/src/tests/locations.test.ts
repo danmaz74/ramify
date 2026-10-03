@@ -39,7 +39,7 @@ describe('original text locations and retained parser data', () => {
       { kind: 'keyword', raw: 'module', decoded: 'module', span: { start: 12, end: 18, line: 2, column: 2 } },
       { kind: 'string', raw: '"ui"', decoded: 'ui', span: { start: 19, end: 23, line: 2, column: 9 } },
     ]);
-    expect(document.module).toEqual({ name: 'ui', tags: ['ui'], span: { start: 12, end: 35, line: 2, column: 2 } });
+    expect(document.module).toEqual({ name: 'ui', tags: ['ui'], root: null, span: { start: 12, end: 35, line: 2, column: 2 } });
     expect(document.tokens.filter(({ kind }) => kind === 'comment')).toEqual([]);
     const statement = exposure(document.statements[0]);
     expect(statement.span).toEqual({ start: 53, end: 119, line: 4, column: 3 });

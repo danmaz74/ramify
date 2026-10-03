@@ -5,7 +5,8 @@ boundaries were adopted on 2026-10-01 and are not yet implemented. Their
 concrete statement syntax and declaration validation were specified on
 2026-10-03; the parser accepts the statement syntax, and declaration
 validation remains pending. The root marker on the module line and its
-validity rules were specified on 2026-10-03 and are not yet implemented.
+validity rules were specified on 2026-10-03; the parser accepts the marker,
+and its selection and validity rules remain pending.
 The implementation plan schedules that work. The exposure grammar below is unchanged.
 
 **Format version:** 1
@@ -1080,8 +1081,8 @@ invalid descriptions or registries still fail model validation.
 
 The adopted whole-tree ownership, auxiliary-source and nested-tree rules are
 not yet implemented; only the nested-tree statement syntax is parsed. The root
-marker and its validity rules, specified on 2026-10-03, are not yet parsed or
-enforced.
+marker, specified on 2026-10-03, is parsed; its selection and validity rules
+are not yet enforced.
 Specification adoption does not establish parser or checker support.
 
 Tooling must identify the version 1 features it implements and report missing
