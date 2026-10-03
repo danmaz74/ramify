@@ -1,4 +1,4 @@
-import type { ParsedDescription, DescriptionParser } from '../../../descriptions/src/interfaces/syntax.js';
+import type { ParsedDescription, DescriptionParser, RootMarkerReader, TextSpan } from '../../../descriptions/src/interfaces/syntax.js';
 
 export interface ProjectRequest {
   readonly cwd: string;
@@ -111,14 +111,16 @@ export interface ProjectInventory {
   readonly warnings: readonly OutsideSourceWarning[];
 }
 export interface ProjectIssue {
-  readonly code: 'root-not-found' | 'missing-root-description' | 'configuration-not-found'
-    | 'references-only-configuration' | 'invalid-layout' | 'invalid-description'
-    | 'duplicate-name' | 'description-in-src' | 'stray-description'
-    | 'reserved-container' | 'symlink-root' | 'symlink-description'
+  readonly code: 'root-not-found' | 'missing-root-description' | 'unmarked-root-description'
+    | 'configuration-not-found' | 'references-only-configuration' | 'invalid-layout'
+    | 'invalid-description' | 'duplicate-name' | 'description-in-src' | 'stray-description'
+    | 'reserved-container' | 'undeclared-project-boundary' | 'symlink-root' | 'symlink-description'
     | 'symlink-reference' | 'case-mismatch' | 'missing-file' | 'invalid-path'
     | 'resource-limit' | 'read-failure' | 'changed-input';
   readonly path: string;
   readonly message: string;
+  /** The located evidence within `path`, when the issue has one, such as a root marker. */
+  readonly span?: TextSpan;
 }
 export interface AcquisitionLimits {
   readonly attempts: number;
@@ -146,6 +148,8 @@ export interface ProjectInputView {
 export interface ProjectReadOptions {
   readonly request: ProjectRequest;
   readonly parse: DescriptionParser;
+  /** Decides a description's root marker from its module line, for selection and acquisition validity. */
+  readonly marker: RootMarkerReader;
   readonly limits: AcquisitionLimits;
   readonly signal?: AbortSignal;
   readonly retained?: RetainedConfiguration | null;

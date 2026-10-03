@@ -2,10 +2,12 @@ import { basename, join, relative, resolve, sep } from 'node:path';
 import { Capture } from './capture.js';
 import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
+import { descriptionMarker } from './marker.js';
 import { buildProjectOwnership, reservedSegmentKind } from './ownership.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
-import type { DescriptionParser } from '../../descriptions/src/interfaces/syntax.js';
+import { unmarkedRoot } from './selection.js';
+import type { DescriptionParser, RootMarkerReader, TextSpan } from '../../descriptions/src/interfaces/syntax.js';
 import type { ConfigurationData } from './configuration-data.js';
 import type { ExactReference, InventoryFile, InventoryModule, OutsideSourceWarning, ProjectInventory, ProjectIssue, ProjectOwnership, ProjectScope } from './interfaces/project.js';
 
@@ -13,7 +15,8 @@ const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
 /** Compiler-visible source, as distinct from an owned resource. */
 export const inventoryFileKind = (path: string): InventoryFile['kind'] => compilerSource.test(path) ? 'source' : 'resource';
 type Metadata = Record<string, { identity: string; purpose: InventoryModule['purpose'] }>;
-interface Boundary { directory: string; module: InventoryModule | null; depth: number }
+/** `enclosing` is the nearest valid module at or above `directory`; `module` is null for a layout-invalid boundary. */
+interface Boundary { directory: string; module: InventoryModule | null; enclosing: InventoryModule | null; depth: number }
 interface Walk { directory: string; boundary: Boundary | null }
 type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[]; metadata: Metadata; metadataReused: boolean }
   & ({ status: 'complete' } | { status: 'failed'; error: unknown });
@@ -50,8 +53,20 @@ export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): re
   return [...groups].sort(([a], [b]) => byteOrder(a, b))
     .map(([entry, files]) => ({ code: 'outside-module-source' as const, entry, count: files.length, files }));
 }
+/**
+ * A marked description other than the root's: located at its marker, naming
+ * the nested-tree declaration its nearest enclosing module would add.
+ */
+function undeclaredBoundary(root: string, path: string, directory: string, marker: TextSpan, enclosing: InventoryModule | null): ProjectIssue {
+  const owner = join(root, enclosing?.directory ?? '.');
+  const declared = JSON.stringify(relative(owner, directory).split(sep).join('/'));
+  const kinds = within(join(owner, 'src'), directory) ? `owned-ignored ${declared}` : `owned-ignored ${declared} or external ${declared}`;
+  const description = enclosing ? join(enclosing.directory, 'module.ramify') : 'its nearest enclosing module description';
+  return { code: 'undeclared-project-boundary', path, span: marker,
+    message: `Invalid module boundary: undeclared-project-boundary at ${marker.line}:${marker.column}: a marked project root must lie in a declared nested tree; declare ${kinds} in ${description}` };
+}
 export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'independentScopes' | 'ownership'>,
-  config: ConfigurationData, parse: DescriptionParser, previousMetadata?: Metadata): Promise<InventoryRead> {
+  config: ConfigurationData, parse: DescriptionParser, read: RootMarkerReader, previousMetadata?: Metadata): Promise<InventoryRead> {
   const metadata: Metadata = {};
   let metadataReused = true;
   async function purpose(readme: string): Promise<InventoryModule['purpose']> {
@@ -98,16 +113,25 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
       if (hasDescription) {
         const path = relative(capture.root, descriptionPath);
         const kind = await capture.kind(descriptionPath);
+        const isRoot = directory === capture.root;
+        const enclosing = boundary?.enclosing ?? null;
+        // Every regular description discovery meets has its marker decided:
+        // only the root's carries it, wherever another one lies.
+        const bytes = kind === 'file' ? await capture.bytes(descriptionPath, 'description') : undefined;
+        const marker = bytes === undefined ? null : descriptionMarker(path, bytes, read);
         let code: ProjectIssue['code'] | undefined;
         if (kind === 'symlink') code = 'symlink-description';
         else if (kind !== 'file') code = 'invalid-description';
+        else if (!isRoot && marker) code = 'undeclared-project-boundary';
         else if (inSource) code = 'description-in-src';
         else if (boundary && (directory === join(boundary.directory, 'src') || directory === join(boundary.directory, 'subs'))) code = 'reserved-container';
         else if (directory !== capture.root && (!legalChild || !boundary?.module)) code = 'stray-description';
         if (code) {
-          issues.push({ code, path, message: `Invalid module boundary: ${code}` });
-          boundary = { directory, module: null, depth: (boundary?.depth ?? -1) + 1 };
+          issues.push(code === 'undeclared-project-boundary' ? undeclaredBoundary(capture.root, path, directory, marker!, enclosing)
+            : { code, path, message: `Invalid module boundary: ${code}` });
+          boundary = { directory, module: null, enclosing, depth: (boundary?.depth ?? -1) + 1 };
         } else {
+          if (isRoot && !marker) issues.push({ code: 'unmarked-root-description', path, message: unmarkedRoot(path) });
           let text: string | undefined;
           try { text = await capture.readFile(descriptionPath, 'description'); }
           catch (error) {
@@ -118,7 +142,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
           if (!description || description.status === 'invalid') {
             for (const issue of description?.issues ?? []) issues.push({ code: 'invalid-description', path,
               message: `${issue.span.line}:${issue.span.column}: ${issue.code}: ${issue.message} [${issue.span.start},${issue.span.end})` });
-            boundary = { directory, module: null, depth: (boundary?.depth ?? -1) + 1 };
+            boundary = { directory, module: null, enclosing, depth: (boundary?.depth ?? -1) + 1 };
           } else {
             if (modules.length >= capture.limits.maxOwners || (boundary?.depth ?? -1) + 1 > capture.limits.maxDepth) {
               throw new AcquisitionError('resource-limit', path, 'Owner count or module depth limit exceeded');
@@ -145,7 +169,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
               }
             } else names.set(id, module);
             modules.push(module);
-            boundary = { directory, module, depth: (boundary?.depth ?? -1) + 1 };
+            boundary = { directory, module, enclosing: module, depth: (boundary?.depth ?? -1) + 1 };
             await capture.readFile(join(directory, 'package.json'), 'dependency');
           }
         }

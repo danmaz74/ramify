@@ -7,7 +7,7 @@ import { buildProjectOwnership, classifyProjectPath } from '../ownership.js';
 import type { NestedTreeDeclaration } from '../ownership.js';
 import type { NestedTreeStatement, ParsedDescription } from '../../../descriptions/src/interfaces/syntax.js';
 import type { InventoryModule, PathOwnership, ProjectExclusion, ProjectOwnership, ProjectReadOptions, ProjectScope } from '../interfaces/project.js';
-import { limits, put } from './fixtures.js';
+import { limits, marker, put } from './fixtures.js';
 
 // Expectations below are written from the plan's written topology
 // (fixtures.md) and the layout specification, not from classifier output.
@@ -286,7 +286,7 @@ describe('PB1-08/PB1-19: an acquired scope classifies absent and deleted paths w
     await put(root, 'subs/a/fixtures/sample/data.txt', 'data\n');
     // The external tree, scratch directories, `dist` and every seeded file below stay absent.
     const parse: ProjectReadOptions['parse'] = file => documents[file]!.description;
-    const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, limits });
+    const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, marker, limits });
     expect(result.status, JSON.stringify(result.status === 'acquired' || result.status === 'cancelled' ? {} : result.issues)).toBe('acquired');
     if (result.status !== 'acquired') return;
     const scope = result.view.inventory.scope;

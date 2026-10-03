@@ -127,9 +127,9 @@ const acquisitionFailure: Readonly<Record<CarriedCode, AnalysisDiagnostic['categ
   'references-only-configuration': 'acquisition', 'symlink-reference': 'acquisition',
   'case-mismatch': 'acquisition', 'missing-file': 'acquisition', 'invalid-path': 'acquisition',
   'read-failure': 'acquisition', 'changed-input': 'acquisition',
-  'missing-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
+  'missing-root-description': 'layout', 'unmarked-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
   'description-in-src': 'layout', 'stray-description': 'layout', 'reserved-container': 'layout',
-  'symlink-root': 'layout', 'symlink-description': 'layout',
+  'undeclared-project-boundary': 'layout', 'symlink-root': 'layout', 'symlink-description': 'layout',
 };
 
 /** Invocation-local plain evidence. This object never stores a provider or a callback. */

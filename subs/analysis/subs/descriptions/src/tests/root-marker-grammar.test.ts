@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseDescription } from '../parse.js';
+import { parseDescription, readRootMarker } from '../parse.js';
 import { assignOriginalTags, createDefaultTagRegistry, deriveSourceAreas, resolveTagRegistry } from '../../../model/src/index.js';
 import type { ResolvedTagRegistry } from '../../../model/src/interfaces/model.js';
 import type { DescriptionDocument, DescriptionIssue } from '../interfaces/syntax.js';
@@ -217,5 +217,40 @@ describe('PB1-41: a misplaced root is malformed with the existing parser codes',
     const codes = new Set(cases.flatMap(([, text]) => invalid(text).map(({ code }) => code)));
     expect([...codes].sort()).toEqual(['duplicate-header', 'invalid-destination', 'invalid-order', 'invalid-whitespace',
       'missing-header', 'missing-version', 'reserved-name', 'unknown-clause', 'unknown-statement']);
+  });
+});
+
+// PB1-42: the marker determination selection uses. It reads the module line
+// alone, so later errors keep the marker and a missing or misplaced header
+// removes it. Offsets are counted from the texts, in UTF-16 code units.
+describe('the root marker read from the module line alone', () => {
+  const marker = (start: number, line = 2) => ({ start, end: start + 4, line, column: 1 });
+  const cases: [string, string, ReturnType<typeof marker> | null][] = [
+    ['a marked header', 'ramify 1\nroot module app\n', marker(9)],
+    ['an unmarked header', 'ramify 1\nmodule app\n', null],
+    ['a marked header with later malformed lines', 'ramify 1\nroot module app\nexpose-src\nnot a statement\n', marker(9)],
+    ['a marked header with an unterminated name on its own line', 'ramify 1\nroot module "app\n', marker(9)],
+    ['a marked header separated by a non-ASCII space, which parsing rejects', 'ramify 1\nroot\u00a0module app\n', marker(9)],
+    ['a marked header separated by a tab', 'ramify 1\nroot\tmodule app\n', marker(9)],
+    ['a BOM and CRLF', '\uFEFFramify 1\r\nroot module app\r\n', marker(11)],
+    ['comments and blank lines before the header', '// note\n\nramify 1\n  // header\nroot module app\n', marker(30, 5)],
+    ['no version header', 'root module app\n', null],
+    ['a header after another statement', 'ramify 1\nexpose-src a from "a.ts" to parent\nroot module app\n', null],
+    ['a marked second module line', 'ramify 1\nmodule a\nroot module b\n', null],
+    ['root alone before the header', 'ramify 1\nroot\nmodule app\n', null],
+    ['root as the module name', 'ramify 1\nmodule root\n', null],
+    ['root joined to module', 'ramify 1\nrootmodule app\n', null],
+    ['another letter case', 'ramify 1\nRoot module app\n', null],
+    ['a quoted root', 'ramify 1\n"root" module app\n', null],
+    ['empty text', '', null],
+  ];
+  it.each(cases)('reads %s', (_, text, expected) => {
+    expect(readRootMarker('module.ramify', text)).toEqual(expected);
+  });
+  it('agrees with the parsed header wherever the description is valid', () => {
+    for (const [, text] of cases) {
+      const parsed = parseDescription('module.ramify', text);
+      if (parsed.status === 'valid') expect(readRootMarker('module.ramify', text)).toEqual(parsed.document.module.root);
+    }
   });
 });

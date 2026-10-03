@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { originalKey, resolveTagRegistry } from '../subs/model/src/index.js';
 import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/project/src/interfaces/project.js';
@@ -152,7 +152,7 @@ class Session implements RetainedSession {
     const started = performance.now();
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, marker: readRootMarker, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -703,7 +703,7 @@ class Session implements RetainedSession {
     // it made answers the same on disk; the scope comparison below still runs.
     const observed = state.observer?.resolution ?? null;
     if (observed && observed !== this.#observedResolution) { this.#observedResolution = observed; this.#remember(observed); }
-    const resolved = await resolveProjectRoot(invocation.project, signal, this.#resolutions);
+    const resolved = await resolveProjectRoot(invocation.project, readRootMarker, signal, this.#resolutions);
     if (resolved.status !== 'resolved') return problem(`The invocation does not resolve to a project: ${resolved.issues.map(issue => issue.message).join('; ')}`);
     this.#remember(resolved);
     if (resolved.root !== scope.root || resolved.configuration !== scope.configuration) {
@@ -725,7 +725,7 @@ class Session implements RetainedSession {
     const state = this.#state;
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, marker: readRootMarker, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };

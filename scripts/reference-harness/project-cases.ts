@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
 import type { ProjectInventory, ProjectRequest } from '../../subs/analysis/src/validation-entry.js';
 import type { AcquisitionLimits, ProjectRead, ProjectInputView } from '../../subs/analysis/subs/project/src/interfaces/project.js';
@@ -20,7 +20,7 @@ const provider = 'subs/provider/module.ramify';
 const api = 'subs/provider/src/interfaces/api.ts';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 async function read(root: string, request: Partial<ProjectRequest> = {}): Promise<ProjectRead> {
-  const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover', ...request }, parse: parseDescription, limits });
+  const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover', ...request }, parse: parseDescription, marker: readRootMarker, limits });
   recordObservation('acquisition', result.status === 'acquired'
     ? { status: result.status, scope: result.view.inventory.scope, diagnostics: [], warnings: result.view.inventory.warnings }
     : result);

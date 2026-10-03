@@ -208,6 +208,23 @@ class LineParser {
   }
 }
 
+/** The header rule both readers share: a line is the module header when it begins with `module`, or with `root` then `module`. */
+const moduleHeader = (line: TokenLine): boolean =>
+  line.tokens[0]?.raw === 'module' || (line.tokens[0]?.raw === 'root' && line.tokens[1]?.raw === 'module');
+
+/**
+ * The root marker's span, decided from the module line alone: the second
+ * significant line, after a `ramify` version line, is the module header and
+ * begins with `root`. Errors after that line do not remove the marker. A
+ * missing or misplaced header carries none. The caller supplies only the text
+ * it could decode.
+ */
+export function readRootMarker(file: string, text: string): TextSpan | null {
+  const [version, header] = tokenize(file, text).lines.filter(line => line.tokens.length);
+  if (version?.tokens[0]?.raw !== 'ramify' || !header || !moduleHeader(header)) return null;
+  return header.tokens[0].raw === 'root' ? header.tokens[0].span : null;
+}
+
 function freeze<T>(value: T): T {
   if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.values(value).forEach(freeze);
@@ -237,7 +254,7 @@ export function parseDescription(file: string, text: string): ParsedDescription 
         if (significantLines !== 0) report('invalid-order', 'The version header must be the first statement.');
         versionSeen = true;
         if (!line.invalid) parser.version();
-      } else if (first.raw === 'module' || (first.raw === 'root' && line.tokens[1]?.raw === 'module')) {
+      } else if (moduleHeader(line)) {
         if (moduleSeen) report('duplicate-header', 'The module header must occur exactly once.');
         if (!versionSeen || significantLines !== 1) report('invalid-order', 'The module header must follow the version header.');
         moduleSeen = true;

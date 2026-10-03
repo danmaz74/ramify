@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 import type { LinkedDescriptions } from '../subs/descriptions/src/interfaces/linking.js';
 import { linkDescriptions } from '../subs/descriptions/src/link.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import { deriveSourceAreas, originalKey } from '../subs/model/src/index.js';
 import type { Model, ResolvedTagRegistry, SourceArea } from '../subs/model/src/interfaces/model.js';
 import type { CapturedInput, InventoryUpdate, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserver, ProjectRequest } from '../subs/project/src/interfaces/project.js';
@@ -128,7 +128,7 @@ export async function captureInvalidFacts(state: SessionState, signal?: AbortSig
   const acquired = await readProject({ request: state.project, limits: state.request.limits.acquisition,
     registry: state.registry.id, parse: (file, text) => {
       const result = parseDescription(file, text); parsed.set(file, result); return result;
-    }, ...(signal ? { signal } : {}) });
+    }, marker: readRootMarker, ...(signal ? { signal } : {}) });
   if (acquired.status === 'cancelled') throw cancelled();
   if (acquired.status === 'acquired') {
     await acquired.view.dispose();

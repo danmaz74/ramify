@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { CatalogExport, CatalogOriginal, FileExports, ProjectInventory, SourceCatalog } from '../../subs/analysis/src/validation-entry.js';
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry, deriveSourceAreas } from '../../subs/analysis/subs/model/src/index.js';
 import type { OriginalId } from '../../subs/analysis/subs/model/src/index.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
@@ -84,7 +84,7 @@ describe('unchanged Collection Review catalog', () => {
   beforeAll(async () => {
     const root = fileURLToPath(new URL('../../examples/collection-review/', import.meta.url));
     const acquired = await readProject({
-      request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription,
+      request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription, marker: readRootMarker,
       limits: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
         maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2,
         maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 },

@@ -30,11 +30,12 @@ with the root marker, `root module <name>`, as the
 [module description specification](../model/module-description.spec.md#a-description-file-establishes-a-directory-boundary)
 defines; every other description in the tree is unmarked.
 
-**Pending root marker.** This selection rule was specified on 2026-10-03 and
-is not yet implemented. Until it is, the CLI applies the earlier climb: the
-nearest description at or above the working directory is the candidate, and
-the climb advances to the nearest description-bearing ancestor while the
-candidate lies strictly beneath that ancestor's `subs/`.
+**Pending declared trees.** Selection by the root marker is implemented, and
+checking a project reports every other marked description its discovery meets.
+Until discovery prunes declared nested trees, it still meets a marked
+description inside one of them, unless the description lies beneath a
+directory with its own `tsconfig.json` that the root configuration does not
+select: discovery still skips such a directory, as before.
 
 1. `--root <dir>` names the root explicitly. The directory must contain a
    `module.ramify` carrying the root marker; nothing above it is examined. A
@@ -46,7 +47,9 @@ candidate lies strictly beneath that ancestor's `subs/`.
    their position relative to any `subs/` directory.
 3. When no description at or above the working directory carries the marker,
    the command fails with exit 2 and a message naming the working directory.
-   It never searches subdirectories.
+   When an unmarked description lies at or above it, the message also names
+   the nearest one and says to add `root` to its module line if it is the
+   project root. It never searches subdirectories.
 
 Paths are canonicalized before the climb, so a working directory reached
 through a symlink finds the same root as its real path. Selection does not

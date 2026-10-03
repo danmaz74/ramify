@@ -346,12 +346,13 @@ export class Capture {
   /**
    * What every recorded query answered: kind, canonical path, exact name,
    * enumerated members and read bytes. Stat metadata such as size and times is
-   * left out, so an edited file that was only probed answers the same.
+   * left out, so an edited file that was only probed answers the same. The
+   * read bytes of `unread` are left out too, as if those paths were only probed.
    */
-  get answers(): string {
+  answers(unread: ReadonlySet<string> = new Set()): string {
     const entries = [...this.#observations.values()].sort((a, b) => byteOrder(a.path, b.path));
     return hash(JSON.stringify(entries.map(entry => [entry.path, entry.kind, entry.canonical ?? null, entry.exactName ?? null,
-      entry.entries ?? null, entry.bytes === undefined ? null : this.#hash(entry)])));
+      entry.entries ?? null, entry.bytes === undefined || unread.has(entry.path) ? null : this.#hash(entry)])));
   }
   /** Enumerations actually performed; a cached listing costs none. */
   get enumerations(): number { return this.#enumerations; }

@@ -65,3 +65,5 @@ export type ParsedDescription =
       readonly tokens: readonly DescriptionToken[];
       readonly issues: readonly DescriptionIssue[] };
 export type DescriptionParser = (file: string, text: string) => ParsedDescription;
+/** Decides the root marker from a description's module line alone, as `readRootMarker` does; null when unmarked. */
+export type RootMarkerReader = (file: string, text: string) => TextSpan | null;

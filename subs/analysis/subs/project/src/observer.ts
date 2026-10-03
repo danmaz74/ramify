@@ -5,6 +5,7 @@ import type { AcquiredProject } from './read-project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, within } from './data.js';
 import { excludedDirectory, inventoryFileKind, outsideSourceWarnings, scopeOwnership } from './inventory.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
+import { descriptionMarker } from './marker.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import { ReportedObservations, inputIdentity, reportedInput } from './observations.js';
@@ -260,6 +261,10 @@ class Observer implements ProjectObserver {
       if (item.kind === 'description') {
         const module = this.#moduleAt(item.directory)!;
         await this.#capture.refresh(item.path);
+        // A gained or lost root marker changes the root's selection or makes a
+        // child another project's root: acquisition decides either.
+        const bytes = this.#capture.recorded(item.path)?.kind === 'file' ? await this.#capture.bytes(item.path, 'description') : undefined;
+        if (bytes !== undefined && (descriptionMarker(label, bytes, this.options.marker) !== null) !== (module.parent === null)) return this.#rebuild(signal);
         let text: string | undefined;
         try { text = await this.#capture.readFile(item.path, 'description'); }
         catch (error) {

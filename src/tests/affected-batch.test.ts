@@ -84,6 +84,11 @@ describe('affected batch form (A7-11)', () => {
         expect([resident.exitCode, resident.stderr]).toEqual([1, '']);
         expect(JSON.parse(resident.stdout)).toMatchObject({ exitCode: 1, diagnostics: [{ code: 'invalid-project' }] });
       } finally { await quick.dispose(); }
+      // A root description without the root marker is invalid the same way (R7).
+      await put(empty, 'module.ramify', 'ramify 1\nmodule empty\n');
+      await put(empty, 'tsconfig.json', '{"compilerOptions":{"types":[]},"include":["src"]}\n');
+      expect(await runAffectedBatch({ cwd: empty, root: empty, modules: ['x'], paths: [] }))
+        .toMatchObject({ status: 'unavailable', reason: 'invalid-project', unknownModules: [], exitCode: 1 });
     } finally { await rm(empty, { recursive: true, force: true }); }
   }, 30_000);
 

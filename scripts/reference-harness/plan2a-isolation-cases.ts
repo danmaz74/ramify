@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry } from '../../subs/analysis/subs/model/src/index.js';
 import { isRamifyGeneratedPath } from '../../subs/analysis/subs/project/src/generated-path.js';
 import { observeProject } from '../../subs/analysis/subs/project/src/observer.js';
@@ -28,7 +28,7 @@ async function withTemp<T>(prefix: string, run: (root: string) => Promise<T>): P
   try { return await run(root); } finally { await rm(root, { recursive: true, force: true }); }
 }
 function options(root: string): ProjectReadOptions {
-  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: parseDescription, limits, registry };
+  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: parseDescription, marker: readRootMarker, limits, registry };
 }
 async function batch(root: string) {
   const acquired = await readProject(options(root));

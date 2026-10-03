@@ -4,7 +4,7 @@ module analysis
 expose-sub * from model to parent, descendants
 
 // A6: syntax vocabulary available to assembly and acquisition.
-expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, ExposureStatement, NestedTreeStatement, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
+expose-sub TextSpan, DescriptionToken, DescriptionIssue, NamedSelection, DescriptionSelection, ExposureStatement, NestedTreeStatement, DescriptionStatement, DescriptionDocument, ParsedDescription, DescriptionParser, RootMarkerReader, LinkInputs, ExpandedSelection, LinkIssue, LinkedDescriptions from descriptions to parent, descendants
 
 // A7: project vocabulary supplied to assembly and children.
 expose-sub ProjectRequest, ProjectScope, PathOwner, ProjectExclusion, ProjectOwnership, PathOwnership, CapturedInput, InventoryArea, ModulePurpose, InventoryModule, InventoryFile, ExactReference, OutsideSourceWarning, ProjectInventory, ProjectIssue, AcquisitionLimits, ProjectInputView, ProjectReadOptions, ProjectRead, ProjectResolution, RetainedConfiguration, ObservationSink, ObservationRetirement, InputChangeKind, ObservedChange, InventoryUpdate, ProjectObserver, ProjectObserve, isRamifyGeneratedPath, classifyProjectPath from project to parent, descendants

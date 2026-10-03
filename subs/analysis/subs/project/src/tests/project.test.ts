@@ -5,14 +5,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProject } from '../read-project.js';
 import type { ProjectRead, ProjectReadOptions, ProjectInputView } from '../interfaces/project.js';
-import { fixture, limits, put, syntax } from './fixtures.js';
+import { fixture, limits, marker, put, syntax } from './fixtures.js';
 
 let work: string, root: string;
 const views: ProjectInputView[] = [];
 beforeEach(async () => { work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-project-'))); root = join(work, 'project'); await fixture(root); });
 afterEach(async () => { for (const view of views.splice(0)) await view.dispose(); await rm(work, { recursive: true, force: true }); });
 async function read(changes: Partial<ProjectReadOptions> = {}): Promise<ProjectRead> {
-  const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, limits, ...changes });
+  const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, marker, limits, ...changes });
   if (result.status === 'acquired') views.push(result.view);
   return result;
 }
@@ -91,7 +91,8 @@ describe('real project configuration and scope', () => {
     expect(await read()).toMatchObject({ status: 'incomplete', issues: [{ code: 'read-failure', message: expect.stringContaining('absent.json') }] });
   });
   it('rejects malformed description UTF-8 before calling the parser', async () => {
-    await put(root, 'module.ramify', new Uint8Array([0xff]));
+    // The invalid byte follows the marked module line, so the root stays selected (R7).
+    await put(root, 'module.ramify', new Uint8Array([...Buffer.from('ramify 1\nroot module fixture\n'), 0xff]));
     let called = false;
     const result = await read({ parse: (...args) => { called = true; return syntax(...args); } });
     expect(called).toBe(false);
@@ -102,10 +103,21 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read({ request: { cwd: join(work, 'source-link'), configuration: 'discover', scope: 'whole-project' } }));
     expect(acquired.inventory.scope).toMatchObject({ root, invokedFrom: join(root, 'src'), selection: 'found' });
   });
-  it('rejects a missing parent marker above a child directly under subs', async () => {
+  it('finds no project above an unmarked child directly under subs whose parent has no description', async () => {
+    // R7: an unmarked description never stops the climb, and nothing above carries the marker.
     const child = join(work, 'orphan/subs/child'); await fixture(child);
-    expect(await read({ request: { cwd: join(child, 'src'), configuration: 'discover', scope: 'whole-project' } }))
-      .toMatchObject({ status: 'invalid', issues: [{ code: 'missing-root-description', message: expect.stringContaining('parent description') }] });
+    await put(child, 'module.ramify', 'ramify 1\nmodule child\n');
+    const result = await read({ request: { cwd: join(child, 'src'), configuration: 'discover', scope: 'whole-project' } });
+    expect(result).toMatchObject({ status: 'unavailable', inventory: null, issues: [{ code: 'root-not-found',
+      message: `No marked project root at or above ${join(child, 'src')}; the nearest description is ${join(child, 'module.ramify')}: add root before module on its module line if it is the project root` }] });
+  });
+  it('reports an unmarked orphan child beneath a marked root as a stray description of that root', async () => {
+    await put(root, 'orphan/subs/child/module.ramify', 'ramify 1\nmodule child\n');
+    await put(root, 'orphan/subs/child/src/value.ts', 'export const value = 1;\n');
+    const result = await read({ request: { cwd: join(root, 'orphan/subs/child/src'), configuration: 'discover', scope: 'whole-project' } });
+    expect(result).toMatchObject({ status: 'invalid', inventory: { scope: { root, selection: 'found', invokedFrom: join(root, 'orphan/subs/child/src') } },
+      issues: [{ code: 'stray-description', path: 'orphan/subs/child/module.ramify' }] });
+    if (result.status === 'invalid') expect(result.issues).toHaveLength(1);
   });
   it.each(['src', 'subs', 'src/tests', 'src/interfaces'])('rejects a marker at %s', async path => {
     await put(root, `${path}/module.ramify`, 'ramify 1\nmodule child\n');

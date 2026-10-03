@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isRamifyGeneratedPath, isRamifyGeneratedSegment } from '../generated-path.js';
 import { readProject } from '../read-project.js';
 import type { ProjectInputView } from '../interfaces/project.js';
-import { fixture, limits, put, syntax } from './fixtures.js';
+import { fixture, limits, marker, put, syntax } from './fixtures.js';
 
 describe('isRamifyGeneratedSegment / isRamifyGeneratedPath', () => {
   it('recognizes exactly the final catalog and the two transient publisher forms', () => {
@@ -71,7 +71,7 @@ describe('generated-output isolation at the project acquisition boundary', () =>
   beforeEach(async () => { work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-generated-path-'))); root = join(work, 'project'); await fixture(root); });
   afterEach(async () => { for (const view of views.splice(0)) await view.dispose(); await rm(work, { recursive: true, force: true }); });
   async function read() {
-    const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, limits });
+    const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, marker, limits });
     expect(result.status).toBe('acquired');
     if (result.status !== 'acquired') throw new Error('unreachable');
     views.push(result.view);

@@ -625,8 +625,8 @@ platform. Files use UTF-8, LF and a terminating newline; JSONL has exactly one
 record per line; there are no timestamps, host paths or process identifiers.
 Two identifiers are the analysis's own, not the view's: the `revision` names
 the daemon context's generation, so two daemons' views of the same inputs
-differ in that identifier alone, and the `input` identity records the absent
-`module.ramify` of each ancestor directory, so copies of one project at
+differ in that identifier alone, and the `input` identity records the
+project's canonical root and configuration paths, so copies of one project at
 different paths also differ in it. Every other byte is equal.
 
 Bounds a successor plan must measure before freezing, on the reference

@@ -29,10 +29,10 @@ export function projectDiagnostics(inventory: ProjectInventory | null, issues: r
       // Exact source references come only from owned exposure statements.
       return statement && 'from' in statement ? [{ file: issue.path, ...statement.from.span }] : [];
     });
-    const layout = ['missing-root-description', 'invalid-layout', 'duplicate-name', 'description-in-src',
-      'stray-description', 'reserved-container', 'symlink-root', 'symlink-description'].includes(issue.code);
+    const layout = ['missing-root-description', 'unmarked-root-description', 'invalid-layout', 'duplicate-name', 'description-in-src',
+      'stray-description', 'reserved-container', 'undeclared-project-boundary', 'symlink-root', 'symlink-description'].includes(issue.code);
     result.push(diagnostic(issue.code, issue.message, references.length ? 'description' : layout ? 'layout' : 'acquisition',
-      spans.length ? spans : [{ file: issue.path, start: 0, end: 0, line: 1, column: 1 }]));
+      spans.length ? spans : [{ file: issue.path, ...issue.span ?? { start: 0, end: 0, line: 1, column: 1 } }]));
   }
   return [...new Map(result.map(item => [item.id, item])).values()];
 }

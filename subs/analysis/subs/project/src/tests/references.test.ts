@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProject } from '../read-project.js';
 import type { ProjectInputView, ProjectReadOptions } from '../interfaces/project.js';
-import { fixture, limits, put, syntax } from './fixtures.js';
+import { fixture, limits, marker, put, syntax } from './fixtures.js';
 
 let root: string;
 let retained: ProjectInputView | undefined;
@@ -27,7 +27,7 @@ async function reference(path: string, kind: 'expose-src' | 'expose-test' = 'exp
       from: { value: path, span }, tags: null, destinations: ['parent'],
     }] } };
   };
-  const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, limits });
+  const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, marker, limits });
   if (result.status === 'acquired') retained = result.view;
   const inventory = result.status === 'acquired' ? result.view.inventory : result.status === 'cancelled' ? null : result.inventory;
   return { result, inventory, reference: inventory?.references[0] };
@@ -107,7 +107,7 @@ describe('exact owned source paths', () => {
         { index: 2, kind: 'external', span, directory: { value: 'absent-cache', span } },
       ] } };
     };
-    const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, limits });
+    const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, marker, limits });
     if (result.status === 'acquired') retained = result.view;
     expect(result.status).toBe('acquired');
     if (result.status !== 'acquired') throw new Error('Expected acquired view');

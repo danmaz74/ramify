@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { linkDescriptions } from '../subs/descriptions/src/link.js';
 import { deriveSourceAreas, resolveTagRegistry } from '../subs/model/src/index.js';
@@ -54,7 +54,7 @@ export async function validateProject(inputs: AnalysisInputs, control: RunContro
         const acquisitionStart = performance.now();
         const acquired = await readProject({ request: inputs.project, parse: (file, text) => {
           const description = parseDescription(file, text); parsed.set(file, description); return description;
-        }, limits: { ...inputs.limits.acquisition, attempts: 1,
+        }, marker: readRootMarker, limits: { ...inputs.limits.acquisition, attempts: 1,
           deadlineMs: remaining(inputs.limits.acquisition.deadlineMs - acquisitionElapsed) }, signal: abort.signal });
         acquisitionElapsed += performance.now() - acquisitionStart;
         if (acquired.status === 'cancelled') break;

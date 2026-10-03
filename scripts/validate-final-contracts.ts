@@ -392,6 +392,22 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 3B: the root-marker reader that
+  // analysis supplies to project selection, and its type, which travels with
+  // `ProjectReadOptions` as a signature companion.
+  { plan: 'Phase 1 project boundaries (root marker)',
+    added: {
+      './': [
+        'expose-sub RootMarkerReader from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub RootMarkerReader from descriptions to parent, descendants',
+      ].join('\n'),
+      'subs/analysis/subs/descriptions/': [
+        'expose-src readRootMarker from "parse.ts" to parent',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** The expected selections: the archived list, then each named layer in turn.

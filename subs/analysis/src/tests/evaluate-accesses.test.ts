@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { evaluateAccesses, evaluateAccessesAsync } from '../evaluate-accesses.js';
-import { parseDescription } from '../../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/descriptions/src/parse.js';
 import { linkDescriptions } from '../../subs/descriptions/src/link.js';
 import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../subs/model/src/index.js';
 import type { ModelResult } from '../../subs/model/src/index.js';
@@ -40,7 +40,7 @@ async function stage(probe: string, overrides: Readonly<Record<string, string>> 
       await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), text);
     }
     await inspect?.(root);
-    const acquired = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription,
+    const acquired = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription, marker: readRootMarker,
       limits: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000, maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2,
         maxApplicationBytes: 64 * 1024 ** 2, maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 } });
     if (acquired.status !== 'acquired') throw new Error(JSON.stringify(acquired));

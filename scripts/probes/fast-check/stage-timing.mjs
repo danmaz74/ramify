@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { readProject } from '../../../dist/subs/analysis/subs/project/src/read-project.js';
-import { parseDescription } from '../../../dist/subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../../dist/subs/analysis/subs/descriptions/src/parse.js';
 import { linkDescriptions } from '../../../dist/subs/analysis/subs/descriptions/src/link.js';
 import { buildModel, deriveSourceAreas } from '../../../dist/subs/analysis/subs/model/src/index.js';
 import { createDefaultTagRegistry } from '../../../dist/subs/analysis/subs/model/src/registry.js';
@@ -14,7 +14,7 @@ const marks = [];
 let last = performance.now();
 const mark = (label) => { const now = performance.now(); marks.push([label, (now - last).toFixed(1)]); last = now; };
 const registry = createDefaultTagRegistry();
-const acquired = await readProject({ request: { cwd: root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription, limits: acquisition });
+const acquired = await readProject({ request: { cwd: root, scope: 'whole-project', configuration: 'discover' }, parse: parseDescription, marker: readRootMarker, limits: acquisition });
 mark('acquire (root, config helper, inventory, reads)');
 if (acquired.status !== 'acquired') { console.log(acquired); process.exit(1); }
 const view = acquired.view;

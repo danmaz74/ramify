@@ -53,7 +53,7 @@ const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 
   'SessionUpdate', 'VerifyOutcome', 'SessionExplorerDetailsOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
   'DescriptionSelection', 'ExposureStatement', 'NestedTreeStatement', 'DescriptionStatement', 'DescriptionDocument',
-  'ParsedDescription', 'DescriptionParser'];
+  'ParsedDescription', 'DescriptionParser', 'RootMarkerReader'];
 
 const projectNames = ['ProjectRequest', 'ProjectScope', 'PathOwner', 'ProjectExclusion', 'ProjectOwnership', 'PathOwnership', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
@@ -189,7 +189,7 @@ const toolkit: readonly Fixture[] = [
       'TestReferenceOutcome'], 'interfaces/dependency-diagram.ts'),
     src(['BehavioralDependencyMetrics'], 'interfaces/modularity.ts'),
     src(['analyzeDependencyDiagram'], 'dependency-analyzer.ts'), src('*', 'interfaces/dependency-analyzer.ts')] },
-  { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
+  { path: 'subs/analysis/subs/descriptions/', name: 'descriptions', tags: browser, statements: [src(['parseDescription'], 'parse.ts', browser), src('*', 'interfaces/syntax.ts'), src(['readRootMarker'], 'parse.ts'), src(['linkDescriptions'], 'link.ts', browser), src('*', 'interfaces/linking.ts')] },
   { path: 'subs/analysis/subs/model/', name: 'model', tags: browser, statements: [
     src('*', 'interfaces/model.ts'), src(['resolveTagRegistry', 'createDefaultTagRegistry'], 'registry.ts', browser),
     src(['deriveSourceAreas', 'assignOriginalTags'], 'profiles.ts', browser), src(['originalKey'], 'identity.ts', browser),

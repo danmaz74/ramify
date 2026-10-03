@@ -110,7 +110,19 @@ describe('CLI with real batch sessions', () => {
     // Explicitly place the working directory outside all described ancestors.
     const result = await invoke('/', ['check', '--batch', '--format', 'json']);
     expect(result.exitCode).toBe(2);
-    expect(JSON.parse(result.stdout).diagnostics.some((issue: AnalysisDiagnostic) => issue.message.includes('/'))).toBe(true);
+    expect(JSON.parse(result.stdout).diagnostics).toEqual([expect.objectContaining({ code: 'root-not-found', message: 'No marked project root at or above /' })]);
+  }), 15_000);
+
+  it('selects only a marked root: an unmarked --root exits 1 and an unmarked climb exits 2, each saying to add the marker', async () => fixture(async root => {
+    const explicit = await invoke(root, ['check', '--batch', '--format', 'json', '--root', 'subs/consumer']);
+    expect(explicit.exitCode).toBe(1);
+    expect(JSON.parse(explicit.stdout).diagnostics).toEqual([expect.objectContaining({ code: 'unmarked-root-description', category: 'layout',
+      message: `${join(root, 'subs/consumer/module.ramify')} does not carry the root marker: add root before module on its module line to declare the project root` })]);
+    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value from "interfaces/api.ts" to descendants\n');
+    const found = await invoke(join(root, 'subs/consumer/src'), ['check', '--batch', '--format', 'json']);
+    expect(found.exitCode).toBe(2);
+    expect(JSON.parse(found.stdout).diagnostics).toEqual([expect.objectContaining({ code: 'root-not-found',
+      message: `No marked project root at or above ${join(root, 'subs/consumer/src')}; the nearest description is ${join(root, 'subs/consumer/module.ramify')}: add root before module on its module line if it is the project root` })]);
   }), 15_000);
 
   it('refuses browser verification through the batch capability contract', async () => fixture(async root => {

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry } from '../../subs/analysis/subs/model/src/index.js';
 import { observeProject, observedEnumerations } from '../../subs/analysis/subs/project/src/observer.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
@@ -48,7 +48,7 @@ function batchIdentity(inventory: ProjectInventory, inputs: readonly CapturedInp
 }
 
 function options(root: string, parse: DescriptionParser = parseDescription): ProjectReadOptions {
-  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse, limits, registry };
+  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse, marker: readRootMarker, limits, registry };
 }
 /** One acquisition-only batch capture of exactly the state on disk now. */
 async function batch(root: string): Promise<{ identity: string; inputs: readonly CapturedInput[]; inventory: ProjectInventory }> {

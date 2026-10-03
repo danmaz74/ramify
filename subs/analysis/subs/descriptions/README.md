@@ -24,6 +24,11 @@ The module header records the root marker's span when its line begins with
 `root`, and null otherwise; the header span then begins at the marker. The
 parser accepts a description either way and never decides which description
 is the project root. A `root` keyword anywhere else is malformed.
+`readRootMarker(file, text)` decides the marker from the module line alone, for
+project selection: the second significant line, after a `ramify` line, is the
+module header by the parser's own header rule and begins with `root`. It
+returns the marker's span, so later errors leave a marked description marked,
+and a missing or misplaced header leaves it unmarked.
 Tokenization collects lexical errors throughout the input. Parsing recovers at
 physical line boundaries after a malformed clause; a lexically invalid line
 is not interpreted from its incomplete tokens. Duplicate tag/destination items

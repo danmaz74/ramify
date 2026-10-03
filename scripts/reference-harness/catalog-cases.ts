@@ -2,7 +2,7 @@ import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { CatalogOriginal, FileExports, ProjectInventory, SourceCatalog } from '../../subs/analysis/src/validation-entry.js';
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { assignOriginalTags, createDefaultTagRegistry, deriveSourceAreas, originalKey } from '../../subs/analysis/subs/model/src/index.js';
 import type { ModelResult, OriginalId, SourceArea } from '../../subs/analysis/subs/model/src/index.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
@@ -49,7 +49,7 @@ function sourceAreas(inventory: ProjectInventory): readonly SourceArea[] {
 async function catalogued(context: ProjectContext, check: (catalog: SourceCatalog, inventory: ProjectInventory) => void): Promise<void> {
   const acquired = await readProject({
     request: { cwd: context.root, root: context.root, scope: 'whole-project', configuration: 'discover' },
-    parse: parseDescription, limits: acquisitionLimits,
+    parse: parseDescription, marker: readRootMarker, limits: acquisitionLimits,
   });
   context.assertions.equal('project acquired', acquired.status, 'acquired');
   if (acquired.status !== 'acquired') throw new Error(JSON.stringify(acquired));

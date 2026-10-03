@@ -16,6 +16,18 @@ export const syntax: ProjectReadOptions['parse'] = (file) => ({ status: 'valid',
     ? { name: 'fixture', tags: [], root: { start: 9, end: 13, line: 2, column: 1 }, span: { start: 9, end: 28, line: 2, column: 1 } }
     : { name: 'child', tags: [], root: null, span: { start: 9, end: 23, line: 2, column: 1 } }, tokens: [], statements: [],
 } });
+/**
+ * A local root-marker double: a description is marked when its first line
+ * begins with `ramify` and its second line with `root`, whitespace and
+ * `module`, as the root fact of `syntax` and the header `fixture()` writes
+ * are. The Descriptions owner's reader decides the real rule; the analysis
+ * tests and the reference harness supply it.
+ */
+export const marker: ProjectReadOptions['marker'] = (_file, text) => {
+  const [version = '', header = ''] = text.split('\n');
+  return /^\uFEFF?ramify\b/.test(version) && /^root[ \t]+module[ \t]/.test(header)
+    ? { start: version.length + 1, end: version.length + 5, line: 2, column: 1 } : null;
+};
 export async function fixture(root: string): Promise<void> {
   await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
   await put(root, 'README.md', '# Fixture\n\nFixture purpose.\n');
