@@ -26,7 +26,7 @@ function module(id: string, parent: string | null, directory: string, statements
 }
 function scopeOf(ownership: ProjectOwnership): ProjectScope {
   return { root: '/project', selection: 'given', invokedFrom: '/project', configuration: '/project/tsconfig.json',
-    walkedAreas: [], independentScopes: [], ownership };
+    walkedAreas: [], ownership };
 }
 
 const rootTrees = [tree(0, 'owned-ignored', 'fixture-project'), tree(1, 'external', 'external-project')];

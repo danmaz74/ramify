@@ -47,8 +47,14 @@ const joined = (segments: readonly string[]): string => segments.length ? segmen
 const contains = (directory: string, path: string): boolean =>
   directory === '.' || path === directory || path.startsWith(`${directory}/`);
 
-/** Resolve a declared directory string against its module's directory, or say why it cannot be. */
-function decodeDeclared(module: string, written: string): { directory: string | null; problem: NestedTreeProblem | null } {
+/** The scratch directory of a module directory: `tmp` directly beneath its `src/`. */
+export const scratchDirectory = (directory: string): string => directory === '.' ? 'src/tmp' : `${directory}/src/tmp`;
+
+/**
+ * Resolve a declared directory string against its module's directory (both
+ * normalized project-relative), or say why it cannot be. Reads nothing.
+ */
+export function decodeNestedTree(module: string, written: string): { directory: string | null; problem: NestedTreeProblem | null } {
   if (written === '' || written.startsWith('/') || /^[A-Za-z]:/.test(written) || written.includes('\\')
     || /[\u0000-\u001f\u007f]/u.test(written)) return { directory: null, problem: 'invalid-path' };
   const base = segmentsOf(module);
@@ -76,8 +82,7 @@ export function buildProjectOwnership(modules: readonly Pick<InventoryModule, 'i
   const owners: PathOwner[] = modules.map(({ id, parent, directory }) => ({ id, parent, directory }))
     .sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.id, b.id));
   const exclusions: ProjectExclusion[] = [];
-  const scratch = (directory: string): string => directory === '.' ? 'src/tmp' : `${directory}/src/tmp`;
-  for (const owner of owners) exclusions.push({ kind: 'scratch', directory: scratch(owner.directory), owner: owner.id });
+  for (const owner of owners) exclusions.push({ kind: 'scratch', directory: scratchDirectory(owner.directory), owner: owner.id });
   const outputDirectories = [...new Set(outputs)].filter(directory => directory !== '.' && directory !== '..' && !directory.startsWith('../'));
   for (const directory of outputDirectories) exclusions.push({ kind: 'output', directory, owner: null });
 
@@ -93,7 +98,7 @@ export function buildProjectOwnership(modules: readonly Pick<InventoryModule, 'i
     if (module.description.status !== 'valid') continue;
     for (const statement of module.description.document.statements) {
       if (!('directory' in statement)) continue;
-      const decoded = decodeDeclared(module.directory, statement.directory.value);
+      const decoded = decodeNestedTree(module.directory, statement.directory.value);
       let problem = decoded.problem;
       const directory = decoded.directory;
       if (!problem && directory !== null) {
@@ -101,7 +106,7 @@ export function buildProjectOwnership(modules: readonly Pick<InventoryModule, 'i
         else if (statement.kind === 'external' && contains(module.directory === '.' ? 'src' : `${module.directory}/src`, directory)) {
           problem = 'external-in-src';
         } else if (segmentsOf(directory).some(segment => reservedSegmentKind(segment) !== null)
-          || outputDirectories.some(output => contains(output, directory)) || contains(scratch(module.directory), directory)) {
+          || outputDirectories.some(output => contains(output, directory)) || contains(scratchDirectory(module.directory), directory)) {
           problem = 'always-excluded';
         }
       }
@@ -121,6 +126,23 @@ export function buildProjectOwnership(modules: readonly Pick<InventoryModule, 'i
   }
   exclusions.sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.kind, b.kind));
   return freeze({ ownership: { modules: owners, exclusions }, declarations: evidence });
+}
+
+/**
+ * The project-relative directories discovery never enters for one module: its
+ * scratch directory and every nested tree it declares whose directory string
+ * decodes strictly beneath it. Other problems of a declaration make the
+ * acquisition invalid; they do not reopen the tree to interpretation.
+ */
+export function prunedDirectories(module: Pick<InventoryModule, 'directory' | 'description'>): string[] {
+  const directories = [scratchDirectory(module.directory)];
+  if (module.description.status !== 'valid') return directories;
+  for (const statement of module.description.document.statements) {
+    if (!('directory' in statement)) continue;
+    const decoded = decodeNestedTree(module.directory, statement.directory.value);
+    if (!decoded.problem && decoded.directory !== null) directories.push(decoded.directory);
+  }
+  return directories;
 }
 
 interface OwnershipIndex {

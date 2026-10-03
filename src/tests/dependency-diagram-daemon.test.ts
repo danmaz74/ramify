@@ -20,6 +20,15 @@ const classifierModule = /\/subs\/analysis\/subs\/typescript\/src\/behavior-clas
 const analyzerEntry = /\/dist\/src\/dependency-analyzer-entry\.js$/;
 
 /** A copy of the toolkit's analyzed inputs, so the test edits no file of this checkout. */
+/**
+ * The root description's owned-ignored trees that a copy leaves out are
+ * recreated empty: each must exist as a real directory, and nothing beneath
+ * one is ever read, so an empty directory is an equivalent input.
+ */
+async function restoreOwnedIgnored(root: string): Promise<void> {
+  const description = await readFile(join(root, 'module.ramify'), 'utf8');
+  for (const [, directory] of description.matchAll(/^owned-ignored "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
+}
 async function copyToolkit(): Promise<string> {
   const target = await realpath(await mkdtemp('/tmp/rd24-'));
   const { stdout } = await promisify(execFile)('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'src', 'subs',
@@ -28,6 +37,7 @@ async function copyToolkit(): Promise<string> {
     await mkdir(dirname(join(target, file)), { recursive: true });
     await copyFile(join(repositoryRoot, file), join(target, file));
   }
+  await restoreOwnedIgnored(target);
   await symlink(await realpath(join(repositoryRoot, 'node_modules')), join(target, 'node_modules'));
   return target;
 }

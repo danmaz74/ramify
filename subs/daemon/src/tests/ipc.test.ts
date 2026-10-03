@@ -442,7 +442,7 @@ import { createMeasureDriver } from './measure-driver.js';
         if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/2',
           inputId: 'input/1:scripted', paths: [], changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure',
           widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json',
-            walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
+            walkedAreas: [], ownership: { modules: [], exclusions: [] } }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
         signals.push(control!.signal!);
         return new Promise(resolve => control!.signal!.addEventListener('abort', () => resolve({ status: 'cancelled' }), { once: true }));
       },

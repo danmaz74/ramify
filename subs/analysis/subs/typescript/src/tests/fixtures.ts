@@ -112,7 +112,7 @@ export async function acquire(root: string): Promise<ProjectInputView> {
   const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
   const inventory: ProjectInventory = {
     scope: { root, selection: 'given', invokedFrom: root, configuration: join(root, 'tsconfig.json'),
-      walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)), independentScopes: [], ownership: { modules: [], exclusions: [] } },
+      walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)), ownership: { modules: [], exclusions: [] } },
     modules, references: [], outsideModuleFiles: [], warnings: [],
     files: [...files].flatMap(([path, content]) => {
       const local = relative(root, path);

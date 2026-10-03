@@ -277,7 +277,7 @@ export function scriptedSelection(inputId: string, modules: readonly string[]): 
   const changed = modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` }));
   return { schemaVersion: 'ramify.affected/2', inputId, paths: [], changedModules: changed, affectedModules: [], testModules: changed,
     selection: 'dependency-closure', widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture',
-      configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } },
+      configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
     coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' };
 }
 export async function flush(): Promise<void> { for (let index = 0; index < 80; index++) await Promise.resolve(); }

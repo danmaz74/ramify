@@ -216,7 +216,7 @@ describe('ramify.ipc/2: the strict context-status scope carries its ownership ta
       { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'app/a' }],
   };
   const scope = { root: '/project', selection: 'given', invokedFrom: '/project', configuration: '/project/tsconfig.json',
-    walkedAreas: ['src', 'src/tests'], independentScopes: [], ownership };
+    walkedAreas: ['src', 'src/tests'], ownership };
   const status = (value: unknown) => ({ token, selection: { root: '/project', scope: 'whole-project', configuration: 'discover',
     setup: { registry: 'registry', capabilities: [] } }, scope: value, state: 'warm', synchronization: 'synchronized', published: null,
   lastValid: null, pending: { requests: 0, changedPaths: 0, analysisRunning: false }, history: { retained: 0, bytes: 0, oldest: null },

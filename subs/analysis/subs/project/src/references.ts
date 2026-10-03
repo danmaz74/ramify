@@ -1,8 +1,12 @@
-import { basename, join, posix } from 'node:path';
+import { basename, join, posix, relative } from 'node:path';
 import { Capture } from './capture.js';
+import { prunedDirectories } from './ownership.js';
 import type { ExactReference, InventoryModule, ProjectIssue } from './interfaces/project.js';
 
 export async function exactReferences(capture: Capture, modules: readonly InventoryModule[], owned: ReadonlySet<string>, issues: ProjectIssue[], references: ExactReference[]): Promise<void> {
+  // A reference into a scratch directory or a declared nested tree stops at
+  // that boundary: its target is excluded, and nothing beneath it is listed.
+  const pruned = new Set(modules.flatMap(module => prunedDirectories(module)));
   for (const module of modules) {
     if (module.description.status !== 'valid') continue;
     for (const statement of module.description.document.statements) {
@@ -25,6 +29,7 @@ export async function exactReferences(capture: Capture, modules: readonly Invent
             status = entries.some(entry => basename(entry).toLowerCase() === segment.toLowerCase()) ? 'case-mismatch' : 'missing'; break;
           }
           directory = join(directory, segment);
+          if (pruned.has(relative(capture.root, directory))) { status = 'excluded'; break; }
           const kind = await capture.kind(directory);
           if (kind === 'symlink') { status = 'symlink'; break; }
           if (index === segments.length - 1) status = kind === 'directory' ? 'directory' : kind === 'file' ? 'file' : 'missing';

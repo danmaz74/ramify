@@ -1,14 +1,16 @@
 # Directory Structure And Module Description Specification
 
 **Status:** Active specification. Whole-tree ownership and declared nested-tree
-boundaries were adopted on 2026-10-01 and are not yet implemented. Their
-concrete statement syntax and declaration validation were specified on
-2026-10-03; the parser accepts the statement syntax, and declaration
-validation remains pending. The root marker on the module line and its
-validity rules were specified on 2026-10-03; the parser accepts the marker,
-the root is selected by it and discovery enforces its validity, except that a
-marked description inside a declared nested tree is not yet excluded.
-The implementation plan schedules that work. The exposure grammar below is unchanged.
+boundaries were adopted on 2026-10-01. Their concrete statement syntax and
+declaration validation were specified on 2026-10-03; the parser accepts the
+statement syntax, and discovery validates each declaration and prunes declared
+trees and module scratch directories before descent. The root marker on the
+module line and its validity rules were specified on 2026-10-03; the parser
+accepts the marker, the root is selected by it and discovery enforces its
+validity, never reading a marked description inside a declared nested tree.
+Analysis of auxiliary source, the compiler-selection warnings and the import
+rule for declared trees are not yet implemented; the implementation plan
+schedules that work. The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -155,7 +157,9 @@ to escape its checked boundary.
 
 ### Declared Nested Trees Bound Interpretation
 
-The following semantics are adopted and not yet implemented.
+Discovery implements the declaration, validation and pruning rules of this
+section. The warning about compiler-selected source in an owned-ignored tree
+is adopted and not yet implemented.
 
 A module declares each nested tree in its own description, using a directory
 relative to the module and one of two kinds: `owned-ignored` or `external`.
@@ -1080,11 +1084,12 @@ diagnostics for TypeScript source forms separately from the `module.ramify`
 parser. Analysis limits in a completed source check are nonblocking by default;
 invalid descriptions or registries still fail model validation.
 
-The adopted whole-tree ownership, auxiliary-source and nested-tree rules are
-not yet implemented; only the nested-tree statement syntax is parsed. The root
-marker, specified on 2026-10-03, is parsed, selects the root and is enforced in
-discovery; a marked description inside a declared nested tree is not yet
-excluded from it.
+Discovery implements the nested-tree declarations, their validation and the
+pruning of declared trees and module scratch directories; the adopted
+auxiliary-source rules and the rest of whole-tree ownership are not yet
+implemented. The root marker, specified on 2026-10-03, is parsed, selects the
+root and is enforced in discovery; a marked description inside a declared
+nested tree is never read.
 Specification adoption does not establish parser or checker support.
 
 Tooling must identify the version 1 features it implements and report missing

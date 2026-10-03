@@ -13,7 +13,7 @@ const selection = (inputId: string, modules: readonly string[]): AffectedSelecti
   changedModules: modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` })), affectedModules: [],
   testModules: modules.map(id => ({ id, directory: id === 'fixture' ? '.' : `subs/${id}` })),
   selection: 'dependency-closure', widening: [],
-  scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } },
+  scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
   coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
 });
 const cooling = { warmIdleMs: 100, coldRetainMs: 200, sweepIntervalMs: 1_000 };

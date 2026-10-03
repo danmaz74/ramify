@@ -246,17 +246,17 @@ exposed to both destinations counts once in each destination row and once in
 repository interface use = selected exposed owned originals / exposed owned originals
 ```
 
-The label is `repository interface use`, never unused API. Independent compiler
-scopes (`ProjectScope.independentScopes`) are recorded as `omittedScopes` in
-provenance; their absence from the graph is not zero use.
+The label is `repository interface use`, never unused API. The declared
+nested-tree directories, owned-ignored and external, are recorded as
+`omittedScopes` in provenance, in byte order; consumers inside them are absent
+from the graph, so their absence is not zero use. Module scratch directories
+and other always-excluded paths are not listed.
 
-When project boundaries are implemented, inferred independent compiler scopes
-no longer exist: `omittedScopes` records the declared nested-tree directories
-instead, and owned compiler source outside `src/`, including scripts and
-probes, is analyzed as its owner's auxiliary source rather than counted as an
-`outside-project` target. The report's schema version advances with that
-shape change. Renaming the `outside-module` target kind to `outside-project`
-left the report's shape unchanged.
+When auxiliary source is analyzed, owned compiler source outside `src/`,
+including scripts and probes, is analyzed as its owner's auxiliary source
+rather than counted as an `outside-project` target. Renaming the
+`outside-module` target kind to `outside-project` left the report's shape
+unchanged.
 
 Under candidate ownership, declarations are unchanged, so interface use is
 `unavailable` with reason `candidate-exposure`. Compare candidates with
@@ -517,9 +517,12 @@ results and ownership of the report.
 
 ### Whole projection
 
-The report schema is `ramify.modularity/2`; version 2 added the required
+The report schema is `ramify.modularity/3`; version 3 records the declared
+nested-tree directories as `omittedScopes`, where version 2 recorded inferred
+independent compiler scopes, and version 2 added the required
 `ModularityView.dependencyDiagram`. Documents recorded under
-`ramify.modularity/1` remain historical evidence and are not rewritten.
+`ramify.modularity/1` and `ramify.modularity/2` remain historical evidence and
+are not rewritten.
 
 `projectModularity` returns `unavailable` with reason `analysis-incomplete`
 unless `report.outcome.execution` is `completed` and `inputId`, `registry`,
@@ -709,7 +712,7 @@ Candidate modules may own no files; they then appear only in `modules`.
 `RevisionId`, or `batch:<inputId>` for a disposable batch analysis.
 `ModularityProvenance` records it with the analysis schema, `inputId`, registry
 id, check and coverage outcomes, the requested-and-executed capabilities, the
-omitted independent scopes and the ownership mode and candidate id. The
+omitted declared nested trees and the ownership mode and candidate id. The
 analysis `runId` is excluded because it is random.
 
 Git-derived facts carry `ChangeHistoryProvenance` in their own report. The

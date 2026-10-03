@@ -1,5 +1,5 @@
 import { readSync, writeSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { basename } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { FRAME_BYTES, CHUNK_BYTES } from './configuration-data.js';
 import type { ConfigurationData } from './configuration-data.js';
@@ -90,8 +90,6 @@ try {
   }) : [];
   const result: ConfigurationData = {
     options: parsed.options, files: parsed.fileNames, references,
-    exclusions: [...configurations].flatMap(([path, doc]) => Array.isArray(doc.exclude)
-      ? [{ directory: dirname(path), patterns: doc.exclude.filter((value): value is string => typeof value === 'string') }] : []),
   };
   api.close();
   const bytes = Buffer.from(JSON.stringify(result));

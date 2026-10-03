@@ -32,3 +32,8 @@ expose-src AppRouter, assembleRouter, ProtocolRouter from "interfaces/protocol.t
 // seeing the router type, the testing module included, also sees the types
 // that describe it.
 expose-sub CatalogProcedures, ReviewsProcedures, RecordId, recordIdSchema, revisionScopeSchema, ReviewStatus, reviewStatusSchema, Finding, findingSchema, Observation, observationSchema from workspace to descendants
+
+// The work directory the toolkit's reference harness writes into this project:
+// copies of projects, each with its own root. Discovery never enters it, and
+// it may be absent.
+external ".reference-work"

@@ -44,7 +44,7 @@ describe('modularity projection: declared ownership', () => {
   const test = view(report, 'test');
 
   it('records provenance, the ownership tree and views in contract order', () => {
-    expect(report.schemaVersion).toBe('ramify.modularity/2');
+    expect(report.schemaVersion).toBe('ramify.modularity/3');
     expect(report.provenance).toEqual({
       revision: 'batch:input-1', analysisSchema: 'ramify.analysis/2', inputId: 'input-1',
       registryId: buildReport(graphSpec).registry!.id, check: 'passed', analysisCoverage: 'complete',
@@ -375,7 +375,9 @@ describe('modularity projection: availability and determinism', () => {
   });
 
   it('produces byte-identical JSON independent of input order and run identity', () => {
-    const spec: FixtureSpec = { ...graphSpec, independentScopes: ['site', 'examples/app'],
+    // Declared nested trees are the omitted scopes; a module scratch directory is not one.
+    const spec: FixtureSpec = { ...graphSpec, exclusions: [{ kind: 'external', directory: 'examples/app', owner: null },
+      { kind: 'owned-ignored', directory: 'site', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' }],
       behavior: { facts: [{ consumer: paths.main, file: paths.model, binding: 'makeModel', classification: 'behavioral' }] } };
     const forward = buildReport(spec);
     const reversed = buildReport({ ...spec, modules: [...spec.modules].reverse(), files: [...spec.files].reverse(),

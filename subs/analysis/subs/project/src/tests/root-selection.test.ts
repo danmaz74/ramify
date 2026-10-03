@@ -33,15 +33,19 @@ const views: { dispose(): Promise<void> }[] = [];
 /**
  * `app` of the written topology: marked; `a`, `grand` and `b` unmarked;
  * `subs/a/fixtures/sample` and `fixture-project` marked projects with their
- * own configurations, which `app`'s configuration does not select.
+ * own configurations, which `app`'s configuration does not select, declared
+ * owned-ignored by `a` and by `app`, which also declares the absent
+ * `external-project`.
  */
+const appText = 'ramify 1\nroot module app tagged [dispatch]\nowned-ignored "fixture-project"\nexternal "external-project"\n';
+const aText = 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n';
 async function topology(): Promise<void> {
-  await put(app, 'module.ramify', 'ramify 1\nroot module app tagged [dispatch]\n');
+  await put(app, 'module.ramify', appText);
   await put(app, 'tsconfig.json', '{"compilerOptions":{"types":[],"module":"ESNext","moduleResolution":"bundler"},'
     + '"include":["src","scripts","subs/a/src","subs/a/subs/grand/src","subs/b/src"]}\n');
   await put(app, 'src/main.ts', 'export const main = 1;\n');
   await put(app, 'scripts/check.ts', 'export {};\n');
-  await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\n');
+  await put(app, 'subs/a/module.ramify', aText);
   await put(app, 'subs/a/src/api.ts', 'export function api(): number { return 1; }\n');
   await put(app, 'subs/a/subs/grand/module.ramify', 'ramify 1\nmodule grand\n');
   await put(app, 'subs/a/subs/grand/src/grand.ts', 'export {};\n');
@@ -120,8 +124,13 @@ describe('PB1-42: selection by the root marker', () => {
     // The invalid root contributes no module, so its children are unattributed as before; no selection issue arises.
     expect(result).toMatchObject({ status: 'invalid', inventory: { scope: { root: app, selection: 'found' } } });
     if (result.status !== 'invalid') return;
-    expect(result.issues[0]).toEqual({ code: 'invalid-description', path: 'module.ramify', message: '3:1: unknown-statement: Unknown statement not. [43,46)' });
-    expect(result.issues.slice(1).map(item => item.code)).toEqual(['stray-description', 'stray-description', 'stray-description']);
+    expect(result.issues.filter(item => item.path === 'module.ramify'))
+      .toEqual([{ code: 'invalid-description', path: 'module.ramify', message: '3:1: unknown-statement: Unknown statement not. [43,46)' }]);
+    // An invalid root declares no nested tree, so discovery enters both marked projects and reports them.
+    expect(result.issues.map(item => [item.code, item.path])).toEqual([
+      ['undeclared-project-boundary', 'fixture-project/module.ramify'], ['invalid-description', 'module.ramify'],
+      ['undeclared-project-boundary', 'subs/a/fixtures/sample/module.ramify'], ['stray-description', 'subs/a/module.ramify'],
+      ['stray-description', 'subs/a/subs/grand/module.ramify'], ['stray-description', 'subs/b/module.ramify']]);
   });
 
   it('decides the marker from the decodable lines: an encoding error after the module line keeps it, one before removes it', async () => {
@@ -130,8 +139,8 @@ describe('PB1-42: selection by the root marker', () => {
     expect(await resolve(join(app, 'subs/a/src'))).toMatchObject({ status: 'resolved', root: app });
     const encoded = await read(join(app, 'subs/a/src'));
     expect(encoded).toMatchObject({ status: 'invalid', inventory: { scope: { root: app, selection: 'found' } } });
-    if (encoded.status === 'invalid') expect(encoded.issues[0]).toEqual({ code: 'invalid-description', path: 'module.ramify',
-      message: '1:1: invalid-encoding: Description is not valid UTF-8' });
+    if (encoded.status === 'invalid') expect(encoded.issues.filter(item => item.path === 'module.ramify')).toEqual([{ code: 'invalid-description',
+      path: 'module.ramify', message: '1:1: invalid-encoding: Description is not valid UTF-8' }]);
     if (encoded.status === 'invalid') expect(encoded.issues.some(item => item.code === 'unmarked-root-description')).toBe(false);
     await put(app, 'module.ramify', Buffer.concat([Buffer.from([0xff, 0x0a]), header]));
     expect(await resolve(join(app, 'subs/a/src'))).toEqual({ status: 'unavailable', issues: [{ code: 'root-not-found',
@@ -212,7 +221,7 @@ describe('PB1-42: selection by the root marker', () => {
 });
 
 describe('PB1-43: root-marker validity in acquisition', () => {
-  it('acquires the marked root with unmarked children, each description as parsed, leaving inferred independent scopes unread', async () => {
+  it('acquires the marked root with unmarked children, each description as parsed, leaving the declared projects unread', async () => {
     const result = await read(app, app);
     const acquired = inventory(result);
     expect(result.status).toBe('acquired');
@@ -220,11 +229,16 @@ describe('PB1-43: root-marker validity in acquisition', () => {
       .toEqual([['app', '.'], ['app/a', 'subs/a'], ['app/a/grand', 'subs/a/subs/grand'], ['app/b', 'subs/b']]);
     for (const module of acquired.modules) {
       const path = module.directory === '.' ? 'module.ramify' : `${module.directory}/module.ramify`;
-      const text = module.directory === '.' ? 'ramify 1\nroot module app tagged [dispatch]\n' : `ramify 1\nmodule ${module.name}\n`;
+      const text = module.directory === '.' ? appText : module.directory === 'subs/a' ? aText : `ramify 1\nmodule ${module.name}\n`;
       expect(module.description).toEqual(parse(path, text));
     }
-    // Until iteration 8, a directory with its own unselected configuration is still skipped, so its marked root is never read.
-    expect(acquired.scope.independentScopes).toEqual(['fixture-project', 'subs/a/fixtures/sample']);
+    // The declared trees are pruned before descent, so their marked roots are never read; the absent external tree is valid.
+    expect(acquired.scope.ownership.exclusions.filter(item => item.kind === 'owned-ignored' || item.kind === 'external')).toEqual([
+      { kind: 'external', directory: 'external-project', owner: null },
+      { kind: 'owned-ignored', directory: 'fixture-project', owner: 'app' },
+      { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'app/a' }]);
+    if (result.status === 'acquired') expect(result.view.inputs.filter(input => input.path.startsWith('fixture-project/')
+      || input.path.startsWith('subs/a/fixtures/sample/'))).toEqual([]);
     if (result.status === 'acquired') expect(result.view.inputs.filter(input => input.role === 'description').map(input => input.path))
       .toEqual(['module.ramify', 'subs/a/module.ramify', 'subs/a/subs/grand/module.ramify', 'subs/b/module.ramify']);
   });
@@ -277,10 +291,15 @@ describe('PB1-43: root-marker validity in acquisition', () => {
     expect(inventory(result).files.some(file => file.path.startsWith('subs/a/src/vendor/'))).toBe(false);
   });
 
-  it('interprets a marked description in a declared tree without its own configuration, which iteration 8 will prune', async () => {
-    // Declarations are parsed but not yet enforced: the sample, no longer an inferred independent scope, is walked.
-    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\nowned-ignored "fixtures/sample"\n');
+  it('never reads a marked description in a declared tree, and reports it once its declaration is removed, configuration or not', async () => {
+    // Declared, the sample is pruned whether or not it has its own configuration.
     await unlink(join(app, 'subs/a/fixtures/sample/tsconfig.json'));
+    const declared = await read(app, app);
+    expect(declared.status).toBe('acquired');
+    if (declared.status === 'acquired') expect(declared.view.inputs.some(input => input.path.startsWith('subs/a/fixtures/sample/'))).toBe(false);
+    // Undeclared, it is walked: a configuration of its own does not stop discovery, and its marked root is a layout error.
+    await put(app, 'subs/a/fixtures/sample/tsconfig.json', configuration);
+    await put(app, 'subs/a/module.ramify', 'ramify 1\nmodule a\n');
     const result = await read(app, app);
     expect(result).toMatchObject({ status: 'invalid', issues: [issue('undeclared-project-boundary')] });
     if (result.status === 'invalid') expect(result.issues.map(item => item.path)).toEqual(['subs/a/fixtures/sample/module.ramify']);

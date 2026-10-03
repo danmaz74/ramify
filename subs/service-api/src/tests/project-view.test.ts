@@ -51,13 +51,13 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
         maxFileBytes: 1000, maxInputBytes: 1000, maxApplicationBytes: 1000, maxOwners: 10, maxDepth: 10, deadlineMs: 1000 },
       source: { maxExports: 100, maxAccesses: 100, maxSelections: 100, maxForwardingDepth: 10, deadlineMs: 1000 },
       maxExposurePairs: 100, maxDiagnostics: 100, maxReportBytes: 32 * 1024 ** 2, disposeTimeoutMs: 1000, deadlineMs: 1000 } },
-    scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } },
+    scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
     registry, capabilities: [], stages: [{ stage: 'report', status: 'completed', blockedBy: [], diagnosticIds: [] }],
     outcome: { execution: 'completed', check: 'failed', coverage: 'partial' }, diagnostics: [], warnings: [], coverage: limits,
     summary: { complete: true, owners: 3, sourceFiles: 3, resources: 1, originals: 1, accesses: 8,
       allowed: 6, denied: 2, errors: 1, warnings: 0, coverageNotes: 3, external: 3 },
     snapshot: {
-      inventory: { scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [], ownership: { modules: [], exclusions: [] } },
+      inventory: { scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
         modules: [
           { id: 'fixture', name: 'fixture', parent: null, directory: '.', headerTags: [], areas: [{ owner: 'fixture', kind: 'ordinary', root: 'src', present: true }], purpose: { state: 'present', readme: 'README.md', paragraph: 'Root.' }, description: {} },
           { id: 'fixture/consumer', name: 'consumer', parent: 'fixture', directory: 'subs/consumer', headerTags: ['dispatch'], areas: [{ ...consumerArea, present: true }], purpose: { state: 'missing-file', readme: 'subs/consumer/README.md' }, description: {} },

@@ -280,6 +280,8 @@ const reference: readonly Fixture[] = [
     src(['AppRouter', 'assembleRouter', 'ProtocolRouter'], 'interfaces/protocol.ts', null, descendants), // R3
     sub(['CatalogProcedures', 'ReviewsProcedures', 'RecordId', 'recordIdSchema', 'revisionScopeSchema', 'ReviewStatus',
       'reviewStatusSchema', 'Finding', 'findingSchema', 'Observation', 'observationSchema'], 'workspace', descendants), // R4
+    // The reference harness's work directory inside the example, declared external (iteration 8A).
+    tree('external', '.reference-work'),
   ] },
   { path: 'subs/integration-tests/', name: 'integration-tests', tags: ['testing', 'dispatch'], statements: [] },
   { path: workspace, name: 'workspace', tags: ['ui', 'browser', 'dispatch'], statements: [

@@ -12,7 +12,6 @@ export interface ProjectScope {
   readonly invokedFrom: string;
   readonly configuration: string;
   readonly walkedAreas: readonly string[];
-  readonly independentScopes: readonly string[];
   /** The revision's containment and exclusion facts; `classifyProjectPath` reads them. */
   readonly ownership: ProjectOwnership;
 }
@@ -120,12 +119,13 @@ export interface ProjectIssue {
   readonly code: 'root-not-found' | 'missing-root-description' | 'unmarked-root-description'
     | 'configuration-not-found' | 'references-only-configuration' | 'invalid-layout'
     | 'invalid-description' | 'duplicate-name' | 'description-in-src' | 'stray-description'
-    | 'reserved-container' | 'undeclared-project-boundary' | 'symlink-root' | 'symlink-description'
+    | 'reserved-container' | 'undeclared-project-boundary' | 'invalid-nested-tree' | 'missing-owned-ignored'
+    | 'overlapping-nested-tree' | 'symlink-root' | 'symlink-description'
     | 'symlink-reference' | 'case-mismatch' | 'missing-file' | 'invalid-path'
     | 'resource-limit' | 'read-failure' | 'changed-input';
   readonly path: string;
   readonly message: string;
-  /** The located evidence within `path`, when the issue has one, such as a root marker. */
+  /** The located evidence within `path`, when the issue has one, such as a root marker or a declared directory. */
   readonly span?: TextSpan;
 }
 export interface AcquisitionLimits {

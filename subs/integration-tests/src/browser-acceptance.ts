@@ -50,11 +50,21 @@ async function copyTree(from: string, to: string, excluded: ReadonlySet<string>)
   }
 }
 
+/**
+ * The root description's owned-ignored trees that a copy leaves out are
+ * recreated empty: each must exist as a real directory, and nothing beneath
+ * one is ever read, so an empty directory is an equivalent input.
+ */
+async function restoreOwnedIgnored(root: string): Promise<void> {
+  const description = await readFile(join(root, 'module.ramify'), 'utf8');
+  for (const [, directory] of description.matchAll(/^owned-ignored "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
+}
 async function isolatedProject(kind: 'reference' | 'toolkit', scratch: string): Promise<{ root: string; dispose(): Promise<void> }> {
   const root = await mkdtemp(join(scratch, `${kind}-`));
   const source = kind === 'reference' ? join(packageRoot, 'examples/collection-review') : packageRoot;
   await copyTree(source, root, kind === 'reference'
     ? new Set(['node_modules', 'dist', '.reference-work', '.git', '.vite']) : ignored);
+  await restoreOwnedIgnored(root);
   await symlink(join(source, 'node_modules'), join(root, 'node_modules'));
   return { root: await realpath(root), dispose: () => rm(root, { recursive: true, force: true }) };
 }

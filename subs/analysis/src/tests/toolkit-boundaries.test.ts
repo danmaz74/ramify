@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { acquireInventory } from '../inventory-entry.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
 import { classifyProjectPath } from '../../subs/project/src/ownership.js';
+import type { InventorySnapshot } from '../interfaces/analysis.js';
 import type { PathOwnership, ProjectExclusion, ProjectScope } from '../../subs/project/src/interfaces/project.js';
 
 // The toolkit's own committed root description, acquired as the self-check
 // acquires it. Expectations are the nested trees the user decided on
-// 2026-10-03, not acquisition output. Discovery does not prune declared trees
-// before iteration 8, so this verifies their entry into the ownership table.
+// 2026-10-03, not acquisition output: their entry into the ownership table
+// and, from iteration 8, their pruning before descent (PB1-32 for the harness).
 const root = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/$/, '');
 const ownedIgnored = ['docs', 'examples/collection-review', 'scripts/probes/fixtures/compiler-api',
   'scripts/probes/fixtures/plan2a-symbol-details', 'scripts/reference-harness', 'site'];
@@ -24,12 +25,15 @@ const externalBy = (directory: string): PathOwnership =>
 const rootOwned: PathOwnership = { status: 'owned', module: 'ramify', directory: '.', exclusion: null };
 
 async function toolkitScope(): Promise<ProjectScope> {
+  return (await toolkitInventory()).inventory.scope;
+}
+async function toolkitInventory(): Promise<InventorySnapshot> {
   const result = await acquireInventory({ project: { cwd: root, root, scope: 'whole-project', configuration: 'discover' },
     registry: createDefaultTagRegistry(), limits: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
       maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2, maxApplicationBytes: 64 * 1024 ** 2,
       maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 } });
   if (result.status !== 'completed') throw new Error(JSON.stringify(result));
-  return result.snapshot.inventory.scope;
+  return result.snapshot;
 }
 
 describe('the toolkit root description declares its nested trees', () => {
@@ -87,5 +91,24 @@ describe('the toolkit root description declares its nested trees', () => {
       ['dist/src/cli-entry.js', { status: 'excluded', module: null, exclusion: { kind: 'output', directory: 'dist', owner: null } }],
     ];
     for (const [path, expected] of seeds) expect(classifyProjectPath(scope, path), path).toEqual(expected);
+  });
+
+  it('prunes every declared tree before descent: no file, warning, description or input beneath any of them', async () => {
+    const { inventory, inputs } = await toolkitInventory();
+    // The scope carries the ownership table and no inferred independent scopes.
+    expect(Object.keys(inventory.scope).sort()).toEqual(['configuration', 'invokedFrom', 'ownership', 'root', 'selection', 'walkedAreas']);
+    for (const directory of [...ownedIgnored, ...external]) {
+      const inside = (path: string): boolean => path.startsWith(`${directory}/`);
+      expect(inventory.files.filter(file => inside(file.path)), directory).toEqual([]);
+      expect(inventory.outsideModuleFiles.filter(inside), directory).toEqual([]);
+      expect(inventory.warnings.filter(warning => warning.files.some(inside)), directory).toEqual([]);
+      expect(inventory.modules.filter(module => inside(module.directory)), directory).toEqual([]);
+      // At most the tree's own directory is observed, as boundary evidence; nothing beneath it is.
+      expect(inputs.filter(input => inside(input.path)).map(input => input.path), directory).toEqual([]);
+    }
+    // The reference harness tree in particular (PB1-32), and the agent harness's unmarked roots, are never read.
+    expect(inputs.some(input => input.path === 'scripts/reference-harness' && input.role === 'directory')).toBe(true);
+    expect(inputs.filter(input => input.role === 'description').map(input => input.path)
+      .filter(path => path.startsWith('ramify-agent/') || path.startsWith('scripts/reference-harness/'))).toEqual([]);
   });
 });

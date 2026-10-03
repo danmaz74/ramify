@@ -42,7 +42,7 @@ describe('project-root resolution on open', () => {
     try {
       const first = capture(1);
       const scope = { root: '/fixture', selection: 'given' as const, invokedFrom: '/fixture',
-        configuration: 'tsconfig.json', walkedAreas: ['src'], independentScopes: [], ownership: { modules: [], exclusions: [] } };
+        configuration: 'tsconfig.json', walkedAreas: ['src'], ownership: { modules: [], exclusions: [] } };
       e.script.pending.push(() => ({ ...first, report: { ...first.report, scope } }));
       const given = await e.open('/fixture', 'given'); await flush();
       // The second lease finds the same root by climbing from a subdirectory: one context, two invocations.

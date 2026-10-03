@@ -3,7 +3,8 @@ import { Capture } from './capture.js';
 import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { descriptionMarker } from './marker.js';
-import { buildProjectOwnership, reservedSegmentKind } from './ownership.js';
+import { nestedTreeIssues } from './nested-trees.js';
+import { buildProjectOwnership, prunedDirectories, reservedSegmentKind } from './ownership.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import { unmarkedRoot } from './selection.js';
@@ -24,24 +25,24 @@ type InventoryRead = { inventory: ProjectInventory; issues: ProjectIssue[]; meta
 export function excludedDirectory(path: string, config: ConfigurationData): boolean {
   const reserved = reservedSegmentKind(basename(path));
   if (reserved === 'repository' || reserved === 'packages') return true;
-  if ([config.options.outDir, config.options.declarationDir]
-    .some(directory => typeof directory === 'string' && within(directory, path))) return true;
-  // Only generated scratch conventions use an explicit directory exclusion.
-  // An arbitrary excluded/unselected tests/ or tools/ directory still needs
-  // discovery: a marker there is a layout error regardless of source selection.
-  return basename(path) === '.reference-work' && config.exclusions.some(exclusion =>
-    exclusion.patterns.some(pattern => pattern === '**/.reference-work'
-      || join(exclusion.directory, pattern) === path));
+  // Compiler exclusion never removes a directory from discovery: an excluded
+  // or unselected tests/ or tools/ directory is still walked, and only declared
+  // nested trees and module scratch directories are pruned beyond these.
+  return [config.options.outDir, config.options.declarationDir]
+    .some(directory => typeof directory === 'string' && within(directory, path));
+}
+/** The configuration's output directories, project-relative and normalized. */
+function outputDirectories(root: string, config: ConfigurationData): string[] {
+  return [config.options.outDir, config.options.declarationDir]
+    .filter((directory): directory is string => typeof directory === 'string')
+    .map(directory => relative(root, resolve(root, directory)).split(sep).join('/') || '.');
 }
 /**
  * The scope's ownership table for these modules: their declarations, scratch
  * directories and the configuration's output directories. Reads nothing.
  */
 export function scopeOwnership(root: string, modules: readonly InventoryModule[], config: ConfigurationData): ProjectOwnership {
-  const outputs = [config.options.outDir, config.options.declarationDir]
-    .filter((directory): directory is string => typeof directory === 'string')
-    .map(directory => relative(root, resolve(root, directory)).split(sep).join('/') || '.');
-  return buildProjectOwnership(modules, outputs).ownership;
+  return buildProjectOwnership(modules, outputDirectories(root, config)).ownership;
 }
 /** One warning per first path entry, in byte order, for outside selected source. */
 export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): readonly OutsideSourceWarning[] {
@@ -57,15 +58,20 @@ export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): re
  * A marked description other than the root's: located at its marker, naming
  * the nested-tree declaration its nearest enclosing module would add.
  */
-function undeclaredBoundary(root: string, path: string, directory: string, marker: TextSpan, enclosing: InventoryModule | null): ProjectIssue {
+function undeclaredBoundary(root: string, path: string, directory: string, marker: TextSpan | null, enclosing: InventoryModule | null): ProjectIssue {
   const owner = join(root, enclosing?.directory ?? '.');
   const declared = JSON.stringify(relative(owner, directory).split(sep).join('/'));
   const kinds = within(join(owner, 'src'), directory) ? `owned-ignored ${declared}` : `owned-ignored ${declared} or external ${declared}`;
   const description = enclosing ? join(enclosing.directory, 'module.ramify') : 'its nearest enclosing module description';
-  return { code: 'undeclared-project-boundary', path, span: marker,
-    message: `Invalid module boundary: undeclared-project-boundary at ${marker.line}:${marker.column}: a marked project root must lie in a declared nested tree; declare ${kinds} in ${description}` };
+  const declare = `declare ${kinds} in ${description}`;
+  return marker
+    ? { code: 'undeclared-project-boundary', path, span: marker,
+      message: `Invalid module boundary: undeclared-project-boundary at ${marker.line}:${marker.column}: a marked project root must lie in a declared nested tree; ${declare}` }
+    // A package manifest outside a module's own directory marks another project or package.
+    : { code: 'undeclared-project-boundary', path,
+      message: `Invalid module boundary: undeclared-project-boundary: a directory with a package manifest must be a module's own directory or lie in a declared nested tree; ${declare}` };
 }
-export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'independentScopes' | 'ownership'>,
+export async function inventoryProject(capture: Capture, scope: Omit<ProjectScope, 'walkedAreas' | 'ownership'>,
   config: ConfigurationData, parse: DescriptionParser, read: RootMarkerReader, previousMetadata?: Metadata): Promise<InventoryRead> {
   const metadata: Metadata = {};
   let metadataReused = true;
@@ -81,8 +87,10 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   const modules: InventoryModule[] = [], files: InventoryFile[] = [], issues: ProjectIssue[] = [];
   const references: ExactReference[] = [];
   let outsideModuleFiles: string[] = [];
-  const independentScopes: string[] = [];
   const excludedRoots: string[] = [];
+  // Scratch directories and declared nested trees of the modules found so far,
+  // absolute: discovery never descends into them, so nothing beneath is read.
+  const pruned = new Set<string>();
   const queue: Walk[] = [{ directory: capture.root, boundary: null }];
   const names = new Map<string, InventoryModule>();
   // Generated output is isolated before any compiler selection can admit it,
@@ -92,7 +100,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   function snapshot(): ProjectInventory {
     return freeze({
       scope: { ...scope, walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
-        independentScopes: independentScopes.sort(byteOrder), ownership: scopeOwnership(capture.root, modules, config) },
+        ownership: scopeOwnership(capture.root, modules, config) },
       modules: modules.sort((a, b) => byteOrder(a.directory, b.directory)),
       files: files.sort((a, b) => byteOrder(a.path, b.path)), references, outsideModuleFiles,
       warnings: outsideSourceWarnings(outsideModuleFiles),
@@ -169,10 +177,17 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
               }
             } else names.set(id, module);
             modules.push(module);
+            for (const excluded of prunedDirectories(module)) pruned.add(join(capture.root, excluded));
             boundary = { directory, module, enclosing: module, depth: (boundary?.depth ?? -1) + 1 };
             await capture.readFile(join(directory, 'package.json'), 'dependency');
           }
         }
+      } else if (entries.includes(join(directory, 'package.json'))) {
+        // An undeclared directory with a package manifest is another project's
+        // or package's root: a layout error whose contents no module receives.
+        const enclosing = boundary?.enclosing ?? null;
+        issues.push(undeclaredBoundary(capture.root, relative(capture.root, join(directory, 'package.json')), directory, null, enclosing));
+        boundary = { directory, module: null, enclosing, depth: (boundary?.depth ?? -1) + 1 };
       }
       for (const path of entries) {
         // Isolate the reserved `.ramify` catalog and its transient stage/
@@ -181,14 +196,11 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
         if (isRamifyGeneratedPath(basename(path))) continue;
         const kind = await capture.kind(path);
         if (kind === 'directory') {
-          const ownSource = boundary && within(join(boundary.directory, 'src'), path);
-          const childContainer = boundary && within(join(boundary.directory, 'subs'), path);
           if (excludedDirectory(path, config)) { excludedRoots.push(path); continue; }
-          // Independent configurations only end a non-src/non-subs branch. An
-          // owner's own tsconfig never excludes that owner from its parent tree.
-          if (!ownSource && !childContainer && await capture.fileExists(join(path, 'tsconfig.json')) && !selected.some(file => within(path, file))) {
-            independentScopes.push(relative(capture.root, path)); continue;
-          }
+          // A declared nested tree or a scratch directory is observed as an
+          // entry of its parent, never entered: a description inside, marked
+          // or not, is not read. A nested configuration ends nothing.
+          if (pruned.has(path)) continue;
           queue.push({ directory: path, boundary });
         } else if (kind === 'file' && boundary?.module && within(join(boundary.directory, 'src'), path)) {
           if (basename(path) === 'module.ramify') continue;
@@ -204,6 +216,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
     modules.sort((a, b) => byteOrder(a.directory, b.directory));
     files.sort((a, b) => byteOrder(a.path, b.path));
     const owned = new Set(files.map(file => file.path));
+    issues.push(...await nestedTreeIssues(capture, modules, buildProjectOwnership(modules, outputDirectories(capture.root, config)).declarations));
     await exactReferences(capture, modules, owned, issues, references);
     outsideModuleFiles = [...new Set(selected.filter(path => !excludedRoots.some(root => within(root, path)))
       .map(path => relative(capture.root, path)))].filter(path => !owned.has(path) && basename(path) !== 'module.ramify').sort(byteOrder);

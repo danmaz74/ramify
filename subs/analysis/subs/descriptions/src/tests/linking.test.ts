@@ -25,7 +25,7 @@ function fixture(child: string, root = 'expose-sub * from child to descendants',
   if (area.status !== 'valid') throw new Error('Fixture area invalid');
   const id: OriginalId = { kind: 'code', owner: 'fixture/child', file: 'interfaces/api.ts', binding: 'value' };
   const location = { file, start: 13, end: 18, line: 1, column: 14 };
-  return { registry, inventory: { scope: { root: '/fixture', invokedFrom: '/fixture', selection: 'given', configuration: 'tsconfig.json', walkedAreas: ['src', 'subs/child/src'], independentScopes: [], ownership: { modules: [], exclusions: [] } },
+  return { registry, inventory: { scope: { root: '/fixture', invokedFrom: '/fixture', selection: 'given', configuration: 'tsconfig.json', walkedAreas: ['src', 'subs/child/src'], ownership: { modules: [], exclusions: [] } },
     modules, files: [{ path: file, owner: 'fixture/child', area: 'ordinary', kind: 'source', placement: 'src', sha256: 'fixture', bytes: 23 }],
     references: modules.flatMap(module => module.description.document.statements.filter((statement): statement is ExposureStatement => 'from' in statement && statement.kind !== 'expose-sub').map(statement => ({
       description: module.description.document.file, statement: statement.index, decoded: statement.from.value, normalized: file, status: 'file' as const, interfaceEligible: true,

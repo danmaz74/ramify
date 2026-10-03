@@ -154,7 +154,7 @@ function renderEvaluation(evaluation: ModularityEvaluation): string {
       ['Unattributed accesses', integer(modularity.coverage.detail.unattributedAccesses)],
       ['Unknown behavioral dependencies', integer(modularity.coverage.detail.unknownDependencies)],
       ['Capabilities', provenance.capabilities.map(code).join(', ')],
-      ['Omitted independent scopes (absent from repository measures)', provenance.omittedScopes.map(code).join(', ') || 'none'],
+      ['Omitted declared nested trees (absent from repository measures)', provenance.omittedScopes.map(code).join(', ') || 'none'],
       ['Ownership', provenance.ownership],
       ['Candidate id', provenance.candidateId === null ? 'none' : code(provenance.candidateId)],
       ['Modules in the tree', integer(modularity.modules.length)],
@@ -283,7 +283,7 @@ function renderEvaluation(evaluation: ModularityEvaluation): string {
     });
   section('## Repository interface use',
     'Selected exposed owned originals / exposed owned originals, by exposure destination and capability. This is repository-local use, not unused API:',
-    `omitted independent scopes (${provenance.omittedScopes.map(code).join(', ') || 'none'}) and external package consumers are absent.\n`,
+    `omitted declared nested trees (${provenance.omittedScopes.map(code).join(', ') || 'none'}) and external package consumers are absent.\n`,
     ...views.map(view => `### ${view.filter}\n\n` + table(['Owner', 'Parent: value', 'Parent: type-only', 'Descendants: value', 'Descendants: type-only', 'Any destination: any capability'],
       view.owners.map(owner => [code(owner.owner), useRow(owner, 'parent', 'value'), useRow(owner, 'parent', 'type-only'),
         useRow(owner, 'descendants', 'value'), useRow(owner, 'descendants', 'type-only'), useRow(owner, 'any', 'any')]), numeric(1, 5))));
@@ -445,7 +445,7 @@ function renderRanked(evaluation: ModularityEvaluation, view: ModularityView, tr
     })));
 
   parts.push(ranked('Exposed originals without repository selection', 'exposed owned originals not selected by another owner (any destination and capability)',
-    `Candidates for manual contract review, not deletion: omitted scopes (${evaluation.modularity.provenance.omittedScopes.map(code).join(', ') || 'none'}) and package consumers are absent.`,
+    `Candidates for manual contract review, not deletion: omitted declared nested trees (${evaluation.modularity.provenance.omittedScopes.map(code).join(', ') || 'none'}) and package consumers are absent.`,
     ['Owner', 'Unselected exposed originals', 'Repository interface use', 'Reading'],
     view.owners.map(owner => {
       const any = valueOf(owner.interfaceUse)?.rows.find(row => row.destination === 'any' && row.capability === 'any');

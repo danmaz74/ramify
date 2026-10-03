@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import type { NestedTreeStatement } from '../../../descriptions/src/interfaces/syntax.js';
 import type { AcquisitionLimits, ProjectReadOptions } from '../interfaces/project.js';
 
 export const limits: AcquisitionLimits = { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
@@ -39,6 +40,9 @@ export async function fixture(root: string): Promise<void> {
 /**
  * A local header parser for observer tests: it reflects the declared name and
  * tags of real bytes, so a renamed or broken header is a distinguishable fact.
+ * It also reflects each `owned-ignored "…"` or `external "…"` line as a
+ * nested-tree statement with its spans (no escapes); other statement lines
+ * are not reflected, so indices count nested-tree lines only.
  */
 export const declaration: ProjectReadOptions['parse'] = (file, text) => {
   const lines = text.split('\n');
@@ -54,7 +58,17 @@ export const declaration: ProjectReadOptions['parse'] = (file, text) => {
       issues: [{ code: 'missing-header', message: 'Expected a module header', file,
         span: { start: offset, end: offset + word.length, line, column: 1 } }] };
   }
-  return { status: 'valid', document: { file, version: 1, tokens: [], statements: [],
+  const statements: NestedTreeStatement[] = [];
+  lines.forEach((line, number) => {
+    const tree = /^(owned-ignored|external)([ \t]+)"([^"]*)"[ \t]*$/.exec(line);
+    if (!tree) return;
+    const offset = lines.slice(0, number).reduce((total, entry) => total + entry.length + 1, 0);
+    const at = tree[1]!.length + tree[2]!.length;
+    statements.push({ index: statements.length, kind: tree[1] as NestedTreeStatement['kind'],
+      span: { start: offset, end: offset + line.length, line: number + 1, column: 1 },
+      directory: { value: tree[3]!, span: { start: offset + at, end: offset + at + tree[3]!.length + 2, line: number + 1, column: at + 1 } } });
+  });
+  return { status: 'valid', document: { file, version: 1, tokens: [], statements,
     module: { name: header[2]!, tags: (header[3] ?? '').split(',').map(tag => tag.trim()).filter(Boolean),
       root: header[1] ? { start, end: start + 4, line: index + 1, column: 1 } : null,
       span: { start, end: start + lines[index]!.length, line: index + 1, column: 1 } } } };

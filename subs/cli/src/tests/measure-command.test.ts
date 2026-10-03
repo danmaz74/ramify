@@ -142,6 +142,8 @@ describe('measure command', { timeout: 60_000 }, () => {
       await put(f.root, 'src/.ramify-other/real.ts', 'export const similar = true;\n');
       await put(f.root, 'node_modules/pkg/index.ts', 'export const dependency = true;\n');
       await put(f.root, 'dist/output.ts', 'export const output = true;\n');
+      // A nested project is declared: its marked root is never read, and its contents are not observed.
+      await put(f.root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "examples/independent"\n');
       await put(f.root, 'examples/independent/module.ramify', 'ramify 1\nroot module independent\n');
       await put(f.root, 'examples/independent/tsconfig.json', '{}\n');
       await put(f.root, 'examples/independent/src/own.ts', 'export const independent = true;\n');

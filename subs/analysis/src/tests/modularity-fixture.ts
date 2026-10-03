@@ -1,7 +1,7 @@
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
 import type { AccessResult, AnalysisReport, Capability } from '../interfaces/analysis.js';
 import type { Destination, ImportDecision, ImportReason, ModuleRecord, OriginalId, SourceArea } from '../../subs/model/src/interfaces/model.js';
-import type { CapturedInput, InventoryFile, InventoryModule } from '../../subs/project/src/interfaces/project.js';
+import type { CapturedInput, InventoryFile, InventoryModule, ProjectExclusion } from '../../subs/project/src/interfaces/project.js';
 import type { AccessSelection, SourceAccess, SourceLimit } from '../../subs/typescript/src/interfaces/source.js';
 import type { DependencyBehaviorFact, DependencyBehaviorFacts } from '../../subs/typescript/src/interfaces/dependency-behavior.js';
 
@@ -51,7 +51,8 @@ export interface FixtureSpec {
   /** Omitted: not requested. `missing`: requested without facts. */
   readonly behavior?: { readonly status?: 'completed' | 'failed'; readonly facts: readonly FixtureFact[];
     readonly limits?: readonly string[] } | 'missing';
-  readonly independentScopes?: readonly string[];
+  /** The scope's ownership exclusions; declared nested trees among them are the omitted scopes. */
+  readonly exclusions?: readonly ProjectExclusion[];
 }
 
 const directory = (id: string): string => id.split('/').slice(1).map(name => `subs/${name}/`).join('');
@@ -161,7 +162,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
   };
   const requested = spec.behavior === undefined ? baseCapabilities : [...baseCapabilities, 'dependency-behavior' as const];
   const scope = { root: '/fixture', selection: 'given' as const, invokedFrom: '/fixture', configuration: '/fixture/tsconfig.json',
-    walkedAreas: areas.map(item => item.root), independentScopes: spec.independentScopes ?? [], ownership: { modules: [], exclusions: [] } };
+    walkedAreas: areas.map(item => item.root), ownership: { modules: [], exclusions: spec.exclusions ?? [] } };
   return {
     schemaVersion: 'ramify.analysis/2', runId: 'random', inputId: 'input-1',
     request: { project: { cwd: '/fixture', scope: 'whole-project', configuration: 'discover' }, registry, capabilities: requested,

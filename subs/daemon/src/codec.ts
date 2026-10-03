@@ -166,9 +166,9 @@ function ownership(value: unknown): boolean {
         : unownedExclusions.includes(exclusion.kind as string) && exclusion.owner === null));
 }
 function scope(value: unknown): boolean {
-  return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'independentScopes', 'ownership'])
+  return value === null || shape(value, ['root', 'selection', 'invokedFrom', 'configuration', 'walkedAreas', 'ownership'])
     && string(value.root) && ['given', 'found'].includes(value.selection as string) && string(value.invokedFrom) && string(value.configuration)
-    && strings(value.walkedAreas) && strings(value.independentScopes) && ownership(value.ownership);
+    && strings(value.walkedAreas) && ownership(value.ownership);
 }
 function outcome(value: unknown): boolean {
   return shape(value, ['execution', 'check', 'coverage']) && ['completed', 'invalid', 'incomplete', 'unavailable'].includes(value.execution as string)

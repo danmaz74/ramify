@@ -42,11 +42,14 @@ marker lost between selection and reading; the root still contributes its
 module. Any other marked description, at a child, stray or `src/` position, is
 the layout error `undeclared-project-boundary`, located at its marker and
 naming the nested-tree declaration its nearest enclosing module would add; it
-contributes no module and its contents are attributed to none. Directories
-with their own unselected configuration are still skipped as independent
-scopes, so a marked description there is never read, and declared trees are
-not yet pruned. An observed description that gains or loses the marker
-rebuilds the inventory through acquisition.
+contributes no module and its contents are attributed to none. A directory
+that is not a module's own directory and holds a `package.json` is the same
+layout error, located at the manifest. Discovery never stops at a nested
+`tsconfig.json`; it prunes each module's scratch directory and every declared
+nested tree before descent, observing the pruned directory as an entry of its
+parent and reading nothing beneath it, so a marked description inside a
+declared tree is never read. An observed description that gains or loses the
+marker rebuilds the inventory through acquisition.
 
 Configuration discovery uses the root or nearest ancestor `tsconfig.json`.
 The pinned TypeScript 7.0.2 sync API performs configuration inheritance and file
@@ -59,9 +62,10 @@ files produce aggregated warnings. Each inventory file records its `placement`:
 `src`, `auxiliary` for owned compiler source outside `src/`, or
 `referenced-resource`. Acquisition inventories files beneath `src/` only, so
 every file is `src` until auxiliary source is inventoried. Unselected outside-source files are silent,
-but their misplaced descriptions remain errors. Independent configurations,
-installed dependencies and compiler output supply discovery boundaries; an
-arbitrary compiler source exclusion cannot hide an owner or a stray marker.
+but their misplaced descriptions remain errors. Declared nested trees, scratch
+directories, installed dependencies and compiler output supply discovery
+boundaries; an arbitrary compiler source exclusion cannot hide an owner or a
+stray marker.
 
 Acquisition validates its observations and retries the complete attempt up to
 the supplied three-attempt ceiling within one deadline. The successful view
@@ -90,8 +94,19 @@ keep their owner, and repository, package and generated segments are excluded
 wherever they occur. Declarations are decoded and normalized against their
 module; one that escapes, lies in a child module, overlaps another, places an
 external tree under `src/` or names an always-excluded path contributes no
-exclusion. Discovery does not yet prune declared trees, validate them on the
-filesystem or report invalid declarations.
+exclusion. Acquisition reports each such declaration as
+`invalid-nested-tree`, or `overlapping-nested-tree` for every participant of an
+overlap, located at its directory string. It then checks every other
+declaration on the filesystem without traversing a symbolic link, observing
+each directory from the declaring module down to the declared one: a link on
+that path or at the target, or a target that exists but is not a directory, is
+`invalid-nested-tree`; an absent owned-ignored target is
+`missing-owned-ignored`; an absent external target is valid. Those
+observations are captured inputs, so a tree's appearance or disappearance makes
+the revision stale. Any such issue makes the acquisition invalid. The observer
+ignores changes beneath a declared tree or scratch directory unless the
+compiler reported reading the path, and rebuilds when such a directory itself
+changes.
 
 `isRamifyGeneratedSegment` reserves the generated view names at any depth:
 `.ramify` and `.ramify-architect`, and their publisher siblings

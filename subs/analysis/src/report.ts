@@ -129,7 +129,8 @@ const acquisitionFailure: Readonly<Record<CarriedCode, AnalysisDiagnostic['categ
   'read-failure': 'acquisition', 'changed-input': 'acquisition',
   'missing-root-description': 'layout', 'unmarked-root-description': 'layout', 'invalid-layout': 'layout', 'duplicate-name': 'layout',
   'description-in-src': 'layout', 'stray-description': 'layout', 'reserved-container': 'layout',
-  'undeclared-project-boundary': 'layout', 'symlink-root': 'layout', 'symlink-description': 'layout',
+  'undeclared-project-boundary': 'layout', 'invalid-nested-tree': 'layout', 'missing-owned-ignored': 'layout',
+  'overlapping-nested-tree': 'layout', 'symlink-root': 'layout', 'symlink-description': 'layout',
 };
 
 /** Invocation-local plain evidence. This object never stores a provider or a callback. */
@@ -318,7 +319,7 @@ export class ReportDraft {
             registry: { ...this.echo.registry, id: prefix(this.echo.registry.id), definitions: [] },
             capabilities: [...new Set(this.echo.capabilities)].slice(0, 15) };
             if (this.scope) this.scope = { ...this.scope, root: prefix(this.scope.root), invokedFrom: prefix(this.scope.invokedFrom),
-              configuration: prefix(this.scope.configuration), walkedAreas: [], independentScopes: [],
+              configuration: prefix(this.scope.configuration), walkedAreas: [],
               ownership: { modules: [], exclusions: [] } };
             // For a caller-supplied limit smaller than the mandatory JSON
             // envelope itself, only the fixed control reserve can be returned.

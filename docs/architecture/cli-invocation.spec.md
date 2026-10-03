@@ -30,12 +30,10 @@ with the root marker, `root module <name>`, as the
 [module description specification](../model/module-description.spec.md#a-description-file-establishes-a-directory-boundary)
 defines; every other description in the tree is unmarked.
 
-**Pending declared trees.** Selection by the root marker is implemented, and
-checking a project reports every other marked description its discovery meets.
-Until discovery prunes declared nested trees, it still meets a marked
-description inside one of them, unless the description lies beneath a
-directory with its own `tsconfig.json` that the root configuration does not
-select: discovery still skips such a directory, as before.
+Selection by the root marker is implemented, and checking a project reports
+every other marked description its discovery meets. Discovery prunes declared
+nested trees before descent, so it never reads a marked description inside
+one, and a directory's own `tsconfig.json` no longer stops it.
 
 1. `--root <dir>` names the root explicitly. The directory must contain a
    `module.ramify` carrying the root marker; nothing above it is examined. A
@@ -111,7 +109,10 @@ code.
 
 **Pending project boundaries.** The whole-tree ownership model adopted on
 2026-10-01 replaces this section when it is implemented; until then the
-section describes current behavior. Ownership then follows the
+section describes current behavior. Discovery already prunes declared nested
+trees and module scratch directories and is no longer stopped by a nested
+`tsconfig.json`; analysis of auxiliary source and the warnings below remain
+pending. Ownership then follows the
 [module description specification](../model/module-description.spec.md):
 owned compiler source outside every `src/`, including sibling `tests/` or
 `interfaces/` directories and loose source beneath `subs/`, is analyzed as its
@@ -147,9 +148,10 @@ errors.
 
 Outside module source areas, files outside the configuration's selection are
 silent. Every owned `src/` is still checked regardless of that selection.
-`node_modules`, build outputs, a nested independent project with its own
-configuration and tooling compiled under another configuration are silent by the project's own
-conventions, not by a Ramify rule. Projects that want different treatment,
+`node_modules`, build outputs and tooling compiled under another configuration
+are silent by the project's own conventions, not by a Ramify rule. A nested
+project belongs in a declared nested tree: undeclared, its marked root
+description or package manifest is a layout error. Projects that want different treatment,
 such as declaring a tooling directory as intentionally unowned or silencing a
 warning, will do so in a Ramify project configuration file. That file's
 format is unspecified and is not part of Plan 1.

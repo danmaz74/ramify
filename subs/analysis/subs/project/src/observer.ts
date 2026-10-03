@@ -7,6 +7,7 @@ import { excludedDirectory, inventoryFileKind, outsideSourceWarnings, scopeOwner
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { descriptionMarker } from './marker.js';
 import { readPurpose } from './purpose.js';
+import { classifyProjectPath } from './ownership.js';
 import { exactReferences } from './references.js';
 import { ReportedObservations, inputIdentity, reportedInput } from './observations.js';
 import type { ConfigurationData } from './configuration-data.js';
@@ -24,6 +25,10 @@ type Classified =
   | { readonly kind: 'structural'; readonly path: string }
   | { readonly kind: 'ignored'; readonly path: string };
 
+/** The kind and written directory of each nested-tree statement, in order. */
+const nestedTrees = (description: InventoryModule['description']): readonly (readonly [string, string])[] =>
+  description.status === 'valid' ? description.document.statements.flatMap(statement =>
+    'directory' in statement ? [[statement.kind, statement.directory.value] as const] : []) : [];
 const issueOrder = (a: ProjectIssue, b: ProjectIssue): number =>
   byteOrder(a.path, b.path) || byteOrder(a.code, b.code) || byteOrder(a.message, b.message);
 /** A configuration or manifest read is never a locally repairable input. */
@@ -224,6 +229,21 @@ class Observer implements ProjectObserver {
     if (!within(this.#capture.root, path)) {
       return this.#capture.recorded(path) ? { kind: 'input', path } : { kind: 'ignored', path };
     }
+    // Declared nested trees and scratch directories are never entered, so a
+    // path beneath one never becomes owned: it is an input only when the
+    // compiler reported reading it. The appearance, disappearance or
+    // replacement of such a directory itself is boundary evidence.
+    const relativePath = relative(this.#capture.root, path);
+    if (relativePath !== '') {
+      const ownership = classifyProjectPath(this.#inventory.scope, relativePath);
+      const exclusion = ownership.status === 'owned' || ownership.status === 'excluded' ? ownership.exclusion : null;
+      if (exclusion && (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external' || exclusion.kind === 'scratch')) {
+        if (exclusion.directory === relativePath) return { kind: 'structural', path };
+        const recorded = this.#capture.recorded(path);
+        if (!recorded) return { kind: 'ignored', path };
+        return broadRoles.has(recorded.role) || broadNames.has(name) ? { kind: 'structural', path } : { kind: 'input', path };
+      }
+    }
     if (name === 'module.ramify') {
       const directory = dirname(path);
       return this.#moduleAt(directory) ? { kind: 'description', path, directory } : { kind: 'structural', path };
@@ -283,6 +303,8 @@ class Observer implements ProjectObserver {
         }
         // A renamed owner changes identity, ancestry and sibling uniqueness.
         if (parsed.document.module.name !== module.name) return this.#rebuild(signal);
+        // A changed nested-tree declaration moves a discovery boundary: acquisition prunes and validates it.
+        if (JSON.stringify(nestedTrees(parsed)) !== JSON.stringify(nestedTrees(module.description))) return this.#rebuild(signal);
         // Build on this update's record, so a README of the same module applied earlier keeps its purpose.
         modules.set(module.directory, { ...modules.get(module.directory)!, description: parsed, headerTags: parsed.document.module.tags });
         descriptions.push(label); relink = true;

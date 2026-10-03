@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProject } from '../read-project.js';
 import type { ProjectRead, ProjectReadOptions, ProjectInputView } from '../interfaces/project.js';
-import { fixture, limits, marker, put, syntax } from './fixtures.js';
+import { declaration, fixture, limits, marker, put, syntax } from './fixtures.js';
 
 let work: string, root: string;
 const views: ProjectInputView[] = [];
@@ -173,11 +173,17 @@ describe('real project configuration and scope', () => {
     expect(acquired.inventory.warnings).toEqual([]);
     expect(acquired.inputs.some(input => input.path === `${excluded}/module.ramify`)).toBe(false);
   });
-  it('keeps independent projects out of enclosing discovery', async () => {
+  it('keeps a declared nested project out of enclosing discovery and reports an undeclared one', async () => {
     await fixture(join(root, 'examples/demo'));
-    const acquired = view(await read());
-    expect(acquired.inventory.scope.independentScopes).toEqual(['examples/demo']);
-    expect(acquired.inventory.modules).toHaveLength(1);
+    // Undeclared, its own configuration no longer ends discovery: its marked root is another project's root.
+    const undeclared = await read({ parse: declaration });
+    expect(undeclared).toMatchObject({ status: 'invalid', issues: [{ code: 'undeclared-project-boundary', path: 'examples/demo/module.ramify' }] });
+    if (undeclared.status === 'invalid') expect(undeclared.issues).toHaveLength(1);
+    // Declared, it is never entered: nothing beneath it is read or inventoried.
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "examples/demo"\n');
+    const acquired = view(await read({ parse: declaration }));
+    expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture']);
+    expect(acquired.inputs.filter(input => input.path.startsWith('examples/demo/'))).toEqual([]);
   });
 });
 
