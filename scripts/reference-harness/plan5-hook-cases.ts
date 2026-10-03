@@ -188,7 +188,7 @@ add('plain-check-unchanged', async (p, root, _directory, a) => {
   const resident = await p.check(root, false), batch = await p.check(root, true);
   const { runId: _resident, ...one } = resident, { runId: _batch, ...two } = batch;
   a.equal('plain resident document remains exactly batch except runId', one, two);
-  a.equal('plain schema and independent reference expectation', [resident.schemaVersion, resident.summary.owners, resident.summary.denied], ['ramify.analysis/1', 15, 0]);
+  a.equal('plain schema and independent reference expectation', [resident.schemaVersion, resident.summary.owners, resident.summary.denied], ['ramify.analysis/2', 15, 0]);
   a.equal('compact members do not leak into plain report', ['revision', 'since', 'changed', 'timings', 'exitCode'].filter(key => key in resident), []);
   const human = await p.run(root, ['check']);
   a.equal('plain human exit', [human.code, human.stderr], [0, '']);

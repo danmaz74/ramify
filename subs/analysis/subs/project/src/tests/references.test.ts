@@ -94,4 +94,24 @@ describe('exact owned source paths', () => {
     await put(root, 'src/helpers/interfaces/api.ts', 'export const value = 1;');
     expect((await reference('helpers/interfaces/api.ts')).reference).toMatchObject({ status: 'file', interfaceEligible: false });
   });
+  it('reads exact references from exposure statements only, at their index among all statements', async () => {
+    await put(root, 'fixtures/sample/data.txt', 'data');
+    const span = { start: 24, end: 70, line: 3, column: 1 };
+    const parse: ProjectReadOptions['parse'] = (file, text) => {
+      const parsed = syntax(file, text);
+      if (parsed.status !== 'valid') return parsed;
+      return { ...parsed, document: { ...parsed.document, statements: [
+        { index: 0, kind: 'owned-ignored', span, directory: { value: 'fixtures/sample', span } },
+        { index: 1, kind: 'expose-src', span, selection: { kind: 'named', names: [{ name: 'value', alias: 'value', span }] },
+          from: { value: 'interfaces/api.ts', span }, tags: null, destinations: ['parent'] },
+        { index: 2, kind: 'external', span, directory: { value: 'absent-cache', span } },
+      ] } };
+    };
+    const result = await readProject({ request: { cwd: root, root, scope: 'whole-project', configuration: 'discover' }, parse, limits });
+    if (result.status === 'acquired') retained = result.view;
+    expect(result.status).toBe('acquired');
+    if (result.status !== 'acquired') throw new Error('Expected acquired view');
+    expect(result.view.inventory.references).toEqual([{ description: 'module.ramify', statement: 1, decoded: 'interfaces/api.ts',
+      normalized: 'src/interfaces/api.ts', status: 'file', interfaceEligible: true }]);
+  });
 });

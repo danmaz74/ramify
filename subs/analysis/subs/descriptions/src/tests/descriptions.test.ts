@@ -3,11 +3,11 @@ import { readFile, readdir } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 import { parseDescription } from '../parse.js';
-import type { DescriptionStatement } from '../interfaces/syntax.js';
+import type { ExposureStatement } from '../interfaces/syntax.js';
 
 const root = new URL('../../../../../../', import.meta.url);
 type Names = '*' | readonly (string | readonly [string, string])[];
-function statement(kind: DescriptionStatement['kind'], names: Names, from: string,
+function statement(kind: ExposureStatement['kind'], names: Names, from: string,
   destinations: readonly ('parent' | 'descendants')[] = ['parent'], tags: readonly string[] | null = null) {
   return { kind, names: names === '*' ? '*' : names.map((name) => typeof name === 'string' ? [name, name] : name), from, tags, destinations };
 }
@@ -52,7 +52,8 @@ const analysisNames = ['Capability', 'StageId', 'RunControl', 'AnalysisLimits', 
   'SessionChange', 'RevisionPath', 'CheckedSet', 'FindingDelta', 'RevisionTimings', 'OperationTimings', 'SessionRevision',
   'SessionUpdate', 'VerifyOutcome', 'SessionExplorerDetailsOutcome', 'SessionStatus', 'RetainedSession', 'SessionOpen'];
 const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedSelection',
-  'DescriptionSelection', 'DescriptionStatement', 'DescriptionDocument', 'ParsedDescription', 'DescriptionParser'];
+  'DescriptionSelection', 'ExposureStatement', 'NestedTreeStatement', 'DescriptionStatement', 'DescriptionDocument',
+  'ParsedDescription', 'DescriptionParser'];
 
 const projectNames = ['ProjectRequest', 'ProjectScope', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
   'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
@@ -319,10 +320,11 @@ describe('all current project descriptions as exact-text parser fixtures', () =>
         if (result.status !== 'valid') throw new Error('Invalid authored description');
         const document = result.document;
         expect([document.file, document.version, document.module.name, document.module.tags]).toEqual([file, 1, fixture.name, fixture.tags]);
-        expect(document.statements.map((item) => ({
+        // A nested-tree statement compares by its kind and decoded directory.
+        expect(document.statements.map((item) => 'directory' in item ? { kind: item.kind, directory: item.directory.value } : {
           kind: item.kind, names: item.selection.kind === 'wildcard' ? '*' : item.selection.names.map(({ name, alias }) => [name, alias]),
           from: item.from.value, tags: item.tags?.values ?? null, destinations: item.destinations,
-        }))).toEqual(fixture.statements);
+        })).toEqual(fixture.statements);
         expect(document.statements.map(({ index }) => index)).toEqual(fixture.statements.map((_, index) => index));
         for (const token of document.tokens) expect(text.slice(token.span.start, token.span.end)).toBe(token.raw);
       });

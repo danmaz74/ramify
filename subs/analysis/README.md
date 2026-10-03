@@ -22,7 +22,7 @@ compiler update, then only the files whose resolution those paths can change are
 described and interpreted. A membership change whose reach the retained facts or
 the compiler cannot bound takes the broad path instead. Every revision
 carries its checked set, finding delta and timings; `report` materializes the
-`ramify.analysis/1` document of a retained revision on request, equal to
+`ramify.analysis/2` document of a retained revision on request, equal to
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes
 everything from the warm compiler and compares it with the retained facts.
 
@@ -86,7 +86,7 @@ with located coverage notes; definite import violations and missing resource
 exports fail it. A missing resource import is unverifiable, while an exposure
 naming that missing resource is invalid.
 
-`ramify.analysis/1` reports retain inventory and purpose metadata, captured
+`ramify.analysis/2` reports retain inventory and purpose metadata, captured
 input identity, expanded declarations, original and accessed source locations,
 source selections, decisions and provenance. The batch UUID identifies a call;
 the input digest identifies its sealed root/configuration/registry and captured

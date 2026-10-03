@@ -88,7 +88,7 @@ function expectFrozenPlainData(value: unknown, active = new Set<object>(), verif
 describe('public disposable analysis session', () => {
   it('publishes the full real pipeline, provenance and independent capability dimensions', async () => fixture(async (root, inputs) => {
     const report = reported(await analyzeProject(inputs));
-    expect(report).toMatchObject({ schemaVersion: 'ramify.analysis/1', request: inputs,
+    expect(report).toMatchObject({ schemaVersion: 'ramify.analysis/2', request: inputs,
       scope: { root, configuration: join(root, 'tsconfig.json'), selection: 'given', walkedAreas: expect.arrayContaining(['src', 'subs/consumer/src']) },
       registry: inputs.registry, outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
       diagnostics: [], warnings: [], coverage: [],

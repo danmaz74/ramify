@@ -3,8 +3,8 @@
 **Status:** Active specification. Whole-tree ownership and declared nested-tree
 boundaries were adopted on 2026-10-01 and are not yet implemented. Their
 concrete statement syntax and declaration validation were specified on
-2026-10-03; parser and validator support remain pending. The implementation
-plan schedules that work. The exposure grammar below is unchanged.
+2026-10-03; the parser accepts the statement syntax, and declaration
+validation remains pending. The implementation plan schedules that work. The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -1043,8 +1043,8 @@ diagnostics for TypeScript source forms separately from the `module.ramify`
 parser. Analysis limits in a completed source check are nonblocking by default;
 invalid descriptions or registries still fail model validation.
 
-The adopted whole-tree ownership, auxiliary-source and nested-tree rules,
-including the nested-tree statement syntax, are not yet implemented.
+The adopted whole-tree ownership, auxiliary-source and nested-tree rules are
+not yet implemented; only the nested-tree statement syntax is parsed.
 Specification adoption does not establish parser or checker support.
 
 Tooling must identify the version 1 features it implements and report missing

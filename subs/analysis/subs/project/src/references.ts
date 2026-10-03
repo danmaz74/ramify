@@ -6,7 +6,8 @@ export async function exactReferences(capture: Capture, modules: readonly Invent
   for (const module of modules) {
     if (module.description.status !== 'valid') continue;
     for (const statement of module.description.document.statements) {
-      if (statement.kind === 'expose-sub') continue;
+      // Only owned exposure forms carry a source reference; nested trees are interpreted separately.
+      if ('directory' in statement || statement.kind === 'expose-sub') continue;
       const decoded = statement.from.value;
       const base = join(module.directory, 'src', ...(statement.kind === 'expose-test' ? ['tests'] : []));
       const normalized = posix.normalize(decoded);

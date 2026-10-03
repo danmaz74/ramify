@@ -14,7 +14,9 @@ interface SelectionManifest { readonly name: string; readonly tags: readonly str
 /** Compare atomic selections so grouping named statements creates no false drift. */
 function manifest(document: DescriptionDocument): SelectionManifest {
   return { name: document.module.name, tags: [...document.module.tags].sort(),
-    selections: document.statements.flatMap(statement => statement.destinations.flatMap(destination =>
+    selections: document.statements.flatMap(statement => 'directory' in statement
+      ? [JSON.stringify({ kind: statement.kind, directory: statement.directory.value })]
+      : statement.destinations.flatMap(destination =>
       (statement.selection.kind === 'wildcard' ? [{ name: '*', alias: '*', wildcard: true }]
         : statement.selection.names.map(({ name, alias }) => ({ name, alias, wildcard: false })))
         .map(selection => JSON.stringify({ kind: statement.kind, from: statement.from.value, destination,
@@ -359,6 +361,18 @@ const declarationLayers: readonly DeclarationLayer[] = [
       'subs/service-api/': [
         'expose-src ExplorerProjectionResult from "project-view.ts" to parent',
         'expose-src ExplorerProcedures from "router.ts" to parent',
+      ].join('\n'),
+    },
+  },
+  // Phase 1 project boundaries, iteration 2: the description statement union
+  // names its two members, which travel with it as signature companions.
+  { plan: 'Phase 1 project boundaries (nested-tree statements)',
+    added: {
+      './': [
+        'expose-sub ExposureStatement, NestedTreeStatement from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub ExposureStatement, NestedTreeStatement from descriptions to parent, descendants',
       ].join('\n'),
     },
   },

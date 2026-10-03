@@ -45,7 +45,7 @@ function processResult(context: ProjectContext, result: Awaited<ReturnType<typeo
   recordObservation('compiled-cli', { code: result.code, signal: result.signal, stderr: result.stderr, durationMs: result.durationMs });
   if (result.stdout.startsWith('{')) {
     const report = JSON.parse(result.stdout);
-    recordObservation('compiled-report', report.schemaVersion === 'ramify.analysis/1' ? analysisEvidence(report) : report);
+    recordObservation('compiled-report', report.schemaVersion === 'ramify.analysis/2' ? analysisEvidence(report) : report);
   }
   context.assertions.equal('actual subprocess exit and streams', [result.code, result.signal, result.stderr], [exit, null, '']);
   context.assertions.ok('finite subprocess completion', result.durationMs < 30_000);

@@ -48,7 +48,7 @@ export function reportCommand(result, owners, denied = 0, expected = []) {
     assert.fail(`Resident command exited ${result.code}; expected ${denied ? 1 : 0}${detail ? `: ${detail.slice(0, 4096)}` : ''}`);
   }
   const report = JSON.parse(result.stdout);
-  assert.equal(report.schemaVersion, 'ramify.analysis/1');
+  assert.equal(report.schemaVersion, 'ramify.analysis/2');
   assert.deepEqual(report.outcome, { execution: 'completed', check: denied ? 'failed' : 'passed', coverage: 'complete' });
   assert.equal(report.summary.owners, owners); assert.equal(report.summary.denied, denied);
   assert.equal(report.coverage.length, 0); assert.ok(report.stages.every(stage => stage.status === 'completed'));

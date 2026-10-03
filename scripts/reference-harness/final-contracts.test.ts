@@ -15,9 +15,9 @@ describe('Plan 2 final contract validator', () => {
   it('requires eleven owners and expands every abbreviation from the archived review', async () => {
     const owners = reviewedOwners(...await reviews('owners.md'));
     expect([...owners.keys()].sort()).toEqual(['analysis', 'cli', 'contexts', 'daemon', 'descriptions', 'layout', 'model', 'presentation', 'project', 'ramify', 'typescript']);
-    const names = owners.get('ramify')!.document.statements.flatMap(statement => statement.selection.kind === 'named' ? statement.selection.names.map(item => item.name) : []);
+    const names = owners.get('ramify')!.document.statements.flatMap(statement => 'selection' in statement && statement.selection.kind === 'named' ? statement.selection.names.map(item => item.name) : []);
     for (const name of ['explainImport', 'LinkedDescriptions', 'SourceAnalysis', 'shopFocusDiagram', 'ProjectResolution', 'IncrementRun', 'ServiceConnector', 'createQuickEnvironment']) expect(names).toContain(name);
-    expect(owners.get('analysis')!.document.statements.some(statement => statement.from.value === 'increment.ts')).toBe(true);
+    expect(owners.get('analysis')!.document.statements.some(statement => 'from' in statement && statement.from.value === 'increment.ts')).toBe(true);
     const [baseline, plan2] = await reviews('owners.md');
     expect(() => reviewedOwners(baseline.replace('TextSpan, DescriptionToken', 'ChangedSpan, DescriptionToken'), plan2)).toThrow('Abbreviation must match');
   });

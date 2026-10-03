@@ -336,7 +336,7 @@ seals the view before publishing a report. Changed inputs trigger a fresh
 acquisition within the configured retry limit or an explicit incomplete result.
 Compiler state is not retained across batch runs.
 
-Reports use schema `ramify.analysis/1`, a fresh `runId` and a captured `inputId`
+Reports use schema `ramify.analysis/2`, a fresh `runId` and a captured `inputId`
 when established. They retain stage and capability execution, inventory, linked
 contracts, accesses, decisions, diagnostics, warnings and coverage as frozen
 plain data. These batch identities are not context generations or revisions.
@@ -696,7 +696,7 @@ timings. With `--format json` the CLI writes it as one `ramify.check/1` document
 The command exits 0 with no finding, 1 with findings or an invalid revision and 2
 when the files were not checked, and it never falls back to batch. The whole
 report is built only for `scope: 'report'`, which the plain `ramify check` requests
-for its unchanged `ramify.analysis/1` document. The
+for its unchanged `ramify.analysis/2` document. The
 [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks) pairs the
 two forms.
 

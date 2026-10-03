@@ -15,12 +15,17 @@ whitespace and comments. Names and paths retain exact decoded strings.
 
 A valid result contains located headers, tokens and ordered statements. An
 invalid result contains tokens and sorted diagnostics, with no partial document.
+Statements are either exposure statements or `owned-ignored` and `external`
+nested-tree statements, each holding one located decoded directory; indices
+count all statements in source order. The linker and exact source references
+read exposure statements only; nested-tree statements belong to project
+acquisition.
 Tokenization collects lexical errors throughout the input. Parsing recovers at
 physical line boundaries after a malformed clause; a lexically invalid line
 is not interpreted from its incomplete tokens. Duplicate tag/destination items
 each receive their own diagnostic. Returned data is deeply frozen and JSON-safe.
 
-Unknown tag names await registry validation. Path normalization, containment,
+Unknown tag names await registry validation. Path and directory normalization, containment,
 exact file existence, symlinks, wildcard eligibility, export ownership and
 exposure semantics await acquisition/linking. The parser never probes a path or
 validates UTF-8 bytes that its string input cannot represent; acquisition owns

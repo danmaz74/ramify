@@ -46,7 +46,7 @@ describe('modularity projection: declared ownership', () => {
   it('records provenance, the ownership tree and views in contract order', () => {
     expect(report.schemaVersion).toBe('ramify.modularity/2');
     expect(report.provenance).toEqual({
-      revision: 'batch:input-1', analysisSchema: 'ramify.analysis/1', inputId: 'input-1',
+      revision: 'batch:input-1', analysisSchema: 'ramify.analysis/2', inputId: 'input-1',
       registryId: buildReport(graphSpec).registry!.id, check: 'passed', analysisCoverage: 'complete',
       capabilities: ['coverage', 'registry', 'static-access'], omittedScopes: [], ownership: 'declared', candidateId: null,
     });

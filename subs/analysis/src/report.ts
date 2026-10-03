@@ -222,7 +222,7 @@ export class ReportDraft {
     const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
     const diagnosticIds = new Set(this.diagnostics.map(item => item.id));
     return {
-      schemaVersion: 'ramify.analysis/1', runId: this.runId, inputId: this.inputId, request: this.echo,
+      schemaVersion: 'ramify.analysis/2', runId: this.runId, inputId: this.inputId, request: this.echo,
       scope: this.scope, registry: this.registry,
       capabilities: [...availableCapabilities, 'browser-verification' as const].map(capability => ({ capability,
         available: availableCapabilities.includes(capability), requested: this.request.capabilities.includes(capability),

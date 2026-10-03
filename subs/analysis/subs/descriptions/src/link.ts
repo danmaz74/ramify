@@ -80,6 +80,8 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
     const toParent = new Set<string>();
     contracts.set(module.id, { names, toParent });
     for (const statement of doc.statements) {
+      // Nested-tree statements bound project acquisition; they never expose a symbol.
+      if ('directory' in statement) continue;
       const site = location(doc.file, statement.span);
       const fromSite = location(doc.file, statement.from.span);
       const pairs: { name: string; original: OriginalId; effective: boolean }[] = [];

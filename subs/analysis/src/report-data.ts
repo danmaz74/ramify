@@ -26,7 +26,8 @@ export function projectDiagnostics(inventory: ProjectInventory | null, issues: r
     const doc = module?.description.status === 'valid' ? module.description.document : null;
     const spans = references.flatMap(ref => {
       const statement = doc?.statements.find(item => item.index === ref.statement);
-      return statement ? [{ file: issue.path, ...statement.from.span }] : [];
+      // Exact source references come only from owned exposure statements.
+      return statement && 'from' in statement ? [{ file: issue.path, ...statement.from.span }] : [];
     });
     const layout = ['missing-root-description', 'invalid-layout', 'duplicate-name', 'description-in-src',
       'stray-description', 'reserved-container', 'symlink-root', 'symlink-description'].includes(issue.code);

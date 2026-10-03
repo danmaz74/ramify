@@ -139,7 +139,7 @@ describe('changed-file CLI through the real resident service', () => {
       expect(plain.stderr).toBe('');
       expect(plain.batchCalls).toBe(0);
       const report = JSON.parse(plain.stdout);
-      expect(report.schemaVersion).toBe('ramify.analysis/1');
+      expect(report.schemaVersion).toBe('ramify.analysis/2');
       expect(report).not.toHaveProperty('revision');
       expect(report).not.toHaveProperty('mode');
       expect(report).not.toHaveProperty('findings');

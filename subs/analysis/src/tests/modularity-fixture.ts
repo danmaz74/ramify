@@ -163,7 +163,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
   const scope = { root: '/fixture', selection: 'given' as const, invokedFrom: '/fixture', configuration: '/fixture/tsconfig.json',
     walkedAreas: areas.map(item => item.root), independentScopes: spec.independentScopes ?? [] };
   return {
-    schemaVersion: 'ramify.analysis/1', runId: 'random', inputId: 'input-1',
+    schemaVersion: 'ramify.analysis/2', runId: 'random', inputId: 'input-1',
     request: { project: { cwd: '/fixture', scope: 'whole-project', configuration: 'discover' }, registry, capabilities: requested,
       limits: {} as AnalysisReport['request']['limits'] },
     scope, registry,

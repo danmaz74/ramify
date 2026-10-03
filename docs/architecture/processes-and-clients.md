@@ -150,7 +150,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 
 | Command | Required behavior |
 | --- | --- |
-| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize every current input, obtain the whole report, print it and exit. This is the complete check; human output names the revision's path on its `Mode:` line and `--format json` writes the unchanged `ramify.analysis/1` report. |
+| `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize every current input, obtain the whole report, print it and exit. This is the complete check; human output names the revision's path on its `Mode:` line and `--format json` writes the unchanged `ramify.analysis/2` report. |
 | `ramify check --changed <path>... [--since <revision>] [--deadline <ms>] [--format json]` | The bounded hook check agent post-write hooks run, on the [fast incremental check](daemon.md#fast-incremental-checks) path. The CLI hashes each named file relative to the selected root and asks for the first revision covering those identities, waiting at most the deadline (default 2,000 ms). It prints every project finding, marking those new since `--since` or the previous revision; `--format json` writes one `ramify.check/1` document. It never runs a batch analysis. See [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |

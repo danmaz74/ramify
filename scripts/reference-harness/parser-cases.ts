@@ -1,5 +1,5 @@
 import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
-import type { DescriptionDocument, DescriptionIssue, DescriptionStatement, TextSpan } from '../../subs/analysis/subs/descriptions/src/interfaces/syntax.js';
+import type { DescriptionDocument, DescriptionIssue, ExposureStatement, TextSpan } from '../../subs/analysis/subs/descriptions/src/interfaces/syntax.js';
 import type { Assertions, InstanceHandler } from './runner.js';
 
 // Literal expectations transcribed from the reviewed D variants. No registry,
@@ -10,7 +10,7 @@ const source = 'expose-src value from "interfaces/api.ts" to parent';
 const baseline = `${header}${source}\n`;
 
 interface ExpectedStatement {
-  kind: DescriptionStatement['kind'];
+  kind: ExposureStatement['kind'];
   selection: '*' | readonly (readonly [string, string])[];
   from: string;
   tags: readonly string[] | null;
@@ -116,11 +116,12 @@ function assertDocument(assertions: Assertions, label: string, fixture: ValidCas
   const document = result.document;
   assertions.equal(`${label}: header`, [document.file, document.version, document.module.name, document.module.tags],
     [file, 1, fixture.name ?? 'provider', fixture.tags ?? []]);
-  assertions.equal(`${label}: statements`, document.statements.map((statement) => ({
-    kind: statement.kind,
-    selection: statement.selection.kind === 'wildcard' ? '*' : statement.selection.names.map(({ name, alias }) => [name, alias]),
-    from: statement.from.value, tags: statement.tags?.values ?? null, destinations: statement.destinations,
-  })), fixture.statements ?? [ordinary]);
+  assertions.equal(`${label}: statements`, document.statements.map((statement) => 'directory' in statement
+    ? { kind: statement.kind, directory: statement.directory.value } : {
+      kind: statement.kind,
+      selection: statement.selection.kind === 'wildcard' ? '*' : statement.selection.names.map(({ name, alias }) => [name, alias]),
+      from: statement.from.value, tags: statement.tags?.values ?? null, destinations: statement.destinations,
+    }), fixture.statements ?? [ordinary]);
   assertions.equal(`${label}: source order`, document.statements.map(({ index }) => index), document.statements.map((_, index) => index));
   assertions.ok(`${label}: comments excluded`, document.tokens.every((token) => token.kind !== 'comment'));
   document.tokens.forEach((token, index) => {
@@ -130,6 +131,8 @@ function assertDocument(assertions: Assertions, label: string, fixture: ValidCas
   assertSpan(assertions, `${label} module`, fixture.text, document.module.span);
   document.statements.forEach((statement, index) => {
     assertSpan(assertions, `${label} statement ${index}`, fixture.text, statement.span);
+    // These fixtures hold exposure statements only; the statements comparison above rejects any other member.
+    if ('directory' in statement) return;
     const raw = fixture.text.slice(statement.span.start, statement.span.end);
     assertions.ok(`${label} statement ${index}: complete physical line`,
       raw.startsWith(statement.kind) && raw.endsWith(statement.destinations.at(-1)!) && !/[\r\n]/.test(raw));

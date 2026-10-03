@@ -9,7 +9,7 @@ and batch bindings, lazy in the Node entry and a Node child in the compiled
 client, and owns SIGINT and stream cleanup.
 The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
-`ramify.cli/1`; plain check results retain the bare `ramify.analysis/1` document.
+`ramify.cli/1`; plain check results retain the bare `ramify.analysis/2` document.
 
 `check --changed <path>...` hashes each named file relative to the selected root,
 with a missing file represented by an absent identity. It requests a compact

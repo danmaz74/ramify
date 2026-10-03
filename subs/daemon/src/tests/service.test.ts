@@ -35,7 +35,7 @@ describe('validated daemon service', () => {
     if (!opened.ok || opened.value.status !== 'opened') throw new Error('Expected opened context');
     const token = opened.value.token;
     const plain = await environment.service.check({ token, requestId: 'plain', freshness: { mode: 'synchronized', expect: [] } });
-    expect(plain).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { schemaVersion: 'ramify.analysis/1' } } });
+    expect(plain).toMatchObject({ ok: true, value: { status: 'reported', published: true, report: { schemaVersion: 'ramify.analysis/2' } } });
     if (!plain.ok || plain.value.status !== 'reported' || !plain.value.published) throw new Error('Expected publication');
     const since = plain.value.revision.revision;
     const sha256 = createHash('sha256').update('export const value = 1;\n').digest('hex');

@@ -32,7 +32,7 @@ async function command(p: SequenceProcess, root: string, args: string[], a: Asse
   const document = result.stdout.startsWith('{') ? JSON.parse(result.stdout) as AnalysisReport : null;
   recordObservation(label, { command: result.command, code: result.code, signal: result.signal,
     error: result.error, stderr: result.stderr, durationMs: result.durationMs, raw,
-    ...(document?.schemaVersion === 'ramify.analysis/1' ? { report: analysisEvidence(document) }
+    ...(document?.schemaVersion === 'ramify.analysis/2' ? { report: analysisEvidence(document) }
       : { stdout: result.stdout }) });
   a.equal(`${label}: finite expected process exit`, [result.code, result.signal, result.error], [code, null, null]);
   a.equal(`${label}: empty stderr`, result.stderr, '');
@@ -113,7 +113,7 @@ for (const instance of plan2Instances.filter(item => /^I2-(19|20|21|22):/.test(i
           } else {
             const result = await command(p, cwd, ['check', '--format', 'json'], a, 'resident JSON check', expected);
             const report = JSON.parse(result.stdout);
-            a.equal('exactly one bare versioned analysis document', [report.schemaVersion, result.stdout.trim().split('\n').length], ['ramify.analysis/1', 1]);
+            a.equal('exactly one bare versioned analysis document', [report.schemaVersion, result.stdout.trim().split('\n').length], ['ramify.analysis/2', 1]);
             const batch = await command(p, cwd, ['check', '--batch', '--format', 'json'], a, 'independent batch check', expected);
             a.equal('resident semantic report matches independent batch', semantic(report), semantic(JSON.parse(batch.stdout)));
             if (subcase === 'exit-denied' || subcase === 'synchronized-after-save') a.equal('provider edit yields exact located denial', report.diagnostics.map((issue: { code: string; location: { file: string } }) => [issue.code, issue.location.file]), [['not-visible', 'src/assembly.ts']]);

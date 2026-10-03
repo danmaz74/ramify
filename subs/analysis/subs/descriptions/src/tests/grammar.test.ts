@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseDescription } from '../parse.js';
-import type { DescriptionIssue } from '../interfaces/syntax.js';
+import type { DescriptionDocument, DescriptionIssue, ExposureStatement } from '../interfaces/syntax.js';
 
 const header = 'ramify 1\nmodule example\n';
 const source = (selection: string) => `expose-src ${selection} from "interfaces/api.ts" to parent`;
@@ -10,6 +10,12 @@ function valid(text: string) {
   expect(result.status, JSON.stringify(result)).toBe('valid');
   if (result.status !== 'valid') throw new Error('Expected valid description');
   return result.document;
+}
+function exposures(document: DescriptionDocument): readonly ExposureStatement[] {
+  return document.statements.map((statement) => {
+    if ('directory' in statement) throw new Error(`Expected only exposure statements, found ${statement.kind}`);
+    return statement;
+  });
 }
 function invalid(text: string, code: DescriptionIssue['code']) {
   const result = parseDescription('module.ramify', text);
@@ -36,22 +42,22 @@ describe('the complete version 1 grammar', () => {
       expose-sub * from "ui" to descendants
       expose-src * from "interfaces/nested/api.ts" to parent
     `);
-    expect(document.statements.map(({ kind, index, from, tags, destinations }) =>
+    expect(exposures(document).map(({ kind, index, from, tags, destinations }) =>
       [kind, index, from.value, tags?.values ?? null, destinations])).toEqual([
       ['expose-src', 0, 'src/./api.ts', [], ['descendants', 'parent']],
       ['expose-test', 1, 'tests/helper.ts', ['testing', 'custom-tag'], ['parent']],
       ['expose-sub', 2, 'ui', null, ['descendants']],
       ['expose-src', 3, 'interfaces/nested/api.ts', null, ['parent']],
     ]);
-    const selection = document.statements[0].selection;
+    const selection = exposures(document)[0].selection;
     expect(selection.kind).toBe('named');
     if (selection.kind === 'named') expect(selection.names.map(({ name, alias }) => [name, alias])).toEqual([['A', 'B'], ['default', 'default']]);
   });
 
   it('distinguishes literal star names and aliases from wildcard selection', () => {
     const document = valid(`${header}${source('"*" as "from", A as "*"')}\nexpose-test "*" from "f.ts" to parent`);
-    expect(document.statements.every(({ selection }) => selection.kind === 'named')).toBe(true);
-    const selection = document.statements[0].selection;
+    expect(exposures(document).every(({ selection }) => selection.kind === 'named')).toBe(true);
+    const selection = exposures(document)[0].selection;
     if (selection.kind === 'named') expect(selection.names.map(({ name, alias }) => [name, alias])).toEqual([['*', 'from'], ['A', '*']]);
   });
 
@@ -59,19 +65,19 @@ describe('the complete version 1 grammar', () => {
     const line = source('A as B, A as B');
     const document = valid(`${header}${line}\n${line}`);
     expect(document.statements).toHaveLength(2);
-    expect(document.statements[0].selection).toMatchObject({ kind: 'named', names: [{ name: 'A', alias: 'B' }, { name: 'A', alias: 'B' }] });
+    expect(exposures(document)[0].selection).toMatchObject({ kind: 'named', names: [{ name: 'A', alias: 'B' }, { name: 'A', alias: 'B' }] });
   });
 
   it('accepts arbitrary syntactically valid tag names without a registry', () => {
     const document = valid('ramify 1\nmodule custom-tag tagged [custom-tag, testing, browser, ui, dispatch]\nexpose-src customTag from "a.ts" tagged [not-registered] to parent');
     expect(document.module.tags).toEqual(['custom-tag', 'testing', 'browser', 'ui', 'dispatch']);
-    expect(document.statements[0].tags?.values).toEqual(['not-registered']);
+    expect(exposures(document)[0].tags?.values).toEqual(['not-registered']);
     expect(valid('ramify 1\nmodule tests tagged [testing]').module.name).toBe('tests');
     expect(valid('ramify 1\nmodule dispatch').module.name).toBe('dispatch');
     expect(valid(`${header}${source('dispatch, tests')}`).statements).toHaveLength(1);
   });
 
-  const keywords = ['ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing', 'browser', 'ui'];
+  const keywords = ['ramify', 'module', 'expose-src', 'expose-test', 'expose-sub', 'owned-ignored', 'external', 'from', 'as', 'tagged', 'to', 'parent', 'descendants', 'testing', 'browser', 'ui'];
   for (const word of keywords) {
     it(`requires quotes for ${word} in every name position`, () => {
       for (const make of [
@@ -88,7 +94,7 @@ describe('the complete version 1 grammar', () => {
   }
 
   it.each(['fromValue', 'From', '_from', '$testing', 'default', 'a0', 'UI'])('accepts the complete bare export name %s', (name) => {
-    expect(valid(`${header}${source(name)}`).statements[0].selection).toMatchObject({ kind: 'named', names: [{ name }] });
+    expect(exposures(valid(`${header}${source(name)}`))[0].selection).toMatchObject({ kind: 'named', names: [{ name }] });
   });
   it.each(['from-value', 'from-', '1name', 'name$-x', 'foo--bar'])('never splits invalid bare name %s into convenient keywords', (name) => {
     const result = invalid(`${header}${source(name)}`, 'invalid-name');
@@ -176,7 +182,7 @@ describe('the complete version 1 grammar', () => {
   it('does not normalize, resolve or validate the filesystem meaning of decoded paths', () => {
     for (const path of ['../escape.ts', '/absolute.ts', 'C:/file.ts', 'https://example/a', 'interfaces//api.ts', 'interfaces/../private.ts', 'interfaces/*.ts', 'interfaces/', 'src/a.js', 'a\\b.ts', '@alias']) {
       const document = valid(`${header}expose-src * from ${JSON.stringify(path)} to parent`);
-      expect(document.statements[0].from.value).toBe(path);
+      expect(exposures(document)[0].from.value).toBe(path);
     }
   });
 });
@@ -194,7 +200,7 @@ describe('strings, Unicode and diagnostic recovery', () => {
     ['"a\uFEFFb"', 'a\uFEFFb'],
     ['"\uFFFD"', '\uFFFD'], // A real replacement scalar is not evidence of invalid UTF-8 bytes.
   ])('decodes %s exactly', (raw, decoded) => {
-    expect(valid(`${header}${source(raw)}`).statements[0].selection).toMatchObject({ kind: 'named', names: [{ name: decoded, alias: decoded }] });
+    expect(exposures(valid(`${header}${source(raw)}`))[0].selection).toMatchObject({ kind: 'named', names: [{ name: decoded, alias: decoded }] });
   });
 
   it.each(['\\b', '\\f', '\\n', '\\r', '\\t', '\\u0000', '\\u001f', '\\u007f'])('rejects decoded control %s in names and paths', (escape) => {

@@ -42,7 +42,7 @@ test('cleanup failure cannot turn a successful workload into a pass', async () =
 
 test('successful cold results do not retain raw command output', async () => {
   const measurements = {};
-  const complete = { ...incomplete, code: 0, stdout: JSON.stringify({ schemaVersion: 'ramify.analysis/1',
+  const complete = { ...incomplete, code: 0, stdout: JSON.stringify({ schemaVersion: 'ramify.analysis/2',
     outcome: { execution: 'completed', check: 'passed', coverage: 'complete' }, summary: { owners: 500, denied: 0 },
     coverage: [], stages: [{ status: 'completed' }] }) };
   const result = await coldCommand({ cli: async () => complete, connect: async () => {} }, { owners: 500 }, measurements);

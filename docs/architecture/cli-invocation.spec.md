@@ -155,7 +155,7 @@ never an external package.
 The human report prints the root and how it was selected, the compiler
 configuration in use, a `Mode:` line, failures first, then warnings, then
 analysis limits, then the completed scope. `--format json` writes the unchanged
-`ramify.analysis/1` report to stdout, without the human mode line or an added mode
+`ramify.analysis/2` report to stdout, without the human mode line or an added mode
 member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging goes
 to stderr; nothing else is written to stdout in that mode. Locations are relative
 to the root regardless of the working directory. Ordering is deterministic.
@@ -168,7 +168,7 @@ changes so that an outdated reader fails on it rather than misreading the
 document. Documents whose shape does not change keep their version.
 
 `--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
-that report. The report keeps `ramify.analysis/1` and sets `snapshot` to null; its
+that report. The report keeps `ramify.analysis/2` and sets `snapshot` to null; its
 summary, outcome, findings, warnings, analysis limits and exit code are those of
 the same check with the snapshot. A caller that reads only the verdict and its
 findings uses it: on the toolkit itself the snapshot is almost all of a
