@@ -428,6 +428,10 @@ Diagnostic, warning, coverage-note and limit code fields are open sets
 know, and a new code is not a shape change. A changed meaning of an existing
 value, or a new value in a closed status field that readers branch on, such as
 an outcome or an execution status, is a shape change and advances the version.
+A DTO exchanged only between a server and a page of the same build is exempt
+from the rule for an embedded value without its own schema identifier: the
+explorer's browser model keeps `ramify.explorer-http/1` unless iteration 18
+changes the HTTP envelope itself.
 
 If a slice finds an
 earlier shape change than this table names, the version advances in that slice

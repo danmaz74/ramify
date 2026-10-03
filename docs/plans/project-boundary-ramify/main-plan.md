@@ -223,3 +223,17 @@ None remain open; the decided questions follow.
    tree beneath `subs/` is selected from inside it because its root
    description is marked. The `subs/`-based climb is replaced, and the
    proposal's statement holds without narrowing.
+3. **The modularity probe's Markdown test.** Decided by the user on
+   2026-10-03: `scripts/probes/modularity/markdown.test.ts` moves into the
+   harness tree as `scripts/reference-harness/modularity-markdown.test.ts`
+   (iteration 6), a one-file addition to the harness test inventory that R6
+   fixed; `reference:cases` counts 37 files and 393 tests from that slice.
+4. **Additional toolkit declarations in iteration 7.** Decided by the user on
+   2026-10-03: `docs` and the probe fixture directories
+   `scripts/probes/fixtures/compiler-api` and
+   `scripts/probes/fixtures/plan2a-symbol-details` are `owned-ignored` at the
+   root; `scripts/probes/fast-check` and `scripts/spikes` stay undeclared and
+   are analyzed as auxiliary source.
+5. **The explorer's browser model.** Decided by the user on 2026-10-03: its
+   embedded `SourceOrigin.auxiliary` member does not advance
+   `ramify.explorer-http/1`; see [schema versions](contracts.md#schema-versions).
