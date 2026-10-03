@@ -49,7 +49,7 @@ qualification and issue a new artifact digest; never silently replace it.
 
 Phase 2 starts against the handed-off local artifact. Its own temporary install
 or fixture setup can use that tarball; no local artifact path is committed as
-its dependency. The stale audit draft is reconciled with this plan's PB1 cases,
+its dependency. The audit's detailed plan is authored against this plan's PB1 cases,
 iteration identities and actual contracts before audit implementation begins.
 
 A provider defect found during audit development is fixed in a toolkit-owned

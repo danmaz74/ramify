@@ -95,17 +95,12 @@ version. No local artifact path is committed as a dependency. A provider
 defect found during consumer work is fixed in the provider and delivered as a
 rebuilt local artifact until that publication.
 
-## Existing project-local drafts
+## Consumer plans
 
-Two drafts predate this sequence and name this document as their coordinator:
-`ramify-audit:docs/plans/04-project-boundary/main-plan.md` and
-[ramify-agent Plan 20](../../../ramify-agent/docs/plans/20-project-boundary/main-plan.md).
-Their prerequisites refer to toolkit iterations T1–T8, a toolkit-owned A6
-gate, PB case identifiers and a `sizing.md` that this plan does not define.
-Neither draft is executable as written. Each is reconciled with the actual
-provider handoff when its phase begins: replace the stale prerequisites,
-identifiers and publication requirements with those of this sequence, and
-recheck its source inventory before its first iteration.
+The detailed ramify-audit and ramify-agent plans are authored when their phase
+begins, from the actual provider handoff. Earlier drafts written before this
+sequence were removed on 2026-10-03; they remain in each repository's history
+and are not a starting point.
 
 ## Phase 1: update Ramify
 
@@ -270,4 +265,4 @@ is drafted. It proposes the grammar and public contracts, maps proposal sections
 and defines dependency-ordered iterations under the
 [planning workflow](../../development/implementation-workflow.md).
 Its contracts require review before implementation.
-Audit and agent detailed plans are reconciled in their respective later phases.
+Audit and agent detailed plans are authored in their respective later phases.
