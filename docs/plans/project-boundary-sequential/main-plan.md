@@ -25,6 +25,13 @@ Within Ramify, update all affected internal consumers, public contracts,
 transports, CLI outputs, generated views, tests and documentation together.
 Breaking a previous contract does not excuse an inconsistent new one.
 
+A project root declares itself with the root marker, `root module <name>`, as
+the user decided on 2026-10-03; an unmarked root is invalid under the updated
+Ramify. Every existing project must be updated to this rule in the phase that
+adopts that Ramify: the toolkit's own roots, generators and fixtures in
+Phase 1, ramify-audit's fixtures and test projects in Phase 2, and
+ramify-agent's own root, fixtures and target projects in Phase 3.
+
 ## Agent coordination and protected documents
 
 Implement these phases with directly coordinated agents, without relying on
@@ -114,7 +121,12 @@ declared analysis boundaries, and exposes the facts its later consumers need.
    These contracts pass review before the first implementation iteration.
 2. Implement declared `owned-ignored` and `external` trees, always-excluded
    paths and module scratch exclusions. Replace inferred independent-project
-   boundaries with explicit declarations and migration diagnostics. Add the
+   boundaries with explicit declarations and migration diagnostics. Require
+   the root marker: without `--root`, select the nearest description at or
+   above the working directory that carries it, require it of a description
+   named by `--root`, treat a marked description inside a declared tree as a
+   separate project and one elsewhere in the evaluated tree as a layout error,
+   and say to add the marker when a selected root lacks it. Add the
    warnings for compiler-selected source inside an owned-ignored tree or a
    scratch directory and for repository-ignored directories Ramify would
    still enter; remove discovery's `.reference-work` special case.
@@ -131,7 +143,9 @@ declared analysis boundaries, and exposes the facts its later consumers need.
    and materialized views. Make owned-ignored boundaries visible without
    interpreting their contents, and retire the outside-module-source warning.
 6. Migrate Ramify's own layout, declarations, compiler exclusions and tooling
-   to the model. Declare the site and example owned-ignored and the agent
+   to the model. Mark the toolkit's and the example's roots and every toolkit
+   generator or fixture that writes a root description, before the marker is
+   enforced. Declare the site and example owned-ignored and the agent
    external; declare the reference harness owned-ignored where it is and
    remove imports from analyzed code into it; give scripts and measurements
    legal imports. Update the site's package consumption and
@@ -139,8 +153,13 @@ declared analysis boundaries, and exposes the facts its later consumers need.
 
 **Completion gate:** verify parser and layout cases, containment, auxiliary
 source, boundary imports, linked-package positive controls, excluded-path
-outcomes, the new warnings and incremental consistency. Confirm that CLI root
-selection and production selection are unchanged. Run Ramify's build, type
+outcomes, the new warnings and incremental consistency. Verify that CLI root
+selection follows the root-marker rule: the nearest description carrying the
+marker is selected, unmarked descriptions never stop the climb, `--root` must
+name a marked description, no marked description means exit 2, and a selected
+root without the marker gets the diagnostic that says to add it. Confirm that
+production selection is unchanged and that every toolkit root, generator and
+fixture carries the marker. Run Ramify's build, type
 checks, self-check and the full regression and acceptance suites, including
 the reference harness under its unchanged configuration. Demonstrate the new
 contracts through real public entry points and CLI/process flows.
@@ -196,6 +215,10 @@ verification and report separate project results.
    result. Implement requested nested audits in the prepared checkout, with
    separate project records, reuse, verdicts and an aggregate caller result.
 
+Update every Ramify project the audit's fixtures and tests create or check to
+the root-marker rule when they adopt the Phase 1 Ramify. The audit's mode
+detection by the presence of `module.ramify` is unaffected.
+
 **Completion gate:** qualify full and partial audits, selection and coverage,
 committed configuration and evidence reuse, nested-project execution, failure
 aggregation and locking against the Phase 1 artifact. The updated audit must
@@ -235,13 +258,18 @@ while consuming both updated providers.
    package walks and readiness tests with the audit configuration's workspace
    preparation, retaining guarded-configuration authorization.
 4. Migrate the agent's fixture layout, declarations, scripts and compiler
-   exclusions. Adopt its shared-input audit policy. Invoke nested audits at
+   exclusions. Mark ramify-agent's own root, its fixtures' roots and every
+   target project it creates or checks with the root marker, together with the
+   provider update: until its root is marked, the updated Ramify invoked
+   inside `ramify-agent/` selects the enclosing toolkit root instead. Update
+   the agent's own readers of module headers to accept the marker. Adopt its shared-input audit policy. Invoke nested audits at
    the final plan gate, retaining each project's result and project identity
    in findings and evidence.
 
 **Completion gate:** verify write denials and explicit tree inclusion, scratch
 cleanup and resume, scoped selection, readiness preparation, provider adapters
-and final nested-audit reporting through real harness workflows. Complete an
+and final nested-audit reporting through real harness workflows, and that every
+agent project, fixture and target project carries the root marker. Complete an
 integration run with all three updated artifacts and revision-bound evidence.
 The run uses the published Ramify and ramify-audit versions through the
 agent's committed exact pins.

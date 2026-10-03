@@ -15,6 +15,10 @@ The local artifact and receipt name:
 - Every PB1 case's fixture, independent expectation, actual provider answer,
   command/configuration and receipt digest; full audit or direct-gate identity,
   explicit reference-command and full reference acceptance results.
+- The root-marker rule (R7) as a contract every consumer adopts: each project
+  a consumer checks, including its own root, fixtures and generated target
+  projects, declares its root with `root module <name>`, or the published
+  Ramify rejects it.
 - Current schema/CLI/API documents and the written [fixture topology](fixtures.md),
   including normalized exclusions, containment seeds, outside paths and expected
   reverse-import closure. Consumer tests rebuild it; no fixture files are copied.

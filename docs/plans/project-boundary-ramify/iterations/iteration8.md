@@ -16,7 +16,7 @@ Activate boundary pruning before walk descent; validate real directories/child o
 
 ## Read first
 
-- [Contracts](../contracts.md): Canonical path ownership and inventory; Description language; Schema versions.
+- [Contracts](../contracts.md): Canonical path ownership and inventory; Description language; Root marker; Schema versions.
 - [Modularity report specification](../../../architecture/modularity-report.spec.md): its project-boundary paragraph.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
@@ -39,9 +39,9 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 ## Deliverables
 
-1. Activate boundary pruning before walk descent; validate real directories/child overlap and retain boundary existence evidence. Remove inferred independentScopes and .reference-work special handling.
+1. Activate boundary pruning before walk descent; validate real directories/child overlap and retain boundary existence evidence. Remove inferred independentScopes and .reference-work special handling. A description carrying the root marker inside a declared tree is then never read: it is a separate project's root, not interpreted and not an error. Extend `undeclared-project-boundary`, which iteration 3B introduced for marked descriptions the walk interprets, to package manifests in undeclared nonmodule directories; directories formerly skipped as independent scopes are walked unless declared. Root selection does not change here: it already follows the marker.
 2. Inventory all owned compiler source, including auxiliary/unselected/loose subs code, and required resources; retire outsideModuleFiles/outside warning. Add compiler-selected ignored/scratch warnings.
-3. Add project-boundary-inventory.test.ts with invalid layout, ignored malformed descriptions, scratch position, compiler selections and inert inventories. Run widened self-check on actual toolkit imports, and confirm the harness tree contributes no inventory file, warning or finding.
+3. Add project-boundary-inventory.test.ts with invalid layout, ignored malformed and marked descriptions, a marked description in an undeclared directory, scratch position, compiler selections and inert inventories. Run widened self-check on actual toolkit imports, and confirm the harness tree contributes no inventory file, warning or finding.
 4. Own the modularity producer, `subs/analysis/src/modularity.ts` and its context and graph: `omittedScopes` records the declared nested-tree directories, outside occurrences count `outside-project` targets, and owned compiler source outside `src/` counts as its owner's auxiliary source, as the modularity report specification states. Advance it to `ramify.modularity/3`.
 5. Per [schema versions](../contracts.md#schema-versions), advance `ramify.check/2` (`ProjectWarning`) and `ramify.measure/2` (`outsideModuleFiles` retired), and extend the documents already at version 2 for the removed `independentScopes`, including the daemon codec's scope validator. Update every toolkit reader in this candidate: the CLI changed command, `examples/hooks/claude-code-post-write.mjs`, `scripts/measurements/fast-assertions.mjs`, `fast-evidence.test.mjs` and `plan2c.mjs`, the daemon measure service, toolkit tests and the reference harness's expected values, such as the `outside-module-source` warning and `outsideModuleFiles`, under [iteration gates](../execution.md#iteration-gates).
 

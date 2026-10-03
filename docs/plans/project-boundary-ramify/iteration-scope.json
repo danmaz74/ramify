@@ -66,6 +66,49 @@
       "producerCases": []
     },
     {
+      "index": "3A",
+      "scope": "Descriptions plus mechanical relays of the extended header type through analysis/root; the toolkit's two committed root descriptions; every toolkit generator, fixture, test double and header reader that writes or reads a root description, including the reference harness's fixtures and its expected values for outputs this slice changes; the quoted root header in `docs/architecture/daemon.md`. Extends `ramify.analysis/2`.",
+      "sourceReads": [
+        "subs/analysis/subs/descriptions/src/tokenize.ts",
+        "subs/analysis/subs/descriptions/src/parse.ts",
+        "subs/analysis/subs/descriptions/src/interfaces/syntax.ts",
+        "module.ramify",
+        "examples/collection-review/module.ramify"
+      ],
+      "exercisedCases": [
+        "PB1-41",
+        "PB1-44"
+      ],
+      "producerCases": [
+        "PB1-41"
+      ]
+    },
+    {
+      "index": "3B",
+      "scope": "Project selection, resolution reuse and acquisition validity, plus mechanical issue-code relays and layout categories through analysis/root; CLI help or failure text only where it describes the old climb; fixture and expectation corrections that enforcement exposes, including root-selection tests and the reference harness's expected values for selection and layout outputs. Extends `ramify.analysis/2`. Specification changes only as proposed patches.",
+      "sourceReads": [
+        "subs/analysis/subs/project/src/selection.ts",
+        "subs/analysis/subs/project/src/resolve-root.ts",
+        "subs/analysis/subs/project/src/read-project.ts",
+        "subs/analysis/subs/project/src/inventory.ts",
+        "subs/analysis/subs/project/src/interfaces/project.ts",
+        "subs/analysis/src/report.ts",
+        "subs/analysis/src/report-data.ts",
+        "subs/analysis/src/session-engine.ts"
+      ],
+      "exercisedCases": [
+        "PB1-30",
+        "PB1-42",
+        "PB1-43",
+        "PB1-44"
+      ],
+      "producerCases": [
+        "PB1-42",
+        "PB1-43",
+        "PB1-44"
+      ]
+    },
+    {
       "index": 4,
       "scope": "One toolkit-wide provenance type migration; behavioral implementations stay in their named owners. The reference harness's expected values for the renamed target kind.",
       "sourceReads": [

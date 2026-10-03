@@ -8,7 +8,7 @@ and execute their pinned Ramify. No fixture files are shared between projects.
 ## Topology
 
 ```text
-app/                              module app tagged [dispatch]
+app/                              root module app tagged [dispatch]
   module.ramify
   tsconfig.json
   README.md
@@ -40,7 +40,7 @@ Root declarations, under the adopted grammar:
 
 ```ramify
 ramify 1
-module app tagged [dispatch]
+root module app tagged [dispatch]
 owned-ignored "fixture-project"
 external "external-project"
 expose-sub api from a to descendants
@@ -48,9 +48,10 @@ expose-sub api from a to descendants
 
 The `a` description declares `owned-ignored "fixtures/sample"` and
 `expose-src api from "api.ts" to parent`. Other modules expose nothing unless a
-case says otherwise. The ignored projects have their own valid descriptions,
-configurations and source that would be invalid if interpreted as the enclosing
-project's source. They are data in the enclosing evaluation. Normal compiler
+case says otherwise. Every other description in `app` is unmarked. The ignored
+projects have their own valid descriptions, with marked roots, configurations
+and source that would be invalid if interpreted as the enclosing project's
+source. They are data in the enclosing evaluation. Normal compiler
 configuration excludes both declared trees and all module scratch directories;
 warning cases deliberately include them.
 
@@ -109,6 +110,25 @@ of ownership; its evidence cannot be hidden by an excluded seed.
    facts do not change. Remove an owned-ignored directory, change its declaration
    or introduce a child boundary: acquisition/invalidation reacts to that boundary
    evidence. Excluded bytes never become freshness inputs.
+
+## Root selection
+
+Selection follows the [root marker](contracts.md#root-marker), independently of
+declarations:
+
+| Working directory or `--root` | Expected selection |
+| --- | --- |
+| `subs/a/subs/grand/` or `scripts/` | `app`, found; unmarked descriptions do not stop the climb |
+| inside `subs/a/fixtures/sample/` | `sample`, found; its marked root lies beneath `app`'s `subs/` |
+| inside `fixture-project/` | `fixture-project`, found |
+| a directory with no marked description at or above it | `root-not-found`, exit 2, naming the working directory |
+| `--root subs/a` (unmarked) | `unmarked-root-description`, invalid, exit 1, saying to add the marker |
+| `--root .` | `app`, given |
+
+Mutations: removing `app`'s marker makes a found selection from `app`'s own
+directory `root-not-found` and an explicit one invalid; marking `subs/b` makes
+`app`'s acquisition report `undeclared-project-boundary` at that marker, while
+a selection from inside `subs/b` selects `b` as its own root.
 
 ## Qualification variations
 

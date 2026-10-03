@@ -2,6 +2,8 @@
 
 **Status:** accepted by the user on 2026-10-03 and adopted in the owning
 specifications in iteration 1 (commit `6d0c66f0`); implementation pending.
+R7, the root marker, was decided by the user on 2026-10-03 after iteration 2;
+the coordinator adopts its specification patches before iteration 3A.
 These are implementation contracts, not claims of support. Names below are
 planned additions to existing interfaces, not discovered available APIs.
 
@@ -15,9 +17,13 @@ planned additions to existing interfaces, not discovered available APIs.
 | R4 | A changed check gives the result the complete check would give on the project after the change. Paths Ramify does not analyze carry a not-analyzed disposition and need no content coverage; they never change the exit code. Exit 2 remains only for a check that could not establish that result. | Hook/API disposition, content freshness and negative controls. |
 | R5 | Decided 2026-10-03: correctness under the new rules comes first, optimization second. No rule is weakened to meet a limit or timing target. Capacity limits remain safety limits and are raised with a recorded measurement if the new rules need it. Earlier timing targets are measured and reported to the user at the end of the plan; missing one does not stop the plan. Inert/excluded contents never become inputs. | [Budgets](budgets.md), observation and cancellation coverage. |
 | R6 | Decided 2026-10-03: the reference harness stays at `scripts/reference-harness/` as an owned-ignored tree of the root, with its compiler configuration, runner and commands unchanged; analyzed toolkit code no longer imports from it. Site consumes packed toolkit exports. | No analyzed importer of the tree, package/build graph and preserved test inventory. |
+| R7 | Decided 2026-10-03: a project root declares itself with `root` before `module` on its module line, in format version 1, so existing root descriptions are invalid until migrated. Without `--root`, selection takes the nearest description at or above the working directory carrying the marker; unmarked descriptions never stop the climb, and no marked description means exit 2. `--root` must name a marked description. A marked description inside a declared tree is a separate project and is not interpreted; one elsewhere in the evaluated tree is a layout error; a selected root without the marker is an error whose message says to add it. | Grammar and reserved keyword, climb and resolution reuse, discovery validity, and migration of every toolkit root, generator and fixture before enforcement. See [root marker](#root-marker). |
 
 The user accepted all six entries on 2026-10-03: R2, R4, R5 and R6 as decided
-in their rows, and R1 and R3 as drafted. For R3 the user confirmed that the path
+in their rows, and R1 and R3 as drafted. The user decided R7 later the same
+day; it resolves the plan's former open question on root selection inside an
+owned-ignored tree beneath `subs/`, and needs no principles edit, since the
+importability principles already require an explicit application root. For R3 the user confirmed that the path
 and the current declarations alone decide ownership, and that no backwards
 compatibility is kept: the version numbers change only so that an outdated
 reader fails clearly. Under R4 the changed check is the quick form of the
@@ -29,8 +35,12 @@ dispositions below are stated in the
 
 Iteration 1 adopted the accepted wording in the owning specifications (commit
 `6d0c66f0`) and recorded the review receipt in
-[its results](iterations/iteration1-results.md). Runtime support and acceptance
-remain with the producing slices. Changes to an accepted interface invalidate
+[its results](iterations/iteration1-results.md). R7's exact patches to the
+module description and CLI invocation specifications, the glossary and the
+proposal are adopted by the coordinator under the
+[protected-document procedure](execution.md#protected-principles-and-specifications)
+before iteration 3A, and the receipt is recorded with that iteration's
+handoff. Runtime support and acceptance remain with the producing slices. Changes to an accepted interface invalidate
 affected downstream receipts.
 
 ## Description language and validation
@@ -67,10 +77,82 @@ An owned-ignored target must be an existing real directory. An external target
 may be absent; an existing target must be a real directory.
 
 Planned Project issue codes are `invalid-nested-tree`, `missing-owned-ignored`,
-`overlapping-nested-tree` and `undeclared-project-boundary`, retaining located
-declaration evidence. A malformed statement is a description error. An invalid
+`overlapping-nested-tree`, `undeclared-project-boundary` and, for R7,
+`unmarked-root-description`, retaining located declaration evidence.
+Iteration 3B introduces `undeclared-project-boundary` for marked descriptions;
+iteration 8 extends it to package manifests. A malformed statement is a description error. An invalid
 boundary makes acquisition invalid; never attribute hidden contents to the
 parent and continue with a valid partial model.
+
+## Root marker
+
+R7 extends the module line without changing the format version:
+
+```ebnf
+module-line = [ "root", hws ], "module", hws, module-name,
+              [ hws, tag-clause ], LF ;
+```
+
+`root` joins the reserved keywords as `owned-ignored` and `external` did. In
+every name position it must be double-quoted, as in `module "root"`. In tag
+position it remains a valid lowercase tag name resolved only through the
+registry, like the other special tag tokens; the marker defines no tag. A
+`root` keyword anywhere other than immediately before the header's `module`
+keyword is malformed syntax, reported with the existing parser codes; no new
+parser issue code is added. No committed or generated toolkit description
+uses a bare `root` in a name or tag position (verified at `3f435172`;
+`ramify-agent/` included).
+
+`DescriptionDocument.module` gains `root: TextSpan | null`: the span of the
+marker keyword, null when unmarked. The header's existing `span` covers the
+whole module line, beginning at the marker when present. An unmarked document
+remains valid: the parser does not know which description is the root.
+
+**Marker determination.** A description carries the marker when its module
+line begins with `root`. Selection decides this from the module line alone,
+using the Descriptions owner's tokenizer and header rules, supplied to Project
+the way `parse` is supplied today; Project gains no second grammar. A
+description whose module line begins with `root` carries the marker even when
+later lines are invalid, so the climb stops there and acquisition reports
+those errors. A description whose module line cannot be read, because of an
+encoding error before it or a missing or misplaced header, does not carry it.
+
+**Selection.** Without `--root`, selection takes the nearest directory at or
+above the canonical working directory whose `module.ramify` carries the marker,
+reading each description it passes. Unmarked descriptions never stop it. The
+`subs/`-based advance and the missing-parent-description check are removed;
+a child left without its parent description is reported by the selected
+project's discovery as a misplaced description. No marked description at or
+above the working directory remains `root-not-found`: status unavailable,
+exit 2, naming the working directory. `--root` must name a directory whose
+description carries the marker. A description there without it is
+`unmarked-root-description`: status invalid, exit 1 like
+`missing-root-description`, naming that description, with a message that
+says to add `root` before `module`. Symlink rules are unchanged.
+
+A reused resolution's discovery evidence includes the marker determination of
+every description selection read, so a marker change at any of them makes the
+reused resolution stale. A byte edit that leaves every determination unchanged
+does not.
+
+**Acquisition validity.** The root description acquisition parses must carry
+the marker; otherwise acquisition is invalid with `unmarked-root-description`,
+which also covers a change between selection and reading. Every other
+description the walk interprets that carries the marker is
+`undeclared-project-boundary`, category layout, located at the marker, with a
+message naming the nested-tree declaration to add in its nearest enclosing
+module. That directory contributes no module, and its contents are not
+attributed to an enclosing module, as for the existing layout-invalid
+descriptions. Until iteration 8 the walk still skips inferred independent
+scopes, so it does not read a marked description inside one. Iteration 8
+prunes declared trees before descent, so a marked description inside a
+declared tree is never read and is the root of a separate project.
+
+**Migration.** Every existing toolkit root description, and every toolkit
+generator or fixture that writes one, adopts the marker before enforcement;
+child descriptions stay unmarked. Iteration 3A migrates them and iteration 3B
+enforces the rule. `ramify-agent/` and `/ramify-audit` update their own roots,
+fixtures and target projects in their phases.
 
 ## Canonical path ownership and inventory
 
@@ -286,8 +368,9 @@ uses the owner's ordinary profile and publishes beneath its `src/`; selection
 from an excluded tree is invalid-location. Existing projection budgets and
 transactional publication remain in force.
 
-CLI root climbing remains unchanged: a description outside `subs/` establishes
-its own root, including when invoked within a nested project. Production
+CLI root selection follows R7, as [root marker](#root-marker) states:
+iteration 3B implements it in Project for every command that selects a
+project, and iteration 17 demonstrates it through real CLI processes. Production
 selection still consumes resolved profiles; testing modules and nested testing
 areas are excluded, ordinary analyzed auxiliary inputs are eligible, and inert
 owned files are not production merely because they have an owner.
@@ -315,7 +398,7 @@ exists for the intermediate shapes, and only the final shape is handed off.
 
 | Document | Advances in | First shape change | Later slices extending it |
 | --- | --- | --- | --- |
-| `ramify.analysis/2` | 2 | The report snapshot's parsed descriptions gain the nested-tree statement member | 3 scope `ownership`; 4 origin, placement and target vocabulary; 8 `independentScopes` removed, `ProjectWarning`; 11 denied outcome, boundary diagnostics and excluded-target coverage |
+| `ramify.analysis/2` | 2 | The report snapshot's parsed descriptions gain the nested-tree statement member | 3 scope `ownership`; 3A the parsed module header's `root` marker span; 3B the `unmarked-root-description` and marked-description `undeclared-project-boundary` layout issues; 4 origin, placement and target vocabulary; 8 `independentScopes` removed, `ProjectWarning`; 11 denied outcome, boundary diagnostics and excluded-target coverage |
 | `ramify.affected/2`, `ramify.affected-cli/2` | 3 | The selection's `scope` gains `ownership` | 8 `independentScopes` removed; 14 bases, seed status, exclusion and topology; 17 CLI output |
 | `ramify.watch/2`, `ramify.daemon-status/2` | 3 | Context status `scope` gains `ownership`; daemon status names `ramify.ipc/2` | 8 `independentScopes` removed; 15–17 check and status fields |
 | `ramify.ipc/2` | 3 | The strict codec's context-status scope gains `ownership` | 8 `independentScopes` removed; 15–16 check request paths, classification sequence and dispositions |
@@ -332,7 +415,19 @@ exactly. Iteration 4 renames `outside-module` to `outside-project` in
 `SourceTarget`, which extends `ramify.analysis/2`, and in the modularity
 producer's internal target kinds without changing the serialized modularity
 report. Toolkit tests use `ramify.ipc/2` as the incompatible-peer literal;
-iteration 3 replaces it with a literal no build produces. If a slice finds an
+iteration 3 replaces it with a literal no build produces. R7's issue codes are
+new values of existing code fields, not new members: a document that carries
+such a code as a string without enumerating it, such as `ramify.check/1` before
+iteration 8 or a `ramify.cli/1` diagnostic, keeps its version, and the human
+report keeps its root and selection lines.
+
+Diagnostic, warning, coverage-note and limit code fields are open sets
+(decided by the user on 2026-10-03): a reader tolerates a code it does not
+know, and a new code is not a shape change. A changed meaning of an existing
+value, or a new value in a closed status field that readers branch on, such as
+an outcome or an execution status, is a shape change and advances the version.
+
+If a slice finds an
 earlier shape change than this table names, the version advances in that slice
 and the coordinator updates the table.
 

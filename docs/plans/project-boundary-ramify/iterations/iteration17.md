@@ -16,7 +16,7 @@ Emit check/affected JSON and human path dispositions; the changed check's findin
 
 ## Read first
 
-- [Contracts](../contracts.md): Reports, affected queries and freshness; Git advisory warning; Schema versions.
+- [Contracts](../contracts.md): Reports, affected queries and freshness; Git advisory warning; Root marker; Schema versions.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-10, PB1-20, PB1-26, PB1-30 and the independent
@@ -41,7 +41,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 1. Emit check/affected JSON and human path dispositions, replacing `covered`, and extend `ramify.check/2` and `ramify.affected-cli/2` per [schema versions](../contracts.md#schema-versions). Findings and exit code are those of the complete check on the project after the change: a not-analyzed path never changes the exit code, and exit 2 means the result could not be established. Preserve definite findings for mixed checks and retry stale classification at most once. Update the harness's expected values, such as Plan 5's `covered` assertions, under [iteration gates](../execution.md#iteration-gates).
 2. Implement NUL-safe ignored-but-walked Git advice without model/ownership influence; no repo/missing Git/optional command failure leaves source verdict intact.
-3. Add project-boundary-cli.test.ts in the root tests for real built batch/resident invocations, nested roots, outside seeds, whitespace paths and every exclusion/not-analyzed control. Update CLI help. Propose the CLI invocation specification edits, including its passages that still name `ramify.analysis/1`, to the coordinator as exact patches under the [protected-document procedure](../execution.md#protected-principles-and-specifications); do not edit the specification.
+3. Add project-boundary-cli.test.ts in the root tests for real built batch/resident invocations, root-marker selection per PB1-30, outside seeds, whitespace paths and every exclusion/not-analyzed control. Update CLI help. Propose the CLI invocation specification edits, including its passages that still name `ramify.analysis/1`, to the coordinator as exact patches under the [protected-document procedure](../execution.md#protected-principles-and-specifications); do not edit the specification.
 
 ## Matrix rows executed here
 
@@ -70,7 +70,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-PB1-10/20/26/30 pass through actual CLI processes; no excluded content is labelled passed, and root selection remains documented behavior. Selection for a project inside an owned-ignored tree beneath `subs/` follows the user's answer to [open question 2](../main-plan.md#open-questions-for-the-user).
+PB1-10/20/26/30 pass through actual CLI processes; no excluded content is labelled passed, and root selection follows the root-marker rule of the [CLI invocation specification](../../../architecture/cli-invocation.spec.md#selecting-the-project), which iteration 3B implemented: the nearest marked description, including a marked project in an owned-ignored tree beneath `subs/`, exit 2 when none is marked, and exit 1 with the add-the-marker message for `--root` on an unmarked description.
 
 Record `iteration17-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

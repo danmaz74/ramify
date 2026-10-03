@@ -25,27 +25,34 @@ ramify --version
 
 The project is the tree beneath one root description: the root's `src/`, its
 `subs/` children and their `src/` and `subs/` recursively, with each owner's
-`src/tests/` and `src/interfaces/` areas.
+`src/tests/` and `src/interfaces/` areas. The root description declares itself
+with the root marker, `root module <name>`, as the
+[module description specification](../model/module-description.spec.md#a-description-file-establishes-a-directory-boundary)
+defines; every other description in the tree is unmarked.
+
+**Pending root marker.** This selection rule was specified on 2026-10-03 and
+is not yet implemented. Until it is, the CLI applies the earlier climb: the
+nearest description at or above the working directory is the candidate, and
+the climb advances to the nearest description-bearing ancestor while the
+candidate lies strictly beneath that ancestor's `subs/`.
 
 1. `--root <dir>` names the root explicitly. The directory must contain a
-   root `module.ramify`; nothing above it is examined.
-2. Without `--root`, take the nearest directory at or above the working
-   directory that contains `module.ramify` as the candidate. Find its nearest
-   proper ancestor containing another description. If the candidate lies
-   strictly beneath that ancestor's `subs/`, advance to that ancestor and
-   repeat. Ordinary grouping directories between `subs/` and a child do not
-   stop the climb. Otherwise the candidate is an independent project root:
-   stop, without skipping that nearer declared boundary to join a higher tree.
-   If the climb would stop at a candidate directly under `subs/` and the
-   parent of that `subs/` directory has no description, report that missing parent
-   description instead of treating the child as an independent root.
-3. Outside any ramified project, the command fails with exit 2 and a message
-   naming the working directory. It never searches subdirectories.
+   `module.ramify` carrying the root marker; nothing above it is examined. A
+   description there without the marker is an invalid selection, exit 1,
+   whose message says to add the marker.
+2. Without `--root`, select the nearest directory at or above the working
+   directory whose `module.ramify` carries the root marker. Unmarked
+   descriptions are modules of that root and never stop the climb, whatever
+   their position relative to any `subs/` directory.
+3. When no description at or above the working directory carries the marker,
+   the command fails with exit 2 and a message naming the working directory.
+   It never searches subdirectories.
 
 Paths are canonicalized before the climb, so a working directory reached
-through a symlink finds the same root as its real path. A consequence of the
-discovery rule is that an implicitly selected root may not itself sit directly
-under a directory named `subs`.
+through a symlink finds the same root as its real path. Selection does not
+depend on whether a marked description lies beneath another project's `subs/`
+or inside one of its declared nested trees. Checking that enclosing project
+reports a marked description outside its declared trees as a layout error.
 
 The report states the root and how it was selected: given, or found from the
 working directory. A resident check states the selection of its own invocation
@@ -55,11 +62,12 @@ discovery climb, so it can differ from a batch run that found the root by climbi
 from a subdirectory. Working from inside a nested module, an excluded-looking
 directory such as the toolkit's `site/`, or an independent project nested in
 the tree such as the toolkit's example, all resolve by the same rule, and the
-example resolves to its own root because `examples/` is not `subs/`.
+example resolves to its own root because its description carries the marker.
 For example, a command inside `project/subs/group/child/src/` selects `project`
-when `project` and `child` are the declared modules. An independent project
-inside `project/subs/child/examples/demo/` selects `demo`: its nearest containing
-module is `child`, and `demo` is outside that module's `subs/`.
+when `project`'s description carries the marker and `child`'s does not. A
+project in an owned-ignored tree `project/subs/child/fixtures/demo/`, whose
+description carries the marker, is selected from inside `demo`, although it
+lies beneath `project`'s `subs/`.
 
 ## Compiler configuration
 
@@ -112,8 +120,9 @@ compiler-selected source inside an owned-ignored tree, compiler-selected
 source inside a module's scratch directory, and, when the root lies in a Git
 repository and `git` is available, each repository-ignored directory the check
 would still enter. The CLI derives that last warning from Git's output; it is
-never an analysis input and never changes the result. Root selection is
-unchanged.
+never an analysis input and never changes the result. Root selection
+follows the root marker, as [selecting the project](#selecting-the-project)
+states.
 
 The configuration also defines what the project's own files are, in the
 ordinary TypeScript sense: the files its `files`, `include` and `exclude`
@@ -129,7 +138,7 @@ contains stray files, with the count. A stray `module.ramify` found outside
 the permitted module locations, including beside these files, is an individual
 layout error even if its contents are valid. It fails the check with exit 1;
 it is not included in the ordinary file-warning count and needs no strict
-configuration. Invalid descriptions within the checked tree, including markers
+configuration. Invalid descriptions within the checked tree, including descriptions
 inside `src/` or at reserved container roots, and invalid exposure paths remain
 errors.
 
@@ -314,6 +323,9 @@ content or deletion identity only for checked paths.
   beyond the analysis limits they cause.
 - Root discovery from a subdirectory is part of Plan 1; `--root` is the
   override, not the primary form.
+- A project root declares itself with the root marker, and the climb selects
+  the nearest description carrying it (decided 2026-10-03). Unmarked
+  descriptions never stop the climb.
 - Single compiler configuration per project in Plan 1; references later. No
   configuration override: the root's `tsconfig.json` is the whole-project
   configuration.

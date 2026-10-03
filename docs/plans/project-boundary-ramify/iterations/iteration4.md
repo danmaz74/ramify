@@ -1,7 +1,7 @@
 # Iteration 4: Auxiliary provenance vocabulary
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
-**Prerequisites:** [Iteration 3](iteration3.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
+**Prerequisites:** [Iteration 3B](iteration3b.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
 **Owners and write scope:** One toolkit-wide provenance type migration; behavioral implementations stay in their named owners. The reference harness's expected values for the renamed target kind. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 

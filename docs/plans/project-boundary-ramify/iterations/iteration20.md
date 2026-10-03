@@ -51,7 +51,7 @@ that producing slice and the phase qualification gate.
 
 ## Verification
 
-Execute the entire Final gate section of execution.md, not just the two commands below. Requalify PB1-01 through PB1-38 that describe runtime behavior; keep artifact PB1-36 for iteration 21. No required command/configuration may be omitted.
+Execute the entire Final gate section of execution.md, not just the two commands below. Requalify PB1-01 through PB1-38 and PB1-41 through PB1-44 that describe runtime behavior; keep artifact PB1-36 for iteration 21. No required command/configuration may be omitted.
 
 From the toolkit checkout:
 

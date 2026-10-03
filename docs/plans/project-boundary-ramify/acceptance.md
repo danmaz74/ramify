@@ -6,6 +6,8 @@ fixture, command/configuration, revision, actual result and primary artifacts.
 The producer column closes behavior only after its whole case passes; earlier
 slices may exercise preparations but cannot claim completion. Iteration 20
 requalifies every runtime case and iteration 21 qualifies artifact cases.
+PB1-41 to PB1-44 cover the root marker (R7); their producers are the inserted
+iterations 3A and 3B, registered as `"3A"` and `"3B"` in the case register.
 
 Provider cases use local builders derived from [fixtures.md](fixtures.md).
 Tests stay in the owning module's tests, or in the declared reference testing
@@ -18,8 +20,8 @@ specified in each iteration. Existing scenarios are retained through migration.
 | PB1-02: Malformed statement grammar | Unquoted/empty directories, multiline strings, extra clauses, repeated headers and invalid encoding fail with located independent expected codes. | 2 | focused |
 | PB1-03: Boundary layout validation | Escape, external-under-src, child overlap and a missing owned-ignored directory invalidate acquisition; absent external directories remain valid. | 8 | focused |
 | PB1-04: Declaration ambiguity and symlinks | Duplicate normalized or overlapping declarations and symlink traversal fail; equivalent nonoverlapping real directories pass. | 8 | focused |
-| PB1-05: Excluded discovery and separate roots | Neither ignored nor external descendants enter the enclosing model; an ignored project selected from its own root is evaluated independently. | 8 | public-api |
-| PB1-06: Undeclared project migration | A package/root description in an undeclared nonmodule directory is a named layout error; a tsconfig alone never silently stops discovery. | 8 | focused |
+| PB1-05: Excluded discovery and separate roots | Neither ignored nor external descendants enter the enclosing model, and a marked project root inside either kind is neither interpreted nor a layout error; an ignored project selected from its own root is evaluated independently. | 8 | public-api |
+| PB1-06: Undeclared project migration | A package manifest or a marked description in an undeclared nonmodule directory is a named layout error suggesting a declaration; a tsconfig alone never silently stops discovery. | 8 | focused |
 | PB1-07: Auxiliary compiler source inventory | Owned selected and unselected compiler source outside src, including loose subs source, appears under its owner; external compiler dependencies do not become application files. | 8 | public-api |
 | PB1-08: Inert and nonexistent ownership | New/deleted inert paths have containment owners without inventory entries, content hashes or per-file subscriptions. | 14 | public-api |
 | PB1-09: Scratch location and ownership | Only tmp directly under each module src is excluded and owned; src/tests/tmp and tools/tmp remain ordinary analyzed source in their corresponding profiles. | 8 | focused |
@@ -43,7 +45,7 @@ specified in each iteration. Existing scenarios are retained through migration.
 | PB1-27: Architect boundary visibility | Module metadata names both boundary kinds and owned-ignored omissions; ignored descendants contribute no symbols/files/tests; analyzed auxiliary originals are internal evidence. | 18 | materialization |
 | PB1-28: Foreign API projection | Only legal exposed originals appear; auxiliary/ignored originals never become foreign APIs; auxiliary from-selection uses the owner ordinary profile and excluded selection is refused. | 18 | materialization |
 | PB1-29: Explorer and measurements | Source counts and byte sums include analyzed auxiliary source/resources exactly, exclude inert/ignored contents and remain revision-bound in explorer/browser projection. | 18 | public-api |
-| PB1-30: CLI root selection | Invocation from a nested own-root description selects that project; root climbing elsewhere and explicit roots retain the existing documented selection. | 17 | cli-process |
+| PB1-30: CLI root selection | Real built batch and resident processes select the nearest root-marked description: the enclosing root from inside a nested unmarked module, and a marked project in an owned-ignored tree beneath subs/ from inside it. No marked description above exits 2 naming the working directory; --root on an unmarked description exits 1 with the add-the-marker message; the report states the root and how it was selected. | 17 | cli-process |
 | PB1-31: Production selection policy | Resolved testing profiles exclude testing modules/areas; ordinary auxiliary inputs are eligible; inert ownership adds no production files and declared trees/scratch never enter. | 19 | public-api |
 | PB1-32: Reference harness boundary | The harness tree is a root owned-ignored tree: none of its files enters the inventory, analysis or views, no analyzed toolkit source imports from it, no compiler-selected warning names it, and its test files and instances run unchanged under the unchanged command. | 8 | reference-runner |
 | PB1-33: Legal toolkit scripting imports | Root scripts/measurements use exposed source APIs and cannot gain testing access from filename/configuration tricks; same-owner references remain legal. | 8 | self-check |
@@ -54,6 +56,10 @@ specified in each iteration. Existing scenarios are retained through migration.
 | PB1-38: Full regression and reference acceptance | Candidate full toolkit suite, explicit reference suite and required completed-plan acceptance chain execute with all required correctness cases passing, preserving failures and only valid evidence reuse; earlier timing targets are measured and reported as met or missed without failing the case. | 20 | full-gate |
 | PB1-39: Revision-bound artifact receipt | Verified source/configuration/contract revisions, package version/digest, actual gate results and durable primary artifacts are bound in one handoff; a later changed tree is not silently certified. | 21 | artifact |
 | PB1-40: Phase boundaries | No Phase 1 edit/install touches audit or agent, no unsupported audit fields are added and no local artifact path is committed as a dependency. | 21 | artifact |
+| PB1-41: Root marker grammar | `root module` parses with the marker span and a whole-line header span; an unmarked header stays valid with a null marker and unchanged exposure records; `root` is reserved in every name position and valid there only quoted; as a tag it resolves through the registry, unknown under the default one; `root` alone, doubled, after `module` or before another statement is malformed with existing parser codes. | 3A | focused |
+| PB1-42: Root selection by marker | Selection passes unmarked descriptions inside and outside subs/ and stops at the nearest marked one; a marked project in an owned-ignored tree beneath subs/ is selected from inside it; a marked root with later syntax errors stops the climb and acquisition reports them; no marked description is root-not-found naming the working directory; --root on an unmarked description is invalid unmarked-root-description with the add-the-marker message; a reused resolution is stale after a marker change and reused after a marker-preserving edit. | 3B | public-api |
+| PB1-43: Root marker validity | A root description that lost its marker makes acquisition invalid with the migration message; a marked description at a child position beneath subs/ or at a stray position is a located undeclared-project-boundary layout error that contributes no module; the marked root with unmarked children acquires with exposures unchanged. | 3B | focused |
+| PB1-44: Toolkit root migration | The toolkit and example roots carry the marker and their committed child descriptions do not; every toolkit generator and fixture writes marked roots; with the rule enforced, the full toolkit suite, self-check and every reference instance pass without deleting or skipping a case. | 3B | full-gate |
 
 ## Evidence requirements
 

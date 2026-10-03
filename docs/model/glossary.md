@@ -2,8 +2,9 @@
 
 **Status:** Active
 
-Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01;
-the corresponding tooling changes are not yet implemented.
+Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01,
+and the root marker adopted 2026-10-03; the corresponding tooling changes are
+not yet implemented.
 
 ## Purpose
 
@@ -246,8 +247,14 @@ that S's declared signature names.
 ## Module header
 
 The **module header** is the `module` statement of `module.ramify`: the
-module's declared name and its optional `tagged` clause. Its tag set is the
-module's declared tag set and classifies the module's ordinary source.
+optional root marker, the module's declared name and its optional `tagged`
+clause. Its tag set is the module's declared tag set and classifies the
+module's ordinary source.
+
+## Root marker
+
+The **root marker** is the keyword `root` before `module` in a module header,
+declaring that module the root of its own project.
 
 ## Module tagging
 

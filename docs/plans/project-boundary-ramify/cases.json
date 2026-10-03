@@ -46,7 +46,7 @@
     {
       "id": "PB1-05",
       "title": "Excluded discovery and separate roots",
-      "expected": "Neither ignored nor external descendants enter the enclosing model; an ignored project selected from its own root is evaluated independently.",
+      "expected": "Neither ignored nor external descendants enter the enclosing model, and a marked project root inside either kind is neither interpreted nor a layout error; an ignored project selected from its own root is evaluated independently.",
       "producerIteration": 8,
       "fixture": "provider-topology",
       "tier": "public-api",
@@ -56,7 +56,7 @@
     {
       "id": "PB1-06",
       "title": "Undeclared project migration",
-      "expected": "A package/root description in an undeclared nonmodule directory is a named layout error; a tsconfig alone never silently stops discovery.",
+      "expected": "A package manifest or a marked description in an undeclared nonmodule directory is a named layout error suggesting a declaration; a tsconfig alone never silently stops discovery.",
       "producerIteration": 8,
       "fixture": "independent-config",
       "tier": "focused",
@@ -296,7 +296,7 @@
     {
       "id": "PB1-30",
       "title": "CLI root selection",
-      "expected": "Invocation from a nested own-root description selects that project; root climbing elsewhere and explicit roots retain the existing documented selection.",
+      "expected": "Real built batch and resident processes select the nearest root-marked description: the enclosing root from inside a nested unmarked module, and a marked project in an owned-ignored tree beneath subs/ from inside it. No marked description above exits 2 naming the working directory; --root on an unmarked description exits 1 with the add-the-marker message; the report states the root and how it was selected.",
       "producerIteration": 17,
       "fixture": "nested-root-selection",
       "tier": "cli-process",
@@ -401,6 +401,46 @@
       "fixture": "scope-review",
       "tier": "artifact",
       "finalQualificationIteration": 21,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-41",
+      "title": "Root marker grammar",
+      "expected": "`root module` parses with the marker span and a whole-line header span; an unmarked header stays valid with a null marker and unchanged exposure records; `root` is reserved in every name position and valid there only quoted; as a tag it resolves through the registry, unknown under the default one; `root` alone, doubled, after `module` or before another statement is malformed with existing parser codes.",
+      "producerIteration": "3A",
+      "fixture": "root-marker-lines",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-42",
+      "title": "Root selection by marker",
+      "expected": "Selection passes unmarked descriptions inside and outside subs/ and stops at the nearest marked one; a marked project in an owned-ignored tree beneath subs/ is selected from inside it; a marked root with later syntax errors stops the climb and acquisition reports them; no marked description is root-not-found naming the working directory; --root on an unmarked description is invalid unmarked-root-description with the add-the-marker message; a reused resolution is stale after a marker change and reused after a marker-preserving edit.",
+      "producerIteration": "3B",
+      "fixture": "root-marker-selection",
+      "tier": "public-api",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-43",
+      "title": "Root marker validity",
+      "expected": "A root description that lost its marker makes acquisition invalid with the migration message; a marked description at a child position beneath subs/ or at a stray position is a located undeclared-project-boundary layout error that contributes no module; the marked root with unmarked children acquires with exposures unchanged.",
+      "producerIteration": "3B",
+      "fixture": "root-marker-layout",
+      "tier": "focused",
+      "finalQualificationIteration": 20,
+      "status": "planned"
+    },
+    {
+      "id": "PB1-44",
+      "title": "Toolkit root migration",
+      "expected": "The toolkit and example roots carry the marker and their committed child descriptions do not; every toolkit generator and fixture writes marked roots; with the rule enforced, the full toolkit suite, self-check and every reference instance pass without deleting or skipping a case.",
+      "producerIteration": "3B",
+      "fixture": "toolkit-roots",
+      "tier": "full-gate",
+      "finalQualificationIteration": 20,
       "status": "planned"
     }
   ]

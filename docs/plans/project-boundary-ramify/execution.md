@@ -81,7 +81,11 @@ beyond it require renewed review.
 Iteration 1 took the user's accepted R1–R6 decisions and obtained authorization
 for the exact specification-adoption patches before applying them (commit
 `6d0c66f0`). Implementation status stays pending. No principle edit is expected; a need discovered during adoption uses
-the same change-request procedure. Later status or wording changes to protected
+the same change-request procedure. The user decided R7, the root marker, on
+2026-10-03 and authorized its specification changes; the coordinator reviews
+and adopts the exact patches before iteration 3A, records their baseline,
+approval and diff identity in that iteration's handoff, and supplies the new
+authoritative revision to later briefs. Later status or wording changes to protected
 documents also require a documented reason and specific authorization.
 
 At every handoff, compare against the iteration's baseline across committed
