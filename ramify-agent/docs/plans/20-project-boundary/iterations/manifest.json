@@ -1,0 +1,68 @@
+{
+  "plan": "../main-plan.md",
+  "status": "draft",
+  "iterations": [
+    {
+      "id": "H1",
+      "family": "H1",
+      "file": "iteration1.md",
+      "dependsOn": []
+    },
+    {
+      "id": "H2",
+      "family": "H2",
+      "file": "iteration2.md",
+      "dependsOn": [
+        "H1"
+      ]
+    },
+    {
+      "id": "H3a",
+      "family": "H3",
+      "file": "iteration3.md",
+      "dependsOn": [
+        "H2"
+      ]
+    },
+    {
+      "id": "H3b",
+      "family": "H3",
+      "file": "iteration4.md",
+      "dependsOn": [
+        "H3a"
+      ]
+    },
+    {
+      "id": "H4a",
+      "family": "H4",
+      "file": "iteration5.md",
+      "dependsOn": [
+        "H3b"
+      ]
+    },
+    {
+      "id": "H4b",
+      "family": "H4",
+      "file": "iteration6.md",
+      "dependsOn": [
+        "H4a"
+      ]
+    },
+    {
+      "id": "H5",
+      "family": "H5",
+      "file": "iteration7.md",
+      "dependsOn": [
+        "H4b"
+      ]
+    },
+    {
+      "id": "H6",
+      "family": "H6",
+      "file": "iteration8.md",
+      "dependsOn": [
+        "H5"
+      ]
+    }
+  ]
+}
