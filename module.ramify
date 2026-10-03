@@ -1,6 +1,26 @@
 ramify 1
 root module "ramify" tagged [dispatch]
 
+// Owned trees Ramify does not interpret: the documentation, the documentation
+// site (its own package), the Collection Review example (its own package and
+// project), the reference harness, and two probe fixture projects with their
+// own compiler configurations.
+owned-ignored "docs"
+owned-ignored "examples/collection-review"
+owned-ignored "scripts/probes/fixtures/compiler-api"
+owned-ignored "scripts/probes/fixtures/plan2a-symbol-details"
+owned-ignored "scripts/reference-harness"
+owned-ignored "site"
+
+// The agent harness, a separate project, and the work directories tools write
+// into the checkout: cucumber-viz state, editor history, browser-agent output
+// and the build and reference harness work area. Any of them may be absent.
+external ".cucumber-viz"
+external ".history"
+external ".playwright-mcp"
+external ".reference-work"
+external "ramify-agent"
+
 // R1: invocation vocabulary for the injected CLI operation.
 expose-src * from "interfaces/batch.ts" to descendants
 // R6: dispatch-facing service vocabulary, implemented by daemon.

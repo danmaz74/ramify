@@ -428,6 +428,25 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 7: the toolkit's nested trees, as
+  // the user decided them on 2026-10-03.
+  { plan: 'Phase 1 project boundaries (toolkit nested trees)',
+    added: {
+      './': [
+        'owned-ignored "docs"',
+        'owned-ignored "examples/collection-review"',
+        'owned-ignored "scripts/probes/fixtures/compiler-api"',
+        'owned-ignored "scripts/probes/fixtures/plan2a-symbol-details"',
+        'owned-ignored "scripts/reference-harness"',
+        'owned-ignored "site"',
+        'external ".cucumber-viz"',
+        'external ".history"',
+        'external ".playwright-mcp"',
+        'external ".reference-work"',
+        'external "ramify-agent"',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** The expected selections: the archived list, then each named layer in turn.

@@ -861,13 +861,15 @@ export async function apiViewIdentity(): Promise<ApiIdentityEvidence> {
           entries: number(3), bytesWritten: number(4), unchanged: number(5), modules: null, records: null, dependencies: null };
         return { outcome, stdout: result.stdout, files: await readApiViews(root) };
       }, stops, launcher);
-      // The baseline build predates the root marker, so it reads the copy with the
-      // marker removed from the root's module line; this build reads it marked.
-      // API views carry no description bytes, so the comparison stays exact.
+      // The baseline build predates the root marker and nested-tree statements, so
+      // it reads the copy with the marker removed from the root's module line and
+      // without the root's nested-tree statements; this build reads it as written.
+      // API views carry no description bytes and cover module source only, which
+      // no declared tree contains, so the comparison stays exact.
       const description = join(root, 'module.ramify');
       const marked = await readFile(description, 'utf8');
       if ((marked.match(/^root module /gm) ?? []).length !== 1) throw new Error(`Expected one marked root module line in the ${kind} copy`);
-      await writeFile(description, marked.replace(/^root module /m, 'module '));
+      await writeFile(description, marked.replace(/^root module /m, 'module ').replace(/^(?:owned-ignored|external) "[^"\n]*"\n/gm, ''));
       const before = await run(join(base, 'dist/src/ramify'));
       await writeFile(description, marked);
       await removeGenerated(root);

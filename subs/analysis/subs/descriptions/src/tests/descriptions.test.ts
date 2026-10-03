@@ -15,6 +15,7 @@ const src = (names: Names, from: string, tags: readonly string[] | null = null, 
   statement('expose-src', names, from, destinations, tags);
 const sub = (names: Names, from: string, destinations: readonly ('parent' | 'descendants')[] = ['parent']) =>
   statement('expose-sub', names, from, destinations);
+const tree = (kind: 'owned-ignored' | 'external', directory: string) => ({ kind, directory });
 const descendants = ['descendants'] as const;
 const both = ['parent', 'descendants'] as const;
 const browser = ['browser'];
@@ -139,10 +140,14 @@ interface Fixture {
   path: string;
   name: string;
   tags: readonly string[];
-  statements: readonly ReturnType<typeof statement>[];
+  statements: readonly (ReturnType<typeof statement> | ReturnType<typeof tree>)[];
 }
 const toolkit: readonly Fixture[] = [
   { path: '', name: 'ramify', tags: ['dispatch'], statements: [
+    // The toolkit's nested trees, decided by the user on 2026-10-03.
+    ...['docs', 'examples/collection-review', 'scripts/probes/fixtures/compiler-api', 'scripts/probes/fixtures/plan2a-symbol-details',
+      'scripts/reference-harness', 'site'].map((directory) => tree('owned-ignored', directory)),
+    ...['.cucumber-viz', '.history', '.playwright-mcp', '.reference-work', 'ramify-agent'].map((directory) => tree('external', directory)),
     src('*', 'interfaces/batch.ts', null, descendants), src('*', 'interfaces/service.ts', null, descendants),
     statement('expose-test', ['createQuickEnvironment', 'QuickEnvironment'], 'quick-environment.ts', descendants),
     sub([...modelNames, ...availabilityNames], 'analysis', descendants), sub([...syntaxNames, ...linkingNames], 'analysis', descendants),

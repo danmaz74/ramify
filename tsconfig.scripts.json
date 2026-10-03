@@ -19,5 +19,10 @@
   "exclude": ["node_modules", "dist", "site", "examples", "**/.reference-work",
     // The reference harness, with its package-consumer fixture, has its own compiler
     // scope, scripts/reference-harness/tsconfig.json; no script here imports from it.
-    "scripts/reference-harness"]
+    "scripts/reference-harness",
+    // Owned-ignored probe fixture projects, each with its own tsconfig.json; the
+    // probes read them by path.
+    "scripts/probes/fixtures/compiler-api", "scripts/probes/fixtures/plan2a-symbol-details",
+    // Each module's scratch directory, `tmp` directly beneath its `src/`.
+    "src/tmp", "subs/**/src/tmp"]
 }
