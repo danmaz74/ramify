@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
+import { providerValueNote } from './fixtures/plan2/project.js';
 import { ownerId, sourcePath } from './linking-expectations.js';
 import { repositoryRoot } from './plan.js';
 import type { AssertionEvidence, InstanceHandler, ProjectContext } from './runner.js';
@@ -36,7 +37,8 @@ function add(id: string, fixture: 'R' | 'F', mutate: Handler['mutate'], run: Han
   }, baseline: async context => {
     await compilerValid(context.root, context.assertions);
     const report = await sessionReport(context.root);
-    if (options.partialBaseline) completed(report, context.assertions, 'partial'); else clean(report, context.assertions);
+    if (options.partialBaseline) completed(report, context.assertions, 'partial');
+    else clean(report, context.assertions, fixture === 'F' ? [providerValueNote] : []);
     context.assertions.equal('baseline exact owner count', report.summary.owners, fixture === 'R' ? 15 : 3);
   }, mutate, run });
 }

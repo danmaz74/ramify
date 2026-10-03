@@ -57,7 +57,9 @@ async function report(root: string, directory: string, before: boolean): Promise
 async function compare(root: string, directory: string, assertions: Assertions, fixture: string): Promise<void> {
   const before = await report(root, directory, true);
   const after = await report(root, directory, false);
-  const expected = fixture === 'R' ? [15, 294, 2] : [11, 2744, 0];
+  // ff01212e (Plan 8) declared the reference's signatures and pinned its whole baseline at
+  // 313 accesses, as Plan 1's reference baseline asserts; owners and warnings are unchanged.
+  const expected = fixture === 'R' ? [15, 313, 2] : [11, 2744, 0];
   assertions.equal(`${fixture}: recorded baseline owners, accesses and warnings`,
     [before.summary.owners, before.summary.accesses, before.summary.warnings], expected);
   assertions.equal(`${fixture}: complete baseline with no findings`, [before.outcome, before.diagnostics, before.coverage],

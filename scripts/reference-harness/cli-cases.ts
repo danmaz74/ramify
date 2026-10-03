@@ -8,6 +8,7 @@ import type { AnalysisReport } from '../../subs/analysis/src/index.js';
 import { cliProcess, compiledEntry } from '../../src/tests/process.js';
 import type { TraceEvent } from '../../src/tests/process.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
+import { providerValueNote } from './fixtures/plan2/project.js';
 import { replaceExactlyOnce } from './mutation.js';
 import { repositoryRoot } from './plan.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
@@ -26,7 +27,7 @@ function add(id: string, fixture: 'R' | 'F', mutate: Handler['mutate'], run: Han
   baseline: async ({ root, assertions }) => {
     await compilerValid(root, assertions);
     const report = await sessionReport(root);
-    clean(report, assertions);
+    clean(report, assertions, fixture === 'F' ? [providerValueNote] : []);
     assertions.equal('baseline owner count', report.summary.owners, fixture === 'R' ? 15 : 3);
   }, mutate, run });
 }

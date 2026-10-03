@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { analyzeProject, createAnalysisSession } from '../../subs/analysis/src/index.js';
 import type { AnalysisReport, AnalysisRun, AnalysisSession } from '../../subs/analysis/src/index.js';
+import { providerValueNote, signatureNoteKey } from './fixtures/plan2/project.js';
 import { Assertions } from './runner.js';
 import { inspectPlainReport, sessionInputs } from './session-expectations.js';
 
@@ -174,7 +175,9 @@ async function run(): Promise<void> {
     released('changed acquisition');
     if (changes === 'once') {
       assertions.equal('one mutation occurred at capture validation', mutations, 1);
-      assertions.equal('stable retry completed real checking', report.outcome, { execution: 'completed', check: 'passed', coverage: 'complete' });
+      // The appended `changed1` is unexposed, so F's one recipe note is the only coverage.
+      assertions.equal('stable retry completed real checking', report.outcome, { execution: 'completed', check: 'passed', coverage: 'partial' });
+      assertions.equal('stable retry keeps only the recipe\'s value signature note', report.coverage.map(signatureNoteKey), [providerValueNote]);
       const digest = createHash('sha256').update(await fs.readFile(target)).digest('hex');
       assertions.equal('inventory and captured bytes share the final coherent file identity',
         [report.snapshot!.inventory.files.find(file => file.path === 'subs/provider/src/interfaces/api.ts')?.sha256,

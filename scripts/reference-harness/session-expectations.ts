@@ -1,5 +1,7 @@
 import { analyzeProject } from '../../subs/analysis/src/index.js';
 import type { AnalysisInputs, AnalysisReport } from '../../subs/analysis/src/index.js';
+import { signatureNoteKey } from './fixtures/plan2/project.js';
+import type { SignatureNoteKey } from './fixtures/plan2/project.js';
 import { validationInputs } from './linking-expectations.js';
 import type { Assertions } from './runner.js';
 import { analysisEvidence, recordObservation } from './observations.js';
@@ -27,9 +29,13 @@ export function completed(report: AnalysisReport, assertions: Assertions, covera
     [report.summary.complete, report.summary.errors, report.summary.warnings, report.summary.coverageNotes],
     [true, report.diagnostics.length, report.warnings.length, report.coverage.length]);
 }
-export function clean(report: AnalysisReport, assertions: Assertions): void {
-  completed(report, assertions);
-  assertions.equal('baseline source diagnostics and coverage', [report.diagnostics, report.coverage], [[], []]);
+/** An unchanged fixture: no diagnostic or denial, and exactly the coverage
+ * notes its recipe implies. R has none. F passes `[providerValueNote]`: its
+ * exposed `value` has an inferred signature, a nonblocking note that leaves the
+ * check passed with partial coverage. */
+export function clean(report: AnalysisReport, assertions: Assertions, notes: readonly SignatureNoteKey[] = []): void {
+  completed(report, assertions, notes.length ? 'partial' : 'complete');
+  assertions.equal('baseline source diagnostics and coverage', [report.diagnostics, report.coverage.map(signatureNoteKey)], [[], notes]);
   assertions.ok('baseline has real allowed application decisions', report.summary.allowed > 0);
   assertions.equal('baseline denial count', report.summary.denied, 0);
 }
