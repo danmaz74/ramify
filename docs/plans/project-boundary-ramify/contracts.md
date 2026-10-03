@@ -124,7 +124,9 @@ reading each description it passes. Unmarked descriptions never stop it. The
 a child left without its parent description is reported by the selected
 project's discovery as a misplaced description. No marked description at or
 above the working directory remains `root-not-found`: status unavailable,
-exit 2, naming the working directory. `--root` must name a directory whose
+exit 2, naming the working directory. When an unmarked description lies at
+or above the working directory, the message also names the nearest one and
+says to add `root` to its module line if it is the project root. `--root` must name a directory whose
 description carries the marker. A description there without it is
 `unmarked-root-description`: status invalid, exit 1 like
 `missing-root-description`, naming that description, with a message that
