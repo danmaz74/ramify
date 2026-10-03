@@ -232,6 +232,13 @@ order:
   Their contents are not rendered.
 - `files` counts the inventory's source files, TypeScript and JavaScript, in
   the module's own areas, and the same for its subtree.
+- When project boundaries are implemented, `module.json` also lists the
+  module's declared owned-ignored and external trees with their kinds and
+  declaration locations, and never the files, symbols or tests inside them.
+  `files` and `metrics` then count analyzed auxiliary source and referenced
+  resources outside `src/` and exclude inert and excluded contents. Auxiliary
+  originals appear only as internal evidence. Each document whose shape this
+  changes advances its schema version.
 - `uses` and `usedBy` count distinct originals per module pair, from the
   dependency facts under the production source filter. Unused imports are
   absent. An `unknown` count is present only when nonzero. Both arrays are

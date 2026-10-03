@@ -98,6 +98,23 @@ code.
 
 ## Files outside modules
 
+**Pending project boundaries.** The whole-tree ownership model adopted on
+2026-10-01 replaces this section when it is implemented; until then the
+section describes current behavior. Ownership then follows the
+[module description specification](../model/module-description.spec.md):
+owned compiler source outside every `src/`, including sibling `tests/` or
+`interfaces/` directories and loose source beneath `subs/`, is analyzed as its
+owner's auxiliary source whether or not the configuration selects it, and the
+outside-module warning is retired. Only declared nested trees and
+always-excluded paths are left out; a nested `tsconfig.json` and repository
+ignore rules exclude nothing. Three nonblocking warnings remain:
+compiler-selected source inside an owned-ignored tree, compiler-selected
+source inside a module's scratch directory, and, when the root lies in a Git
+repository and `git` is available, each repository-ignored directory the check
+would still enter. The CLI derives that last warning from Git's output; it is
+never an analysis input and never changes the result. Root selection is
+unchanged.
+
 The configuration also defines what the project's own files are, in the
 ordinary TypeScript sense: the files its `files`, `include` and `exclude`
 select. Any of those files that lies outside every module's `src/` is a
@@ -142,6 +159,13 @@ analysis limits, then the completed scope. `--format json` writes the unchanged
 member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging goes
 to stderr; nothing else is written to stdout in that mode. Locations are relative
 to the root regardless of the working directory. Ordering is deterministic.
+
+When project boundaries are implemented, every machine document whose payload
+shape they change moves to its next version, including `ramify.analysis/2`,
+`ramify.check/2`, `ramify.affected-cli/2` and the IPC protocol
+`ramify.ipc/2`. No reader for the earlier version is kept: a version number
+changes so that an outdated reader fails on it rather than misreading the
+document. Documents whose shape does not change keep their version.
 
 `--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
 that report. The report keeps `ramify.analysis/1` and sets `snapshot` to null; its
@@ -208,6 +232,19 @@ modules, 1 for an invalid project, an unknown module ID or an invalid seed,
 2 when unavailable, pending, cold, superseded or past a deadline, and 130 when
 interrupted. `--changed`, `--since` and `--deadline` do not apply.
 
+When project boundaries are implemented, `ramify affected` answers every path
+seed by containment under the current declarations, without an inventory entry
+or a filesystem read, so absent, new and deleted paths and both sides of a
+rename resolve. Each path seed states whether the path is owned, excluded or
+outside the project, with its exclusion when one applies. An owned path,
+including one in an owned-ignored tree or a scratch directory, selects its
+owner and that owner's transitive importers. A path in an external tree or
+another always-excluded path selects nothing. Only a path outside the project,
+written with a leading `../`, widens the answer to all modules; any other
+malformed seed is an invalid seed. The answer carries the revision's whole
+ownership topology. These answers use `ramify.affected-cli/2`, carrying a
+`ramify.affected/2` selection.
+
 ### Hook and complete checks
 
 `check` has three forms with distinct roles. They apply the same rules to the
@@ -244,6 +281,27 @@ revision, and 2 when it was not checked, naming the reason. One known limit:
 where the root `tsconfig.json` carries `references` beside its own files, a
 created or deleted file makes the daemon find the project again rather than
 reuse what it knows, so those hooks are slower than the same hooks elsewhere.
+
+When project boundaries are implemented, the hook check gives each named path
+one disposition. `checked` means the covering revision completed the relevant
+analysis with evidence of the path's current content or its deletion; deleting
+previously analyzed source is checked once its removal is analyzed.
+`not-analyzed` means the complete check does not analyze the path either: it
+lies in an owned-ignored, external or scratch directory or another
+always-excluded path, or it is an owned file that is neither source nor an
+analysis input. Descriptions, configuration, READMEs and referenced resources
+that the analysis reads are analysis inputs, not inert files. A not-analyzed
+path is not hashed or captured, needs no content coverage and never changes
+the exit code: a request naming only such paths exits 0 when the covering
+revision has no findings and 1 when it has findings or is invalid, exactly as
+`ramify check` would. `not-checked` means the hook could not establish the
+result for that path, for example through stale or unobserved content, an
+expired deadline, a named configuration file or unavailable work; it gives
+exit 2 and retains findings verified before the failure. The disposition, not
+the exit code, states that a path was not analyzed, and no such path is shown
+as passing source checks. The `ramify.check/2` document reports these
+dispositions in place of each changed path's coverage flag, with the analyzed
+content or deletion identity only for checked paths.
 
 ## Decisions recorded here
 

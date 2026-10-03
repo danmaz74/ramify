@@ -250,6 +250,13 @@ The label is `repository interface use`, never unused API. Independent compiler
 scopes (`ProjectScope.independentScopes`) are recorded as `omittedScopes` in
 provenance; their absence from the graph is not zero use.
 
+When project boundaries are implemented, inferred independent compiler scopes
+no longer exist: `omittedScopes` records the declared nested-tree directories
+instead, the `outside-module` target kind becomes `outside-project`, and owned
+compiler source outside `src/`, including scripts and probes, is analyzed as
+its owner's auxiliary source. The report's schema version advances with that
+shape change.
+
 Under candidate ownership, declarations are unchanged, so interface use is
 `unavailable` with reason `candidate-exposure`. Compare candidates with
 contract breadth: the distinct selected symbols of each outgoing and incoming
