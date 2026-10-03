@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { SourceLocation } from '../subs/model/src/interfaces/model.js';
-import type { ProjectInventory, ProjectIssue, ProjectScope, OutsideSourceWarning } from '../subs/project/src/interfaces/project.js';
+import type { ProjectInventory, ProjectIssue, ProjectScope, ProjectWarning } from '../subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../subs/typescript/src/interfaces/source.js';
 import type { AnalysisCode, AnalysisInputs, AnalysisDiagnostic, AnalysisReport, AnalysisSnapshot, Capability, StageExecution, StageId } from './interfaces/analysis.js';
 import { diagnostic } from './report-data.js';
@@ -50,6 +50,8 @@ function scalar(text: string, index: number): number {
 export const locatedOrder = (a: { location: SourceLocation | null; code: string; id: string }, b: typeof a): number =>
   byteOrder(a.location?.file ?? '', b.location?.file ?? '') || (a.location?.start ?? 0) - (b.location?.start ?? 0)
   || byteOrder(a.code, b.code) || byteOrder(a.id, b.id);
+/** The order a report lists its warnings: by path, then code. */
+const warningOrder = (a: ProjectWarning, b: ProjectWarning): number => byteOrder(a.path, b.path) || byteOrder(a.code, b.code);
 
 /** Summary counts a snapshot yields. A publication draft records them without building the snapshot. */
 export interface SnapshotCounts {
@@ -137,7 +139,7 @@ const acquisitionFailure: Readonly<Record<CarriedCode, AnalysisDiagnostic['categ
 export class ReportDraft {
   inputId: string | null = null;
   scope: ProjectScope | null = null;
-  readonly warnings: OutsideSourceWarning[] = [];
+  readonly warnings: ProjectWarning[] = [];
   registry: AnalysisReport['registry'] = null;
   snapshot: AnalysisSnapshot | null = null;
   /** Counts recorded instead of a snapshot by a publication draft. */
@@ -220,7 +222,7 @@ export class ReportDraft {
   build(): AnalysisReport {
     this.blockDependents();
     const complete = this.isComplete();
-    const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
+    const warnings = [...this.warnings].sort(warningOrder);
     const diagnosticIds = new Set(this.diagnostics.map(item => item.id));
     return {
       schemaVersion: 'ramify.analysis/2', runId: this.runId, inputId: this.inputId, request: this.echo,
@@ -249,7 +251,7 @@ export class ReportDraft {
     if (this.stages.find(stage => stage.stage === 'report')!.status !== 'failed') this.stage('report', 'completed');
     this.blockDependents();
     const complete = this.isComplete();
-    const warnings = [...this.warnings].sort((a, b) => byteOrder(a.entry, b.entry));
+    const warnings = [...this.warnings].sort(warningOrder);
     const diagnostics = [...this.diagnostics].sort(locatedOrder), coverage = [...this.coverage].sort(locatedOrder);
     const kept: PublishedReport = { outcome: this.outcomeOf(complete),
       summary: this.summaryOf(complete, this.counts ?? snapshotCounts(this.snapshot), warnings.length), diagnostics, warnings, coverage };

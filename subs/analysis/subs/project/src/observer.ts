@@ -3,7 +3,7 @@ import type { Capture } from './capture.js';
 import { acquireProject } from './read-project.js';
 import type { AcquiredProject } from './read-project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, within } from './data.js';
-import { excludedDirectory, inventoryFileKind, outsideSourceWarnings, scopeOwnership } from './inventory.js';
+import { excludedDirectory, inventoryFileKind, scopeOwnership } from './inventory.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { descriptionMarker } from './marker.js';
 import { readPurpose } from './purpose.js';
@@ -345,8 +345,9 @@ class Observer implements ProjectObserver {
         walkedAreas: nextModules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
         ownership: scopeOwnership(this.#capture.root, nextModules, this.#configurationData) },
       modules: nextModules, files: nextFiles, references,
-      outsideModuleFiles: this.#inventory.outsideModuleFiles,
-      warnings: outsideSourceWarnings(this.#inventory.outsideModuleFiles),
+      // A local update moves no boundary and admits no outside-module file, so
+      // those files and every warning carry over; a rebuild recomputes them.
+      outsideModuleFiles: this.#inventory.outsideModuleFiles, warnings: this.#inventory.warnings,
     });
     this.#inventory = inventory;
     return freeze({ kind: 'local', inventory, descriptions: descriptions.sort(byteOrder), readmes: readmes.sort(byteOrder),

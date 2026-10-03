@@ -101,7 +101,8 @@ describe('the toolkit root description declares its nested trees', () => {
       const inside = (path: string): boolean => path.startsWith(`${directory}/`);
       expect(inventory.files.filter(file => inside(file.path)), directory).toEqual([]);
       expect(inventory.outsideModuleFiles.filter(inside), directory).toEqual([]);
-      expect(inventory.warnings.filter(warning => warning.files.some(inside)), directory).toEqual([]);
+      expect(inventory.warnings.filter(warning => warning.path === directory || inside(warning.path)
+        || (warning.files ?? []).some(inside)), directory).toEqual([]);
       expect(inventory.modules.filter(module => inside(module.directory)), directory).toEqual([]);
       // At most the tree's own directory is observed, as boundary evidence; nothing beneath it is.
       expect(inputs.filter(input => inside(input.path)).map(input => input.path), directory).toEqual([]);

@@ -56,8 +56,10 @@ const syntaxNames = ['TextSpan', 'DescriptionToken', 'DescriptionIssue', 'NamedS
   'DescriptionSelection', 'ExposureStatement', 'NestedTreeStatement', 'DescriptionStatement', 'DescriptionDocument',
   'ParsedDescription', 'DescriptionParser', 'RootMarkerReader'];
 
+// Phase 1 project boundaries, iteration 8: `ProjectWarning` replaces the
+// relayed `OutsideSourceWarning` in the same position.
 const projectNames = ['ProjectRequest', 'ProjectScope', 'PathOwner', 'ProjectExclusion', 'ProjectOwnership', 'PathOwnership', 'CapturedInput', 'InventoryArea', 'ModulePurpose',
-  'InventoryModule', 'InventoryFile', 'ExactReference', 'OutsideSourceWarning', 'ProjectInventory',
+  'InventoryModule', 'InventoryFile', 'ExactReference', 'ProjectWarning', 'ProjectInventory',
   'ProjectIssue', 'AcquisitionLimits', 'ProjectInputView', 'ProjectReadOptions', 'ProjectRead', 'ProjectResolution', 'RetainedConfiguration'];
 // Plan 8: the observer's signature companions travel with it, so the root relays the sink too.
 const observerNames = ['ObservationSink', 'ObservationRetirement', 'InputChangeKind', 'ObservedChange', 'InventoryUpdate', 'ProjectObserver', 'ProjectObserve'];

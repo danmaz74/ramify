@@ -75,7 +75,8 @@ describe('CLI with real batch sessions', () => {
     await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue; declare const target: string; void import(target);\n");
     const result = await invoke(root, ['check', '--batch']);
     expect(result.exitCode).toBe(1);
-    const ordered = ['Error [not-visible] subs/consumer/src/use.ts:1:', 'Warning [outside-module-source] tests: 1',
+    const ordered = ['Error [not-visible] subs/consumer/src/use.ts:1:',
+      'Warning [outside-module-source] tests: 1 compiler-selected file outside module source (tests/helper.ts)\n',
       'Analysis limit [nonliteral-target]', 'Completed scope:'];
     const positions = ordered.map(text => result.stdout.indexOf(text));
     expect(positions.every(index => index >= 0)).toBe(true);
@@ -92,7 +93,8 @@ describe('CLI with real batch sessions', () => {
     const report = JSON.parse(result.stdout) as AnalysisReport;
     expect(result.exitCode).toBe(0);
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
-    expect(report.warnings).toEqual([{ code: 'outside-module-source', entry: 'tests', count: 1, files: ['tests/helper.ts'] }]);
+    expect(report.warnings).toEqual([{ code: 'outside-module-source', path: 'tests',
+      message: '1 compiler-selected file outside module source', files: ['tests/helper.ts'], count: 1 }]);
     expect(report.coverage[0].code).toBe('nonliteral-target');
     expect(report.snapshot!.inventory.files.some(file => file.path === 'tests/helper.ts')).toBe(false);
   }), 15_000);

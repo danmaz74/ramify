@@ -14,7 +14,7 @@ completion before reporting success. Pre-analysis invocation failures use
 `check --changed <path>...` hashes each named file relative to the selected root,
 with a missing file represented by an absent identity. It requests a compact
 delta with synchronized freshness, a two-second default deadline and an optional
-`--since` revision. JSON output is one `ramify.check/1` document; human output
+`--since` revision. JSON output is one `ramify.check/2` document; human output
 marks new findings and names the revision path, checked set and wait. Findings
 anywhere in the project fail the check. Cold, overdue, unobserved, superseded,
 configuration-named and unavailable checks exit 2 explicitly. This command never calls the batch

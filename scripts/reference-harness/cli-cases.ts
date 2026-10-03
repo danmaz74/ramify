@@ -63,7 +63,12 @@ function humanEvidence(context: ProjectContext, text: string, report: AnalysisRe
   a.ok('human outcomes from the same report', text.includes(`Execution: ${report.outcome.execution}; check: ${report.outcome.check}; coverage: ${report.outcome.coverage}`));
   for (const [index, issue] of report.diagnostics.entries()) a.ok(`human diagnostic ${index + 1} code, message and location`, text.includes(`[${issue.code}]`)
     && text.includes(issue.message) && (!issue.location || text.includes(`${issue.location.file}:${issue.location.line}:${issue.location.column}`)));
-  for (const [index, warning] of report.warnings.entries()) a.ok(`human warning ${index + 1} and count`, text.includes(`Warning [${warning.code}] ${warning.entry}: ${warning.count} compiler-selected`));
+  // A warning line names its code, path and message, then its listed files and how many more its count states.
+  for (const [index, warning] of report.warnings.entries()) {
+    const more = (warning.count ?? 0) - (warning.files?.length ?? 0);
+    const files = warning.files?.length ? ` (${warning.files.join(', ')}${more > 0 ? `, and ${more} more` : ''})` : '';
+    a.ok(`human warning ${index + 1} and count`, text.includes(`Warning [${warning.code}] ${warning.path}: ${warning.message}${files}\n`));
+  }
   for (const [index, limit] of report.coverage.entries()) a.ok(`human analysis limit ${index + 1}`, text.includes(`[${limit.code}]`) && text.includes(limit.message));
   a.ok('human completed scope matches API counts', text.includes(`${report.summary.complete ? 'Completed' : 'Incomplete'} scope: ${report.summary.owners} owners, ${report.summary.sourceFiles} source files, ${report.summary.resources} resources, ${report.summary.accesses} accesses`));
 }
@@ -147,7 +152,7 @@ for (const kind of ['clean', 'denied', 'invalid'] as const) for (const format of
     else humanEvidence(context, result.stdout, expected);
     if (kind === 'clean') {
       context.assertions.equal('completed unchanged reference', [expected.outcome.check, expected.summary.owners, expected.diagnostics.length, expected.coverage.length], ['passed', 15, 0, 0]);
-      context.assertions.equal('both reference configuration warnings remain visible', expected.warnings.map(warning => [warning.entry, warning.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
+      context.assertions.equal('both reference configuration warnings remain visible', expected.warnings.map(warning => [warning.path, warning.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
     } else if (kind === 'denied') {
       context.assertions.equal('one independently expected located original denial', expected.diagnostics.map(issue => [issue.code, issue.location?.file, issue.original, issue.importer?.owner, issue.importer?.kind]),
         [['not-visible', 'src/assembly.ts', { kind: 'code', owner: 'collection-review/workspace/catalog', file: 'router.ts', binding: 'createCatalogRouter' }, 'collection-review', 'ordinary']]);
@@ -198,7 +203,8 @@ for (const stray of [false, true]) for (const format of ['human', 'json'] as con
   processResult(context, result, stray ? 1 : 0);
   if (format === 'json') context.assertions.equal('structured output matches API warning/layout evidence', semantic(JSON.parse(result.stdout)), semantic(expected));
   else humanEvidence(context, result.stdout, expected);
-  context.assertions.equal('selected loose file warning aggregated independently', expected.warnings, [{ code: 'outside-module-source', entry: 'tests', count: 1, files: ['tests/helper.ts'] }]);
+  context.assertions.equal('selected loose file warning aggregated independently', expected.warnings, [{ code: 'outside-module-source', path: 'tests',
+    message: '1 compiler-selected file outside module source', files: ['tests/helper.ts'], count: 1 }]);
   context.assertions.ok('loose file is never classified as owned testing source', !expected.snapshot?.inventory.files.some(file => file.path === 'tests/helper.ts')
     && !expected.snapshot?.areas.some(area => area.root === 'tests'));
   if (stray) context.assertions.ok('valid stray marker is still a located layout error', expected.diagnostics.some(issue => issue.category === 'layout' && issue.code === 'stray-description' && issue.location?.file === 'tests/module.ramify'));

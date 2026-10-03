@@ -1,15 +1,23 @@
 import { Buffer } from 'node:buffer';
 import type { AnalysisDiagnostic, AnalysisReport } from '../../analysis/src/interfaces/analysis.js';
 import type { SourceLocation } from '../../analysis/subs/model/src/interfaces/model.js';
+import type { ProjectWarning } from '../../analysis/subs/project/src/interfaces/project.js';
 import type { CheckDocument } from './interfaces/cli.js';
 
 const location = (value: SourceLocation): string => `${value.file}:${value.line}:${value.column}`;
+const oneLine = (text: string): string => text.replace(/[\r\n]+/g, ' ');
+/** A warning's listed files, and how many more its count states, when it carries file evidence. */
+function warningFiles(warning: ProjectWarning): string {
+  if (!warning.files?.length) return '';
+  const more = (warning.count ?? warning.files.length) - warning.files.length;
+  return ` (${warning.files.join(', ')}${more > 0 ? `, and ${more} more` : ''})`;
+}
 
 export function formatChangedHuman(document: CheckDocument): string {
   const lines = [`Root: ${document.root}`,
     `Mode: resident (${document.revision ? `revision ${document.revision.sequence}; ${document.revision.path}` : document.reason ?? 'no revision'})`];
   for (const finding of document.findings) lines.push(`Error${finding.new ? ' [new]' : ''} [${finding.code}]${finding.location ? ` ${location(finding.location)}` : ''}: ${finding.message.replace(/[\r\n]+/g, ' ')}`);
-  for (const warning of document.warnings) lines.push(`Warning [${warning.code}] ${warning.entry}: ${warning.count} compiler-selected files outside module source`);
+  for (const warning of document.warnings) lines.push(`Warning [${warning.code}] ${warning.path}: ${oneLine(warning.message)}`);
   for (const limit of document.coverage) lines.push(`Analysis limit [${limit.code}] ${location(limit.location)}: ${limit.message.replace(/[\r\n]+/g, ' ')}`);
   const checked = document.checked ? `${document.checked.files.length} files (${document.checked.files.join(', ') || 'none'}), ${document.checked.accesses} accesses` : 'none';
   lines.push(`${document.outcome === 'checked' ? 'Checked' : `Not checked (${document.reason})`}: ${document.changed.map(item => item.path).join(', ')}; checked set: ${checked}; wait: ${document.timings.waitedMs.toFixed(1)} ms; findings: ${document.findings.length}`);
@@ -62,7 +70,7 @@ export function formatHuman(report: AnalysisReport, mode: string): string {
     if (issue.original) lines.push(`  Original: ${issue.original.owner}/${issue.original.file}#${issue.original.binding}`);
     for (const related of issue.related) lines.push(`  Related: ${location(related)}`);
   }
-  for (const warning of report.warnings) lines.push(`Warning [${warning.code}] ${warning.entry}: ${warning.count} compiler-selected file${warning.count === 1 ? '' : 's'} outside module source (${warning.files.join(', ')})`);
+  for (const warning of report.warnings) lines.push(`Warning [${warning.code}] ${warning.path}: ${oneLine(warning.message)}${warningFiles(warning)}`);
   for (const limit of report.coverage) lines.push(`Analysis limit [${limit.code}] ${location(limit.location)}: ${limit.message}`);
   lines.push(`Execution: ${report.outcome.execution}; check: ${report.outcome.check}; coverage: ${report.outcome.coverage}`);
   lines.push(`Stages: ${report.stages.map(stage => `${stage.stage}=${stage.status}`).join(', ')}`);

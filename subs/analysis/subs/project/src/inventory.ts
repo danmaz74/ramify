@@ -4,13 +4,13 @@ import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { descriptionMarker } from './marker.js';
 import { nestedTreeIssues } from './nested-trees.js';
-import { buildProjectOwnership, prunedDirectories, reservedSegmentKind } from './ownership.js';
+import { buildProjectOwnership, classifyProjectPath, prunedDirectories, reservedSegmentKind } from './ownership.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import { unmarkedRoot } from './selection.js';
 import type { DescriptionParser, RootMarkerReader, TextSpan } from '../../descriptions/src/interfaces/syntax.js';
 import type { ConfigurationData } from './configuration-data.js';
-import type { ExactReference, InventoryFile, InventoryModule, OutsideSourceWarning, ProjectInventory, ProjectIssue, ProjectOwnership, ProjectScope } from './interfaces/project.js';
+import type { ExactReference, InventoryFile, InventoryModule, ProjectInventory, ProjectIssue, ProjectOwnership, ProjectScope, ProjectWarning } from './interfaces/project.js';
 
 const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
 /** Compiler-visible source, as distinct from an owned resource. */
@@ -44,15 +44,50 @@ function outputDirectories(root: string, config: ConfigurationData): string[] {
 export function scopeOwnership(root: string, modules: readonly InventoryModule[], config: ConfigurationData): ProjectOwnership {
   return buildProjectOwnership(modules, outputDirectories(root, config)).ownership;
 }
-/** One warning per first path entry, in byte order, for outside selected source. */
-export function outsideSourceWarnings(outsideModuleFiles: readonly string[]): readonly OutsideSourceWarning[] {
-  const groups = new Map<string, string[]>();
+/** The most files one warning lists; its `count` states the total. */
+const warningFileLimit = 20;
+const selectedFiles = (count: number): string => `${count} compiler-selected file${count === 1 ? '' : 's'}`;
+/** One warning per group, `files` byte-ordered and bounded, ordered by path and then code. */
+function projectWarnings(groups: ReadonlyMap<string, { readonly code: ProjectWarning['code']; readonly message: (count: number) => string;
+  readonly files: readonly string[] }>): ProjectWarning[] {
+  return [...groups].map(([path, { code, message, files }]) => {
+    const ordered = [...files].sort(byteOrder);
+    return { code, path, message: message(ordered.length), files: ordered.slice(0, warningFileLimit), count: ordered.length };
+  }).sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.code, b.code));
+}
+/**
+ * One transitional `outside-module-source` warning per first path entry of
+ * compiler-selected source outside every module's `src/`.
+ */
+function outsideSourceWarnings(outsideModuleFiles: readonly string[]): ProjectWarning[] {
+  const groups = new Map<string, { code: ProjectWarning['code']; message: (count: number) => string; files: string[] }>();
   for (const file of outsideModuleFiles) {
     const entry = file.split('/')[0]!;
-    const group = groups.get(entry) ?? []; group.push(file); groups.set(entry, group);
+    const group = groups.get(entry) ?? { code: 'outside-module-source', message: count => `${selectedFiles(count)} outside module source`, files: [] };
+    group.files.push(file); groups.set(entry, group);
   }
-  return [...groups].sort(([a], [b]) => byteOrder(a, b))
-    .map(([entry, files]) => ({ code: 'outside-module-source' as const, entry, count: files.length, files }));
+  return projectWarnings(groups);
+}
+/**
+ * One warning per owned-ignored tree or module scratch directory holding
+ * compiler-selected source, located at that directory. Such source is neither
+ * inventoried nor read; an external tree's selected files warn about nothing.
+ */
+function excludedSelectionWarnings(ownership: ProjectOwnership, scope: Omit<ProjectScope, 'walkedAreas' | 'ownership'>,
+  files: readonly string[]): ProjectWarning[] {
+  const groups = new Map<string, { code: ProjectWarning['code']; message: (count: number) => string; files: string[] }>();
+  for (const file of files) {
+    const owned = classifyProjectPath({ ...scope, walkedAreas: [], ownership }, file);
+    const exclusion = owned.status === 'owned' ? owned.exclusion : null;
+    if (exclusion?.kind !== 'owned-ignored' && exclusion?.kind !== 'scratch') continue;
+    const group = groups.get(exclusion.directory) ?? (exclusion.kind === 'owned-ignored'
+      ? { code: 'compiler-selected-owned-ignored', files: [],
+        message: count => `${selectedFiles(count)} in an owned-ignored tree of module ${exclusion.owner}, which Ramify does not analyze; exclude the tree from the compiler configuration` }
+      : { code: 'compiler-selected-scratch', files: [],
+        message: count => `${selectedFiles(count)} in the scratch directory of module ${exclusion.owner}, which Ramify does not analyze; exclude the directory from the compiler configuration` });
+    group.files.push(file); groups.set(exclusion.directory, group);
+  }
+  return projectWarnings(groups);
 }
 /**
  * A marked description other than the root's: located at its marker, naming
@@ -87,6 +122,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   const modules: InventoryModule[] = [], files: InventoryFile[] = [], issues: ProjectIssue[] = [];
   const references: ExactReference[] = [];
   let outsideModuleFiles: string[] = [];
+  let warnings: ProjectWarning[] = [];
   const excludedRoots: string[] = [];
   // Scratch directories and declared nested trees of the modules found so far,
   // absolute: discovery never descends into them, so nothing beneath is read.
@@ -102,8 +138,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
       scope: { ...scope, walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
         ownership: scopeOwnership(capture.root, modules, config) },
       modules: modules.sort((a, b) => byteOrder(a.directory, b.directory)),
-      files: files.sort((a, b) => byteOrder(a.path, b.path)), references, outsideModuleFiles,
-      warnings: outsideSourceWarnings(outsideModuleFiles),
+      files: files.sort((a, b) => byteOrder(a.path, b.path)), references, outsideModuleFiles, warnings,
     });
   }
   try {
@@ -218,8 +253,16 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
     const owned = new Set(files.map(file => file.path));
     issues.push(...await nestedTreeIssues(capture, modules, buildProjectOwnership(modules, outputDirectories(capture.root, config)).declarations));
     await exactReferences(capture, modules, owned, issues, references);
-    outsideModuleFiles = [...new Set(selected.filter(path => !excludedRoots.some(root => within(root, path)))
+    // Selected source in a declared tree or a scratch directory is neither
+    // inventoried nor read; owned-ignored and scratch selections are warned about.
+    const prunedRoots = [...pruned];
+    const isPruned = (path: string): boolean => prunedRoots.some(root => within(root, path));
+    const unanalyzed = [...new Set(selected.filter(isPruned).map(path => relative(capture.root, path)))];
+    outsideModuleFiles = [...new Set(selected.filter(path => !excludedRoots.some(root => within(root, path)) && !isPruned(path))
       .map(path => relative(capture.root, path)))].filter(path => !owned.has(path) && basename(path) !== 'module.ramify').sort(byteOrder);
+    warnings = [...outsideSourceWarnings(outsideModuleFiles),
+      ...excludedSelectionWarnings(scopeOwnership(capture.root, modules, config), scope, unanalyzed)]
+      .sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.code, b.code));
     // Selected outside source is captured as input, but receives no owner/area.
     for (const file of outsideModuleFiles) await capture.readFile(file, 'dependency');
   } catch (error) {

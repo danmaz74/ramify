@@ -447,6 +447,28 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 8: `ProjectWarning` replaces
+  // `OutsideSourceWarning` as the inventory's and the reports' warning type,
+  // so the relays that carried the old type carry the new one. Project's
+  // wildcard interface exposure already selects it.
+  { plan: 'Phase 1 project boundaries (project warnings)',
+    added: {
+      './': [
+        'expose-sub ProjectWarning from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub ProjectWarning from project to parent, descendants',
+      ].join('\n'),
+    },
+    withdrawn: {
+      './': [
+        'expose-sub OutsideSourceWarning from analysis to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-sub OutsideSourceWarning from project to parent, descendants',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** The expected selections: the archived list, then each named layer in turn.

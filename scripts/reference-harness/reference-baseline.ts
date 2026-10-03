@@ -34,7 +34,8 @@ export async function assertBaseline(report: AnalysisReport, assertions: Asserti
     sourceFiles: 54, resources: 5, originals: 95, accesses: 313, allowed: 179, denied: 0,
     errors: 0, warnings: 2, coverageNotes: 0, external: 134 });
   assertions.equal('separate expected configuration warnings', report.warnings,
-    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', entry: file, count: 1, files: [file] })));
+    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', path: file,
+      message: '1 compiler-selected file outside module source', files: [file], count: 1 })));
   const disk = (await Promise.all(referenceOwners.map(owner => filesBelow(root, sourcePath(owner, '').replace(/\/$/, ''))))).flat().sort();
   assertions.equal('every owned implementation test and resource inventoried', inventory.files.map(file => file.path).sort(), disk);
   const unimportedResources = ['subs/integration-tests/src/features/collection-review.viz.feature', 'subs/workspace/src/index.html'];

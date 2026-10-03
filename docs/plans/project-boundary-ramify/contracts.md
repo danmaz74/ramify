@@ -277,6 +277,14 @@ and `ignored-but-walked`. Warnings remain nonblocking. Source outside `src/`
 is analyzed; no outside-module-source warning survives. Git advice is produced
 by the CLI, not the analysis model or scope fingerprint.
 
+Iteration 8B fixed the open details: a compiler-selection warning is one per
+owned-ignored tree or scratch directory, located at that directory; `files`
+holds at most 20 files in byte order and `count` the total; warnings are
+ordered by path, then code; a compiler-selected file in an external tree
+produces no warning. Until iteration 8C inventories auxiliary source, the
+outside-source warning is carried in this shape under the transitional code
+`outside-module-source`.
+
 Affected answers keep module seeds and the reverse-import dependency graph.
 Extend path bases with `containment` and `excluded`. Every path seed includes
 `status: 'owned' | 'excluded' | 'outside-project'` and `exclusion`, nullable.

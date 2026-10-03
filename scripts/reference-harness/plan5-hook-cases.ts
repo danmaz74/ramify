@@ -50,7 +50,7 @@ async function changed(p: SequenceProcess, root: string, a: Assertions, label: s
   recordObservation(label, { ...result, raw: await archiveObservation(label, result) });
   a.equal(`${label}: finite process exit and stderr`, [result.code, result.signal, result.error, result.stderr], [expected, null, null, '']);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/1', 1, expected]);
+  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/2', 1, expected]);
   if (expected === 0 || expected === 1) {
     a.equal(`${label}: covering publication`, [document.outcome, document.reason, document.changed.every(item => item.covered)], ['checked', null, true]);
     a.ok(`${label}: revision and checked set`, document.revision && document.checked && document.timings.daemon);

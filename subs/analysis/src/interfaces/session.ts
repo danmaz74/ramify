@@ -1,5 +1,5 @@
 import type { AvailableForm } from '../../subs/model/src/interfaces/model.js';
-import type { CapturedInput, ObservedChange, OutsideSourceWarning } from '../../subs/project/src/interfaces/project.js';
+import type { CapturedInput, ObservedChange, ProjectWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../subs/typescript/src/interfaces/source.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './architect-view.js';
@@ -53,7 +53,7 @@ export interface SessionRevision {
   readonly outcome: AnalysisReport['outcome'];
   readonly summary: AnalysisSummary;
   readonly diagnostics: readonly AnalysisDiagnostic[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly delta: FindingDelta;
   readonly timings: RevisionTimings;

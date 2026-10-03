@@ -212,7 +212,8 @@ describe('acquisition limits and cancellation', () => {
     ]);
     expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
     expect(result.inventory?.files.map(file => file.path)).toEqual(['subs/child/src/kept.ts']);
-    expect(result.inventory?.warnings).toEqual([{ code: 'outside-module-source', entry: 'src', count: 2, files: ['src/value.ts', 'src/z-failure.ts'] }]);
+    expect(result.inventory?.warnings).toEqual([{ code: 'outside-module-source', path: 'src',
+      message: '2 compiler-selected files outside module source', files: ['src/value.ts', 'src/z-failure.ts'], count: 2 }]);
     expect(Object.isFrozen(result.inventory)).toBe(true);
     expect(Object.isFrozen(result.issues)).toBe(true);
   });

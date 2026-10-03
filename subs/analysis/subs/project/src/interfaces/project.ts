@@ -101,11 +101,21 @@ export interface ExactReference {
     | 'case-mismatch' | 'excluded' | 'invalid-path';
   readonly interfaceEligible: boolean;
 }
-export interface OutsideSourceWarning {
-  readonly code: 'outside-module-source';
-  readonly entry: string;
-  readonly count: number;
-  readonly files: readonly string[];
+/**
+ * A nonblocking project warning, located at a project-relative `path`. Codes
+ * are an open set: a reader tolerates a code it does not know.
+ * `compiler-selected-owned-ignored` and `compiler-selected-scratch` name, at the
+ * tree or scratch directory, compiler-selected source Ramify does not analyze.
+ * `outside-module-source` is transitional: one per first path entry of
+ * compiler-selected source outside every module's `src/`.
+ */
+export interface ProjectWarning {
+  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch' | 'outside-module-source';
+  readonly path: string;
+  readonly message: string;
+  /** Where file evidence is needed: a bounded, byte-ordered prefix of the files, with `count` the total. */
+  readonly files?: readonly string[];
+  readonly count?: number;
 }
 export interface ProjectInventory {
   readonly scope: ProjectScope;
@@ -113,7 +123,7 @@ export interface ProjectInventory {
   readonly files: readonly InventoryFile[];
   readonly references: readonly ExactReference[];
   readonly outsideModuleFiles: readonly string[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
 }
 export interface ProjectIssue {
   readonly code: 'root-not-found' | 'missing-root-description' | 'unmarked-root-description'

@@ -1,7 +1,7 @@
 import type { ImportDecision, ImportReason, Model, ModelIssue, OriginalId, ResolvedTagRegistry, SourceArea, SourceLocation } from '../../subs/model/src/interfaces/model.js';
 import type { DescriptionIssue } from '../../subs/descriptions/src/interfaces/syntax.js';
 import type { LinkedDescriptions, LinkIssue } from '../../subs/descriptions/src/interfaces/linking.js';
-import type { AcquisitionLimits, CapturedInput, ProjectInventory, ProjectIssue, ProjectRequest, ProjectScope, OutsideSourceWarning } from '../../subs/project/src/interfaces/project.js';
+import type { AcquisitionLimits, CapturedInput, ProjectInventory, ProjectIssue, ProjectRequest, ProjectScope, ProjectWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceAccess, SourceCatalog, SourceLimit, SourceWorkLimits } from '../../subs/typescript/src/interfaces/source.js';
 import type { DependencyBehaviorFacts } from '../../subs/typescript/src/interfaces/dependency-behavior.js';
 
@@ -131,7 +131,7 @@ export interface AnalysisReport {
     readonly coverage: 'complete' | 'partial' | 'not-run' };
   readonly snapshot: AnalysisSnapshot | null;
   readonly diagnostics: readonly AnalysisDiagnostic[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly summary: AnalysisSummary;
 }

@@ -107,7 +107,8 @@ function assertClean(context: ProjectContext, report: AnalysisReport, label: str
     report.outcome.check, report.outcome.coverage, report.summary.complete, report.summary.owners,
     report.summary.denied, report.summary.errors, report.coverage], ['ramify.analysis/2', 'completed', 'passed', 'complete', true, 15, 0, 0, []]);
   context.assertions.equal(`${label}: original configuration warnings retained`, report.warnings,
-    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', entry: file, count: 1, files: [file] })));
+    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', path: file,
+      message: '1 compiler-selected file outside module source', files: [file], count: 1 })));
   observe(context, 'relocation-analysis', { label, report: analysisEvidence(report) });
 }
 

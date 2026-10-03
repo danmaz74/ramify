@@ -8,9 +8,9 @@ trees and module scratch directories before descent. The root marker on the
 module line and its validity rules were specified on 2026-10-03; the parser
 accepts the marker, the root is selected by it and discovery enforces its
 validity, never reading a marked description inside a declared nested tree.
-Analysis of auxiliary source, the compiler-selection warnings and the import
-rule for declared trees are not yet implemented; the implementation plan
-schedules that work. The exposure grammar below is unchanged.
+Acquisition reports the compiler-selection warnings. Analysis of auxiliary
+source and the import rule for declared trees are not yet implemented; the
+implementation plan schedules that work. The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -158,8 +158,8 @@ to escape its checked boundary.
 ### Declared Nested Trees Bound Interpretation
 
 Discovery implements the declaration, validation and pruning rules of this
-section. The warning about compiler-selected source in an owned-ignored tree
-is adopted and not yet implemented.
+section, and acquisition reports the warning about compiler-selected source in
+an owned-ignored tree.
 
 A module declares each nested tree in its own description, using a directory
 relative to the module and one of two kinds: `owned-ignored` or `external`.
@@ -1085,9 +1085,11 @@ parser. Analysis limits in a completed source check are nonblocking by default;
 invalid descriptions or registries still fail model validation.
 
 Discovery implements the nested-tree declarations, their validation and the
-pruning of declared trees and module scratch directories; the adopted
-auxiliary-source rules and the rest of whole-tree ownership are not yet
-implemented. The root marker, specified on 2026-10-03, is parsed, selects the
+pruning of declared trees and module scratch directories. Acquisition warns
+about compiler-selected source in an owned-ignored tree or a module scratch
+directory, never inventories or reads it and never makes it a compiler root.
+The adopted auxiliary-source rules and the rest of whole-tree ownership are not
+yet implemented. The root marker, specified on 2026-10-03, is parsed, selects the
 root and is enforced in discovery; a marked description inside a declared
 nested tree is never read.
 Specification adoption does not establish parser or checker support.

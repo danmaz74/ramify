@@ -87,7 +87,7 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
     equal('terminal recovery selects exit 2 without batch', [exitCode, batchCalls], [2, 0]);
     equal('exactly one stdout document with empty stderr', [stdout.length, stderr], [1, []]);
     equal('output is the compact terminal outcome', document ? [document.schemaVersion, document.outcome, document.reason, document.exitCode] : null,
-      ['ramify.check/1', 'not-checked', reason, 2]);
+      ['ramify.check/2', 'not-checked', reason, 2]);
     equal('lost response cannot claim a published result', document ? [document.revision, document.execution, document.checked, document.timings.daemon] : null,
       [null, null, null, null]);
     equal('output retains the original expectation without coverage', document?.changed,

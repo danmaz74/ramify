@@ -52,7 +52,7 @@ function checkDocument(result: Awaited<ReturnType<typeof invokeResident>>): Chec
   expect(result.stderr).toBe('');
   expect(result.batchCalls).toBe(0);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  expect(document.schemaVersion).toBe('ramify.check/1');
+  expect(document.schemaVersion).toBe('ramify.check/2');
   expect(document.exitCode).toBe(result.exitCode);
   return document;
 }

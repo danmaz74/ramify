@@ -190,7 +190,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'check') {
     if (changed && batch) throw new Error('--changed cannot be combined with --batch');
     if (!changed && (since !== undefined || deadlineMs !== undefined)) throw new Error('--since and --deadline require --changed');
-    // A changed check's ramify.check/1 document has no snapshot to leave out.
+    // A changed check's ramify.check/2 document has no snapshot to leave out.
     if (changed && noSnapshot) throw new Error('--no-snapshot cannot be combined with --changed');
     if (noSnapshot && format !== 'json') throw new Error('--no-snapshot requires --format json');
     return { command, ...project, batch, ...(changed ? { changed } : {}),

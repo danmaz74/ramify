@@ -67,7 +67,9 @@ the compiler is discarded rather than answering from a stale snapshot.
 
 The supervised helper uses the pinned TypeScript 7.0.2 native API. Its in-memory
 configuration extends the project's configuration and includes every owned
-compiler source, including tests omitted by ordinary compiler selection. A
+compiler source, including tests omitted by ordinary compiler selection, and
+every other configuration-selected file except those in a declared nested tree
+or a module scratch directory, which it never roots. A
 synthetic, unexecuted import witness obtains effective descriptions for resources
 that application source does not import. Neither synthetic file is written into
 the project. All native filesystem callbacks use the same captured view.

@@ -150,7 +150,7 @@ scope and exit codes. `--help` and `--version` load no compiler or server.
 `check --changed <path>...` is the bounded hook check. It hashes the named files,
 waits up to `--deadline` milliseconds (default 2000) for a daemon revision that
 covers them and prints every project finding, marking the new ones; JSON output
-is one `ramify.check/1` document. It exits 0 without findings, 1 with findings or
+is one `ramify.check/2` document. It exits 0 without findings, 1 with findings or
 an invalid revision and 2 when the files were not checked, and it never falls back to batch. The
 example adapter [`examples/hooks/claude-code-post-write.mjs`](examples/hooks/README.md)
 runs it from a Claude Code post-write hook. Use the plain `check` or `--batch` at

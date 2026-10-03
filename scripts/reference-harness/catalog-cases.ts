@@ -103,7 +103,7 @@ function resource(assertions: Assertions, catalog: SourceCatalog,
 
 function referenceResources(assertions: Assertions, catalog: SourceCatalog, inventory: ProjectInventory): void {
   assertions.equal('reference declared owners', inventory.modules.length, 15);
-  assertions.equal('reference configuration warnings', inventory.warnings.map(warning => [warning.entry, warning.count]),
+  assertions.equal('reference configuration warnings', inventory.warnings.map(warning => [warning.path, warning.count]),
     [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
   const first = resource(assertions, catalog, card, ['ui']);
   const second = resource(assertions, catalog, resultStyle, ['ui']);

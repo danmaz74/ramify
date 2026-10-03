@@ -57,8 +57,16 @@ selection inside a disposable process group. Its private helper receives every
 filesystem result from the parent capture through a single-operation protocol,
 with 1 MiB frames and sequential 192 KiB chunks. It opens no compiler program.
 Configuration scripts and application entries are never executed. Owned source
-is inventoried independently of compiler selection; selected outside-source
-files produce aggregated warnings. Each inventory file records its `placement`:
+is inventoried independently of compiler selection. Each project warning
+carries a `code`, a `path`, a `message` and, where file evidence is needed, a
+byte-ordered `files` list of at most 20 entries with the total `count`.
+Compiler-selected source inside an owned-ignored tree or a module's scratch
+directory produces one `compiler-selected-owned-ignored` or
+`compiler-selected-scratch` warning per tree or directory, located there; such a
+file is neither inventoried nor read, and selected files in an external tree
+produce no warning. Other selected outside-source files produce the transitional
+`outside-module-source` warning, one per first path entry, until auxiliary
+source is analyzed. Each inventory file records its `placement`:
 `src`, `auxiliary` for owned compiler source outside `src/`, or
 `referenced-resource`. Acquisition inventories files beneath `src/` only, so
 every file is `src` until auxiliary source is inventoried. Unselected outside-source files are silent,

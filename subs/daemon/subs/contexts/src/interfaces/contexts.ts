@@ -1,7 +1,7 @@
 import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewProjection, ApiViewSelection, CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest, TestTitleLimits } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
-import type { ProjectRequest, ProjectScope, ProjectResolution, OutsideSourceWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectRequest, ProjectScope, ProjectResolution, ProjectWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ArchitectViewProjection } from '../../../../../analysis/src/interfaces/architect-view.js';
@@ -136,7 +136,7 @@ export interface CheckDelta {
   readonly since: RevisionId | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
 }
 export type UnavailableReason = 'unknown-context' | 'expired-generation' | 'evicted-revision' | 'unobserved-input'

@@ -54,7 +54,8 @@ async function changedReference(root: string, value: string): Promise<void> {
   await replaceExactlyOnce(join(root, provider), 'expose-src value from "interfaces/api.ts"', `expose-src value from ${JSON.stringify(value)}`);
 }
 function warning(assertions: Assertions, inventory: ProjectInventory, entry: string, paths: string[]): void {
-  assertions.equal('outside warning', inventory.warnings, [{ code: 'outside-module-source', entry, count: paths.length, files: paths }]);
+  assertions.equal('outside warning', inventory.warnings, [{ code: 'outside-module-source', path: entry,
+    message: `${paths.length} compiler-selected file${paths.length === 1 ? '' : 's'} outside module source`, files: paths, count: paths.length }]);
   assertions.equal('outside source selection', inventory.outsideModuleFiles, paths);
   assertions.ok('outside files have no owner or profile', paths.every(path => !inventory.files.some(file => file.path === path)));
 }
@@ -193,8 +194,8 @@ const cases: Record<string, Case> = {
     mutate: async c => { for (const path of ['config-extra.ts', 'tests/a.ts', 'tests/b.ts', 'ignored/c.ts']) await put(c.root, path, 'export {};\n'); await include(c.root, 'config-extra.ts', 'tests'); },
     run: c => acquired(c, view => {
       c.assertions.equal('per-entry aggregation and counts', view.inventory.warnings, [
-        { code: 'outside-module-source', entry: 'config-extra.ts', count: 1, files: ['config-extra.ts'] },
-        { code: 'outside-module-source', entry: 'tests', count: 2, files: ['tests/a.ts', 'tests/b.ts'] },
+        { code: 'outside-module-source', path: 'config-extra.ts', message: '1 compiler-selected file outside module source', files: ['config-extra.ts'], count: 1 },
+        { code: 'outside-module-source', path: 'tests', message: '2 compiler-selected files outside module source', files: ['tests/a.ts', 'tests/b.ts'], count: 2 },
       ]);
       c.assertions.equal('selected outside files only', view.inventory.outsideModuleFiles, ['config-extra.ts', 'tests/a.ts', 'tests/b.ts']);
       c.assertions.equal('outside files receive no source areas', view.inventory.files.map(f => f.path), ['subs/consumer/src/probe.ts', api]);
@@ -245,7 +246,7 @@ async function referenceInventory(c: ProjectContext, view: ProjectInputView, sel
   c.assertions.equal('scope root/config/selection', [inventory.scope.root, inventory.scope.configuration, inventory.scope.selection], [c.root, join(c.root, 'tsconfig.json'), selection]);
   c.assertions.equal('all ordinary and testing roots reported', inventory.scope.walkedAreas.length, 30);
   c.assertions.equal('no other walked area', [...inventory.scope.walkedAreas].sort(), inventory.modules.flatMap(m => m.areas.map(a => a.root)).sort());
-  c.assertions.equal('two configuration-source warnings', inventory.warnings.map(w => [w.entry, w.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
+  c.assertions.equal('two configuration-source warnings', inventory.warnings.map(w => [w.path, w.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
   c.assertions.ok('compiler configuration captured', view.inputs.some(i => i.path === 'tsconfig.json' && i.role === 'configuration' && i.sha256 === digest(projectFixtureText(c.root))));
   c.assertions.ok('standalone testing owner ordinary source', inventory.files.some(f => f.owner === 'collection-review/integration-tests' && f.area === 'ordinary'));
   c.assertions.ok('all references exact', inventory.references.every(r => r.status === 'file'));

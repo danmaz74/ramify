@@ -60,7 +60,7 @@ function cycle(index, kind = 'body') {
   return { kind, index, expected, beforeSequence: sequence - 1, revision,
     hookStartedAt: index * 1000 + 1, countersBeforeSave: { coveredRequests: 0 },
     hook: { failure: null, signal: null, stderr: '', code: 0, durationMs: 1,
-      document: { schemaVersion: 'ramify.check/1', outcome: 'checked', execution: 'completed', exitCode: 0,
+      document: { schemaVersion: 'ramify.check/2', outcome: 'checked', execution: 'completed', exitCode: 0,
         revision: { id: revision.revision, sequence }, changed: expected.map(item => ({ ...item, covered: true })),
         findings: [], coverage: [], timings: { daemon: timings } } },
   };
@@ -186,6 +186,7 @@ test('racing evidence accepts a hook covered on publication or answered by its o
     ['a covered answer naming another revision', row => { row.hook.document.revision.id = 'rev/stale'; }],
     ['a covered entry with the wrong content', row => { row.hook.document.changed[0].sha256 = 'wrong-content'; }],
     ['an uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
+    ['an outdated check document version', row => { row.hook.document.schemaVersion = 'ramify.check/1'; }],
     ['a not-checked reply', row => { row.hook.code = 2; row.hook.document.outcome = 'not-checked'; row.hook.document.exitCode = 2; }],
     ['two covered requests', row => { row.settled.counters.coveredRequests++; }],
     ['a covered reply reporting session work', row => { row.hook.document.timings.reply = { ...worked }; }],
@@ -334,7 +335,7 @@ function configurationCycle(index) {
   row.expected = [{ path: 'tsconfig.json', sha256: (index % 2 ? 'a' : 'b').repeat(64) }];
   row.revision.checked = { path: 'broad', accesses: 1, files: ['src/body.ts'], modelRebuilt: true };
   row.hook.code = 2;
-  row.hook.document = { schemaVersion: 'ramify.check/1', outcome: 'not-checked', reason: 'configuration-changed',
+  row.hook.document = { schemaVersion: 'ramify.check/2', outcome: 'not-checked', reason: 'configuration-changed',
     execution: null, exitCode: 2, revision: null, checked: null, findings: [], coverage: [],
     changed: row.expected.map(item => ({ ...item, covered: false })), timings: { daemon: null } };
   return row;

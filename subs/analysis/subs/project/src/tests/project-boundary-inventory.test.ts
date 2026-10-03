@@ -291,6 +291,61 @@ describe('PB1-09: scratch position', () => {
   });
 });
 
+// PB1-11 at the iteration 8B boundary: compiler-selected source inside an
+// owned-ignored tree or a module's scratch directory yields one nonblocking
+// warning per tree or directory, with a bounded byte-ordered file list and the
+// total count, and is neither inventoried nor read. Message texts are this
+// slice's choice where the contracts leave them open.
+describe('PB1-11: compiler-selected exclusion warnings', () => {
+  const selecting = (exclude: readonly string[] = []): string => JSON.stringify({ compilerOptions: { types: [], module: 'ESNext',
+    moduleResolution: 'bundler' }, include: ['src', 'subs', 'fixtures', 'vendor', 'tools'], exclude }) + '\n';
+  const ownedIgnored = (count: number): string => `${count} compiler-selected file${count === 1 ? '' : 's'} in an owned-ignored tree `
+    + 'of module app, which Ramify does not analyze; exclude the tree from the compiler configuration';
+  const scratch = (module: string, count: number): string => `${count} compiler-selected file${count === 1 ? '' : 's'} in the scratch `
+    + `directory of module ${module}, which Ramify does not analyze; exclude the directory from the compiler configuration`;
+  const unanalyzed = ['fixtures/a.ts', 'fixtures/deep/b.ts', 'src/tmp/draft.ts', 'subs/a/src/tmp/draft.ts', 'vendor/lib.ts'];
+  beforeEach(async () => {
+    await put(app, 'module.ramify', root('owned-ignored "fixtures"', 'external "vendor"'));
+    await put(app, 'tsconfig.json', selecting());
+    for (const path of unanalyzed) await put(app, path, 'export const value = 1;\n');
+    // Positive control: selected source outside every module keeps the transitional outside warning and is read.
+    await put(app, 'tools/loose.ts', 'export const loose = 1;\n');
+  });
+
+  it('warns once per owned-ignored tree and scratch directory, distinctly, and neither inventories nor reads those files', async () => {
+    const view = acquired(await read());
+    expect(view.inventory.warnings).toEqual([
+      { code: 'compiler-selected-owned-ignored', path: 'fixtures', message: ownedIgnored(2), files: ['fixtures/a.ts', 'fixtures/deep/b.ts'], count: 2 },
+      { code: 'compiler-selected-scratch', path: 'src/tmp', message: scratch('app', 1), files: ['src/tmp/draft.ts'], count: 1 },
+      { code: 'compiler-selected-scratch', path: 'subs/a/src/tmp', message: scratch('app/a', 1), files: ['subs/a/src/tmp/draft.ts'], count: 1 },
+      { code: 'outside-module-source', path: 'tools', message: '1 compiler-selected file outside module source', files: ['tools/loose.ts'], count: 1 },
+    ]);
+    // An external tree's selected file is not the enclosing project's and warns about nothing.
+    expect(view.inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
+    expect(view.inventory.outsideModuleFiles).toEqual(['tools/loose.ts']);
+    // Their bytes are never read. The compiler's selection observes only that
+    // they exist (a kind observation without bytes), while the outside file is read.
+    expect(view.inputs.filter(input => input.path === 'tools/loose.ts').map(input => [input.role, input.bytes > 0])).toEqual([['dependency', true]]);
+    expect(view.inputs.filter(input => unanalyzed.includes(input.path)).map(input => [input.path, input.role, input.bytes]))
+      .toEqual(unanalyzed.map(path => [path, 'dependency', 0]));
+  });
+
+  it('bounds the listed files and states the total count', async () => {
+    for (let index = 0; index < 25; index++) await put(app, `fixtures/many/f${String(index).padStart(2, '0')}.ts`, 'export {};\n');
+    const warning = acquired(await read()).inventory.warnings.find(item => item.path === 'fixtures');
+    const all = ['fixtures/a.ts', 'fixtures/deep/b.ts', ...Array.from({ length: 25 }, (_, index) => `fixtures/many/f${String(index).padStart(2, '0')}.ts`)];
+    expect(warning).toEqual({ code: 'compiler-selected-owned-ignored', path: 'fixtures', message: ownedIgnored(27), files: all.slice(0, 20), count: 27 });
+  });
+
+  it('reports no exclusion warning once the compiler configuration excludes those directories', async () => {
+    await put(app, 'tsconfig.json', selecting(['fixtures', 'src/tmp', 'subs/a/src/tmp']));
+    const view = acquired(await read());
+    expect(view.inventory.warnings).toEqual([{ code: 'outside-module-source', path: 'tools',
+      message: '1 compiler-selected file outside module source', files: ['tools/loose.ts'], count: 1 }]);
+    expect(view.inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
+  });
+});
+
 describe('observation of declared trees', () => {
   it('ignores changes beneath a declared tree and rebuilds when its directory disappears', async () => {
     await put(app, 'module.ramify', root('owned-ignored "fixture-project"'));

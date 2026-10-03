@@ -179,7 +179,7 @@ remain later work.
 | `contexts` | Select and isolate contexts; order watcher changes and requests per context; publish revisions atomically; keep compact history; apply the covering rule, the sweep schedule, deadlines, leases, the hot and warm levels and eviction. | `createContextManager`, revision/status/outcome vocabulary, the `AnalysisDriver` port and controlled test ports. |
 | `presentation` | Render model data, interactions and teaching examples; report views remain later work. | Selected components explicitly tagged `[ui, browser]` and owned props. |
 | `layout` | Calculate diagram geometry from supplied neutral data. | Selected functions explicitly tagged `[browser]` and owned layout vocabulary. |
-| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/1` document. |
+| `cli` | Parse arguments, send resident checks, hook checks, watch and daemon requests through the injected connector, invoke an injected batch operation, render results and map execution status to exits. MCP serving and explorer launch remain later work. | `runCli` and its dispatch-classified vocabulary, including the `ramify.check/2` document. |
 
 `analysis` owns computational invalidation; `contexts` owns scheduling and
 publication; `daemon` owns process and transport mechanics. There is one authority
@@ -693,7 +693,7 @@ file in the CLI, a missing file as absent, and sends one synchronized request wi
 `deadlineMs`. The compact reply names the covering revision's identifier, sequence
 and path, its checked set, every project finding with a `new` mark against `since`
 or the previous revision, removed finding identities, warnings, coverage and
-timings. With `--format json` the CLI writes it as one `ramify.check/1` document.
+timings. With `--format json` the CLI writes it as one `ramify.check/2` document.
 The command exits 0 with no finding, 1 with findings or an invalid revision and 2
 when the files were not checked, and it never falls back to batch. The whole
 report is built only for `scope: 'report'`, which the plain `ramify check` requests

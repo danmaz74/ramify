@@ -111,8 +111,8 @@ code.
 2026-10-01 replaces this section when it is implemented; until then the
 section describes current behavior. Discovery already prunes declared nested
 trees and module scratch directories and is no longer stopped by a nested
-`tsconfig.json`; analysis of auxiliary source and the warnings below remain
-pending. Ownership then follows the
+`tsconfig.json`, and the first two warnings below are reported; analysis of
+auxiliary source and the Git warning remain pending. Ownership then follows the
 [module description specification](../model/module-description.spec.md):
 owned compiler source outside every `src/`, including sibling `tests/` or
 `interfaces/` directories and loose source beneath `subs/`, is analyzed as its
@@ -136,9 +136,19 @@ This includes sibling `tests/` or `interfaces/` directories and loose files
 beneath `subs/`. These files receive no module source-area classification, and
 their presence alone does not make the layout invalid or fail the check.
 
-Warnings are aggregated per top-level entry relative to the root: one warning
-per stray file directly under the root, and one per top-level directory that
-contains stray files, with the count. A stray `module.ramify` found outside
+A selected file inside an owned-ignored tree or a module's scratch directory
+is not a project file outside modules. It is neither inventoried nor read,
+the compiler does not receive it as a root file, and it produces one
+`compiler-selected-owned-ignored` or
+`compiler-selected-scratch` warning per tree or scratch directory, located at
+that directory. A selected file inside an external tree produces no warning.
+Each warning carries a code, a path and a message and, where it lists files,
+at most 20 of them in byte order with their total count.
+
+Warnings about project files outside modules, code `outside-module-source`,
+are aggregated per top-level entry relative to the root: one warning per stray
+file directly under the root, and one per top-level directory that contains
+stray files, with the count. A stray `module.ramify` found outside
 the permitted module locations, including beside these files, is an individual
 layout error even if its contents are valid. It fails the check with exit 1;
 it is not included in the ordinary file-warning count and needs no strict
@@ -189,7 +199,7 @@ findings uses it: on the toolkit itself the snapshot is almost all of a
 25 MB report. It applies to complete checks in both modes; a batch session drops
 the snapshot before its result leaves the session, and a resident check drops it
 when printing. The flag requires `--format json` and cannot accompany `--changed`,
-whose `ramify.check/1` document has no snapshot; either misuse is an invalid
+whose `ramify.check/2` document has no snapshot; either misuse is an invalid
 invocation, exit 2.
 
 | Exit | Meaning |

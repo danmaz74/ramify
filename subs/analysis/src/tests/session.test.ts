@@ -237,11 +237,35 @@ describe('public disposable analysis session', () => {
     const report = reported(await analyzeProject(inputs));
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
     expect(report.summary).toMatchObject({ warnings: 1, coverageNotes: 1, external: 0, allowed: 0, denied: 0 });
-    expect(report.warnings).toEqual([{ code: 'outside-module-source', entry: 'tools', count: 1, files: ['tools/outside.ts'] }]);
+    expect(report.warnings).toEqual([{ code: 'outside-module-source', path: 'tools',
+      message: '1 compiler-selected file outside module source', files: ['tools/outside.ts'], count: 1 }]);
     expect(report.coverage).toEqual([expect.objectContaining({ code: 'outside-module-target', location: expect.objectContaining({ file: importer }) })]);
     expect(report.snapshot!.accesses[0]!.target).toEqual({ kind: 'outside-project', file: 'tools/outside.ts' });
     expect(report.snapshot!.results[0]).toMatchObject({ outcome: 'outside-scope', decisions: [], diagnostics: [] });
   }), 15_000);
+
+  // PB1-11 through the batch session: the source Project leaves unanalyzed is
+  // also kept out of the compiler's roots, so no stage reads its bytes.
+  it('warns about compiler-selected source in an owned-ignored tree and a scratch directory without compiling or reading it', async () => fixture(async (root, inputs) => {
+    await put(root, 'module.ramify', `${fixtureFiles['module.ramify']}owned-ignored "tools/fixtures"\n`);
+    const unanalyzed = ['subs/consumer/src/tmp/draft.ts', 'tools/fixtures/data.ts'];
+    for (const path of unanalyzed) await put(root, path, 'export const value = 1;\n');
+    await put(root, 'tools/outside.ts', 'export const outside = 1;\n');
+    const report = reported(await analyzeProject(inputs));
+    expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
+    expect(report.summary).toMatchObject({ warnings: 3, errors: 0, coverageNotes: 0, sourceFiles: 2 });
+    expect(report.warnings).toEqual([
+      { code: 'compiler-selected-scratch', path: 'subs/consumer/src/tmp', files: ['subs/consumer/src/tmp/draft.ts'], count: 1,
+        message: '1 compiler-selected file in the scratch directory of module fixture/consumer, which Ramify does not analyze; exclude the directory from the compiler configuration' },
+      { code: 'outside-module-source', path: 'tools', message: '1 compiler-selected file outside module source', files: ['tools/outside.ts'], count: 1 },
+      { code: 'compiler-selected-owned-ignored', path: 'tools/fixtures', files: ['tools/fixtures/data.ts'], count: 1,
+        message: '1 compiler-selected file in an owned-ignored tree of module fixture, which Ramify does not analyze; exclude the tree from the compiler configuration' },
+    ]);
+    // The selected outside file is read; the unanalyzed ones never are, by acquisition or by the compiler.
+    const read = report.snapshot!.inputs.filter(input => input.bytes > 0).map(input => input.path);
+    expect(read).toContain('tools/outside.ts');
+    expect(read.filter(path => unanalyzed.includes(path))).toEqual([]);
+  }), 20_000);
 
   it.each(['ordinary', 'testing'] as const)('keeps known %s origins on unsupported CommonJS without manufacturing allowed decisions', async area => fixture(async (root, inputs) => {
     await put(root, 'package.json', '{"type":"commonjs"}');

@@ -4,7 +4,7 @@ import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfa
 import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
 import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
-import type { OutsideSourceWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { AffectedSelection } from '../../../analysis/src/interfaces/affected.js';
 
@@ -38,7 +38,7 @@ export interface CliEnvironment {
   readonly buildRefusal?: () => Promise<string | null>;
 }
 export interface CheckDocument {
-  readonly schemaVersion: 'ramify.check/1';
+  readonly schemaVersion: 'ramify.check/2';
   readonly root: string;
   readonly revision: { readonly id: RevisionId; readonly sequence: number; readonly path: RevisionPath } | null;
   readonly since: RevisionId | null;
@@ -48,7 +48,7 @@ export interface CheckDocument {
   readonly execution: AnalysisReport['outcome']['execution'] | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly checked: CheckedSet | null;
   readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number;
