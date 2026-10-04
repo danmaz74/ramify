@@ -237,3 +237,21 @@ None remain open; the decided questions follow.
 5. **The explorer's browser model.** Decided by the user on 2026-10-03: its
    embedded `SourceOrigin.auxiliary` member does not advance
    `ramify.explorer-http/1`; see [schema versions](contracts.md#schema-versions).
+6. **The example's own `.reference-work`.** Decided by the user on
+   2026-10-04: `examples/collection-review/module.ramify` keeps
+   `external ".reference-work"`, as committed in iteration 8A.
+7. **Identity of originals defined in auxiliary source.** Decided by the user
+   on 2026-10-04: an original keeps the `src/`-relative file form, and an
+   auxiliary file's path admits a leading `../`, such as
+   `../scripts/build-production.ts`, with the origin flagged `auxiliary`.
+8. **The modularity and dependency-analyzer probes.** Decided by the user on
+   2026-10-04: `scripts/probes/modularity` and
+   `scripts/probes/dependency-analyzer` move into the analysis module as its
+   own auxiliary source, with the path patch to the modularity report
+   specification. Iteration 5's assumption that their package
+   self-references are coverage notes was wrong: the resolver maps them to
+   analysis source.
+9. **JavaScript files when the configuration does not admit JavaScript.**
+   Decided by the user on 2026-10-04: a `.js`, `.mjs` or `.cjs` file is
+   compiler source only when the root configuration admits JavaScript;
+   otherwise it is an inert owned file. The example gains no `allowJs`.
