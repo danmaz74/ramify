@@ -19,10 +19,50 @@ Capability-needed submissions also verify scratch before provisional source capt
 
 ## Validation
 
-- Focused scripted lifecycle group: 8 files, 58 tests passed; later scratch and accepted-commit group: 2 files, 21 tests passed.
-- Capability recovery and delegation: 2 files, 27 tests passed. The three direct Git snapshot cases also passed under the default test timeout after copied fixture repositories received the general ignore rule.
-- Real Git accepted/audited tree integration: 1 test passed. The post-fixture-change nested capability group passed 3 tests (parent suspension, child closure and child handback after service restart).
-- Targeted module creation, repair/exhaustion, unsuitable closure, correction and close-event crash recovery cases passed.
-- `npm run type-check`, `npm run check:self` and `git diff --check` passed. `check:self` reported 0 errors, 0 warnings and 316 analysis limits. The full suite was not run.
+Run these commands from `ramify-agent/`. Each command below names the focused run actually used; the filters are significant.
+
+```sh
+npx vitest run subs/harness/src/tests/accepted-commit.test.ts subs/harness/src/tests/iteration-gate.test.ts subs/harness/src/tests/module-creation.test.ts subs/harness/src/tests/scratch-setup.test.ts subs/harness/src/tests/single-session.test.ts subs/harness/src/tests/engineer-directory.test.ts subs/harness/src/tests/gate-diagnostics.test.ts subs/harness/src/tests/contract-revision.test.ts
+```
+
+Passed: 8 files, 58 tests. Later additions to scratch and accepted-commit coverage passed with:
+
+```sh
+npx vitest run subs/harness/src/tests/scratch.test.ts subs/harness/src/tests/accepted-commit.test.ts
+```
+
+Passed: 2 files, 21 tests. The following selected lifecycle cases also passed individually:
+
+```sh
+npx vitest run subs/harness/src/tests/module-creation.test.ts -t 'a create decision and its registry proposal lead to a bootstrap assignment'
+npx vitest run subs/harness/src/tests/iteration-gate.test.ts -t 'a gate that fails three times exhausts|an owner with no test yet'
+npx vitest run subs/harness/src/tests/reconciliation.test.ts -t 'a repair is planned with its intent' --testTimeout 120000
+npx vitest run subs/harness/src/tests/accepted-commit.test.ts -t 'recovery finishes cleanup'
+npx vitest run subs/harness/src/tests/iterations-integration.test.ts
+```
+
+The real-Git `iterations-integration.test.ts` run passed its one test and verified the accepted commit's audited tree. The post-fixture-change nested capability group passed 3 selected tests, including service restart:
+
+```sh
+npx vitest run subs/harness/src/tests/capability-dependencies.test.ts -t 'B asks for C and only a fresh child coordinator runs|a real C child gate and review hand back to B' --testTimeout 120000
+```
+
+An initial four-file recovery/capability run had 57 passes and 3 failures at Vitest's default five-second timeout, all in direct Git provisional-snapshot cases:
+
+```sh
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/capability-delegation.test.ts subs/harness/src/tests/contract-revision-scripted.test.ts subs/harness/src/tests/run-recovery.test.ts
+```
+
+Rerunning one failed case with a longer timeout exposed the actual `ScratchSafetyError`: the copied capability fixture lacked an ignore rule. The fixture copy helper now supplies the general rule. After that correction, the selected cases passed both with the explicit timeout and with the default timeout; the two complete capability files passed 27 tests with the explicit timeout. The final capability-needed repair witness passed under the default timeout.
+
+```sh
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts -t 'snapshot written before its request commit' --testTimeout 30000
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/capability-delegation.test.ts -t 'snapshot written before its request commit|retry refuses a changed staged|provisional snapshot keeps staged' --testTimeout 30000
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/capability-delegation.test.ts --testTimeout 30000
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/capability-delegation.test.ts -t 'snapshot written before its request commit|retry refuses a changed staged|provisional snapshot keeps staged'
+npx vitest run subs/harness/src/tests/capability-delegation.test.ts -t 'unsafe scratch override refuses capability source capture'
+```
+
+The first command in that block failed with the explicit scratch conflict before the fixture correction; the next four passed after it. `npm run type-check`, `npm run check:self` and `git diff --check` passed after the final source change. `check:self` reported 0 errors, 0 warnings and 316 analysis limits. The full suite was not run.
 
 The superseded cleanup test verifies the same owner-selection function used by recovery and evidence reopening, then applies its selected removals to real files. It does not claim an end-to-end contract revision with scratch inside a superseded engineer assignment.
