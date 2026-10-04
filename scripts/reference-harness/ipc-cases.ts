@@ -229,7 +229,7 @@ add('I2-14:error-preservation', async assertions => {
     await writeFile(join(fixture.project, 'subs/provider/module.ramify'), 'ramify 1\nmodule provider\n');
     const denied = await checked(client, context.token, 'denial');
     assertions.ok('a denied import remains a published domain report', denied.report.summary.denied > 0 && denied.published);
-    await writeFile(join(fixture.project, 'module.ramify'), 'invalid declaration\n');
+    await writeFile(join(fixture.project, 'module.ramify'), 'ramify 1\nroot module fixture\ninvalid declaration\n');
     const invalid = await checked(client, context.token, 'invalid');
     assertions.equal('invalid descriptions retain the invalid execution discriminator', invalid.report.outcome.execution, 'invalid');
     const unavailable = await client.check({ token: { ...context.token, context: `ctx/1:${'f'.repeat(64)}` }, requestId: 'unknown', freshness: { mode: 'published', wait: false } });

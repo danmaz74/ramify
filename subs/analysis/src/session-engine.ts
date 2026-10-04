@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { originalKey, resolveTagRegistry } from '../subs/model/src/index.js';
-import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/project/src/interfaces/project.js';
+import type { CapturedInput, ProjectObserver, ProjectRequest, ProjectResolution } from '../subs/project/src/interfaces/project.js';
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
 import type { ExportShape, SymbolDetail, SymbolDetailRequest, TestFileTitles } from '../subs/typescript/src/interfaces/source.js';
@@ -40,6 +40,9 @@ interface Version {
 
 /** Distinct invocation requests whose resolutions a session keeps for reuse. */
 const knownResolutions = 4;
+/** Two project requests that resolve alike: the same raw fields, before any path is canonicalized. */
+const sameRequest = (a: ProjectRequest, b: ProjectRequest): boolean =>
+  a.cwd === b.cwd && (a.root ?? null) === (b.root ?? null) && a.scope === b.scope && a.configuration === b.configuration;
 const explorerDetailLimits = {
   maxSignatureBytes: 2048,
   maxDocumentationBytes: 512,
@@ -704,6 +707,10 @@ class Session implements RetainedSession {
     const observed = state.observer?.resolution ?? null;
     if (observed && observed !== this.#observedResolution) { this.#observedResolution = observed; this.#remember(observed); }
     const resolved = await resolveProjectRoot(invocation.project, readRootMarker, signal, this.#resolutions);
+    // The opening request resolving to an invalid root (a missing or unmarked root
+    // description, or a symlink) is the project's current state, not another project:
+    // the update's acquisition, made with that request, reports it as a batch read does.
+    if (resolved.status === 'invalid' && sameRequest(invocation.project, state.project)) return null;
     if (resolved.status !== 'resolved') return problem(`The invocation does not resolve to a project: ${resolved.issues.map(issue => issue.message).join('; ')}`);
     this.#remember(resolved);
     if (resolved.root !== scope.root || resolved.configuration !== scope.configuration) {

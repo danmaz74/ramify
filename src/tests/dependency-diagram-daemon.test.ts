@@ -1,13 +1,12 @@
-import { execFile } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { capabilities } from '../../subs/cli/src/command-support.js';
 import { connectDaemon } from '../../subs/daemon/src/connect-daemon.js';
 import { readDaemonRecord, selectEndpoint } from '../../subs/daemon/src/discovery.js';
 import type { ContextDependencyDiagramOutcome, ContextToken } from '../../subs/daemon/src/context-types.js';
 import type { DaemonStatus, ServiceResult } from '../interfaces/service.js';
+import { checkoutFiles } from './checkout-files.js';
 import type { TraceEvent } from './process.js';
 import { packageEngine as engine, packageVersion as version, repositoryRoot } from './process.js';
 import { dependencyAnalyzerCapacity } from '../dependency-analyzer-process.js';
@@ -31,9 +30,7 @@ async function restoreOwnedIgnored(root: string): Promise<void> {
 }
 async function copyToolkit(): Promise<string> {
   const target = await realpath(await mkdtemp('/tmp/rd24-'));
-  const { stdout } = await promisify(execFile)('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'src', 'subs',
-    'module.ramify', 'README.md', 'tsconfig.json', 'package.json', 'package-lock.json'], { cwd: repositoryRoot, maxBuffer: 64 * 1024 ** 2 });
-  for (const file of stdout.split('\0').filter(Boolean)) {
+  for (const file of await checkoutFiles(repositoryRoot, ['src', 'subs', 'module.ramify', 'README.md', 'tsconfig.json', 'package.json', 'package-lock.json'])) {
     await mkdir(dirname(join(target, file)), { recursive: true });
     await copyFile(join(repositoryRoot, file), join(target, file));
   }

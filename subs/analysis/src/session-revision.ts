@@ -134,12 +134,15 @@ export async function captureInvalidFacts(state: SessionState, signal?: AbortSig
     await acquired.view.dispose();
     throw Object.assign(new Error('Invalid project changed during acquisition; retry the update'), { code: 'changed-input' });
   }
-  if (acquired.status !== 'invalid' || !acquired.sealedInputs) {
+  if (acquired.status !== 'invalid') {
     throw Object.assign(new Error(acquired.issues.map(issue => issue.message).join('; ')),
       { code: acquired.issues[0]?.code ?? 'read-failure' });
   }
+  // A root found invalid before any inventory (missing, unmarked or a symlink)
+  // leaves no sealed capture. The batch run and the cold open report it with no
+  // inputs, and so does an update.
   return invalidFacts(state, await acquisitionDiagnostics(parsed, acquired.inventory, acquired.issues), acquired.inventory,
-    parseRefused(acquired.issues), acquired.sealedInputs);
+    parseRefused(acquired.issues), acquired.sealedInputs ?? []);
 }
 
 interface LinkOutcome {

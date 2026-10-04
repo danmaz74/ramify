@@ -4,7 +4,7 @@ import { AcquisitionError, byteOrder, freeze, hash, within } from './data.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { descriptionMarker } from './marker.js';
 import { nestedTreeIssues } from './nested-trees.js';
-import { buildProjectOwnership, classifyProjectPath, prunedDirectories, reservedSegmentKind } from './ownership.js';
+import { buildProjectOwnership, classifyProjectPath, prunedDirectories, reservedSegmentKind, withinAnyDirectory } from './ownership.js';
 import { readPurpose } from './purpose.js';
 import { exactReferences } from './references.js';
 import { unmarkedRoot } from './selection.js';
@@ -255,10 +255,14 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
     await exactReferences(capture, modules, owned, issues, references);
     // Selected source in a declared tree or a scratch directory is neither
     // inventoried nor read; owned-ignored and scratch selections are warned about.
-    const prunedRoots = [...pruned];
-    const isPruned = (path: string): boolean => prunedRoots.some(root => within(root, path));
+    // Each selected path is tested by its prefixes, not against every directory.
+    const projectRelative = (path: string): string => relative(capture.root, path).split(sep).join('/');
+    const prunedPaths = new Set([...pruned].map(projectRelative));
+    const excludedPaths = new Set(excludedRoots.map(projectRelative));
+    const isPruned = (path: string): boolean => withinAnyDirectory(prunedPaths, projectRelative(path));
+    const isExcluded = (path: string): boolean => withinAnyDirectory(excludedPaths, projectRelative(path));
     const unanalyzed = [...new Set(selected.filter(isPruned).map(path => relative(capture.root, path)))];
-    outsideModuleFiles = [...new Set(selected.filter(path => !excludedRoots.some(root => within(root, path)) && !isPruned(path))
+    outsideModuleFiles = [...new Set(selected.filter(path => !isExcluded(path) && !isPruned(path))
       .map(path => relative(capture.root, path)))].filter(path => !owned.has(path) && basename(path) !== 'module.ramify').sort(byteOrder);
     warnings = [...outsideSourceWarnings(outsideModuleFiles),
       ...excludedSelectionWarnings(scopeOwnership(capture.root, modules, config), scope, unanalyzed)]

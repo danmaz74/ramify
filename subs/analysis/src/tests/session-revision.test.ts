@@ -384,6 +384,78 @@ describe('description, metadata and broad session revisions', () => {
     } finally { await handle.dispose(); }
   }), timeout);
 
+  // The root-marker contract: an unmarked selected root is `unmarked-root-description`,
+  // status invalid like the other invalid descriptions, including a change between
+  // selection and reading. An observed update publishes what a batch read reports.
+  it('publishes an unmarked or missing root description as invalid, as a batch read reports it, and recovers when the marker returns', () => fixture(async (root, inputs) => {
+    const { handle, revision: valid } = await opened(inputs);
+    try {
+      const validReport = await handle.report();
+      const unmarkedMessage = `${join(root, 'module.ramify')} does not carry the root marker: add root before module on its module line to declare the project root`;
+      await put(root, 'module.ramify', fixtureFiles['module.ramify']!.replace('root module fixture', 'module fixture'));
+      const unmarked = await revised(handle, ['module.ramify']);
+      expect(unmarked.sequence).toBe(valid.sequence + 1);
+      expect(unmarked.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(unmarked.diagnostics.map(item => [item.code, item.category, item.message]))
+        .toEqual([['unmarked-root-description', 'layout', unmarkedMessage]]);
+      expect((await equalToBatch(handle, inputs)).snapshot?.results ?? []).toEqual([]);
+      expect(comparable(await handle.report(undefined, valid.sequence))).toEqual(comparable(validReport));
+      await audited(handle);
+
+      // A module line that cannot be read does not carry the marker either. A resident
+      // check passes its invocation, the opening request here, with every update.
+      const invocation = { project: inputs.project, capabilities: inputs.capabilities };
+      await put(root, 'module.ramify', 'invalid declaration\n');
+      for (const changes of [[{ path: 'module.ramify', kind: 'changed' as const }], []]) {
+        const unreadable = await handle.update(changes, {}, invocation);
+        expect(unreadable.status).toBe('revised');
+        expect(handle.current!.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+        expect(handle.current!.diagnostics.map(item => [item.code, item.category, item.message]))
+          .toEqual([['unmarked-root-description', 'layout', unmarkedMessage]]);
+      }
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+
+      await rm(join(root, 'module.ramify'));
+      const missing = await handle.update([{ path: 'module.ramify', kind: 'deleted' }], {}, invocation);
+      if (missing.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(missing)}`);
+      expect(missing.revision.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(missing.revision.diagnostics.map(item => item.code)).toEqual(['missing-root-description']);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+
+      await put(root, 'module.ramify', fixtureFiles['module.ramify']!);
+      const restored = await handle.update([{ path: 'module.ramify', kind: 'created' }], {}, invocation);
+      if (restored.status !== 'revised') throw new Error(`Expected a revision: ${JSON.stringify(restored)}`);
+      const recovered = restored.revision;
+      expect(recovered.outcome).toEqual(valid.outcome);
+      expect(recovered.diagnostics).toEqual(valid.diagnostics);
+      expect(recovered.checked.path).toBe('broad');
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
+  it('publishes a child that gains the root marker as an undeclared project boundary and recovers when it loses it', () => fixture(async (root, inputs) => {
+    const { handle, revision: valid } = await opened(inputs);
+    try {
+      await put(root, 'subs/sibling/module.ramify', 'ramify 1\nroot module sibling\n');
+      const marked = await revised(handle, ['subs/sibling/module.ramify']);
+      expect(marked.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+      expect(marked.diagnostics.map(item => [item.code, item.category, item.location?.file]))
+        .toEqual([['undeclared-project-boundary', 'layout', 'subs/sibling/module.ramify']]);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+
+      await put(root, 'subs/sibling/module.ramify', fixtureFiles['subs/sibling/module.ramify']!);
+      const recovered = await revised(handle, ['subs/sibling/module.ramify']);
+      expect(recovered.outcome).toEqual(valid.outcome);
+      expect(recovered.diagnostics).toEqual(valid.diagnostics);
+      await equalToBatch(handle, inputs);
+      await audited(handle);
+    } finally { await handle.dispose(); }
+  }), timeout);
+
   it('keeps current and historical facts unpublished when extraction fails and recovers with a broad update', () => fixture(async (root, inputs) => {
     const { handle, state, revision: current } = await opened(inputs);
     try {

@@ -145,6 +145,20 @@ export function prunedDirectories(module: Pick<InventoryModule, 'directory' | 'd
   return directories;
 }
 
+/**
+ * Whether a normalized project-relative path is one of `directories` or lies
+ * beneath one. It looks up each prefix of the path once, so its work follows
+ * the path's depth, not the number of directories.
+ */
+export function withinAnyDirectory(directories: ReadonlySet<string>, path: string): boolean {
+  let prefix = '';
+  for (const segment of path.split('/')) {
+    prefix = prefix ? `${prefix}/${segment}` : segment;
+    if (directories.has(prefix)) return true;
+  }
+  return false;
+}
+
 interface OwnershipIndex {
   readonly modules: ReadonlyMap<string, PathOwner>;
   readonly byId: ReadonlyMap<string, PathOwner>;
