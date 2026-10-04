@@ -49,7 +49,7 @@ npm run type-check
 npm test
 npm run check:self
 npm run build:web
-cp -r fixtures/collection-review /tmp/collection-review
+cp -r subs/harness/fixtures/collection-review /tmp/collection-review
 npm run serve -- --project /tmp/collection-review [--port 4180]
 npm run session -- --project <root> --module <module-path> --prompt "<text>"
 npm run trial -- prepare [--into <directory>]
@@ -162,7 +162,7 @@ prepare another.
 
 ## Fixture
 
-`fixtures/collection-review/` is a copy of the toolkit's reference example
+`subs/harness/fixtures/collection-review/` is a copy of the toolkit's reference example
 with two plans under `plans/`. It is test data and an independent project:
 its own `tsconfig.json` makes Ramify's discovery treat it as an independent
 scope, so its `module.ramify` files are not part of this project.

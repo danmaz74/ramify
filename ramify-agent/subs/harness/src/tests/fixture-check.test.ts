@@ -6,7 +6,7 @@ import { realRamify } from './helpers/runs.js';
 /*
  * The fixture guard.
  *
- * `fixtures/collection-review` is the target project 49 test files copy, and
+ * `subs/harness/fixtures/collection-review` is the target project 49 test files copy, and
  * every one of them assumes it satisfies Ramify's own rules. Nothing asserted
  * that on its own: the tests that ran the real checker over it did so on the
  * way to another assertion, so the signature-companion rule could land and

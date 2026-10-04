@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** The fixture target project, kept as test data at the package root. */
-export const fixtureRoot = fileURLToPath(new URL('../../../../../fixtures/collection-review', import.meta.url));
+/** The fixture target project, kept as test data under the harness module. */
+export const fixtureRoot = fileURLToPath(new URL('../../../fixtures/collection-review', import.meta.url));
 
 /** A temporary directory, removed by the returned function. */
 export async function temporaryDirectory(): Promise<{ path: string; remove: () => Promise<void> }> {

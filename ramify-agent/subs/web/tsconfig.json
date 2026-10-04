@@ -14,5 +14,6 @@
     "types": [],
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["../harness/fixtures/**/*", "src/tmp/**/*"]
 }

@@ -9,5 +9,6 @@
   "include": [
     "src",
     "subs/**/src"
-  ]
+  ],
+  "exclude": ["**/src/tmp/**/*"]
 }

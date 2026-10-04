@@ -24,5 +24,6 @@
     "subs/**/src",
     "vite.config.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["**/src/tmp/**/*"]
 }

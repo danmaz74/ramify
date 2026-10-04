@@ -14,7 +14,7 @@ import { temporaryDirectory } from './fixture.js';
 export async function copyCapabilityFixture(nested = false): Promise<{ root: string; remove: () => Promise<void> }> {
   const directory = await temporaryDirectory();
   const name = nested ? 'capability-coordination-nested' : 'capability-coordination';
-  const source = fileURLToPath(new URL(`../../../../../fixtures/${name}/`, import.meta.url));
+  const source = fileURLToPath(new URL(`../../../fixtures/${name}/`, import.meta.url));
   const root = join(directory.path, name);
   await cp(source, root, { recursive: true });
   const ignore = join(root, '.gitignore');

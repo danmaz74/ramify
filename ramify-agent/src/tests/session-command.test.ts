@@ -16,7 +16,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 const run = promisify(execFile);
 const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
 const main = join(packageRoot, 'src', 'main.ts');
-const fixture = join(packageRoot, 'fixtures', 'collection-review');
+const fixture = join(packageRoot, 'subs', 'harness', 'fixtures', 'collection-review');
 const reviews = 'subs/workspace/subs/reviews';
 
 let directory: string;
