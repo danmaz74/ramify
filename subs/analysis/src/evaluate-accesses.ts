@@ -9,8 +9,8 @@ const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), B
 
 /**
  * Every target kind names its outcome; only an application target can be
- * `checked`. Source analysis does not yet produce nested-tree or excluded
- * targets, so neither may pass as checked before its rule is enforced.
+ * `checked`. Nested-tree and excluded targets stay unverifiable, never checked,
+ * until the project-boundary rules that decide them are enforced.
  */
 function outcomeOf(target: SourceTarget, unknown: boolean, checked: boolean): AccessResult['outcome'] {
   switch (target.kind) {

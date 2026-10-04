@@ -134,17 +134,20 @@ describe('auxiliary provenance vocabulary', () => {
     expect(all).toContainEqual({ file: 'src/barrel.ts', area: { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] }, auxiliary: false });
   });
 
-  it('reports the renamed outside-project target with its unchanged outcome and coverage code', async () => {
+  it('reports an import into an owned-ignored tree as a nested-tree target that is never checked', async () => {
     const value = await report();
-    // Owned source outside src/ is now an application target; a file in an
-    // owned-ignored tree is not inventoried and keeps the outside-project target.
+    // Owned source outside src/ is an application target; a file in an
+    // owned-ignored tree is not inventoried and is classified at its physical
+    // location as a nested-tree target with its declaration. Until the boundary
+    // rule is enforced its outcome is unverifiable with the unchanged coverage code.
     const tool = value.snapshot!.accesses.filter(access => access.specifier === '../vendor/tool.js');
-    expect(tool.map(access => access.target)).toEqual([{ kind: 'outside-project', file: 'vendor/tool.ts' }]);
-    expect(value.snapshot!.results.find(result => result.accessId === tool[0]!.id)).toMatchObject({ outcome: 'outside-scope', decisions: [] });
+    expect(tool.map(access => access.target)).toEqual([{ kind: 'nested-tree', file: 'vendor/tool.ts',
+      exclusion: { kind: 'owned-ignored', directory: 'vendor', owner: 'fixture' } }]);
+    expect(value.snapshot!.results.find(result => result.accessId === tool[0]!.id)).toMatchObject({ outcome: 'unverifiable', decisions: [] });
     expect(value.coverage.map(note => [note.code, note.location?.file])).toEqual([['outside-module-target', 'src/use.ts']]);
   });
 
-  it('never lets an unproduced nested-tree or excluded target pass as checked', async () => {
+  it('never lets a nested-tree or excluded target pass as checked', async () => {
     const value = await report();
     const probe = value.snapshot!.accesses.find(access => access.importer.file === 'subs/consumer/src/probe.ts')!;
     const boundary: readonly SourceAccess[] = [

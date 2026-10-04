@@ -172,6 +172,13 @@ function interpretAccesses(setup: AccessInterpretation,
   const targetOf = (resolved: ResolvedModule, specifier: string): SourceTarget => {
     if (resolved.kind === 'application' && resolved.file) return { kind: 'application', origin: origin(resolved.file) };
     if (resolved.kind === 'outside-project' && resolved.file) return { kind: 'outside-project', file: resolved.file };
+    const exclusion = resolved.exclusion;
+    if (resolved.kind === 'nested-tree' && resolved.file && exclusion && (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external')) {
+      return { kind: 'nested-tree', file: resolved.file, exclusion: { ...exclusion, kind: exclusion.kind } };
+    }
+    if (resolved.kind === 'excluded' && resolved.file && exclusion && exclusion.kind !== 'owned-ignored' && exclusion.kind !== 'external') {
+      return { kind: 'excluded', file: resolved.file, exclusion: { ...exclusion, kind: exclusion.kind } };
+    }
     if (resolved.kind === 'external') {
       const source = resolved.file ? project.program.getSourceFile(resolve(root, resolved.file)) : undefined;
       return { kind: 'external', name: specifier, resolvedFile: resolved.file ? relative(root, resolved.file) : null,
@@ -213,8 +220,15 @@ function interpretAccesses(setup: AccessInterpretation,
     if (target.kind === 'unresolved' && form !== 'macro' && !(form === 'commonjs' && specifier === null)) coverageIds.push(limit(specifier === null ? 'nonliteral-target'
       : resolved?.kind === 'resource-target' ? 'resource-target' : 'unresolved-target',
     specifierNode ? location(specifierNode) : at, 'Cannot establish the accessed source or resource target'));
+    // Until the project-boundary rules are enforced, a target outside the root,
+    // inside a declared tree or inside an always-excluded path is reported as
+    // this one nonblocking limit; excluded files are never interpreted.
     if (target.kind === 'outside-project') coverageIds.push(limit('outside-module-target', at,
-      `Accessed project file ${target.file} is outside every module source area`));
+      `Accessed file ${target.file} is outside the project root without package resolution`));
+    if (target.kind === 'nested-tree') coverageIds.push(limit('outside-module-target', at,
+      `Accessed file ${target.file} lies in the declared ${target.exclusion.kind} tree ${target.exclusion.directory} without package resolution`));
+    if (target.kind === 'excluded') coverageIds.push(limit('outside-module-target', at,
+      `Accessed file ${target.file} lies in the always-excluded ${target.exclusion.kind} directory ${target.exclusion.directory} without package resolution`));
     if (deferred) coverageIds.push(limit(deferred.code, at, deferred.message));
     const selections: AccessSelection[] = [];
     if (selection) {

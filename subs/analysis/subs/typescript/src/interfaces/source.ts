@@ -53,8 +53,10 @@ export interface CatalogDelta {
 }
 export type SourceTarget =
   | { readonly kind: 'application'; readonly origin: SourceOrigin }
+  /** An established package route, even to a real location inside the project; a builtin; or a standard-library declaration. */
   | { readonly kind: 'external'; readonly resolution: 'package' | 'builtin' | 'standard-library';
       readonly name: string; readonly resolvedFile: string | null }
+  /** A physical target outside the project root without package resolution. */
   | { readonly kind: 'outside-project'; readonly file: string }
   /** A physical project-relative target inside a declared nested tree, with its declaration. */
   | { readonly kind: 'nested-tree'; readonly file: string;

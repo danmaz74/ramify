@@ -99,7 +99,9 @@ an application target the **target file** is `target.origin.file`.
 **Application occurrence.** An occurrence whose target kind is `application`.
 Only application occurrences form dependencies. External (`package`, `builtin`,
 `standard-library`), `outside-project` and `unresolved` occurrences are counted
-separately and never contribute to an edge.
+separately and never contribute to an edge. `nested-tree` and `excluded`
+occurrences name no provider either: they are counted with `unresolved`
+occurrences and never contribute to an edge.
 
 **Original identity.** The triple `(kind, defining file, binding)` of an
 `OriginalId`. `OriginalId.file` is relative to the declared owner's ordinary
@@ -157,8 +159,8 @@ and the ordinary source of testing-classified modules such as
 `integration-tests`. The **test subset** contains testing-classified source files.
 
 An occurrence passes a source filter when its importer file is in that subset.
-The same importer rule applies to external, outside-project and unresolved
-counts. The provider file is not filtered: a production occurrence targeting a
+The same importer rule applies to external, outside-project, unresolved,
+nested-tree and excluded counts. The provider file is not filtered: a production occurrence targeting a
 testing-classified file is a check violation and remains counted, so the
 report never hides it.
 
@@ -560,8 +562,9 @@ size adds the counted resources.
 A metric is partial when any of these holds:
 
 1. an occurrence in scope names a `coverageIds` entry;
-2. an occurrence in scope from a scope file has an `unresolved` or
-   `outside-project` target (counted in `unattributedAccesses`);
+2. an occurrence in scope from a scope file has an `unresolved`,
+   `outside-project`, `nested-tree` or `excluded` target (counted in
+   `unattributedAccesses`);
 3. a selection of an application occurrence in scope has a status other than
    `resolved`; external selections never resolve to an original;
 4. a source file in scope has `FileExports.state` other than `complete`, or a

@@ -159,10 +159,12 @@ undecided; Plan 1 has no strict configuration or CLI flag.
 An import whose target is auxiliary source is an application import decided by
 the ordinary rules: same-owner access is allowed, and another owner's import of
 an auxiliary original is denied, since no exposure can select one. An owned
-import whose target is an existing file the inventory does not hold, such as
-one inside a declared nested tree or in compiler output, is reported as outside
-scope: an analysis limit on that import, never an allowed import and never an
-external package, until the project-boundary import rules are implemented.
+import whose target, without package resolution, lies inside a declared nested
+tree or an always-excluded path such as compiler output is unverifiable, with
+an analysis limit on that import; one outside the root is outside scope, with
+the same limit. None is an allowed import or an external package. The
+definite finding for declared trees and the separate excluded-target limit
+await the project-boundary import rules.
 
 ## Output and exit
 

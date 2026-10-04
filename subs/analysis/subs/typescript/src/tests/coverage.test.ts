@@ -13,20 +13,22 @@ describe('iteration 12 source coverage boundaries', () => {
       .toEqual([['value', 'resolved'], ['missing', 'missing-export']]);
   }), 30_000);
 
+  // The outside file lies beside the project root: owned source outside src/
+  // would be auxiliary application source, not an outside-project target.
   it('separates proven package and builtin scope from unresolved names and outside-project files', async () => withCatalog({
     'node_modules/pkg/package.json': '{"name":"pkg","type":"module","types":"./index.d.ts"}',
     'node_modules/pkg/index.d.ts': 'export declare const value: number;',
-    'outside.ts': 'export const value = 2;',
-    'src/use.ts': "import { value } from 'pkg'; import 'node:fs'; import { unknown } from '@application/missing'; import { value as outside } from '../outside.js';",
+    'src/use.ts': "import { value } from 'pkg'; import 'node:fs'; import { unknown } from '@application/missing'; import { value as outside } from '../../outside.js';",
   }, async ({ source }) => {
     const result = await source.accesses();
     expect(result.accesses.map(access => [access.specifier, access.target.kind])).toEqual([
-      ['pkg', 'external'], ['node:fs', 'external'], ['@application/missing', 'unresolved'], ['../outside.js', 'outside-project'],
+      ['pkg', 'external'], ['node:fs', 'external'], ['@application/missing', 'unresolved'], ['../../outside.js', 'outside-project'],
     ]);
     expect(result.accesses[0].target).toMatchObject({ resolution: 'package' });
     expect(result.accesses[1].target).toMatchObject({ resolution: 'builtin' });
+    expect(result.accesses[3].target).toEqual({ kind: 'outside-project', file: '../outside.ts' });
     expect(result.coverage.map(issue => issue.code)).toEqual(['unresolved-target', 'outside-module-target']);
-  }), 30_000);
+  }, { outside: { 'outside.ts': 'export const value = 2;' } }), 30_000);
 
   it('keeps a missing resource unverifiable and a missing name on a known resource definite', async () => withCatalog({
     'src/resources.d.ts': 'declare module "*.css" { const classes: Record<string, string>; export default classes; }',

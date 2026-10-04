@@ -107,9 +107,25 @@ selections use the existing target-origin check without invented symbols.
 These limits do not suppress resolved selections.
 
 Iteration 12 records proven package and builtin scope separately from unresolved
-targets and project files outside modules, which are `outside-project` targets.
-The `nested-tree` and `excluded` target members, each with its exclusion, are
-declared but not yet produced. Every origin takes its `auxiliary` flag from the
+targets. Resolution retains how a specifier resolved before its real target is
+classified. A package route needs a bare, unaliased specifier whose
+compiler-resolved file lies in an installed package directory that the
+`node_modules` lookup reaches from the importer: as spelled, through a link, or
+in an identical installed copy (same name and version), to which the compiler
+resolves every copy. Such a target is external even when its real location is a
+declared tree. Retracing the lookup uses only the observations the compiler's
+own lookup made. A relative path, a `paths` alias, a package import map entry,
+the importer's own package name, a path segment named `node_modules` or the
+compiler's external-library flag never establishes one.
+Every other compiler-resolved file that is not inventoried is classified at its
+physical location, through every link, by Project's `classifyProjectPath`: a
+`nested-tree` target in a declared owned-ignored or external tree, an
+`excluded` target in a scratch, output, installed-package, repository or
+generated directory, each with its exclusion, and an `outside-project` target
+outside the root. An owned location the inventory does not hold is unresolved.
+Excluded files are never described; until the project-boundary rules are
+enforced, each of these three targets carries the nonblocking
+`outside-module-target` limit. Every origin takes its `auxiliary` flag from the
 inventory file's placement. Vite globs, loader import methods,
 direct Jiti calls and CommonJS access/export patterns retain explicit coverage.
 They never become native ESM selections. Known CommonJS targets retain their source areas for

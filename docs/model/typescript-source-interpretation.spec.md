@@ -2,8 +2,10 @@
 
 **Status:** Active specification. Whole-tree ownership, auxiliary-source and
 package-boundary interpretation were adopted on 2026-10-01. Auxiliary source is
-analyzed with its owner's ordinary profile; package-boundary interpretation and
-the rejection of auxiliary originals through exposure are not yet implemented.
+analyzed with its owner's ordinary profile. Resolution retains the package route
+and classifies nested-tree, always-excluded and outside-project targets; the
+definite project-boundary finding, the excluded-target limit and the rejection
+of auxiliary originals through exposure are not yet implemented.
 Specification status does not establish implementation support.
 
 ## Purpose
@@ -538,6 +540,7 @@ harness requiring that stage must fail its capability check; this differs from
 a supported checker completing with documented analysis limits. Diagnostics
 do not create exposure declarations or dependency allowlists.
 
-Auxiliary source is analyzed; the adopted project-boundary changes are not yet
+Auxiliary source is analyzed, and resolution classifies the project-boundary
+targets; their definite finding and excluded-target limit are not yet
 implemented. Adopting these rules does not establish runtime support; report
 unsupported or unrun analysis explicitly.

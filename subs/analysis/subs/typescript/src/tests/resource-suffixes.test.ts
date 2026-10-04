@@ -156,8 +156,11 @@ describe('compiler-selected resource declarations with moduleSuffixes', () => {
       'src/forward.ts': 'export { default as selected } from "@selected";',
     }, ({ catalog }) => {
       expect(exported(catalog, 'src/forward.ts', 'selected').original).toBeNull();
-      expect(catalog.coverage).toContainEqual(expect.objectContaining({ location: expect.objectContaining({ file: 'src/forward.ts' }),
-        message: expect.stringContaining('compiler-resolved external') }));
+      // A paths alias is never package resolution: its declaration in the
+      // installed package directory is an always-excluded target, not external.
+      expect(catalog.coverage).toContainEqual(expect.objectContaining({ code: 'outside-module-target',
+        location: expect.objectContaining({ file: 'src/forward.ts' }), message: expect.stringContaining('outside the analyzed application source') }));
+      expect(catalog.coverage.some(limit => limit.message.includes('compiler-resolved external'))).toBe(false);
     });
   }, 15_000);
 });

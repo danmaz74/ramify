@@ -98,7 +98,7 @@ export function viewSummary(view: ViewFacts, edges: readonly EdgeGroup[], covera
         if (occurrence.provider === occurrence.consumer) same++;
       } else if (occurrence.kind === 'external') external++;
       else if (occurrence.kind === 'outside-project') outside++;
-      // Unresolved, and the not yet produced nested-tree and excluded targets.
+      // Unresolved, nested-tree and excluded targets.
       else unresolved++;
     }
     return scope.metric({

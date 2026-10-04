@@ -21,7 +21,9 @@ export interface FixtureFile { readonly path: string; readonly owner: string; re
 export interface FixtureOriginal { readonly file: string; readonly binding: string; readonly value?: boolean }
 export interface FixtureExposure { readonly module: string; readonly file: string; readonly binding: string;
   readonly destinations: readonly Destination[]; readonly effective?: boolean }
-export type FixtureTarget = string | { readonly external: string } | { readonly outside: string } | 'unresolved';
+/** `nested` lies in an owned-ignored `vendor` tree of `app`; `excluded` in the output directory `dist`. */
+export type FixtureTarget = string | { readonly external: string } | { readonly outside: string }
+  | { readonly nested: string } | { readonly excluded: string } | 'unresolved';
 export interface FixtureSelection { readonly file: string; readonly binding: string; readonly name?: string;
   readonly status?: AccessSelection['status'] }
 /** An import decision for one selected original; resolved selections default to allowed `exposed`. */
@@ -108,6 +110,8 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     const target: SourceAccess['target'] = typeof access.target === 'string'
       ? access.target === 'unresolved' ? { kind: 'unresolved' } : { kind: 'application', origin: { file: access.target, area: area(access.target), auxiliary: auxiliary(access.target) } }
       : 'external' in access.target ? { kind: 'external', resolution: 'package', name: access.target.external, resolvedFile: null }
+      : 'nested' in access.target ? { kind: 'nested-tree', file: access.target.nested, exclusion: { kind: 'owned-ignored', directory: 'vendor', owner: 'app' } }
+      : 'excluded' in access.target ? { kind: 'excluded', file: access.target.excluded, exclusion: { kind: 'output', directory: 'dist', owner: null } }
       : { kind: 'outside-project', file: access.target.outside };
     return {
       id: access.id, location, importer: { file: access.importer, area: area(access.importer), auxiliary: auxiliary(access.importer) }, specifier: 'x',
@@ -133,7 +137,8 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       : (access.selections ?? []).filter(selection => (selection.status ?? 'resolved') === 'resolved')
         .map(selection => decision(selection.file, selection.binding, 'allowed', 'exposed'));
     const outcome: AccessResult['outcome'] = access.outcome ?? (source.target.kind === 'external' ? 'external'
-      : source.target.kind === 'outside-project' ? 'outside-scope' : source.target.kind === 'unresolved' ? 'unverifiable'
+      : source.target.kind === 'outside-project' ? 'outside-scope'
+      : source.target.kind === 'unresolved' || source.target.kind === 'nested-tree' || source.target.kind === 'excluded' ? 'unverifiable'
       : source.coverageIds.length ? 'mixed' : 'checked');
     return { accessId: access.id, decisions, outcome, diagnostics: [], coverage: source.coverageIds };
   });

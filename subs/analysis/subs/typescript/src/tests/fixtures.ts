@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { createDefaultTagRegistry } from '../../../model/src/registry.js';
 import { deriveSourceAreas } from '../../../model/src/profiles.js';
 import type { OriginalId, SourceArea } from '../../../model/src/interfaces/model.js';
-import type { CapturedInput, InventoryModule, ProjectInputView, ProjectInventory } from '../../../project/src/interfaces/project.js';
+import { classifyProjectPath } from '../../../project/src/ownership.js';
+import type { CapturedInput, InventoryModule, ProjectExclusion, ProjectInputView, ProjectInventory, ProjectOwnership } from '../../../project/src/interfaces/project.js';
 import { createSourceAnalysis } from '../source-analysis.js';
 import type { CatalogExport, CatalogOriginal, ExportShapeRequest, FileExports, SourceAnalysis, SourceCatalog, SourceWorkLimits } from '../interfaces/source.js';
 
@@ -25,7 +26,20 @@ export const configuration = {
 interface FixtureOwner { readonly name: string; readonly directory: string; readonly tags: readonly string[] }
 const rootOwner: FixtureOwner = { name: 'fixture', directory: '', tags: ['browser'] };
 export const childOwner: FixtureOwner = { name: 'child', directory: 'subs/child', tags: ['ui'] };
-const definitions = new Map<string, { files: Readonly<Record<string, string>>; owners: readonly FixtureOwner[] }>();
+/**
+ * Explicit boundary facts a fixture adds to the double: declared, output or
+ * other exclusions of its ownership table beyond each owner's scratch
+ * directory, directory links (link path to target, both root-relative; the
+ * target may leave the root), and files beside the root. With `outside` the
+ * root is `app` inside a fresh directory, which the caller removes.
+ */
+export interface FixtureBoundaries {
+  readonly exclusions?: readonly ProjectExclusion[];
+  readonly links?: Readonly<Record<string, string>>;
+  readonly outside?: Readonly<Record<string, string>>;
+}
+const definitions = new Map<string, { files: Readonly<Record<string, string>>; owners: readonly FixtureOwner[];
+  boundaries: FixtureBoundaries }>();
 
 export async function put(root: string, file: string, content: string): Promise<void> {
   await mkdir(dirname(join(root, file)), { recursive: true });
@@ -43,8 +57,10 @@ export async function drop(root: string, file: string): Promise<void> {
   definitions.set(root, { ...definition, files });
 }
 
-export async function fixture(files: Readonly<Record<string, string>>, children: readonly FixtureOwner[] = []): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'ramify-source-catalog-'));
+export async function fixture(files: Readonly<Record<string, string>>, children: readonly FixtureOwner[] = [],
+  boundaries: FixtureBoundaries = {}): Promise<string> {
+  const created = await mkdtemp(join(tmpdir(), 'ramify-source-catalog-'));
+  const root = boundaries.outside ? join(created, 'app') : created;
   try {
     const contents = {
       'module.ramify': 'ramify 1\nroot module fixture tagged [browser]\n',
@@ -54,10 +70,18 @@ export async function fixture(files: Readonly<Record<string, string>>, children:
       ...files,
     };
     for (const [file, content] of Object.entries(contents)) await put(root, file, content);
-    definitions.set(root, { files: contents, owners: [rootOwner, ...children] });
+    for (const [file, content] of Object.entries(boundaries.outside ?? {})) {
+      await mkdir(dirname(join(created, file)), { recursive: true });
+      await writeFile(join(created, file), content);
+    }
+    for (const [link, target] of Object.entries(boundaries.links ?? {})) {
+      await mkdir(dirname(join(root, link)), { recursive: true });
+      await symlink(relative(dirname(join(root, link)), join(root, target)), join(root, link), 'dir');
+    }
+    definitions.set(root, { files: contents, owners: [rootOwner, ...children], boundaries });
     return root;
   } catch (error) {
-    await rm(root, { recursive: true, force: true });
+    await rm(created, { recursive: true, force: true });
     throw error;
   }
 }
@@ -85,7 +109,8 @@ export async function acquire(root: string): Promise<ProjectInputView> {
   if (!definition) throw new Error(`No explicit fixture definition for ${root}`);
   const files = new Map(Object.entries(definition.files).map(([path, content]) => [resolve(root, path), content]));
   const directories = new Map<string, Set<string>>([[root, new Set()]]);
-  for (const path of files.keys()) {
+  const links = new Map(Object.entries(definition.boundaries.links ?? {}).map(([link, target]) => [resolve(root, link), resolve(root, target)]));
+  for (const path of [...files.keys(), ...links.keys()]) {
     let child = path;
     while (child !== root) {
       const parent = dirname(child);
@@ -93,6 +118,13 @@ export async function acquire(root: string): Promise<ProjectInputView> {
       entries.add(child); directories.set(parent, entries); child = parent;
     }
   }
+  /** A path through the fixture's explicit links, as the disk resolves it. */
+  const follow = (path: string): string => {
+    for (const [link, target] of links) {
+      if (path === link || path.startsWith(`${link}/`)) return follow(`${target}${path.slice(link.length)}`);
+    }
+    return path;
+  };
   const span = { start: 9, end: 23, line: 2, column: 1 };
   const modules: InventoryModule[] = definition.owners.map(owner => {
     const sourceRoot = owner.directory ? `${owner.directory}/src` : 'src';
@@ -110,14 +142,25 @@ export async function acquire(root: string): Promise<ProjectInputView> {
     };
   });
   const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
+  // The ownership table the fixture's explicit records imply: each owner with its
+  // scratch directory, plus the fixture's declared or always-excluded directories.
+  const byteOrder = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+  const ownership: ProjectOwnership = {
+    modules: modules.map(module => ({ id: module.id, parent: module.parent, directory: module.directory || '.' }))
+      .sort((a, b) => byteOrder(a.directory, b.directory)),
+    exclusions: [...modules.map(module => ({ kind: 'scratch' as const, directory: module.directory ? `${module.directory}/src/tmp` : 'src/tmp', owner: module.id })),
+      ...definition.boundaries.exclusions ?? []].sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.kind, b.kind)),
+  };
+  const scope: ProjectInventory['scope'] = { root, selection: 'given', invokedFrom: root, configuration: join(root, 'tsconfig.json'),
+    walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)), ownership };
   const inventory: ProjectInventory = {
-    scope: { root, selection: 'given', invokedFrom: root, configuration: join(root, 'tsconfig.json'),
-      walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)), ownership: { modules: [], exclusions: [] } },
-    modules, references: [], warnings: [],
+    scope, modules, references: [], warnings: [],
     files: [...files].flatMap(([path, content]) => {
       const local = relative(root, path);
       const owner = modules.find(module => local.startsWith(`${module.areas[0]!.root}/`));
-      if (!owner) return [];
+      const placed = classifyProjectPath(scope, local);
+      // Discovery never enters a scratch directory or a declared tree.
+      if (!owner || placed.status !== 'owned' || placed.exclusion) return [];
       return [{ path: local, owner: owner.id, area: local.startsWith(`${owner.areas[1]!.root}/`) ? 'tests' as const : 'ordinary' as const,
         kind: /\.(?:[cm]?[jt]sx?)$/.test(local) ? 'source' as const : 'resource' as const, placement: 'src' as const,
         sha256: sha256(content), bytes: Buffer.byteLength(content) }];
@@ -140,17 +183,19 @@ export async function acquire(root: string): Promise<ProjectInputView> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ENOTDIR') return fallback;
     throw error;
   };
+  // A path beneath a link is read at its target; a listing keeps the requested spelling.
   return {
     inventory, inputs,
-    readFile(path) { const absolute = resolve(root, path); return memoized('readFile', absolute, async () => local(absolute)
+    readFile(path) { const absolute = follow(resolve(root, path)); return memoized('readFile', absolute, async () => local(absolute)
       ? files.get(absolute) : readFile(absolute, 'utf8').catch(missing(undefined))); },
-    fileExists(path) { const absolute = resolve(root, path); return memoized('fileExists', absolute, async () => local(absolute)
+    fileExists(path) { const absolute = follow(resolve(root, path)); return memoized('fileExists', absolute, async () => local(absolute)
       ? files.has(absolute) : stat(absolute).then(value => value.isFile()).catch(missing(false))); },
-    directoryExists(path) { const absolute = resolve(root, path); return memoized('directoryExists', absolute, async () => local(absolute)
+    directoryExists(path) { const absolute = follow(resolve(root, path)); return memoized('directoryExists', absolute, async () => local(absolute)
       ? directories.has(absolute) : stat(absolute).then(value => value.isDirectory()).catch(missing(false))); },
-    readDirectory(path) { const absolute = resolve(root, path); return memoized('readDirectory', absolute, async () => local(absolute)
-      ? [...(directories.get(absolute) ?? [])].sort() : readdir(absolute).then(entries => entries.map(name => join(absolute, name)).sort()).catch(missing([]))); },
-    realPath(path) { const absolute = resolve(root, path); return memoized('realPath', absolute, async () => local(absolute)
+    readDirectory(path) { const requested = resolve(root, path), absolute = follow(requested); return memoized('readDirectory', requested, async () => (local(absolute)
+      ? [...(directories.get(absolute) ?? [])] : await readdir(absolute).then(entries => entries.map(name => join(absolute, name))).catch(missing([] as string[])))
+      .map(entry => join(requested, relative(absolute, entry))).sort()); },
+    realPath(path) { const absolute = follow(resolve(root, path)); return memoized('realPath', absolute, async () => local(absolute)
       ? files.has(absolute) || directories.has(absolute) ? absolute : undefined : realpath(absolute).catch(missing(undefined))); },
     async seal() { if (disposed) throw new Error('Fixture input view is disposed'); return { status: 'coherent', inputs }; },
     async dispose() { disposed = true; files.clear(); directories.clear(); memo.clear(); definitions.delete(root); },
@@ -180,11 +225,12 @@ export async function analyzeView(view: ProjectInputView): ReturnType<typeof ana
 }
 
 export async function withCatalog(files: Readonly<Record<string, string>>,
-  check: (result: Awaited<ReturnType<typeof analyze>>, root: string) => Promise<void> | void): Promise<void> {
-  const root = await fixture(files);
+  check: (result: Awaited<ReturnType<typeof analyze>>, root: string) => Promise<void> | void,
+  boundaries: FixtureBoundaries = {}): Promise<void> {
+  const root = await fixture(files, [], boundaries);
   let result: Awaited<ReturnType<typeof analyze>> | undefined;
   try { result = await analyze(root); await check(result, root); }
-  finally { await result?.dispose(); await rm(root, { recursive: true, force: true }); }
+  finally { await result?.dispose(); await rm(boundaries.outside ? dirname(root) : root, { recursive: true, force: true }); }
 }
 
 export function file(catalog: SourceCatalog, path: string): FileExports {

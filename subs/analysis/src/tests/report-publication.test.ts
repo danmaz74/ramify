@@ -18,7 +18,7 @@ const tools = 'tools/outside.ts';
  * Findings, a project warning and coverage notes, so every list a revision
  * keeps is non-empty. Since iteration 8C a loose root file would be root
  * auxiliary source, so `tools` is an owned-ignored tree: its selected file
- * warns, and the import of it stays an outside-project coverage note.
+ * warns, and the import of it is a nested-tree target with a coverage note.
  */
 const evidence: Record<string, string> = {
   'module.ramify': `${fixtureFiles['module.ramify']}owned-ignored "tools"\n`,

@@ -310,8 +310,8 @@ export function resolveOccurrence(access: SourceAccess, ownership: OwnershipReso
     symbols: sorted(selected.map(selection => originals.symbol(selection.original!, selection.exportedName))),
     originals: sorted(selected.map(selection => originals.identity(selection.original!))),
     limitIds: sorted(access.coverageIds),
-    // Source analysis does not yet produce nested-tree or excluded targets;
-    // like unresolved and outside-project targets, they name no provider.
+    // Nested-tree and excluded targets, like unresolved and outside-project
+    // targets, name no provider.
     unattributed: target.kind === 'unresolved' || target.kind === 'outside-project'
       || target.kind === 'nested-tree' || target.kind === 'excluded',
     // External selections never resolve to an original; only application selections bear on coverage.

@@ -349,6 +349,23 @@ describe('modularity projection: coverage', () => {
     expect(partial(owner(production, 'app').subtree.all).coverage.unattributedAccesses).toBe(2);
   });
 
+  it('counts nested-tree and excluded occurrences with unresolved ones, as unattributed and never as edges', () => {
+    const base = measured(view(projected(buildReport(graphSpec)), 'production').summary.all);
+    const spec: FixtureSpec = { ...graphSpec, accesses: [...graphSpec.accesses,
+      { id: 'a14', importer: paths.button, target: { nested: 'vendor/tool.ts' } },
+      { id: 'a15', importer: paths.button, target: { excluded: 'dist/out.d.ts' }, runtime: false },
+    ] };
+    const production = view(projected(buildReport(spec)), 'production');
+    // Neither names a provider: no edge or application occurrence is added.
+    expect(partial(production.summary.all)).toMatchObject({
+      observed: { edges: base.edges, applicationOccurrences: base.applicationOccurrences, outsideModuleOccurrences: 0, unresolvedOccurrences: 2 },
+      coverage: { limitIds: [], unattributedAccesses: 2, unknownDependencies: 0 } });
+    expect(production.edges.map(edge => [edge.consumer, edge.provider])).toEqual(
+      view(projected(buildReport(graphSpec)), 'production').edges.map(edge => [edge.consumer, edge.provider]));
+    expect(partial(production.summary.runtime).coverage.unattributedAccesses).toBe(1);
+    expect(partial(production.summary.typeOnly).coverage.unattributedAccesses).toBe(1);
+  });
+
   it('applies incomplete source export descriptions and unlocated limits', () => {
     const incomplete: FixtureSpec = { ...graphSpec, files: graphSpec.files.map(file => file.path === paths.helper
       ? { ...file, state: 'incomplete' as const, issueIds: ['issue-h'] } : file) };

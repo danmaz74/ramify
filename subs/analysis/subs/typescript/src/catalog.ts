@@ -791,9 +791,11 @@ class CatalogBuilder {
             this.unresolvedCompilerTarget(file, specifier);
             return { name, original: null, namespace: null, forwarding };
           }
-          if (target.kind === 'outside-project' || target.kind === 'external') {
-            this.limit(file, target.kind === 'outside-project' ? 'outside-module-target' : 'unresolved-original',
-              target.kind === 'external' ? `Export ${name} forwards a compiler-resolved external dependency` : `Export ${name} targets source outside owned modules`, specifier);
+          // A target outside the root, in a declared tree or in an always-excluded
+          // path is never interpreted: its exports describe no application original.
+          if (target.kind === 'outside-project' || target.kind === 'nested-tree' || target.kind === 'excluded' || target.kind === 'external') {
+            this.limit(file, target.kind === 'external' ? 'unresolved-original' : 'outside-module-target',
+              target.kind === 'external' ? `Export ${name} forwards a compiler-resolved external dependency` : `Export ${name} targets a file outside the analyzed application source`, specifier);
             return { name, original: null, namespace: null, forwarding };
           }
         }
@@ -890,7 +892,8 @@ class CatalogBuilder {
       if (!isExportDeclaration(statement) || statement.exportClause || !statement.moduleSpecifier) continue;
       const target = this.target(statement.moduleSpecifier);
       if (target.kind !== 'application' || !target.file) {
-        this.limit(file, target.kind === 'outside-project' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
+        this.limit(file, target.kind === 'outside-project' || target.kind === 'nested-tree' || target.kind === 'excluded' ? 'outside-module-target'
+          : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
           'Cannot enumerate every application original of this star export', statement.moduleSpecifier);
         if (target.kind === 'unresolved' || target.kind === 'resource-target') this.unresolvedCompilerTarget(file, statement.moduleSpecifier);
         continue;

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { API } from 'typescript/unstable/sync';
 import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
@@ -43,7 +43,9 @@ export async function withNativeInterpreter<T>(root: string, operation: (context
       snapshot = api.updateSnapshot({ openProjects: [configuration] });
       const project = snapshot.getProject(configuration);
       assert.ok(project);
-      const host = { resourceWitness: '', fileExists: existsSync, readFile: (path: string) => {
+      const host = { resourceWitness: '', fileExists: existsSync,
+        realpath: (path: string) => existsSync(path) ? realpathSync(path) : path,
+        directoryExists: (path: string) => existsSync(path) && statSync(path).isDirectory(), readFile: (path: string) => {
         try { return readFileSync(path, 'utf8'); }
         catch (error) { if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return null; throw error; }
       } };

@@ -88,12 +88,14 @@ try {
   const virtual = new Map<string, string>();
   const fileExists = (path: string): boolean => virtual.has(resolve(path)) || request('fileExists', path) as boolean;
   const readFile = (path: string): string | null => virtual.get(resolve(path)) ?? request('readFile', path) as string | null;
+  const realpath = (path: string): string => virtual.has(resolve(path)) ? resolve(path) : request('realPath', path) as string;
+  const directoryExists = (path: string): boolean => request('directoryExists', path) as boolean;
   api = new API({ cwd: root, fs: {
     readFile,
     fileExists,
-    directoryExists: path => request('directoryExists', path) as boolean,
+    directoryExists,
     getAccessibleEntries: path => request('readDirectory', path) as { files: string[]; directories: string[] },
-    realpath: path => virtual.has(resolve(path)) ? resolve(path) : request('realPath', path) as string,
+    realpath,
   } });
   const parsed = api.parseConfigFile(configuration);
   const configurationText = readFile(configuration);
@@ -122,7 +124,7 @@ try {
   // Private export-path facts stay with this compiler/catalog lifetime. They
   // neither change original identities nor extend the public catalog contract.
   const runtime = new Map<CatalogExport, boolean>();
-  const host = { fileExists, readFile, resourceWitness };
+  const host = { fileExists, readFile, realpath, directoryExists, resourceWitness };
   const currentCatalog = (): SourceCatalog => catalog ??= buildCatalog(project, inputs, host, runtime);
   let interpreter: AccessInterpretation | undefined;
   const currentInterpreter = (): AccessInterpretation => interpreter ??= new AccessInterpretation(
