@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
@@ -69,7 +70,7 @@ function script(seen: string[], mode: 'assignments' | 'boundary' | 'partial-bloc
         write('consumer.ts', "export const useFact = () => 'old';\n"),
         write('../module.ramify', 'ramify 1\nmodule d\nexpose-src legacyLabel from \"consumer.ts\" to parent\n'));
       if (owner === p) return submit({ kind: 'completion-proposed', summary: 'P exposed', findings: [] },
-        write('../module.ramify', 'ramify 1\nmodule capability-coordination\nexpose-sub readFact from b to descendants\nexpose-sub legacyLabel from d to descendants\n'),
+        write('../module.ramify', rootDescription('capability-coordination', 'expose-sub readFact from b to descendants\nexpose-sub legacyLabel from d to descendants\n')),
         write('../subs/b/src/companion.ts', 'export const companion = true;\n'));
       if (owner === a) return submit({ kind: 'completion-proposed', summary: 'A integrated', findings: [] },
         write('caller.ts', "export const renderA = () => 'old from B';\n"));
