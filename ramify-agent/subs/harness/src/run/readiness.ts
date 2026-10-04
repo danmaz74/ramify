@@ -12,7 +12,8 @@ import type { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { RunFailureReason } from '../interfaces/protocol/runs.js';
 import { discoverNestedPackages } from './policy.js';
-import { matchSupport, moduleTestAreas, scenarioModules, unresolvedCommands } from './project-config.js';
+import { declaredModuleDirectories, matchSupport, moduleTestAreas, scenarioModules, unresolvedCommands } from './project-config.js';
+import { removeScratchDirectories, trackedScratchPaths } from '../work/scratch.js';
 import {
   readinessAttemptSchema, infrastructureRecoverySchema,
   type CapturedProjectConfig, type InfrastructureRecovery, type ReadinessAttempt, type ReadinessStep, type RecoveryId, type RunPolicy,
@@ -84,6 +85,7 @@ export async function runReadiness(execution: CheckExecutionPort, request: Readi
   const steps: StepResult[] = [];
 
   steps.push(await projectRootStep(projectRoot));
+  steps.push(await scratchCleanupStep(projectRoot, request.git ?? gitService, steps[0]!.outcome));
   steps.push(await gitCleanStep(projectRoot, request.signal, request.git ?? gitService));
   steps.push(await compilerConfigStep(projectRoot));
   steps.push(await testRunnerStep(projectRoot));
@@ -389,6 +391,28 @@ async function gitCleanStep(projectRoot: string, signal: AbortSignal | undefined
   } catch (error) {
     const detail = error instanceof GitError ? error.message : error instanceof Error ? error.message : String(error);
     return { step: 'git-clean', outcome: 'failed', detail: `the execution directory is not a git repository the harness can read: ${detail}` };
+  }
+}
+
+async function scratchCleanupStep(projectRoot: string, git: GitService, rootOutcome: StepResult['outcome']): Promise<StepResult> {
+  if (rootOutcome !== 'passed') return { step: 'scratch-cleanup', outcome: 'not-verified', detail: 'the project root is unavailable' };
+  try {
+    const modules = await declaredModuleDirectories(projectRoot);
+    const tracked = await trackedScratchPaths(projectRoot, modules, git);
+    if (tracked.length > 0) return {
+      step: 'scratch-cleanup', outcome: 'failed',
+      detail: `tracked scratch paths must be removed from the index before readiness: ${tracked.join(', ')}; nothing was deleted`,
+    };
+    const removed = await removeScratchDirectories(projectRoot, modules, git);
+    if (removed.preservedTracked.length > 0) return {
+      step: 'scratch-cleanup', outcome: 'failed',
+      detail: `tracked scratch paths appeared during cleanup: ${removed.preservedTracked.join(', ')}`,
+    };
+    return { step: 'scratch-cleanup', outcome: 'passed', detail: `stale scratch removed from ${modules.length} module${modules.length === 1 ? '' : 's'}` };
+  } catch (error) {
+    const detail = error instanceof GitError ? `${error.message}: ${error.detail.output}`
+      : error instanceof Error ? error.message : String(error);
+    return { step: 'scratch-cleanup', outcome: 'failed', detail: `scratch cleanup could not complete: ${detail}` };
   }
 }
 

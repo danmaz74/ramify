@@ -109,6 +109,11 @@ interface DeclaredModule {
   readonly testing: boolean;
 }
 
+/** Current module directories from declarations on disk, including modules added since a view was made. */
+export async function declaredModuleDirectories(projectRoot: string): Promise<string[]> {
+  return [...new Set((await declaredModules(projectRoot, null)).map(module => module.dir))].sort();
+}
+
 async function declaredModules(projectRoot: string, index: ArchitectIndex | null): Promise<DeclaredModule[]> {
   const modules: DeclaredModule[] = [];
   if (index !== null) {

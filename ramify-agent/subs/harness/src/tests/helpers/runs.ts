@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { createScriptedAgent, type Script, type ScriptedAgent, type ScriptedAgentOptions } from '../../../subs/agent/src/scripted.js';
 import { declaringScenarios } from './declarations.js';
 import { childEnvironment } from '../../../subs/evidence/src/run-command.js';
+import { gitService } from '../../../subs/evidence/src/git.js';
 import { checkCommand } from '../../checks/records.js';
 import { privateRamify, RamifyCli, ramifyExecutable } from '../../../subs/evidence/src/ramify-cli.js';
 import type { InputManifest } from '../../interfaces/protocol/evidence.js';
@@ -20,6 +21,7 @@ import { RunService, type RunServiceOptions } from '../../run/service.js';
 import type { CapabilityWorkflow } from '../../capability/workflow.js';
 import { acquireProjectLock, lockPath } from '../../store/lock.js';
 import { FakeRamifyCli } from './fake-ramify.js';
+import { fixtureScratchGit } from './mock-git.js';
 import { installScriptedCucumber } from './project-config.js';
 import {
   createDirectCheckExecution, createMappedCheckExecution, createPassingCheckExecution,
@@ -240,6 +242,8 @@ export async function realRamify(): Promise<Awaited<ReturnType<typeof privateRam
 }
 
 export interface OpenRunsOptions extends Partial<RunServiceOptions> {
+  /** Use the supplied Git scratch answers, for scratch-specific or real-Git tests. */
+  readonly scratchGit?: 'provided' | undefined;
   /** Exercise the public production constructor and its fixed policy. */
   readonly production?: boolean | undefined;
   /** Test-only workflow factory; production composition never receives it. */
@@ -267,7 +271,7 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
   const scripted = options.script === undefined ? undefined : createScriptedAgent(declaringScenarios(options.script), options.agentOptions);
   const agent = scripted ?? options.agent;
   const warnings: string[] = [];
-  const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, production, ...rest } = options;
+  const { script: _script, checkScript, agentOptions: _agentOptions, capabilityWorkflowFactory, production, scratchGit, ...rest } = options;
   const checkExecution = checkScript === undefined
     ? createPassingCheckExecution()
     : typeof checkScript === 'function'
@@ -283,6 +287,7 @@ export async function openRuns(root: string, options: OpenRunsOptions) {
     ...(production === true ? {} : { policy: (projectRoot: string) => testPolicy(projectRoot) }),
     warn: message => warnings.push(message),
     ...rest,
+    git: scratchGit === 'provided' || options.git === gitService ? options.git : fixtureScratchGit(options.git),
     ...(agent === undefined ? {} : { agent }),
   };
   const { service, recovery } = production === true

@@ -102,6 +102,12 @@ export const nonfunctionalRecoveryBoundaries = {
   'nonfunctional-repair-assigned': 'nonfunctional-recovery.test.ts',
   'nonfunctional-repair-committed': 'nonfunctional-recovery.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
+export const scratchRecoveryBoundaries = {
+  'scratch-setting-up': 'scratch-setup.test.ts',
+  'scratch-rule-appended': 'scratch-setup.test.ts',
+  'scratch-committed': 'scratch-setup.test.ts',
+  'scratch-setup-complete': 'scratch-setup.test.ts',
+} as const satisfies Partial<Record<RunWrite, string>>;
 export const capabilityRecoveryBoundaries = {
   'writer-process-registered': 'capability-recovery.test.ts',
   'capability-coordinator-resumed': 'capability-recovery.test.ts',
@@ -116,7 +122,7 @@ export const capabilityRecoveryBoundaries = {
   'capability-assignment-interrupted': 'capability-recovery.test.ts',
   'capability-verification-started': 'capability-acceptance.integration.test.ts',
 } as const satisfies Partial<Record<RunWrite, string>>;
-type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries>;
+type InterruptedRunWrite = Exclude<RunWrite, keyof typeof nonfunctionalRecoveryBoundaries | keyof typeof capabilityRecoveryBoundaries | keyof typeof scratchRecoveryBoundaries>;
 
 /** One row per durable boundary with the interrupted-run recovery contract. */
 export const recoveryTable = {

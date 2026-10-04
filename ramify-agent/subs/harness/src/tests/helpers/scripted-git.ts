@@ -21,6 +21,10 @@ export function scenariosCommit(planId: string, commit = `scenarios-of-${planId}
 /** Canned external responses for a scenario, including unchanged checkpoints. */
 export interface GitScript {
   readonly scratch?: ScratchGitScript | undefined;
+  /** Explicit working-tree change the harness setup will commit after readiness. */
+  readonly setupChanges?: GitCheckpoint['changes'] | undefined;
+  /** Exact answers to interrupted scratch-setup commit lookups. */
+  readonly recoveredScratch?: readonly (string | null)[] | undefined;
   readonly head: string;
   readonly checkpoints: readonly GitCheckpoint[];
   /** Exact ordered tree previews, never inferred from checkpoint commits. */
@@ -49,9 +53,10 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
   let previewIndex = 0;
   // Gate attempts after readiness's `ga-0001`; the scenarios commit is no gate's.
   let gates = 0;
+  let scratchLookups = 0;
   let head = script.head;
   let branch: string | null = null;
-  let pending: GitCheckpoint['changes'] = [];
+  let pending: GitCheckpoint['changes'] = script.setupChanges ?? [];
   let last = { from: head, to: head, changes: pending };
   const made: Array<{ id: string; message: string }> = [];
   const calls: Record<string, number> = {};
@@ -103,13 +108,24 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
         expect(title === step!.subject || title.startsWith(`${step!.subject}:`), `expected checkpoint ${step!.subject}, got ${title}`).toBe(true);
       });
       index += 1;
-      if (!message.includes('\nRamify-Scenarios: ')) gates += 1;
+      if (!message.includes('\nRamify-Scenarios: ') && !message.includes('\nRamify-Scratch: ')) gates += 1;
       last = { from: head, to: step!.commit ?? head, changes: step!.changes };
       if (step!.commit !== null) { head = step!.commit; made.push({ id: head, message }); }
       pending = [];
       return step!.commit;
     },
     async findCommitByTrailers(project, trailers) {
+      if (trailers[1]?.key === 'Ramify-Scratch') {
+        check('findCommitByTrailers', project, () => {
+          expect(trailers).toEqual([
+            { key: 'Ramify-Run', value: branch?.slice('ramify-agent-run/'.length) },
+            { key: 'Ramify-Scratch', value: 'setup' },
+          ]);
+        });
+        const answer = script.recoveredScratch?.[scratchLookups++];
+        if (answer === undefined) return unsupported('scratch setup lookup');
+        return answer;
+      }
       check('findCommitByTrailers', project, () => {
         expect(trailers.map(trailer => trailer.key)).toEqual(['Ramify-Run', 'Ramify-Gate']);
         expect(trailers[0]!.value).toBe(branch?.slice('ramify-agent-run/'.length));
@@ -147,6 +163,7 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
       expect(failures).toEqual([]);
       expect(index).toBe(script.checkpoints.length);
       expect(previewIndex).toBe(script.previews?.length ?? 0);
+      expect(scratchLookups).toBe(script.recoveredScratch?.length ?? 0);
     },
     head: () => head,
     commits: () => made,

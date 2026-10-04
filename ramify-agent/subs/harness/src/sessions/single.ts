@@ -16,6 +16,7 @@ import { inputsHash, loadPromptPackages, renderEngineerPrompt, sha256 } from '..
 import { ExcursionWatcher } from '../run/excursions.js';
 import { runCheckpoint } from '../run/gates.js';
 import { captureProjectConfig } from '../run/project-config.js';
+import { declaredModuleDirectories } from '../run/project-config.js';
 import { architectRunInputs } from '../run/inputs.js';
 import { recordSettledSnapshot } from '../run/mutations.js';
 import { ObservationLog } from '../run/observations.js';
@@ -30,6 +31,7 @@ import { ContentStore } from '../transcripts/store.js';
 import { TranscriptWriter } from '../transcripts/writer.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
 import { engineerWorkingDirectory } from '../work/engineer-directory.js';
+import { ensureScratchRule, removeScratchDirectories, trackedScratchPaths } from '../work/scratch.js';
 import {
   capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
   type EngineerSubmission,
@@ -115,6 +117,8 @@ export interface SessionSummary {
   readonly standingViolations: readonly HookFinding[];
   /** Every uncommitted path when the session settled. */
   readonly changed: readonly string[];
+  /** A path changed by the harness while preparing scratch, rather than by the engineer. */
+  readonly harnessChanged: readonly string[];
   /** Changed paths outside the write scope. */
   readonly outsideScope: readonly string[];
   readonly usage: InvocationOutcome['usage'];
@@ -265,6 +269,20 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const workingDirectory = await engineerWorkingDirectory(projectRoot, scope, initial)
     .catch(error => ({ error: message(error) }));
   if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
+  let harnessChanged: string[] = [];
+  let alreadyChanged: string[];
+  try {
+    const modules = await declaredModuleDirectories(projectRoot);
+    const tracked = await trackedScratchPaths(projectRoot, modules, git);
+    if (tracked.length > 0) return notStarted(`Tracked scratch prevents this session: ${tracked.join(', ')}; nothing was deleted`);
+    const removed = await removeScratchDirectories(projectRoot, modules, git);
+    if (removed.preservedTracked.length > 0) return notStarted(`Tracked scratch appeared during preparation: ${removed.preservedTracked.join(', ')}`);
+    alreadyChanged = await git.changedPaths(projectRoot);
+    const prepared = await ensureScratchRule(projectRoot, modules, git);
+    if (prepared.appended) harnessChanged = ['.gitignore'];
+  } catch (error) {
+    return notStarted(`Scratch preparation refused this session: ${message(error)}`);
+  }
   // The project's configuration for the harness is never an agent's to write.
   const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
   const tests = testPolicyOf('ordinary', base, []);
@@ -278,7 +296,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   const views = await iterationApiViews(ramify, projectRoot, initial, scope.base);
   const head = await git.currentHead(projectRoot);
   const guardedFiles = await captureGuardedFiles(projectRoot);
-  const alreadyChanged = await git.changedPaths(projectRoot).catch(() => [] as string[]);
 
   const id = sessionId();
   const records = join(projectRoot, sessionsDirectory, id);
@@ -466,7 +483,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     await transcript.end({ ended: 'failed', interruption: 'adapter-fault', error: reason, actual: null });
     await writeOutcome(at(sessionLayout.outcome), {
       session: id, ended: 'failed', interruption: 'adapter-fault', error: reason, submission: null, rejectedSubmissions: 0,
-      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, outsideScope: [],
+      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, harnessChanged, outsideScope: [],
       usage: recorder.outcomeUsage(agent), elapsedMs: Date.now() - started, gate: null,
     });
     return notStarted(reason, records);
@@ -570,7 +587,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     settled,
     changed: [...snapshot.paths],
     alreadyChanged: alreadyChanged.map(path => path.split(sep).join('/')).sort(),
-    outsideScope: [...snapshot.outsideScope],
+    harnessChanged,
+    outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
     usage: recorder.outcomeUsage(agent),
     elapsedMs,
     gate: gate === null ? null : gate.ran
@@ -586,7 +604,8 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     rejectedSubmissions: judge.rejections,
     standingViolations: standing,
     changed: [...snapshot.paths],
-    outsideScope: [...snapshot.outsideScope],
+    harnessChanged,
+    outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
     usage: recorder.outcomeUsage(agent),
     elapsedMs,
     records,

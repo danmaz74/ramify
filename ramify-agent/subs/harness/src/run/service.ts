@@ -1,6 +1,6 @@
 import type { CommandRunner } from '../../subs/evidence/src/run-command.js';
 import { z } from 'zod';
-import { mkdir, readFile, stat } from 'node:fs/promises';
+import { lstat, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import type { AgentPort, AgentSession, JsonSchema, SessionSpec, SessionStart, ToolDefinition } from '../../subs/agent/src/interfaces/port.js';
 import { gitCandidateSource, gitService, type CandidateSource, type GitService } from '../../subs/evidence/src/git.js';
@@ -219,6 +219,8 @@ import { dueIntegrations, integrationBriefing, integrationWorkItem, type Integra
 import { briefed, entryScenariosOf, type EngineerScenarios } from '../work/scenario-briefing.js';
 import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
+import { declaredModuleDirectories } from './project-config.js';
+import { ensureScratchRule, ScratchIgnoreConflictError } from '../work/scratch.js';
 import {
   gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
   measurementSnapshotSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
@@ -275,6 +277,10 @@ export type RunWrite =
   | 'context-package-append-requested'
   | 'context-package-appended'
   | 'readiness-attempted'
+  | 'scratch-setting-up'
+  | 'scratch-rule-appended'
+  | 'scratch-committed'
+  | 'scratch-setup-complete'
   | 'scenarios-materializing'
   | 'scenarios-committed'
   | 'scenarios-materialized'
@@ -606,6 +612,13 @@ interface LiveInvocation {
   readonly reader: boolean;
   session: AgentSession | undefined;
   readonly done: Promise<void>;
+}
+
+class ScratchSetupRefusal extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'ScratchSetupRefusal';
+  }
 }
 
 class Run {
@@ -2685,6 +2698,11 @@ export class RunService {
         performed.push('the materialization of the feature files');
         continue;
       }
+      if (event.type === 'scratch-setting-up') {
+        await this.performScratchSetup(run, true);
+        performed.push('the scratch ignore rule setup');
+        continue;
+      }
       if (event.type !== 'gate-committing') {
         this.warn(`Run ${run.record.jobId}: effect "${pending.key}" has no known completion and was left alone`);
         continue;
@@ -3262,6 +3280,9 @@ export class RunService {
 
     const ready = await this.reachReadiness(run);
     if (!ready || this.ignoring(run)) return;
+
+    await this.setupScratch(run);
+    if (this.ignoring(run)) return;
 
     await this.materializeScenarios(run);
     if (this.ignoring(run)) return;
@@ -10675,6 +10696,86 @@ export class RunService {
   /** The count of committed gate attempts: every readiness and every checkpoint. */
   private gateCount(run: Run): number {
     return run.log.count('readiness-passed') + run.log.all('readiness-failed').length + run.log.count('gate-attempted');
+  }
+
+  /** A recoverable setup on the run branch, before feature or iteration files are written. */
+  private async setupScratch(run: Run): Promise<void> {
+    if (run.log.find('scratch-setup-complete') !== undefined) return;
+    run.writer.requireSettled('Scratch setup cannot run');
+    try {
+      await this.performScratchSetup(run, false);
+      await this.afterWrite('scratch-setup-complete', run.record.jobId);
+    } catch (error) {
+      if (!(error instanceof ScratchSetupRefusal)) throw error;
+      await this.fail(run, 'readiness-failed', `Scratch setup failed before work: ${message(error)}`);
+    }
+  }
+
+  private async performScratchSetup(run: Run, recovering: boolean): Promise<{ commit: string | null; appended: boolean }> {
+    const ignoreFile = join(this.projectRoot, '.gitignore');
+    const ignoreInfo = await lstat(ignoreFile).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    });
+    if (ignoreInfo?.isSymbolicLink()) throw new ScratchSetupRefusal(`project .gitignore is a symlink: ${ignoreFile}`);
+    if (ignoreInfo !== null && !ignoreInfo.isFile()) throw new ScratchSetupRefusal(`project .gitignore is not a file: ${ignoreFile}`);
+    const original = recovering
+      ? run.log.find('scratch-setting-up')?.data.originalIgnoreBase64
+      : await readFile(ignoreFile).then(bytes => bytes.toString('base64'), (error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      });
+    if (original === undefined) throw new Error('Scratch setup recovery has no original .gitignore');
+    return run.mutex.run(() => run.log.ledger.effect<{ commit: string | null; appended: boolean }>({
+      key: 'scratch-setup',
+      intent: { event: run.log.next({ type: 'scratch-setting-up', data: { originalIgnoreBase64: original } }), records: [] },
+      perform: async () => {
+        await this.afterWrite('scratch-setting-up', run.record.jobId);
+        if (recovering) {
+          const committed = await this.git.findCommitByTrailers(this.projectRoot, [
+            { key: 'Ramify-Run', value: run.record.jobId },
+            { key: 'Ramify-Scratch', value: 'setup' },
+          ]);
+          if (committed !== null) return { commit: committed, appended: true };
+        }
+        let committed: string | null = null;
+        let appended = false;
+        try {
+          const modules = await declaredModuleDirectories(this.projectRoot);
+          const prepared = await ensureScratchRule(this.projectRoot, modules, this.git);
+          if (prepared.appended) await this.afterWrite('scratch-rule-appended', run.record.jobId);
+          if (!prepared.appended && !recovering) return { commit: null, appended: false };
+          const changed = await this.git.changedPaths(this.projectRoot, this.accepted(run));
+          if (changed.some(path => path !== '.gitignore')) {
+            throw new ScratchSetupRefusal(`unexpected working-tree changes: ${changed.join(', ')}`);
+          }
+          appended = prepared.appended || changed.length > 0;
+          if (changed.length > 0) {
+            committed = await this.git.commitAccepted(this.projectRoot, [
+              'Prepare module scratch ignore rule', '',
+              `Ramify-Run: ${run.record.jobId}`,
+              'Ramify-Scratch: setup', '',
+            ].join('\n'));
+            if (committed === null) throw new ScratchSetupRefusal('the .gitignore change made no commit');
+          }
+        } catch (error) {
+          if (committed !== null) throw error;
+          const restoreInfo = await lstat(ignoreFile).catch((issue: unknown) => {
+            if ((issue as NodeJS.ErrnoException).code === 'ENOENT') return null;
+            throw issue;
+          });
+          if (restoreInfo?.isSymbolicLink()) throw new ScratchSetupRefusal(`project .gitignore became a symlink: ${ignoreFile}`);
+          if (original === null) await rm(ignoreFile, { force: true });
+          else await writeFile(ignoreFile, Buffer.from(original, 'base64'));
+          throw error instanceof ScratchIgnoreConflictError
+            ? new ScratchSetupRefusal(error.message)
+            : error;
+        }
+        if (committed !== null) await this.afterWrite('scratch-committed', run.record.jobId);
+        return { commit: committed, appended };
+      },
+      complete: result => ({ event: run.log.next({ type: 'scratch-setup-complete', data: result }), records: [] }),
+    }));
   }
 
   /**

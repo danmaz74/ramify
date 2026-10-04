@@ -448,7 +448,7 @@ export type EntryAssignments = z.infer<typeof entryAssignmentsSchema>;
  * run branch created and checked out, last of all.
  */
 export const readinessSteps = [
-  'project-root', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
+  'project-root', 'scratch-cleanup', 'git-clean', 'compiler-config', 'test-runner', 'project-config', 'acceptance-runner',
   'baseline-acceptance', 'acceptance-full', 'nested-packages',
   'test-discovery', 'ramify-daemon', 'baseline-setup', 'baseline-tests', 'baseline-type-check', 'baseline-ramify-check',
   'run-branch',

@@ -355,6 +355,10 @@ function describe(event: RunEvent): [string, Ref[]] {
       return [`Capability task ${event.data.task} stopped`, ref('capability-task', event.data.task)];
     case 'stop-requested':
       return ['A stop was requested', []];
+    case 'scratch-setting-up':
+      return ['The harness is preparing ignored module scratch', []];
+    case 'scratch-setup-complete':
+      return [event.data.commit === null ? 'Module scratch ignore rule verified' : 'Module scratch ignore rule committed', ref('commit', event.data.commit)];
     case 'job-completed':
       return [
         `The run completed after ${counted(event.data.workItems, 'work item', 'work items')}${event.data.planDeviations === undefined ? '' : `, with ${counted(event.data.planDeviations, 'plan deviation', 'plan deviations')} to review`}`,

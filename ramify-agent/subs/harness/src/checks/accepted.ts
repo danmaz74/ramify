@@ -20,7 +20,7 @@ export interface AcceptedBoundaryLine {
 
 /**
  * The audited hash of the latest passed committing checkpoint, or of the
- * commit that materialized the feature files, in committed event order. The
+ * commit that prepared scratch or materialized the feature files, in committed event order. The
  * run's base is returned only until neither exists.
  *
  * A withdrawal commit ("Withdraw sc-NNN") is not an accepted boundary. It
@@ -32,7 +32,7 @@ export function acceptedCommit(entries: readonly AcceptedBoundaryLine[], base: s
   let accepted = base;
   for (const entry of entries) {
     const event = entry.transaction.event;
-    if (event.type === 'scenarios-materialized') {
+    if (event.type === 'scratch-setup-complete' || event.type === 'scenarios-materialized') {
       // The harness's own commit of the feature files is accepted as it is
       // made: no gate runs over it, and the next iteration starts from it.
       const commit = (event.data as { readonly commit?: unknown }).commit;

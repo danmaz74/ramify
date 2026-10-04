@@ -203,6 +203,8 @@ async function reached(root: string, runId: string, events: string, write: RunWr
     case 'context-package-appended': return types.includes('context-package-appended');
     case 'analysis-evidence-staged': return types.includes('invocation-ended') && !types.includes('analysis-accepted');
     case 'readiness-attempted': return types.includes('readiness-passed') || types.includes('readiness-failed');
+    case 'scratch-setting-up': case 'scratch-rule-appended': case 'scratch-committed': return types.includes('scratch-setting-up');
+    case 'scratch-setup-complete': return types.includes('scratch-setup-complete');
     // The materialization's intent is in the log; its commit is made at the second.
     case 'scenarios-materializing': case 'scenarios-committed': return types.includes('scenarios-materializing');
     case 'scenarios-materialized': return types.includes('scenarios-materialized');

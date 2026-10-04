@@ -20,7 +20,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { addModule, completionProposed, edit, installMiniRunner, read, readDeclaredTree, shell, unsuitableScope, write } from './helpers/iterations.js';
 import { testPolicy } from './helpers/runs.js';
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
-import { mockGit } from './helpers/mock-git.js';
+import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
 import { createDirectCheckExecution, type DirectCheckStep } from './helpers/direct-check-execution.js';
 import { commandResult } from './helpers/command-result.js';
 import { expectNoProcesses, forgetExternalTools } from './helpers/external-tools.js';
@@ -124,7 +124,7 @@ async function session(
     prompt: 'Raise the note limit to 500.',
     agent,
     ramify,
-    git,
+    git: fixtureScratchGit(git),
     checkExecution,
     commandExecution: boundaries.commandExecution ?? (async request => {
       throw new Error(`No command result scripted for ${request.argv.join(' ')}`);

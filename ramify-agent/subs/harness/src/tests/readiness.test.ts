@@ -389,7 +389,7 @@ describe('the structural steps', () => {
   test('a directory that is no git repository is refused with the same step', async () => {
     const root = await target();
     const { failures } = await readinessOf(root, {});
-    expect(failures[0]).toMatchObject({ step: 'git-clean', recovery: null, final: true });
+    expect(failures[0]).toMatchObject({ step: 'scratch-cleanup', recovery: null, final: true });
     expect(failures[0]!.detail).toContain('not a git repository');
   }, 180_000);
 

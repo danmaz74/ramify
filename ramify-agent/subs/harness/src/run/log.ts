@@ -263,6 +263,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
    * "Scenarios of <planId>". A crash before its completion is recovered by
    * re-rendering and by the commit's trailers.
    */
+  event('scratch-setting-up', z.object({ originalIgnoreBase64: z.string().nullable() }).strict()),
+  event('scratch-setup-complete', z.object({ commit: z.string().nullable(), appended: z.boolean() }).strict()),
   event('scenarios-materializing', z.object({ files: z.array(text) }).strict()),
   /**
    * The feature files are on the run branch: the commit that holds them, or

@@ -94,7 +94,8 @@ describe('materializing the feature files', () => {
     const events = await runEventsOnDisk(project, plan, receipt.jobId);
     const types = events.map(event => event.type);
     expect(types.slice(types.indexOf('readiness-passed'), types.indexOf('work-item-started') + 1)).toEqual([
-      'readiness-passed', 'scenarios-materializing', 'scenarios-materialized', 'work-item-started',
+      'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete',
+      'scenarios-materializing', 'scenarios-materialized', 'work-item-started',
     ]);
     expect(events.find(event => event.type === 'scenarios-materializing')!.data).toEqual({ files: [rootFeature, reviewsFeature] });
     expect(events.find(event => event.type === 'scenarios-materialized')!.data).toEqual({

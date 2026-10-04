@@ -1,12 +1,14 @@
 import { directReadinessExecution } from './external-tools.js';
 import { openRuns, type OpenRunsOptions } from './runs.js';
-import { scriptedGit, type GitCheckpoint, type ScriptedGit } from './scripted-git.js';
+import { scriptedGit, type GitCheckpoint, type GitScript, type ScriptedGit } from './scripted-git.js';
 import { scriptedCandidates } from './candidates.js';
 import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
 
 const scripts: ScriptedGit[] = [];
 
 export interface UnchangedRunsOptions extends Omit<OpenRunsOptions, 'git'> {
+  /** Explicit Git answers for harness setup; ordinary fixture runs need none. */
+  readonly gitScript?: Partial<GitScript> | undefined;
   /**
    * Passing gate checkpoints in exact order; omission explicitly declares
    * none. A subject is a checkpoint over an unchanged tree; a checkpoint
@@ -32,23 +34,25 @@ function previewAnswers(root: string, checkpoints: readonly GitCheckpoint[], cou
 }
 
 /** Explicit fixture for scenarios whose agents never change project source. */
-export function unchangedGit(root: string, checkpoints: ReadonlyArray<string | GitCheckpoint> = [], previewCount = 0): ScriptedGit {
+export function unchangedGit(root: string, checkpoints: ReadonlyArray<string | GitCheckpoint> = [], previewCount = 0,
+  script: Partial<GitScript> = {}): ScriptedGit {
   const stated = checkpoints.map(checkpointOf);
   const git = scriptedGit(root, {
     head: fixtureHead,
     checkpoints: stated,
     previews: previewAnswers(root, stated, previewCount),
+    ...script,
   });
   scripts.push(git);
   return git;
 }
 
 export async function openUnchangedRuns(root: string, options: UnchangedRunsOptions = {}) {
-  const { unchangedCheckpoints = [], previewCount, ...runs } = options;
+  const { unchangedCheckpoints = [], previewCount, gitScript, ...runs } = options;
   const checkpoints = unchangedCheckpoints.map(checkpointOf);
   const final = checkpoints.findIndex(checkpoint => checkpoint.subject.startsWith('final verification'));
   const count = previewCount ?? (final < 0 ? 0 : 4);
-  const git = unchangedGit(root, unchangedCheckpoints, count);
+  const git = unchangedGit(root, unchangedCheckpoints, count, gitScript);
   const before = checkpoints.slice(0, final).flatMap(checkpoint => checkpoint.commit ?? []).at(-1) ?? fixtureHead;
   const audited = final < 0 ? null : checkpoints[final]!.commit ?? before;
   const candidates = audited === null ? undefined : scriptedCandidates(root, {
