@@ -17,3 +17,9 @@ Git needs a slash suffix to classify an absent directory under a directory-only 
 - `git diff --cached --check` passed before the implementation commit.
 
 Readiness setup and iteration lifecycle integration belong to iterations 3 and 4. This iteration did not run the complete suite or make a model call.
+
+## Follow-up: batched ignore queries
+
+Lifecycle integration needs to check several modules before a candidate snapshot. The primary `check-ignore -z --stdin` query now sends all requested paths to Git in one process, validates one four-field response per path, and preserves request order, duplicates and paths with spaces. Only nonmatches need the existing per-path lookup for a negating rule. An empty request starts no Git process. The actual worktree response remains the authority for ignored status.
+
+`npm test -- subs/harness/subs/evidence/src/tests/scratch-git.test.ts subs/harness/subs/evidence/src/tests/git.test.ts subs/harness/subs/evidence/src/tests/run-command.test.ts` passed: 3 files, 23 tests. `npm run type-check` passed. The complete suite was not run.

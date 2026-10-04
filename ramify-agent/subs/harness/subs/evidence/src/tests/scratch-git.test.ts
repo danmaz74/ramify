@@ -33,7 +33,14 @@ test('index paths and effective ignore rules come from Git, including unchanged 
   ]);
 
   await repository.write('.gitignore', '**/src/tmp/\n');
+  expect(await gitService.ignoreStatus(root, [])).toEqual([]);
   expect(await gitService.ignoreStatus(root, ['src/tmp/', 'subs/space name/src/tmp/'])).toEqual([
+    { path: 'src/tmp/', ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } },
+    { path: 'subs/space name/src/tmp/', ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } },
+  ]);
+  expect(await gitService.ignoreStatus(root, ['subs/space name/src/tmp/', 'src/other/', 'src/tmp/', 'subs/space name/src/tmp/'])).toEqual([
+    { path: 'subs/space name/src/tmp/', ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } },
+    { path: 'src/other/', ignored: false, rule: null },
     { path: 'src/tmp/', ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } },
     { path: 'subs/space name/src/tmp/', ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } },
   ]);

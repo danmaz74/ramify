@@ -125,10 +125,11 @@ export interface IgnoreStatus {
 
 /** Ask Git about paths as directories, even when a directory has not been created yet. */
 export async function ignoreStatus(root: string, paths: readonly string[], signal?: AbortSignal): Promise<IgnoreStatus[]> {
+  for (const path of paths) validateProjectPath(path);
+  const primary = await decidingIgnoreRules(root, paths, signal);
   const answers: IgnoreStatus[] = [];
-  for (const path of paths) {
-    validateProjectPath(path);
-    let rule = await decidingIgnoreRule(root, path, signal);
+  for (const [index, path] of paths.entries()) {
+    let rule = primary[index] ?? null;
     // Git describes a negated directory pattern on the path without its
     // trailing slash, although the slash is needed to check an absent directory.
     if (rule === null && path.endsWith('/')) {
@@ -187,8 +188,14 @@ async function absentDirectoryRule(root: string, path: string, signal?: AbortSig
 }
 
 async function decidingIgnoreRule(root: string, path: string, signal?: AbortSignal, prefix: readonly string[] = []): Promise<IgnoreRule | null> {
+  return (await decidingIgnoreRules(root, [path], signal, prefix))[0] ?? null;
+}
+
+/** One NUL-delimited Git query keeps paths, spaces and response order exact. */
+async function decidingIgnoreRules(root: string, paths: readonly string[], signal?: AbortSignal, prefix: readonly string[] = []): Promise<Array<IgnoreRule | null>> {
+  if (paths.length === 0) return [];
   const args = ['check-ignore', '--no-index', '--verbose', '--non-matching', '-z', '--stdin'];
-  const run = await git(root, [...prefix, ...args], signal, `${path}\0`);
+  const run = await git(root, [...prefix, ...args], signal, `${paths.join('\0')}\0`);
   if (run.exitCode !== 0 && run.exitCode !== 1) {
     throw new GitError(`\`git check-ignore\` exited with ${run.exitCode}: ${run.stderr.trim()}`, {
       argv: ['git', ...prefix, ...args],
@@ -197,12 +204,17 @@ async function decidingIgnoreRule(root: string, path: string, signal?: AbortSign
     });
   }
   const fields = run.stdout.split('\0');
-  if (fields.length !== 5 || fields[4] !== '' || fields[3] !== path) throw new Error(`Git gave an invalid ignore answer for ${path}`);
-  const [source, line, pattern] = fields as [string, string, string, string, string];
-  if (source === '' && line === '' && pattern === '') return null;
-  const number = Number.parseInt(line, 10);
-  if (!Number.isInteger(number) || number < 1) throw new Error(`Git gave an invalid ignore rule line for ${path}`);
-  return { source, line: number, pattern };
+  if (fields.length !== paths.length * 4 + 1 || fields.at(-1) !== '') {
+    throw new Error(`Git gave ${fields.length - 1} ignore fields for ${paths.length} paths`);
+  }
+  return paths.map((path, index) => {
+    const [source, line, pattern, answeredPath] = fields.slice(index * 4, index * 4 + 4);
+    if (answeredPath !== path) throw new Error(`Git gave an ignore answer for ${answeredPath ?? '<missing>'} instead of ${path}`);
+    if (source === '' && line === '' && pattern === '') return null;
+    const number = Number.parseInt(line!, 10);
+    if (!Number.isInteger(number) || number < 1) throw new Error(`Git gave an invalid ignore rule line for ${path}`);
+    return { source: source!, line: number, pattern: pattern! };
+  });
 }
 
 function validateProjectPath(path: string): void {
