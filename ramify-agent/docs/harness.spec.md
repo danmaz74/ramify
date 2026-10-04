@@ -72,11 +72,16 @@ and avoiding duplicates, including when new modules are introduced. This is
 harness setup responsibility, independent of an engineer's module write scope.
 
 The harness creates the assigned module's scratch directory within its scope.
-Scratch survives repairs and interrupted-iteration resumption, and every module's
-scratch directory is removed when the iteration closes, whatever its outcome.
-Readiness removes scratch left by an earlier run. Evidence that must survive
-belongs in durable results or evidence records, not scratch. The project remains
-responsible for compiler exclusions that keep scratch out of builds.
+Scratch survives for as long as the iteration that generated it remains open,
+including repairs, suspension for nested capability work and interrupted-iteration
+resumption. Closing another iteration never removes that scratch. At closure,
+the harness removes scratch from modules with no iteration still open, whatever
+the closing outcome. It preserves and reports any paths in Git's index instead
+of deleting them. Readiness first checks all scratch for tracked paths and stops
+without deleting anything if any exist; otherwise it removes scratch left by an
+earlier run. Evidence that must survive belongs in durable results or evidence
+records, not scratch. The project remains responsible for compiler exclusions
+that keep scratch out of builds.
 
 ### A Module Carries Its Own Onboarding
 

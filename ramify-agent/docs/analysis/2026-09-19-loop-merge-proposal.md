@@ -254,7 +254,7 @@ do not make one commit per transition a prerequisite of this abstraction.
 
 ## 10. What the spikes establish, and what they do not
 
-The [selection spike](../../spikes/briefs/results.md) supports deterministic
+The [selection spike's analysis](2026-09-19-plan-to-brief-spike.md) supports deterministic
 assembly once the necessary semantic content exists. The
 [Sol spike](../spikes/work-brief-examples/results.md) supports separating maps
 from bounded decisions and demonstrates why protocol text should be fixed.

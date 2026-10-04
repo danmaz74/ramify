@@ -5,7 +5,7 @@
 Two experiments took a feature request for the toolkit to the point just
 before the first implementation agent:
 
-- **Selection.** The [plan-to-brief spike](../../spikes/briefs/results.md) had
+- **Selection.** The plan-to-brief spike (removed on 2026-10-04) had
   one architect write a map that includes work items, and a script assemble
   every brief by copying from it. Its [analysis](2026-09-19-plan-to-brief-spike.md)
   follows the [work loop](../work-loop.md).

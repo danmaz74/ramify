@@ -210,7 +210,8 @@ deviation.
 41 TypeScript files changed, with 75 changed lines. Every one is an import
 specifier except a single comment in `subs/harness/src/http/app.ts`, which
 named the protocol's former module. The out-of-tree spike tool
-`spikes/briefs/tools/brief.ts` follows the map to its new path.
+`spikes/briefs/tools/brief.ts` followed the map to its new path at the time of
+this refactor. That obsolete spike tree was removed on 2026-10-04.
 
 Documents updated where they describe the active module tree: the root,
 `harness` and `web` READMEs, `AGENTS.md`, `docs/architecture.md`,

@@ -5,10 +5,10 @@ none.
 
 The [work loop](../work-loop.md) rests on one claim: the harness can turn an
 implementation map into each agent's brief by selection alone, without writing
-a sentence. The [spike](../../spikes/briefs/README.md) tested that claim on the
-toolkit with three plans of different sizes, and its
-[results](../../spikes/briefs/results.md) list the findings one by one. This
-document asks what they mean together.
+a sentence. The former `spikes/briefs/` experiment tested that claim on the
+toolkit with three plans of different sizes. Its source and detailed artifacts
+were removed on 2026-10-04; this analysis retains the findings and asks what
+they mean together.
 
 ## What was done, and how far it can be trusted
 

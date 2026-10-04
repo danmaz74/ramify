@@ -35,8 +35,8 @@ Design documents for the separate agent harness:
 - [State machine architecture with XState](analysis/2026-09-26-state-machine-architecture.md),
   analysis of owner-local workflow machines with the run ledger as authority
 - [What the plan-to-brief spike taught us](analysis/2026-09-19-plan-to-brief-spike.md),
-  analysis of the [spike](../spikes/briefs/README.md) that mapped three toolkit
-  plans and assembled their briefs
+  analysis of the former `spikes/briefs/` experiment that mapped three toolkit
+  plans and assembled their briefs; the spike tree was removed on 2026-10-04
 - [From a plan to a brief: a merge of the two spikes](analysis/2026-09-19-merged-brief-process.md),
   proposal
 - [A merged implementation loop](analysis/2026-09-19-loop-merge-proposal.md),
