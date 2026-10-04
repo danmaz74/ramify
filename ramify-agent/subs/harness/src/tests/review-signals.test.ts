@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptStep } from '../../subs/agent/src/scripted.js';
@@ -68,7 +69,7 @@ describe('the modules of a concern', () => {
       base: 'c0',
       changes: [],
       files: {
-        'module.ramify': declaration('shop'),
+        'module.ramify': rootDescription('shop'),
         'src/index.ts': '',
         'subs/cart/module.ramify': declaration('cart'),
         'subs/cart/README.md': '# cart\n',
@@ -124,7 +125,7 @@ describe('a driven review binds risk, ground, credibility and modules', () => {
     const scripted = candidates();
     const second = scripted['revision-02']!;
     const texts: Record<string, string> = {
-      'module.ramify': 'ramify 1\nmodule collection-review\n',
+      'module.ramify': rootDescription('collection-review'),
       'subs/workspace/module.ramify': 'ramify 1\nmodule workspace\n',
       'subs/workspace/subs/reviews/module.ramify': 'ramify 1\nmodule reviews\n',
       [`${notesDirectory}/module.ramify`]: 'ramify 1\nmodule notes\n',

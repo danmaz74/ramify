@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -19,7 +20,7 @@ async function fixture(nested = false) {
   const files: Record<string, string> = {
     'package.json': '{"name":"api-preparation","private":true,"type":"module"}',
     'tsconfig.json': '{"compilerOptions":{"strict":true,"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext"},"include":["src/**/*.ts","subs/**/*.ts"]}',
-    'module.ramify': 'ramify 1\nmodule app\nexpose-src readToken from "api.ts" to descendants\n',
+    'module.ramify': rootDescription('app', "expose-src readToken from \"api.ts\" to descendants\n"),
     'src/api.ts': 'export function readToken(): string { return "original"; }\n',
   };
   for (const owner of ['cli', 'analysis', 'model']) {
@@ -58,7 +59,7 @@ test('cold Analysis and Model preparation publishes real separate source-area vi
     }
   }
   await writeFile(join(root, 'src/api.ts'), 'export function readFreshToken(): number { return 42; }\n');
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule app\nexpose-src readFreshToken from "api.ts" to descendants\n');
+  await writeFile(join(root, 'module.ramify'), rootDescription('app', "expose-src readFreshToken from \"api.ts\" to descendants\n"));
   const continued = await iterationApiViews(ramify, root, index, base);
   for (const [i, entry] of continued.entries()) {
     expect(entry.unavailable).toBeNull();

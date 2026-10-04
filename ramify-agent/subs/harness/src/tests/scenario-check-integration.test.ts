@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { execFileSync } from 'node:child_process';
 import { access, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -218,7 +219,7 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
     return {
       'package.json': '{ "name": "scenario-project", "private": true, "type": "module", "scripts": { "test": "vitest run" } }\n',
       'tsconfig.json': '{}\n',
-      'module.ramify': 'ramify 1\nmodule demo\n',
+      'module.ramify': rootDescription('demo'),
       'subs/shelf/module.ramify': 'ramify 1\nmodule shelf\n',
       'src/tests/placeholder.test.ts': '',
       'ramify-agent.json': `${JSON.stringify({

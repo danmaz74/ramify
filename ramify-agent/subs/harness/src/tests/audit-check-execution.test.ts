@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { execFileSync } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -177,7 +178,7 @@ describe('audit-backed gate execution', () => {
 
   it('narrows a registered Vitest run to Ramify-selected source after a full root', { timeout: 60_000 }, async () => {
     const fixture = await repository({
-      'module.ramify': 'ramify 1\nmodule "fixture"\nexpose-sub value from producer to descendants\n',
+      'module.ramify': rootDescription('"fixture"', "expose-sub value from producer to descendants\n"),
       'package.json': '{"name":"fixture","private":true,"type":"module","scripts":{"test":"vitest run"}}',
       'tsconfig.json': '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","subs/**/*.ts"]}',
       'src/index.ts': 'export {};\n',
@@ -255,7 +256,7 @@ describe('audit-backed gate execution', () => {
 
   it('defaults committing gates to partial mode and requests full mode for final', async () => {
     const fixture = await repository({
-      'module.ramify': 'ramify 1\nmodule "fixture"\n',
+      'module.ramify': rootDescription('"fixture"'),
       'package.json': '{"name":"fixture","private":true}',
       'src/index.ts': 'export const value = 1;\n',
     });

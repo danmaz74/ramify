@@ -1,3 +1,4 @@
+import { rootDescription } from '../../../../../../src/tests/helpers/root-description.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
@@ -43,7 +44,7 @@ async function run(steps: readonly ReplyStep[], options: {
 } = {}): Promise<Harness> {
   const workingDirectory = await mkdtemp(join(tmpdir(), 'ramify-agent-pi-cwd-'));
   cleanups.push(() => rm(workingDirectory, { recursive: true, force: true }));
-  await writeFile(join(workingDirectory, 'module.ramify'), 'ramify 1\nmodule demo\n');
+  await writeFile(join(workingDirectory, 'module.ramify'), rootDescription('demo'));
   await mkdir(join(workingDirectory, 'subs'));
   await writeFile(join(workingDirectory, 'subs', 'notes.md'), 'expose-sub appears here\n');
   const sessionDirectory = join(workingDirectory, 'session');

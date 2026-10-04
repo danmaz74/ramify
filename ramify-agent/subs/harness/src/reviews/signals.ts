@@ -4,6 +4,7 @@ import type { CandidateSource } from '../../subs/evidence/src/git.js';
 import type { ArchitectIndex, ModuleEntry } from '../../subs/evidence/src/views.js';
 import { ownerOf } from '../kpi/lines.js';
 import type { CandidateSnapshot } from './snapshot.js';
+import { parseModuleHeader } from '../run/module-header.js';
 
 /*
  * What the harness binds to a reviewer's concern besides its words: the
@@ -53,9 +54,9 @@ export async function candidateModuleIndex(source: CandidateSource, projectRoot:
   const declared = (dir: string) => snapshot.entries.get(dir === '' ? 'module.ramify' : `${dir}/module.ramify`)?.kind === 'file';
   const visit = async (dir: string, parent: string | null): Promise<string | null> => {
     const text = await source.readBlob(projectRoot, snapshot.commit, dir === '' ? 'module.ramify' : `${dir}/module.ramify`);
-    const name = /^module\s+("[^"]*"|\S+)/mu.exec(text)?.[1]?.replace(/^"|"$/gu, '');
-    if (name === undefined) return null;
-    const module = parent === null ? name : `${parent}/${name}`;
+    const header = parseModuleHeader(text);
+    if (header === null) return null;
+    const module = parent === null ? header.name : `${parent}/${header.name}`;
     const prefix = dir === '' ? 'subs/' : `${dir}/subs/`;
     const children: string[] = [];
     const childDirs = [...snapshot.directories].filter(path => path.startsWith(prefix) && !path.slice(prefix.length).includes('/')).sort();
@@ -64,7 +65,7 @@ export async function candidateModuleIndex(source: CandidateSource, projectRoot:
       const named = await visit(child, module);
       if (named !== null) children.push(named);
     }
-    modules.set(module, { module, dir, parent, children, tags: [], areas: ['src'] });
+    modules.set(module, { module, dir, parent, children, tags: header.tags, areas: ['src'] });
     return module;
   };
   if (declared('')) await visit('', null);

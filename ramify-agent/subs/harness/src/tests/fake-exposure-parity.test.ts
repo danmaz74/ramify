@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -94,7 +95,7 @@ function tree(files: Readonly<Record<string, string>>) {
 
 const fakeSource = 'export const enrichImportDiagnosticsFake = (report) => report;\n';
 const declarations = {
-  'module.ramify': 'ramify 1\nmodule "ramify"\n\n// CLI uses the explicitly named analysis stand-in.\nexpose-sub enrichImportDiagnosticsFake from analysis to descendants\n',
+  'module.ramify': rootDescription('"ramify"', "\n// CLI uses the explicitly named analysis stand-in.\nexpose-sub enrichImportDiagnosticsFake from analysis to descendants\n"),
   'subs/analysis/module.ramify': 'ramify 1\nmodule analysis\nexpose-src enrichImportDiagnosticsFake from "fakes/enrich-import-diagnostics.fake.ts" to parent\n',
 };
 
@@ -294,7 +295,7 @@ describe('the fake-exposure-parity rule', () => {
     const retired = await fakeExposureParity({
       index: toolkit([realRecord()]),
       standIns: [registered],
-      read: tree({ 'module.ramify': 'ramify 1\nmodule "ramify"\n', 'subs/analysis/module.ramify': 'ramify 1\nmodule analysis\n' }),
+      read: tree({ 'module.ramify': rootDescription('"ramify"'), 'subs/analysis/module.ramify': 'ramify 1\nmodule analysis\n' }),
       writeScope: ['subs/analysis'],
     });
     expect(retired).toEqual({ rule: 'fake-exposure-parity', outcome: 'passed', violations: [] });

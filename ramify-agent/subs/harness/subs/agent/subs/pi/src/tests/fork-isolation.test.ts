@@ -1,3 +1,4 @@
+import { rootDescription } from '../../../../../../src/tests/helpers/root-description.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
@@ -50,7 +51,7 @@ test('a fork from a pinned point in another directory holds the parent\'s histor
   const reviewer = { workingDirectory: join(own, 'workspace'), sessionDirectory: join(own, 'session') };
   await mkdir(reviewer.workingDirectory);
   await mkdir(reviewer.sessionDirectory);
-  await writeFile(join(reviewer.workingDirectory, 'module.ramify'), 'ramify 1\nmodule demo\n');
+  await writeFile(join(reviewer.workingDirectory, 'module.ramify'), rootDescription('demo'));
 
   const fork = await startPi(cleanups, [
     // Its parent's read tool is gone, even for the parent's own path.

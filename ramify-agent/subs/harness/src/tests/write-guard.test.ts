@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -41,7 +42,7 @@ async function project() {
   await mkdir(join(root, 'subs', 'contracts', 'src', 'interfaces'), { recursive: true });
   await mkdir(outside, { recursive: true });
 
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule shop\n');
+  await writeFile(join(root, 'module.ramify'), rootDescription('shop'));
   await writeFile(join(root, 'package.json'), '{}\n');
   await writeFile(join(root, 'subs', 'orders', 'module.ramify'), 'ramify 1\nmodule orders\n');
   await writeFile(join(root, 'subs', 'orders', 'README.md'), '# orders\n');

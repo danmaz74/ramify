@@ -1,3 +1,4 @@
+import { rootDescription } from './helpers/root-description.js';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
@@ -21,7 +22,7 @@ afterEach(async () => {
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-agent-workspace-owner-'));
   cleanups.push(root);
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), rootDescription('fixture'));
   await mkdir(join(root, 'plans', 'plan', '.harness', 'jobs', '20260921T000000Z-aabbcc', 'gates', 'ga-0001'), { recursive: true });
   const commit = await initRepository(root);
   await mkdir(join(root, 'node_modules'), { recursive: true });
@@ -162,7 +163,7 @@ describe('durable audit workspace ownership', () => {
 
     await expect(f.ownership.recoverAbandonedWorkspaces(f.repository)).rejects.toThrow('Refusing non-audit temporary directory');
 
-    expect(await readFile(marker, 'utf8')).toBe('ramify 1\nmodule fixture\n');
+    expect(await readFile(marker, 'utf8')).toBe(rootDescription('fixture'));
     const record = JSON.parse(await readFile(join(f.root, 'plans/plan/.harness/jobs/20260921T000000Z-aabbcc/gates/ga-0001/audit-workspace.json'), 'utf8')) as { state: string };
     expect(record.state).toBe('intended');
   });

@@ -3,6 +3,7 @@ import { delimiter, isAbsolute, join, matchesGlob, relative, sep } from 'node:pa
 import { readProjectConfiguration } from '../../subs/evidence/src/project-configuration.js';
 import { isTestingModule, type ArchitectIndex } from '../../subs/evidence/src/views.js';
 import type { ScenarioModule } from '../../subs/scenarios/src/records.js';
+import { parseModuleHeader } from './module-header.js';
 import {
   capturedProjectConfigSchema, projectConfigSchema,
   type AcceptanceMode, type CapturedProjectConfig, type ProjectConfig,
@@ -152,12 +153,7 @@ async function moduleHeader(path: string): Promise<{ name: string; tags: string[
   } catch {
     return null;
   }
-  const match = /^module\s+("[^"]*"|\S+)(?:\s+tagged\s+\[([^\]]*)\])?/mu.exec(text);
-  if (match === null) return null;
-  return {
-    name: match[1]!.replace(/^"|"$/gu, ''),
-    tags: (match[2] ?? '').split(',').map(tag => tag.trim()).filter(Boolean),
-  };
+  return parseModuleHeader(text);
 }
 
 /** What one `support` entry matched: the files inside a test area and those outside every one. */

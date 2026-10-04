@@ -6,6 +6,7 @@ import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 import type { RamifyCli } from '../../../subs/evidence/src/ramify-cli.js';
 import type { ArchitectIndex, ModuleEntry } from '../../../subs/evidence/src/views.js';
 import { architectRunInputs, type RunInputs } from '../../run/inputs.js';
+import { parseModuleHeader } from '../../run/module-header.js';
 import type { AssignmentBody } from '../../work/assignment.js';
 import type { z } from 'zod';
 import type { engineerSubmissionSchema } from '../../work/engineer.js';
@@ -325,10 +326,9 @@ export async function readDeclaredTree(projectRoot: string): Promise<ArchitectIn
   const children = new Map<string, string[]>();
   for (const directory of directories) {
     const declaration = await readFile(join(projectRoot, directory, 'module.ramify'), 'utf8');
-    const matched = /^module\s+(?:"([^"]+)"|(\S+))/m.exec(declaration);
-    const name = matched?.[1] ?? matched?.[2];
-    if (name === undefined) continue;
-    const tags = /^module\s+\S+.*tagged\s*\[([^\]]*)\]/m.exec(declaration)?.[1]?.split(',').map(tag => tag.trim()).filter(Boolean) ?? [];
+    const header = parseModuleHeader(declaration);
+    if (header === null) continue;
+    const { name, tags } = header;
     const parentDirectory = directories.filter(candidate => candidate !== directory && within(directory, candidate)).at(-1);
     const parent = parentDirectory === undefined ? null : names.get(parentDirectory) ?? null;
     const path = parent === null ? name : `${parent}/${name}`;
