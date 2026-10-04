@@ -451,6 +451,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
     notices: z.array(moduleNoticeSchema),
     checkFindings: checkFindingEventsField.optional(),
   }).strict()),
+  /** Cleanup follows durable closure; recovery repeats it if interrupted. */
+  event('scratch-preserved', z.object({ iteration: text, paths: z.array(text) }).strict()),
   /**
    * Commits the `contract` `IterationAssignment` of one sub-session, and
    * licenses the contract engineer. `requestedBy` names the engineer

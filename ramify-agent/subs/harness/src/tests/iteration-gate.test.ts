@@ -137,9 +137,9 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
       // The first three attempts propose completion without repairing
       // anything; the repair iteration's engineer fixes the defect.
       engineer: [
-        submit(completionProposed('I believe this is done.')),
-        submit(completionProposed('I still believe this is done.')),
-        submit(completionProposed('I believe this once more.')),
+        submit(completionProposed('I believe this is done.'), write('tmp/working.txt', 'first attempt\n')),
+        submit(completionProposed('I still believe this is done.'), edit('tmp/working.txt', 'first', 'second')),
+        submit(completionProposed('I believe this once more.'), edit('tmp/working.txt', 'second', 'third')),
         submit(completionProposed('Raised the limit to 500.'), edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500')),
       ],
     }, {
@@ -177,6 +177,7 @@ describe('K1: a module gate fails, is repaired and reruns the complete gate', ()
     expect(result.gate).toBeNull();
     expect(result.commit).toBeNull();
     expect(result.invocations).toHaveLength(3);
+    await expect(readFile(join(root, notesDirectory, 'src/tmp/working.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     // The cause the architect receives is the first attempt's, not the last.
     expect(result.findings.some(finding => finding.includes(`check-failed at gate ${exhausted[0]!.id}`))).toBe(true);
     // The repair iteration the architect then assigned is the one accepted,
@@ -274,7 +275,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
       ],
       engineer: [
         // Nothing is written, so the selection is still empty.
-        submit(completionProposed('I changed the source and wrote no test.')),
+        submit(completionProposed('I changed the source and wrote no test.'), write('tmp/unsuitable.txt', 'scratch\n')),
         // The first test of the owner, written by the iteration that needs it.
         submit(completionProposed('Added the first test of this module.'),
           write('tests/notes.test.ts', limitTest)),
@@ -297,6 +298,7 @@ describe('K8: every gate resolves the current tests under the captured policy', 
     expect(iterationGates[0]!.commands.every(command => command.outcome === 'not-verified')).toBe(true);
     expect(iterationGates[0]!.next).toBe('return-to-local-architect');
     expect((await readResult(root, runId, 'wi-001', 1)).outcome).toBe('unsuitable');
+    await expect(readFile(join(root, notesDirectory, 'src/tmp/unsuitable.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     // An attempt that runs nothing commits nothing either.
     expect(iterationGates[0]).toMatchObject({ commit: null, audited: null });
 

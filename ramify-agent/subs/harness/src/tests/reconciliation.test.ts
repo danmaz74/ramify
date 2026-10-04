@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ScriptedAgent, ScriptStep } from '../../subs/agent/src/scripted.js';
 import type { CheckFindingSummary } from '../../subs/check-findings/src/interfaces/check-findings.js';
@@ -257,7 +258,9 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
       commits: correctedCandidates(),
       gates: correctionGates,
       architect: architect(),
-      engineer: engineers,
+      engineer: [...engineers.slice(0, 3), submit(completionProposed('Corrected the limit.'),
+        write('tmp/correction.txt', 'correction evidence\n'),
+        write(limit, 'export const limit = (text: string) => text.length <= 500;\n'))],
       reviewers: {
         'rq-0001': review(changed[1]),
         'rq-0002': review(changed[2], [concern(limit, 'The limit is 50 characters, and the plan asks for 500', 'high')]),
@@ -309,6 +312,7 @@ describe('CF11 and CF15: a correction round, and the floor of the next', () => {
     // The correction closed accepted with the repair claim on its own line;
     // the CheckFinding stayed open until the next round fixed it.
     const closed = eventsOf(events, 'iteration-closed').find(event => event.data.iteration === 'wi-001.i04')!;
+    await expect(readFile(join(root, notesDirectory, 'src/tmp/correction.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(closed.data.checkFindings).toEqual([expect.objectContaining({
       type: 'check-finding-decided',
       data: expect.objectContaining({ checkFinding: 'cf-0001', decision: expect.objectContaining({ decision: { action: 'claim-repair', candidate: { kind: 'tree', id: correctedTree }, change: 'wi-001.i04' } }) }),

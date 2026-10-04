@@ -10,7 +10,7 @@ import { runLayout } from '../run/records.js';
 import type { RunWrite } from '../run/service.js';
 import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
-import { addModule, assign, byRole, completionProposed, outline, submit, treeInputs, write } from './helpers/iterations.js';
+import { addModule, assign, byRole, completionProposed, edit, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { createPassingCheckExecution } from './helpers/direct-check-execution.js';
 import { gateGit, scenariosCommit, type GateCommit, type GateGitOptions } from './helpers/gate-git.js';
 import { finalCandidate } from './helpers/final-candidate.js';
@@ -113,6 +113,137 @@ const storeWrite = write('store.ts', 'export const store = new Map();\n');
 const latePath = `${notesDirectory}/src/late.ts`;
 
 describe('a change to the working directory blocks nothing', () => {
+  test('an engineer uses ignored scratch through acceptance, then closure removes it before final audit', async () => {
+    const root = await target();
+    const temporary = join(root, notesDirectory, 'src/tmp/draft.txt');
+    const final = finalCandidate(root, 'revision-01');
+    const scripted = gateGit(root, {
+      head: base, previews: final.previews,
+      commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }, unchanged, unchanged],
+    });
+    const opened = await openRuns(root, {
+      script: byRole(onePass([write('tmp/draft.txt', 'temporary evidence\n'), storeWrite])),
+      inputs: treeInputs(), git: scripted.git, candidates: final.candidates,
+      readinessExecution: directReadinessExecution(),
+      afterWrite: async current => {
+        if (current === 'gate-attempted' && scripted.messages.length === 1) {
+          expect(await readFile(temporary, 'utf8')).toBe('temporary evidence\n');
+        }
+      },
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await opened.service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(opened.service, 'review-notes').state, JSON.stringify(onlyRun(opened.service, 'review-notes').failure)).toBe('completed');
+    await expect(readFile(temporary)).rejects.toThrow();
+    const result = await readResult(root, receipt.jobId, 1);
+    const attempt = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate(result.gate!)), 'utf8')) as GateAttempt;
+    expect(attempt).toMatchObject({ verdict: 'passed', audited: 'revision-01' });
+    expect(scripted.messages[1]).toContain('Ramify-Iteration: wi-001.i01');
+    expect(scripted.calls.filter(call => call.operation === 'commitAccepted')).toHaveLength(4);
+    scripted.assertComplete();
+  }, 120_000);
+
+  test('recovery finishes cleanup after the durable accepted close event', async () => {
+    const root = await target();
+    const scratch = join(root, notesDirectory, 'src/tmp/recovery.txt');
+    const scripted = gateGit(root, { head: base,
+      commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }] });
+    const crashed = await openRuns(root, {
+      script: byRole(onePass([write('tmp/recovery.txt', 'recover me\n'), storeWrite])),
+      inputs: treeInputs(), git: scripted.git, readinessExecution: directReadinessExecution(),
+      afterWrite: async current => { if (current === 'iteration-closed') await freeze(); },
+    });
+    const receipt = await crashed.service.execute(startRun('review-notes'));
+    await until(() => (crashed.service.events('review-notes', receipt.jobId) ?? []).some(event => event.type === 'iteration-closed'), 30_000);
+    expect(await readFile(scratch, 'utf8')).toBe('recover me\n');
+    await staleCrashLock(root);
+    const recoveryGit = gateGit(root, { head: 'revision-01', commits: [] });
+    const reopened = await openRuns(root, { inputs: treeInputs(), git: recoveryGit.git,
+      readinessExecution: directReadinessExecution() });
+    cleanups.push(() => reopened.service.close());
+    await expect(readFile(scratch)).rejects.toMatchObject({ code: 'ENOENT' });
+    recoveryGit.assertComplete();
+  }, 120_000);
+
+  test('a nested ignore exception fails the gate before commit and repair retains scratch', async () => {
+    const root = await target();
+    const override = join(root, notesDirectory, 'src/.gitignore');
+    const scratch = join(root, notesDirectory, 'src/tmp/draft.txt');
+    const final = finalCandidate(root, 'revision-01');
+    const scripted = gateGit(root, {
+      head: base, previews: final.previews,
+      commits: [scenarios, { commit: 'revision-01', changes: [{ status: 'A', path: storePath }] }, unchanged, unchanged],
+    });
+    const git = {
+      ...scripted.git,
+      async trackedPaths() { return []; },
+      async ignoreStatus(_project: string, paths: readonly string[]) {
+        const changed = await readFile(override, 'utf8').catch(() => '');
+        return paths.map(path => path === `${notesDirectory}/src/tmp/` && changed.includes('!tmp/')
+          ? { path, ignored: false, rule: { source: `${notesDirectory}/src/.gitignore`, line: 1, pattern: '!tmp/' } }
+          : { path, ignored: true, rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } });
+      },
+    };
+    const plan = onePass();
+    const opened = await openRuns(root, {
+      script: byRole({ ...plan, engineer: [
+        submit(completionProposed('First candidate.'), write('tmp/draft.txt', 'draft\n'), write('.gitignore', '!tmp/\n')),
+        submit(completionProposed('Repaired ignore exception.'), edit('tmp/draft.txt', 'draft', 'kept'), write('.gitignore', ''), storeWrite),
+      ] }),
+      inputs: treeInputs(), git, scratchGit: 'provided', candidates: final.candidates,
+      readinessExecution: directReadinessExecution(),
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await opened.service.settled('review-notes', receipt.jobId);
+    expect(onlyRun(opened.service, 'review-notes').state, JSON.stringify(onlyRun(opened.service, 'review-notes').failure)).toBe('completed');
+    const first = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as GateAttempt;
+    expect(first).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: null, next: 'repair' });
+    expect(first.rules?.find(rule => rule.rule === 'scratch-safety')?.violations).toEqual([expect.objectContaining({
+      path: `${notesDirectory}/src/tmp/`, detail: expect.stringContaining(`${notesDirectory}/src/.gitignore:1`),
+    })]);
+    expect(scripted.messages).toHaveLength(4);
+    await expect(readFile(scratch)).rejects.toThrow();
+    scripted.assertComplete();
+  }, 120_000);
+
+  test('a forced-staged scratch file fails the run gate and closure preserves only indexed scratch', async () => {
+    const root = await target();
+    const indexed = `${notesDirectory}/src/tmp/indexed.txt`;
+    const other = `${notesDirectory}/src/tmp/other.txt`;
+    const scripted = gateGit(root, { head: base, commits: [scenarios] });
+    const git = {
+      ...scripted.git,
+      async trackedPaths() { return await readFile(join(root, indexed)).then(() => [indexed], () => []); },
+      async ignoreStatus(_project: string, paths: readonly string[]) {
+        return paths.map(path => ({ path, ignored: true,
+          rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } }));
+      },
+    };
+    const plan = onePass();
+    const opened = await openRuns(root, {
+      script: byRole({ ...plan, engineer: [
+        submit(completionProposed('Candidate with indexed scratch.'), write('tmp/indexed.txt', 'indexed\n'), write('tmp/other.txt', 'other\n')),
+        submit({ kind: 'partial', done: ['Source inspected'], unfinished: ['Remove indexed scratch'], findings: [] }),
+      ] }),
+      inputs: treeInputs(), git, scratchGit: 'provided', readinessExecution: directReadinessExecution(),
+    });
+    cleanups.push(() => opened.service.close());
+    const receipt = await opened.service.execute(startRun('review-notes'));
+    await until(() => (opened.service.events('review-notes', receipt.jobId) ?? []).some(event => event.type === 'scratch-preserved'), 30_000);
+    const events = await runEventsOnDisk(root, 'review-notes', receipt.jobId);
+    expect(events.find(event => event.type === 'scratch-preserved')?.data).toMatchObject({
+      iteration: 'wi-001.i01', paths: [indexed],
+    });
+    const failed = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as GateAttempt;
+    expect(failed).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: null });
+    expect(failed.rules?.find(rule => rule.rule === 'scratch-safety')?.violations).toEqual([expect.objectContaining({ path: indexed })]);
+    expect(await readFile(join(root, indexed), 'utf8')).toBe('indexed\n');
+    await expect(readFile(join(root, other))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(scripted.messages).toHaveLength(1);
+  }, 120_000);
+
   test('a verified gate makes one commit before audit, including a late change before that commit', async () => {
     const root = await target();
     const final = finalCandidate(root, 'revision-01');

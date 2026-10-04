@@ -155,6 +155,7 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
     let childTurns = 0;
     let childReturned = false;
     let resumedBPrompt = '';
+    let resumedScratchObserved = '';
     let sourceCaptures = 0;
     let closing: Promise<void> | undefined;
     let closeFirst: (() => Promise<void>) | undefined;
@@ -181,10 +182,11 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
           constraints: [], knownInterface: { kind: 'none-known' },
           examples: [{ title: 'normalizes source', code: 'expect(normalizeSource("B")).toBe("B")', designation: 'pseudocode' }],
           suggestedProvider: { module: c, reason: 'C owns normalization' },
-        } }, edit('fact.ts', "return 'old';", "return 'old from C';"));
+        } }, edit('fact.ts', "return 'old';", "return 'old from C';"), write('tmp/parent.txt', 'parent scratch\n'));
         if (!childReturned) throw new Error('B resumed before child handback');
         resumedBPrompt = spec.prompt;
-        return submit({ kind: 'completion-proposed', summary: 'B completed its original assignment after C returned', findings: [] });
+        return submit({ kind: 'completion-proposed', summary: 'B completed its original assignment after C returned', findings: [] },
+          edit('tmp/parent.txt', 'parent scratch', 'resumed parent scratch'));
       }
       if (spec.role === 'capability-architect') {
         if (spec.submission.name !== 'submit_capability_action') throw new Error('Unexpected child action');
@@ -207,6 +209,9 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
     const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
       afterWrite: async (write: string) => {
         if (write === 'capability-source-captured' && ++sourceCaptures === 2) closing = closeFirst?.();
+        if (write === 'invocation-ended' && childReturned && engineerTurns >= 3 && resumedScratchObserved === '') {
+          resumedScratchObserved = await readFile(join(fixture.root, 'subs/b/src/tmp/parent.txt'), 'utf8');
+        }
       } };
     const first = await openCapabilityRuns(fixture.root, options);
     closeFirst = () => first.service.close();
@@ -268,6 +273,8 @@ test('CA21 CA29 CA32: B asks for C and only a fresh child coordinator runs while
     expect(returnedEvents.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01')).toHaveLength(1);
     expect(resumedBPrompt).toContain('Nested capability cap-002 handed back');
     expect(resumedBPrompt).toContain('Continue cap-001.i01');
+    expect(resumedScratchObserved).toBe('resumed parent scratch\n');
+    await expect(readFile(join(fixture.root, 'subs/b/src/tmp/parent.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const current = resumed.service.events('need', receipt.jobId)!;
       try { await resumed.service.execute(stopRun('need', receipt.jobId, current.at(-1)!.sequence)); break; }
@@ -429,6 +436,7 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     let childTurns = 0;
     let parentTurns = 0;
     let returnedPrompt = '';
+    let childClosureScratch: { parent: string; childRemoved: boolean } | null = null;
     let frozenHandback = false;
     let service: Awaited<ReturnType<typeof openCapabilityRuns>>['service'] | undefined;
     const script: Script = spec => {
@@ -452,10 +460,10 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
           constraints: [], knownInterface: { kind: 'none-known' },
           examples: [{ title: 'normalizes source', code: "expect(readFact()).toBe('B')", designation: 'pseudocode' }],
           suggestedProvider: { module: c, reason: 'C owns normalization' },
-        } }, edit('fact.ts', "return 'old';", "return 'old from C';"));
+        } }, edit('fact.ts', "return 'old';", "return 'old from C';"), write('tmp/parent.txt', 'parent scratch\n'));
         if (spec.prompt.includes('# Iteration cap-002.i01')) return submit({
           kind: 'completion-proposed', summary: 'C normalizes the source', findings: [],
-        }, write('source.ts', 'export function normalizeSource(value: string): string { return value.trim().toUpperCase(); }\n'),
+        }, write('tmp/child.txt', 'child scratch\n'), write('source.ts', 'export function normalizeSource(value: string): string { return value.trim().toUpperCase(); }\n'),
         write('tests/source.test.ts', "import { expect, test } from 'vitest';\nimport { normalizeSource } from '../source.js';\ntest('C normalizes source', () => expect(normalizeSource(' b ')).toBe('B'));\n"));
         if (spec.prompt.includes('# Iteration cap-002.i02')) return submit({
           kind: 'completion-proposed', summary: 'B uses the real C normalizer', findings: [],
@@ -499,6 +507,14 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     const options = { git: gitService, script, inputs: treeInputs(), readinessExecution: directReadinessExecution(),
       checkExecution: createLocalCommandCheckExecution(),
       afterWrite: async (event: string, runId: string) => {
+        const last = service?.events('need', runId)?.at(-1);
+        if (event === 'capability-assignment-settled' && childClosureScratch === null &&
+          last?.type === 'capability-assignment-settled' && last.data.assignment === 'cap-002.i01') {
+          childClosureScratch = {
+            parent: await readFile(join(fixture.root, 'subs/b/src/tmp/parent.txt'), 'utf8'),
+            childRemoved: await readFile(join(fixture.root, 'subs/c/src/tmp/child.txt')).then(() => false, () => true),
+          };
+        }
         if (restartAfterHandback && event === 'capability-handed-back' && !frozenHandback &&
           service?.events('need', runId)?.at(-1)?.type === 'capability-handed-back') {
           frozenHandback = true;
@@ -533,6 +549,8 @@ test(`CA19 CA21 CA32: a real C child gate and review hand back to B${restartAfte
     const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     expect(events.filter(event => event.type === 'job-failed'), JSON.stringify({ events: events.slice(-18),
       gate: await completionGateDiagnostic(fixture.root, receipt.jobId) })).toHaveLength(0);
+    expect(childClosureScratch).toEqual({ parent: 'parent scratch\n', childRemoved: true });
+    await expect(readFile(join(fixture.root, 'subs/b/src/tmp/parent.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(events.filter(event => event.type === 'capability-handed-back' && event.data.task === 'cap-002')).toHaveLength(1);
     const originalSettlement = events.filter(event => event.type === 'capability-assignment-settled' && event.data.assignment === 'cap-001.i01');
     expect(originalSettlement).toHaveLength(1);

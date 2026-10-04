@@ -185,7 +185,7 @@ import {
   failureDigest, renderTranscript, validateFailureAnalysis,
   type AnalysisEvidence as FailureEvidence, type DigestShellCall, type FailureAnalysisSubmission,
 } from '../work/failure.js';
-import { resolveRealTarget } from '../guard/resolve-contained-path.js';
+import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
 import {
   captureGuardedFiles, checkpointOf, deniedFiles, guardedScopeOf, injectionSiteRule, moduleOwning, resolveWriteScope, scopePaths, testPolicyOf,
   type GuardedScenarioFiles,
@@ -220,7 +220,7 @@ import { briefed, entryScenariosOf, type EngineerScenarios } from '../work/scena
 import { bridgingGivens, compositionFailures } from '../../subs/scenarios/src/composition.js';
 import { failingStep, performRecovery, readinessFailureReason, recoveryFor, runReadiness, withRecovery } from './readiness.js';
 import { declaredModuleDirectories } from './project-config.js';
-import { ensureScratchRule, ScratchIgnoreConflictError } from '../work/scratch.js';
+import { assertScratchSafe, ensureScratchRule, releasableScratchModules, removeScratchDirectories, scratchSafetyRule, ScratchIgnoreConflictError } from '../work/scratch.js';
 import {
   gateAttemptId, gateAttemptSchema, invocationId, invocationOutcomeSchema, invocationSchema, lineEventSummarySchema,
   measurementSnapshotSchema, recoveryId, runDirectory, runLayout, runRecordSchema, runSchemas, sessionId, snapshotId,
@@ -748,6 +748,12 @@ export class RunService {
 
   get projectRoot(): string {
     return this.options.projectRoot;
+  }
+
+  /** No candidate is read while Git could include scratch in its tree. */
+  private async previewCandidateTree(): ReturnType<GitService['previewCandidateTree']> {
+    await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+    return this.git.previewCandidateTree(this.projectRoot);
   }
 
   private warn(message: string): void {
@@ -2434,6 +2440,14 @@ export class RunService {
 
       const rewritten = await recoverCommits(run.log.ledger);
       if (rewritten.rewritten.length > 0) report.rematerialized.push(`${run.key}: ${rewritten.rewritten.length} record file(s)`);
+      // A crash can land after the durable close event and before its
+      // filesystem cleanup. Repeat the idempotent cleanup on every load.
+      try {
+        await this.cleanupClosedScratch(run);
+      } catch (error) {
+        if (!run.log.terminal) await this.fail(run, 'recovery-exhausted', `Closed iteration scratch could not be cleaned: ${message(error)}`);
+        else this.warn(`Run ${run.record.jobId}: closed iteration scratch could not be cleaned: ${message(error)}`);
+      }
 
       if (!run.log.terminal && this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion) {
         try {
@@ -2573,7 +2587,7 @@ export class RunService {
     const replay = replayNonfunctionalPhase(run.log.ledger.replay(), nfrIds, marker.data.maxRounds);
     if (!replay.ok) return `phase ledger prefix is invalid: ${replay.reason}`;
     if (replay.value.final !== null) {
-      const preview = await this.git.previewCandidateTree(this.projectRoot);
+      const preview = await this.previewCandidateTree();
       if (preview.tree !== replay.value.final.candidate.tree) return 'source tree changed after the final assessment';
     }
     const { packages } = await loadPromptPackages({
@@ -3271,6 +3285,7 @@ export class RunService {
     // of the run itself has happened yet.
     if (!recovering) await this.afterWrite('job-created', run.record.jobId);
     if (this.ignoring(run)) return;
+    if (recovering) await this.cleanupClosedScratch(run);
     this.startReviews(run, agent, packages);
     const accepted = await this.analyse(run, agent, packages, baseline);
     if (!accepted || this.ignoring(run)) return;
@@ -3310,7 +3325,7 @@ export class RunService {
       return null;
     }
     await this.rerenderScenarios(run);
-    const preview = await this.git.previewCandidateTree(this.projectRoot);
+    const preview = await this.previewCandidateTree();
     const id = `cand-${String(run.log.count('candidate-prepared') + 1).padStart(3, '0')}`;
     const candidate = { tree: preview.tree, head: preview.head, preparedAt: this.now().toISOString() };
     const body = preparedCandidateSchema.parse({
@@ -3474,7 +3489,7 @@ export class RunService {
       || action.deviations.some(choice => choice.proposedAlternative === null && choice.uncertainty.trim() === '')) {
       return unavailable('The accepted close action does not dispose each unresolved NFR exactly once');
     }
-    const preview = await this.git.previewCandidateTree(this.projectRoot);
+    const preview = await this.previewCandidateTree();
     if (preview.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed before non-functional deviations were recorded');
       return false;
@@ -3583,7 +3598,7 @@ export class RunService {
       await this.fail(run, 'agent-failed', `Non-functional coordinator action ended ${result.ended}`);
       return null;
     }
-    const late = await this.git.previewCandidateTree(this.projectRoot);
+    const late = await this.previewCandidateTree();
     if (late.tree !== candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during the non-functional coordinator action');
       return null;
@@ -3616,7 +3631,7 @@ export class RunService {
       await this.fail(run, 'agent-failed', `Non-functional investigation ended ${result.ended}`);
       return false;
     }
-    const late = await this.git.previewCandidateTree(this.projectRoot);
+    const late = await this.previewCandidateTree();
     if (late.tree !== assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during non-functional investigation');
       return false;
@@ -3704,7 +3719,7 @@ export class RunService {
     }
     if (started.length === 0) {
       const prepared = await this.readPreparedCandidate(run, assignment.candidate);
-      const observed = await this.git.previewCandidateTree(this.projectRoot);
+      const observed = await this.previewCandidateTree();
       if (observed.tree !== prepared.candidate.tree) {
         await this.fail(run, 'inputs-changed', `Source changed before assigned repair ${assignment.id} could start`);
         return false;
@@ -3795,7 +3810,7 @@ export class RunService {
         await this.fail(run, 'agent-failed', `The non-functional coordinator ended ${result.ended} without a complete assessment`);
         return null;
       }
-      const late = await this.git.previewCandidateTree(this.projectRoot);
+      const late = await this.previewCandidateTree();
       const bound = bindCoordinatorAssessment(result.value, { catalog: catalog.catalog, candidate: prepared.candidate,
         observedTree: late.tree, id, round, phase, coordinatorInvocation: result.id });
       if (!bound.ok) {
@@ -4128,6 +4143,9 @@ export class RunService {
 
     const ended = interruption !== undefined ? 'failed' : request.endedAs?.() ?? endedOf(outcome.kind, judge.boundReached);
     const keptAs = keeping(ended, ended === 'submitted' ? value : undefined);
+    const scratchAtSettlement = request.candidateBefore === undefined ? null
+      : await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+    const candidateAfter = scratchAtSettlement?.outcome === 'passed' ? (await this.previewCandidateTree()).tree : undefined;
     const error = interruption === 'idle-timeout'
       ? `No port event for ${limits.invocationIdleMs} ms`
       : interruption === 'absolute-timeout'
@@ -4150,7 +4168,7 @@ export class RunService {
       ...(budget === undefined ? {} : { budget }),
       settled,
       outsideScope,
-      ...(request.candidateBefore === undefined ? {} : { candidateAfter: (await this.git.previewCandidateTree(this.projectRoot)).tree }),
+      ...(candidateAfter === undefined ? {} : { candidateAfter }),
       usage: recorder.outcomeUsage(agent),
       elapsedMs,
       ...(outcome.kind === 'failed' && interruption === undefined ? { error: outcome.error } : {}),
@@ -6477,6 +6495,7 @@ export class RunService {
         const tracked = trackedScenarios(run.log.ledger.replay());
         await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
         const message = rewordingMessage({ runId: run.record.jobId, rewording: data.rewording, deviation: data.deviation, scenarios: data.scenarios, files: data.files });
+        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
         const commit = await commitForScenarios(this.projectRoot, run.record.jobId, rewordedTrailerValue(data.rewording), message, recovering, this.git);
         return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
       },
@@ -7571,7 +7590,7 @@ export class RunService {
         results.some(result => result === undefined) ? 'An assignment has no ordinary result' : ''].filter(Boolean).join('; ') || 'An assignment is unfinished' };
     }
     const latestResult = records.results.get(latestAccepted.id)!;
-    const candidate = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const candidate = (await this.previewCandidateTree()).tree;
     const acceptedGate = latestResult.gate === null ? null
       : gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(latestResult.gate)));
     if (acceptedGate?.success !== true || acceptedGate.data.audited === null ||
@@ -7629,7 +7648,7 @@ export class RunService {
       }
       return { handedBack: false, guidance: `Task completion gate ${gate.id} ${gate.verdict}: ${gate.cause ?? 'incomplete evidence'}; report ${runLayout.gate(gate.id)}`, coordinator };
     }
-    const currentTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const currentTree = (await this.previewCandidateTree()).tree;
     const auditedTree = await this.candidates.commitTree(this.projectRoot, gate.audited);
     if (auditedTree !== currentTree) return { handedBack: false, guidance: `Source changed after gate ${gate.id}; verify again`, coordinator };
     const basisRefusal = await this.completionBasisRefusal(run, task.id, gate, reconciled.basis);
@@ -7735,7 +7754,7 @@ export class RunService {
     const { schema: _schema, ...body } = raw;
     const parsed = capabilityActionSchema.safeParse(body);
     const gate = gateAttemptSchema.safeParse(this.committedBody(run, runLayout.gate(started.data.gate)));
-    const tree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+    const tree = (await this.previewCandidateTree()).tree;
     if (raw.schema !== 'ramify-agent.capability-action/1' || !parsed.success || parsed.data.kind !== 'request-handback' ||
       parsed.data.task !== task.id || parsed.data.planRevision !== plan.revision || !gate.success ||
       gate.data.verdict !== 'passed' || gate.data.audited === null || await this.candidates.commitTree(this.projectRoot, gate.data.audited) !== tree) {
@@ -7967,7 +7986,7 @@ export class RunService {
         await this.fail(run, 'inputs-changed', `Capability assignment ${id} package is unavailable: ${message(error)}`);
         return null;
       }
-      const startingTree = (await this.git.previewCandidateTree(this.projectRoot)).tree;
+      const startingTree = (await this.previewCandidateTree()).tree;
       const startingPaths = await Promise.all((await this.git.changedPaths(this.projectRoot, this.accepted(run)))
         .map(async path => ({ path, hash: await readFile(join(this.projectRoot, path)).then(bytes => sha256(bytes)).catch(() => null) })));
       assignment = await this.buildIterationAssignment(run, {
@@ -8062,7 +8081,7 @@ export class RunService {
       }
       await this.write(run, { type: 'capability-assignment-settled', data: {
         task: task.id, assignment: id, outcome: stateOutcome, mutated: [...mutated].sort(), outsideScope: [...outside].sort(),
-        endingTree: (await this.git.previewCandidateTree(this.projectRoot)).tree,
+        endingTree: (await this.previewCandidateTree()).tree,
       } });
       await this.afterWrite('capability-assignment-settled', run.record.jobId);
     }
@@ -8092,7 +8111,7 @@ export class RunService {
     // runs under the bounds its assignment raised, and its prompt states the
     // longest a command may run.
     const bounds = this.engineerBounds(run, assignment);
-    const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index);
+    const workingDirectory = await engineerWorkingDirectory(this.projectRoot, assignment.scope, run.index, this.git);
     const systemPrompt = renderEngineerPrompt(loaded, this.projectRoot, bounds.commandTimeoutMs, workingDirectory);
     const measurementScope = {
       exactOwners: 'module' in assignment.scope.base ? [assignment.scope.base.module] : assignment.scope.base.modules,
@@ -8210,7 +8229,7 @@ export class RunService {
 
       attempt += 1;
       const beforeTree = assignment.coordination?.kind === 'capability-task'
-        ? (await this.git.previewCandidateTree(this.projectRoot)).tree : undefined;
+        ? (await this.previewCandidateTree()).tree : undefined;
       const before = await takeLineSnapshot(this.projectRoot, this.accepted(run), this.git);
       const guarded = guardedScopeOf(assignment.scope, await this.deniedFiles(run));
       const briefedScenarios = assignment.coordination?.kind === 'capability-task'
@@ -9393,6 +9412,7 @@ export class RunService {
       },
     }, [...registration.records, ...reopening.records]);
     await this.afterWrite('evidence-reopened', run.record.jobId);
+    await this.cleanupClosedScratch(run);
     if (this.ignoring(run)) return null;
 
     const findings: string[] = [];
@@ -9745,7 +9765,43 @@ export class RunService {
       await this.write(run, { type: 'iteration-closed', data }, [record]);
     }
     await this.afterWrite('iteration-closed', run.record.jobId);
+    await this.cleanupClosedScratch(run);
     return result;
+  }
+
+  /** A closed assignment releases scratch only when no other assignment in its module remains open. */
+  private async cleanupClosedScratch(run: Run): Promise<void> {
+    const records = committedRecords(run.log.ledger.replay());
+    // Contract revision can supersede an assignment by committing its result
+    // with evidence-reopened, without a separate iteration-closed event.
+    const closed = new Set(records.results.keys());
+    const engineerAssignments = new Set([
+      ...run.log.all('iteration-assigned').map(event => event.data.iteration),
+      ...run.log.all('capability-assigned').map(event => event.data.assignment),
+    ]);
+    const declared = await declaredModuleDirectories(this.projectRoot);
+    const directoriesOf = (scope: WriteScope): string[] => {
+      const captured = scope.resolved.roots.flatMap(root => {
+        const path = relative(this.projectRoot, root).replaceAll('\\', '/');
+        return path === 'src' ? [''] : path.endsWith('/src') ? [path.slice(0, -'/src'.length)] : [];
+      });
+      return [...new Set([...declared, ...captured].filter(directory => {
+        const src = join(this.projectRoot, directory, 'src');
+        return scope.resolved.roots.some(root => root === src || isContained(root, src));
+      }))];
+    };
+    const assignments = [...records.assignments.values()]
+      .filter(assignment => engineerAssignments.has(assignment.id))
+      .map(assignment => ({ id: assignment.id, modules: directoriesOf(assignment.scope) }));
+    for (const iteration of closed) {
+      const removable = releasableScratchModules(iteration, assignments, closed);
+      if (removable.length === 0) continue;
+      const removed = await removeScratchDirectories(this.projectRoot, removable, this.git);
+      if (removed.preservedTracked.length > 0 && !run.log.all('scratch-preserved').some(entry =>
+        entry.data.iteration === iteration && entry.data.paths.join('\0') === removed.preservedTracked.join('\0'))) {
+        await this.write(run, { type: 'scratch-preserved', data: { iteration, paths: [...removed.preservedTracked] } });
+      }
+    }
   }
 
   /**
@@ -10073,7 +10129,7 @@ export class RunService {
         if (!recorded.success || recorded.data.checkpoint !== 'work-item' ||
           recorded.data.subject?.workItem !== owner || recorded.data.proposedBy !== invocation ||
           recorded.data.verdict !== 'passed' || recorded.data.audited === null) continue;
-        candidate ??= (await this.git.previewCandidateTree(this.projectRoot)).tree;
+        candidate ??= (await this.previewCandidateTree()).tree;
         if (await this.candidates.commitTree(this.projectRoot, recorded.data.audited) !== candidate) continue;
         if (!await this.recordScenarioPasses(run, recorded.data)) return null;
         return recorded.data;
@@ -10311,7 +10367,7 @@ export class RunService {
     }
     // Every tracked scenario, integration scenarios included.
     const required = tracked.records;
-    const beforeGate = await this.git.previewCandidateTree(this.projectRoot);
+    const beforeGate = await this.previewCandidateTree();
     if (beforeGate.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed after non-functional assessment', [runLayout.assessment(binding.assessment.id)]);
       return;
@@ -10392,7 +10448,7 @@ export class RunService {
       await this.fail(run, 'inputs-changed', `The captured plan evidence changed during final verification: ${lateSourceChanges.join('; ')}`, [runLayout.documentManifest, runLayout.gate(gateId)]);
       return;
     }
-    const afterGate = await this.git.previewCandidateTree(this.projectRoot);
+    const afterGate = await this.previewCandidateTree();
     if (afterGate.tree !== binding.assessment.candidate.tree) {
       await this.fail(run, 'inputs-changed', 'The source tree changed during final verification', [runLayout.assessment(binding.assessment.id), runLayout.gate(gateId)]);
       return;
@@ -10434,8 +10490,10 @@ export class RunService {
     const captured = run.record.projectConfig;
     const typeCheckOutput = 'config' in captured ? captured.config.typeCheck?.output : undefined;
     const setup = 'config' in captured ? captured.config.setup : undefined;
+    const scratch = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
     const prepared = await prepareCheckpoint({
       ...request,
+      rules: [...(request.rules ?? []), scratch],
       ...(scenarios === undefined ? {} : { scenarios }),
       ...(typeCheckOutput === undefined ? {} : { typeCheckOutput }),
       ...(setup === undefined ? {} : { setup }),
@@ -10509,9 +10567,10 @@ export class RunService {
         const rendering = await this.rerenderScenarios(run);
         if (binding !== undefined) {
           if (rendering.written.length > 0) throw new CandidateDriftError('Final gate rendering changed the assessed candidate');
-          const current = await this.git.previewCandidateTree(this.projectRoot);
+          const current = await this.previewCandidateTree();
           if (current.tree !== binding.assessment.candidate.tree) throw new CandidateDriftError('Final gate source changed after assessment');
         }
+        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
         const commit = await commitForGate(this.projectRoot, run.record.jobId, identity.id, message, undefined, this.git);
         await this.afterWrite('gate-committing', run.record.jobId);
         const sourceCommit = commit ?? identity.head;
@@ -10751,6 +10810,7 @@ export class RunService {
           }
           appended = prepared.appended || changed.length > 0;
           if (changed.length > 0) {
+            await assertScratchSafe(this.projectRoot, modules, this.git);
             committed = await this.git.commitAccepted(this.projectRoot, [
               'Prepare module scratch ignore rule', '',
               `Ramify-Run: ${run.record.jobId}`,
@@ -10808,6 +10868,7 @@ export class RunService {
         const message = materializationMessage({
           planId: run.record.planId, runId: run.record.jobId, files, scenarios: trackedScenarios(run.log.ledger.replay()).records.length,
         });
+        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
         const commit = await commitForMaterialization(this.projectRoot, run.record.jobId, message, recovering, this.git);
         await this.afterWrite('scenarios-committed', run.record.jobId);
         return { commit, files };
@@ -11130,6 +11191,7 @@ export class RunService {
         await rerenderFeatureFiles(this.projectRoot, expectedFeatureFiles(tracked, { planId: run.record.planId, runId: run.record.jobId }));
         const files = [...new Set(tracked.records.filter(record => data.scenarios.includes(record.id)).map(record => record.file))].sort();
         const message = withdrawalMessage({ runId: run.record.jobId, withdrawal: data.withdrawal, workItem: data.workItem, scenarios: data.scenarios, reason: data.reason, files });
+        await assertScratchSafe(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
         const commit = await commitForScenarios(this.projectRoot, run.record.jobId, withdrawnTrailerValue(data.withdrawal), message, recovering, this.git);
         return { commit: commit ?? await this.git.currentHead(this.projectRoot) };
       },

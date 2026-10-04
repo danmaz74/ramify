@@ -41,16 +41,15 @@ async function scratch(root: string, options: { tracked?: readonly (readonly str
   };
 }
 
-async function successfulRun(root: string, inputs: { scratch: ScratchGitScript; setup: boolean }) {
+async function successfulRun(root: string, inputs: { setup: boolean }) {
   const opened = await openUnchangedRuns(root, {
-    scratchGit: 'provided',
     script: [{ kind: 'submit', input: emptyAnalysis() }],
     unchangedCheckpoints: [
       ...(inputs.setup ? [{ subject: 'Prepare module scratch ignore rule', commit: setupCommit,
         changes: [{ status: 'M', path: '.gitignore' }] }] : []),
       `final verification of plan "${plan}"`,
     ],
-    gitScript: { scratch: inputs.scratch, ...(inputs.setup ? { setupChanges: [{ status: 'M', path: '.gitignore' }] } : {}) },
+    gitScript: inputs.setup ? { setupChanges: [{ status: 'M', path: '.gitignore' }] } : {},
   });
   cleanups.push(() => opened.service.close());
   const receipt = await opened.service.execute(startRun(plan));
@@ -70,7 +69,7 @@ async function failedRun(root: string, git: ScriptedGit) {
 describe('scratch setup before a run uses it', () => {
   test('commits only the appended rule, once, before any work', async () => {
     const root = await project();
-    const result = await successfulRun(root, { scratch: await scratch(root), setup: true });
+    const result = await successfulRun(root, { setup: true });
     expect(onlyRun(result.service, plan).state).toBe('completed');
     expect(result.git.commits().filter(entry => entry.message.includes('Ramify-Scratch: setup'))).toHaveLength(1);
     expect(result.git.commits()[0]!.message).toContain(`Ramify-Run: ${result.receipt.jobId}`);
@@ -80,7 +79,7 @@ describe('scratch setup before a run uses it', () => {
 
   test('an existing effective rule makes no setup commit', async () => {
     const root = await project(true);
-    const result = await successfulRun(root, { scratch: await scratch(root), setup: false });
+    const result = await successfulRun(root, { setup: false });
     expect(onlyRun(result.service, plan).state).toBe('completed');
     expect(result.events.find(event => event.type === 'scratch-setup-complete')?.data).toEqual({ commit: null, appended: false });
     expect(result.git.commits()).toEqual([]);
@@ -93,7 +92,7 @@ describe('scratch setup before a run uses it', () => {
     configuration.acceptance.support = [];
     await writeFile(join(root, 'ramify-agent.json'), `${JSON.stringify(configuration)}\n`);
     await writeFile(join(root, '.gitignore'), '/src/tmp/\n');
-    const result = await successfulRun(root, { scratch: await scratch(root), setup: true });
+    const result = await successfulRun(root, { setup: true });
     expect(onlyRun(result.service, plan).state).toBe('completed');
     expect(await readFile(join(root, '.gitignore'), 'utf8')).toBe('/src/tmp/\n**/src/tmp/\n');
   });
@@ -129,7 +128,7 @@ describe('scratch setup before a run uses it', () => {
     const root = await project(true);
     await mkdir(join(root, 'src/tmp'), { recursive: true });
     await writeFile(join(root, 'src/tmp/stale.txt'), 'stale\n');
-    const result = await successfulRun(root, { scratch: await scratch(root), setup: false });
+    const result = await successfulRun(root, { setup: false });
     expect(onlyRun(result.service, plan).state).toBe('completed');
     await expect(readFile(join(root, 'src/tmp/stale.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
@@ -175,13 +174,12 @@ describe('scratch setup before a run uses it', () => {
   test('a failed baseline leaves no setup change and the next attempt passes clean-tree readiness', async () => {
     const root = await project(true);
     const before = await readFile(join(root, '.gitignore'));
-    const answers = await scratch(root, { tracked: [[], [], [], []] });
     const git = scriptedGit(root, { head: source, checkpoints: [{ subject: `final verification of plan "${plan}"`, commit: null, changes: [] }],
-      scratch: answers, previews: Array.from({ length: 3 }, () => ({ repositoryRoot: root, head: source, tree: 'a'.repeat(40) })) });
+      previews: Array.from({ length: 3 }, () => ({ repositoryRoot: root, head: source, tree: 'a'.repeat(40) })) });
     let tests = 0;
     const readinessExecution = createMappedCheckExecution({ script: ({ check }) => check.kind === 'tests' && ++tests === 1
       ? { outcome: { kind: 'completed', exitCode: 1 } } : {} });
-    const opened = await openRuns(root, { git, scratchGit: 'provided', script: [{ kind: 'submit', input: emptyAnalysis() }],
+    const opened = await openRuns(root, { git, script: [{ kind: 'submit', input: emptyAnalysis() }],
       readinessExecution });
     cleanups.push(() => opened.service.close());
     const first = await opened.service.execute(startRun(plan));
@@ -199,23 +197,19 @@ describe('scratch setup before a run uses it', () => {
   for (const boundary of ['scratch-rule-appended', 'scratch-committed'] as const satisfies readonly RunWrite[]) {
     test(`recovers one setup commit after interruption at ${boundary}`, async () => {
       const root = await project();
-      const answers = await scratch(root);
       const git = scriptedGit(root, { head: source, checkpoints: [{ subject: 'Prepare module scratch ignore rule',
         commit: setupCommit, changes: [{ status: 'M', path: '.gitignore' }] }],
         setupChanges: [{ status: 'M', path: '.gitignore' }],
-        recoveredScratch: [boundary === 'scratch-rule-appended' ? null : setupCommit],
-        scratch: boundary === 'scratch-rule-appended'
-          ? { ...answers, ignoreStatus: [...answers.ignoreStatus!, ...answers.ignoreStatus!] }
-          : answers });
+        recoveredScratch: [boundary === 'scratch-rule-appended' ? null : setupCommit] });
       let frozen = false;
-      const first = await openRuns(root, { git, scratchGit: 'provided', script: [{ kind: 'submit', input: emptyAnalysis() }],
+      const first = await openRuns(root, { git, script: [{ kind: 'submit', input: emptyAnalysis() }],
         readinessExecution: directReadinessExecution(), afterWrite: async write => {
           if (write === boundary) { frozen = true; await freeze(); }
         } });
       const receipt = await first.service.execute(startRun(plan));
       await until(() => frozen);
       await staleCrashLock(root);
-      const restarted = await openRuns(root, { git, scratchGit: 'provided', readinessExecution: directReadinessExecution() });
+      const restarted = await openRuns(root, { git, readinessExecution: directReadinessExecution() });
       cleanups.push(() => restarted.service.close());
       expect(restarted.recovery.effects).toContain(`${plan}/${receipt.jobId}: the scratch ignore rule setup`);
       expect(git.commits().filter(entry => entry.message.includes('Ramify-Scratch: setup'))).toHaveLength(1);
@@ -228,6 +222,33 @@ describe('scratch setup before a run uses it', () => {
 });
 
 describe('a single session prepares scratch without a commit', () => {
+  test('a forced-staged scratch path fails its gate, survives cleanup, and is reported', async () => {
+    const root = await project(true);
+    const staged = 'src/tmp/staged.txt';
+    const other = 'src/tmp/other.txt';
+    const agent = createScriptedAgent([
+      { kind: 'tool', tool: 'write', input: { path: 'tmp/staged.txt', content: 'indexed\n' } },
+      { kind: 'tool', tool: 'write', input: { path: 'tmp/other.txt', content: 'throwaway\n' } },
+      { kind: 'submit', input: unsuitableScope('Inspect staged scratch') },
+    ]);
+    const git = mockGit({
+      currentHead: async () => source,
+      changedPaths: async () => [],
+      trackedPaths: async () => await readFile(join(root, staged)).then(() => [staged], () => []),
+      ignoreStatus: async (_project, paths) => paths.map(path => ({ path, ignored: true,
+        rule: { source: '.gitignore', line: 1, pattern: '**/src/tmp/' } })),
+    });
+    const result = await runSingleSession({ projectRoot: root, module: 'collection-review', prompt: 'Inspect scratch.',
+      agent, ramify: new FakeRamifyCli(), git, refresh: readDeclaredTree, policy: testPolicy(root), gate: true });
+    expect(result.status).toBe('finished');
+    if (result.status !== 'finished') return;
+    expect(result.summary.preservedTracked).toEqual([staged]);
+    expect(result.summary.gate).toMatchObject({ ran: true, verdict: 'failed', cause: 'check-failed' });
+    expect(await readFile(join(root, staged), 'utf8')).toBe('indexed\n');
+    await expect(readFile(join(root, other))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(git.commitAccepted).not.toHaveBeenCalled();
+  });
+
   async function session(root: string, answers: { tracked?: readonly string[]; ignored?: boolean } = {}) {
     const agent = createScriptedAgent([{ kind: 'submit', input: unsuitableScope('Nothing to change') }]);
     const git = mockGit({

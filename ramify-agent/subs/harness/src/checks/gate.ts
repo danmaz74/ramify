@@ -109,9 +109,12 @@ export async function prepareGate(checkpoint: Checkpoint, request: GateRequest):
   // The sum is the time the commands may legitimately consume in sequence;
   // the small allowance covers lease, worktree and publication operations.
   const timeoutMs = request.checks.reduce((total, check) => total + check.command.timeoutMs, 0) + 30_000;
-  if (!verified) {
+  // Scratch violations must stop before a committing checkpoint stages a tree.
+  // Keep a normal failed attempt so the engineer receives repair diagnostics.
+  const unsafeScratch = rules.some(rule => rule.rule === 'scratch-safety' && rule.outcome === 'failed');
+  if (!verified || unsafeScratch) {
     return finishGate({ checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs }, {
-      commands: await notVerifiedRecords(request, failures), audited: null, evidence: null,
+      commands: await notVerifiedRecords(request, failures, unsafeScratch ? 'local-rule-failed' : 'interrupted'), audited: null, evidence: null,
     }, null);
   }
   return { checkpoint, request, guardedChanges, rules, unauthorized, ruleFailed, decisive, timeoutMs };
@@ -202,6 +205,7 @@ async function finishGate(prepared: PreparedGate, executionResult: CheckExecutio
 async function notVerifiedRecords(
   request: GateRequest,
   failures: readonly (VerificationFailure | null)[],
+  skipped: 'local-rule-failed' | 'interrupted' = 'interrupted',
 ): Promise<GateCommandRecord[]> {
   const startedAt = new Date().toISOString();
   return Promise.all(request.checks.map(async (check, index) => {
@@ -217,7 +221,7 @@ async function notVerifiedRecords(
       elapsedMs: 0,
       exitCode: null,
       outcome: 'not-verified' as const,
-      notVerified: failure?.notVerified ?? 'interrupted',
+      notVerified: failure?.notVerified ?? skipped,
       runnerError: null,
       output: { path: outputFile, bytes: 0, truncated: false, tail: failure?.detail ?? '' },
     };
@@ -295,7 +299,7 @@ function classify(check: PlannedCheck, run: CommandRun, outputFile: string, scen
  * verified.
  */
 function verdictOf(commands: readonly GateCommandRecord[], harnessFinding: boolean): GateAttempt['verdict'] {
-  if (commands.some(command => command.outcome === 'not-verified' && command.notVerified !== 'setup-failed' && command.notVerified !== 'audit-unselected')) return 'not-verified';
+  if (commands.some(command => command.outcome === 'not-verified' && command.notVerified !== 'setup-failed' && command.notVerified !== 'audit-unselected' && command.notVerified !== 'local-rule-failed')) return 'not-verified';
   if (harnessFinding || commands.some(command => command.outcome === 'failed')) return 'failed';
   return 'passed';
 }

@@ -5,7 +5,7 @@ import {
 import { capabilityPolicyFrom } from '../../capability/policy.js';
 import { createCapabilityWorkflow } from '../../capability/workflow.js';
 import { openRuns, testPolicy, type OpenRunsOptions } from './runs.js';
-import { cp } from 'node:fs/promises';
+import { cp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { temporaryDirectory } from './fixture.js';
@@ -17,6 +17,9 @@ export async function copyCapabilityFixture(nested = false): Promise<{ root: str
   const source = fileURLToPath(new URL(`../../../../../fixtures/${name}/`, import.meta.url));
   const root = join(directory.path, name);
   await cp(source, root, { recursive: true });
+  const ignore = join(root, '.gitignore');
+  const content = await readFile(ignore, 'utf8');
+  await writeFile(ignore, `${content}${content.endsWith('\n') ? '' : '\n'}**/src/tmp/\n`);
   return { root, remove: directory.remove };
 }
 

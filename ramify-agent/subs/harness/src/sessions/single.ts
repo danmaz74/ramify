@@ -31,7 +31,7 @@ import { ContentStore } from '../transcripts/store.js';
 import { TranscriptWriter } from '../transcripts/writer.js';
 import { engineerEquipment } from '../work/engineer-equipment.js';
 import { engineerWorkingDirectory } from '../work/engineer-directory.js';
-import { ensureScratchRule, removeScratchDirectories, trackedScratchPaths } from '../work/scratch.js';
+import { ensureScratchRule, removeScratchDirectories, scratchSafetyRule, trackedScratchPaths } from '../work/scratch.js';
 import {
   capabilityEngineerJsonSchema, capabilityEngineerSubmissionSchema, engineerSubmissionDescription, engineerToolName, iterationMessage, validateEngineer,
   type EngineerSubmission,
@@ -119,6 +119,8 @@ export interface SessionSummary {
   readonly changed: readonly string[];
   /** A path changed by the harness while preparing scratch, rather than by the engineer. */
   readonly harnessChanged: readonly string[];
+  /** Indexed scratch kept at session end; it must be removed from the index before readiness. */
+  readonly preservedTracked: readonly string[];
   /** Changed paths outside the write scope. */
   readonly outsideScope: readonly string[];
   readonly usage: InvocationOutcome['usage'];
@@ -266,9 +268,6 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     if (!list.includes(target.resolved)) list.push(target.resolved);
   }
   const scope = { ...own, resolved: { ...own.resolved, roots, files } };
-  const workingDirectory = await engineerWorkingDirectory(projectRoot, scope, initial)
-    .catch(error => ({ error: message(error) }));
-  if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
   let harnessChanged: string[] = [];
   let alreadyChanged: string[];
   try {
@@ -283,6 +282,11 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   } catch (error) {
     return notStarted(`Scratch preparation refused this session: ${message(error)}`);
   }
+  const workingDirectory = await engineerWorkingDirectory(projectRoot, scope, initial, git)
+    .catch(error => ({ error: message(error) }));
+  if (typeof workingDirectory !== 'string') return notStarted(`The engineer cannot start in the module's src directory: ${workingDirectory.error}`);
+  let scratchSettled = false;
+  try {
   // The project's configuration for the harness is never an agent's to write.
   const guarded: GuardedScope = guardedScopeOf(scope, await deniedFiles(projectRoot, []));
   const tests = testPolicyOf('ordinary', base, []);
@@ -479,11 +483,14 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     agentSession = agent.startSession(spec);
   } catch (error) {
     const settled = await writer.release(id);
+    const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
+    scratchSettled = true;
     const reason = `The agent session could not start: ${message(error)}`;
     await transcript.end({ ended: 'failed', interruption: 'adapter-fault', error: reason, actual: null });
     await writeOutcome(at(sessionLayout.outcome), {
       session: id, ended: 'failed', interruption: 'adapter-fault', error: reason, submission: null, rejectedSubmissions: 0,
-      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, harnessChanged, outsideScope: [],
+      standingViolations: [], settled, changed: alreadyChanged, alreadyChanged, harnessChanged,
+      preservedTracked: [...removed.preservedTracked], outsideScope: [],
       usage: recorder.outcomeUsage(agent), elapsedMs: Date.now() - started, gate: null,
     });
     return notStarted(reason, records);
@@ -507,6 +514,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   await equipment.settle?.().catch(() => undefined);
   const settled = await writer.release(id, agentSession);
   const snapshot = await recordSettledSnapshot({ projectRoot, changed: () => git.changedPaths(projectRoot), scope: guarded }, observations);
+  const removed = await removeScratchDirectories(projectRoot, [entry.dir], git);
+  scratchSettled = true;
+  const safety = await scratchSafetyRule(projectRoot, await declaredModuleDirectories(projectRoot), git);
 
   const interruption = bounds.interruption ?? (stoppedByCaller ? 'stopped-by-caller' as const : undefined);
   const ended: InvocationOutcome['ended'] = bounds.interruption !== undefined
@@ -552,6 +562,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
         tests: selection,
         guarded: guardedFiles,
         authorizations: [],
+        rules: [safety],
         ...(setup === undefined ? {} : { setup }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
@@ -588,6 +599,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     changed: [...snapshot.paths],
     alreadyChanged: alreadyChanged.map(path => path.split(sep).join('/')).sort(),
     harnessChanged,
+    preservedTracked: [...removed.preservedTracked],
     outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
     usage: recorder.outcomeUsage(agent),
     elapsedMs,
@@ -605,6 +617,7 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
     standingViolations: standing,
     changed: [...snapshot.paths],
     harnessChanged,
+    preservedTracked: removed.preservedTracked,
     outsideScope: snapshot.outsideScope.filter(path => !harnessChanged.includes(path)),
     usage: recorder.outcomeUsage(agent),
     elapsedMs,
@@ -615,6 +628,9 @@ async function runLocked(options: SingleSessionOptions): Promise<SingleSessionRe
   progress({ type: 'summary', summary });
   const passed = ended === 'submitted' && (gate === null || (gate.ran && gate.verdict === 'passed'));
   return { status: 'finished', summary, exitStatus: passed ? 0 : 1 };
+  } finally {
+    if (!scratchSettled) await removeScratchDirectories(projectRoot, [entry.dir], git);
+  }
 }
 
 async function writeOutcome(path: string, body: Omit<SessionOutcomeRecord, 'schema' | 'finishedAt'>): Promise<void> {

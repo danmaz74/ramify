@@ -1,12 +1,14 @@
 import { mkdir, realpath, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import type { ArchitectIndex } from '../../subs/evidence/src/views.js';
+import { gitService, type GitService } from '../../subs/evidence/src/git.js';
 import { isContained, resolveRealTarget } from '../guard/resolve-contained-path.js';
+import { createScratchDirectory } from './scratch.js';
 import { directoryOf } from './scope.js';
 import type { WriteScope } from './iterations.js';
 
 /** The first recorded base module is where an ordinary engineer starts. */
-export async function engineerWorkingDirectory(projectRoot: string, scope: WriteScope, index: ArchitectIndex | null): Promise<string> {
+export function assignedModuleDirectory(scope: WriteScope, index: ArchitectIndex | null): string {
   const module = 'module' in scope.base ? scope.base.module : scope.base.modules[0]!;
   const declared = directoryOf(index, module);
   const candidates = scope.bootstrap.filter(entry => entry.directory.split('/').at(-1) === module.split('/').at(-1));
@@ -14,6 +16,15 @@ export async function engineerWorkingDirectory(projectRoot: string, scope: Write
   const bootstrap = candidates.length === 1 ? candidates[0] : undefined;
   const directory = declared ?? bootstrap?.directory;
   if (directory === undefined || directory === null) throw new Error(`The assigned base module ${module} has no resolved directory`);
+  return directory;
+}
+
+/** The first recorded base module is where an ordinary engineer starts. */
+export async function engineerWorkingDirectory(projectRoot: string, scope: WriteScope, index: ArchitectIndex | null,
+  git: GitService = gitService): Promise<string> {
+  const module = 'module' in scope.base ? scope.base.module : scope.base.modules[0]!;
+  const directory = assignedModuleDirectory(scope, index);
+  const bootstrap = scope.bootstrap.find(entry => entry.directory === directory);
   const target = await resolveRealTarget(projectRoot, join(directory, 'src'));
   if (!target.ok) throw new Error(`The assigned base module ${module} has no resolvable src directory: ${target.reason}`);
   const src = target.resolved;
@@ -34,6 +45,7 @@ export async function engineerWorkingDirectory(projectRoot: string, scope: Write
   if (!scope.resolved.roots.some(root => root === canonical || isContained(root, canonical))) {
     throw new Error(`The source directory ${canonical} is outside the assigned write scope`);
   }
+  await createScratchDirectory(projectRoot, relative(projectRoot, dirname(canonical)).split(sep).join('/'), git);
   return canonical;
 }
 

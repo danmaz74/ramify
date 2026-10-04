@@ -105,6 +105,8 @@ export const sessionOutcomeSchema = z.object({
   alreadyChanged: z.array(z.string()),
   /** Uncommitted paths the harness itself changed while preparing the session. */
   harnessChanged: z.array(z.string()),
+  /** Indexed scratch that cleanup preserved at session end. */
+  preservedTracked: z.array(z.string()),
   /** Changed paths outside the write scope: the shell's writes pass no guard. */
   outsideScope: z.array(z.string()),
   usage: invocationOutcomeSchema.shape.usage,

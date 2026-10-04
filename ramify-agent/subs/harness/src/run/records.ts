@@ -818,7 +818,7 @@ const verifiedPlannedCheckSchema = plannedCheckSchema
 
 /** A rule the harness verified itself over the tree, beside the commands it ran. */
 export const gateRuleSchema = z.object({
-  rule: z.enum(['fake-naming', 'fake-exposure-parity']),
+  rule: z.enum(['fake-naming', 'fake-exposure-parity', 'scratch-safety']),
   outcome: z.enum(['passed', 'failed']),
   violations: z.array(z.object({ rule: text, path: text, detail: text }).strict()),
   /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */
@@ -859,7 +859,7 @@ export const gateAttemptSchema = z.object({
     lockWaitMs: z.int().nonnegative().optional(),
     exitCode: z.int().nullable(),
     outcome: z.enum(['passed', 'failed', 'not-verified']),
-    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed', 'audit-unselected']).optional(),
+    notVerified: z.enum(['timeout', 'runner-error', 'command-missing', 'empty-selection', 'interrupted', 'discovery-error', 'required-suite-missing', 'setup-failed', 'audit-unselected', 'local-rule-failed']).optional(),
     runnerError: z.object({ kind: z.string(), message: z.string() }).strict().nullable(),
     output: z.object({ path: z.string(), bytes: z.int().nonnegative(), truncated: z.boolean(), tail: z.string() }).strict(),
     /** How ramify-audit stopped the command's process tree, in words; absent where it did not stop it. */

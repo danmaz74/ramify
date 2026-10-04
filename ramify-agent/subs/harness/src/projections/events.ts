@@ -359,6 +359,8 @@ function describe(event: RunEvent): [string, Ref[]] {
       return ['The harness is preparing ignored module scratch', []];
     case 'scratch-setup-complete':
       return [event.data.commit === null ? 'Module scratch ignore rule verified' : 'Module scratch ignore rule committed', ref('commit', event.data.commit)];
+    case 'scratch-preserved':
+      return [`Indexed scratch preserved for ${event.data.iteration}: ${event.data.paths.join(', ')}`, ref('iteration', event.data.iteration)];
     case 'job-completed':
       return [
         `The run completed after ${counted(event.data.workItems, 'work item', 'work items')}${event.data.planDeviations === undefined ? '' : `, with ${counted(event.data.planDeviations, 'plan deviation', 'plan deviations')} to review`}`,

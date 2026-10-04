@@ -5,6 +5,9 @@ import { promisify } from 'node:util';
 import { sha256 } from '../prompts/packages.js';
 import { provisionalSourceSchema, type ProvisionalSource } from './records.js';
 import { previewCandidateTree } from '../../subs/evidence/src/candidate-tree.js';
+import { gitService } from '../../subs/evidence/src/git.js';
+import { declaredModuleDirectories } from '../run/project-config.js';
+import { assertScratchSafe } from '../work/scratch.js';
 
 const exec = promisify(execFile);
 
@@ -59,6 +62,7 @@ export async function reconcileProvisionalSource(input: {
     !Array.isArray(document.files)) throw new Error(`Provisional snapshot ${snapshot} has a conflicting basis`);
   const { tree, snapshotHash, ...content } = document;
   if (sha256(JSON.stringify(content)) !== snapshotHash) throw new Error(`Provisional snapshot ${snapshot} has invalid bytes`);
+  await assertScratchSafe(input.projectRoot, await declaredModuleDirectories(input.projectRoot), gitService);
   if ((await previewCandidateTree(input.projectRoot)).tree !== tree) {
     throw new Error(`Provisional snapshot ${snapshot} differs from the live candidate; source was preserved`);
   }
@@ -130,6 +134,7 @@ export async function captureProvisionalSource(input: {
   const document = { schema: 'ramify-agent.provisional-source/1' as const, acceptedBase: input.acceptedBase,
     writerSettledBy: input.writerSettledBy, files };
   const snapshotHash = sha256(JSON.stringify(document));
+  await assertScratchSafe(input.projectRoot, await declaredModuleDirectories(input.projectRoot), gitService);
   const tree = (await previewCandidateTree(input.projectRoot)).tree;
   const target = join(input.runDirectory, snapshot);
   await mkdir(dirname(target), { recursive: true });

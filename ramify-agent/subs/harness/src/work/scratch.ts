@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, readdir, rm, rmdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GitService, IgnoreRule } from '../../subs/evidence/src/git.js';
+import type { GateRuleRecord } from '../checks/records.js';
 
 /** The general project rule also covers modules introduced after setup. */
 export const scratchIgnoreRule = '**/src/tmp/';
@@ -17,6 +18,18 @@ function scratchRelativePath(moduleDir: string): string {
 /** The assigned module's scratch directory, within its ordinary source area. */
 export function scratchPath(projectRoot: string, moduleDir: string): string {
   return join(projectRoot, scratchRelativePath(moduleDir));
+}
+
+/** D1: release every owner of a closed assignment unless another assignment still owns it. */
+export function releasableScratchModules(
+  iteration: string,
+  assignments: readonly { readonly id: string; readonly modules: readonly string[] }[],
+  closed: ReadonlySet<string>,
+): readonly string[] {
+  const own = assignments.find(assignment => assignment.id === iteration);
+  if (own === undefined || !closed.has(iteration)) return [];
+  const open = new Set(assignments.filter(assignment => !closed.has(assignment.id)).flatMap(assignment => assignment.modules));
+  return [...new Set(own.modules.filter(module => !open.has(module)))].sort();
 }
 
 function scratchDirectories(moduleDirs: readonly string[]): string[] {
@@ -49,6 +62,31 @@ export async function scratchIgnoreConflicts(projectRoot: string, moduleDirs: re
   const paths = scratchDirectories(moduleDirs).map(path => `${path}/`);
   const statuses = await git.ignoreStatus(projectRoot, paths);
   return statuses.filter(status => !status.ignored).map(status => ({ path: status.path, rule: status.rule }));
+}
+
+/** The candidate and commit preflight uses Git's effective ignore answer and its index. */
+export async function scratchSafetyRule(projectRoot: string, moduleDirs: readonly string[], git: GitService): Promise<GateRuleRecord> {
+  const conflicts = await scratchIgnoreConflicts(projectRoot, moduleDirs, git);
+  const tracked = await trackedScratchPaths(projectRoot, moduleDirs, git);
+  const violations = [
+    ...conflicts.map(conflict => ({ rule: 'scratch-ignore', path: conflict.path,
+      detail: conflict.rule === null ? 'Git has no ignore rule for this scratch directory'
+        : `Git rule ${conflict.rule.source}:${conflict.rule.line} (${conflict.rule.pattern}) leaves scratch unignored` })),
+    ...tracked.map(path => ({ rule: 'scratch-index', path, detail: 'Scratch is in Git\'s index; remove it from the index before a candidate or commit' })),
+  ];
+  return { rule: 'scratch-safety', outcome: violations.length === 0 ? 'passed' : 'failed', violations };
+}
+
+export class ScratchSafetyError extends Error {
+  constructor(readonly violations: GateRuleRecord['violations']) {
+    super(`Unsafe scratch candidate: ${violations.map(item => `${item.path}: ${item.detail}`).join('; ')}`);
+    this.name = 'ScratchSafetyError';
+  }
+}
+
+export async function assertScratchSafe(projectRoot: string, moduleDirs: readonly string[], git: GitService): Promise<void> {
+  const result = await scratchSafetyRule(projectRoot, moduleDirs, git);
+  if (result.outcome === 'failed') throw new ScratchSafetyError(result.violations);
 }
 
 /**

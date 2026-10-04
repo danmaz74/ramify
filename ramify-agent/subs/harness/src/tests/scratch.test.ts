@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   ScratchIgnoreConflictError, createScratchDirectory, ensureScratchRule,
-  removeScratchDirectories, scratchIgnoreConflicts, scratchPath, trackedScratchPaths,
+  releasableScratchModules, removeScratchDirectories, scratchIgnoreConflicts, scratchPath, trackedScratchPaths,
 } from '../work/scratch.js';
 import { mockGit } from './helpers/mock-git.js';
 
@@ -107,6 +107,28 @@ test('removal covers root and nested scratch, leaves other source, and preserves
   expect(await readFile(join(root, 'src/kept.ts'), 'utf8')).toBe('kept');
   expect(await readFile(join(root, tracked[0]!), 'utf8')).toBe('tracked');
   await expect(stat(join(root, 'subs/notes/src/tmp/deep/free.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+test('a durable superseded result releases all owners except those held by an open assignment', async () => {
+  const assignments = [
+    { id: 'wi-001.i01', modules: ['subs/notes', 'subs/tags'] },
+    { id: 'wi-002.i01', modules: ['subs/tags'] },
+  ];
+  const superseded = new Set(['wi-001.i01']);
+  expect(releasableScratchModules('wi-001.i01', assignments, superseded)).toEqual(['subs/notes']);
+  expect(releasableScratchModules('wi-002.i01', assignments, superseded)).toEqual([]);
+  await mkdir(join(root, 'subs/notes/src/tmp'), { recursive: true });
+  await mkdir(join(root, 'subs/tags/src/tmp'), { recursive: true });
+  await writeFile(join(root, 'subs/notes/src/tmp/draft.txt'), 'notes');
+  await writeFile(join(root, 'subs/tags/src/tmp/draft.txt'), 'tags');
+  const git = mockGit({ async trackedPaths() { return []; } });
+  await removeScratchDirectories(root, releasableScratchModules('wi-001.i01', assignments, superseded), git);
+  await expect(readFile(join(root, 'subs/notes/src/tmp/draft.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(await readFile(join(root, 'subs/tags/src/tmp/draft.txt'), 'utf8')).toBe('tags');
+  const bothClosed = new Set(['wi-001.i01', 'wi-002.i01']);
+  expect(releasableScratchModules('wi-001.i01', assignments, bothClosed)).toEqual(['subs/notes', 'subs/tags']);
+  await removeScratchDirectories(root, releasableScratchModules('wi-001.i01', assignments, bothClosed), git);
+  await expect(readFile(join(root, 'subs/tags/src/tmp/draft.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
 test('removal refuses a symlinked scratch directory without entering its target', async () => {

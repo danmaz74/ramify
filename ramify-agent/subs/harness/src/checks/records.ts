@@ -130,7 +130,7 @@ export type CheckCommandKind = 'setup' | 'ramify-check' | 'type-check' | 'tests'
  */
 export type NotVerified =
   | 'timeout' | 'runner-error' | 'command-missing' | 'empty-selection'
-  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed' | 'audit-unselected';
+  | 'interrupted' | 'discovery-error' | 'required-suite-missing' | 'setup-failed' | 'audit-unselected' | 'local-rule-failed';
 
 /**
  * A format of the type checker's output the project declares in
@@ -177,7 +177,7 @@ export type GateNext = 'accept' | 'repair' | 'retry-infrastructure' | 'return-to
  * and what it found is the diagnostics the engineer repairs from.
  */
 export interface GateRuleRecord {
-  readonly rule: 'fake-naming' | 'fake-exposure-parity';
+  readonly rule: 'fake-naming' | 'fake-exposure-parity' | 'scratch-safety';
   readonly outcome: 'passed' | 'failed';
   readonly violations: ReadonlyArray<{ readonly rule: string; readonly path: string; readonly detail: string }>;
   /** What the rule could not establish, or found and did not attribute to this attempt; absent when nothing. */

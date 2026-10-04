@@ -80,6 +80,7 @@ interface SessionBoundaries {
   readonly gate?: readonly DirectCheckStep[] | undefined;
   readonly commandExecution?: CommandRunner | undefined;
   readonly starts?: boolean | undefined;
+  readonly preparationChangedPaths?: number | undefined;
 }
 
 async function session(
@@ -139,7 +140,7 @@ async function session(
   expect(git.unexpected).toEqual([]);
   const starts = boundaries.starts ?? true;
   expect(git.currentHead).toHaveBeenCalledTimes(starts ? (extra.gate === true ? 2 : 1) : 0);
-  expect(git.changedPaths).toHaveBeenCalledTimes(starts ? 4 : 0);
+  expect(git.changedPaths).toHaveBeenCalledTimes(starts ? 4 : boundaries.preparationChangedPaths ?? 0);
   expect(git.commitAccepted).not.toHaveBeenCalled();
   return { result, agent, events, git };
 }
@@ -362,7 +363,7 @@ describe('a single engineer session', () => {
   test('a declared module with missing src is refused before the agent starts', async () => {
     const root = await project();
     await rm(join(root, notesDirectory, 'src'), { recursive: true });
-    const { result, agent } = await session(root, [], {}, { starts: false });
+    const { result, agent } = await session(root, [], {}, { starts: false, preparationChangedPaths: 1 });
     expect(result).toMatchObject({ status: 'not-started', exitStatus: 2 });
     expect(result.status === 'not-started' ? result.reason : '').toContain('has no src directory');
     expect(agent.sessions).toHaveLength(0);

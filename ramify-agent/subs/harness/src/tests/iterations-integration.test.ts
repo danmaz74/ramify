@@ -11,7 +11,7 @@ import { copyFixture } from './helpers/fixture.js';
 import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import {
   addModule, assign, byRole, completionProposed, edit, installMiniRunner, outline,
-  runScopeTests, submit, viewedInputs,
+  runScopeTests, submit, viewedInputs, write,
 } from './helpers/iterations.js';
 import {
   git, initRepository, onlyRun, openRuns, realRamify, runEventsOnDisk, runPath, startRun,
@@ -41,7 +41,7 @@ const notesDirectory = 'subs/workspace/subs/reviews/subs/notes';
 
 describe('G8: one small work item completes in one iteration', () => {
   test('a local architect assigns it, an engineer works it, the gate accepts it and the harness commits', async () => {
-    const fixture = await copyFixture();
+    const fixture = await copyFixture({ scratchRule: false });
     cleanups.push(fixture.remove);
     const root = fixture.root;
     await addModule(root, notesDirectory, 'notes', {
@@ -77,6 +77,7 @@ describe('G8: one small work item completes in one iteration', () => {
         ],
         engineer: [submit(
           completionProposed('Raised the note limit to the 500 characters the plan asks for.'),
+          write('tmp/draft.txt', 'throwaway note\n'),
           edit('notes.ts', 'noteLimit = 400', 'noteLimit = 500'),
           runScopeTests(),
         )],
@@ -98,6 +99,7 @@ describe('G8: one small work item completes in one iteration', () => {
     expect(types).toContain('writer-acquired');
     expect(types).toContain('writer-released');
     expect(types).toContain('iteration-closed');
+    expect(types).toContain('scratch-setup-complete');
     // The writer is acquired before the session starts and released before
     // the gate runs.
     expect(types.indexOf('writer-acquired')).toBeLessThan(types.indexOf('writer-released'));
@@ -135,6 +137,8 @@ describe('G8: one small work item completes in one iteration', () => {
     expect(accepted).toContain('Audit-Note: git notes --ref=audit show');
     expect(accepted).toContain(`Ramify-Gate: ${result.gate}`);
     expect(gate.audited).toBe(result.commit);
+    expect((await git(root, 'ls-tree', '-r', '--name-only', gate.audited!)).split('\n').filter(path => path.includes('/src/tmp/'))).toEqual([]);
+    await expect(readFile(join(root, notesDirectory, 'src/tmp/draft.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(gate.evidence).not.toBeNull();
     const auditNote = await git(root, 'notes', '--ref=audit', 'show', gate.audited!);
     expect(auditNote).toContain('Audited-Overall: pass');

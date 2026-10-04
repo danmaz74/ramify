@@ -1,4 +1,4 @@
-<!-- ramify-agent engineer procedure, version 7. -->
+<!-- ramify-agent engineer procedure, version 8. -->
 Do this, in order:
 
 1. Read the goal, the approach and the completion evidence in the message
@@ -12,6 +12,9 @@ Do this, in order:
    no more: where a capability the message does not ask for would round the
    work off, such as producing its inputs or acting on its result, name it
    in `findings` instead of building it.
+   Use `tmp/` for throwaway files while this iteration is open; its contents
+   are removed when the iteration closes, so put lasting evidence in the
+   assigned result locations.
 4. Run `run_scope_tests` until the selection passes, and the scenarios you
    bind with it. It is a diagnosis, not a verdict.
 5. Submit, declaring the scenarios your step definitions bind.
