@@ -45,6 +45,13 @@ describe('runCommand', () => {
     expect(Date.parse(run.startedAt)).not.toBeNaN();
   });
 
+  it('passes exact stdin bytes through the process-group start barrier', async () => {
+    const input = 'src/tmp/\0subs/space name/src/tmp/\0';
+    const run = await runCommand(request('cat', { stdin: input }));
+    expect(run.outcome).toEqual({ kind: 'completed', exitCode: 0 });
+    expect(run.stdout).toBe(input);
+  });
+
   it('holds the command behind durable group registration and reports its kernel identity', async () => {
     const marker = join(directory.path, 'started.txt');
     let release!: () => void;

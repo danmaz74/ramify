@@ -98,6 +98,14 @@ describe('the captured commands', () => {
 });
 
 describe('nested-package discovery', () => {
+  test('does not enter a module scratch directory holding a package manifest', async () => {
+    const fixture = await copyFixture();
+    cleanups.push(fixture.remove);
+    await write(join(fixture.root, 'src/tmp'), { scripts: { test: 'vitest run' } }, false);
+    await write(join(fixture.root, 'subs/workspace/src/tmp'), { scripts: { test: 'vitest run' } }, false);
+    expect(await discoverNestedPackages(fixture.root)).toEqual([]);
+  }, 60_000);
+
   test('finds an independent package, skips node_modules and the harness\'s own directories', async () => {
     const fixture = await copyFixture();
     cleanups.push(fixture.remove);

@@ -176,7 +176,8 @@ async function discover(projectRoot: string, directory: string): Promise<string[
     for (const entry of entries) {
       const path = join(current, entry.name);
       if (entry.isDirectory()) {
-        if (excludedDirectories.has(entry.name) || entry.name.startsWith('.')) continue;
+        if (excludedDirectories.has(entry.name) || entry.name.startsWith('.') ||
+          (entry.name === 'tmp' && basename(current) === 'src')) continue;
         await walk(path);
       } else if (entry.isFile() && testFile.test(entry.name)) {
         found.push(toPosix(relative(projectRoot, path)));

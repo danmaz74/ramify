@@ -2,7 +2,7 @@ import { expect } from 'vitest';
 import type { CommitTrailer, GitService } from '../../../subs/evidence/src/git.js';
 import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
 import type { LineChange } from '../../kpi/lines.js';
-import { mockGit } from './mock-git.js';
+import { mockGit, scriptedScratchGit, type ScratchGitScript } from './mock-git.js';
 
 /*
  * Git, answered rather than run, for a scenario that crashes and restarts.
@@ -56,6 +56,7 @@ export interface RecoveredCommit {
 
 /** The canned answers of one scenario, in the order its commits are made. */
 export interface GitResponses {
+  readonly scratch?: ScratchGitScript | undefined;
   /** The revision the project is on before the run commits anything. */
   readonly head: string;
   /** Exact ordered candidate tree answers; omitted means no preview may be requested. */
@@ -125,6 +126,7 @@ export const scenariosCommitName = 'scenarios';
  * rest for the restart that follows it.
  */
 export function scenarioGit(root: string, responses: GitResponses): ScenarioGit {
+  const scratch = scriptedScratchGit(root, responses.scratch);
   if (responses.commits.length > 0 && responses.after === undefined) {
     throw new Error('A recovery Git scenario with commit responses must state its final accepted boundary');
   }
@@ -168,6 +170,7 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
   // and throws for every other one, so an unstated boundary fails rather
   // than passing silently.
   const mock = mockGit({
+    ...scratch.answers,
     async previewCandidateTree(project) {
       asked('previewCandidateTree', project);
       const answer = responses.previews?.[previewCursor];
@@ -289,10 +292,12 @@ export function scenarioGit(root: string, responses: GitResponses): ScenarioGit 
     branch: () => branch,
     operations: () => ({ ...counts }),
     assertAnswered() {
+      scratch.assertComplete();
       expect(failures, 'Git answers this scenario was asked for wrongly').toEqual([]);
       expect(mock.unexpected, 'Git operations this scenario states no answer for').toEqual([]);
     },
     assertComplete() {
+      scratch.assertComplete();
       expect(failures, 'Git answers this scenario was asked for wrongly').toEqual([]);
       expect(mock.unexpected, 'Git operations this scenario states no answer for').toEqual([]);
       expect(cursor, 'stated commit responses consumed').toBe(responses.commits.length);

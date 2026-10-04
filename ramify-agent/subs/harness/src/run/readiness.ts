@@ -1,5 +1,5 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 import type { CheckExecutionPort, GateCommandStarted } from '../checks/execution.js';
 import { runGate } from '../checks/gate.js';
 import { allProjectChecks, checkpointPolicies, installOperation, linkedModulesRefusals, planScenarioCheck, setupChecks } from '../checks/checkpoint.js';
@@ -554,7 +554,8 @@ export async function discoverTestFiles(projectRoot: string): Promise<string[]> 
     for (const entry of entries) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+        if (entry.name === 'node_modules' || entry.name.startsWith('.') ||
+          (entry.name === 'tmp' && basename(directory) === 'src')) continue;
         if (await isStateDirectory(path)) continue;
         await walk(path, depth + 1);
       } else if (entry.isFile() && testFilePattern.test(entry.name)) {

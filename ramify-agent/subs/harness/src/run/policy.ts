@@ -1,5 +1,5 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { ramifyExecutable } from '../../subs/evidence/src/ramify-cli.js';
 import { checkCommand, type CheckCommand } from '../checks/records.js';
 import type { Role } from '../interfaces/protocol/runs.js';
@@ -195,7 +195,8 @@ export async function discoverNestedPackages(projectRoot: string): Promise<Neste
       if (!(await isStateDirectory(directory))) found.push(await describe(projectRoot, directory));
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      if (!entry.isDirectory() || entry.name === 'node_modules' || entry.name.startsWith('.') ||
+        (entry.name === 'tmp' && basename(directory) === 'src')) continue;
       const child = join(directory, entry.name);
       if (await isStateDirectory(child)) continue;
       await walk(child, depth + 1);

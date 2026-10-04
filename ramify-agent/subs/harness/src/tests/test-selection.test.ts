@@ -97,6 +97,19 @@ describe('K3: an exact owner and an included child subtree', () => {
 });
 
 describe('K8: every resolution reads the tree as it stands', () => {
+  test('scoped selection skips scratch in a testing module source area', async () => {
+    const root = await fixture();
+    await mkdir(join(root, 'subs/integration-tests/src/tmp'), { recursive: true });
+    await writeFile(join(root, 'subs/integration-tests/src/tmp/ignored.test.ts'), '');
+    await writeFile(join(root, 'subs/integration-tests/src/kept.test.ts'), '');
+    const result = await resolveTestSelection({
+      projectRoot: root, index: fixtureIndex, policy: policy(['collection-review/integration-tests']),
+    });
+    expect(result.failure).toBeNull();
+    expect(result.selection.resolved).toContain('subs/integration-tests/src/kept.test.ts');
+    expect(result.selection.resolved).not.toContain('subs/integration-tests/src/tmp/ignored.test.ts');
+  });
+
   test('a test file written after the policy was captured is selected by the next resolution', async () => {
     const root = await fixture();
     const owner = policy(['collection-review/workspace/reviews/validation']);

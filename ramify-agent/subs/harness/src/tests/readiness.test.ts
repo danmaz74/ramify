@@ -10,6 +10,7 @@ import {
 import { runLayout, type InfrastructureRecovery, type ReadinessAttempt } from '../run/records.js';
 import { RamifyCli } from '../../subs/evidence/src/ramify-cli.js';
 import { gitService } from '../../subs/evidence/src/git.js';
+import { discoverTestFiles } from '../run/readiness.js';
 import { checkOutputPath, notRun, type CheckExecutionPort } from '../checks/execution.js';
 
 /*
@@ -25,6 +26,17 @@ import { checkOutputPath, notRun, type CheckExecutionPort } from '../checks/exec
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+});
+
+test('test discovery skips scratch files under root and child module source', async () => {
+  const root = await counterDirectory();
+  await mkdir(join(root, 'src/tmp'), { recursive: true });
+  await mkdir(join(root, 'subs/notes/src/tmp'), { recursive: true });
+  await mkdir(join(root, 'subs/notes/src/tests'), { recursive: true });
+  await writeFile(join(root, 'src/tmp/root.test.ts'), '');
+  await writeFile(join(root, 'subs/notes/src/tmp/child.test.ts'), '');
+  await writeFile(join(root, 'subs/notes/src/tests/kept.test.ts'), '');
+  expect(await discoverTestFiles(root)).toEqual(['subs/notes/src/tests/kept.test.ts']);
 });
 
 async function target() {

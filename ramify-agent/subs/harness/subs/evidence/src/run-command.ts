@@ -108,6 +108,8 @@ export interface CommandRequest {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string>>;
   readonly timeoutMs: number;
+  /** Optional bytes sent to the command after the process-group start barrier. */
+  readonly stdin?: string | undefined;
   /** Where to write the complete output. Omit for a command whose answer is its stdout. */
   readonly outputFile?: string | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -261,7 +263,7 @@ export async function runCommand(request: CommandRequest): Promise<CommandRun> {
         void (pid === 0 ? Promise.resolve() : processGroupIdentity(pid).then(identity =>
           request.registerProcessGroup?.(pid, identity) ?? Promise.resolve())).then(() => {
           if (request.signal?.aborted) child.stdin?.destroy();
-          else child.stdin?.end('start\n');
+          else child.stdin?.end(`start\n${request.stdin ?? ''}`);
         }, error => { child.stdin?.destroy(); reject(error); });
       });
     });

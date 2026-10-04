@@ -1,7 +1,7 @@
 import { expect } from 'vitest';
 import type { LineChange } from '../../kpi/lines.js';
 import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
-import { mockGit } from './mock-git.js';
+import { mockGit, scriptedScratchGit, type ScratchGitScript } from './mock-git.js';
 
 /*
  * The answers Git gives a committing lifecycle scenario.
@@ -58,6 +58,7 @@ export interface TrailedCommit {
 }
 
 export interface GateGitOptions {
+  readonly scratch?: ScratchGitScript | undefined;
   /** The revision the project is on before the run commits anything. */
   readonly head: string;
   /** Exact ordered candidate tree answers; omitted means no preview may be requested. */
@@ -125,6 +126,7 @@ export interface GateGit {
  * than a silent success.
  */
 export function gateGit(root: string, options: GateGitOptions): GateGit {
+  const scratch = scriptedScratchGit(root, options.scratch);
   const calls: GitCall[] = [];
   const messages: string[] = [];
   const lookups: Array<readonly { key: string; value: string }[]> = [];
@@ -173,6 +175,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
   }
 
   const git = mockGit({
+    ...scratch.answers,
     async previewCandidateTree(project) {
       expect(project).toBe(root);
       const answer = options.previews?.[previewCursor];
@@ -283,6 +286,7 @@ export function gateGit(root: string, options: GateGitOptions): GateGit {
     head: () => head,
     mark: name => record('mark', name),
     assertComplete() {
+      scratch.assertComplete();
       expect(failures).toEqual([]);
       expect(git.unexpected).toEqual([]);
       expect(`${cursor} of ${options.commits.length} commit boundaries`).toBe(`${options.commits.length} of ${options.commits.length} commit boundaries`);

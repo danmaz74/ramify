@@ -1,6 +1,7 @@
 import { expect } from 'vitest';
 import type { GitService } from '../../../subs/evidence/src/git.js';
 import type { CandidateTreePreview } from '../../../subs/evidence/src/candidate-tree.js';
+import { scriptedScratchGit, type ScratchGitScript } from './mock-git.js';
 
 export interface GitCheckpoint {
   readonly subject: string;
@@ -19,6 +20,7 @@ export function scenariosCommit(planId: string, commit = `scenarios-of-${planId}
 
 /** Canned external responses for a scenario, including unchanged checkpoints. */
 export interface GitScript {
+  readonly scratch?: ScratchGitScript | undefined;
   readonly head: string;
   readonly checkpoints: readonly GitCheckpoint[];
   /** Exact ordered tree previews, never inferred from checkpoint commits. */
@@ -42,6 +44,7 @@ export interface ScriptedGit extends GitService {
  * from fixture data. No disk reads, diffing, hashing, history or Git rules.
  */
 export function scriptedGit(root: string, script: GitScript): ScriptedGit {
+  const scratch = scriptedScratchGit(root, script.scratch);
   let index = 0;
   let previewIndex = 0;
   // Gate attempts after readiness's `ga-0001`; the scenarios commit is no gate's.
@@ -63,6 +66,18 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     throw new Error(failures.at(-1));
   }
   return {
+    async trackedPaths(project, directories) {
+      check('trackedPaths', project);
+      const answer = scratch.answers.trackedPaths;
+      if (answer === undefined) return unsupported('trackedPaths');
+      return answer(project, directories);
+    },
+    async ignoreStatus(project, paths) {
+      check('ignoreStatus', project);
+      const answer = scratch.answers.ignoreStatus;
+      if (answer === undefined) return unsupported('ignoreStatus');
+      return answer(project, paths);
+    },
     async previewCandidateTree(project) {
       const answer = script.previews?.[previewIndex];
       check('previewCandidateTree', project, () => {
@@ -128,6 +143,7 @@ export function scriptedGit(root: string, script: GitScript): ScriptedGit {
     async commitNameStatus() { return unsupported('commitNameStatus'); },
     givenWrites() { pending = script.checkpoints[index]!.changes; },
     assertComplete() {
+      scratch.assertComplete();
       expect(failures).toEqual([]);
       expect(index).toBe(script.checkpoints.length);
       expect(previewIndex).toBe(script.previews?.length ?? 0);

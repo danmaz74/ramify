@@ -1,5 +1,6 @@
-import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { copyFile, lstat, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { runCommand, childEnvironment } from './run-command.js';
 import type { CommandOutcome } from './run-command.js';
 import type { previewCandidateTree } from './candidate-tree.js';
@@ -62,13 +63,14 @@ interface GitRun {
   readonly stderr: string;
 }
 
-async function git(root: string, args: readonly string[], signal?: AbortSignal): Promise<GitRun> {
+async function git(root: string, args: readonly string[], signal?: AbortSignal, stdin?: string): Promise<GitRun> {
   const argv = ['git', ...args];
   const run = await runCommand({
     argv,
     cwd: root,
     env: childEnvironment({ GIT_TERMINAL_PROMPT: '0' }),
     timeoutMs: gitTimeoutMs,
+    ...(stdin === undefined ? {} : { stdin }),
     ...(signal === undefined ? {} : { signal }),
   });
   if (run.outcome.kind !== 'completed') {
@@ -94,6 +96,119 @@ async function gitOk(root: string, args: readonly string[], signal?: AbortSignal
 export async function isCleanRepository(root: string, signal?: AbortSignal): Promise<boolean> {
   const run = await gitOk(root, ['status', '--porcelain', '--untracked-files=all'], signal);
   return run.stdout.trim() === '';
+}
+
+/** Paths in Git's index beneath the supplied project-relative directories, including unchanged files. */
+export async function trackedPaths(root: string, directories: readonly string[], signal?: AbortSignal): Promise<string[]> {
+  if (directories.length === 0) return [];
+  const paths = directories.map(directory => {
+    validateProjectPath(directory);
+    return directory.endsWith('/') ? directory : `${directory}/`;
+  });
+  const run = await gitOk(root, ['--literal-pathspecs', 'ls-files', '--cached', '-z', '--', ...paths], signal);
+  return [...new Set(run.stdout.split('\0').filter(Boolean))].sort();
+}
+
+/** Git's deciding ignore rule, including a negating rule when it makes a path unignored. */
+export interface IgnoreRule {
+  readonly source: string;
+  readonly line: number;
+  readonly pattern: string;
+}
+
+/** One exact project-relative path and Git's answer about its ignore status. */
+export interface IgnoreStatus {
+  readonly path: string;
+  readonly ignored: boolean;
+  readonly rule: IgnoreRule | null;
+}
+
+/** Ask Git about paths as directories, even when a directory has not been created yet. */
+export async function ignoreStatus(root: string, paths: readonly string[], signal?: AbortSignal): Promise<IgnoreStatus[]> {
+  const answers: IgnoreStatus[] = [];
+  for (const path of paths) {
+    validateProjectPath(path);
+    let rule = await decidingIgnoreRule(root, path, signal);
+    // Git describes a negated directory pattern on the path without its
+    // trailing slash, although the slash is needed to check an absent directory.
+    if (rule === null && path.endsWith('/')) {
+      const bare = path.slice(0, -1);
+      rule = await decidingIgnoreRule(root, bare, signal);
+      if (rule === null) {
+        const isolated = await absentDirectoryRule(root, bare, signal);
+        // The real worktree alone decides ignored status. The isolated view
+        // can only identify a negation behind an actual nonmatch.
+        if (isolated?.pattern.startsWith('!')) rule = isolated;
+      }
+    }
+    answers.push({ path, ignored: rule !== null && !rule.pattern.startsWith('!'), rule });
+  }
+  return answers;
+}
+
+/**
+ * Git cannot name a negating directory rule while that directory is absent.
+ * Recreate only the ancestor ignore files and an empty directory in an
+ * isolated worktree view, keeping the real worktree untouched. Git still uses
+ * the repository's own info/exclude and configured global rules.
+ */
+async function absentDirectoryRule(root: string, path: string, signal?: AbortSignal): Promise<IgnoreRule | null> {
+  try {
+    if ((await lstat(join(root, path))).isDirectory()) return null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  const gitDir = (await gitOk(root, ['rev-parse', '--absolute-git-dir'], signal)).stdout.trim();
+  const topLevel = (await gitOk(root, ['rev-parse', '--show-toplevel'], signal)).stdout.trim();
+  const prefix = (await gitOk(root, ['rev-parse', '--show-prefix'], signal)).stdout.trim();
+  const fullPath = join(prefix, path);
+  const worktree = await mkdtemp(join(tmpdir(), 'ramify-ignore-'));
+  try {
+    const components = fullPath.split('/');
+    let ancestor = '';
+    for (const component of components) {
+      const source = join(topLevel, ancestor, '.gitignore');
+      const info = await lstat(source).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      });
+      if (info?.isFile()) {
+        const destination = join(worktree, ancestor, '.gitignore');
+        await mkdir(dirname(destination), { recursive: true });
+        await copyFile(source, destination);
+      }
+      ancestor = join(ancestor, component);
+    }
+    await mkdir(join(worktree, fullPath), { recursive: true });
+    return await decidingIgnoreRule(join(worktree, prefix), path, signal, [`--git-dir=${gitDir}`, `--work-tree=${worktree}`]);
+  } finally {
+    await rm(worktree, { recursive: true, force: true });
+  }
+}
+
+async function decidingIgnoreRule(root: string, path: string, signal?: AbortSignal, prefix: readonly string[] = []): Promise<IgnoreRule | null> {
+  const args = ['check-ignore', '--no-index', '--verbose', '--non-matching', '-z', '--stdin'];
+  const run = await git(root, [...prefix, ...args], signal, `${path}\0`);
+  if (run.exitCode !== 0 && run.exitCode !== 1) {
+    throw new GitError(`\`git check-ignore\` exited with ${run.exitCode}: ${run.stderr.trim()}`, {
+      argv: ['git', ...prefix, ...args],
+      outcome: { kind: 'completed', exitCode: run.exitCode },
+      output: `${run.stdout}${run.stderr}`.trim().slice(-2000),
+    });
+  }
+  const fields = run.stdout.split('\0');
+  if (fields.length !== 5 || fields[4] !== '' || fields[3] !== path) throw new Error(`Git gave an invalid ignore answer for ${path}`);
+  const [source, line, pattern] = fields as [string, string, string, string, string];
+  if (source === '' && line === '' && pattern === '') return null;
+  const number = Number.parseInt(line, 10);
+  if (!Number.isInteger(number) || number < 1) throw new Error(`Git gave an invalid ignore rule line for ${path}`);
+  return { source, line: number, pattern };
+}
+
+function validateProjectPath(path: string): void {
+  if (path === '' || path.startsWith('/') || path.includes('\\') || path.includes('\0') || path.split('/').some(part => part === '..' || part === '.')) {
+    throw new Error(`Git path must be project-relative without parent traversal: ${path}`);
+  }
 }
 
 /**
@@ -550,6 +665,8 @@ export async function inspectGit(root: string, request: GitInspection, signal?: 
  * the project's root explicit, just as the command adapter does.
  */
 export interface GitService {
+  readonly trackedPaths: typeof trackedPaths;
+  readonly ignoreStatus: typeof ignoreStatus;
   readonly previewCandidateTree: typeof previewCandidateTree;
   readonly currentHead: typeof currentHead;
   readonly isCleanRepository: typeof isCleanRepository;
@@ -568,6 +685,7 @@ export interface GitService {
 
 /** The process-backed adapter. Consumer tests should supply a scripted GitService. */
 export const gitService: GitService = {
+  trackedPaths, ignoreStatus,
   previewCandidateTree: async (projectRoot, signal) => (await import('./candidate-tree.js')).previewCandidateTree(projectRoot, signal),
   currentHead, isCleanRepository, createRunBranch, commitAccepted,
   findCommitByTrailer, findCommitByTrailers, changedPaths, changedEntries,
