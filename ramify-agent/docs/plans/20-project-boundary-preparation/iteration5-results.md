@@ -23,3 +23,13 @@ The probe found no moved-project layout error and no fixture source selected int
 - `git check-ignore -v` confirmed the root rule ignores root, harness and nested scenario `src/tmp/` examples. `git diff --cached --check` passed before the implementation commit.
 
 The complete suite and final full audit are reserved for the plan's final gate.
+
+## Final-audit regression repair
+
+Repair commit: `b36105dd`. The first plan final audit (`c218`) ran the complete suite and exposed four integration test files that predated scratch setup and safety checks. A targeted reproduction with `node_modules/.bin/vitest run subs/harness/src/tests/scenario-check-integration.test.ts subs/harness/src/tests/contract-delegation-integration.test.ts subs/harness/src/tests/fake-exposure-parity.test.ts subs/harness/src/tests/session-fixture.test.ts --maxWorkers=2` reproduced five failed tests and the HTTP fixture's timed-out setup. No fixture source path was missing.
+
+- `scenario-check-integration.test.ts` now supplies both empty tracked-path answers readiness requires before and during scratch cleanup. Its three failing acceptance cases reach their intended Cucumber checks again.
+- `contract-delegation-integration.test.ts` and `fake-exposure-parity.test.ts` now expect the successful `scratch-safety` gate rule alongside their existing parity rules.
+- The live HTTP session fixture passes its scripted Git through the standard copied-fixture scratch adapter. This lets the run reach its paced engineer while retaining the scripted Git record for its assertions.
+
+The first targeted rerun after these changes passed contract delegation and the HTTP session fixture. It exposed one further `scratch-safety` expectation in the fake's provider gate and a second tracked-path query during readiness. After those two corrections, a focused rerun of `scenario-check-integration.test.ts` and `fake-exposure-parity.test.ts` passed both files and all 16 tests. `npm run check:self` and `npm run type-check` passed after the repair, with zero structural errors or warnings. `git diff --cached --check` passed before commit. The parent owns the next complete final audit.
