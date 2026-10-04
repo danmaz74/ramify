@@ -1,6 +1,6 @@
 # Plan 20: project-boundary preparation under the current pins
 
-**Date:** 2026-10-04. **Status:** proposed; harness implementation not started.
+**Date:** 2026-10-04. **Status:** implemented. See [final results](final-results.md) for acceptance evidence and the full-audit reference.
 The user decisions below are accepted, and the obsolete `spikes/` tree was
 removed on 2026-10-04. The
 user asked for this plan on 2026-10-04: do in ramify-agent what the
