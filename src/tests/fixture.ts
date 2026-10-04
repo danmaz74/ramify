@@ -34,7 +34,7 @@ export async function invoke(root: string, argv: readonly string[], batch: Batch
 }
 
 /** The affected-module reference project: `example/app -> example/mid -> example/core`, where an arrow
- * means "depends on", an unrelated `example/lone`, and an unowned `docs/notes.md`. */
+ * means "depends on", an unrelated `example/lone`, and `docs/notes.md`, inert prose the root owns. */
 export const affectedFiles: Readonly<Record<string, string>> = {
   'module.ramify': 'ramify 1\nroot module example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
   'README.md': '# Example\n\nThe affected-module reference project.\n',

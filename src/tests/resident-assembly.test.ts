@@ -74,7 +74,7 @@ describe('resident analysis driver resolution lifetime', () => {
     // The fixture's `consumer` imports the root's exposed `value`: changing the root selects the consumer.
     const expected = { changedModules: [{ id: 'fixture', directory: '.' }], affectedModules: [{ id: 'fixture/consumer', directory: 'subs/consumer' }],
       testModules: [{ id: 'fixture', directory: '.' }, { id: 'fixture/consumer', directory: 'subs/consumer' }],
-      paths: [{ path: 'src/interfaces/api.ts', module: 'fixture', basis: 'inventory' }], selection: 'dependency-closure', widening: [] };
+      paths: [{ path: 'src/interfaces/api.ts', status: 'owned', module: 'fixture', basis: 'inventory', exclusion: null }], selection: 'dependency-closure', widening: [] };
     const project = { cwd: root, root, scope: 'whole-project' as const, configuration: 'discover' as const };
     const driver = createSessionDriver();
     try {

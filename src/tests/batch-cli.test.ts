@@ -205,14 +205,14 @@ describe('CLI with real batch sessions', () => {
   it('A7-11: affected --batch hands the seeds to the affected batch operation alone and never connects', () => affectedFixture(async root => {
     const invocations: AffectedBatchInvocation[] = [];
     const stdout: string[] = [];
-    const exitCode = await runCli(['affected', 'example/lone', '--path', 'subs/mid/src/interfaces/api.ts', '--path', 'docs/notes.md',
+    const exitCode = await runCli(['affected', 'example/lone', '--path', 'subs/mid/src/interfaces/api.ts', '--path', '../notes.md',
       '--batch', '--root', root, '--format', 'json'], { cwd: join(root, 'subs/lone'), version: '1', stdout: text => { stdout.push(text); },
       stderr: text => { throw new Error(text); }, connect: async () => { throw new Error('Unexpected daemon connection'); },
       batch: async () => { throw new Error('Unexpected check batch'); },
       affectedBatch: async (invocation, control) => { invocations.push(invocation); return runAffectedBatch(invocation, control); } });
     expect([exitCode, stdout.length]).toEqual([0, 1]);
     expect(invocations).toEqual([{ cwd: join(root, 'subs/lone'), root, modules: ['example/lone'],
-      paths: ['subs/mid/src/interfaces/api.ts', 'docs/notes.md'] }]);
+      paths: ['subs/mid/src/interfaces/api.ts', '../notes.md'] }]);
     const document = JSON.parse(stdout[0]!) as AffectedDocument;
     expect(document).toMatchObject({ mode: 'batch', root, revision: { sequence: null } });
     expect(document.selection).toMatchObject({ changedModules: [{ id: 'example/lone', directory: 'subs/lone' }, { id: 'example/mid', directory: 'subs/mid' }],

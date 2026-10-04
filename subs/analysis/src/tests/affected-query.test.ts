@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { affectedLimits, projectAffected } from '../affected-query.js';
 import type { AffectedFacts, AffectedProjection } from '../affected-query.js';
 import type { AffectedSelection } from '../interfaces/affected.js';
-import { access, chain, coverageGraph, diamondCycle, graphFacts, inventoryFile, isolated, note, origin, rootGraph, scope, selection,
+import type { ProjectExclusion } from '../../subs/project/src/interfaces/project.js';
+import { access, chain, coverageGraph, diamondCycle, graphFacts, inventoryFile, isolated, note, origin, rootGraph, selection,
   shimGraph } from './affected-fixtures.js';
 
 const seeds = (modules: readonly string[] = [], paths: readonly string[] = []) => ({ modules, paths });
@@ -19,6 +20,7 @@ const sub = (id: string) => ({ id, directory: `subs/${id}` });
 
 describe('affected-module projection: graph (A7-01)', () => {
   it('A7-01:chain: A->B->C seeded at C selects A and B as affected and A, B, C as tests', () => {
+    const { scope } = chain();
     expect(select(chain(), ['c'])).toEqual({
       schemaVersion: 'ramify.affected/2', inputId: 'input/1', paths: [],
       changedModules: [sub('c')], affectedModules: [sub('a'), sub('b')], testModules: [sub('a'), sub('b'), sub('c')],
@@ -54,8 +56,8 @@ describe('affected-module projection: graph (A7-01)', () => {
       edges: [['é', 'z'], ['a', 'z'], ['B', 'z']] });
     const result = select(facts, ['z', 'z'], ['subs/z/src/z.ts', 'subs/B/src/B.ts', 'subs/z/src/z.ts']);
     expect(result.paths).toEqual([
-      { path: 'subs/B/src/B.ts', module: 'B', basis: 'inventory' },
-      { path: 'subs/z/src/z.ts', module: 'z', basis: 'inventory' },
+      { path: 'subs/B/src/B.ts', status: 'owned', module: 'B', basis: 'inventory', exclusion: null },
+      { path: 'subs/z/src/z.ts', status: 'owned', module: 'z', basis: 'inventory', exclusion: null },
     ]);
     expect(ids(result.changedModules)).toEqual(['B', 'z']);
     expect(ids(result.affectedModules)).toEqual(['a', 'é']);
@@ -158,10 +160,12 @@ describe('affected-module projection: path seeds (A7-02)', () => {
   };
   const root = { id: 'r', directory: '.' }, a = { id: 'r/a', directory: 'subs/a' };
   const b = { id: 'r/b', directory: 'subs/b' }, c = { id: 'r/c', directory: 'subs/c' };
+  const owned = (path: string, module: string, basis: 'inventory' | 'declaration' | 'area' | 'containment', exclusion: ProjectExclusion | null = null) =>
+    ({ path, status: 'owned', module, basis, exclusion });
 
   it('A7-02:inventory-file: an inventoried source file seeds its owner', () => {
     const result = select(facts(), [], ['subs/b/src/b.ts']);
-    expect(result.paths).toEqual([{ path: 'subs/b/src/b.ts', module: 'r/b', basis: 'inventory' }]);
+    expect(result.paths).toEqual([owned('subs/b/src/b.ts', 'r/b', 'inventory')]);
     expect(result.changedModules).toEqual([b]);
     expect(result.affectedModules).toEqual([root, a]);
     expect(result.testModules).toEqual([root, a, b]);
@@ -170,82 +174,122 @@ describe('affected-module projection: path seeds (A7-02)', () => {
 
   it('A7-02:owned-test-file: a file under src/tests/ seeds its own module', () => {
     const result = select(facts(), [], ['subs/b/src/tests/b.test.ts']);
-    expect(result.paths).toEqual([{ path: 'subs/b/src/tests/b.test.ts', module: 'r/b', basis: 'inventory' }]);
+    expect(result.paths).toEqual([owned('subs/b/src/tests/b.test.ts', 'r/b', 'inventory')]);
     expect(result.changedModules).toEqual([b]);
     expect(result.affectedModules).toEqual([root, a]);
   });
 
   it('A7-02:declaration-file: <dir>/module.ramify seeds that module, and the root description seeds the root', () => {
     const result = select(facts(), [], ['subs/b/module.ramify', 'module.ramify']);
-    expect(result.paths).toEqual([
-      { path: 'module.ramify', module: 'r', basis: 'declaration' },
-      { path: 'subs/b/module.ramify', module: 'r/b', basis: 'declaration' },
-    ]);
+    expect(result.paths).toEqual([owned('module.ramify', 'r', 'declaration'), owned('subs/b/module.ramify', 'r/b', 'declaration')]);
     expect(result.changedModules).toEqual([root, b]);
     expect(result.affectedModules).toEqual([a]);
   });
 
   it('A7-02:readme: <dir>/README.md seeds that module with basis declaration', () => {
     expect(select(facts(), [], ['subs/c/README.md', 'README.md']).paths).toEqual([
-      { path: 'README.md', module: 'r', basis: 'declaration' },
-      { path: 'subs/c/README.md', module: 'r/c', basis: 'declaration' },
-    ]);
+      owned('README.md', 'r', 'declaration'), owned('subs/c/README.md', 'r/c', 'declaration')]);
   });
 
   it('A7-02:area-fixture: a non-inventoried path under an area root seeds its owner with basis area', () => {
     const result = select(facts(), [], ['subs/b/src/tests/fixtures/input.json', 'src/tests/fixtures/root.json']);
     expect(result.paths).toEqual([
-      { path: 'src/tests/fixtures/root.json', module: 'r', basis: 'area' },
-      { path: 'subs/b/src/tests/fixtures/input.json', module: 'r/b', basis: 'area' },
-    ]);
+      owned('src/tests/fixtures/root.json', 'r', 'area'), owned('subs/b/src/tests/fixtures/input.json', 'r/b', 'area')]);
     expect(result.changedModules).toEqual([root, b]);
   });
 
-  it('A7-02:area-fixture boundary: an area root matches whole path segments only', () => {
-    // a's area is subs/a/src and ab's is subs/ab/src.
-    const result = select(graphFacts({ modules: { a: 'subs/a', ab: 'subs/ab' } }), [], ['subs/ab/src/new.ts', 'subs/abc/x.ts', 'subs/a']);
+  it('A7-02:area-fixture boundary: an area root matches whole path segments only; other owned paths resolve by containment', () => {
+    // a's area is subs/a/src and ab's is subs/ab/src; subs/ab/srcx lies in ab outside its areas.
+    const result = select(graphFacts({ modules: { a: 'subs/a', ab: 'subs/ab' } }), [], ['subs/ab/src/new.ts', 'subs/ab/srcx/x.ts', 'subs/a']);
     expect(result.paths).toEqual([
-      { path: 'subs/a', module: null, basis: 'none' },
-      { path: 'subs/ab/src/new.ts', module: 'ab', basis: 'area' },
-      { path: 'subs/abc/x.ts', module: null, basis: 'none' },
-    ]);
-    expect(result.changedModules).toEqual([sub('ab')]);
+      owned('subs/a', 'a', 'containment'), owned('subs/ab/src/new.ts', 'ab', 'area'), owned('subs/ab/srcx/x.ts', 'ab', 'containment')]);
+    expect(result.changedModules).toEqual([sub('a'), sub('ab')]);
     expect(result.affectedModules).toEqual([]);
     expect(result.testModules).toEqual([sub('a'), sub('ab')]);
-    expect(result.selection).toBe('all-modules');
-    expect(result.widening).toEqual(['unowned-path']);
+    expect(result.selection).toBe('dependency-closure');
+    expect(result.widening).toEqual([]);
   });
 
   it('A7-02:deleted-file: a missing, non-inventoried path in an area seeds that module and keeps the closure', () => {
     const result = select(facts(), [], ['subs/a/src/removed.ts']);
-    expect(result.paths).toEqual([{ path: 'subs/a/src/removed.ts', module: 'r/a', basis: 'area' }]);
+    expect(result.paths).toEqual([owned('subs/a/src/removed.ts', 'r/a', 'area')]);
     expect(result.changedModules).toEqual([a]);
     expect(result.affectedModules).toEqual([]);
     expect(result.testModules).toEqual([a]);
     expect(result.selection).toBe('dependency-closure');
   });
 
-  it('A7-02:unowned-root-file: package.json has no module and widens while keeping the known seeds and closure', () => {
+  it('A7-02:unowned-root-file: package.json is the root\'s by containment and selects the root\'s closure without widening', () => {
     const result = select(facts(), [], ['package.json', 'subs/b/src/b.ts']);
+    expect(result.paths).toEqual([owned('package.json', 'r', 'containment'), owned('subs/b/src/b.ts', 'r/b', 'inventory')]);
+    expect(result.changedModules).toEqual([root, b]);
+    expect(result.affectedModules).toEqual([a]);
+    expect(result.testModules).toEqual([root, a, b]);
+    expect(result.selection).toBe('dependency-closure');
+    expect(result.widening).toEqual([]);
+  });
+
+  it('A7-02:docs-path: documentation and loose files belong to their nearest module and select no descendant by ancestry', () => {
+    const result = select(facts(), [], ['docs/notes.md', 'subs/c/tests/loose.ts', '.']);
     expect(result.paths).toEqual([
-      { path: 'package.json', module: null, basis: 'none' },
-      { path: 'subs/b/src/b.ts', module: 'r/b', basis: 'inventory' },
-    ]);
+      owned('.', 'r', 'containment'), owned('docs/notes.md', 'r', 'containment'), owned('subs/c/tests/loose.ts', 'r/c', 'containment')]);
+    // a imports the root, so it is affected; b and c are descendants of the root and are not.
+    expect(result.changedModules).toEqual([root, c]);
+    expect(result.affectedModules).toEqual([a]);
+    expect(result.testModules).toEqual([root, a, c]);
+    expect(result).toMatchObject({ selection: 'dependency-closure', widening: [] });
+  });
+
+  it('a path in a scratch directory is its module\'s by containment, inside that module\'s area root', () => {
+    const result = select(facts(), [], ['subs/b/src/tmp/new.ts']);
+    expect(result.paths).toEqual([owned('subs/b/src/tmp/new.ts', 'r/b', 'containment', { kind: 'scratch', directory: 'subs/b/src/tmp', owner: 'r/b' })]);
+    expect(result).toMatchObject({ changedModules: [b], affectedModules: [root, a], testModules: [root, a, b], selection: 'dependency-closure', widening: [] });
+  });
+
+  it('a path in an owned-ignored tree selects its owner; a path in an external tree selects nothing and does not widen', () => {
+    const base = facts();
+    const ownership = { ...base.scope.ownership, exclusions: [...base.scope.ownership.exclusions,
+      { kind: 'external' as const, directory: 'external-project', owner: null },
+      { kind: 'owned-ignored' as const, directory: 'subs/a/fixtures/sample', owner: 'r/a' }] };
+    const scope = { ...base.scope, ownership };
+    const declared: AffectedFacts = { ...base, scope, inventory: { ...base.inventory, scope } };
+    const ignored = { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'r/a' } as const;
+    const result = select(declared, [], ['subs/a/fixtures/sample/src/world.ts', 'subs/a/fixtures/sample/module.ramify',
+      'external-project/file.ts', 'external-project']);
+    expect(result.paths).toEqual([
+      { path: 'external-project', status: 'excluded', module: null, basis: 'excluded', exclusion: ownership.exclusions.at(-2) },
+      { path: 'external-project/file.ts', status: 'excluded', module: null, basis: 'excluded', exclusion: ownership.exclusions.at(-2) },
+      owned('subs/a/fixtures/sample/module.ramify', 'r/a', 'containment', ignored),
+      owned('subs/a/fixtures/sample/src/world.ts', 'r/a', 'containment', ignored)]);
+    expect(result).toMatchObject({ changedModules: [a], affectedModules: [], testModules: [a], selection: 'dependency-closure', widening: [] });
+  });
+
+  it('a reserved path selects nothing with its excluded basis and unowned exclusion, wherever the segment occurs', () => {
+    const result = select(facts(), [], ['node_modules/sample/index.ts', 'subs/a/src/.ramify/index.json', '.git/HEAD',
+      'subs/c/node_modules/x']);
+    expect(result.paths).toEqual([
+      { path: '.git/HEAD', status: 'excluded', module: null, basis: 'excluded', exclusion: { kind: 'repository', directory: '.git', owner: null } },
+      { path: 'node_modules/sample/index.ts', status: 'excluded', module: null, basis: 'excluded',
+        exclusion: { kind: 'packages', directory: 'node_modules', owner: null } },
+      { path: 'subs/a/src/.ramify/index.json', status: 'excluded', module: null, basis: 'excluded',
+        exclusion: { kind: 'generated', directory: 'subs/a/src/.ramify', owner: null } },
+      { path: 'subs/c/node_modules/x', status: 'excluded', module: null, basis: 'excluded',
+        exclusion: { kind: 'packages', directory: 'subs/c/node_modules', owner: null } }]);
+    expect(result).toMatchObject({ changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure', widening: [] });
+  });
+
+  it('A7-02:outside-path: only a path outside the project, written with leading "..", widens, keeping the known seeds and closure', () => {
+    const result = select(facts(), [], ['../outside.ts', '..', '../../elsewhere/x.ts', 'subs/b/src/b.ts', 'node_modules/x.ts']);
+    expect(result.paths).toEqual([
+      { path: '..', status: 'outside-project', module: null, basis: 'none', exclusion: null },
+      { path: '../../elsewhere/x.ts', status: 'outside-project', module: null, basis: 'none', exclusion: null },
+      { path: '../outside.ts', status: 'outside-project', module: null, basis: 'none', exclusion: null },
+      { path: 'node_modules/x.ts', status: 'excluded', module: null, basis: 'excluded', exclusion: { kind: 'packages', directory: 'node_modules', owner: null } },
+      owned('subs/b/src/b.ts', 'r/b', 'inventory')]);
     expect(result.changedModules).toEqual([b]);
     expect(result.affectedModules).toEqual([root, a]);
     expect(result.testModules).toEqual([root, a, b, c]);
     expect(result.selection).toBe('all-modules');
-    expect(result.widening).toEqual(['unowned-path']);
-  });
-
-  it('A7-02:docs-path: a documentation path has no module and widens', () => {
-    const result = select(facts(), [], ['docs/notes.md', 'subs/b/tests/loose.ts']);
-    expect(result.paths).toEqual([
-      { path: 'docs/notes.md', module: null, basis: 'none' },
-      { path: 'subs/b/tests/loose.ts', module: null, basis: 'none' },
-    ]);
-    expect(result.changedModules).toEqual([]);
-    expect(result.testModules).toEqual([root, a, b, c]);
     expect(result.widening).toEqual(['unowned-path']);
   });
 
@@ -255,11 +299,20 @@ describe('affected-module projection: path seeds (A7-02)', () => {
     }
   });
 
-  it('A7-02:dotdot-rejected: a "..", "." or empty segment or a backslash is invalid-query', () => {
-    for (const path of ['subs/a/../b/src/b.ts', '../outside.ts', './src/r.ts', 'subs//b/src/b.ts', 'subs/b/', 'subs\\b\\src\\b.ts']) {
+  it('A7-02:dotdot-rejected: an interior ".." segment, a "." or empty segment or a backslash is invalid-query', () => {
+    for (const path of ['subs/a/../b/src/b.ts', 'subs/..', '../a/./b', '../', './src/r.ts', 'subs//b/src/b.ts', 'subs/b/', 'subs\\b\\src\\b.ts']) {
       expect(projectAffected(facts(), seeds([], [path]), affectedLimits), path)
         .toMatchObject({ status: 'unavailable', reason: 'invalid-query' });
     }
+  });
+
+  it('a scope whose ownership names a module the inventory lacks is invalid-current, never a guessed answer', () => {
+    const base = facts();
+    const ownership = { ...base.scope.ownership, modules: [...base.scope.ownership.modules, { id: 'r/d', parent: 'r', directory: 'subs/d' }] };
+    const scope = { ...base.scope, ownership };
+    expect(projectAffected({ ...base, scope }, seeds([], ['subs/d/x.ts']), affectedLimits))
+      .toMatchObject({ status: 'unavailable', reason: 'invalid-current' });
+    expect(projectAffected({ ...base, scope }, seeds([], ['subs/c/x.ts']), affectedLimits).status).toBe('answered');
   });
 });
 
@@ -284,8 +337,10 @@ describe('affected-module projection: coverage (A7-04)', () => {
 
   it('a boundary import into an owned-ignored tree, which carries no note, still depends on the tree\'s owner', () => {
     // Project-boundary iteration 11: the import is a definite finding without a
-    // coverage note, so it widens nothing; its edge to the owner keeps the
-    // importer selected. An external tree has no owner and adds no edge.
+    // coverage note, so it widens nothing. Iteration 14: a path in an
+    // owned-ignored tree is its owner's, and a seed there selects the owner and
+    // its importers, so the importer of that path depends on the owner. An
+    // external tree has no owner and adds no edge.
     const consumer = origin('subs/b/src/b.ts', 'b');
     const facts = graphFacts({ modules: { a: 'subs/a', b: 'subs/b', c: 'subs/c' }, accesses: [
       access(consumer, { kind: 'nested-tree', file: 'subs/a/fixtures/sample/index.ts',
@@ -295,7 +350,32 @@ describe('affected-module projection: coverage (A7-04)', () => {
     ] });
     expect(select(facts, ['a'])).toMatchObject({ changedModules: [sub('a')], affectedModules: [sub('b')],
       testModules: [sub('a'), sub('b')], selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] } });
+    expect(select(facts, [], ['subs/a/fixtures/sample/index.ts'])).toMatchObject({ changedModules: [sub('a')], affectedModules: [sub('b')] });
     expect(select(facts, ['c'])).toMatchObject({ affectedModules: [], testModules: [sub('c')], widening: [] });
+  });
+
+  it('an import of a scratch file depends on the scratch directory\'s owner; other excluded targets add no edge', () => {
+    // A scratch path is its module's, like an owned-ignored one. The import's
+    // excluded-target note still makes coverage partial, so the closure is
+    // reported and the test selection widens.
+    const excluded = note('excluded-target', 'subs/b/src/b.ts');
+    const facts = graphFacts({ modules: { a: 'subs/a', b: 'subs/b', c: 'subs/c' }, coverage: [excluded, note('excluded-target', 'subs/c/src/c.ts')],
+      accesses: [
+        access(origin('subs/b/src/b.ts', 'b'), { kind: 'excluded', file: 'subs/a/src/tmp/scratch.ts',
+          exclusion: { kind: 'scratch', directory: 'subs/a/src/tmp', owner: 'a' } }),
+        access(origin('subs/c/src/c.ts', 'c'), { kind: 'excluded', file: 'dist/a.js', exclusion: { kind: 'output', directory: 'dist', owner: null } }),
+      ] });
+    expect(select(facts, [], ['subs/a/src/tmp/scratch.ts'])).toMatchObject({ changedModules: [sub('a')], affectedModules: [sub('b')],
+      testModules: [sub('a'), sub('b'), sub('c')], selection: 'all-modules', widening: ['partial-coverage'] });
+    expect(select(facts, ['c'])).toMatchObject({ changedModules: [sub('c')], affectedModules: [] });
+  });
+
+  it('partial coverage widens whatever the seeds are; an excluded seed cannot hide it', () => {
+    const dynamic = note('nonliteral-target', 'subs/d/src/d.ts');
+    expect(select(coverageGraph(dynamic), [], ['node_modules/x/index.ts', 'subs/c/src/tmp/new.ts'])).toMatchObject({
+      paths: [{ path: 'node_modules/x/index.ts', status: 'excluded' }, { path: 'subs/c/src/tmp/new.ts', status: 'owned', module: 'c' }],
+      changedModules: [sub('c')], affectedModules: [sub('a'), sub('b')], testModules: [sub('a'), sub('b'), sub('c'), sub('d')],
+      selection: 'all-modules', widening: ['partial-coverage'], coverage: { status: 'partial', notes: [dynamic] } });
   });
 
   it('A7-04:signature-only-complete: owner-known notes keep coverage complete and return every note in report order', () => {

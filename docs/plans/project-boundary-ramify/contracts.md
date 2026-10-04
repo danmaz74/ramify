@@ -197,10 +197,11 @@ fact; ordinary ownership does not prove a path was inventoried or checked.
 `InventoryModule` retains its existing source areas and description. Its nested
 trees are obtained by joining the scope's ownership facts; do not keep a second
 independently computed boundary table. `InventoryFile` adds
-`placement: 'src' | 'auxiliary' | 'referenced-resource'`. Auxiliary means owned
-compiler source outside `src/` only, with ordinary classification. A referenced
-resource outside `src/` has an ordinary owner/profile but is not auxiliary code.
-Inventory descriptions, READMEs, compiler source, configuration, required package
+`placement: 'src' | 'auxiliary'`. Auxiliary means owned
+compiler source outside `src/` only, with ordinary classification. Phase 1
+produces no placement for a resource outside `src/`: source importing one keeps
+a nonblocking `resource-target` limit, and bytes the compiler reads stay
+captured inputs. Inventory descriptions, READMEs, compiler source, configuration, required package
 metadata and referenced resources only. Inert docs/data and excluded contents
 are never application inputs, per-file hashes or per-file watch targets.
 Only auxiliary compiler source is newly added by the base inventory walk.

@@ -26,7 +26,8 @@ export function formatAffected(document: AffectedDocument): string {
   const notes = selection.coverage.notes.length;
   return `Root: ${document.root}\nMode: ${document.mode}\nRevision: ${sequence}, input ${document.revision.inputId}\n`
     + `Selection: ${selection.selection}${selection.widening.length ? ` (widened: ${selection.widening.join(', ')})` : ''}\n`
-    + selection.paths.map(seed => `Path ${seed.path}: ${seed.module ?? 'no module'} (${seed.basis})\n`).join('')
+    + selection.paths.map(seed => `Path ${seed.path}: ${seed.module ?? 'no module'} (${seed.basis}`
+      + `${seed.exclusion ? `, ${seed.exclusion.kind} ${seed.exclusion.directory}` : ''})\n`).join('')
     + moduleList('Changed modules', selection.changedModules)
     + moduleList('Affected modules', selection.affectedModules)
     + moduleList('Test modules', selection.testModules)

@@ -250,7 +250,7 @@ modules, 1 for an invalid project, an unknown module ID or an invalid seed,
 2 when unavailable, pending, cold, superseded or past a deadline, and 130 when
 interrupted. `--changed`, `--since` and `--deadline` do not apply.
 
-When project boundaries are implemented, `ramify affected` answers every path
+`ramify affected` answers every path
 seed by containment under the current declarations, without an inventory entry
 or a filesystem read, so absent, new and deleted paths and both sides of a
 rename resolve. Each path seed states whether the path is owned, excluded or
@@ -259,8 +259,10 @@ including one in an owned-ignored tree or a scratch directory, selects its
 owner and that owner's transitive importers. A path in an external tree or
 another always-excluded path selects nothing. Only a path outside the project,
 written with a leading `../`, widens the answer to all modules; any other
-malformed seed is an invalid seed. The answer carries the revision's whole
-ownership topology. These answers use `ramify.affected-cli/2`, carrying a
+malformed seed is an invalid seed. The selection's scope carries the
+revision's whole ownership topology: its modules and their rooted exclusions,
+while repository, package and generated segments are excluded wherever they
+occur. These answers use `ramify.affected-cli/2`, carrying a
 `ramify.affected/2` selection.
 
 ### Hook and complete checks

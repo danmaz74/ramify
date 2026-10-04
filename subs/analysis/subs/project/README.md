@@ -64,9 +64,9 @@ Compiler-selected source inside an owned-ignored tree or a module's scratch
 directory produces one `compiler-selected-owned-ignored` or
 `compiler-selected-scratch` warning per tree or directory, located there; such a
 file is neither inventoried nor read, and selected files in an external tree
-produce no warning. Each inventory file records its `placement`: `src`,
-`auxiliary` or `referenced-resource`. Owned compiler source outside every
-`src/`, selected or not and including loose source beneath `subs/`, is its
+produce no warning. Each inventory file records its `placement`: `src` or
+`auxiliary`. Owned compiler source outside every `src/`, selected or not and
+including loose source beneath `subs/`, is its
 nearest module's auxiliary source with that owner's ordinary area. A `.js`,
 `.jsx`, `.mjs` or `.cjs` file there is compiler source only when the
 configuration admits JavaScript (`allowJs`, which defaults to `checkJs`). Every

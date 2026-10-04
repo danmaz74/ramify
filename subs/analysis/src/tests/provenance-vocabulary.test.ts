@@ -24,9 +24,11 @@ const origins: readonly SourceOrigin[] = [
 ];
 // @ts-expect-error every origin states whether it is auxiliary
 const unstated: SourceOrigin = { file: 'src/main.ts', area: ordinary };
-const placements: readonly InventoryFile['placement'][] = ['src', 'auxiliary', 'referenced-resource'];
-// @ts-expect-error placement is one of the three reviewed values
+const placements: readonly InventoryFile['placement'][] = ['src', 'auxiliary'];
+// @ts-expect-error placement is one of the two reviewed values
 const outsidePlacement: InventoryFile['placement'] = 'outside';
+// @ts-expect-error no stage produces a referenced-resource placement
+const resourcePlacement: InventoryFile['placement'] = 'referenced-resource';
 // @ts-expect-error every inventory file states its placement
 const unplaced: InventoryFile = { path: 'src/main.ts', owner: 'fixture', area: 'ordinary', kind: 'source', sha256: '0'.repeat(64), bytes: 1 };
 const targets: readonly SourceTarget[] = [
@@ -102,8 +104,8 @@ function snapshotOrigins(value: AnalysisReport): SourceOrigin[] {
 
 describe('auxiliary provenance vocabulary', () => {
   it('types origins, placements and boundary targets', () => {
-    expect([origins.length, placements.length, targets.length]).toEqual([2, 3, 8]);
-    expect([unstated, outsidePlacement, unplaced, renamed, scratchTree, declaredExcluded, bareTree]).toHaveLength(7);
+    expect([origins.length, placements.length, targets.length]).toEqual([2, 2, 8]);
+    expect([unstated, outsidePlacement, resourcePlacement, unplaced, renamed, scratchTree, declaredExcluded, bareTree]).toHaveLength(8);
   });
 
   it('gives files beneath src/ src placement and false flags, and the loose root file auxiliary placement and true flags', async () => {

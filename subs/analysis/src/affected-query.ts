@@ -1,6 +1,7 @@
-import type { ProjectInventory, ProjectScope } from '../subs/project/src/interfaces/project.js';
+import type { InventoryArea, PathOwnership, ProjectInventory, ProjectScope } from '../subs/project/src/interfaces/project.js';
+import { classifyProjectPath } from '../subs/project/src/ownership.js';
 import type { SourceAccess, SourceLimit } from '../subs/typescript/src/interfaces/source.js';
-import type { AffectedModule, AffectedPathBasis, AffectedPathSeed, AffectedSelection, AffectedWideningReason,
+import type { AffectedModule, AffectedPathSeed, AffectedSelection, AffectedWideningReason,
   SessionAffectedOutcome } from './interfaces/affected.js';
 import type { RunControl } from './interfaces/analysis.js';
 import { byteOrder, locatedOrder } from './report.js';
@@ -61,19 +62,15 @@ export function assembleAffectedFacts(facts: SessionFacts, inputId: string, scop
   return { inventory: facts.inventory, accesses, shims, coverage: [...notes.values()].sort(locatedOrder), scope, inputId, analysisCheck };
 }
 
-/** A path is project-relative and `/`-separated, without empty, `.` or `..` segments. */
-function pathProblem(path: string): string | null {
-  if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) return `Path ${JSON.stringify(path)} is absolute`;
-  if (path.includes('\\')) return `Path ${JSON.stringify(path)} contains a backslash`;
-  for (const segment of path.split('/')) {
-    if (segment === '' || segment === '.' || segment === '..') return `Path ${JSON.stringify(path)} has an empty, "." or ".." segment`;
-  }
-  return null;
-}
-
-/** Validate both seed lists; returns their distinct values or the reason they are invalid. */
-function validateSeeds(seeds: { readonly modules: unknown; readonly paths: unknown }):
-  { readonly modules: readonly string[]; readonly paths: readonly string[] } | string {
+type Classified = Exclude<PathOwnership, { readonly status: 'invalid-path' }>;
+/**
+ * Validate both seed lists and classify each distinct path against the scope's
+ * ownership; returns the distinct modules and classified paths, or the reason
+ * the seeds are invalid. A path is canonical project-relative, `'.'` for the
+ * root, or such a path after leading `..` segments, which is outside the project.
+ */
+function validateSeeds(seeds: { readonly modules: unknown; readonly paths: unknown }, scope: ProjectScope):
+  { readonly modules: readonly string[]; readonly paths: ReadonlyMap<string, Classified> } | string {
   const { modules, paths } = seeds;
   if (!Array.isArray(modules) || !Array.isArray(paths)) return 'Seed modules and paths must be arrays of nonempty strings';
   if (modules.length + paths.length > maximumAffectedSeeds) {
@@ -82,25 +79,30 @@ function validateSeeds(seeds: { readonly modules: unknown; readonly paths: unkno
   for (const value of [...modules, ...paths]) {
     if (typeof value !== 'string' || value === '') return 'Seed modules and paths must be arrays of nonempty strings';
   }
+  const classified = new Map<string, Classified>();
   for (const path of paths as string[]) {
-    const problem = pathProblem(path);
-    if (problem) return problem;
+    if (classified.has(path)) continue;
+    const ownership = classifyProjectPath(scope, path);
+    if (ownership.status === 'invalid-path') return ownership.message;
+    classified.set(path, ownership);
   }
-  return { modules: [...new Set(modules as string[])], paths: [...new Set(paths as string[])] };
+  return { modules: [...new Set(modules as string[])], paths: classified };
 }
 
 /**
  * Select the modules affected by the given seeds from one revision's facts.
  * Builds one temporary reverse module graph, traverses it once from every seed
- * and discards it. Unknown module IDs fail the whole query; an unowned path or
+ * and discards it. Path seeds resolve by the scope's ownership without an
+ * inventory entry or a read, so absent, new and deleted paths resolve alike.
+ * Unknown module IDs fail the whole query; a path outside the project or
  * partial coverage widens the test selection to every module while the seeds
- * and their closure are still reported.
+ * and their closure are still reported. Ownership alone selects no descendant.
  */
 export function projectAffected(facts: AffectedFacts, seeds: { readonly modules: readonly string[]; readonly paths: readonly string[] },
   limits: AffectedLimits, control: RunControl = {}): AffectedProjection {
   const signal = control.signal;
   if (signal?.aborted) return { status: 'cancelled' };
-  const valid = validateSeeds(seeds);
+  const valid = validateSeeds(seeds, facts.scope);
   if (typeof valid === 'string') return unavailable('invalid-query', valid);
   const { inventory } = facts;
   const modules = new Map(inventory.modules.map(module => [module.id, module]));
@@ -110,27 +112,35 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
     return unavailable('resource-limit', `The inventory has ${modules.size} modules; a query supports at most ${limits.maxModules}`);
   }
 
-  // Path seeds: an inventoried file, a module's declaration or README, a path in a module's area, or none.
+  // Path seeds by the scope's ownership, which reads nothing: an owned path outside
+  // every exclusion resolves by its inventory entry, its module's description or
+  // README, or one of its module's areas, else by containment, as does an owned
+  // path in an owned-ignored tree or a scratch directory. An excluded path and a
+  // path outside the project name no module.
   const fileOwners = new Map(inventory.files.map(file => [file.path, file.owner]));
   const declarations = new Map<string, string>();
+  const areas = new Map<string, readonly InventoryArea[]>();
   for (const module of inventory.modules) {
     const prefix = module.directory === '.' ? '' : `${module.directory}/`;
     declarations.set(`${prefix}module.ramify`, module.id);
     declarations.set(`${prefix}README.md`, module.id);
+    areas.set(module.id, module.areas);
   }
-  const areas = inventory.modules.flatMap(module => module.areas);
-  const resolvePath = (path: string): AffectedPathSeed => {
-    const owner = fileOwners.get(path);
-    if (owner !== undefined) return seed(path, owner, 'inventory');
-    const declared = declarations.get(path);
-    if (declared !== undefined) return seed(path, declared, 'declaration');
-    let area: { readonly owner: string; readonly root: string } | null = null;
-    for (const candidate of areas) {
-      if ((path === candidate.root || path.startsWith(`${candidate.root}/`)) && (!area || candidate.root.length > area.root.length)) area = candidate;
-    }
-    return area ? seed(path, area.owner, 'area') : seed(path, null, 'none');
+  const resolvePath = (path: string, ownership: Classified): AffectedPathSeed => {
+    if (ownership.status === 'outside-project') return { path, status: 'outside-project', module: null, basis: 'none', exclusion: null };
+    if (ownership.status === 'excluded') return { path, status: 'excluded', module: null, basis: 'excluded', exclusion: ownership.exclusion };
+    const { module, exclusion } = ownership;
+    const basis = exclusion !== null ? 'containment'
+      : fileOwners.get(path) === module ? 'inventory'
+        : declarations.get(path) === module ? 'declaration'
+          : (areas.get(module) ?? []).some(area => path === area.root || path.startsWith(`${area.root}/`)) ? 'area' : 'containment';
+    return { path, status: 'owned', module, basis, exclusion };
   };
-  const pathSeeds = [...valid.paths].sort(byteOrder).map(resolvePath);
+  const pathSeeds = [...valid.paths.entries()].sort(([a], [b]) => byteOrder(a, b)).map(([path, ownership]) => resolvePath(path, ownership));
+  const strangers = pathSeeds.flatMap(path => path.module !== null && !modules.has(path.module) ? [path.module] : []);
+  if (strangers.length) {
+    return unavailable('invalid-current', `The scope's ownership names modules the inventory lacks: ${[...new Set(strangers)].sort(byteOrder).join(', ')}`);
+  }
   const seedIds = new Set(valid.modules);
   for (const path of pathSeeds) if (path.module !== null) seedIds.add(path.module);
 
@@ -153,9 +163,9 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
     if (++visited % cancellationStride === 0 && signal?.aborted) return { status: 'cancelled' };
     const consumer = access.importer.area.owner;
     if (access.target.kind === 'application' && !depend(consumer, access.target.origin.area.owner)) return edgeLimit();
-    // An import into an owned-ignored tree is a boundary finding without a
-    // limit to widen the answer; it still depends on the tree's owner.
-    if (access.target.kind === 'nested-tree' && access.target.exclusion.owner !== null
+    // A path in an owned-ignored tree or a scratch directory is its owner's,
+    // although its contents are not analyzed: an import of it depends on the owner.
+    if ((access.target.kind === 'nested-tree' || access.target.kind === 'excluded') && access.target.exclusion.owner !== null
       && !depend(consumer, access.target.exclusion.owner)) return edgeLimit();
     for (const selection of access.selections) {
       if (selection.original && !depend(consumer, selection.original.owner)) return edgeLimit();
@@ -185,7 +195,8 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
   const partial = facts.coverage.some(note => !ownerKnownCodes.has(note.code));
   const widening: AffectedWideningReason[] = [];
   if (partial) widening.push('partial-coverage');
-  if (pathSeeds.some(path => path.basis === 'none')) widening.push('unowned-path');
+  // Only a path outside the project is unowned; an excluded path selects nothing and widens nothing.
+  if (pathSeeds.some(path => path.status === 'outside-project')) widening.push('unowned-path');
   widening.sort(byteOrder);
   const listed = (ids: Iterable<string>): AffectedModule[] => [...ids].sort(byteOrder)
     .map(id => ({ id, directory: modules.get(id)!.directory }));
@@ -199,5 +210,3 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
     analysisCheck: facts.analysisCheck,
   } };
 }
-
-const seed = (path: string, module: string | null, basis: AffectedPathBasis): AffectedPathSeed => ({ path, module, basis });

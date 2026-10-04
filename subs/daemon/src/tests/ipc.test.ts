@@ -368,12 +368,13 @@ import { createMeasureDriver } from './measure-driver.js';
       if (!socket.ok || socket.value.status !== 'answered' || !direct.ok || direct.value.status !== 'answered') {
         throw new Error(JSON.stringify([socket, direct]));
       }
-      // The one-module fixture: the seed module changed, nothing depends on it, and the unowned
-      // manifest path widens the test selection to every module.
+      // The one-module fixture: the seed module changed and nothing depends on it. The root owns
+      // the manifest by containment, so the path seeds the root and nothing widens.
       const root = { id: 'example', directory: '.' };
       expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/2',
-        paths: [{ path: 'package.json', module: null, basis: 'none' }, { path: 'src/index.ts', module: 'example', basis: 'inventory' }],
-        changedModules: [root], affectedModules: [], testModules: [root], selection: 'all-modules', widening: ['unowned-path'],
+        paths: [{ path: 'package.json', status: 'owned', module: 'example', basis: 'containment', exclusion: null },
+          { path: 'src/index.ts', status: 'owned', module: 'example', basis: 'inventory', exclusion: null }],
+        changedModules: [root], affectedModules: [], testModules: [root], selection: 'dependency-closure', widening: [],
         analysisCheck: 'passed' });
       expect(socket.value.revision).toEqual(direct.value.revision);
       expect(socket.value.result).toEqual(direct.value.result);

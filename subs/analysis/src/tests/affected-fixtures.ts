@@ -9,8 +9,19 @@ import type { AffectedFacts } from '../affected-query.js';
  * `consumer -> provider` is one access from the consumer's file to the
  * provider's file. Expected answers are written by hand in the tests.
  */
-export const scope: ProjectScope = { root: '/project', selection: 'given', invokedFrom: '/project', configuration: 'tsconfig.json',
-  walkedAreas: [], ownership: { modules: [], exclusions: [] } };
+const byteOrder = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+/**
+ * The scope of a fixture: its modules' ownership table, with each module's
+ * scratch directory and no declared tree, in the classifier's byte order.
+ */
+export function scopeOf(modules: readonly Pick<InventoryModule, 'id' | 'parent' | 'directory'>[]): ProjectScope {
+  const owners = modules.map(({ id, parent, directory }) => ({ id, parent, directory }))
+    .sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.id, b.id));
+  const exclusions = owners.map(owner => ({ kind: 'scratch' as const, directory: `${sourceRoot(owner.directory)}/tmp`, owner: owner.id }))
+    .sort((a, b) => byteOrder(a.directory, b.directory));
+  return { root: '/project', selection: 'given', invokedFrom: '/project', configuration: 'tsconfig.json', walkedAreas: [],
+    ownership: { modules: owners, exclusions } };
+}
 
 const location = (file: string) => ({ file, start: 0, end: 1, line: 1, column: 1 });
 const sourceRoot = (directory: string): string => directory === '.' ? 'src' : `${directory}/src`;
@@ -84,6 +95,7 @@ export function graphFacts(spec: GraphSpec): AffectedFacts {
     access(origin(fileOf(consumer), consumer), { kind: 'application', origin: origin(fileOf(provider), provider) },
       [selection({ owner: provider, file: fileOf(provider) })]));
   const files = [...modules.map(module => inventoryFile(sourceFile(module), module.id)), ...spec.files ?? []];
+  const scope = scopeOf(modules);
   const inventory: ProjectInventory = { scope, modules, files, references: [], warnings: [] };
   return { inventory, accesses: [...edgeAccesses, ...spec.accesses ?? []], shims: spec.shims ?? [], coverage: spec.coverage ?? [],
     scope, inputId: 'input/1', analysisCheck: spec.analysisCheck ?? 'passed' };

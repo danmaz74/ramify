@@ -56,14 +56,17 @@ without it, measure prints a short exact/subtree table. It is a synchronized,
 whole-project daemon query: it writes nothing and never falls back to batch.
 
 affected selects the modules whose tests a change calls for. Seeds are module
-IDs and --path paths relative to the root, as the inventory spells them; give at
-least one. The answer lists the changed modules, the modules that depend on
+IDs and --path paths relative to the root, present or not; give at least one.
+A path selects its owning module, also in an owned-ignored tree or a scratch
+directory; a path in an external tree or another always-excluded path selects
+nothing. The answer lists the changed modules, the modules that depend on
 them, and the test modules, from one revision's dependency facts. A path
-outside every module widens the answer to all modules, as does partial
-coverage; the widening reasons are printed. Without --batch it is a
-synchronized resident query that never falls back to batch; --batch answers
-from a fresh session that trusts no daemon state. --format json prints one
-ramify.affected-cli/2 document. --changed, --since and --deadline do not apply.
+outside the project, written with a leading ../, widens the answer to all
+modules, as does partial coverage; the widening reasons are printed. Without
+--batch it is a synchronized resident query that never falls back to batch;
+--batch answers from a fresh session that trusts no daemon state.
+--format json prints one ramify.affected-cli/2 document.
+--changed, --since and --deadline do not apply.
 
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in

@@ -87,7 +87,7 @@ describe('affected command through the real resident service (A7-10)', { timeout
       expect(document.revision.sequence).toEqual(expect.any(Number));
       expect(document.revision.inputId).toMatch(/.+/);
       expect(document.selection).toMatchObject({ schemaVersion: 'ramify.affected/2', inputId: document.revision.inputId,
-        paths: [{ path: 'subs/core/src/interfaces/api.ts', module: 'example/core', basis: 'inventory' }],
+        paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
         changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
         selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
         scope: { root: f.root } });
@@ -121,16 +121,23 @@ describe('affected command through the real resident service (A7-10)', { timeout
   it('A7-10:widened-exit-0: an all-modules answer exits 0 and names its widening reason', async () => {
     const f = await fixture();
     try {
-      const json = await invoke(f.root, f.quick.connect, ['affected', 'example/lone', '--path', 'docs/notes.md', '--format', 'json']);
+      // Only a path outside the project widens (project-boundary contracts, "Reports, affected queries and freshness").
+      const json = await invoke(f.root, f.quick.connect, ['affected', 'example/lone', '--path', '../notes.md', '--format', 'json']);
       expect([json.exit, json.stderr, json.writes]).toEqual([0, '', 1]);
       expect((JSON.parse(json.stdout) as AffectedDocument).selection).toMatchObject({
-        paths: [{ path: 'docs/notes.md', module: null, basis: 'none' }],
+        paths: [{ path: '../notes.md', status: 'outside-project', module: null, basis: 'none', exclusion: null }],
         changedModules: [lone], affectedModules: [], testModules: [example, app, core, lone, mid],
         selection: 'all-modules', widening: ['unowned-path'] });
-      const human = await invoke(f.root, f.quick.connect, ['affected', 'example/lone', '--path', 'docs/notes.md']);
+      const human = await invoke(f.root, f.quick.connect, ['affected', 'example/lone', '--path', '../notes.md']);
       expect(human.exit).toBe(0);
-      expect(human.stdout).toContain('Selection: all-modules (widened: unowned-path)\nPath docs/notes.md: no module (none)\n');
+      expect(human.stdout).toContain('Selection: all-modules (widened: unowned-path)\nPath ../notes.md: no module (none)\n');
       expect(human.stdout).toContain('Test modules (5):\n  example (.)\n');
+      // Root-owned documentation selects the root by containment, and an installed-package path selects nothing; neither widens.
+      const owned = await invoke(f.root, f.quick.connect, ['affected', '--path', 'docs/notes.md', '--path', 'node_modules/x/index.js']);
+      expect(owned.exit).toBe(0);
+      expect(owned.stdout).toContain('Selection: dependency-closure\nPath docs/notes.md: example (containment)\n'
+        + 'Path node_modules/x/index.js: no module (excluded, packages node_modules)\nChanged modules (1):\n  example (.)\n'
+        + 'Affected modules (0):\nTest modules (1):\n  example (.)\n');
     } finally { await f.dispose(); }
   });
 

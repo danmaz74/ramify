@@ -94,7 +94,7 @@ describe('RetainedSession.affected: source forms (A7-03)', () => {
   it('A7-03:type-only: import type is an edge, so a change to the type\'s file selects the importer', async () => {
     const { handle } = shared.get();
     const result = await answer(handle, { paths: [formPaths.api] });
-    expect(result.paths).toEqual([{ path: formPaths.api, module: 'fixture/p', basis: 'inventory' }]);
+    expect(result.paths).toEqual([{ path: formPaths.api, status: 'owned', module: 'fixture/p', basis: 'inventory', exclusion: null }]);
     expect(ids(result.changedModules)).toEqual(['fixture/p']);
     expect(ids(result.affectedModules)).toContain('fixture/typeonly');
   }, timeout);
@@ -209,7 +209,7 @@ describe('RetainedSession.affected: coverage (A7-04)', () => {
       await revised(handle, ['subs/lonely/src/extra.ts'], 'deleted');
       const result = await answer(handle, { paths: ['subs/lonely/src/extra.ts'] });
       // The deleted file resolves by area; the importer's unresolved target widens.
-      expect(result.paths).toEqual([{ path: 'subs/lonely/src/extra.ts', module: 'fixture/lonely', basis: 'area' }]);
+      expect(result.paths).toEqual([{ path: 'subs/lonely/src/extra.ts', status: 'owned', module: 'fixture/lonely', basis: 'area', exclusion: null }]);
       expect(result.coverage.notes.map(note => note.code)).toEqual(['unresolved-target']);
       expect(result).toMatchObject({ selection: 'all-modules', widening: ['partial-coverage'] });
       expect(ids(result.testModules)).toEqual(formModules);
@@ -335,9 +335,12 @@ describe('RetainedSession.affected: revisions and readiness (A7-05)', () => {
       const report = vi.spyOn(handle, 'report');
       seams.reads.length = 0; seams.counting = true;
       let result: AffectedSelection;
-      try { result = await answer(handle, { modules: ['fixture/p'], paths: [formPaths.api, 'package.json'] }); }
+      try { result = await answer(handle, { modules: ['fixture/p'], paths: [formPaths.api, 'package.json', '../outside.ts'] }); }
       finally { seams.counting = false; }
-      expect(result.selection).toBe('all-modules');
+      // The root owns package.json by containment; only the path outside the project widens.
+      expect(result.paths.map(path => [path.path, path.module, path.basis])).toEqual([['../outside.ts', null, 'none'],
+        ['package.json', 'fixture', 'containment'], [formPaths.api, 'fixture/p', 'inventory']]);
+      expect(result).toMatchObject({ selection: 'all-modules', widening: ['unowned-path'] });
       expect(seams.reads).toEqual([]);
       for (const spy of [compiler.update, compiler.describe, compiler.interpret, compiler.dispose, observer.apply, observer.reobserve,
         observer.retire, descriptions, readmes, report, ...queries]) expect(spy).not.toHaveBeenCalled();
