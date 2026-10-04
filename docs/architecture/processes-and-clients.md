@@ -8,7 +8,7 @@ version, the resident daemon with its service, IPC host and lightweight client,
 implemented, as are the explorer's on-demand behavioral dependency diagram and
 the daemon-started dependency analyzer process
 ([Plan 6D](../plans/iteration-6d-behavioral-dependency-diagram/main-plan.md)).
-The daemon's synchronized `measure` service operation, `ramify.measure/1`
+The daemon's synchronized `measure` service operation, `ramify.measure/2`
 document and `ramify measure` CLI command are implemented by
 [Plan 2C](../plans/iteration-2c-module-measurements/main-plan.md).
 The MCP adapter and unsaved-content overlays are not implemented;
@@ -155,7 +155,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify materialize [--view <api\|architect>]... [--from <path> \| --all] [--root <dir>]` | Synchronize one revision and publish every requested generated view from it in one transaction: the [API discovery view](materialized-api-view.spec.md) of one module or of all modules, and the project's [architect view](architect-view.spec.md), which waits for the daemon's dependency facts for that revision. Without `--view`, the API view alone. It never runs a batch analysis. |
-| `ramify measure [--format json] [--root <dir>]` | Require the daemon's advertised `measure` capability, synchronize one current whole-project revision, and print exact and subtree module buckets as a short table or the returned `ramify.measure/1` document verbatim. It writes nothing, adds no selectors or path query, never runs batch analysis, and maps cold, pending, deadline, superseded, unavailable and resource-refusal outcomes to a non-success exit without a partial document. |
+| `ramify measure [--format json] [--root <dir>]` | Require the daemon's advertised `measure` capability, synchronize one current whole-project revision, and print exact and subtree module buckets as a short table or the returned `ramify.measure/2` document verbatim. It writes nothing, adds no selectors or path query, never runs batch analysis, and maps cold, pending, deadline, superseded, unavailable and resource-refusal outcomes to a non-success exit without a partial document. |
 | `ramify check --batch` | Load the engine only for this mode, in the CLI process or its Node child, create a fresh session, run the check and dispose it on exit. CI uses this independent mode. |
 | `ramify explore` | Ensure a compatible daemon and open the selected project's context, then reuse that project's ready explorer server, whoever started it, or start one detached. Print `<origin>/analysis/latest`, open it in the platform browser and exit 0. If the browser cannot be opened, the URL is still printed, the command still exits 0 and the server keeps running. |
 | `ramify mcp` | Lazily load the MCP adapter and serve the host's stdio connection in this process. Resolve a compatible daemon for analysis requests; no web server or per-call CLI subprocess is required. |

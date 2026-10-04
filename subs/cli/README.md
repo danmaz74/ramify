@@ -68,7 +68,7 @@ architect view adds the line
 
 `measure [--root <dir>] [--format json]` requires the daemon's advertised
 `measure` capability and requests one synchronized whole-project document. JSON
-output is the returned bounded `ramify.measure/1` value exactly. Human output
+output is the returned bounded `ramify.measure/2` value exactly. Human output
 is a compact two-row-per-module table for exact and subtree production, tests,
 documentation and view buckets. The command adds no selectors or filesystem
 attribution logic, writes no generated files, never invokes batch analysis and

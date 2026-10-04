@@ -4,8 +4,8 @@
 
 Whole-tree ownership and project-boundary vocabulary adopted 2026-10-01,
 and the root marker adopted 2026-10-03; discovery implements the root marker
-and the declared nested trees, and the remaining tooling changes, including
-auxiliary-source analysis, are not yet implemented.
+and the declared nested trees, auxiliary source is analyzed, and the remaining
+tooling changes are not yet implemented.
 
 ## Purpose
 

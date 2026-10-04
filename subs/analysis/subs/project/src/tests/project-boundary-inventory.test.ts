@@ -8,7 +8,8 @@ import type { ProjectInputView, ProjectIssue, ProjectObserver, ProjectRead, Proj
 import { declaration, limits, marker, put } from './fixtures.js';
 
 // PB1-03, PB1-04, PB1-05 (inventory part), PB1-06 and PB1-09 (pruning) at the
-// iteration 8A boundary: declared nested trees are pruned before descent and
+// iteration 8A boundary, and PB1-07 (auxiliary and inert inventories) with the
+// observer's auxiliary bridge from iteration 8C: declared nested trees are pruned before descent and
 // validated on the filesystem, a package manifest or a marked description in
 // an undeclared directory is a layout error, and a configuration alone never
 // stops discovery. Expected codes, paths, spans and inventories follow the
@@ -308,7 +309,7 @@ describe('PB1-11: compiler-selected exclusion warnings', () => {
     await put(app, 'module.ramify', root('owned-ignored "fixtures"', 'external "vendor"'));
     await put(app, 'tsconfig.json', selecting());
     for (const path of unanalyzed) await put(app, path, 'export const value = 1;\n');
-    // Positive control: selected source outside every module keeps the transitional outside warning and is read.
+    // Positive control: selected source outside every src/ is the root's auxiliary source, inventoried and read, with no warning.
     await put(app, 'tools/loose.ts', 'export const loose = 1;\n');
   });
 
@@ -318,14 +319,12 @@ describe('PB1-11: compiler-selected exclusion warnings', () => {
       { code: 'compiler-selected-owned-ignored', path: 'fixtures', message: ownedIgnored(2), files: ['fixtures/a.ts', 'fixtures/deep/b.ts'], count: 2 },
       { code: 'compiler-selected-scratch', path: 'src/tmp', message: scratch('app', 1), files: ['src/tmp/draft.ts'], count: 1 },
       { code: 'compiler-selected-scratch', path: 'subs/a/src/tmp', message: scratch('app/a', 1), files: ['subs/a/src/tmp/draft.ts'], count: 1 },
-      { code: 'outside-module-source', path: 'tools', message: '1 compiler-selected file outside module source', files: ['tools/loose.ts'], count: 1 },
     ]);
     // An external tree's selected file is not the enclosing project's and warns about nothing.
-    expect(view.inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
-    expect(view.inventory.outsideModuleFiles).toEqual(['tools/loose.ts']);
+    expect(view.inventory.files.map(file => [file.path, file.placement])).toEqual([['src/main.ts', 'src'], ['subs/a/src/api.ts', 'src'], ['tools/loose.ts', 'auxiliary']]);
     // Their bytes are never read. The compiler's selection observes only that
-    // they exist (a kind observation without bytes), while the outside file is read.
-    expect(view.inputs.filter(input => input.path === 'tools/loose.ts').map(input => [input.role, input.bytes > 0])).toEqual([['dependency', true]]);
+    // they exist (a kind observation without bytes), while the auxiliary file is read as source.
+    expect(view.inputs.filter(input => input.path === 'tools/loose.ts').map(input => [input.role, input.bytes > 0])).toEqual([['source', true]]);
     expect(view.inputs.filter(input => unanalyzed.includes(input.path)).map(input => [input.path, input.role, input.bytes]))
       .toEqual(unanalyzed.map(path => [path, 'dependency', 0]));
   });
@@ -340,9 +339,117 @@ describe('PB1-11: compiler-selected exclusion warnings', () => {
   it('reports no exclusion warning once the compiler configuration excludes those directories', async () => {
     await put(app, 'tsconfig.json', selecting(['fixtures', 'src/tmp', 'subs/a/src/tmp']));
     const view = acquired(await read());
-    expect(view.inventory.warnings).toEqual([{ code: 'outside-module-source', path: 'tools',
-      message: '1 compiler-selected file outside module source', files: ['tools/loose.ts'], count: 1 }]);
+    expect(view.inventory.warnings).toEqual([]);
+    expect(view.inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts', 'tools/loose.ts']);
+  });
+});
+
+describe('PB1-07: auxiliary compiler source inventory', () => {
+  const entry = (file: { path: string; owner: string; area: string; kind: string; placement: string }) =>
+    [file.path, file.owner, file.area, file.kind, file.placement];
+  const configure = (options: Record<string, unknown>): string => JSON.stringify({ compilerOptions: { types: [], module: 'ESNext',
+    moduleResolution: 'bundler', ...options }, include: ['src', 'subs/a/src', 'tools'] }) + '\n';
+
+  it('inventories owned compiler source outside src/, selected or not, including loose subs source, under its nearest owner', async () => {
+    await put(app, 'tsconfig.json', configure({}));
+    await put(app, 'tools/selected.ts', 'export const selected = 1;\n');
+    await put(app, 'scripts/unselected.ts', 'export const unselected = 1;\n');
+    await put(app, 'subs/loose.ts', 'export const loose = 1;\n');
+    await put(app, 'subs/a/scripts/a-tool.ts', 'export const tool = 1;\n');
+    await put(app, 'subs/a/tests/sibling.test.ts', 'export const sibling = 1;\n');
+    const view = acquired(await read());
+    expect(view.inventory.files.map(entry)).toEqual([
+      ['scripts/unselected.ts', 'app', 'ordinary', 'source', 'auxiliary'],
+      ['src/main.ts', 'app', 'ordinary', 'source', 'src'],
+      ['subs/a/scripts/a-tool.ts', 'app/a', 'ordinary', 'source', 'auxiliary'],
+      ['subs/a/src/api.ts', 'app/a', 'ordinary', 'source', 'src'],
+      // A sibling tests/ directory has no testing classification: its source is ordinary auxiliary source.
+      ['subs/a/tests/sibling.test.ts', 'app/a', 'ordinary', 'source', 'auxiliary'],
+      // Loose source beneath subs/ outside every child belongs to the parent.
+      ['subs/loose.ts', 'app', 'ordinary', 'source', 'auxiliary'],
+      ['tools/selected.ts', 'app', 'ordinary', 'source', 'auxiliary'],
+    ]);
+    expect(view.inventory.warnings).toEqual([]);
+    expect(view.inventory).not.toHaveProperty('outsideModuleFiles');
+    // Each auxiliary file is an application input read for its bytes.
+    for (const path of ['scripts/unselected.ts', 'subs/loose.ts', 'tools/selected.ts']) {
+      expect(view.inputs.filter(input => input.path === path).map(input => [input.role, input.bytes > 0]), path).toEqual([['source', true]]);
+    }
+  });
+
+  it('keeps inert owned files out of the inventory and admits JavaScript only when the configuration does', async () => {
+    const javaScript = ['scripts/build.js', 'scripts/legacy.cjs', 'scripts/run.mjs', 'scripts/view.jsx'];
+    const inert = ['data/fixture.json', 'notes/plan.md', 'scripts/README.md'];
+    for (const path of [...javaScript, ...inert]) await put(app, path, path.endsWith('.json') ? '{}\n' : 'export {};\n');
+    await put(app, 'scripts/types.d.ts', 'export type Id = string;\n');
+    const auxiliary = (view: ProjectInputView): string[] => view.inventory.files.filter(file => file.placement === 'auxiliary').map(file => file.path);
+    // Without allowJs, a JavaScript file is an inert owned file: neither inventoried nor read.
+    await put(app, 'tsconfig.json', configure({}));
+    const plain = acquired(await read());
+    expect(auxiliary(plain)).toEqual(['scripts/types.d.ts']);
+    expect(plain.inputs.filter(input => [...javaScript, ...inert].includes(input.path) && input.bytes > 0)).toEqual([]);
+    // allowJs admits JavaScript; checkJs alone admits it too, as the compiler defaults allowJs to it.
+    for (const options of [{ allowJs: true }, { checkJs: true }]) {
+      await put(app, 'tsconfig.json', configure(options));
+      const admitted = acquired(await read());
+      expect(auxiliary(admitted), JSON.stringify(options)).toEqual(['scripts/build.js', 'scripts/legacy.cjs', 'scripts/run.mjs', 'scripts/types.d.ts', 'scripts/view.jsx']);
+      expect(admitted.inventory.files.filter(file => inert.includes(file.path))).toEqual([]);
+    }
+    await put(app, 'tsconfig.json', configure({ allowJs: false, checkJs: true }));
+    expect(auxiliary(acquired(await read()))).toEqual(['scripts/types.d.ts']);
+  });
+
+  it('never turns an external compiler dependency or an external tree into application files', async () => {
+    await put(app, 'module.ramify', root('external "vendor"'));
+    await put(app, 'node_modules/dep/package.json', '{"name":"dep","types":"index.d.ts"}\n');
+    await put(app, 'node_modules/dep/index.d.ts', 'export declare const dep: number;\n');
+    await put(app, 'vendor/lib.ts', 'export const lib = 1;\n');
+    await put(app, 'src/main.ts', "import { dep } from 'dep';\nexport const main = dep;\n");
+    const view = acquired(await read());
     expect(view.inventory.files.map(file => file.path)).toEqual(['src/main.ts', 'subs/a/src/api.ts']);
+  });
+});
+
+describe('observation of auxiliary source', () => {
+  it('updates an edited auxiliary file in place and recomputes the inventory when auxiliary source is added or removed', async () => {
+    await put(app, 'scripts/tool.ts', 'export const tool = 1;\n');
+    const result = await observeProject({ request: { cwd: app, root: app, scope: 'whole-project', configuration: 'discover' },
+      parse: declaration, marker, limits, registry: 'registry/1:test' });
+    if (result.status !== 'observing') throw new Error(JSON.stringify(result));
+    const observer: ProjectObserver = result.observer;
+    opened.push(observer);
+    const before = observer.inventory.files.find(file => file.path === 'scripts/tool.ts')!;
+    expect(before).toMatchObject({ owner: 'app', placement: 'auxiliary' });
+
+    await put(app, 'scripts/tool.ts', 'export const tool = 2;\n');
+    const edited = await observer.apply([{ path: 'scripts/tool.ts', kind: 'changed' }]);
+    expect(edited).toMatchObject({ kind: 'local', changed: ['scripts/tool.ts'], created: [], deleted: [] });
+    if (edited.kind !== 'local') throw new Error(edited.kind);
+    expect(edited.inventory.files.find(file => file.path === 'scripts/tool.ts')!.sha256).not.toBe(before.sha256);
+
+    // Inert files and JavaScript the configuration does not admit change nothing.
+    await put(app, 'scripts/notes.md', 'notes\n');
+    await put(app, 'scripts/run.mjs', 'export {};\n');
+    expect((await observer.apply([{ path: 'scripts/notes.md', kind: 'created' }, { path: 'scripts/run.mjs', kind: 'created' }])).kind).toBe('unchanged');
+
+    await put(app, 'scripts/new.ts', 'export const added = 1;\n');
+    const created = await observer.apply([{ path: 'scripts/new.ts', kind: 'created' }]);
+    expect(created.kind).toBe('structural');
+    if (created.kind !== 'structural') throw new Error(created.kind);
+    expect(created.inventory.files.filter(file => file.placement === 'auxiliary').map(file => file.path)).toEqual(['scripts/new.ts', 'scripts/tool.ts']);
+
+    await rm(join(app, 'scripts/tool.ts'));
+    const deleted = await observer.apply([{ path: 'scripts/tool.ts', kind: 'deleted' }]);
+    expect(deleted.kind).toBe('structural');
+    if (deleted.kind !== 'structural') throw new Error(deleted.kind);
+    expect(deleted.inventory.files.filter(file => file.placement === 'auxiliary').map(file => file.path)).toEqual(['scripts/new.ts']);
+
+    // Removing a directory above an inventoried auxiliary file recomputes too.
+    await rm(join(app, 'scripts'), { recursive: true });
+    const removed = await observer.apply([{ path: 'scripts', kind: 'deleted' }]);
+    expect(removed.kind).toBe('structural');
+    if (removed.kind !== 'structural') throw new Error(removed.kind);
+    expect(removed.inventory.files.filter(file => file.placement === 'auxiliary')).toEqual([]);
   });
 });
 

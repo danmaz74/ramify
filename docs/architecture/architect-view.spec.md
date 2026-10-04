@@ -494,7 +494,7 @@ buckets without writing files. Its JSON form is:
 
 ```json
 {
-  "schema": "ramify.measure/1",
+  "schema": "ramify.measure/2",
   "revision": "rev/1:…",
   "root": "…",
   "ownershipRule": "the ordered rule below",
@@ -506,13 +506,14 @@ buckets without writing files. Its JSON form is:
   "files": [
     { "path": "subs/analysis/src/architect-view.ts", "owner": "ramify/analysis",
       "area": "ordinary", "kind": "source", "bytes": 12345 }
-  ],
-  "outsideModuleFiles": []
+  ]
 }
 ```
 
 `modules` is ordered by module identifier and `files` by project-relative
-path. Source and resource records retain physical area `ordinary` or `tests`.
+path. Source and resource records retain physical area `ordinary` or `tests`;
+auxiliary source, owned compiler source outside every `src/`, is listed with
+its owner's `ordinary` area. Version 2 retired `outsideModuleFiles`.
 Documentation records use `area` and `kind` `documentation` and name only the
 owner's root `README.md` or `module.ramify`. The root module has an empty `dir`
 and null `parent`. The complete-record source-classification derivation is the
@@ -527,8 +528,7 @@ root; malformed paths and escapes are not attributable:
    `.old-<suffix>` siblings at any depth, including sibling marker files.
    Similar names such as `.ramify-other` are not reserved.
 2. A `files` record is `inventoried` with exactly its recorded owner, area,
-   kind and bytes. An `outsideModuleFiles` record is known outside the owned
-   inventory and receives no owner, even when its spelling resembles source.
+   kind and bytes.
 3. An unlisted path beneath `.git`, `node_modules`, `bower_components` or
    `jspm_packages` is `excluded`.
 4. Every other unlisted path is `unobserved`. Its nearest listed module may

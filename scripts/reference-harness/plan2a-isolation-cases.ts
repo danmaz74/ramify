@@ -61,7 +61,8 @@ handlers.set('I2A-02:ordinary-inventory-excluded', { kind: 'memory', run: async 
     try {
       const owned = view.inventory.files.map(file => file.path);
       assertions.equal('no generated file entered the owned inventory', owned.filter(path => isRamifyGeneratedPath(path)), []);
-      assertions.equal('no generated path entered outsideModuleFiles', view.inventory.outsideModuleFiles.filter(path => isRamifyGeneratedPath(path)), []);
+      // Project-boundary iteration 8C retired outsideModuleFiles; generated paths never become auxiliary source either.
+      assertions.equal('no generated path entered the auxiliary inventory', view.inventory.files.filter(file => file.placement === 'auxiliary' && isRamifyGeneratedPath(file.path)), []);
       assertions.equal('no generated path was captured as an input', view.inputs.filter(input => isRamifyGeneratedPath(input.path)), []);
       assertions.ok('a real neighboring source file is still inventoried', owned.includes('subs/provider/src/interfaces/api.ts'));
     } finally { await view.dispose(); }
@@ -99,7 +100,8 @@ handlers.set('I2A-02:explicit-config-excluded', { kind: 'memory', run: async ({ 
     await put(root, '.ramify/explicit.ts', 'export const generated = 1;\n');
     const view = await batch(root);
     try {
-      assertions.equal('the explicitly selected generated path is not outside-module source', view.inventory.outsideModuleFiles, []);
+      // Project-boundary iteration 8C: owned source outside src/ is auxiliary, but a generated path never is.
+      assertions.equal('the explicitly selected generated path is not auxiliary source', view.inventory.files.filter(file => file.path === '.ramify/explicit.ts'), []);
       assertions.equal('the explicitly selected generated path was not captured as an input', view.inputs.filter(input => isRamifyGeneratedPath(input.path)), []);
       assertions.ok('the explicitly selected real file is still owned', view.inventory.files.some(file => file.path === 'src/value.ts'));
     } finally { await view.dispose(); }

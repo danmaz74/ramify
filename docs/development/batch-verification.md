@@ -35,8 +35,8 @@ child directory still checks the whole discovered project. `--batch` is accepted
 
 The CLI returns 0 for a completed check with no violations, 1 for invalid
 descriptions/layout or definite source violations, and 2 for usage, unavailable
-or incomplete execution. Interruption returns 130. Coverage limits and selected
-files outside module source are visible but nonblocking. A compiler-blocked
+or incomplete execution. Interruption returns 130. Coverage limits and project
+warnings are visible but nonblocking. A compiler-blocked
 construct is not an allowed access. The stricter reference gate requires the
 reviewed capabilities and source witnesses even when the ordinary CLI can
 complete with partial coverage. See the [invocation contract](../architecture/cli-invocation.spec.md).

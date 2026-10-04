@@ -148,7 +148,7 @@ try {
   const cold = await command(['measure', '--format', 'json'], endpoint);
   assert.equal(cold.code, 0, cold.stderr || cold.stdout);
   const document = JSON.parse(cold.stdout);
-  assert.equal(document.schema, 'ramify.measure/1');
+  assert.equal(document.schema, 'ramify.measure/2');
   const checked = await consistency(document);
   assert.deepEqual(checked.mismatches, []);
   const warm = await command(['measure', '--format', 'json'], endpoint);
@@ -168,7 +168,7 @@ try {
     measureWarm: { exitCode: warm.code, durationMs: round(warm.durationMs), stderr: warm.stderr },
     architectSessionQuery: sessionQuery, architect, architectRepeat: repeat };
   evidence.toolkit = { revision: document.revision, modules: document.modules.length, files: document.files.length,
-    outsideModuleFiles: document.outsideModuleFiles.length, views: document.views, architectView: size,
+    views: document.views, architectView: size,
     measureDocument: relative(packageRoot, documentOutput), consistency: relative(packageRoot, consistencyOutput) };
   evidence.hitCost = await hitCost(packageRoot);
   const prior = JSON.parse(await readFile(join(packageRoot, 'docs/plans/iteration-2b-generated-views/evidence/plan2b-measurements.json'), 'utf8'));

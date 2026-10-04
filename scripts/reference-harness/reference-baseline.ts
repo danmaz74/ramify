@@ -30,17 +30,20 @@ export async function assertBaseline(report: AnalysisReport, assertions: Asserti
   const { catalog, linked, inventory, accesses, results } = snapshot;
   if (!catalog || linked?.status !== 'valid') throw new Error('Baseline lacks catalog or valid contracts');
   assertions.equal('exact fifteen declared owners', inventory.modules.map(module => module.id), referenceOwners.map(ownerId));
+  // Project-boundary iteration 8C: vite.config.ts and vitest.config.ts are the root's auxiliary source (no warning); cucumber.js is inert, as the example does not admit JavaScript.
+  // Their five static imports are external and each exports one default original.
   assertions.equal('expected whole baseline counts', report.summary, { complete: true, owners: 15,
-    sourceFiles: 54, resources: 5, originals: 95, accesses: 313, allowed: 179, denied: 0,
-    errors: 0, warnings: 2, coverageNotes: 0, external: 134 });
-  assertions.equal('separate expected configuration warnings', report.warnings,
-    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', path: file,
-      message: '1 compiler-selected file outside module source', files: [file], count: 1 })));
+    sourceFiles: 56, resources: 5, originals: 97, accesses: 318, allowed: 179, denied: 0,
+    errors: 0, warnings: 0, coverageNotes: 0, external: 139 });
+  assertions.equal('no configuration warnings', report.warnings, []);
   const disk = (await Promise.all(referenceOwners.map(owner => filesBelow(root, sourcePath(owner, '').replace(/\/$/, ''))))).flat().sort();
-  assertions.equal('every owned implementation test and resource inventoried', inventory.files.map(file => file.path).sort(), disk);
+  assertions.equal('every owned implementation test and resource inventoried', inventory.files.filter(file => file.placement === 'src').map(file => file.path).sort(), disk);
+  const configurations = ['vite.config.ts', 'vitest.config.ts'];
+  assertions.equal('the two configuration files are root auxiliary source', inventory.files.filter(file => file.placement !== 'src')
+    .map(file => [file.path, file.owner, file.area, file.kind, file.placement]), configurations.map(path => [path, 'collection-review', 'ordinary', 'source', 'auxiliary']));
   const unimportedResources = ['subs/integration-tests/src/features/collection-review.viz.feature', 'subs/workspace/src/index.html'];
   assertions.equal('all source and effective resource exports catalogued', catalog.files.map(file => [file.file, file.state]).sort(),
-    disk.map(file => [file, unimportedResources.includes(file) ? 'incomplete' : 'complete']).sort());
+    [...disk, ...configurations].map(file => [file, unimportedResources.includes(file) ? 'incomplete' : 'complete']).sort());
   assertions.equal('resources without effective export descriptions are never source targets', accesses.filter(access =>
     access.target.kind === 'application' && unimportedResources.includes(access.target.origin.file)), []);
   assertReference({ input: { inventory }, catalog, linked }, assertions);

@@ -495,7 +495,6 @@ class Session implements RetainedSession {
       if (control.signal?.aborted) return { status: 'cancelled' };
       return { status: 'measured', measurements: {
         sequence, inputId: current.inputId, modules, files,
-        outsideModuleFiles: [...facts.inventory.outsideModuleFiles],
       } };
     });
   }

@@ -13,8 +13,23 @@ import type { ConfigurationData } from './configuration-data.js';
 import type { ExactReference, InventoryFile, InventoryModule, ProjectInventory, ProjectIssue, ProjectOwnership, ProjectScope, ProjectWarning } from './interfaces/project.js';
 
 const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
+const javaScript = /\.(?:[cm]?js|jsx)$/;
 /** Compiler-visible source, as distinct from an owned resource. */
 export const inventoryFileKind = (path: string): InventoryFile['kind'] => compilerSource.test(path) ? 'source' : 'resource';
+/** Whether the configuration admits JavaScript: `allowJs`, which defaults to `checkJs`. */
+function admitsJavaScript(config: ConfigurationData): boolean {
+  const { allowJs, checkJs } = config.options;
+  return allowJs === undefined ? checkJs === true : allowJs === true;
+}
+/**
+ * Whether an owned file outside every `src/` is auxiliary source: compiler
+ * source by extension, where a `.js`, `.jsx`, `.mjs` or `.cjs` file counts only
+ * when the configuration admits JavaScript. Any other owned file there is
+ * inert and never inventoried.
+ */
+export function auxiliarySource(path: string, config: ConfigurationData): boolean {
+  return compilerSource.test(path) && (!javaScript.test(path) || admitsJavaScript(config));
+}
 type Metadata = Record<string, { identity: string; purpose: InventoryModule['purpose'] }>;
 /** `enclosing` is the nearest valid module at or above `directory`; `module` is null for a layout-invalid boundary. */
 interface Boundary { directory: string; module: InventoryModule | null; enclosing: InventoryModule | null; depth: number }
@@ -54,19 +69,6 @@ function projectWarnings(groups: ReadonlyMap<string, { readonly code: ProjectWar
     const ordered = [...files].sort(byteOrder);
     return { code, path, message: message(ordered.length), files: ordered.slice(0, warningFileLimit), count: ordered.length };
   }).sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.code, b.code));
-}
-/**
- * One transitional `outside-module-source` warning per first path entry of
- * compiler-selected source outside every module's `src/`.
- */
-function outsideSourceWarnings(outsideModuleFiles: readonly string[]): ProjectWarning[] {
-  const groups = new Map<string, { code: ProjectWarning['code']; message: (count: number) => string; files: string[] }>();
-  for (const file of outsideModuleFiles) {
-    const entry = file.split('/')[0]!;
-    const group = groups.get(entry) ?? { code: 'outside-module-source', message: count => `${selectedFiles(count)} outside module source`, files: [] };
-    group.files.push(file); groups.set(entry, group);
-  }
-  return projectWarnings(groups);
 }
 /**
  * One warning per owned-ignored tree or module scratch directory holding
@@ -121,9 +123,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
   }
   const modules: InventoryModule[] = [], files: InventoryFile[] = [], issues: ProjectIssue[] = [];
   const references: ExactReference[] = [];
-  let outsideModuleFiles: string[] = [];
   let warnings: ProjectWarning[] = [];
-  const excludedRoots: string[] = [];
   // Scratch directories and declared nested trees of the modules found so far,
   // absolute: discovery never descends into them, so nothing beneath is read.
   const pruned = new Set<string>();
@@ -138,7 +138,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
       scope: { ...scope, walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
         ownership: scopeOwnership(capture.root, modules, config) },
       modules: modules.sort((a, b) => byteOrder(a.directory, b.directory)),
-      files: files.sort((a, b) => byteOrder(a.path, b.path)), references, outsideModuleFiles, warnings,
+      files: files.sort((a, b) => byteOrder(a.path, b.path)), references, warnings,
     });
   }
   try {
@@ -231,7 +231,7 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
         if (isRamifyGeneratedPath(basename(path))) continue;
         const kind = await capture.kind(path);
         if (kind === 'directory') {
-          if (excludedDirectory(path, config)) { excludedRoots.push(path); continue; }
+          if (excludedDirectory(path, config)) continue;
           // A declared nested tree or a scratch directory is observed as an
           // entry of its parent, never entered: a description inside, marked
           // or not, is not read. A nested configuration ends nothing.
@@ -243,6 +243,12 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
           const fileKind = compilerSource.test(path) ? 'source' : 'resource';
           files.push({ path: relative(capture.root, path), owner: boundary.module.id, area, kind: fileKind, placement: 'src',
             ...await capture.application(path, fileKind) });
+        } else if (kind === 'file' && boundary?.module && auxiliarySource(path, config)) {
+          // Owned compiler source outside the owner's `src/`, including loose
+          // source beneath `subs/` outside every child, is the owner's
+          // auxiliary source with its ordinary classification.
+          files.push({ path: relative(capture.root, path), owner: boundary.module.id, area: 'ordinary', kind: 'source', placement: 'auxiliary',
+            ...await capture.application(path, 'source') });
         }
         // POSIX symlinks are observed, never traversed during discovery. A linked
         // description was diagnosed above; a declared link target is checked next.
@@ -258,17 +264,9 @@ export async function inventoryProject(capture: Capture, scope: Omit<ProjectScop
     // Each selected path is tested by its prefixes, not against every directory.
     const projectRelative = (path: string): string => relative(capture.root, path).split(sep).join('/');
     const prunedPaths = new Set([...pruned].map(projectRelative));
-    const excludedPaths = new Set(excludedRoots.map(projectRelative));
     const isPruned = (path: string): boolean => withinAnyDirectory(prunedPaths, projectRelative(path));
-    const isExcluded = (path: string): boolean => withinAnyDirectory(excludedPaths, projectRelative(path));
     const unanalyzed = [...new Set(selected.filter(isPruned).map(path => relative(capture.root, path)))];
-    outsideModuleFiles = [...new Set(selected.filter(path => !isExcluded(path) && !isPruned(path))
-      .map(path => relative(capture.root, path)))].filter(path => !owned.has(path) && basename(path) !== 'module.ramify').sort(byteOrder);
-    warnings = [...outsideSourceWarnings(outsideModuleFiles),
-      ...excludedSelectionWarnings(scopeOwnership(capture.root, modules, config), scope, unanalyzed)]
-      .sort((a, b) => byteOrder(a.path, b.path) || byteOrder(a.code, b.code));
-    // Selected outside source is captured as input, but receives no owner/area.
-    for (const file of outsideModuleFiles) await capture.readFile(file, 'dependency');
+    warnings = excludedSelectionWarnings(scopeOwnership(capture.root, modules, config), scope, unanalyzed);
   } catch (error) {
     return { status: 'failed', inventory: snapshot(), issues, metadata, metadataReused, error };
   }

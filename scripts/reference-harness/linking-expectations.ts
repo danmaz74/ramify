@@ -100,7 +100,8 @@ export const referenceContracts: readonly (readonly [id: string, owner: string, 
 export function assertReference(result: { input: Pick<ValidProject['input'], 'inventory'>;
   catalog: ValidProject['catalog']; linked: ValidProject['linked'] }, assertions: Assertions, permutation?: string): void {
   assertions.equal('fifteen reference owners', result.input.inventory.modules.length, 15);
-  assertions.equal('all reference source files catalogued', result.catalog.files.length, 59);
+  // Project-boundary iteration 8C: 59 src/ files plus the root's two configuration files, now auxiliary source.
+  assertions.equal('all reference source files catalogued', result.catalog.files.length, 61);
   assertions.equal('all 34 reference statements expanded', result.linked.selections.length, 34);
   for (const [id, owner, index, provider, form, selector, destinations, pairs] of referenceContracts) {
     const module = ownerId(owner);

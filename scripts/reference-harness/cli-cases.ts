@@ -153,7 +153,8 @@ for (const kind of ['clean', 'denied', 'invalid'] as const) for (const format of
     else humanEvidence(context, result.stdout, expected);
     if (kind === 'clean') {
       context.assertions.equal('completed unchanged reference', [expected.outcome.check, expected.summary.owners, expected.diagnostics.length, expected.coverage.length], ['passed', 15, 0, 0]);
-      context.assertions.equal('both reference configuration warnings remain visible', expected.warnings.map(warning => [warning.path, warning.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
+      // Project-boundary iteration 8C: both configuration files are root auxiliary source, so no warning remains.
+      context.assertions.equal('no reference configuration warning', expected.warnings.map(warning => [warning.path, warning.count]), []);
     } else if (kind === 'denied') {
       context.assertions.equal('one independently expected located original denial', expected.diagnostics.map(issue => [issue.code, issue.location?.file, issue.original, issue.importer?.owner, issue.importer?.kind]),
         [['not-visible', 'src/assembly.ts', { kind: 'code', owner: 'collection-review/workspace/catalog', file: 'router.ts', binding: 'createCatalogRouter' }, 'collection-review', 'ordinary']]);
@@ -204,9 +205,14 @@ for (const stray of [false, true]) for (const format of ['human', 'json'] as con
   processResult(context, result, stray ? 1 : 0);
   if (format === 'json') context.assertions.equal('structured output matches API warning/layout evidence', semantic(JSON.parse(result.stdout)), semantic(expected));
   else humanEvidence(context, result.stdout, expected);
-  context.assertions.equal('selected loose file warning aggregated independently', expected.warnings, [{ code: 'outside-module-source', path: 'tests',
-    message: '1 compiler-selected file outside module source', files: ['tests/helper.ts'], count: 1 }]);
-  context.assertions.ok('loose file is never classified as owned testing source', !expected.snapshot?.inventory.files.some(file => file.path === 'tests/helper.ts')
+  // Re-reasoned in project-boundary iteration 8C: the selected loose file is root
+  // auxiliary source (beneath the stray marker it has no owner), so no
+  // outside-source warning remains; the reviewed rows name the retired warning.
+  context.assertions.equal('no outside-source warning', expected.warnings, []);
+  const helper = expected.snapshot?.inventory.files.find(file => file.path === 'tests/helper.ts');
+  if (stray) context.assertions.equal('loose file beneath the stray marker has no owner', helper, undefined);
+  else context.assertions.equal('loose file is root auxiliary source', helper && [helper.owner, helper.area, helper.placement], ['fixture', 'ordinary', 'auxiliary']);
+  context.assertions.ok('loose file is never classified as owned testing source', helper?.area !== 'tests'
     && !expected.snapshot?.areas.some(area => area.root === 'tests'));
   if (stray) context.assertions.ok('valid stray marker is still a located layout error', expected.diagnostics.some(issue => issue.category === 'layout' && issue.code === 'stray-description' && issue.location?.file === 'tests/module.ramify'));
   else context.assertions.equal('warning does not create a layout failure', expected.diagnostics, []);

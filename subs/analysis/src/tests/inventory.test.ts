@@ -50,8 +50,11 @@ describe('inventory analysis entry', () => {
       expect.objectContaining({ path: 'src/resource.css', kind: 'resource' }),
       expect.objectContaining({ path: 'subs/specs/src/interfaces/spec.ts', area: 'ordinary' }),
     ]));
-    expect(result.snapshot.inventory.outsideModuleFiles).toEqual(['outside.ts']);
-    expect(result.snapshot.inventory.files.some(file => file.path === 'outside.ts')).toBe(false);
+    // Root-owned compiler source outside src/ is the root's auxiliary source, ordinary in area.
+    expect(result.snapshot.inventory.files.filter(file => file.placement === 'auxiliary')).toEqual([
+      expect.objectContaining({ path: 'outside.ts', owner: 'fixture', area: 'ordinary', kind: 'source' }),
+    ]);
+    expect(result.snapshot.inventory).not.toHaveProperty('outsideModuleFiles');
     await expect(stat(join(root, 'subs/empty/src'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(Object.isFrozen(result.snapshot.inventory.modules[0])).toBe(true);
     expect(Object.isFrozen(result.snapshot.areas[0]!.profile)).toBe(true);

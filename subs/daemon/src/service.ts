@@ -437,9 +437,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
             reason: 'analysis-failed', message: `Joining module measurements failed: ${String(error)}` }; }
           if (joined.state !== 'measured') return { status: 'unavailable', requestId: outcome.requestId,
             reason: 'analysis-failed', message: `The current inventory cannot be measured: ${joined.reason}` };
-          const document: MeasureDocument = { schema: 'ramify.measure/1', revision: outcome.revision.revision,
+          const document: MeasureDocument = { schema: 'ramify.measure/2', revision: outcome.revision.revision,
             root, ownershipRule: measurementOwnershipRule, views: joined.views, modules: joined.modules,
-            files: outcome.measurements.files, outsideModuleFiles: outcome.measurements.outsideModuleFiles };
+            files: outcome.measurements.files };
           const measured: Extract<MeasureOutcome, { readonly status: 'measured' }> = {
             status: 'measured', requestId: outcome.requestId, freshness: outcome.freshness, document };
           const transport = responseBudgets.getStore();

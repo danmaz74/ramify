@@ -107,72 +107,62 @@ code.
 
 ## Files outside modules
 
-**Pending project boundaries.** The whole-tree ownership model adopted on
-2026-10-01 replaces this section when it is implemented; until then the
-section describes current behavior. Discovery already prunes declared nested
-trees and module scratch directories and is no longer stopped by a nested
-`tsconfig.json`, and the first two warnings below are reported; analysis of
-auxiliary source and the Git warning remain pending. Ownership then follows the
+**Pending Git advice.** Discovery prunes declared nested trees and module
+scratch directories, is no longer stopped by a nested `tsconfig.json`, and
+analyzes auxiliary source; the first two warnings below are reported, and the
+Git warning remains pending.
+
+Ownership follows the
 [module description specification](../model/module-description.spec.md):
 owned compiler source outside every `src/`, including sibling `tests/` or
-`interfaces/` directories and loose source beneath `subs/`, is analyzed as its
-owner's auxiliary source whether or not the configuration selects it, and the
-outside-module warning is retired. Only declared nested trees and
-always-excluded paths are left out; a nested `tsconfig.json` and repository
-ignore rules exclude nothing. Three nonblocking warnings remain:
-compiler-selected source inside an owned-ignored tree, compiler-selected
-source inside a module's scratch directory, and, when the root lies in a Git
-repository and `git` is available, each repository-ignored directory the check
-would still enter. The CLI derives that last warning from Git's output; it is
-never an analysis input and never changes the result. Root selection
-follows the root marker, as [selecting the project](#selecting-the-project)
-states.
-
-The configuration also defines what the project's own files are, in the
-ordinary TypeScript sense: the files its `files`, `include` and `exclude`
-select. Any of those files that lies outside every module's `src/` is a
-project file outside modules. It is not checked, and it produces a warning.
-This includes sibling `tests/` or `interfaces/` directories and loose files
-beneath `subs/`. These files receive no module source-area classification, and
-their presence alone does not make the layout invalid or fail the check.
+`interfaces/` directories and loose source beneath `subs/`, is its nearest
+module's auxiliary source. It is analyzed with that owner's ordinary
+classification whether or not the configuration selects it, and it produces no
+warning. A `.js`, `.jsx`, `.mjs` or `.cjs` file there is compiler source only
+when the configuration admits JavaScript; any other owned file outside `src/`
+is inert and silent. Only declared nested trees and always-excluded paths are
+left out; a nested `tsconfig.json` and repository ignore rules exclude nothing.
+Three nonblocking warnings remain: compiler-selected source inside an
+owned-ignored tree, compiler-selected source inside a module's scratch
+directory, and, when the root lies in a Git repository and `git` is available,
+each repository-ignored directory the check would still enter. The CLI derives
+that last warning from Git's output; it is never an analysis input and never
+changes the result. Root selection follows the root marker, as
+[selecting the project](#selecting-the-project) states.
 
 A selected file inside an owned-ignored tree or a module's scratch directory
-is not a project file outside modules. It is neither inventoried nor read,
-the compiler does not receive it as a root file, and it produces one
-`compiler-selected-owned-ignored` or
+is neither inventoried nor read, the compiler does not receive it as a root
+file, and it produces one `compiler-selected-owned-ignored` or
 `compiler-selected-scratch` warning per tree or scratch directory, located at
 that directory. A selected file inside an external tree produces no warning.
 Each warning carries a code, a path and a message and, where it lists files,
 at most 20 of them in byte order with their total count.
 
-Warnings about project files outside modules, code `outside-module-source`,
-are aggregated per top-level entry relative to the root: one warning per stray
-file directly under the root, and one per top-level directory that contains
-stray files, with the count. A stray `module.ramify` found outside
-the permitted module locations, including beside these files, is an individual
-layout error even if its contents are valid. It fails the check with exit 1;
-it is not included in the ordinary file-warning count and needs no strict
-configuration. Invalid descriptions within the checked tree, including descriptions
-inside `src/` or at reserved container roots, and invalid exposure paths remain
-errors.
+A stray `module.ramify` found outside the permitted module locations,
+including beside auxiliary source, is an individual layout error even if its
+contents are valid. It fails the check with exit 1 and needs no strict
+configuration; source beneath it has no owner. Invalid descriptions within the
+checked tree, including descriptions inside `src/` or at reserved container
+roots, and invalid exposure paths remain errors.
 
-Outside module source areas, files outside the configuration's selection are
-silent. Every owned `src/` is still checked regardless of that selection.
-`node_modules`, build outputs and tooling compiled under another configuration
-are silent by the project's own conventions, not by a Ramify rule. A nested
-project belongs in a declared nested tree: undeclared, its marked root
-description or package manifest is a layout error. Projects that want different treatment,
-such as declaring a tooling directory as intentionally unowned or silencing a
-warning, will do so in a Ramify project configuration file. That file's
-format is unspecified and is not part of Plan 1.
+`node_modules` and the configuration's output directories are always excluded.
+A nested project belongs in a declared nested tree: undeclared, its marked root
+description or package manifest is a layout error. Projects that want
+different treatment, such as silencing a warning, will do so in a Ramify
+project configuration file. That file's format is unspecified and is not part
+of Plan 1.
 
 In the future, we might add a **strict** project configuration that makes
-outside-module-source warnings fail the check. The option's syntax and exact
-scope are undecided; Plan 1 has no strict configuration or CLI flag.
+project warnings fail the check. The option's syntax and exact scope are
+undecided; Plan 1 has no strict configuration or CLI flag.
 
-An owned import whose target is a project file outside modules is reported as
-outside scope: an analysis limit on that import, never an allowed import and
-never an external package.
+An import whose target is auxiliary source is an application import decided by
+the ordinary rules: same-owner access is allowed, and another owner's import of
+an auxiliary original is denied, since no exposure can select one. An owned
+import whose target is an existing file the inventory does not hold, such as
+one inside a declared nested tree or in compiler output, is reported as outside
+scope: an analysis limit on that import, never an allowed import and never an
+external package, until the project-boundary import rules are implemented.
 
 ## Output and exit
 

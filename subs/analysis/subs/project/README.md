@@ -64,13 +64,16 @@ Compiler-selected source inside an owned-ignored tree or a module's scratch
 directory produces one `compiler-selected-owned-ignored` or
 `compiler-selected-scratch` warning per tree or directory, located there; such a
 file is neither inventoried nor read, and selected files in an external tree
-produce no warning. Other selected outside-source files produce the transitional
-`outside-module-source` warning, one per first path entry, until auxiliary
-source is analyzed. Each inventory file records its `placement`:
-`src`, `auxiliary` for owned compiler source outside `src/`, or
-`referenced-resource`. Acquisition inventories files beneath `src/` only, so
-every file is `src` until auxiliary source is inventoried. Unselected outside-source files are silent,
-but their misplaced descriptions remain errors. Declared nested trees, scratch
+produce no warning. Each inventory file records its `placement`: `src`,
+`auxiliary` or `referenced-resource`. Owned compiler source outside every
+`src/`, selected or not and including loose source beneath `subs/`, is its
+nearest module's auxiliary source with that owner's ordinary area. A `.js`,
+`.jsx`, `.mjs` or `.cjs` file there is compiler source only when the
+configuration admits JavaScript (`allowJs`, which defaults to `checkJs`). Every
+other owned file outside `src/` is inert: neither inventoried nor read, though
+a misplaced description there remains an error. The observer updates an edited
+auxiliary file in place and recomputes the inventory when auxiliary source
+appears or disappears. Declared nested trees, scratch
 directories, installed dependencies and compiler output supply discovery
 boundaries; an arbitrary compiler source exclusion cannot hide an owner or a
 stray marker.

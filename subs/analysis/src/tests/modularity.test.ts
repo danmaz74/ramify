@@ -60,6 +60,19 @@ describe('modularity projection: declared ownership', () => {
     expect(test.owners.map(item => item.owner)).toEqual(['app', 'app/core', 'app/tools']);
   });
 
+  // The modularity report specification: owned compiler source outside src/ is
+  // analyzed as its owner's auxiliary source, so it counts as that owner's
+  // production source, and its accesses as that owner's occurrences.
+  it('counts auxiliary source as its owner\'s production source', () => {
+    const script = 'subs/ui/scripts/build.ts';
+    const spec: FixtureSpec = { ...graphSpec, files: [...graphSpec.files, { path: script, owner: 'app/ui', placement: 'auxiliary', bytes: 9 }],
+      accesses: [...graphSpec.accesses, { id: 'a12', importer: script, target: paths.view, selections: [{ file: paths.view, binding: 'render' }] }] };
+    const auxiliary = view(projected(buildReport(spec)), 'production');
+    expect(values(auxiliary.summary).all).toMatchObject({ owners: 4, sourceFiles: 8, applicationOccurrences: 8, sameOwnerOccurrences: 2,
+      crossOwnerOccurrences: 6, edges: 6, outsideModuleOccurrences: 0 });
+    expect(measured(owner(auxiliary, 'app/ui').exact.all).internalOccurrences).toBe(measured(owner(production, 'app/ui').exact.all).internalOccurrences + 1);
+  });
+
   it('summarizes each source filter per load variant without mixing production and test', () => {
     const base = { owners: 4, sourceFiles: 7, outsideModuleOccurrences: 0, unresolvedOccurrences: 0 };
     expect(values(production.summary)).toEqual({

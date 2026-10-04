@@ -68,7 +68,7 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
           { path: 'subs/consumer/src/use.ts', owner: 'fixture/consumer', area: 'ordinary', kind: 'source', sha256: 'b', bytes: 1 },
           { path: 'subs/provider/src/api.ts', owner: 'fixture/provider', area: 'ordinary', kind: 'source', sha256: 'c', bytes: 1 },
           { path: 'subs/provider/src/data.json', owner: 'fixture/provider', area: 'ordinary', kind: 'resource', sha256: 'd', bytes: 1 },
-        ], references: [], outsideModuleFiles: [], warnings: [] },
+        ], references: [], warnings: [] },
       areas: [area('fixture', 'src'), consumerArea, providerArea], inputs: [],
       catalog: { originals: [{ id: original, origin: providerOrigin, declarations: [location('subs/provider/src/api.ts')], hasValue: true, hasType: true }],
         files: [{ file: 'subs/provider/src/api.ts', state: 'complete', issueIds: [], descriptionFiles: [], exports: [

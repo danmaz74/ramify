@@ -253,9 +253,9 @@ nested-tree directories, owned-ignored and external, are recorded as
 from the graph, so their absence is not zero use. Module scratch directories
 and other always-excluded paths are not listed.
 
-When auxiliary source is analyzed, owned compiler source outside `src/`,
-including scripts and probes, is analyzed as its owner's auxiliary source
-rather than counted as an `outside-project` target. Renaming the
+Owned compiler source outside `src/`, including scripts and probes, is
+analyzed as its owner's auxiliary source and counts as that owner's source,
+rather than as an `outside-project` target. Renaming the
 `outside-module` target kind to `outside-project` left the report's shape
 unchanged.
 

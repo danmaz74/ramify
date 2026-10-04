@@ -51,7 +51,7 @@ dependency facts. Without --view, materialize refreshes the API view alone.
 in one transaction.
 
 measure prints revision-bound context-size buckets for every module and the
-owned file inventory. --format json prints the ramify.measure/1 document;
+owned file inventory. --format json prints the ramify.measure/2 document;
 without it, measure prints a short exact/subtree table. It is a synchronized,
 whole-project daemon query: it writes nothing and never falls back to batch.
 

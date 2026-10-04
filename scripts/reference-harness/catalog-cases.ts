@@ -103,8 +103,8 @@ function resource(assertions: Assertions, catalog: SourceCatalog,
 
 function referenceResources(assertions: Assertions, catalog: SourceCatalog, inventory: ProjectInventory): void {
   assertions.equal('reference declared owners', inventory.modules.length, 15);
-  assertions.equal('reference configuration warnings', inventory.warnings.map(warning => [warning.path, warning.count]),
-    [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
+  // Project-boundary iteration 8C: the configuration files are root auxiliary source, so no warning remains.
+  assertions.equal('reference configuration warnings', inventory.warnings.map(warning => [warning.path, warning.count]), []);
   const first = resource(assertions, catalog, card, ['ui']);
   const second = resource(assertions, catalog, resultStyle, ['ui']);
   assertions.equal('catalog card effective names', first.exports.exports.map(entry => entry.name), ['default']);
@@ -134,7 +134,8 @@ const prepareReference: Extract<InstanceHandler, { kind: 'project' }>['prepare']
   ({ root }) => symlink(join(referenceRoot, 'node_modules'), join(root, 'node_modules'));
 const referenceBaseline: Extract<InstanceHandler, { kind: 'project' }>['baseline'] = context =>
   catalogued(context, (catalog, inventory) => {
-    context.assertions.equal('unchanged reference file count', inventory.files.length, 59);
+    // Project-boundary iteration 8C: 59 src/ files plus the root's two auxiliary configuration files.
+    context.assertions.equal('unchanged reference file count', inventory.files.length, 61);
     referenceResources(context.assertions, catalog, inventory);
   });
 
@@ -148,7 +149,8 @@ export const catalogHandlers: ReadonlyMap<string, InstanceHandler> = new Map<str
     mutate: ({ root }) => put(root, aliasFile, "export { default as cardStyles } from './catalog-card.module.css';\n"),
     run: context => catalogued(context, (catalog, inventory) => {
       referenceResources(context.assertions, catalog, inventory);
-      context.assertions.equal('one added forwarding file', inventory.files.length, 60);
+      // Project-boundary iteration 8C: the baseline's 61 owned files (two auxiliary configuration files) plus the forwarding file.
+      context.assertions.equal('one added forwarding file', inventory.files.length, 62);
       const alias = fileExports(context.assertions, catalog, aliasFile);
       context.assertions.equal('forwarding alias preserves resource default', alias.exports.map(entry => [entry.name, entry.original]),
         [['cardStyles', { kind: 'resource', owner: card.owner, file: card.bindingFile, binding: 'default' }]]);

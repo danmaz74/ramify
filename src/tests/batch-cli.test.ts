@@ -70,13 +70,15 @@ describe('CLI with real batch sessions', () => {
       walkedAreas: expect.arrayContaining(['src', 'subs/consumer/src']) });
   }), 15_000);
 
-  it('prints failures before outside-source warnings, coverage and the completed scope', async () => fixture(async root => {
-    await put(root, 'tests/helper.ts', 'export const helper = 1;');
+  // A selected file in the scratch directory warns; tests/helper.ts would now be
+  // root auxiliary source, which warns about nothing.
+  it('prints failures before project warnings, coverage and the completed scope', async () => fixture(async root => {
+    await put(root, 'src/tmp/draft.ts', 'export const draft = 1;');
     await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue; declare const target: string; void import(target);\n");
     const result = await invoke(root, ['check', '--batch']);
     expect(result.exitCode).toBe(1);
     const ordered = ['Error [not-visible] subs/consumer/src/use.ts:1:',
-      'Warning [outside-module-source] tests: 1 compiler-selected file outside module source (tests/helper.ts)\n',
+      'Warning [compiler-selected-scratch] src/tmp: 1 compiler-selected file in the scratch directory of module fixture, which Ramify does not analyze; exclude the directory from the compiler configuration (src/tmp/draft.ts)\n',
       'Analysis limit [nonliteral-target]', 'Completed scope:'];
     const positions = ordered.map(text => result.stdout.indexOf(text));
     expect(positions.every(index => index >= 0)).toBe(true);
@@ -86,17 +88,17 @@ describe('CLI with real batch sessions', () => {
   }), 15_000);
 
   it('allows bounded coverage and warnings while retaining their structured evidence', async () => fixture(async root => {
-    await put(root, 'tests/helper.ts', 'export const helper = 1;');
+    await put(root, 'src/tmp/draft.ts', 'export const draft = 1;');
     // A module: a script's ambient declaration would add a shared-global note.
     await put(root, 'subs/consumer/src/use.ts', "declare const path: string; void import(path); export {};\n");
     const result = await invoke(root, ['check', '--batch', '--format', 'json']);
     const report = JSON.parse(result.stdout) as AnalysisReport;
     expect(result.exitCode).toBe(0);
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
-    expect(report.warnings).toEqual([{ code: 'outside-module-source', path: 'tests',
-      message: '1 compiler-selected file outside module source', files: ['tests/helper.ts'], count: 1 }]);
+    expect(report.warnings).toEqual([{ code: 'compiler-selected-scratch', path: 'src/tmp',
+      message: '1 compiler-selected file in the scratch directory of module fixture, which Ramify does not analyze; exclude the directory from the compiler configuration', files: ['src/tmp/draft.ts'], count: 1 }]);
     expect(report.coverage[0].code).toBe('nonliteral-target');
-    expect(report.snapshot!.inventory.files.some(file => file.path === 'tests/helper.ts')).toBe(false);
+    expect(report.snapshot!.inventory.files.some(file => file.path === 'src/tmp/draft.ts')).toBe(false);
   }), 15_000);
 
   it('fails invalid descriptions with blocked checking as exit 1', async () => fixture(async root => {

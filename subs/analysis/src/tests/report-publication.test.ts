@@ -14,8 +14,14 @@ vi.mock('../report-copy.js', async importOriginal => {
 });
 
 const tools = 'tools/outside.ts';
-/** Findings, an outside-source warning and coverage notes, so every list a revision keeps is non-empty. */
+/**
+ * Findings, a project warning and coverage notes, so every list a revision
+ * keeps is non-empty. Since iteration 8C a loose root file would be root
+ * auxiliary source, so `tools` is an owned-ignored tree: its selected file
+ * warns, and the import of it stays an outside-project coverage note.
+ */
 const evidence: Record<string, string> = {
+  'module.ramify': `${fixtureFiles['module.ramify']}owned-ignored "tools"\n`,
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true }, include: ['src', 'subs', 'tools'] }),
   [tools]: 'export const outside = 1;\n',

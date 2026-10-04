@@ -84,7 +84,7 @@ export function graphFacts(spec: GraphSpec): AffectedFacts {
     access(origin(fileOf(consumer), consumer), { kind: 'application', origin: origin(fileOf(provider), provider) },
       [selection({ owner: provider, file: fileOf(provider) })]));
   const files = [...modules.map(module => inventoryFile(sourceFile(module), module.id)), ...spec.files ?? []];
-  const inventory: ProjectInventory = { scope, modules, files, references: [], outsideModuleFiles: [], warnings: [] };
+  const inventory: ProjectInventory = { scope, modules, files, references: [], warnings: [] };
   return { inventory, accesses: [...edgeAccesses, ...spec.accesses ?? []], shims: spec.shims ?? [], coverage: spec.coverage ?? [],
     scope, inputId: 'input/1', analysisCheck: spec.analysisCheck ?? 'passed' };
 }

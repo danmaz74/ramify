@@ -36,8 +36,11 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.files.map(f => [f.path, f.area])).toEqual([
       ['src/helpers/tests/ordinary.ts', 'ordinary'], ['src/icon.bin', 'ordinary'], ['src/omitted.ts', 'ordinary'], ['src/tests/helper.ts', 'tests'], ['src/value.ts', 'ordinary'],
+      // Owned compiler source outside src/, selected or not, is the root's auxiliary source; the
+      // inherited configuration admits JavaScript, so the `.js` file is compiler source.
+      ['tests/selected.js', 'ordinary'], ['tests/unselected.ts', 'ordinary'],
     ]);
-    expect(acquired.inventory.outsideModuleFiles).toEqual(['tests/selected.js']);
+    expect(acquired.inventory.files.filter(f => f.placement === 'auxiliary').map(f => f.path)).toEqual(['tests/selected.js', 'tests/unselected.ts']);
     expect(acquired.inputs.filter(i => i.role === 'configuration').map(i => i.path)).toEqual(['base.json', 'tsconfig.json']);
     expect((await acquired.seal()).status).toBe('coherent');
   });
@@ -48,7 +51,8 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.scope.configuration).toBe(join(work, 'tsconfig.json'));
     expect(acquired.inventory.modules.map(m => m.id)).toEqual(['fixture']);
-    expect(acquired.inventory.outsideModuleFiles).toEqual([]);
+    // The selected file above the root belongs to no module of this project.
+    expect(acquired.inventory.files.map(f => f.path)).toEqual(['src/value.ts']);
     expect(acquired.inputs.some(i => i.role === 'configuration' && i.path.startsWith('external:'))).toBe(true);
     expect(acquired.inputs.some(i => i.role === 'description' && i.path.startsWith('external:'))).toBe(false);
   });
@@ -59,7 +63,8 @@ describe('real project configuration and scope', () => {
     await put(root, 'tsconfig.json', '{"extends":"config-base"}');
     await put(root, 'tests/selected.js', 'export {};');
     const acquired = view(await read());
-    expect(acquired.inventory.outsideModuleFiles).toEqual(['tests/selected.js']);
+    // The package configuration admits JavaScript, so the selected `.js` file is root auxiliary source.
+    expect(acquired.inventory.files.map(f => [f.path, f.placement])).toEqual([['src/value.ts', 'src'], ['tests/selected.js', 'auxiliary']]);
     expect(acquired.inputs.some(i => i.path === 'node_modules/config-base/package.json' && i.bytes > 0)).toBe(true);
     expect(acquired.inputs.some(i => i.path === 'node_modules/config-base/config.json' && i.role === 'configuration')).toBe(true);
   });
@@ -169,7 +174,6 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture']);
     expect(acquired.inventory.files.map(file => file.path)).toEqual(['src/value.ts']);
-    expect(acquired.inventory.outsideModuleFiles).toEqual([]);
     expect(acquired.inventory.warnings).toEqual([]);
     expect(acquired.inputs.some(input => input.path === `${excluded}/module.ramify`)).toBe(false);
   });
@@ -203,17 +207,20 @@ describe('acquisition limits and cancellation', () => {
     await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
     await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
     await put(root, 'subs/child/src/kept.ts', 'export {};');
-    await put(root, 'src/z-failure.ts', bytes);
+    // Selected source beneath the invalid boundary is no longer read, so the
+    // stopping read is a later module's README, read when the walk reaches it.
+    await put(root, 'subs/child/subs/late/module.ramify', 'ramify 1\nmodule late\n');
+    await put(root, 'subs/child/subs/late/README.md', bytes);
     const result = await read({ limits: { ...limits, maxFileBytes: 512 } });
     expect(result.status).toBe('incomplete');
     if (result.status !== 'incomplete') throw new Error('Expected incomplete acquisition');
     expect(result.issues.map(issue => [issue.code, issue.path])).toEqual([
-      ['description-in-src', 'src/module.ramify'], [code, 'src/z-failure.ts'],
+      ['description-in-src', 'src/module.ramify'], [code, 'subs/child/subs/late/README.md'],
     ]);
     expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
     expect(result.inventory?.files.map(file => file.path)).toEqual(['subs/child/src/kept.ts']);
-    expect(result.inventory?.warnings).toEqual([{ code: 'outside-module-source', path: 'src',
-      message: '2 compiler-selected files outside module source', files: ['src/value.ts', 'src/z-failure.ts'], count: 2 }]);
+    // Source beneath the layout-invalid boundary has no owner and no outside-module warning.
+    expect(result.inventory?.warnings).toEqual([]);
     expect(Object.isFrozen(result.inventory)).toBe(true);
     expect(Object.isFrozen(result.issues)).toBe(true);
   });
@@ -245,7 +252,8 @@ describe('acquisition limits and cancellation', () => {
       ['changed-input', '.'], ['description-in-src', 'src/module.ramify'],
     ]);
     expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture']);
-    expect(result.inventory?.outsideModuleFiles).toEqual(['src/value.ts']);
+    // Source beneath the layout-invalid boundary is neither inventoried nor warned about.
+    expect(result.inventory?.files).toEqual([]);
   });
   it('returns cancelled for an already aborted request', async () => {
     const controller = new AbortController(); controller.abort();

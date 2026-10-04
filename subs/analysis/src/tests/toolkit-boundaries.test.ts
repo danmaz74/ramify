@@ -100,7 +100,6 @@ describe('the toolkit root description declares its nested trees', () => {
     for (const directory of [...ownedIgnored, ...external]) {
       const inside = (path: string): boolean => path.startsWith(`${directory}/`);
       expect(inventory.files.filter(file => inside(file.path)), directory).toEqual([]);
-      expect(inventory.outsideModuleFiles.filter(inside), directory).toEqual([]);
       expect(inventory.warnings.filter(warning => warning.path === directory || inside(warning.path)
         || (warning.files ?? []).some(inside)), directory).toEqual([]);
       expect(inventory.modules.filter(module => inside(module.directory)), directory).toEqual([]);

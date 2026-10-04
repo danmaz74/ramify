@@ -113,9 +113,8 @@ function assertClean(context: ProjectContext, report: AnalysisReport, label: str
   context.assertions.equal(`${label}: real reference completed cleanly`, [report.schemaVersion, report.outcome.execution,
     report.outcome.check, report.outcome.coverage, report.summary.complete, report.summary.owners,
     report.summary.denied, report.summary.errors, report.coverage], ['ramify.analysis/2', 'completed', 'passed', 'complete', true, 15, 0, 0, []]);
-  context.assertions.equal(`${label}: original configuration warnings retained`, report.warnings,
-    ['vite.config.ts', 'vitest.config.ts'].map(file => ({ code: 'outside-module-source', path: file,
-      message: '1 compiler-selected file outside module source', files: [file], count: 1 })));
+  // Project-boundary iteration 8C: vite.config.ts and vitest.config.ts are the root's auxiliary source (no warning); cucumber.js is inert, as the example does not admit JavaScript.
+  context.assertions.equal(`${label}: no configuration warnings`, report.warnings, []);
   observe(context, 'relocation-analysis', { label, report: analysisEvidence(report) });
 }
 

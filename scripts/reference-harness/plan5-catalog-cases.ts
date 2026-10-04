@@ -55,7 +55,8 @@ handlers.set('I5-03:assembled-equals-whole', {
   },
   mutate: async () => {},
   run: async ({ root, assertions }) => {
-    const expected: Readonly<Record<string, readonly [number, number]>> = { R: [15, 54], T: [11, 229], S100: [100, 1100] };
+    // Project-boundary iteration 8C: R gains its two root configuration files as auxiliary source.
+    const expected: Readonly<Record<string, readonly [number, number]>> = { R: [15, 56], T: [11, 229], S100: [100, 1100] };
     const compare = (fixture: string, project: string) => withSourceInputs(project, async inputs => {
       const owned = inputs.inventory.files.map(file => file.path);
       const descriptions = await describeFiles(inputs, owned);

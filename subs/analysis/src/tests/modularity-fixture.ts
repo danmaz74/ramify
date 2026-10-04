@@ -17,7 +17,7 @@ export interface FixtureModule { readonly id: string; readonly testing?: boolean
   readonly descriptionBytes?: number; readonly readmeBytes?: number | null }
 export interface FixtureFile { readonly path: string; readonly owner: string; readonly area?: 'ordinary' | 'tests';
   readonly kind?: 'source' | 'resource'; readonly bytes?: number; readonly state?: 'complete' | 'incomplete';
-  readonly issueIds?: readonly string[] }
+  readonly issueIds?: readonly string[]; readonly placement?: InventoryFile['placement'] }
 export interface FixtureOriginal { readonly file: string; readonly binding: string; readonly value?: boolean }
 export interface FixtureExposure { readonly module: string; readonly file: string; readonly binding: string;
   readonly destinations: readonly Destination[]; readonly effective?: boolean }
@@ -70,6 +70,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     if (!file) throw new Error(`Fixture file ${path} is not declared`);
     return areas.find(item => item.owner === file.owner && item.kind === (file.area ?? 'ordinary'))!;
   };
+  const auxiliary = (path: string): boolean => files.get(path)?.placement === 'auxiliary';
   const originalId = (path: string, binding: string): OriginalId => {
     const owner = files.get(path)!.owner;
     const root = `${directory(owner)}src/`;
@@ -101,15 +102,15 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
     ];
   });
   const inventoryFiles: InventoryFile[] = spec.files.map(file => ({ path: file.path, owner: file.owner, area: file.area ?? 'ordinary',
-    kind: file.kind ?? 'source', placement: 'src', sha256: '0'.repeat(64), bytes: file.bytes ?? 10 }));
+    kind: file.kind ?? 'source', placement: file.placement ?? 'src', sha256: '0'.repeat(64), bytes: file.bytes ?? 10 }));
   const accesses: SourceAccess[] = spec.accesses.map(access => {
     const location = { file: access.importer, start: 0, end: 1, line: 1, column: 1 };
     const target: SourceAccess['target'] = typeof access.target === 'string'
-      ? access.target === 'unresolved' ? { kind: 'unresolved' } : { kind: 'application', origin: { file: access.target, area: area(access.target), auxiliary: false } }
+      ? access.target === 'unresolved' ? { kind: 'unresolved' } : { kind: 'application', origin: { file: access.target, area: area(access.target), auxiliary: auxiliary(access.target) } }
       : 'external' in access.target ? { kind: 'external', resolution: 'package', name: access.target.external, resolvedFile: null }
       : { kind: 'outside-project', file: access.target.outside };
     return {
-      id: access.id, location, importer: { file: access.importer, area: area(access.importer), auxiliary: false }, specifier: 'x',
+      id: access.id, location, importer: { file: access.importer, area: area(access.importer), auxiliary: auxiliary(access.importer) }, specifier: 'x',
       form: 'import', selectionForm: 'named', runtimeLoad: access.runtime ?? true, target,
       selections: (access.selections ?? []).map(selection => ({
         location, exportedName: selection.name ?? selection.binding, localName: selection.binding,
@@ -172,7 +173,7 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
       executed: capability !== 'dependency-behavior' || behavior !== undefined })),
     stages: [], outcome: { execution: 'completed', check: 'passed', coverage: coverage.length ? 'partial' : 'complete' },
     snapshot: {
-      inventory: { scope, modules: inventoryModules, files: inventoryFiles, references: [], outsideModuleFiles: [], warnings: [] },
+      inventory: { scope, modules: inventoryModules, files: inventoryFiles, references: [], warnings: [] },
       areas, inputs: documentationInputs,
       catalog: {
         originals: spec.originals.map(original => ({ id: originalId(original.file, original.binding),

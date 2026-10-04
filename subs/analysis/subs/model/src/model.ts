@@ -1,6 +1,6 @@
 import type { Exposure, Model, ModelInput, ModelIssue, ModelResult, ModuleRecord, Original, SignatureCompanions, SourceArea, SourceOrigin } from './interfaces/model.js';
 import { compare, immutable, isRecord, issue, locations, namePattern, sortedNames, validDeclarationLocation, validLocation, validPath, validText } from './data.js';
-import { originalKey, validModuleId, validOriginalId } from './identity.js';
+import { originalKey, originalSourcePath, validModuleId, validOriginalId } from './identity.js';
 import { deriveSourceAreas, requiredImporterTags, tagIssues } from './profiles.js';
 import { validateRegistry } from './registry.js';
 
@@ -22,14 +22,48 @@ function ownerOf(modules: readonly ModuleRecord[], id: string): ModuleRecord | u
   return index.get(id);
 }
 
+const directoryIndexes = new WeakMap<readonly ModuleRecord[], ReadonlyMap<string, ModuleRecord>>();
+
+/** A module's directory, from its ordinary source root: `''` for a root `src`. */
+function moduleDirectory(module: ModuleRecord): string | undefined {
+  const root = module.areas.find(({ kind }) => kind === 'ordinary')?.root;
+  if (root === 'src') return '';
+  return root?.endsWith('/src') ? root.slice(0, -'/src'.length) : undefined;
+}
+
+/** The module whose directory is the nearest one containing a project-relative file. */
+function nearestModule(modules: readonly ModuleRecord[], file: string): ModuleRecord | undefined {
+  let index = Object.isFrozen(modules) ? directoryIndexes.get(modules) : undefined;
+  if (!index) {
+    index = new Map(modules.flatMap(module => {
+      const directory = moduleDirectory(module);
+      return directory === undefined ? [] : [[directory, module] as const];
+    }));
+    if (Object.isFrozen(modules)) directoryIndexes.set(modules, index);
+  }
+  for (let end = file.lastIndexOf('/'); end > 0; end = file.lastIndexOf('/', end - 1)) {
+    const module = index.get(file.slice(0, end));
+    if (module) return module;
+  }
+  return index.get('');
+}
+
 /**
  * A supplied origin must use the area's actual profile, including tests
- * precedence. It lies beneath its owner's `src/`, so it is not auxiliary.
+ * precedence. An origin beneath its owner's `src/` is not auxiliary. An
+ * auxiliary origin is owned compiler source outside `src/` whose nearest
+ * module is its owner; it keeps the owner's ordinary area and profile.
  */
 export function canonicalOrigin(modules: readonly ModuleRecord[], origin: SourceOrigin): SourceOrigin | undefined {
-  if (!origin || !validPath(origin.file) || !origin.area || origin.auxiliary !== false) return undefined;
+  if (!origin || !validPath(origin.file) || !origin.area || typeof origin.auxiliary !== 'boolean') return undefined;
   const owner = ownerOf(modules, origin.area.owner);
   const ordinary = owner?.areas.find(({ kind }) => kind === 'ordinary');
+  if (origin.auxiliary) {
+    if (!owner || !ordinary || origin.file === ordinary.root || origin.file.startsWith(`${ordinary.root}/`)
+      || nearestModule(modules, origin.file) !== owner || origin.area.kind !== 'ordinary' || origin.area.root !== ordinary.root
+      || !Array.isArray(origin.area.profile) || !sameNames(origin.area.profile, ordinary.profile)) return undefined;
+    return { file: origin.file, area: ordinary, auxiliary: true };
+  }
   if (!ordinary || !origin.file.startsWith(`${ordinary.root}/`)) return undefined;
   const relative = origin.file.slice(ordinary.root.length + 1);
   const kind = relative.startsWith('tests/') ? 'tests' : 'ordinary';
@@ -150,7 +184,7 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
     }
     const origin = canonicalOrigin(moduleList, original.origin);
     const ordinary = modules.get(original.id.owner)?.areas.find(({ kind }) => kind === 'ordinary');
-    if (!origin || origin.area.owner !== original.id.owner || origin.file !== `${ordinary?.root}/${original.id.file}`) {
+    if (!origin || !ordinary || origin.area.owner !== original.id.owner || origin.file !== originalSourcePath(ordinary.root, original.id.file)) {
       issues.push(issue('invalid-original', `Original ${originalKey(original.id)} has inconsistent ownership or source origin`, original.declarations));
       continue;
     }
@@ -196,6 +230,12 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
       continue;
     }
     if ('tags' in exposure) issues.push(issue('conflicting-tags', 'An exposure cannot reassign original tags', exposure.evidence));
+    // Auxiliary originals are never exposed. Linking's located finding for a
+    // selection that reaches one is later work; the model refuses the input.
+    if (originals.get(originalKey(exposure.original))!.origin.auxiliary) {
+      issues.push(issue('ungrounded-exposure', `Auxiliary original ${originalKey(exposure.original)} cannot be exposed`, exposure.evidence));
+      continue;
+    }
     if (exposure.provider === null ? exposure.module !== exposure.original.owner
       : modules.get(exposure.provider)?.parent !== exposure.module) {
       issues.push(issue('ungrounded-exposure', `Exposure in "${exposure.module}" requires ownership or a direct child provider`, exposure.evidence));

@@ -29,7 +29,7 @@ function fixture(child: string, root = 'expose-sub * from child to descendants',
     modules, files: [{ path: file, owner: 'fixture/child', area: 'ordinary', kind: 'source', placement: 'src', sha256: 'fixture', bytes: 23 }],
     references: modules.flatMap(module => module.description.document.statements.filter((statement): statement is ExposureStatement => 'from' in statement && statement.kind !== 'expose-sub').map(statement => ({
       description: module.description.document.file, statement: statement.index, decoded: statement.from.value, normalized: file, status: 'file' as const, interfaceEligible: true,
-    }))), outsideModuleFiles: [], warnings: [] },
+    }))), warnings: [] },
   catalog: { originals: [{ id, origin: { file, area: area.value[0]!, auxiliary: false }, declarations: [location], hasValue: true, hasType: false,
     companions: { named: [], evidence: [], inferred: false, unresolved: 0 } }],
     files: [{ file, state: 'complete', exports: [{ name: 'value', original: id, namespace: null, forwarding: [] }], issueIds: [], descriptionFiles: [] }], coverage: [] } };

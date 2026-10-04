@@ -59,7 +59,9 @@ async function compare(root: string, directory: string, assertions: Assertions, 
   const after = await report(root, directory, false);
   // ff01212e (Plan 8) declared the reference's signatures and pinned its whole baseline at
   // 313 accesses, as Plan 1's reference baseline asserts; owners and warnings are unchanged.
-  const expected = fixture === 'R' ? [15, 313, 2] : [11, 2744, 0];
+  // Project-boundary iteration 8C: the root's two configuration files are auxiliary source,
+  // adding their five external imports and retiring both warnings.
+  const expected = fixture === 'R' ? [15, 318, 0] : [11, 2744, 0];
   assertions.equal(`${fixture}: recorded baseline owners, accesses and warnings`,
     [before.summary.owners, before.summary.accesses, before.summary.warnings], expected);
   assertions.equal(`${fixture}: complete baseline with no findings`, [before.outcome, before.diagnostics, before.coverage],

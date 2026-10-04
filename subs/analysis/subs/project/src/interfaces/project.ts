@@ -106,11 +106,9 @@ export interface ExactReference {
  * are an open set: a reader tolerates a code it does not know.
  * `compiler-selected-owned-ignored` and `compiler-selected-scratch` name, at the
  * tree or scratch directory, compiler-selected source Ramify does not analyze.
- * `outside-module-source` is transitional: one per first path entry of
- * compiler-selected source outside every module's `src/`.
  */
 export interface ProjectWarning {
-  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch' | 'outside-module-source';
+  readonly code: 'compiler-selected-owned-ignored' | 'compiler-selected-scratch';
   readonly path: string;
   readonly message: string;
   /** Where file evidence is needed: a bounded, byte-ordered prefix of the files, with `count` the total. */
@@ -122,7 +120,6 @@ export interface ProjectInventory {
   readonly modules: readonly InventoryModule[];
   readonly files: readonly InventoryFile[];
   readonly references: readonly ExactReference[];
-  readonly outsideModuleFiles: readonly string[];
   readonly warnings: readonly ProjectWarning[];
 }
 export interface ProjectIssue {

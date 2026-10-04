@@ -62,7 +62,6 @@ describe('pruned-directory classification of compiler-selected files', () => {
       // The warning and the pruning are unchanged: the selected scratch file is
       // reported and observed to exist, never inventoried or read.
       expect(inventory.warnings.map(item => [item.code, item.path, item.files])).toEqual([['compiler-selected-scratch', 'src/tmp', ['src/tmp/scratch.ts']]]);
-      expect(inventory.outsideModuleFiles).toEqual([]);
       expect(read.view.inputs.filter(input => input.path === 'src/tmp/scratch.ts').map(input => [input.role, input.bytes])).toEqual([['dependency', 0]]);
       expect(containment.calls).toBeLessThan(modules * modules);
     } finally { await read.view.dispose(); }

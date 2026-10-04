@@ -1,8 +1,10 @@
 # TypeScript Source Interpretation Specification
 
 **Status:** Active specification. Whole-tree ownership, auxiliary-source and
-package-boundary interpretation were adopted on 2026-10-01 and are not yet
-implemented. Specification status does not establish implementation support.
+package-boundary interpretation were adopted on 2026-10-01. Auxiliary source is
+analyzed with its owner's ordinary profile; package-boundary interpretation and
+the rejection of auxiliary originals through exposure are not yet implemented.
+Specification status does not establish implementation support.
 
 ## Purpose
 
@@ -536,6 +538,6 @@ harness requiring that stage must fail its capability check; this differs from
 a supported checker completing with documented analysis limits. Diagnostics
 do not create exposure declarations or dependency allowlists.
 
-The adopted auxiliary-source and project-boundary changes are not yet
+Auxiliary source is analyzed; the adopted project-boundary changes are not yet
 implemented. Adopting these rules does not establish runtime support; report
 unsupported or unrun analysis explicitly.

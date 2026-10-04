@@ -8,8 +8,9 @@ import { evaluateAccesses } from '../evaluate-accesses.js';
 import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
 
 // Auxiliary provenance vocabulary (project-boundary contracts, "Source and
-// exposure provenance"): the public types and the explicit defaults every
-// existing producer gives. No producer yields auxiliary placement or origins,
+// exposure provenance"): the public types, src placement and false flags for
+// source beneath src/, and auxiliary placement and true flags for the selected
+// loose root file, which iteration 8C activates. No producer yields
 // nested-tree or excluded targets yet; expected values follow the contracts.
 
 const ordinary: SourceArea = { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] };
@@ -46,15 +47,16 @@ const declaredExcluded: SourceTarget = { kind: 'excluded', file: 'external-proje
 const bareTree: SourceTarget = { kind: 'nested-tree', file: 'fixture-project/a.ts' };
 
 const files: Record<string, string> = {
-  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src publicValue from "interfaces/api.ts" to descendants\n',
-  'README.md': '# Fixture\n\nOne project whose source all lies beneath src.\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src publicValue from "interfaces/api.ts" to descendants\nowned-ignored "vendor"\n',
+  'README.md': '# Fixture\n\nOne project with source beneath src, one loose root file and an owned-ignored tree.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true }, include: ['src', 'subs', 'loose.ts'] }),
   'loose.ts': 'export const loose = 1;\n',
+  'vendor/tool.ts': 'export const tool = 1;\n',
   'src/interfaces/api.ts': 'export const publicValue: number = 1;\n',
   'src/barrel.ts': "export { publicValue } from './interfaces/api.js';\n",
-  'src/use.ts': "import { publicValue } from './barrel.js';\nimport { loose } from '../loose.js';\nvoid publicValue; void loose;\n",
+  'src/use.ts': "import { publicValue } from './barrel.js';\nimport { loose } from '../loose.js';\nimport { tool } from '../vendor/tool.js';\nvoid publicValue; void loose; void tool;\n",
   'src/style.css': '.a { color: red; }\n',
   'src/tests/use.test.ts': "import { publicValue } from '../interfaces/api.js';\nvoid publicValue;\n",
   'subs/consumer/module.ramify': 'ramify 1\nmodule consumer\n',
@@ -103,11 +105,12 @@ describe('auxiliary provenance vocabulary', () => {
     expect([unstated, outsidePlacement, unplaced, renamed, scratchTree, declaredExcluded, bareTree]).toHaveLength(7);
   });
 
-  it('gives every existing inventory file src placement and every existing origin a false auxiliary flag', async () => {
+  it('gives files beneath src/ src placement and false flags, and the loose root file auxiliary placement and true flags', async () => {
     const value = await report();
     expect(value.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
     const inventory = value.snapshot!.inventory;
     expect(inventory.files.map(file => [file.path, file.area, file.kind, file.placement])).toEqual([
+      ['loose.ts', 'ordinary', 'source', 'auxiliary'],
       ['src/barrel.ts', 'ordinary', 'source', 'src'],
       ['src/interfaces/api.ts', 'ordinary', 'source', 'src'],
       ['src/style.css', 'ordinary', 'resource', 'src'],
@@ -115,20 +118,29 @@ describe('auxiliary provenance vocabulary', () => {
       ['src/use.ts', 'ordinary', 'source', 'src'],
       ['subs/consumer/src/probe.ts', 'ordinary', 'source', 'src'],
     ]);
-    // Selected source outside every module keeps its pre-activation handling.
-    expect(inventory.outsideModuleFiles).toEqual(['loose.ts']);
     const all = snapshotOrigins(value);
     expect(all.length).toBeGreaterThan(0);
-    expect(all.filter(origin => origin.auxiliary !== false)).toEqual([]);
+    // Exactly the loose file's origins are auxiliary, with the root's ordinary area; no other origin is.
+    expect(all.filter(origin => origin.auxiliary !== false).length).toBeGreaterThan(0);
+    expect(all.filter(origin => origin.auxiliary !== (origin.file === 'loose.ts'))).toEqual([]);
+    expect(all).toContainEqual({ file: 'loose.ts', area: ordinary, auxiliary: true });
+    expect(value.snapshot!.catalog!.originals.filter(original => original.origin.auxiliary).map(original => original.id))
+      .toEqual([{ kind: 'code', owner: 'fixture', file: '../loose.ts', binding: 'loose' }]);
+    // The same-owner import of auxiliary source is allowed.
+    const loose = value.snapshot!.accesses.find(access => access.specifier === '../loose.js')!;
+    expect(value.snapshot!.results.find(result => result.accessId === loose.id)).toMatchObject({ outcome: 'checked',
+      decisions: [{ status: 'allowed', reason: 'same-owner' }] });
     // The barrel's forwarding origin is a src origin too.
     expect(all).toContainEqual({ file: 'src/barrel.ts', area: { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] }, auxiliary: false });
   });
 
   it('reports the renamed outside-project target with its unchanged outcome and coverage code', async () => {
     const value = await report();
-    const loose = value.snapshot!.accesses.filter(access => access.specifier === '../loose.js');
-    expect(loose.map(access => access.target)).toEqual([{ kind: 'outside-project', file: 'loose.ts' }]);
-    expect(value.snapshot!.results.find(result => result.accessId === loose[0]!.id)).toMatchObject({ outcome: 'outside-scope', decisions: [] });
+    // Owned source outside src/ is now an application target; a file in an
+    // owned-ignored tree is not inventoried and keeps the outside-project target.
+    const tool = value.snapshot!.accesses.filter(access => access.specifier === '../vendor/tool.js');
+    expect(tool.map(access => access.target)).toEqual([{ kind: 'outside-project', file: 'vendor/tool.ts' }]);
+    expect(value.snapshot!.results.find(result => result.accessId === tool[0]!.id)).toMatchObject({ outcome: 'outside-scope', decisions: [] });
     expect(value.coverage.map(note => [note.code, note.location?.file])).toEqual([['outside-module-target', 'src/use.ts']]);
   });
 

@@ -122,3 +122,10 @@ the facts name another input. `projectTestReferences` projects, from the same
 dependency analyzer run as the diagram, the originals each testing-profile file
 references behaviorally; the analyzer's `ready` outcome carries them as
 `testReferences`, `null` when only they were refused.
+
+The modularity probe (`npm run probe:modularity`) and the dependency-analyzer
+measurement probe live under `scripts/probes/` beside this owner's `src/`. They
+are this owner's auxiliary source with its ordinary profile: they import its
+source by relative path as same-owner source, cannot import its testing source,
+and nothing exposes them. The modularity probe's Git adapter reads repository
+history there, outside `src/`.

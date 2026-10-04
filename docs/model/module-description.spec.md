@@ -8,9 +8,11 @@ trees and module scratch directories before descent. The root marker on the
 module line and its validity rules were specified on 2026-10-03; the parser
 accepts the marker, the root is selected by it and discovery enforces its
 validity, never reading a marked description inside a declared nested tree.
-Acquisition reports the compiler-selection warnings. Analysis of auxiliary
-source and the import rule for declared trees are not yet implemented; the
-implementation plan schedules that work. The exposure grammar below is unchanged.
+Acquisition reports the compiler-selection warnings, and auxiliary source is
+inventoried and analyzed with its owner's ordinary classification. The import
+rule for declared trees and the located finding for an exposure that selects an
+auxiliary original are not yet implemented; the implementation plan schedules
+that work. The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -131,7 +133,12 @@ the root marker inside a declared tree of either kind is the root of a
 separate project.
 
 Analyze all owned compiler source outside those exclusions, including source
-the compiler configuration did not select. Auxiliary source uses its owner's
+the compiler configuration did not select. Outside `src/`, a file is compiler
+source when it has a TypeScript or JavaScript source extension; a `.js`,
+`.jsx`, `.mjs` or `.cjs` file is compiler source only when the root compiler
+configuration admits JavaScript (`allowJs`, which defaults to `checkJs`).
+Every other owned file outside `src/` is inert: it is not inventoried and
+receives no source classification. Auxiliary source uses its owner's
 ordinary classification. Compiler-resolution limitations remain explicit
 coverage notes; omitting owned source from the compiler configuration does
 not exempt it from analysis.
@@ -1088,8 +1095,9 @@ Discovery implements the nested-tree declarations, their validation and the
 pruning of declared trees and module scratch directories. Acquisition warns
 about compiler-selected source in an owned-ignored tree or a module scratch
 directory, never inventories or reads it and never makes it a compiler root.
-The adopted auxiliary-source rules and the rest of whole-tree ownership are not
-yet implemented. The root marker, specified on 2026-10-03, is parsed, selects the
+Auxiliary source is inventoried and analyzed under its owner's ordinary
+classification. The located finding for an exposure that selects an auxiliary
+original and the rest of whole-tree ownership are not yet implemented. The root marker, specified on 2026-10-03, is parsed, selects the
 root and is enforced in discovery; a marked description inside a declared
 nested tree is never read.
 Specification adoption does not establish parser or checker support.

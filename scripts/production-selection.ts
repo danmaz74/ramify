@@ -20,6 +20,8 @@ export function selectProductionFiles(snapshot: InventorySnapshot): ProductionFi
   if (profiles.size !== snapshot.areas.length) throw new Error('Inventory contains duplicate source profiles');
   const retained = new Set<string>();
   for (const file of snapshot.inventory.files) {
+    // Auxiliary source (scripts, configuration files, probes) is never package output.
+    if (file.placement !== 'src') continue;
     const area = profiles.get(`${file.owner}:${file.area}`);
     if (!area) throw new Error(`No resolved source profile for ${file.path}`);
     if (!area.profile.includes('testing')) retained.add(file.path);

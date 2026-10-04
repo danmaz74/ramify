@@ -231,17 +231,25 @@ describe('public disposable analysis session', () => {
     expect(denied.snapshot!.results.filter(result => result.outcome === 'unverifiable')).toHaveLength(1);
   }), 20_000);
 
-  it('reports compiler-selected project targets outside modules as coverage and warnings', async () => fixture(async (root, inputs) => {
+  // Root-owned compiler source outside src/ is the root's auxiliary source: an
+  // application target whose originals no exposure can make visible, so a
+  // child's import of it is a definite denial, with no warning or note.
+  it('denies a child access to root-owned auxiliary source, which no exposure makes visible', async () => fixture(async (root, inputs) => {
     await put(root, 'tools/outside.ts', 'export const outside = 1;\n');
     await put(root, importer, "import { outside } from '../../../tools/outside.js';\nvoid outside;\n");
     const report = reported(await analyzeProject(inputs));
-    expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
-    expect(report.summary).toMatchObject({ warnings: 1, coverageNotes: 1, external: 0, allowed: 0, denied: 0 });
-    expect(report.warnings).toEqual([{ code: 'outside-module-source', path: 'tools',
-      message: '1 compiler-selected file outside module source', files: ['tools/outside.ts'], count: 1 }]);
-    expect(report.coverage).toEqual([expect.objectContaining({ code: 'outside-module-target', location: expect.objectContaining({ file: importer }) })]);
-    expect(report.snapshot!.accesses[0]!.target).toEqual({ kind: 'outside-project', file: 'tools/outside.ts' });
-    expect(report.snapshot!.results[0]).toMatchObject({ outcome: 'outside-scope', decisions: [], diagnostics: [] });
+    expect(report.outcome).toEqual({ execution: 'completed', check: 'failed', coverage: 'complete' });
+    expect(report.summary).toMatchObject({ warnings: 0, coverageNotes: 0, external: 0, allowed: 0, denied: 1, errors: 1 });
+    expect(report.warnings).toEqual([]);
+    expect(report.snapshot!.inventory.files.find(file => file.path === 'tools/outside.ts'))
+      .toMatchObject({ owner: 'fixture', area: 'ordinary', kind: 'source', placement: 'auxiliary' });
+    expect(report.snapshot!.accesses[0]!.target).toEqual({ kind: 'application',
+      origin: { file: 'tools/outside.ts', area: { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] }, auxiliary: true } });
+    expect(report.snapshot!.results[0]).toMatchObject({ outcome: 'checked', decisions: [{ status: 'denied', reason: 'not-visible' }] });
+    expect(report.diagnostics).toEqual([expect.objectContaining({ code: 'not-visible', category: 'import',
+      importer: expect.objectContaining({ owner: 'fixture/consumer', kind: 'ordinary' }),
+      original: { kind: 'code', owner: 'fixture', file: '../tools/outside.ts', binding: 'outside' },
+      location: expect.objectContaining({ file: importer, line: 1 }) })]);
   }), 15_000);
 
   // PB1-11 through the batch session: the source Project leaves unanalyzed is
@@ -253,15 +261,15 @@ describe('public disposable analysis session', () => {
     await put(root, 'tools/outside.ts', 'export const outside = 1;\n');
     const report = reported(await analyzeProject(inputs));
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'complete' });
-    expect(report.summary).toMatchObject({ warnings: 3, errors: 0, coverageNotes: 0, sourceFiles: 2 });
+    // The selected tools/outside.ts is root auxiliary source, inventoried and read, with no warning.
+    expect(report.summary).toMatchObject({ warnings: 2, errors: 0, coverageNotes: 0, sourceFiles: 3 });
     expect(report.warnings).toEqual([
       { code: 'compiler-selected-scratch', path: 'subs/consumer/src/tmp', files: ['subs/consumer/src/tmp/draft.ts'], count: 1,
         message: '1 compiler-selected file in the scratch directory of module fixture/consumer, which Ramify does not analyze; exclude the directory from the compiler configuration' },
-      { code: 'outside-module-source', path: 'tools', message: '1 compiler-selected file outside module source', files: ['tools/outside.ts'], count: 1 },
       { code: 'compiler-selected-owned-ignored', path: 'tools/fixtures', files: ['tools/fixtures/data.ts'], count: 1,
         message: '1 compiler-selected file in an owned-ignored tree of module fixture, which Ramify does not analyze; exclude the tree from the compiler configuration' },
     ]);
-    // The selected outside file is read; the unanalyzed ones never are, by acquisition or by the compiler.
+    // The auxiliary file is read; the unanalyzed ones never are, by acquisition or by the compiler.
     const read = report.snapshot!.inputs.filter(input => input.bytes > 0).map(input => input.path);
     expect(read).toContain('tools/outside.ts');
     expect(read.filter(path => unanalyzed.includes(path))).toEqual([]);
@@ -347,11 +355,10 @@ describe('public disposable analysis session', () => {
   }), 15_000);
 
   it('applies the combined diagnostic bound when warnings alone exceed it', async () => fixture(async (root, inputs) => {
-    const config = JSON.parse(fixtureFiles['tsconfig.json']) as { include: string[] };
-    config.include.push('scripts');
-    await put(root, 'tsconfig.json', JSON.stringify(config));
-    await put(root, 'scripts/outside.ts', 'export const script = 1;\n');
-    await put(root, 'tools/outside.ts', 'export const tool = 1;\n');
+    // Two selected scratch files warn once per scratch directory; source outside
+    // src/ no longer warns, as it is its owner's auxiliary source (iteration 8C).
+    await put(root, 'src/tmp/draft.ts', 'export const draft = 1;\n');
+    await put(root, 'subs/consumer/src/tmp/draft.ts', 'export const draft = 1;\n');
     const baseline = reported(await analyzeProject(inputs));
     expect(baseline.outcome.check).toBe('passed');
     expect(baseline.summary).toMatchObject({ warnings: 2, errors: 0, coverageNotes: 0 });

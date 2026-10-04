@@ -51,7 +51,8 @@ export function assertClientClosure(events: readonly TraceEvent[], installed: st
 }
 
 export function assertContextsDenial(report: AnalysisReport, assertions: Assertions): void {
-  completed(report, assertions, 'complete', 'failed');
+  // Project-boundary iteration 8C: the toolkit's auxiliary scripts keep its coverage partial (see assertToolkit).
+  completed(report, assertions, 'partial', 'failed');
   assertions.equal('contexts has exactly the independently expected dispatch denial', report.diagnostics.map(issue => ({
     code: issue.code, file: issue.location?.file, line: issue.location?.line, original: issue.original, importer: issue.importer,
   })), [{ code: 'required-importer-tag', file: probe, line: 1,

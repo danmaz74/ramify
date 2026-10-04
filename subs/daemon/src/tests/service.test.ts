@@ -416,7 +416,7 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
       views: { state: 'unavailable', reason: 'not-requested' }, contextSize: { exact: { production: { sourceFiles: 1 } } } } });
     const query = await f.measure();
     if (!query.ok || query.value.status !== 'measured') throw new Error(JSON.stringify(query));
-    expect(query.value.document).toMatchObject({ schema: 'ramify.measure/1', revision: result.value.revision.revision,
+    expect(query.value.document).toMatchObject({ schema: 'ramify.measure/2', revision: result.value.revision.revision,
       views: 'measured', modules: [{ id: 'fixture', exact: { production: { sourceFiles: 1 },
         views: { ordinaryBytes: expect.any(Number), testsBytes: expect.any(Number) } } }] });
     const architect = (JSON.parse(await f.view('module.json')) as { metrics: { contextSize: { exact: Record<string, unknown> } } }).metrics;

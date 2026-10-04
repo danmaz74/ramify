@@ -130,14 +130,13 @@ export interface MeasureParams {
 }
 /** The deterministic machine document returned by a successful measurement. */
 export interface MeasureDocument {
-  readonly schema: 'ramify.measure/1';
+  readonly schema: 'ramify.measure/2';
   readonly revision: RevisionId;
   readonly root: string;
   readonly ownershipRule: string;
   readonly views: MeasurementViews;
   readonly modules: readonly ModuleMeasurement[];
   readonly files: readonly MeasurementFileRecord[];
-  readonly outsideModuleFiles: readonly string[];
 }
 export type MeasureOutcome =
   | { readonly status: 'measured'; readonly requestId: string;

@@ -3,7 +3,7 @@ import type { Capture } from './capture.js';
 import { acquireProject } from './read-project.js';
 import type { AcquiredProject } from './read-project.js';
 import { AcquisitionError, Cancelled, byteOrder, freeze, within } from './data.js';
-import { excludedDirectory, inventoryFileKind, scopeOwnership } from './inventory.js';
+import { auxiliarySource, excludedDirectory, inventoryFileKind, scopeOwnership } from './inventory.js';
 import { isRamifyGeneratedPath } from './generated-path.js';
 import { descriptionMarker } from './marker.js';
 import { readPurpose } from './purpose.js';
@@ -21,6 +21,7 @@ type Classified =
   | { readonly kind: 'description'; readonly path: string; readonly directory: string }
   | { readonly kind: 'readme'; readonly path: string; readonly directory: string }
   | { readonly kind: 'owned'; readonly path: string; readonly module: InventoryModule }
+  | { readonly kind: 'auxiliary'; readonly path: string; readonly file: InventoryFile }
   | { readonly kind: 'input'; readonly path: string }
   | { readonly kind: 'structural'; readonly path: string }
   | { readonly kind: 'ignored'; readonly path: string };
@@ -220,6 +221,27 @@ class Observer implements ProjectObserver {
       within(join(this.#capture.root, module.directory, 'src'), path) && basename(path) !== 'module.ramify');
   }
 
+  /**
+   * A conservative bridge for auxiliary source: an edit of an inventoried
+   * auxiliary file updates it in place; any other change that can add or
+   * remove auxiliary source, a new owned compiler source file outside every
+   * `src/` or a path above an inventoried auxiliary file, recomputes the
+   * inventory.
+   */
+  #auxiliary(path: string, relativePath: string): Classified | undefined {
+    if (relativePath === '') return undefined;
+    const file = this.#inventory.files.find(item => item.path === relativePath);
+    if (file?.placement === 'auxiliary') return { kind: 'auxiliary', path, file };
+    if (file) return undefined;
+    const prefix = `${relativePath}/`;
+    if (this.#inventory.files.some(item => item.placement === 'auxiliary' && item.path.startsWith(prefix))) return { kind: 'structural', path };
+    const ownership = classifyProjectPath(this.#inventory.scope, relativePath);
+    if (ownership.status === 'owned' && ownership.exclusion === null && auxiliarySource(path, this.#configurationData)) {
+      return { kind: 'structural', path };
+    }
+    return undefined;
+  }
+
   #classify(path: string): Classified {
     // Generated final and transient publisher output is never a real input:
     // ignore it before it can become owned, structural, description, readme
@@ -250,6 +272,8 @@ class Observer implements ProjectObserver {
     }
     const owner = this.#owner(path);
     if (owner) return { kind: 'owned', path, module: owner };
+    const auxiliary = this.#auxiliary(path, relativePath);
+    if (auxiliary) return auxiliary;
     if (name === 'README.md' && this.#moduleAt(dirname(path))) return { kind: 'readme', path, directory: dirname(path) };
     // A directory beneath `subs/` can only be a new or removed child boundary.
     if (this.#inventory.modules.some(module => within(join(this.#capture.root, module.directory, 'subs'), path))) {
@@ -318,6 +342,14 @@ class Observer implements ProjectObserver {
         readmes.push(label);
         continue;
       }
+      if (item.kind === 'auxiliary') {
+        await this.#capture.refresh(item.path);
+        // A deleted or replaced auxiliary file is recomputed by acquisition.
+        if (this.#capture.recorded(item.path)?.kind !== 'file') return this.#rebuild(signal);
+        files.set(label, { ...item.file, ...await this.#capture.application(item.path, 'source') });
+        changed.push(label);
+        continue;
+      }
       if (item.kind !== 'owned') continue;
       const outcome = await this.#owned(item.path, item.module, files, modules);
       if (outcome === 'structural') return this.#rebuild(signal);
@@ -345,9 +377,9 @@ class Observer implements ProjectObserver {
         walkedAreas: nextModules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
         ownership: scopeOwnership(this.#capture.root, nextModules, this.#configurationData) },
       modules: nextModules, files: nextFiles, references,
-      // A local update moves no boundary and admits no outside-module file, so
-      // those files and every warning carry over; a rebuild recomputes them.
-      outsideModuleFiles: this.#inventory.outsideModuleFiles, warnings: this.#inventory.warnings,
+      // A local update moves no boundary and adds or removes no auxiliary
+      // source, so every warning carries over; a rebuild recomputes them.
+      warnings: this.#inventory.warnings,
     });
     this.#inventory = inventory;
     return freeze({ kind: 'local', inventory, descriptions: descriptions.sort(byteOrder), readmes: readmes.sort(byteOrder),

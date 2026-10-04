@@ -278,7 +278,7 @@ import { createMeasureDriver } from './measure-driver.js';
         resourceFiles: 0, resourceBytes: 0 }, tests: { sourceFiles: 0, sourceBytes: 0, resourceFiles: 0, resourceBytes: 0 },
       documentation: { files: 0, bytes: 0 } };
       return createMeasureDriver({ modules: [{ id: 'example', dir: '', parent: null, exact: bucket, subtree: bucket }],
-        files, outsideModuleFiles: ['outside/外-"quote"-\\slash.ts'] });
+        files });
     };
     const run = async (maximum: number) => {
       const fixture = await ipcFixture({ maxResponseBytes: maximum }, true, driver());
@@ -317,7 +317,7 @@ import { createMeasureDriver } from './measure-driver.js';
         resourceFiles: 0, resourceBytes: 0 }, tests: { sourceFiles: 0, sourceBytes: 0, resourceFiles: 0, resourceBytes: 0 },
       documentation: { files: 0, bytes: 0 } };
       const driver = createMeasureDriver({ modules: [{ id: 'example', dir: '', parent: null, exact: bucket, subtree: bucket }],
-        files, outsideModuleFiles: [] }, false, { apiView: projectionReady });
+        files }, false, { apiView: projectionReady });
       const fixture = await ipcFixture({}, true, driver);
       const client = await fixture.connect();
       const opened = await client.openContext(fixture.params);
@@ -437,7 +437,7 @@ import { createMeasureDriver } from './measure-driver.js';
   it('A7-08:disconnect during the request aborts the session query, releases the lease and leaves the daemon usable', async () => {
     const signals: AbortSignal[] = [];
     let blocking = true;
-    const driver = createMeasureDriver({ modules: [], files: [], outsideModuleFiles: [] }, false, {
+    const driver = createMeasureDriver({ modules: [], files: [] }, false, {
       affected: async (query, control) => {
         if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/2',
           inputId: 'input/1:scripted', paths: [], changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure',

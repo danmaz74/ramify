@@ -484,7 +484,7 @@ RAMIFY_MEASUREMENT_ACTIVITY='Idle host; no other builds or measurements' npm run
 The command uses the built CLI and one owned endpoint. It records a measure
 after daemon startup and a warm repeat, verifies the sum of exact owner buckets
 against the root subtree and every listed byte count against disk, and writes
-the complete `ramify.measure/1` toolkit document. It then measures the architect
+the complete `ramify.measure/2` toolkit document. It then measures the architect
 session query, materialization, unchanged repeat, generated size, Plan 2B search
 terms and sampled daemon/worker/compiler memory. The report chooses the fixed
 architect metrics policy only from the agreed budgets and preserves Plan 2B's

@@ -55,7 +55,9 @@ const ownerPaths = ['', 'subs/analysis', 'subs/analysis/subs/model', 'subs/analy
   'subs/presentation/subs/layout', 'subs/cli'];
 async function toolkitTests(root: string, assertions: Assertions): Promise<string[]> {
   const all = (await Promise.all(['src', 'subs'].map(path => filesBelow(root, path)))).flat().sort();
-  const expected = all.filter(file => /\.test\.tsx?$/.test(file));
+  // Owner tests lie beneath a module's src/; a test-shaped file outside src/, such as analysis's
+  // modularity probe test with its own Vitest configuration, is auxiliary source, not a toolkit test.
+  const expected = all.filter(file => /(?:^|\/)src\/(?:.*\/)?[^/]*\.test\.tsx?$/.test(file));
   const listed = await listedTests(root);
   assertions.equal('all current owner tests discovered exactly once', listed, expected);
   assertions.equal('no duplicate test registration', new Set(listed).size, listed.length);

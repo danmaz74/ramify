@@ -113,7 +113,7 @@ export async function acquire(root: string): Promise<ProjectInputView> {
   const inventory: ProjectInventory = {
     scope: { root, selection: 'given', invokedFrom: root, configuration: join(root, 'tsconfig.json'),
       walkedAreas: modules.flatMap(module => module.areas.map(area => area.root)), ownership: { modules: [], exclusions: [] } },
-    modules, references: [], outsideModuleFiles: [], warnings: [],
+    modules, references: [], warnings: [],
     files: [...files].flatMap(([path, content]) => {
       const local = relative(root, path);
       const owner = modules.find(module => local.startsWith(`${module.areas[0]!.root}/`));

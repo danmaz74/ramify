@@ -20,8 +20,8 @@ The host remembers at most 100,000 distinct request IDs per connection for exact
 
 `measure` is a synchronized, read-only service operation and advertised
 capability. It joins the retained inventory measurement and all-module API-view
-render only when both name one revision, returning `ramify.measure/1` with the
-normative ownership rule, ordered modules/files and outside-module paths. API
+render only when both name one revision, returning `ramify.measure/2` with the
+normative ownership rule and ordered modules/files, including auxiliary source. API
 projection/render resource failure preserves inventory with uniformly unavailable
 view bytes; cancellation, deadline, supersession and invalid inventory end the
 whole request. Response assembly counts exact escaped UTF-8 incrementally,

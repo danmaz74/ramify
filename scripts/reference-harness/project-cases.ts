@@ -53,11 +53,20 @@ async function changedReference(root: string, value: string): Promise<void> {
   // Two reviewed exposures select the same file. Mutate only the value statement.
   await replaceExactlyOnce(join(root, provider), 'expose-src value from "interfaces/api.ts"', `expose-src value from ${JSON.stringify(value)}`);
 }
-function warning(assertions: Assertions, inventory: ProjectInventory, entry: string, paths: string[]): void {
-  assertions.equal('outside warning', inventory.warnings, [{ code: 'outside-module-source', path: entry,
-    message: `${paths.length} compiler-selected file${paths.length === 1 ? '' : 's'} outside module source`, files: paths, count: paths.length }]);
-  assertions.equal('outside source selection', inventory.outsideModuleFiles, paths);
-  assertions.ok('outside files have no owner or profile', paths.every(path => !inventory.files.some(file => file.path === path)));
+// Re-reasoned in project-boundary iteration 8C: owned compiler source outside
+// every src/ is its nearest module's auxiliary source, with that owner's
+// ordinary area and no warning; the reviewed rows still name the retired
+// outside-source warning. A sibling name creates no area of its own.
+function auxiliary(assertions: Assertions, inventory: ProjectInventory, paths: string[]): void {
+  assertions.equal('no outside-source warning', inventory.warnings, []);
+  assertions.equal('root auxiliary source with the ordinary area', inventory.files.filter(file => paths.includes(file.path))
+    .map(file => [file.path, file.owner, file.area, file.kind, file.placement]), paths.map(path => [path, 'fixture', 'ordinary', 'source', 'auxiliary']));
+  assertions.ok('no further source area', inventory.modules.every(module => module.areas.length === 2));
+}
+// Source beneath a layout-invalid boundary has no owner and no warning.
+function unattributed(assertions: Assertions, inventory: ProjectInventory, paths: string[]): void {
+  assertions.equal('no outside-source warning', inventory.warnings, []);
+  assertions.ok('files beneath the invalid boundary have no owner or profile', paths.every(path => !inventory.files.some(file => file.path === path)));
 }
 async function invalid(context: ProjectContext, code: string, path: string, request: Partial<ProjectRequest> = {}): Promise<ProjectRead> {
   const result = await read(context.root, request);
@@ -97,7 +106,7 @@ const cases: Record<string, Case> = {
     mutate: async c => { await put(c.root, 'tests/helper.ts', 'export {};\n'); await include(c.root, 'tests'); await put(c.root, 'tests/module.ramify', 'ramify 1\nmodule hidden\n'); },
     run: async c => {
       const r = await invalid(c, 'stray-description', 'tests/module.ramify');
-      if (r.status === 'invalid' && r.inventory) warning(c.assertions, r.inventory, 'tests', ['tests/helper.ts']);
+      if (r.status === 'invalid' && r.inventory) unattributed(c.assertions, r.inventory, ['tests/helper.ts']);
       // The earlier reviewed loose-directory spelling also remains an error.
       await rename(join(c.root, 'tests'), join(c.root, 'loose'));
       await include(c.root, 'loose');
@@ -193,13 +202,11 @@ const cases: Record<string, Case> = {
   'I1-29:stray-files': {
     mutate: async c => { for (const path of ['config-extra.ts', 'tests/a.ts', 'tests/b.ts', 'ignored/c.ts']) await put(c.root, path, 'export {};\n'); await include(c.root, 'config-extra.ts', 'tests'); },
     run: c => acquired(c, view => {
-      c.assertions.equal('per-entry aggregation and counts', view.inventory.warnings, [
-        { code: 'outside-module-source', path: 'config-extra.ts', message: '1 compiler-selected file outside module source', files: ['config-extra.ts'], count: 1 },
-        { code: 'outside-module-source', path: 'tests', message: '2 compiler-selected files outside module source', files: ['tests/a.ts', 'tests/b.ts'], count: 2 },
-      ]);
-      c.assertions.equal('selected outside files only', view.inventory.outsideModuleFiles, ['config-extra.ts', 'tests/a.ts', 'tests/b.ts']);
-      c.assertions.equal('outside files receive no source areas', view.inventory.files.map(f => f.path), ['subs/consumer/src/probe.ts', api]);
-      c.assertions.ok('unselected outside source bytes not read', !view.inputs.some(i => i.path === 'ignored/c.ts' && i.bytes > 0));
+      // Re-reasoned in iteration 8C: selected or not, each file is root auxiliary source, with no warning.
+      auxiliary(c.assertions, view.inventory, ['config-extra.ts', 'ignored/c.ts', 'tests/a.ts', 'tests/b.ts']);
+      c.assertions.equal('auxiliary files join the inventory in byte order', view.inventory.files.map(f => f.path),
+        ['config-extra.ts', 'ignored/c.ts', 'subs/consumer/src/probe.ts', api, 'tests/a.ts', 'tests/b.ts']);
+      c.assertions.ok('unselected auxiliary source is read as an application input', view.inputs.some(i => i.path === 'ignored/c.ts' && i.bytes > 0));
     }),
   },
 };
@@ -207,7 +214,7 @@ for (const [id, path, entry] of [
   ['loose-subs-source', 'subs/loose.ts', 'subs'], ['sibling-tests', 'tests/probe.ts', 'tests'], ['sibling-interfaces', 'interfaces/probe.ts', 'interfaces'],
 ] as const) cases[`I1-02:${id}`] = {
   mutate: async c => { await put(c.root, path, 'export {};\n'); await include(c.root, path); },
-  run: c => acquired(c, view => warning(c.assertions, view.inventory, entry, [path])),
+  run: c => acquired(c, view => auxiliary(c.assertions, view.inventory, [path])),
 };
 for (const [id, target, status, code] of [
   ['exact-path/js-extension', 'interfaces/api.js', 'missing', 'missing-file'],
@@ -238,7 +245,8 @@ const referenceRoot = resolve(repositoryRoot, 'examples/collection-review');
 async function referenceInventory(c: ProjectContext, view: ProjectInputView, selection: 'given' | 'found'): Promise<void> {
   const inventory = view.inventory;
   c.assertions.equal('all fifteen owners', inventory.modules.length, 15);
-  c.assertions.equal('reference owned file count', inventory.files.length, 59);
+  // Project-boundary iteration 8C: the root's two configuration files join as auxiliary source; cucumber.js stays inert.
+  c.assertions.equal('reference owned file count', inventory.files.length, 61);
   c.assertions.equal('two CSS-module resources', inventory.files.filter(f => f.path.endsWith('.module.css')).map(f => [f.path, f.owner, f.area, f.kind]), [
     ['subs/workspace/subs/catalog/subs/ui/src/catalog-card.module.css', 'collection-review/workspace/catalog/ui', 'ordinary', 'resource'],
     ['subs/workspace/subs/reviews/subs/ui/subs/pure-ui/src/review-result.module.css', 'collection-review/workspace/reviews/ui/pure-ui', 'ordinary', 'resource'],
@@ -246,7 +254,9 @@ async function referenceInventory(c: ProjectContext, view: ProjectInputView, sel
   c.assertions.equal('scope root/config/selection', [inventory.scope.root, inventory.scope.configuration, inventory.scope.selection], [c.root, join(c.root, 'tsconfig.json'), selection]);
   c.assertions.equal('all ordinary and testing roots reported', inventory.scope.walkedAreas.length, 30);
   c.assertions.equal('no other walked area', [...inventory.scope.walkedAreas].sort(), inventory.modules.flatMap(m => m.areas.map(a => a.root)).sort());
-  c.assertions.equal('two configuration-source warnings', inventory.warnings.map(w => [w.path, w.count]), [['vite.config.ts', 1], ['vitest.config.ts', 1]]);
+  c.assertions.equal('no configuration-source warnings', inventory.warnings.map(w => [w.path, w.count]), []);
+  c.assertions.equal('configuration files are root auxiliary source', inventory.files.filter(f => f.placement === 'auxiliary').map(f => [f.path, f.owner]),
+    [['vite.config.ts', 'collection-review'], ['vitest.config.ts', 'collection-review']]);
   c.assertions.ok('compiler configuration captured', view.inputs.some(i => i.path === 'tsconfig.json' && i.role === 'configuration' && i.sha256 === digest(projectFixtureText(c.root))));
   c.assertions.ok('standalone testing owner ordinary source', inventory.files.some(f => f.owner === 'collection-review/integration-tests' && f.area === 'ordinary'));
   c.assertions.ok('all references exact', inventory.references.every(r => r.status === 'file'));

@@ -226,7 +226,9 @@ describe('RetainedSession.affected: coverage (A7-04)', () => {
         selection: 'all-modules', widening: ['partial-coverage'] });
       expect(ids(result.testModules)).toEqual(formModules);
     } finally { await handle.dispose(); }
-  }, { ...formFiles, 'lib/helper.ts': 'export const helper: number = 1;\n',
+  // Since iteration 8C a loose root file is root auxiliary source, an application
+  // target; a file in an owned-ignored tree is still outside every module.
+  }, { ...formFiles, 'module.ramify': `${formFiles['module.ramify']}owned-ignored "lib"\n`, 'lib/helper.ts': 'export const helper: number = 1;\n',
     [formPaths.alone]: "import { helper } from '../../../lib/helper.js';\nexport const alone: number = helper;\n" }), timeout);
 });
 

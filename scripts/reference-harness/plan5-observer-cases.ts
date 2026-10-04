@@ -89,6 +89,7 @@ function counting(): { parse: DescriptionParser; parses: () => number } {
   return { parse: (file: string, text: string) => { parses++; return parseDescription(file, text); }, parses: () => parses };
 }
 /** Establish the cold observation as the baseline every mutation starts from. */
+// Project-boundary iteration 8C: the reference's 61 owned files include its two root configuration files as auxiliary source.
 function baseline(expected: { owners: number; files: number }, mutableZod = false) {
   return {
     prepare: (context: IsolatedProject) => prepareReference(context.root, mutableZod),
@@ -129,7 +130,7 @@ function localUpdate(assertions: Assertions, name: string, update: InventoryUpda
 const handlers = new Map<string, InstanceHandler>();
 
 handlers.set('I5-05:description-local-update', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }),
   mutate: ({ root }) => applyTextMutation(root, edits['remove-hop']).then(() => undefined),
   run: async (context: ProjectContext) => {
     const { observer, inputs, inventory, enumerations, parses } = await session(context);
@@ -157,7 +158,7 @@ handlers.set('I5-05:description-local-update', {
 });
 
 handlers.set('I5-05:readme-local-update', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }),
   mutate: async ({ root }) => {
     const path = join(root, catalogDirectory, 'README.md');
     const text = await readFile(path, 'utf8');
@@ -186,7 +187,7 @@ handlers.set('I5-05:readme-local-update', {
 });
 
 handlers.set('I5-05:file-created-local', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }),
   mutate: ({ root }) => writeFile(join(root, catalogDirectory, 'src/extra.ts'), 'export const extra = 1;\n', { flag: 'wx' }),
   run: async (context: ProjectContext) => {
     const { observer, inventory } = await session(context);
@@ -210,7 +211,7 @@ handlers.set('I5-05:file-created-local', {
 });
 
 handlers.set('I5-05:file-deleted-local', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }),
   mutate: ({ root }) => rm(join(root, unexposedSource)),
   run: async (context: ProjectContext) => {
     const { observer, inventory } = await session(context);
@@ -240,7 +241,7 @@ handlers.set('I5-05:file-deleted-local', {
 });
 
 handlers.set('I5-05:module-added-structural', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }),
   mutate: async ({ root }) => {
     const directory = join(root, catalogDirectory, 'subs/extra');
     await mkdir(join(directory, 'src'), { recursive: true });
@@ -267,7 +268,7 @@ handlers.set('I5-05:module-added-structural', {
 });
 
 handlers.set('I5-05:stray-description-invalid', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }),
   mutate: ({ root }) => writeFile(join(root, catalogDirectory, 'src/module.ramify'), 'ramify 1\nmodule stray\n', { flag: 'wx' }),
   run: async (context: ProjectContext) => {
     const { observer, inventory } = await session(context);
@@ -290,7 +291,7 @@ handlers.set('I5-05:stray-description-invalid', {
 });
 
 handlers.set('I5-05:sweep-detects-unwatched', {
-  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 59 }, true),
+  kind: 'project', fixture: { kind: 'copy', sourceRoot: referenceRoot }, ...baseline({ owners: 15, files: 61 }, true),
   mutate: async ({ root }) => {
     const path = join(root, zodDeclaration);
     await writeFile(path, `${await readFile(path, 'utf8')}\nexport declare const ramifySweepWitness: number;\n`);

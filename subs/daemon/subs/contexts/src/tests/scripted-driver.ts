@@ -224,7 +224,7 @@ export function createScriptedDriver() {
             return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${sequence} is not current` };
           }
           return { status: 'measured', measurements: { sequence, inputId: current.inputId,
-            modules: [], files: [], outsideModuleFiles: [] } };
+            modules: [], files: [] } };
         },
         async affected(query, runControl) {
           entry.affectedCalls.push(query);
