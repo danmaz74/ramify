@@ -66,3 +66,16 @@ npx vitest run subs/harness/src/tests/capability-delegation.test.ts -t 'unsafe s
 The first command in that block failed with the explicit scratch conflict before the fixture correction; the next four passed after it. `npm run type-check`, `npm run check:self` and `git diff --check` passed after the final source change. `check:self` reported 0 errors, 0 warnings and 316 analysis limits. The full suite was not run.
 
 The superseded cleanup test verifies the same owner-selection function used by recovery and evidence reopening, then applies its selected removals to real files. It does not claim an end-to-end contract revision with scratch inside a superseded engineer assignment.
+
+## Final audit inventory follow-up
+
+The final audit exposed stale completeness inventories: `union-values.test.ts` omitted the three new scratch event types and had no projection sample for `scratch-preserved`; `composition.test.ts` lacked named producers for that event and `local-rule-failed` gate commands. The initial focused run failed 3 of 48 tests. The inventories now name the actual producing tests, and the active ignore repair test asserts the command reason directly. No production schema or runtime changed in this follow-up.
+
+```sh
+npx vitest run subs/harness/src/tests/union-values.test.ts subs/harness/src/tests/composition.test.ts
+npx vitest run subs/harness/src/tests/union-values.test.ts subs/harness/src/tests/composition.test.ts subs/harness/src/tests/accepted-commit.test.ts
+npm run type-check
+npm run check:self
+```
+
+The first command was the reproducer (3 failures, 45 passes). After the correction, the second passed 57 tests across 3 files, and both checks passed. `check:self` again reported 0 errors, 0 warnings and 316 analysis limits.

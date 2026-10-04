@@ -482,6 +482,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['fail'], file: 'subs/harness/src/tests/execution-map-projection.test.ts', test: 'reads old gates without an audit fact and a failed published audit independently of verdict' },
   { union: 'record ramify-agent.gate-audit-outcome/1.overall', values: ['indeterminate'], file: 'subs/harness/src/tests/audit-check-execution.test.ts', test: 'retains an indeterminate published audit outcome' },
   { union: 'run log.type', values: ['readiness-failed'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
+  { union: 'run log.type', values: ['scratch-preserved'], file: 'subs/harness/src/tests/accepted-commit.test.ts', test: 'a forced-staged scratch file fails the run gate and closure preserves only indexed scratch' },
   { union: 'run log.type', values: ['global-context-rebuilt'], file: 'subs/harness/src/tests/placement.test.ts', test: 'the generation rises, the pending brief is cleared, and the next fork is oriented from the records' },
   { union: 'run log.type', values: ['job-interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after publishing the run and captured inputs leaves a run that loads and is interrupted' },
   { union: 'run log[invocation-ended].data[false].finished', values: ['interrupted'], file: 'subs/harness/src/tests/run-recovery.test.ts', test: 'a crash after invocation-started closes that invocation without an agent call and without a second one' },
@@ -536,6 +537,7 @@ const producedElsewhere: ReadonlyArray<{ readonly union: string; readonly values
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['command-missing'], file: 'subs/harness/src/tests/readiness.test.ts', test: 'a nonexistent command is a readiness failure that consumes no recovery attempt' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['discovery-error'], file: 'subs/harness/src/tests/iteration-gate.test.ts', test: 'a discovery that fails never falls back to an earlier list' },
   { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['required-suite-missing'], file: 'subs/harness/src/tests/gate-not-verified.test.ts', test: 'refuses a selection that lost a required suite, and one discovery could not establish' },
+  { union: 'record ramify-agent.gate-attempt/3.commands[].notVerified', values: ['local-rule-failed'], file: 'subs/harness/src/tests/accepted-commit.test.ts', test: 'a nested ignore exception fails the gate before commit and repair retains scratch' },
   // The fixture declares no setup command, so no composed run runs one: a
   // run over a copy that declares a build, whose first iteration gate finds
   // it broken, and readiness running one in place produce them.

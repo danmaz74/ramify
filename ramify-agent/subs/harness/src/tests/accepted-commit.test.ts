@@ -200,6 +200,7 @@ describe('a change to the working directory blocks nothing', () => {
     expect(onlyRun(opened.service, 'review-notes').state, JSON.stringify(onlyRun(opened.service, 'review-notes').failure)).toBe('completed');
     const first = JSON.parse(await readFile(runPath(root, 'review-notes', receipt.jobId, runLayout.gate('ga-0002')), 'utf8')) as GateAttempt;
     expect(first).toMatchObject({ verdict: 'failed', cause: 'check-failed', commit: null, audited: null, next: 'repair' });
+    expect(first.commands.some(command => command.notVerified === 'local-rule-failed')).toBe(true);
     expect(first.rules?.find(rule => rule.rule === 'scratch-safety')?.violations).toEqual([expect.objectContaining({
       path: `${notesDirectory}/src/tmp/`, detail: expect.stringContaining(`${notesDirectory}/src/.gitignore:1`),
     })]);
