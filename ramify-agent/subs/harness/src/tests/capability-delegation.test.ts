@@ -154,6 +154,58 @@ test('CA01 CA03 CA04 CA28 CA30 CA32: request reaches one fresh architect and kee
   expect(finished.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
 }, 30_000);
 
+test('an unsafe scratch override refuses capability source capture until the same engineer repairs it', async () => {
+  const fixture = await copyCapabilityFixture();
+  cleanups.push(fixture.remove);
+  await initRepository(fixture.root);
+  await installMiniRunner(fixture.root);
+  const ordinary = script([]);
+  let captured = 0;
+  const opened = await openCapabilityRuns(fixture.root, {
+    git: gitService,
+    script: spec => {
+      const steps = typeof ordinary === 'function' ? ordinary(spec) : ordinary;
+      if (spec.role !== 'engineer') return steps;
+      const submitted = steps.at(-1)!;
+      return [
+        ...steps.slice(0, -1),
+        write('tmp/draft.txt', 'provisional scratch\n'),
+        write('.gitignore', '!tmp/\n'),
+        submitted,
+        edit('.gitignore', '!tmp/', ''),
+        submitted,
+      ];
+    },
+    inputs: treeInputs(), readinessExecution: directReadinessExecution(),
+    afterWrite: async current => { if (current === 'capability-source-captured') captured += 1; },
+  });
+  cleanups.push(() => opened.service.close());
+  const receipt = await opened.service.execute(startRun('need'));
+  await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event =>
+    event.type === 'capability-requested' || event.type === 'job-failed'), 30_000);
+  const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+  expect(events.some(event => event.type === 'job-failed')).toBe(false);
+  expect(captured).toBe(1);
+  expect(events.filter(event => event.type === 'capability-requested')).toHaveLength(1);
+  expect(events.filter(event => event.type === 'gate-attempted')).toHaveLength(0);
+  const engineer = events.find(event => event.type === 'invocation-started' && event.data.role === 'engineer');
+  if (engineer?.type !== 'invocation-started') throw new Error('The engineer did not start');
+  const outcome = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    runLayout.outcome(engineer.data.invocation)), 'utf8')) as InvocationOutcome;
+  expect(outcome.rejectedSubmissions).toBe(1);
+  expect(await readFile(runPath(fixture.root, 'need', receipt.jobId,
+    runLayout.observations(engineer.data.invocation)), 'utf8')).toContain('!tmp/');
+  const request = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId, 'capabilities/requests/need-001.json'), 'utf8')) as CapabilityRequest;
+  expect((await git(fixture.root, 'rev-parse', 'HEAD')).trim()).toBe(request.source.acceptedBase);
+  expect(await readFile(join(fixture.root, 'subs/a/src/tmp/draft.txt'), 'utf8')).toBe('provisional scratch\n');
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const version = opened.service.getRun('need', receipt.jobId)!.version;
+    try { await opened.service.execute(stopRun('need', receipt.jobId, version)); break; }
+    catch (error) { if (!String(error).includes('at version')) throw error; }
+  }
+  await opened.service.settled('need', receipt.jobId);
+}, 60_000);
+
 test('a capability architect budget return reconstructs a fresh session with the current task and plan', async () => {
   const fixture = await copyCapabilityFixture();
   cleanups.push(fixture.remove);

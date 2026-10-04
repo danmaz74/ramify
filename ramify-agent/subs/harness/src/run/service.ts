@@ -8301,7 +8301,8 @@ export class RunService {
         // A claimed completion is checked afresh over the write scope
         // before it is judged, because the hook checks saw only the
         // mutations they covered.
-        validate: async input => validateEngineer(input, {
+        validate: async input => {
+          const validated = validateEngineer(input, {
           capabilityWorkflow: this.workflow !== null && run.record.policy.version === capabilityRunPolicyVersion,
           obligation: assignment.evidenceObligations
             .find(evidence => evidence.obligation !== undefined && evidence.against === 'real')?.obligation ?? null,
@@ -8314,7 +8315,18 @@ export class RunService {
             consumer: item.module,
             providerOf: capability => committedRecords(run.log.ledger.replay()).registry.find(entry => entry.capability === capability)?.owner,
           },
-        }),
+          });
+          // A capability-needed submission captures a provisional candidate
+          // immediately after this invocation. Refuse unsafe scratch here so
+          // the same engineer session can repair it before a tree is read.
+          if (validated.ok && validated.value.kind === 'capability-needed') {
+            const safety = await scratchSafetyRule(this.projectRoot, await declaredModuleDirectories(this.projectRoot), this.git);
+            if (safety.outcome === 'failed') return { ok: false, errors: safety.violations.map(violation => ({
+              path: 'scratch', message: `${violation.path}: ${violation.detail}`,
+            })) };
+          }
+          return validated;
+        },
         acceptedText: value => {
           const check = tools.completionCheck();
           return iterationAcceptance(value.kind, check?.kind === 'not-checked' ? check.reason : null);
