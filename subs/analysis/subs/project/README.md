@@ -121,12 +121,14 @@ observations are captured inputs, so a tree's appearance or disappearance makes
 the revision stale. Any such issue makes the acquisition invalid. The observer
 rebuilds when a declared tree's or scratch directory's own directory, or a
 directory on the way to a declared tree, changes. Beneath such a directory it
-reads nothing: an unobserved path matters only through a listing the compiler
-configuration recorded, an observed entry whose kind or membership changed
-rebuilds the inventory, since the compiler selection and its warnings can
-change, bytes a stage read keep the ordinary input rule, and a byte edit
-changes nothing. A package manifest appearing in the walked tree, a new
-directory outside every `src/`, and a changed directory holding source,
+reads nothing: an unobserved path matters only through what a stage recorded of
+its nearest observed directory up to the tree's own, such as a listing the
+compiler configuration recorded or an absent tree that now exists; an observed
+entry whose kind or membership changed rebuilds the inventory, whether a stage
+read its bytes or not, since the compiler selection and its warnings can
+change; a byte edit of bytes a stage read keeps the ordinary input rule, and
+any other byte edit changes nothing. A package manifest appearing in the walked
+tree, a new directory outside every `src/`, and a changed directory holding source,
 modules or a declared tree also rebuild the inventory.
 
 `isRamifyGeneratedSegment` reserves the generated view names at any depth:

@@ -1010,20 +1010,24 @@ describe('membership path', () => {
       const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
       configuration.compilerOptions.strict = true;
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
-      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      // Every whole invalidation retires the compiler observations reported before it, once.
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', ['all']);
       await replace(root, 'node_modules/fixture-dependency/index.d.ts', 'readonly n: number', 'readonly n: string');
-      await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', []);
+      await expectBroad(handle, state, retire, inputs, ['node_modules/fixture-dependency/index.d.ts'], 'changed', ['all']);
       // A compiler report still pending at the update is promoted by it: a change no created file explains.
       await put(root, `${branch}/explained.ts`, 'export const explained = 1;\n');
       observer.sink.absent(join(root, 'node_modules/unexplained.d.ts'));
       await expectBroad(handle, state, retire, inputs, [`${branch}/explained.ts`], 'created', ['all']);
-      // The first owned test file makes `src/tests/` appear.
+      // The first owned test file makes `src/tests/` appear. The derived source areas follow the module header,
+      // not the directory, so the compiler is kept.
       await put(root, `${branch}/tests/branch.test.ts`, 'export const spec = 1;\n');
       await expectBroad(handle, state, retire, inputs, [`${branch}/tests/branch.test.ts`], 'created', ['all']);
+      // A new child module derives new areas: the compiler is replaced after the whole invalidation, so the
+      // observations the old one reported are retired again before the new one reads.
       await put(root, 'subs/branch/subs/twig/module.ramify', 'ramify 1\nmodule twig\n');
       await put(root, 'subs/branch/subs/twig/README.md', '# Twig\n\nA new child.\n');
       await put(root, 'subs/branch/subs/twig/src/twig.ts', 'export const twig = 1;\n');
-      await expectBroad(handle, state, retire, inputs, ['subs/branch/subs/twig/module.ramify'], 'created', []);
+      await expectBroad(handle, state, retire, inputs, ['subs/branch/subs/twig/module.ramify'], 'created', ['all', 'all']);
     } finally { await handle.dispose(); }
   }, {
     ...membershipFiles,
@@ -1069,7 +1073,7 @@ describe('membership path', () => {
       const configuration = JSON.parse(await readFile(join(root, 'tsconfig.json'), 'utf8'));
       configuration.compilerOptions.baseUrl = '.';
       await put(root, 'tsconfig.json', JSON.stringify(configuration));
-      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', []);
+      await expectBroad(handle, state, retire, inputs, ['tsconfig.json'], 'changed', ['all']);
       await put(root, `${branch}/based.ts`, 'export const based = 1;\n');
       await refused([`${branch}/based.ts`], 'created', ['probes', 'all']);
     } finally { await handle.dispose(); }

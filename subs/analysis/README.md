@@ -28,6 +28,13 @@ carries its checked set, finding delta and timings; `report` materializes the
 `ramify.analysis/2` document of a retained revision on request, equal to
 `analyzeProject` over the same inputs except `runId`, and `verify` recomputes
 everything from the warm compiler and compares it with the retained facts.
+A broad revision retires the compiler's earlier observations immediately before
+the compiler reads the whole program again, so source a declaration excludes or
+a removed target leaves no observation behind and the revision's inputs are
+those a batch capture records. A sweep of a session whose published revision is
+an invalid acquisition, or is stale after a failed or cancelled update,
+acquires the project again instead of trusting its observer, since neither
+observer state describes that revision.
 
 The decide stage also evaluates the signature-companion rule over the model, in
 batch and on every revision path, as its own `companions` timing. Each violation

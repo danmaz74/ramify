@@ -298,10 +298,11 @@ class Observer implements ProjectObserver {
   /**
    * A declared nested tree or scratch directory is never entered. Its own
    * directory is boundary evidence. A path beneath it matters only as far as a
-   * stage observed it: read bytes keep the ordinary input rule, and a changed
-   * kind or membership of an entry the compiler configuration listed can change
-   * the compiler selection and its warnings, so acquisition decides. A byte
-   * edit of an unread entry leaves its identity, and so the inputs, unchanged.
+   * stage observed it: a byte edit of read bytes keeps the ordinary input rule,
+   * and a changed kind or membership of an entry the compiler configuration
+   * listed, read or not, can change the compiler selection and its warnings, so
+   * acquisition decides. A byte edit of an unread entry leaves its identity, and
+   * so the inputs, unchanged.
    */
   async #excluded(path: string, relativePath: string, exclusion: ProjectExclusion): Promise<Classified> {
     const before = this.#capture.recorded(path);
@@ -309,13 +310,25 @@ class Observer implements ProjectObserver {
       return before && await this.#unchanged(path) ? { kind: 'ignored', path } : { kind: 'structural', path };
     }
     if (!before) {
-      // Unobserved: it matters only by changing a listing a stage recorded.
-      const parent = dirname(path);
-      if (!this.#capture.recorded(parent)?.directory) return { kind: 'ignored', path };
-      return await this.#unchanged(parent) ? { kind: 'ignored', path } : { kind: 'structural', path };
+      // Unobserved: it matters only by changing what a stage recorded of its
+      // nearest observed directory, up to the tree's own: a listing that gained
+      // or lost it, or a directory, such as an absent tree, that now exists.
+      const top = join(this.#capture.root, exclusion.directory);
+      for (let directory = dirname(path); within(top, directory); directory = dirname(directory)) {
+        const recorded = this.#capture.recorded(directory);
+        if (!recorded) continue;
+        return await this.#unchanged(directory) ? { kind: 'ignored', path } : { kind: 'structural', path };
+      }
+      return { kind: 'ignored', path };
     }
     if (before.read) {
-      return broadRoles.has(before.role) || broadNames.has(basename(path)) ? { kind: 'structural', path } : { kind: 'input', path, refreshed: false };
+      if (broadRoles.has(before.role) || broadNames.has(basename(path))) return { kind: 'structural', path };
+      // A read entry that appeared or vanished in a listing a stage recorded,
+      // such as the compiler configuration's, can change the compiler selection
+      // and its warnings, as an unread one does; a byte edit stays an input.
+      const parent = dirname(path);
+      if (this.#capture.recorded(parent)?.directory && !await this.#unchanged(parent)) return { kind: 'structural', path };
+      return { kind: 'input', path, refreshed: false };
     }
     if (!await this.#unchanged(path)) return { kind: 'structural', path };
     // Bytes read through a link at another path still depend on this file.

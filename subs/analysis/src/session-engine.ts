@@ -264,13 +264,20 @@ class Session implements RetainedSession {
       // A cancellation reobservation completed without noticing stops here,
       // before the revision step applies anything.
       if (control.signal?.aborted) return this.#cancelledSweep(observer);
-      if (!changes.length) return { status: 'unchanged' };
+      // A stale session's observer is past its published revision, and an invalid
+      // acquisition left the observer on its last valid capture: in both, finding
+      // nothing changed proves nothing about the published revision, so the
+      // revision step reconciles with the disk as an update would.
+      const reconcile = this.#state.stale || this.#state.facts?.invalid != null;
+      if (!changes.length && !reconcile) return { status: 'unchanged' };
       const started = performance.now();
       const result = await revise(this.#state, changes, control.signal);
       if (result.status === 'cancelled') return { status: 'cancelled' };
       if (result.status === 'released') return this.#reopen(changes, started, control.signal);
       if (result.status === 'reported') return result;
-      if (result.status === 'identical') return { status: 'revised', revision: this.#current!, identical: true, reacquired: false };
+      if (result.status === 'identical') {
+        return changes.length ? { status: 'revised', revision: this.#current!, identical: true, reacquired: false } : { status: 'unchanged' };
+      }
       return this.#complete(result, started, control.signal);
     });
   }

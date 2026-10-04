@@ -375,7 +375,7 @@ const unresolvedPackage = (access: SourceAccess): boolean => access.specifier !=
  * so every case this rule cannot bound exactly is refused.
  */
 export function membershipRefusal(previous: SessionFacts, inventory: ProjectInventory,
-  local: Extract<InventoryUpdate, { kind: 'local' }>): string | null {
+  local: Extract<InventoryUpdate, { kind: 'local' }>, observed: readonly CapturedInput[]): string | null {
   if (local.changed.length || local.descriptions.length) return 'other-changes';
   const before = previous.inventory;
   if (!before) return 'no-inventory';
@@ -397,6 +397,11 @@ export function membershipRefusal(previous: SessionFacts, inventory: ProjectInve
   }
   // Package imports, self-references and failed package lookups name no candidate a created file could complete.
   if (local.created.length && Object.values(previous.files).some(file => file.accesses.some(unresolvedPackage))) return 'unresolved-package';
+  // The incremental update keeps a resolution whose candidates lie in a directory
+  // observed absent, such as a missing declared tree, without probing them
+  // again, so the probes a fresh pass records would be retired.
+  const absent = new Set(observed.filter(input => input.role === 'absent').map(input => input.path));
+  if (absent.size && Object.keys(previous.indexes.contributors).some(path => absent.has(dirname(path)))) return 'absent-directory';
   return null;
 }
 
@@ -609,7 +614,7 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     // reason below is decided from those findings and the retained state.
     const otherwiseBroad = state.stale || !state.adapter || !state.adapter.hot || !previous || previous.invalid !== null || previous.areaIssues.length > 0
       || structural || areasChanged || shimChanged || otherChanged.length > 0 || unexplained.length > 0;
-    const refusal = membershipChange && !otherwiseBroad ? membershipRefusal(previous!, inventory, local!) : null;
+    const refusal = membershipChange && !otherwiseBroad ? membershipRefusal(previous!, inventory, local!, observer.inputs) : null;
     const membership = membershipChange && !otherwiseBroad && refusal === null;
     const broad = otherwiseBroad || (membershipChange && !membership);
     timings.classify = performance.now() - start;
@@ -704,27 +709,43 @@ export async function revise(state: SessionState, changes: readonly ObservedChan
     }
 
     if (broad) {
-      if (membershipChange) {
-        start = performance.now();
+      // Created and deleted files enter the program by name; a whole
+      // invalidation is a separate update so neither hides the other.
+      const oldFiles = new Set(previous?.inventory?.files.map(file => file.path));
+      const created = [...owned].filter(path => !oldFiles.has(path));
+      const deleted = [...oldFiles].filter(path => !owned.has(path));
+      const invalidate = state.stale || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0
+        || created.length > 0 || deleted.length > 0;
+      // Whenever the compiler reads the whole program again (a whole
+      // invalidation, a reopened or a recreated compiler), it reports every read
+      // it still needs. The observations reported before are retired
+      // immediately before that, including those of the update that names the
+      // created and deleted files, whose program can still hold files the disk
+      // no longer has; so a probe or read the final program no longer makes,
+      // such as one for a removed target in a declared tree, does not stay an
+      // input of the revision.
+      let retiring = 0;
+      const retire = async (): Promise<void> => {
+        const begun = performance.now();
         await observer.retire({ kind: 'all' });
-        timings.inventory += performance.now() - start;
-      }
+        retiring += performance.now() - begun;
+      };
       stage = 'catalog';
       start = performance.now();
       if (state.adapter) {
-        // Created and deleted files enter the program by name; a whole
-        // invalidation is a separate update so neither hides the other.
-        const oldFiles = new Set(previous?.inventory?.files.map(file => file.path));
-        const created = [...owned].filter(path => !oldFiles.has(path));
-        const deleted = [...oldFiles].filter(path => !owned.has(path));
+        if (!state.adapter.hot) await retire();
         await state.adapter.update({ changed: state.stale ? [...owned] : ownedChanged, created, deleted,
           inventory, invalidateAll: false }, signal);
-        if (state.stale || structural || shimChanged || otherChanged.length > 0 || unexplained.length > 0
-          || created.length > 0 || deleted.length > 0) {
+        if (invalidate) {
+          await retire();
           await state.adapter.update({ changed: [], created: [], deleted: [], inventory: null, invalidateAll: true }, signal);
         }
       }
-      timings.compiler = performance.now() - start;
+      // A missing compiler, or one created with other source areas, is created
+      // afresh by the recomputation below.
+      if (!state.adapter || state.adapterAreas !== JSON.stringify(deriveAreas(state.registry, inventory).areas)) await retire();
+      timings.inventory += retiring;
+      timings.compiler = performance.now() - start - retiring;
       const facts = await recomputeAll(state, inventory, timings, signal);
       state.stale = false;
       return { status: 'computed', facts, checked: wholeCheckedSet('broad', facts), changed, timings, positionRefreshed: [], reacquired: structural };
