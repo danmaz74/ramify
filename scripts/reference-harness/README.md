@@ -71,8 +71,9 @@ The tree keeps its location, its own `tsconfig.json` (checked by
 `reference:verify` and `reference:report` commands.
 
 `modularity-markdown.test.ts` tests the modularity probe's Markdown renderer,
-`scripts/probes/modularity/markdown.ts`, here because it uses analysis's
-testing fixture, which root scripts cannot import.
+`subs/analysis/scripts/probes/modularity/markdown.ts`, here because it uses
+analysis's testing fixture, which the probe, analysis's auxiliary source with
+its ordinary profile, cannot import.
 
 ## Activating an assigned instance
 

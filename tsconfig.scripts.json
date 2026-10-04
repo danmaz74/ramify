@@ -14,6 +14,8 @@
     "scripts/**/*",
     // Presentation's static diagram emitter, presentation-owned source outside its src/.
     "subs/presentation/scripts/**/*",
+    // Analysis's modularity and dependency-analyzer probes, analysis-owned source outside its src/.
+    "subs/analysis/scripts/**/*",
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "dist", "site", "examples", "**/.reference-work",

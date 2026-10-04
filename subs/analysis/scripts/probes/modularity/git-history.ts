@@ -9,7 +9,7 @@
 // belongs to the pure projection.
 
 import { execFileSync } from 'node:child_process';
-import type { ChangeHistory, HistoryCommit } from 'ramify.ts/analysis';
+import type { ChangeHistory, HistoryCommit } from '../../../src/index.js';
 
 export interface GitHistoryRequest {
   /** The project root; any directory inside the repository. */

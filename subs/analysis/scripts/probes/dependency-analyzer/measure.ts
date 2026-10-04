@@ -9,7 +9,7 @@
 // with the batch report's projected diagram are recorded beside them.
 //
 //     npm run build
-//     npx tsx scripts/probes/dependency-analyzer/measure.ts [--root <dir>] [--runs <n>]
+//     npx tsx subs/analysis/scripts/probes/dependency-analyzer/measure.ts [--root <dir>] [--runs <n>]
 //       [--out <dir>] [--name <basename>] [--allow-dirty]
 
 import { execFile, spawn } from 'node:child_process';
@@ -18,10 +18,10 @@ import { availableParallelism, cpus, platform, release, totalmem } from 'node:os
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
-import type { AnalysisReport, Capability, DependencyAnalyzerOutcome, DependencyDiagramFacts } from 'ramify.ts/analysis';
+import type { AnalysisReport, Capability, DependencyAnalyzerOutcome, DependencyDiagramFacts } from '../../../src/index.js';
 import { repositoryState } from '../modularity/git-history.js';
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
 const batchEntry = join(packageRoot, 'dist/src/batch-entry.js');
 const analyzerEntry = join(packageRoot, 'dist/src/dependency-analyzer-entry.js');
 /** The CLI check capabilities; the full batch adds `dependency-behavior`. */
@@ -112,7 +112,7 @@ function published(report: AnalysisReport): AnalysisReport {
     capabilities: report.capabilities.filter(item => item.capability !== 'dependency-behavior') };
 }
 
-type Projection = typeof import('ramify.ts/analysis')['projectDependencyDiagram'];
+type Projection = typeof import('../../../src/index.js')['projectDependencyDiagram'];
 interface RunRecord {
   readonly run: number;
   readonly batch: ReturnType<typeof summary> & { readonly reportBytes: number };
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
   if (!before.clean && !values['allow-dirty']) {
     throw new Refusal(`The worktree is not clean (${before.changes.length} changes); commit first or pass --allow-dirty`);
   }
-  const { projectDependencyDiagram } = await import('ramify.ts/analysis');
+  const { projectDependencyDiagram } = await import('../../../src/index.js');
 
   const records: RunRecord[] = [];
   let lastDiagram: DependencyDiagramFacts | undefined;

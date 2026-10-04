@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { projectModularity } from '../../subs/analysis/src/index.js';
 import type { CandidateOwnership, ModularityDocument, ModularityEvaluation } from '../../subs/analysis/src/index.js';
 import { buildReport, dependencyReportSpec, graphSpec, paths } from '../../subs/analysis/src/tests/modularity-fixture.js';
-import { renderMarkdown } from '../probes/modularity/markdown.js';
+import { renderMarkdown } from '../../subs/analysis/scripts/probes/modularity/markdown.js';
 
 const report = buildReport(graphSpec);
 const evaluate = (ownership?: CandidateOwnership): ModularityEvaluation => {

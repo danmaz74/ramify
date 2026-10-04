@@ -39,8 +39,8 @@ remain authoritative for those rules. Dependency vocabulary follows the
 | The opt-in `dependency-behavior` capability in batch analysis; attaching its facts to the snapshot | `analysis` | existing batch pipeline |
 | Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation and boundary changes; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity*.ts`, `src/change-affinity.ts` |
 | Pure dependency-diagram projection shared by `projectModularity` and the resident operation | `analysis` | `src/interfaces/dependency-diagram.ts`, `src/dependency-diagram.ts` |
-| Git history adapter producing `ChangeHistory` | modularity probe | `scripts/probes/modularity/git-history.ts` |
-| Probe that runs the analysis, the projections and writes JSON and Markdown | modularity probe | `scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
+| Git history adapter producing `ChangeHistory` | `analysis`, auxiliary source | `subs/analysis/scripts/probes/modularity/git-history.ts` |
+| Probe that runs the analysis, the projections and writes JSON and Markdown | `analysis`, auxiliary source | `subs/analysis/scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
 
 **Projection owner.** `analysis` owns the `AnalysisReport` contract that is the
 projection's only source input, and the modularity analysis already assigns it
@@ -64,12 +64,13 @@ cost, and a later boundary review may move the projection with the evidence it
 produces.
 
 **Probe and Git adapter.** Git execution is repository-history acquisition, not
-source analysis, so it stays outside `analysis`. `scripts/` has its own compiler
-scope (`tsconfig.scripts.json`) and is not compiler-selected by the project's
-`tsconfig.json`, so the probe neither becomes module-owned source nor produces
-outside-module warnings. Existing probes import built package output; the
-modularity probe imports `ramify.ts/analysis` from `dist/`. Promotion to a
-supported command would move the adapter into `cli`, still outside `analysis`.
+source analysis, so it stays outside `analysis`'s `src/`. The probe and its Git
+adapter are `analysis`'s auxiliary source under
+`subs/analysis/scripts/probes/modularity/`, with the ordinary profile: they
+import `analysis` source by relative path as same-owner source, cannot import
+its testing source, and cannot be exposed. `tsconfig.scripts.json` compiles
+them; the project's `tsconfig.json` does not select them. Promotion to a
+supported command would move the adapter into `cli`, outside `analysis`.
 
 **Exposure.** Nothing is exposed in iteration 1. Expected additions:
 
@@ -813,6 +814,6 @@ ranking; they are not declared roles.
 - **Iteration 5** adds candidate validation, candidate recomputation and
   `boundaryChanges` to both projections.
 - **Iteration 6** writes the Candidate A and B mappings as `CandidateOwnership`
-  inputs under `scripts/probes/modularity/candidates/` and evaluates them with
+  inputs under `subs/analysis/scripts/probes/modularity/candidates/` and evaluates them with
   one probe run whose `--name` output lands beside the baseline in
   `scripts/probes/results/modularity/`.

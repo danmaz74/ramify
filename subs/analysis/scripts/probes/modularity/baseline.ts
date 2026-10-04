@@ -11,7 +11,6 @@
 // projected from the same report, history and thresholds, and an invalid
 // candidate refuses with its ownership issues.
 //
-//     npm run build
 //     npm run probe:modularity -- [--root <dir>] [--out <dir>] [--name <basename>]
 //       [--range <rev-range>] [--first-parent] [--include-merges]
 //       [--min-owner-commits <n>] [--min-shared-commits <n>]
@@ -30,11 +29,11 @@ import type {
   ModularityDocument,
   ModularityEvaluation,
   OwnershipIssue,
-} from 'ramify.ts/analysis';
+} from '../../../src/index.js';
 import { git, readGitHistory, repositoryState, utf8Order } from './git-history.js';
 import { renderMarkdown } from './markdown.js';
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
 
 /** The shared CLI check capability list, plus the opt-in behavioral evidence. */
 const capabilities: readonly Capability[] = ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking',
@@ -86,8 +85,8 @@ async function main(): Promise<void> {
     excludedCommits: [...new Set(values['exclude-commit'].map(revision => git(root, ['rev-parse', '--verify', `${revision}^{commit}`]).trim()))].sort(utf8Order),
   };
 
-  const { analyzeProject, projectModularity, projectChangeAffinity } = await import('ramify.ts/analysis');
-  const { createDefaultTagRegistry } = await import('ramify.ts/model');
+  const { analyzeProject, projectModularity, projectChangeAffinity } = await import('../../../src/index.js');
+  const { createDefaultTagRegistry } = await import('../../../subs/model/src/index.js');
   const run = await analyzeProject({ project: { cwd: root, root, configuration: 'discover', scope: 'whole-project' },
     registry: createDefaultTagRegistry(), capabilities, limits });
   if (run.status !== 'reported') throw new Refusal('The analysis was cancelled');
