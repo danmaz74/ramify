@@ -32,8 +32,16 @@ describe('Plan 2 final contract validator', () => {
     for (const [name, owner] of archived) expect(layered.get(name)!.document).toBe(owner.document);
     expect(layered.get('daemon')!.layers!.map(layer => layer.plan))
       .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)',
-        'Phase 1 project boundaries (root tooling access)']);
+        'Plan 7 (affected modules)', 'Phase 1 project boundaries (root tooling access)']);
     for (const owner of layered.values()) for (const layer of owner.layers ?? []) expect(layer.plan.trim()).not.toBe('');
+    // Each archived purpose is carried through unchanged; a later purpose
+    // change arrives as a layer that names the plan which reviewed it.
+    for (const [name, owner] of archived) expect(layered.get(name)!.purpose).toBe(owner.purpose);
+    expect(Object.fromEntries([...layered].filter(([, owner]) => owner.purposeLayers?.length)
+      .map(([name, owner]) => [name, owner.purposeLayers!.map(layer => layer.plan)])))
+      .toEqual({ ramify: ['Plan 7 (affected modules)'], analysis: ['Plan 7 (affected modules)'], cli: ['Plan 7 (affected modules)'],
+        daemon: ['Plan 7 (affected modules)'], contexts: ['Plan 7 (affected modules)'],
+        project: ['Phase 1 project boundaries (auxiliary source)'] });
   });
 
   it('accepts reviewed exposures and purpose while rejecting independent declaration and prose drift', async () => {

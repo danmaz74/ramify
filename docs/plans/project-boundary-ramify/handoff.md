@@ -90,3 +90,24 @@ After Phase 2's first audit release, toolkit audit usage adopts that executable
 from an external tool location without changing the agent's install. Full-audit
 inputs and the reference command enter the toolkit's audit definition only
 through that Phase 2 integration. Phase 3 later pins both published providers.
+
+## Known defects carried forward
+
+Defects found during Phase 1 that predate it and lie outside its scope. Each
+stays open until a toolkit-owned slice repairs it with its own verification.
+
+- **A daemon whose working directory is deleted fails later requests.** The
+  resident daemon inherits the working directory of the command that starts
+  it and never changes it. Once that directory is deleted, every later
+  request that opens a project, including one for a different, intact
+  project, returns `internal-error` "analysis-failed: ENOENT: no such file or
+  directory, uv_cwd" with exit 2 and a null `inputId`; a batch check of the
+  same project passes. Reproduction: start the daemon with a resident check
+  from inside a project copy, delete that copy, then run a resident check of
+  another project. It reproduces at `33d8a739`, before Phase 1, and at
+  `a8d99307`. Evidence:
+  `/home/app/ramify-pb1-evidence/verify-repair/i2a13-t-check5.out` and
+  `i2a13-t-check5-base.out`, produced by `i2a13-t-check.mts` in the same
+  directory with `WITH_R`, `DELETE_R` and `EXACT_COPY` set. The harness case
+  `I2A-13:self-reference-checks` now keeps every copy until its daemon has
+  stopped; the runtime is unchanged.

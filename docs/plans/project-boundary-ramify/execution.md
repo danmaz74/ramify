@@ -242,6 +242,20 @@ npm run diagrams
 npm run site:build
 ```
 
+Run the four verifications in this order on one frozen build. Plan 1 runs
+first, because Plans 2, 5 and 2A nest its gate report for the same source, and
+Plan 2A runs last, because `I2A-13:predecessor-regressions` reads the Plan 2
+and Plan 5 reports of the same source.
+
+The earlier measurement evidence is produced once, in iteration 20, as the
+user decided on 2026-10-04: the resident (`npm run measure:resident`), fast
+(`npm run measure:fast`) and Plan 2A materialization
+(`npm run measure:plan2a`) recipes run on the final candidate, on
+Linux only, with samples of 30–50, and the expected runtime is announced to
+the user before they start. `I2A-12:linux-macos-bytes` needs a macOS
+counterpart report; that platform gap is known, the instance is reported
+failed, and it does not fail the final gate.
+
 Existing gates' instance counts and correctness results stay binding. Their
 timing predicates follow the [budget policy](budgets.md#policy): run the
 missing or affected resident, fast and materialization workloads, retain raw

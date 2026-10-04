@@ -38,7 +38,10 @@ const recordedStylesheetAdditions: readonly string[] = ['./module-tree.css'];
 const plan3Directory = 'docs/plans/iteration-3-project-inspection';
 const plan3Base = '71643d5';
 const plan2aCompletion = 'd5c2498';
+// Newest first, as `git log` lists them.
 const reviewedPlan3Changes: readonly { readonly commit: string; readonly decision: string }[] = [
+  { commit: '3fba41bdf3ce7bfd71645893c597708337f202f0',
+    decision: 'The principles and specifications split replaced six links to the module-description and TypeScript-interpretation principles with links to their `.spec.md` successors; the user approved recording these renames on 2026-10-04.' },
   { commit: '14c5c2a81962ecd52dbb0f655b21f4948958aaf9',
     decision: 'Measurement sampling is decent rather than exaggerated: the planned inspect heap plateau takes 40 answers instead of 200.' },
 ];
@@ -187,24 +190,31 @@ export const plan2aCompletionHandlers: ReadonlyMap<string, InstanceHandler> = ne
 
   ['I2A-13:self-reference-checks', { kind: 'memory', run: async ({ assertions: a }) => {
     const scratch = await mkdtemp(join(tmpdir(), 'plan2a-i13-self-reference-'));
+    // The first resident check starts the shared daemon, which keeps that
+    // check's working directory, the R copy. Every copy is therefore disposed
+    // only after `withSequenceProcess` has stopped the daemon, so the daemon's
+    // working directory outlives it.
+    const projects: { readonly root: string; dispose(): Promise<void> }[] = [];
     try {
       await withSequenceProcess(async processes => {
         for (const kind of ['R', 'T'] as const) {
           const project = await isolatedCopy(kind, scratch);
-          try {
-            const before = await processes.check(project.root, false);
-            a.equal(`${kind}: the pre-materialize check has no denial`, before.summary.denied, 0);
-            const materialized = await processes.run(project.root, ['materialize', '--all']);
-            a.equal(`${kind}: materialize --all succeeds`, materialized.code, 0);
-            const after = await processes.check(project.root, false);
-            a.equal(`${kind}: generated views leave the checked input identity unchanged`, after.inputId, before.inputId);
-            a.equal(`${kind}: check has no denial with generated views present`, after.summary.denied, 0);
-            const repeat = await processes.run(project.root, ['materialize', '--all']);
-            a.equal(`${kind}: an unchanged repeat exits 0`, repeat.code, 0);
-          } finally { await project.dispose(); }
+          projects.push(project);
+          const before = await processes.check(project.root, false);
+          a.equal(`${kind}: the pre-materialize check has no denial`, before.summary.denied, 0);
+          const materialized = await processes.run(project.root, ['materialize', '--all']);
+          a.equal(`${kind}: materialize --all succeeds`, materialized.code, 0);
+          const after = await processes.check(project.root, false);
+          a.equal(`${kind}: generated views leave the checked input identity unchanged`, after.inputId, before.inputId);
+          a.equal(`${kind}: check has no denial with generated views present`, after.summary.denied, 0);
+          const repeat = await processes.run(project.root, ['materialize', '--all']);
+          a.equal(`${kind}: an unchanged repeat exits 0`, repeat.code, 0);
         }
       });
-    } finally { await rm(scratch, { recursive: true, force: true }); }
+    } finally {
+      for (const project of projects) await project.dispose();
+      await rm(scratch, { recursive: true, force: true });
+    }
   } }],
 
   ['I2A-13:predecessor-regressions', { kind: 'memory', run: async ({ assertions: a }) => {

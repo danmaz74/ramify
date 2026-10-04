@@ -30,8 +30,11 @@ const plan2a = 'docs/plans/iteration-2a-materialized-api-view';
  * and the selections it added or withdrew. Layers are applied in the order
  * their plans landed, and never edit an archived list. */
 interface ReviewedLayer { readonly plan: string; readonly added?: DescriptionDocument; readonly withdrawn?: DescriptionDocument }
+/** One named layer over an archived README purpose: the plan that reviewed the
+ * change, and the sentence it appended or the exact phrase it replaced. */
+interface ReviewedPurposeLayer { readonly plan: string; readonly appended?: string; readonly replaced?: readonly [string, string] }
 interface ReviewedOwner { readonly directory: string; readonly purpose: string; readonly document: DescriptionDocument;
-  readonly layers?: readonly ReviewedLayer[] }
+  readonly layers?: readonly ReviewedLayer[]; readonly purposeLayers?: readonly ReviewedPurposeLayer[] }
 /** An entry target is a runtime and type pair, or a string naming one packed
  * file, such as a stylesheet, that is resolved and read but never imported. */
 type EntryPair = { readonly types: string; readonly import: string };
@@ -364,6 +367,25 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Plan 7's reviewed manifest additions (`docs/plans/iteration-7-affected-modules/owners.md`,
+  // "Manifest additions"): analysis exposes its affected-module vocabulary by
+  // an interface wildcard, the root relays it with the R3 analysis vocabulary,
+  // and daemon and the root relay the two context types beside the N5 and R7
+  // context vocabulary. Contexts' own wildcard already selects those two.
+  { plan: 'Plan 7 (affected modules)',
+    added: {
+      './': [
+        'expose-sub AffectedQuery, AffectedModule, AffectedPathBasis, AffectedPathSeed, AffectedWideningReason, AffectedSelection, AffectedUnavailableReason, SessionAffectedOutcome from analysis to descendants',
+        'expose-sub AffectedRequest, ContextAffectedOutcome from daemon to descendants',
+      ].join('\n'),
+      'subs/analysis/': [
+        'expose-src * from "interfaces/affected.ts" to parent',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub AffectedRequest, ContextAffectedOutcome from contexts to parent',
+      ].join('\n'),
+    },
+  },
   // Phase 1 project boundaries, iteration 2: the description statement union
   // names its two members, which travel with it as signature companions.
   { plan: 'Phase 1 project boundaries (nested-tree statements)',
@@ -471,6 +493,58 @@ const declarationLayers: readonly DeclarationLayer[] = [
   },
 ];
 
+/** A named layer over the archived README purposes, keyed by owner directory:
+ * a sentence a plan appended, or one exact phrase it replaced. */
+interface PurposeLayer {
+  readonly plan: string;
+  readonly appended?: Readonly<Record<string, string>>;
+  readonly replaced?: Readonly<Record<string, readonly [string, string]>>;
+}
+
+const purposeLayers: readonly PurposeLayer[] = [
+  // Plan 7's reviewed purpose additions (`docs/plans/iteration-7-affected-modules/owners.md`,
+  // "Purpose paragraph additions"), each appended to the existing paragraph.
+  // The user accepted the CLI and contexts paragraphs with these sentences as
+  // their reviewed purposes on 2026-10-04.
+  { plan: 'Plan 7 (affected modules)',
+    appended: {
+      './': 'It assembles the affected-module service and its batch form.',
+      'subs/analysis/': 'It also selects the modules affected by changed paths or modules on demand from one revision\'s retained dependency facts.',
+      'subs/cli/': 'Its affected command prints module test selections from the resident service or a fresh batch session.',
+      'subs/daemon/': 'It exposes the affected-module query through the same bounded service and lightweight client connection.',
+      'subs/daemon/subs/contexts/': 'It schedules affected-module queries against the covering revision with explicit freshness and unavailable outcomes.',
+    },
+  },
+  // Phase 1 project boundaries, iteration 8: owned compiler source outside
+  // `src/` is its owner's auxiliary source, and the outside-module warnings it
+  // replaced are retired; Project records the compiler-selection warnings.
+  { plan: 'Phase 1 project boundaries (auxiliary source)',
+    replaced: {
+      'subs/analysis/subs/project/': ['records raw source areas, configuration selection, outside-module warnings and README purpose metadata',
+        'records raw source areas, auxiliary source, configuration selection, project warnings and README purpose metadata'],
+    },
+  },
+];
+
+/** The expected purpose: the archived paragraph, then each named layer in turn.
+ * A layer that restates an appended sentence, or whose replaced phrase does not
+ * occur exactly once, is itself an error, so a layer cannot hide archived drift. */
+function expectedPurpose(owner: ReviewedOwner): string {
+  let purpose = owner.purpose;
+  for (const layer of owner.purposeLayers ?? []) {
+    if (layer.appended !== undefined) {
+      assert.ok(!purpose.includes(layer.appended), `${layer.plan} restates a reviewed purpose sentence: ${owner.directory}`);
+      purpose = `${purpose} ${layer.appended}`;
+    }
+    if (layer.replaced !== undefined) {
+      const [before, after] = layer.replaced;
+      assert.equal(purpose.split(before).length, 2, `${layer.plan} replaces a phrase the reviewed purpose does not hold once: ${owner.directory}`);
+      purpose = purpose.replace(before, () => after);
+    }
+  }
+  return purpose;
+}
+
 /** The expected selections: the archived list, then each named layer in turn.
  * A layer that restates or withdraws a selection the reviewed declaration does
  * not hold is itself an error, so a layer cannot hide archived drift. */
@@ -515,6 +589,15 @@ export function layeredOwners(archived: ReadonlyMap<string, ReviewedOwner>): Rea
         { plan: layer.plan, added: statements(layer.added?.[directory]), withdrawn: statements(layer.withdrawn?.[directory]) }] });
     }
   }
+  for (const layer of purposeLayers) {
+    for (const directory of new Set([...Object.keys(layer.appended ?? {}), ...Object.keys(layer.replaced ?? {})])) {
+      const name = byDirectory.get(directory);
+      assert.ok(name, `${layer.plan} layers a purpose onto an owner no review declares: ${directory}`);
+      const owner = owners.get(name)!;
+      owners.set(name, { ...owner, purposeLayers: [...owner.purposeLayers ?? [],
+        { plan: layer.plan, appended: layer.appended?.[directory], replaced: layer.replaced?.[directory] }] });
+    }
+  }
   assert.equal(owners.size, 15, 'All fifteen final owners must be present');
   return owners;
 }
@@ -541,7 +624,7 @@ export function assertOwner(actual: string, readme: string, expected: ReviewedOw
   assert.deepEqual(manifest(description(actual)), expectedManifest(expected), `Final selections differ: ${expected.directory}module.ramify`);
   const purpose = readPurpose(`${expected.directory}README.md`, readme);
   assert.equal(purpose.state, 'present', `Missing README prose paragraph: ${expected.directory}`);
-  if (purpose.state === 'present') assert.equal(purpose.paragraph, expected.purpose, `Final README purpose differs: ${expected.directory}`);
+  if (purpose.state === 'present') assert.equal(purpose.paragraph, expectedPurpose(expected), `Final README purpose differs: ${expected.directory}`);
 }
 
 export async function validatePackageEntries(root: string, expected: ExpectedPackage): Promise<number> {

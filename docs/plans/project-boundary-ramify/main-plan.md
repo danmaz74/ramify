@@ -255,3 +255,30 @@ None remain open; the decided questions follow.
    Decided by the user on 2026-10-04: a `.js`, `.mjs` or `.cjs` file is
    compiler source only when the root configuration admits JavaScript;
    otherwise it is an inert owned file. The example gains no `allowJs`.
+10. **Fixture F's verification baselines.** Decided by the user on
+    2026-10-04: they stay as repaired in `5c41f959`, expecting the
+    nonblocking `signature-inferred` note on F's exposed `value`.
+11. **Earlier measurement evidence.** Decided by the user on 2026-10-04: the
+    resident, fast and Plan 2A materialization recipes run once, on the final
+    candidate in iteration 20, on Linux only, with samples of 30–50. The
+    expected runtime is announced to the user before they start. The
+    macOS-dependent instance `I2A-12:linux-macos-bytes` is a known platform
+    gap: it is reported failed and does not fail the final gate.
+12. **The final-contract validator.** Decided by the user on 2026-10-04:
+    `scripts/validate-final-contracts.ts` is repaired in this phase by
+    recording, as named layers, the exposures earlier plans added without
+    one. The CLI and contexts README purposes are accepted as their current
+    text, the reviewed purpose with the sentence Plan 7 appended, recorded as
+    a reviewed layer; those first paragraphs are not changed.
+13. **Plan 5 cases whose premise Plan 8 changed.** Decided by the user on
+    2026-10-04: the reviewed rows of `I5-06:import-added-self-only`,
+    `I5-06:export-removed-missing`, `I5-06:wide-fanin-bounded` and
+    `I5-07:audit-equal-sequence` stay byte-identical and their assertions
+    are re-reasoned to today's behaviour. `export-removed-missing` removes a
+    symbol the root does not expose, and `wide-fanin-bounded`'s value is
+    derived from the reference sources before it is recorded.
+14. **`I2A-13`.** Decided by the user on 2026-10-04: the harness starts the
+    shared daemon from a directory that outlives it; a daemon whose working
+    directory is deleted is a runtime defect carried forward in the
+    [handoff](handoff.md#known-defects-carried-forward); and the `.spec.md`
+    link renames `3fba41bd` made in Plan 3's tree are recorded as approved.

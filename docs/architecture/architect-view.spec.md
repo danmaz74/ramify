@@ -537,12 +537,12 @@ root; malformed paths and escapes are not attributable:
    locations receive no provisional owner. Attribution never climbs to an
    ancestor's source area when the nearest module does not own the location.
 
-Configured output exclusions, independent compiler scopes, invalid boundaries
-and symlink observations are not completely represented. Consequently an
-uninventoried path cannot be asserted present, owned, ordinary, empty or outside
-the project from spelling alone, and no symlink following is implied. A later
-inventory refresh may establish the file. This is a deliberate evidence limit,
-not a zero measurement.
+Configured output exclusions, declared nested trees, scratch directories,
+invalid boundaries and symlink observations are not completely represented.
+Consequently an uninventoried path cannot be asserted present, owned, ordinary,
+empty or outside the project from spelling alone, and no symlink following is
+implied. A later inventory refresh may establish the file. This is a deliberate
+evidence limit, not a zero measurement.
 
 ## Materialization
 

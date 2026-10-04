@@ -40,6 +40,13 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 1. Run all PB1 runtime cases, real public/CLI/IPC/materialization workflows and scale/resource/cleanup assertions on one clean candidate; archive independent expectations and observations.
 2. Run the explicit full old-audit/direct gate, separate locked reference:cases and full reference acceptance chain in execution.md, including affected required measurements and browser workflow. Record each earlier timing target as met or missed under the [budget policy](../budgets.md#policy); a missed target does not fail this gate.
+   As the user decided on 2026-10-04, the resident, fast and Plan 2A
+   materialization recipes run once here, on the final candidate, on Linux
+   only, with samples of 30–50; announce their expected runtime to the user
+   before starting. `I2A-12:linux-macos-bytes` stays failed for want of a
+   macOS report, a known platform gap that does not fail this gate. Run the
+   reference verifications in the [final gate](../execution.md#final-gate)'s
+   order: Plan 1 before the plans that nest it, Plan 2A after Plans 2 and 5.
 3. Review actual write scope, runtime docs, schema identity and remaining defects. Preserve failed attempts and report source/audit/direct/reference results separately.
 
 ## Matrix rows executed here

@@ -277,8 +277,12 @@ add('audit-equal-sequence', async (context, cold, baseline) => {
   values.push(await step(context, '3 import added', () => replace(root, reviewsRouter,
     "import type { ProtocolFacilities } from '../../../../../src/interfaces/protocol.js';\n",
     "import type { ProtocolFacilities } from '../../../../../src/interfaces/protocol.js';\nimport type { RevisionScope } from '../../contracts/src/interfaces/vocabulary.js';\n")));
-  assertions.equal('3 import added decides just the new access', values[2].revision.checked,
-    { path: 'source', files: [reviewsRouter], accesses: 1, modelRebuilt: false });
+  // A source revision decides each access of a re-interpreted file whose facts
+  // changed by value, location included. Since Plan 8 iteration 7 (ff01212e)
+  // the router imports ProtocolRouter on line 11, directly below the line 10
+  // anchor and its only access below it, so the inserted import moves it too.
+  assertions.equal('3 import added decides the new access and the one access it moves', values[2].revision.checked,
+    { path: 'source', files: [reviewsRouter], accesses: 2, modelRebuilt: false });
   assertNoFinding(context, '3 import added', values[2]);
   const exportAnchor = 'export type RevisionScope = z.infer<typeof revisionScopeSchema>;\n';
   const exportAdded = `${exportAnchor}export const sequenceProbeSchema = z.string();\n`;
