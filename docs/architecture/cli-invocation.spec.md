@@ -160,11 +160,13 @@ An import whose target is auxiliary source is an application import decided by
 the ordinary rules: same-owner access is allowed, and another owner's import of
 an auxiliary original is denied, since no exposure can select one. An owned
 import whose target, without package resolution, lies inside a declared nested
-tree or an always-excluded path such as compiler output is unverifiable, with
-an analysis limit on that import; one outside the root is outside scope, with
-the same limit. None is an allowed import or an external package. The
-definite finding for declared trees and the separate excluded-target limit
-await the project-boundary import rules.
+tree is the definite finding `project-boundary-import`, category `import`, for
+every import form, including type-only and symbol-free imports and re-exports;
+it is located at the import and fails the check with exit 1. One inside an
+always-excluded path such as compiler output is unverifiable, with the
+nonblocking `excluded-target` analysis limit on that import; one outside the
+root is outside scope, with the nonblocking `outside-module-target` limit.
+None is an allowed import or an external package.
 
 ## Output and exit
 

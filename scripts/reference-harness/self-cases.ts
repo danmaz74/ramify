@@ -27,8 +27,16 @@ const declaredTrees = ['docs', 'examples/collection-review', 'scripts/probes/fix
 const inDeclaredTree = (path: string): boolean => declaredTrees.some(tree => path === tree || path.startsWith(`${tree}/`));
 /** Nearest module directories of the toolkit's auxiliary source; everything else outside every src/ is the root's. */
 const auxiliaryOwners: readonly (readonly [string, string])[] = [['subs/analysis/', 'ramify/analysis'], ['subs/presentation/', 'ramify/presentation']];
-/** The nonblocking coverage kinds auxiliary scripts may produce: dist/ and node_modules imports, CommonJS, non-literal and resource loads. */
-const auxiliaryNoteCodes = new Set(['outside-module-target', 'unresolved-target', 'unsupported-commonjs', 'nonliteral-target', 'resource-target']);
+/**
+ * The nonblocking coverage kinds auxiliary scripts may produce: CommonJS,
+ * non-literal and resource loads, and the imports of built dist/ output and
+ * relative imports into node_modules. In the checkout those two are
+ * always-excluded targets (`excluded-target` since project-boundary iteration
+ * 11). In a copy, dist/ is absent (unresolved) and node_modules is a link to
+ * the checkout's installation, whose physical location lies outside the
+ * copy's root (`outside-module-target`).
+ */
+const auxiliaryNoteCodes = new Set(['excluded-target', 'outside-module-target', 'unresolved-target', 'unsupported-commonjs', 'nonliteral-target', 'resource-target']);
 const original = { kind: 'code', owner: 'ramify', file: 'interfaces/batch.ts', binding: 'BatchInvocation' };
 
 async function cliReport(root: string, assertions: Assertions, exit: number): Promise<AnalysisReport> {

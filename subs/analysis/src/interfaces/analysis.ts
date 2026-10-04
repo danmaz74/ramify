@@ -54,7 +54,7 @@ export type AnalysisCode = ModelIssue['code'] | DescriptionIssue['code']
   | ProjectIssue['code'] | LinkIssue['code'] | ImportReason
   | 'missing-export' | 'invalid-invocation' | 'unavailable-capability'
   | 'missing-stage' | 'session-used' | 'session-disposed' | 'output-failure'
-  | 'resource-limit' | 'internal-error' | 'exposed-without-companion';
+  | 'resource-limit' | 'internal-error' | 'exposed-without-companion' | 'project-boundary-import';
 export interface AnalysisDiagnostic {
   readonly id: string;
   readonly category: 'invocation' | 'registry' | 'layout' | 'description'
@@ -87,7 +87,9 @@ export interface StageExecution {
 export interface AccessResult {
   readonly accessId: string;
   readonly decisions: readonly ImportDecision[];
-  readonly outcome: 'checked' | 'external' | 'outside-scope' | 'unverifiable' | 'mixed';
+  /** `denied`: an import into a declared nested tree without package resolution,
+   * one located `project-boundary-import` diagnostic and no symbol decision. */
+  readonly outcome: 'checked' | 'external' | 'outside-scope' | 'unverifiable' | 'mixed' | 'denied';
   readonly diagnostics: readonly string[];
   readonly coverage: readonly string[];
 }

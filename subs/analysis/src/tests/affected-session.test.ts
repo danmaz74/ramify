@@ -1,5 +1,5 @@
-import { rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { AffectedLimits } from '../affected-query.js';
 import type { AffectedQuery, AffectedSelection, SessionAffectedOutcome } from '../interfaces/affected.js';
@@ -217,19 +217,25 @@ describe('RetainedSession.affected: coverage (A7-04)', () => {
   }, { ...formFiles, 'subs/lonely/src/extra.ts': 'export const extra: number = 1;\n',
     [formPaths.alone]: "import { extra } from './extra.js';\nexport const alone: number = extra;\n" }), timeout);
 
-  it('A7-04:outside-module-target: an import of a file outside every module widens', () => fixture(async (_root, inputs) => {
-    const { handle } = await opened(inputs);
+  it('A7-04:outside-module-target: an import of a file outside every module widens', () => fixture(async (root, inputs) => {
+    // Since iteration 8C a loose root file is root auxiliary source, an application
+    // target, and since project-boundary iteration 11 a file in a declared tree is
+    // a definite boundary finding without a limit. The file outside every module
+    // is therefore one beside the root, outside the project, with the note.
+    const outside = join(dirname(root), `${basename(root)}-outside.ts`);
+    await writeFile(outside, 'export const helper: number = 1;\n');
     try {
-      const result = await answer(handle, { modules: ['fixture/lonely'] });
-      expect(result.coverage.notes.map(note => note.code)).toEqual(['outside-module-target']);
-      expect(result).toMatchObject({ changedModules: [{ id: 'fixture/lonely', directory: 'subs/lonely' }], affectedModules: [],
-        selection: 'all-modules', widening: ['partial-coverage'] });
-      expect(ids(result.testModules)).toEqual(formModules);
-    } finally { await handle.dispose(); }
-  // Since iteration 8C a loose root file is root auxiliary source, an application
-  // target; a file in an owned-ignored tree is a nested-tree target with the same note.
-  }, { ...formFiles, 'module.ramify': `${formFiles['module.ramify']}owned-ignored "lib"\n`, 'lib/helper.ts': 'export const helper: number = 1;\n',
-    [formPaths.alone]: "import { helper } from '../../../lib/helper.js';\nexport const alone: number = helper;\n" }), timeout);
+      await put(root, formPaths.alone, `import { helper } from '../../../../${basename(outside, '.ts')}.js';\nexport const alone: number = helper;\n`);
+      const { handle } = await opened(inputs);
+      try {
+        const result = await answer(handle, { modules: ['fixture/lonely'] });
+        expect(result.coverage.notes.map(note => note.code)).toEqual(['outside-module-target']);
+        expect(result).toMatchObject({ changedModules: [{ id: 'fixture/lonely', directory: 'subs/lonely' }], affectedModules: [],
+          selection: 'all-modules', widening: ['partial-coverage'] });
+        expect(ids(result.testModules)).toEqual(formModules);
+      } finally { await handle.dispose(); }
+    } finally { await rm(outside, { force: true }); }
+  }, formFiles), timeout);
 });
 
 describe('RetainedSession.affected: revisions and readiness (A7-05)', () => {

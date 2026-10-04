@@ -10,8 +10,9 @@ import { createDefaultTagRegistry } from '../../subs/model/src/index.js';
 // Auxiliary provenance vocabulary (project-boundary contracts, "Source and
 // exposure provenance"): the public types, src placement and false flags for
 // source beneath src/, and auxiliary placement and true flags for the selected
-// loose root file, which iteration 8C activates. No producer yields
-// nested-tree or excluded targets yet; expected values follow the contracts.
+// loose root file, which iteration 8C activates. Since project-boundary
+// iteration 11 a nested-tree target is a definite boundary denial and an
+// excluded target stays unverifiable; expected values follow the contracts.
 
 const ordinary: SourceArea = { owner: 'fixture', kind: 'ordinary', root: 'src', profile: [] };
 
@@ -107,7 +108,9 @@ describe('auxiliary provenance vocabulary', () => {
 
   it('gives files beneath src/ src placement and false flags, and the loose root file auxiliary placement and true flags', async () => {
     const value = await report();
-    expect(value.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
+    // The import into the owned-ignored vendor tree is a definite finding, not a
+    // limit, so the check fails with complete coverage (see the next test).
+    expect(value.outcome).toEqual({ execution: 'completed', check: 'failed', coverage: 'complete' });
     const inventory = value.snapshot!.inventory;
     expect(inventory.files.map(file => [file.path, file.area, file.kind, file.placement])).toEqual([
       ['loose.ts', 'ordinary', 'source', 'auxiliary'],
@@ -138,13 +141,17 @@ describe('auxiliary provenance vocabulary', () => {
     const value = await report();
     // Owned source outside src/ is an application target; a file in an
     // owned-ignored tree is not inventoried and is classified at its physical
-    // location as a nested-tree target with its declaration. Until the boundary
-    // rule is enforced its outcome is unverifiable with the unchanged coverage code.
+    // location as a nested-tree target with its declaration. Its outcome is the
+    // definite boundary denial: one located finding, no symbol decision, no limit.
     const tool = value.snapshot!.accesses.filter(access => access.specifier === '../vendor/tool.js');
     expect(tool.map(access => access.target)).toEqual([{ kind: 'nested-tree', file: 'vendor/tool.ts',
       exclusion: { kind: 'owned-ignored', directory: 'vendor', owner: 'fixture' } }]);
-    expect(value.snapshot!.results.find(result => result.accessId === tool[0]!.id)).toMatchObject({ outcome: 'unverifiable', decisions: [] });
-    expect(value.coverage.map(note => [note.code, note.location?.file])).toEqual([['outside-module-target', 'src/use.ts']]);
+    const result = value.snapshot!.results.find(item => item.accessId === tool[0]!.id)!;
+    expect(result).toMatchObject({ outcome: 'denied', decisions: [], coverage: [] });
+    expect(value.diagnostics.map(item => [item.id, item.code, item.category, item.location?.file, item.location?.line, item.accessId]))
+      .toEqual([[result.diagnostics[0], 'project-boundary-import', 'import', 'src/use.ts', 3, tool[0]!.id]]);
+    expect(value.coverage).toEqual([]);
+    expect([value.summary.denied, value.summary.errors, value.summary.coverageNotes]).toEqual([1, 1, 0]);
   });
 
   it('never lets a nested-tree or excluded target pass as checked', async () => {
@@ -159,8 +166,12 @@ describe('auxiliary provenance vocabulary', () => {
     // Positive control: the same application access is checked and allowed.
     expect(results.find(result => result.accessId === probe.id)).toMatchObject({ outcome: 'checked',
       decisions: [{ status: 'allowed', reason: 'exposed' }] });
+    // Either declared tree is a boundary denial; the scratch target stays unverifiable.
     expect(results.filter(result => result.accessId !== probe.id).map(result => [result.accessId, result.outcome, result.decisions]))
-      .toEqual([['external-tree', 'unverifiable', []], ['nested-tree', 'unverifiable', []], ['scratch', 'unverifiable', []]]);
-    expect(diagnostics).toEqual([]);
+      .toEqual([['external-tree', 'denied', []], ['nested-tree', 'denied', []], ['scratch', 'unverifiable', []]]);
+    expect(diagnostics.map(item => [item.code, item.accessId, item.location])).toEqual(expect.arrayContaining([
+      ['project-boundary-import', 'external-tree', probe.selections[0]!.location],
+      ['project-boundary-import', 'nested-tree', probe.selections[0]!.location]]));
+    expect(diagnostics).toHaveLength(2);
   });
 });

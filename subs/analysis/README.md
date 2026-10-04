@@ -89,6 +89,17 @@ with located coverage notes; definite import violations and missing resource
 exports fail it. A missing resource import is unverifiable, while an exposure
 naming that missing resource is invalid.
 
+Project boundaries are decided before symbol selection and the same-owner
+exemption. An access whose target lies in a declared owned-ignored or external
+tree without package resolution has the `denied` outcome, one located
+`project-boundary-import` finding and no symbol decision, whatever its form:
+value, type-only, symbol-free, namespace or lazy member selection, or
+re-export. Each counts in the summary's denials and fails the check. An
+installed package whose real location lies in such a tree stays external. An
+always-excluded target is unverifiable with the nonblocking `excluded-target`
+limit; a target outside the root is outside scope with `outside-module-target`;
+neither is allowed or external.
+
 `ramify.analysis/2` reports retain inventory and purpose metadata, captured
 input identity, expanded declarations, original and accessed source locations,
 source selections, decisions and provenance. The batch UUID identifies a call;

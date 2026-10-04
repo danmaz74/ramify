@@ -220,14 +220,13 @@ function interpretAccesses(setup: AccessInterpretation,
     if (target.kind === 'unresolved' && form !== 'macro' && !(form === 'commonjs' && specifier === null)) coverageIds.push(limit(specifier === null ? 'nonliteral-target'
       : resolved?.kind === 'resource-target' ? 'resource-target' : 'unresolved-target',
     specifierNode ? location(specifierNode) : at, 'Cannot establish the accessed source or resource target'));
-    // Until the project-boundary rules are enforced, a target outside the root,
-    // inside a declared tree or inside an always-excluded path is reported as
-    // this one nonblocking limit; excluded files are never interpreted.
+    // A target outside the root and one inside an always-excluded path are
+    // distinct nonblocking limits. A target inside a declared tree carries none:
+    // analysis decides it as a definite project-boundary finding. Excluded files
+    // are never interpreted.
     if (target.kind === 'outside-project') coverageIds.push(limit('outside-module-target', at,
       `Accessed file ${target.file} is outside the project root without package resolution`));
-    if (target.kind === 'nested-tree') coverageIds.push(limit('outside-module-target', at,
-      `Accessed file ${target.file} lies in the declared ${target.exclusion.kind} tree ${target.exclusion.directory} without package resolution`));
-    if (target.kind === 'excluded') coverageIds.push(limit('outside-module-target', at,
+    if (target.kind === 'excluded') coverageIds.push(limit('excluded-target', at,
       `Accessed file ${target.file} lies in the always-excluded ${target.exclusion.kind} directory ${target.exclusion.directory} without package resolution`));
     if (deferred) coverageIds.push(limit(deferred.code, at, deferred.message));
     const selections: AccessSelection[] = [];
@@ -362,8 +361,11 @@ function interpretAccesses(setup: AccessInterpretation,
         const found = lookup(specifier, path);
         const entries = path.length ? found.entry?.namespace : found.file?.exports;
         if (!entries) {
-          // A proven external namespace is outside the application model.
-          if (specifier && resolution.module(specifier).kind === 'external') {
+          // A proven external namespace is outside the application model. A
+          // declared tree's exports are never interpreted: its boundary finding
+          // needs no enumeration.
+          const kind = specifier ? resolution.module(specifier).kind : undefined;
+          if (kind === 'external' || kind === 'nested-tree') {
             records++; record(node, specifier, form, selectionForm, runtimeLoad);
           } else unknown(node, 'incomplete-exports', 'Cannot enumerate the selected namespace');
           return;

@@ -9,15 +9,16 @@ const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), B
 
 /**
  * Every target kind names its outcome; only an application target can be
- * `checked`. Nested-tree and excluded targets stay unverifiable, never checked,
- * until the project-boundary rules that decide them are enforced.
+ * `checked`. A nested-tree target is a definite project-boundary denial; an
+ * always-excluded target stays unverifiable with its excluded-target limit.
  */
 function outcomeOf(target: SourceTarget, unknown: boolean, checked: boolean): AccessResult['outcome'] {
   switch (target.kind) {
     case 'application': return unknown ? checked ? 'mixed' : 'unverifiable' : 'checked';
     case 'external': return 'external';
     case 'outside-project': return 'outside-scope';
-    case 'unresolved': case 'nested-tree': case 'excluded': return 'unverifiable';
+    case 'nested-tree': return 'denied';
+    case 'unresolved': case 'excluded': return 'unverifiable';
     default: { const never: never = target; throw new TypeError(`Unknown source target ${JSON.stringify(never)}`); }
   }
 }
@@ -60,7 +61,16 @@ function* evaluateSteps(model: Model, accesses: readonly SourceAccess[], maxDiag
     const decisions: ImportDecision[] = [], ids: string[] = [];
     let unknown = access.coverageIds.length > 0;
     let checked = false;
-    if (access.target.kind === 'application') {
+    if (access.target.kind === 'nested-tree') {
+      // Imports into a declared tree are decided before symbol selection and
+      // the same-owner exemption: every form, including type-only and
+      // symbol-free loads and re-exports, is one located boundary finding and
+      // no symbol decision. Package resolution never reaches this target.
+      const { file, exclusion } = access.target;
+      ids.push(add(access, access.selections[0]?.location ?? access.location, 'project-boundary-import',
+        `${access.specifier === null ? file : `'${access.specifier}'`} resolves to ${file} in the declared ${exclusion.kind} tree ${exclusion.directory}; `
+        + 'an import into a declared tree must use package resolution'));
+    } else if (access.target.kind === 'application') {
       const target = access.target.origin;
       const decide = (location: SourceLocation, selection: Parameters<typeof explainImport>[1]['selection'],
         forwarding: Parameters<typeof explainImport>[1]['forwarding']): void => {

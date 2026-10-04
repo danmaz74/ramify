@@ -72,7 +72,9 @@ function snapshotCounts(snapshot: AnalysisSnapshot | null): SnapshotCounts {
     resources: snapshot?.inventory.files.filter(file => file.kind === 'resource').length ?? 0,
     originals: snapshot?.catalog?.originals.length ?? 0, accesses: snapshot?.accesses.length ?? 0,
     allowed: decisions.filter(decision => decision.status === 'allowed').length,
-    denied: decisions.filter(decision => decision.status === 'denied').length,
+    // A boundary denial has no symbol decision; its access result is denied.
+    denied: decisions.filter(decision => decision.status === 'denied').length
+      + (snapshot?.results.filter(result => result.outcome === 'denied').length ?? 0),
     external: snapshot?.results.filter(result => result.outcome === 'external').length ?? 0 };
 }
 /** Space kept for the mandatory report envelope when evidence is admitted. */

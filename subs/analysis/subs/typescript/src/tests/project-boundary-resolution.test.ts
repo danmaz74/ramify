@@ -8,9 +8,10 @@ import { acquire, analyze, analyzeView, areasFor, code, fixture, sourceLimits, t
 
 /*
  * PB1-14, PB1-15 and PB1-16 at the TypeScript adapter's evidence boundary:
- * which target each resolved specifier receives. The verdicts (the denied
- * outcome, the boundary diagnostic and the excluded-target limit) belong to
- * the analysis that consumes these targets, not to this owner.
+ * which target and limit each resolved specifier receives. The verdicts (the
+ * denied outcome and the boundary diagnostic) belong to the analysis that
+ * consumes these targets, not to this owner; see the analysis owner's
+ * project-boundary-analysis.test.ts.
  *
  * The topology follows the written provider topology: a root `app` with an
  * owned-ignored `fixture-project`, an external `external-project`, a child
@@ -180,10 +181,9 @@ describe('PB1-14: nonpackage imports into declared trees are boundary targets', 
     }
     expect(forms.filter(access => !access.runtimeLoad).map(access => access.form).sort()).toEqual(['import-type', 'import-type-query']);
     expect(targetOf(accesses, 'src/forms.ts', '../fixture-project/src/style.css')).toEqual(nested('fixture-project/src/style.css', fixtureProject));
-    // Until the boundary rule is enforced, each statement carries one nonblocking limit naming the tree.
-    expect(notesOf(accesses, coverage, 'src/forms.ts', '../fixture-project/src/thing.js')).toEqual([
-      'outside-module-target: Accessed file fixture-project/src/thing.ts lies in the declared owned-ignored tree fixture-project without package resolution',
-    ]);
+    // A declared-tree target is a definite finding for analysis, never a nonblocking limit.
+    expect(notesOf(accesses, coverage, 'src/forms.ts', '../fixture-project/src/thing.js')).toEqual([]);
+    expect(notesOf(accesses, coverage, 'src/forms.ts', '../fixture-project/src/style.css')).toEqual([]);
   }, 60_000);
 
   it('gives relative, alias and workspace-link routes into either tree the nested-tree target', async () => {
@@ -203,7 +203,7 @@ describe('PB1-14: nonpackage imports into declared trees are boundary targets', 
   }, 60_000);
 
   it('keeps re-exports into either tree as forwarding-file targets and preserves forwarding provenance', async () => {
-    const { accesses, catalog } = await topologyAccesses();
+    const { accesses, catalog, coverage } = await topologyAccesses();
     expect(targetOf(accesses, 'src/forward.ts', '../fixture-project/src/thing.js')).toEqual(nested('fixture-project/src/thing.ts', fixtureProject));
     expect(targetOf(accesses, 'src/forward.ts', '../external-project/lib.js')).toEqual(nested('external-project/lib.ts', externalProject));
     expect(accesses.filter(access => access.location.file === 'src/forward.ts' && access.target.kind === 'nested-tree')
@@ -213,8 +213,18 @@ describe('PB1-14: nonpackage imports into declared trees are boundary targets', 
     expect(forward.state).toBe('incomplete');
     expect(forward.exports.find(entry => entry.name === 'thing')).toMatchObject({ original: null });
     expect(forward.exports.find(entry => entry.name === 'api')).toMatchObject({ original: code('api.ts', 'api', 'fixture/a') });
+    // Its description is incomplete: the named and type exports into the
+    // owned-ignored tree and the package export describe no original, and the
+    // star export into the external tree cannot be enumerated.
     expect(catalog.coverage.filter(note => note.location.file === 'src/forward.ts').map(note => note.code).sort())
-      .toEqual(['outside-module-target', 'outside-module-target', 'outside-module-target', 'unresolved-original']);
+      .toEqual(['incomplete-exports', 'unresolved-original', 'unresolved-original', 'unresolved-original']);
+    // The statements themselves carry no limit; analysis decides them, and the
+    // star export into the tree is one access without enumerating its exports.
+    for (const specifier of ['../fixture-project/src/thing.js', '../external-project/lib.js']) {
+      expect(notesOf(accesses, coverage, 'src/forward.ts', specifier), specifier).toEqual([]);
+    }
+    expect(accesses.filter(access => access.specifier === '../external-project/lib.js' && access.location.file === 'src/forward.ts')
+      .map(access => [access.form, access.selectionForm, access.coverageIds])).toEqual([['star-export', 'whole-star', []]]);
     // Excluded files are never described, and no original is defined in one.
     expect(catalog.files.map(entry => entry.file).filter(file => file.startsWith('src/tmp/')
       || !file.startsWith('src/') && !file.startsWith('subs/a/src/'))).toEqual([]);
@@ -279,11 +289,11 @@ describe('PB1-16: outside, unresolved and always-excluded targets stay distinct'
     expect(notesOf(accesses, coverage, 'src/limits.ts', '../../outside.js')).toEqual([
       'outside-module-target: Accessed file ../outside.ts is outside the project root without package resolution']);
     expect(notesOf(accesses, coverage, 'src/limits.ts', '../dist/out.js')).toEqual([
-      'outside-module-target: Accessed file dist/out.d.ts lies in the always-excluded output directory dist without package resolution']);
+      'excluded-target: Accessed file dist/out.d.ts lies in the always-excluded output directory dist without package resolution']);
     expect(notesOf(accesses, coverage, 'src/limits.ts', './tmp/scratch.js')).toEqual([
-      'outside-module-target: Accessed file src/tmp/scratch.ts lies in the always-excluded scratch directory src/tmp without package resolution']);
+      'excluded-target: Accessed file src/tmp/scratch.ts lies in the always-excluded scratch directory src/tmp without package resolution']);
     expect(notesOf(accesses, coverage, 'src/limits.ts', '../node_modules/realpkg/index.js')).toEqual([
-      'outside-module-target: Accessed file node_modules/realpkg/index.d.ts lies in the always-excluded packages directory node_modules without package resolution']);
+      'excluded-target: Accessed file node_modules/realpkg/index.d.ts lies in the always-excluded packages directory node_modules without package resolution']);
     expect(notesOf(accesses, coverage, 'src/limits.ts', './missing.js')).toEqual(['unresolved-target: Cannot establish the accessed source or resource target']);
     expect(notesOf(accesses, coverage, 'src/limits.ts', 'sample/hidden')).toEqual(['unresolved-target: Cannot establish the accessed source or resource target']);
   }, 60_000);

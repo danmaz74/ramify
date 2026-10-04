@@ -123,9 +123,14 @@ physical location, through every link, by Project's `classifyProjectPath`: a
 `excluded` target in a scratch, output, installed-package, repository or
 generated directory, each with its exclusion, and an `outside-project` target
 outside the root. An owned location the inventory does not hold is unresolved.
-Excluded files are never described; until the project-boundary rules are
-enforced, each of these three targets carries the nonblocking
-`outside-module-target` limit. Every origin takes its `auxiliary` flag from the
+Excluded files are never described. An `outside-project` target carries the
+nonblocking `outside-module-target` limit and an `excluded` target the
+nonblocking `excluded-target` limit. A `nested-tree` target carries no limit:
+analysis decides it as a definite `project-boundary-import` finding, and a star
+or namespace export into the tree needs no enumeration of its exports. A
+forwarding export into a declared tree leaves its file's description incomplete
+(`unresolved-original`, or `incomplete-exports` for a star export), so a
+consumer never receives a false missing export. Every origin takes its `auxiliary` flag from the
 inventory file's placement. Vite globs, loader import methods,
 direct Jiti calls and CommonJS access/export patterns retain explicit coverage.
 They never become native ESM selections. Known CommonJS targets retain their source areas for

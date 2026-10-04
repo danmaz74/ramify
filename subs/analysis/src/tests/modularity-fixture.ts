@@ -138,7 +138,8 @@ export function buildReport(spec: FixtureSpec): AnalysisReport {
         .map(selection => decision(selection.file, selection.binding, 'allowed', 'exposed'));
     const outcome: AccessResult['outcome'] = access.outcome ?? (source.target.kind === 'external' ? 'external'
       : source.target.kind === 'outside-project' ? 'outside-scope'
-      : source.target.kind === 'unresolved' || source.target.kind === 'nested-tree' || source.target.kind === 'excluded' ? 'unverifiable'
+      : source.target.kind === 'nested-tree' ? 'denied'
+      : source.target.kind === 'unresolved' || source.target.kind === 'excluded' ? 'unverifiable'
       : source.coverageIds.length ? 'mixed' : 'checked');
     return { accessId: access.id, decisions, outcome, diagnostics: [], coverage: source.coverageIds };
   });

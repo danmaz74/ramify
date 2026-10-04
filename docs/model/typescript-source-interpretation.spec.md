@@ -5,8 +5,9 @@ package-boundary interpretation were adopted on 2026-10-01. Auxiliary source is
 analyzed with its owner's ordinary profile. Resolution retains the package route
 and classifies nested-tree, always-excluded and outside-project targets.
 Linking rejects auxiliary originals selected through exposure, including through
-forwarding aliases; the definite project-boundary finding and the excluded-target
-limit are not yet implemented.
+forwarding aliases. Analysis reports an import into a declared nested tree
+without package resolution as the definite `project-boundary-import` finding,
+and an import into an always-excluded path as the `excluded-target` limit.
 Specification status does not establish implementation support.
 
 ## Purpose
@@ -542,6 +543,8 @@ a supported checker completing with documented analysis limits. Diagnostics
 do not create exposure declarations or dependency allowlists.
 
 Auxiliary source is analyzed, and resolution classifies the project-boundary
-targets; their definite finding and excluded-target limit are not yet
-implemented. Adopting these rules does not establish runtime support; report
-unsupported or unrun analysis explicitly.
+targets. An import into a declared nested tree without package resolution is
+reported as the definite `project-boundary-import` finding and an import into
+an always-excluded path as the `excluded-target` limit. Adopting these rules
+does not establish runtime support; report unsupported or unrun analysis
+explicitly.

@@ -102,7 +102,7 @@ export interface SourceLimit {
     | 'ambiguous-original' | 'unknown-key' | 'namespace-escape' | 'nonliteral-target'
     | 'unsupported-loader' | 'unsupported-commonjs' | 'shared-global'
     | 'resource-target' | 'resource-description' | 'compiled-source'
-    | 'outside-module-target' | 'compiler-blocked'
+    | 'outside-module-target' | 'excluded-target' | 'compiler-blocked'
     /** Reported by analysis for an exposed original from its companion facts. */
     | 'signature-inferred' | 'signature-unresolved';
   readonly location: SourceLocation;

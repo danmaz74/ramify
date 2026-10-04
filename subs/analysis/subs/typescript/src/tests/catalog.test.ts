@@ -264,8 +264,11 @@ describe('export completeness and compiler limits', () => {
         code: 'unresolved-original', location: expect.objectContaining({ file: 'src/external.ts' }),
         message: expect.stringContaining('compiler-resolved external'),
       }));
+      // A forwarding export into a declared tree describes no original: the
+      // file's description is incomplete; the statement's access is the boundary finding.
       expect(catalog.coverage).toContainEqual(expect.objectContaining({
-        code: 'outside-module-target', location: expect.objectContaining({ file: 'src/outside.ts' }),
+        code: 'unresolved-original', location: expect.objectContaining({ file: 'src/outside.ts' }),
+        message: expect.stringContaining('declared owned-ignored tree loose'),
       }));
       expect(catalog.coverage).toContainEqual(expect.objectContaining({
         code: 'unresolved-target', location: expect.objectContaining({ file: 'src/unresolved.ts' }),

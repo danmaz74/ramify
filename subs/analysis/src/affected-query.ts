@@ -153,6 +153,10 @@ export function projectAffected(facts: AffectedFacts, seeds: { readonly modules:
     if (++visited % cancellationStride === 0 && signal?.aborted) return { status: 'cancelled' };
     const consumer = access.importer.area.owner;
     if (access.target.kind === 'application' && !depend(consumer, access.target.origin.area.owner)) return edgeLimit();
+    // An import into an owned-ignored tree is a boundary finding without a
+    // limit to widen the answer; it still depends on the tree's owner.
+    if (access.target.kind === 'nested-tree' && access.target.exclusion.owner !== null
+      && !depend(consumer, access.target.exclusion.owner)) return edgeLimit();
     for (const selection of access.selections) {
       if (selection.original && !depend(consumer, selection.original.owner)) return edgeLimit();
       for (const origin of selection.forwarding) if (!depend(consumer, origin.area.owner)) return edgeLimit();

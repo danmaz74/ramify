@@ -11,9 +11,10 @@ validity, never reading a marked description inside a declared nested tree.
 Acquisition reports the compiler-selection warnings, and auxiliary source is
 inventoried and analyzed with its owner's ordinary classification. Linking
 rejects an exposure that selects an auxiliary original, directly or through
-forwarding aliases, with the located `auxiliary-original-exposure` error. The
-import rule for declared trees is not yet implemented; the implementation plan
-schedules that work. The exposure grammar below is unchanged.
+forwarding aliases, with the located `auxiliary-original-exposure` error.
+Analysis enforces the import rule for declared trees: an import into one
+without package resolution is the definite `project-boundary-import` finding.
+The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -1098,8 +1099,10 @@ about compiler-selected source in an owned-ignored tree or a module scratch
 directory, never inventories or reads it and never makes it a compiler root.
 Auxiliary source is inventoried and analyzed under its owner's ordinary
 classification. Linking reports an exposure that selects an auxiliary original
-as the located `auxiliary-original-exposure` error; the rest of whole-tree
-ownership is not yet implemented. The root marker, specified on 2026-10-03, is parsed, selects the
+as the located `auxiliary-original-exposure` error. Analysis reports an import
+into a declared tree without package resolution as the definite
+`project-boundary-import` finding; the rest of whole-tree ownership is not yet
+implemented. The root marker, specified on 2026-10-03, is parsed, selects the
 root and is enforced in discovery; a marked description inside a declared
 nested tree is never read.
 Specification adoption does not establish parser or checker support.

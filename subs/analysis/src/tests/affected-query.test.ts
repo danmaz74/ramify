@@ -282,6 +282,22 @@ describe('affected-module projection: coverage (A7-04)', () => {
     expect(select(coverageGraph(outside), ['c'])).toMatchObject({ ...widened, coverage: { status: 'partial', notes: [outside] } });
   });
 
+  it('a boundary import into an owned-ignored tree, which carries no note, still depends on the tree\'s owner', () => {
+    // Project-boundary iteration 11: the import is a definite finding without a
+    // coverage note, so it widens nothing; its edge to the owner keeps the
+    // importer selected. An external tree has no owner and adds no edge.
+    const consumer = origin('subs/b/src/b.ts', 'b');
+    const facts = graphFacts({ modules: { a: 'subs/a', b: 'subs/b', c: 'subs/c' }, accesses: [
+      access(consumer, { kind: 'nested-tree', file: 'subs/a/fixtures/sample/index.ts',
+        exclusion: { kind: 'owned-ignored', directory: 'subs/a/fixtures/sample', owner: 'a' } }),
+      access(origin('subs/c/src/c.ts', 'c'), { kind: 'nested-tree', file: 'external-project/lib.ts',
+        exclusion: { kind: 'external', directory: 'external-project', owner: null } }),
+    ] });
+    expect(select(facts, ['a'])).toMatchObject({ changedModules: [sub('a')], affectedModules: [sub('b')],
+      testModules: [sub('a'), sub('b')], selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] } });
+    expect(select(facts, ['c'])).toMatchObject({ affectedModules: [], testModules: [sub('c')], widening: [] });
+  });
+
   it('A7-04:signature-only-complete: owner-known notes keep coverage complete and return every note in report order', () => {
     const inferred = note('signature-inferred', 'subs/c/src/c.ts', 5);
     const unresolved = note('unresolved-original', 'subs/a/src/a.ts');
