@@ -295,7 +295,8 @@ not verified, never as a pass. An end-of-task hook, a pre-commit hook or CI runs
 `ramify check`, or `--batch` where no daemon state should be trusted. That
 complete check gives a configuration edit its verdict.
 
-The hook check hashes the named paths relative to the selected root. It exits 0
+The hook check names paths relative to the selected root and hashes those the
+daemon's classification analyzes. It exits 0
 when the covering revision has no findings, 1 for findings or an invalid
 revision, and 2 when it was not checked, naming the reason. One known limit:
 where the root `tsconfig.json` carries `references` beside its own files, a
@@ -311,8 +312,10 @@ lies in an owned-ignored, external or scratch directory or another
 always-excluded path, or it is an owned file that is neither source nor an
 analysis input. Descriptions, configuration, READMEs and referenced resources
 that the analysis reads are analysis inputs, not inert files. A not-analyzed
-path is not hashed or captured, needs no content coverage and never changes
-the exit code: a request naming only such paths exits 0 when the covering
+path is never captured and needs no content coverage, a path in an excluded
+directory is not hashed, and an owned file the covering revision finds to be
+no analysis input carries no content identity although the client hashed it
+before that was known. A not-analyzed path never changes the exit code: a request naming only such paths exits 0 when the covering
 revision has no findings and 1 when it has findings or is invalid, exactly as
 `ramify check` would. `not-checked` means the hook could not establish the
 result for that path, for example through stale or unobserved content, an

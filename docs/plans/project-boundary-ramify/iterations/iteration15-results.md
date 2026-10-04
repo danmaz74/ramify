@@ -368,3 +368,23 @@ iteration 17's patch.
 10. **Closed status value.** `classification-changed` is a new value of
     `CheckOutcome.status`; the brief extends `ramify.ipc/2` without a new
     version, as it states.
+
+## Coordinator review
+
+The coordinator reviewed the classification sequence, the dispositions, the
+deletion evidence and the migrated consumers against the brief, the contracts
+and R4. This iteration ran one iteration ahead in the second worktree; it was
+rebased onto the iteration 14 fix (`6001bc4e`) and merged after that gate was
+green. Two points were put to the user through the relay session, which
+settled them under the user's standing instruction; the user was told and
+may override them. First, each hook check now makes one classification round
+trip before it hashes anything, with no client-side cache; its measured cost
+is reported separately in iteration 20's hook-latency results. Second,
+`proposed-spec-patches.diff` is authorized and applied: in
+`cli-invocation.spec.md` "Hook and complete checks", a path in an excluded
+directory is not hashed, while an owned file the covering revision finds to
+be no analysis input is hashed by the client before that is known and then
+carries no content identity. That narrows a sentence of R4. The smaller
+behaviours this receipt lists are accepted. The agent did not run
+`reference:verify`; the coordinator's gate runs the audit, `reference:cases`
+and the full Plan 1 and Plan 2 verification on the committed candidate.
