@@ -68,7 +68,8 @@ const observerNames = ['ObservationSink', 'ObservationRetirement', 'InputChangeK
 const contextNames = ['ContextId', 'GenerationId', 'RevisionId', 'LeaseId', 'ContextToken', 'ContextSetup',
   'ContextSelection', 'InputFingerprints', 'RevisionCause', 'ContextRevision', 'ContextState', 'SynchronizationState',
   'ContextStatus', 'ExpectedContent', 'Freshness', 'FreshnessRecord', 'CheckRequest', 'CheckDelta', 'UnavailableReason', 'Unavailable',
-  'CheckOutcome', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'DependencyDiagramRequest', 'ContextDependencyDiagramOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
+  // Phase 1 project boundaries (path dispositions): `PathCheckDisposition` travels with `CheckOutcome`.
+  'CheckOutcome', 'PathCheckDisposition', 'ExplorerDetailsRequest', 'ContextExplorerDetailsOutcome', 'DependencyDiagramRequest', 'ContextDependencyDiagramOutcome', 'ReplyTimings', 'OpenOutcome', 'ContextEvent', 'SubscriptionHandle', 'WatchEvent', 'WatcherHandle', 'WatcherPort',
   'ClockPort', 'ContextBudgets'];
 const controlledNames = ['createControlledWatcher', 'createControlledClock', 'ControlledWatcher', 'ControlledClock'];
 const residentNames = ['DaemonInstance', 'LogEntry', 'DaemonBudgets', 'EndpointSelection', 'DaemonRecord',
