@@ -28,6 +28,7 @@ function run(command: string, args: readonly string[], options: { cwd: string; e
     child.once('close', (code, signal) => { clearTimeout(timer); accept({ code, signal, stdout, stderr, ms: performance.now() - started }); });
   });
 }
+const outcome = (result: Outcome) => [result.code, result.signal, result.stdout, result.stderr] as const;
 const withoutRunId = (text: string) => text.replace(/"runId":"[^"]+"/g, '"runId":"<run>"');
 async function processesMentioning(text: string): Promise<string[]> {
   const { stdout } = await promisify(execFile)('ps', ['-eo', 'pid=,args=']);
@@ -68,7 +69,9 @@ describe('compiled client process contracts', () => {
     for (const args of [['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
       ['affected', 'example/mid', '--path', 'docs/notes.md', '--batch']]) {
       const [compiled, node] = [await run(launcher, args, { cwd: root, env }), await run(process.execPath, [nodeEntry, ...args], { cwd: root, env })];
-      expect([compiled.code, compiled.signal, compiled.stdout, compiled.stderr], args.join(' ')).toEqual([0, null, node.stdout, node.stderr]);
+      // A JSON report keeps only the message: name both complete outcomes so a mismatch explains itself.
+      const outcomes = `${args.join(' ')}\ncompiled: ${JSON.stringify(outcome(compiled))}\nnode: ${JSON.stringify(outcome(node))}`;
+      expect([...outcome(compiled), ...outcome(node).slice(0, 2)], outcomes).toEqual([0, null, node.stdout, node.stderr, 0, null]);
     }
     const document = JSON.parse((await run(launcher, ['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
       { cwd: root, env })).stdout);
