@@ -38,10 +38,10 @@ const files: Record<string, string> = {
   'subs/b/src/consumer.ts': "import { api } from '../../a/src/api.js';\nexport const hidden = api();\n",
 };
 
-async function report(): Promise<AnalysisReport> {
+async function report(mutation: Record<string, string> = {}): Promise<AnalysisReport> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-auxiliary-')));
   try {
-    for (const [path, text] of Object.entries(files)) {
+    for (const [path, text] of Object.entries({ ...files, ...mutation })) {
       await mkdir(dirname(join(root, path)), { recursive: true });
       await writeFile(join(root, path), text);
     }
@@ -114,5 +114,68 @@ describe('auxiliary source analysis (PB1-07, PB1-33)', () => {
         ['testing-origin', 'subs/a/scripts/report.test.ts', 'app/a', 'ordinary', []],
         ['testing-origin', 'subs/a/scripts/report.ts', 'app/a', 'ordinary', []],
       ]);
+  }, 60_000);
+});
+
+// PB1-13 through the real catalog (fixtures.md, mutation 4): forward an
+// auxiliary export through files beneath src/ and try to expose it. Linking
+// rejects every selection that reaches the auxiliary original, whatever the
+// forwarding chain, and no model is published; the same selections of an
+// original beneath src/ are the positive control.
+const root = (statements: readonly string[]) =>
+  `ramify 1\nroot module app tagged [dispatch]\nexpose-sub api from a to descendants\n${statements.join('\n')}\n`;
+const childDescription = (statements: readonly string[]) => `ramify 1\nmodule a\nexpose-src api from "api.ts" to parent\n${statements.join('\n')}\n`;
+const forwarding: Record<string, string> = {
+  'src/forward.ts': "export { helper } from '../tools/tmp/helper.js';\nexport { main } from './main.js';\n",
+  'src/chain.ts': "export * from './forward.js';\n",
+  'src/interfaces/contract.ts': "export { helper as tool, main } from '../chain.js';\n",
+  'src/interfaces/clean.ts': "export { main } from '../chain.js';\n",
+  'subs/a/scripts/tool.ts': 'export const tool = 2;\n',
+  'subs/a/src/relay.ts': "export { tool } from '../scripts/tool.js';\nexport { api } from './api.js';\n",
+};
+
+/** The location of `needle` in `text`, computed from the text alone. */
+function at(file: string, text: string, needle: string): { file: string; start: number; end: number; line: number; column: number } {
+  const start = text.indexOf(needle);
+  const before = text.slice(0, start);
+  return { file, start, end: start + needle.length, line: before.split('\n').length, column: start - before.lastIndexOf('\n') };
+}
+
+describe('auxiliary original exposure through the real catalog (PB1-13)', () => {
+  it('rejects exact, chained, wildcard and re-exposed selections of auxiliary originals with located findings', async () => {
+    const app = root(['expose-src helper from "forward.ts" to descendants', 'expose-src helper as chained from "chain.ts" to descendants',
+      'expose-src * from "interfaces/contract.ts" to descendants', 'expose-sub tool as received from a to descendants']);
+    const a = childDescription(['expose-src tool from "relay.ts" to parent']);
+    const value = await report({ ...forwarding, 'module.ramify': app, 'subs/a/module.ramify': a });
+    // An invalid description set publishes no model, so no access is decided.
+    expect(value.outcome).toEqual({ execution: 'invalid', check: 'failed', coverage: 'not-run' });
+    expect(value.diagnostics.map(issue => [issue.code, issue.category, issue.location, issue.related.map(item => item.file)])).toEqual([
+      ['auxiliary-original-exposure', 'description', at('module.ramify', app, 'helper'), ['tools/tmp/helper.ts']],
+      ['auxiliary-original-exposure', 'description', at('module.ramify', app, 'helper as chained'), ['tools/tmp/helper.ts']],
+      // The wildcard reaches `helper` under its interface alias `tool`; `main` is unreported.
+      ['auxiliary-original-exposure', 'description', at('module.ramify', app, '*'), ['tools/tmp/helper.ts']],
+      ['auxiliary-original-exposure', 'description', at('module.ramify', app, 'tool as received'), ['subs/a/scripts/tool.ts']],
+      ['auxiliary-original-exposure', 'description', at('subs/a/module.ramify', a, 'tool'), ['subs/a/scripts/tool.ts']],
+    ]);
+    expect(value.diagnostics.every(issue => issue.message.includes('auxiliary source'))).toBe(true);
+  }, 60_000);
+
+  it('links the same forwarding chains and wildcard for originals beneath src/', async () => {
+    const value = await report({ ...forwarding,
+      'module.ramify': root(['expose-src main from "forward.ts" to descendants', 'expose-src main as chained from "chain.ts" to descendants',
+        'expose-src * from "interfaces/clean.ts" to descendants', 'expose-sub api as received from a to descendants']),
+      'subs/a/module.ramify': childDescription(['expose-src api as relayed from "relay.ts" to parent']) });
+    expect(value.outcome.execution).toBe('completed');
+    expect(value.diagnostics.filter(issue => issue.category === 'description')).toEqual([]);
+    expect(value.snapshot!.model!.exposures.filter(item => item.module === 'app').map(item => [item.original.file, item.original.binding, item.names]))
+      .toEqual([['main.ts', 'main', ['chained', 'main']], ['api.ts', 'api', ['api', 'received']]]);
+    // The child exposes `api` to its parent under both of its names.
+    expect(value.snapshot!.model!.exposures.filter(item => item.module === 'app/a').map(item => [item.original.binding, item.names]))
+      .toEqual([['api', ['api', 'relayed']]]);
+  }, 60_000);
+
+  it('keeps the path rule for an exact reference that itself points outside src/', async () => {
+    const value = await report({ 'module.ramify': root(['expose-src helper from "../tools/tmp/helper.ts" to descendants']) });
+    expect(value.diagnostics.map(issue => issue.code)).toEqual(['invalid-path']);
   }, 60_000);
 });

@@ -230,8 +230,9 @@ export function buildModel(input: ModelInput): ModelResult<Model> {
       continue;
     }
     if ('tags' in exposure) issues.push(issue('conflicting-tags', 'An exposure cannot reassign original tags', exposure.evidence));
-    // Auxiliary originals are never exposed. Linking's located finding for a
-    // selection that reaches one is later work; the model refuses the input.
+    // Auxiliary originals are never exposed, by an owner or by re-exposure.
+    // Linking reports a selection reaching one as `auxiliary-original-exposure`;
+    // the model independently refuses such an exposure supplied to it directly.
     if (originals.get(originalKey(exposure.original))!.origin.auxiliary) {
       issues.push(issue('ungrounded-exposure', `Auxiliary original ${originalKey(exposure.original)} cannot be exposed`, exposure.evidence));
       continue;

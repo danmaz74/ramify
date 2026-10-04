@@ -47,5 +47,11 @@ files and evaluates direct-child contracts from leaves to root. It assigns tags
 through the model before publishing the complete result. Empty expansions and
 ineffective named child selections retain declaration evidence; invalid
 prerequisites, collisions, conflicting assignments and incomplete expansions
-return diagnostics without a partial model. All catalogued originals, including
+return diagnostics without a partial model. A selection whose export denotes
+an original defined in auxiliary source, directly or through any same-owner
+forwarding chain or interface wildcard, is an `auxiliary-original-exposure`
+located at the selection, with the original's declarations. Re-exposure is
+exposure, so a parent's `expose-sub` selecting that name is reported at its own
+selection; the child's selection stays declared rather than becoming a missing
+export. No tag clause is assigned to such an original. All catalogued originals, including
 unexposed exports, retain their defining source areas and mandatory tags.

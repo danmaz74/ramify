@@ -9,10 +9,11 @@ module line and its validity rules were specified on 2026-10-03; the parser
 accepts the marker, the root is selected by it and discovery enforces its
 validity, never reading a marked description inside a declared nested tree.
 Acquisition reports the compiler-selection warnings, and auxiliary source is
-inventoried and analyzed with its owner's ordinary classification. The import
-rule for declared trees and the located finding for an exposure that selects an
-auxiliary original are not yet implemented; the implementation plan schedules
-that work. The exposure grammar below is unchanged.
+inventoried and analyzed with its owner's ordinary classification. Linking
+rejects an exposure that selects an auxiliary original, directly or through
+forwarding aliases, with the located `auxiliary-original-exposure` error. The
+import rule for declared trees is not yet implemented; the implementation plan
+schedules that work. The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -1096,8 +1097,9 @@ pruning of declared trees and module scratch directories. Acquisition warns
 about compiler-selected source in an owned-ignored tree or a module scratch
 directory, never inventories or reads it and never makes it a compiler root.
 Auxiliary source is inventoried and analyzed under its owner's ordinary
-classification. The located finding for an exposure that selects an auxiliary
-original and the rest of whole-tree ownership are not yet implemented. The root marker, specified on 2026-10-03, is parsed, selects the
+classification. Linking reports an exposure that selects an auxiliary original
+as the located `auxiliary-original-exposure` error; the rest of whole-tree
+ownership is not yet implemented. The root marker, specified on 2026-10-03, is parsed, selects the
 root and is enforced in discovery; a marked description inside a declared
 nested tree is never read.
 Specification adoption does not establish parser or checker support.

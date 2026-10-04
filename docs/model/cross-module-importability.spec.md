@@ -3,8 +3,9 @@
 **Status:** Active
 
 Whole-tree ownership, auxiliary-source and project-boundary rules adopted
-2026-10-01; auxiliary source is decided by its owner's ordinary rules, and the
-remaining tooling changes are not yet implemented.
+2026-10-01; auxiliary source is decided by its owner's ordinary rules, linking
+rejects an exposure of an auxiliary original, and the remaining tooling changes
+are not yet implemented.
 
 ## Purpose
 

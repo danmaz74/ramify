@@ -3,9 +3,10 @@
 **Status:** Active specification. Whole-tree ownership, auxiliary-source and
 package-boundary interpretation were adopted on 2026-10-01. Auxiliary source is
 analyzed with its owner's ordinary profile. Resolution retains the package route
-and classifies nested-tree, always-excluded and outside-project targets; the
-definite project-boundary finding, the excluded-target limit and the rejection
-of auxiliary originals through exposure are not yet implemented.
+and classifies nested-tree, always-excluded and outside-project targets.
+Linking rejects auxiliary originals selected through exposure, including through
+forwarding aliases; the definite project-boundary finding and the excluded-target
+limit are not yet implemented.
 Specification status does not establish implementation support.
 
 ## Purpose
