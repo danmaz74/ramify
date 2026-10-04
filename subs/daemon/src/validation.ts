@@ -67,6 +67,13 @@ function setup(value: unknown): boolean {
   return record(value, ['registry', 'capabilities']) && text(value.registry) && array(value.capabilities, text);
 }
 
+/** A project-relative path a synchronized request may name: `/`-separated, normalized,
+ * inside the root and not the root itself. */
+function requestPath(value: unknown): value is string {
+  return nonempty(value) && !value.includes('\\') && !value.includes('\0') && !posix.isAbsolute(value)
+    && posix.normalize(value) === value && value !== '.' && value !== '..' && !value.startsWith('../');
+}
+
 function freshness(value: unknown): boolean {
   if (record(value, ['mode', 'wait'], ['revision']) && value.mode === 'published') {
     return typeof value.wait === 'boolean'
@@ -75,14 +82,30 @@ function freshness(value: unknown): boolean {
   if (!record(value, ['mode', 'expect']) || value.mode !== 'synchronized') return false;
   const paths = new Set<string>();
   return array(value.expect, entry => {
-    if (!record(entry, ['path', 'sha256']) || !nonempty(entry.path)
-      || entry.path.includes('\\') || entry.path.includes('\0') || posix.isAbsolute(entry.path)
-      || posix.normalize(entry.path) !== entry.path || entry.path === '.' || entry.path === '..'
-      || entry.path.startsWith('../') || paths.has(entry.path)
+    if (!record(entry, ['path', 'sha256']) || !requestPath(entry.path) || paths.has(entry.path)
       || !(entry.sha256 === null || matches(entry.sha256, sha256))) return false;
     paths.add(entry.path);
     return true;
   }, 10_000);
+}
+
+/** A changed check's `paths` and `classification`, present together: distinct request
+ * paths under synchronized freshness, every expected path among them, and a positive
+ * revision sequence or null. */
+function changedPaths(params: Record<string, unknown>): boolean {
+  const named = Object.hasOwn(params, 'paths'), classified = Object.hasOwn(params, 'classification');
+  if (!named && !classified) return true;
+  if (!named || !classified) return false;
+  if (!(params.classification === null || typeof params.classification === 'number'
+    && Number.isSafeInteger(params.classification) && params.classification > 0)) return false;
+  const paths = new Set<string>();
+  if (!array(params.paths, path => {
+    if (!requestPath(path) || paths.has(path)) return false;
+    paths.add(path);
+    return true;
+  }, 10_000) || !paths.size) return false;
+  const freshness = params.freshness as { readonly mode: string; readonly expect?: readonly { readonly path: string }[] };
+  return freshness.mode === 'synchronized' && freshness.expect!.every(entry => paths.has(entry.path));
 }
 
 /** A canonical project-relative path (`/`-separated, no leading/trailing slash,
@@ -137,8 +160,8 @@ export function validateServiceRequest(operation: unknown, params: unknown): Ser
       case 'contextStatus':
       case 'subscribe':
       case 'closeContext': valid = record(params, ['token']) && token(params.token); break;
-      case 'check': valid = record(params, ['token', 'requestId', 'freshness'], ['scope', 'since', 'deadlineMs']) && token(params.token)
-        && matches(params.requestId, requestId) && freshness(params.freshness)
+      case 'check': valid = record(params, ['token', 'requestId', 'freshness'], ['scope', 'since', 'deadlineMs', 'paths', 'classification']) && token(params.token)
+        && matches(params.requestId, requestId) && freshness(params.freshness) && changedPaths(params)
         && (!Object.hasOwn(params, 'scope') || params.scope === 'report' || params.scope === 'delta')
         && (!Object.hasOwn(params, 'since') || matches(params.since, revisionId))
         && (!Object.hasOwn(params, 'deadlineMs') || (typeof params.deadlineMs === 'number'

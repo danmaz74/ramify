@@ -89,6 +89,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
   const manager = createContextManager({ ...options, apiViewLimits, dependencyDiagrams, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
     driver: {
       resolve: (request, control, known) => options.driver.resolve(request, control, known),
+      classify: (scope, path) => options.driver.classify(scope, path),
       async open(project, setup, control) {
         const opened = await measured(control, () => options.driver.open(project, setup, control));
         if (opened.status !== 'opened') return opened;

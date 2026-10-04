@@ -151,7 +151,7 @@ configuration discovery, warnings and exits, is [CLI invocation](cli-invocation.
 | Command | Required behavior |
 | --- | --- |
 | `ramify check` | Connect to a compatible daemon, starting one if necessary; synchronize every current input, obtain the whole report, print it and exit. This is the complete check; human output names the revision's path on its `Mode:` line and `--format json` writes the unchanged `ramify.analysis/2` report. |
-| `ramify check --changed <path>... [--since <revision>] [--deadline <ms>] [--format json]` | The bounded hook check agent post-write hooks run, on the [fast incremental check](daemon.md#fast-incremental-checks) path. The CLI hashes each named file relative to the selected root and asks for the first revision covering those identities, waiting at most the deadline (default 2,000 ms). It prints every project finding, marking those new since `--since` or the previous revision; `--format json` writes one `ramify.check/2` document. It never runs a batch analysis. See [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
+| `ramify check --changed <path>... [--since <revision>] [--deadline <ms>] [--format json]` | The bounded hook check agent post-write hooks run, on the [fast incremental check](daemon.md#fast-incremental-checks) path. The CLI names each path relative to the selected root, hashes the ones the daemon's classification analyzes and asks for the first revision covering those identities, waiting at most the deadline (default 2,000 ms). Each named path is reported checked, not analyzed or not checked. It prints every project finding, marking those new since `--since` or the previous revision; `--format json` writes one `ramify.check/2` document. It never runs a batch analysis. See [hook and complete checks](cli-invocation.spec.md#hook-and-complete-checks). |
 | `ramify inspect ...`, `ramify explain ...` | Query the selected project's analysis with explicit freshness/revision semantics, print the result and exit. |
 | `ramify watch` | Keep a bounded subscription open and render published updates. The daemon owns watching and analysis. |
 | `ramify materialize [--view <api\|architect>]... [--from <path> \| --all] [--root <dir>]` | Synchronize one revision and publish every requested generated view from it in one transaction: the [API discovery view](materialized-api-view.spec.md) of one module or of all modules, and the project's [architect view](architect-view.spec.md), which waits for the daemon's dependency facts for that revision. Without `--view`, the API view alone. It never runs a batch analysis. |
@@ -169,9 +169,9 @@ it broke.
 
 | Exit | `ramify check --changed` |
 | --- | --- |
-| 0 | A covering revision completed with no finding in the project. |
+| 0 | A covering revision completed with no finding in the project, and no named path is not checked; a path not analyzed changes nothing. |
 | 1 | A covering revision has findings, or it is invalid; the output marks which findings are new. |
-| 2 | Not checked: `cold`, `deadline-exceeded`, `unobserved-input`, `superseded`, `configuration-changed`, `evicted-revision`, an incomplete or unavailable engine outcome, or an unavailable, stopped or incompatible daemon. |
+| 2 | Not checked: `cold`, `deadline-exceeded`, `unobserved-input`, `superseded`, `configuration-changed`, `classification-changed` after its one retry, `evicted-revision`, a named path not checked, an incomplete or unavailable engine outcome, or an unavailable, stopped or incompatible daemon. |
 | 130 | Interrupted. |
 
 `examples/hooks/claude-code-post-write.mjs` is an example host adapter outside

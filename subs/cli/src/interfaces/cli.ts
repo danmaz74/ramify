@@ -1,10 +1,10 @@
 import type { AffectedBatchOperation, BatchOperation } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
-import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
+import type { ContextStatus, ContextRevision, PathCheckDisposition, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
 import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
-import type { ProjectWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectExclusion, ProjectWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { AffectedSelection } from '../../../analysis/src/interfaces/affected.js';
 
@@ -37,14 +37,22 @@ export interface CliEnvironment {
    * A command awaits it before it connects or runs batch; help and version do not. */
   readonly buildRefusal?: () => Promise<string | null>;
 }
+/** Why a changed check could not establish its result, for the whole request or one path. */
+export type NotCheckedReason = 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | 'classification-changed';
+/** One named path of a `ramify.check/2` document: the daemon's disposition, or not checked
+ * for a reason of the whole request. Only a checked path carries a content or deletion identity. */
+export type CheckedPath = Exclude<PathCheckDisposition, { readonly disposition: 'not-checked' }>
+  | { readonly path: string; readonly disposition: 'not-checked'; readonly module: string | null;
+      readonly exclusion: ProjectExclusion | null; readonly reason: NotCheckedReason };
 export interface CheckDocument {
   readonly schemaVersion: 'ramify.check/2';
   readonly root: string;
   readonly revision: { readonly id: RevisionId; readonly sequence: number; readonly path: RevisionPath } | null;
   readonly since: RevisionId | null;
-  readonly changed: readonly { readonly path: string; readonly sha256: string | null; readonly covered: boolean }[];
+  /** One disposition per named path, in the order first named, each path once. */
+  readonly paths: readonly CheckedPath[];
   readonly outcome: 'checked' | 'not-checked';
-  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | null;
+  readonly reason: NotCheckedReason | null;
   readonly execution: AnalysisReport['outcome']['execution'] | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];

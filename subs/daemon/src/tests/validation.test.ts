@@ -133,6 +133,28 @@ describe('service request structure', () => {
     expect(reads).toBe(0);
   });
 
+  it('accepts a changed check\'s paths with their classification and rejects every malformed variant', () => {
+    const sha256 = 'b'.repeat(64);
+    const changed = { ...synchronized, scope: 'delta', paths: ['src/main.ts', 'site/package.json'], classification: null };
+    expect(validateServiceRequest('check', changed)).toBeNull();
+    expect(validateServiceRequest('check', { ...changed, classification: 7,
+      freshness: { mode: 'synchronized', expect: [{ path: 'src/main.ts', sha256 }] } })).toBeNull();
+    const invalid: Record<string, unknown>[] = [
+      // Present together or not at all.
+      { paths: ['src/main.ts'] }, { classification: null },
+      // Distinct, normalized paths inside the root.
+      ...[[], ['src/main.ts', 'src/main.ts'], ['../outside.ts'], ['/absolute.ts'], ['./src/main.ts'], ['src//main.ts'],
+        ['src\\main.ts'], ['.'], [''], [1], 'src/main.ts', null].map(paths => ({ paths, classification: null })),
+      // A positive revision sequence or null.
+      ...[0, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1].map(classification => ({ paths: ['src/main.ts'], classification })),
+      // Every expectation names a requested path, under synchronized freshness only.
+      { paths: ['src/main.ts'], classification: 1, freshness: { mode: 'synchronized', expect: [{ path: 'src/other.ts', sha256 }] } },
+      { paths: ['src/main.ts'], classification: 1, freshness: { mode: 'published', wait: true } },
+    ];
+    for (const params of invalid) expect(validateServiceRequest('check', { ...synchronized, ...params })?.code, JSON.stringify(params)).toBe('invalid-request');
+    expect(validateServiceRequest('check', { ...changed, paths: Array.from({ length: 10_001 }, (_, index) => `${index}.ts`) })?.code).toBe('invalid-request');
+  });
+
   it('validates explorer detail identities and limits distinct requests to 50', () => {
     const detail = (index: number) => ({ original: { kind: 'code', owner: 'fixture', file: 'api.ts', binding: `value${index}` }, exportName: `value${index}` });
     const requests = Array.from({ length: 50 }, (_, index) => detail(index));

@@ -32,7 +32,9 @@ describe('Plan 2 final contract validator', () => {
     for (const [name, owner] of archived) expect(layered.get(name)!.document).toBe(owner.document);
     expect(layered.get('daemon')!.layers!.map(layer => layer.plan))
       .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)',
-        'Plan 7 (affected modules)', 'Phase 1 project boundaries (root tooling access)']);
+        'Plan 7 (affected modules)', 'Phase 1 project boundaries (root tooling access)',
+        // Phase 1 project boundaries, iteration 15: the relay of `PathCheckDisposition` beside `CheckOutcome`.
+        'Phase 1 project boundaries (path dispositions)']);
     for (const owner of layered.values()) for (const layer of owner.layers ?? []) expect(layer.plan.trim()).not.toBe('');
     // Each archived purpose is carried through unchanged; a later purpose
     // change arrives as a layer that names the plan which reviewed it.

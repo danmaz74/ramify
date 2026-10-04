@@ -1,5 +1,5 @@
 import type { AvailableForm } from '../../subs/model/src/interfaces/model.js';
-import type { CapturedInput, ObservedChange, ProjectWarning } from '../../subs/project/src/interfaces/project.js';
+import type { CapturedInput, ObservedChange, ProjectScope, ProjectWarning } from '../../subs/project/src/interfaces/project.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest } from '../../subs/typescript/src/interfaces/source.js';
 import type { AnalysisDiagnostic, AnalysisInputs, AnalysisReport, AnalysisSummary, RunControl } from './analysis.js';
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from './architect-view.js';
@@ -48,6 +48,9 @@ export interface SessionRevision {
   readonly sequence: number;
   readonly inputId: string;
   readonly inputs: readonly CapturedInput[];
+  /** The revision's project scope, the report's `scope`: its ownership table classifies
+   * paths at this revision. Null only when the revision's acquisition has no inventory. */
+  readonly scope: ProjectScope | null;
   readonly changed: readonly string[];
   readonly checked: CheckedSet;
   readonly outcome: AnalysisReport['outcome'];

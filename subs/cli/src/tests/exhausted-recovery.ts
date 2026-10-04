@@ -24,7 +24,7 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
   const originalBytes = 'export const value = 1;\n', laterBytes = 'export const value = 2;\n';
   const hash = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
-  const requests: CheckParams[] = [], starts: string[] = [], recoveries: string[] = [], events: string[] = [];
+  const requests: CheckParams[] = [], classifications: CheckParams[] = [], starts: string[] = [], recoveries: string[] = [], events: string[] = [];
   const stdout: string[] = [], stderr: string[] = [];
   let batchCalls = 0, closeCalls = 0, closeContextCalls = 0, openCalls = 0;
   let connection: ServiceConnection | undefined, serviceReply: ServiceResult<CheckOutcome> | undefined;
@@ -46,6 +46,12 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
         get reason(): DisconnectReason | null { return lost ? { kind: 'failure', message: 'Connection lost before check reply delivery' } : actual.reason; },
         async openContext(params, control) { openCalls++; return actual.openContext(params, control); },
         async check(params, control) {
+          // The client's first request carries no content and obtains the daemon's
+          // classification; the delivery fault applies to the request carrying the hash.
+          if (!lost && params.freshness.mode === 'synchronized' && !params.freshness.expect.length) {
+            classifications.push(structuredClone(params));
+            return actual.check(params, control);
+          }
           requests.push(structuredClone(params)); events.push('check-dispatched');
           serviceReply = await actual.check(params, control); events.push('service-replied');
           // A caller retry must retain the hash taken before this second write.
@@ -75,7 +81,7 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
     });
     const document = stdout.length === 1 ? JSON.parse(stdout[0]) as CheckDocument : null;
     equal('one successful initial connection and context opening', [starts, openCalls], [['if-needed'], 1]);
-    equal('one real check before reply loss', requests.length, 1);
+    equal('one classification answer, then one real check before reply loss', [classifications.length, requests.length], [1, 1]);
     equal('real service completed a covering clean revision before reply loss',
       serviceReply?.ok && serviceReply.value.status === 'reported' && serviceReply.value.published
         ? [serviceReply.value.revision.outcome.execution, serviceReply.value.freshness.verified, serviceReply.value.delta.findings.length]
@@ -90,8 +96,9 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
       ['ramify.check/2', 'not-checked', reason, 2]);
     equal('lost response cannot claim a published result', document ? [document.revision, document.execution, document.checked, document.timings.daemon] : null,
       [null, null, null, null]);
-    equal('output retains the original expectation without coverage', document?.changed,
-      [{ path: 'src/main.ts', sha256: hash(originalBytes), covered: false }]);
+    // A path not checked carries no identity; the sent request above holds the original hash.
+    equal('output names the path not checked for the terminal reason, with no identity', document?.paths,
+      [{ path: 'src/main.ts', disposition: 'not-checked', module: 'fixture', exclusion: null, reason }]);
     equal('disk changed after the original expectation was sent', hash(await readFile(join(root, 'src/main.ts'), 'utf8')), hash(laterBytes));
     equal('no findings are fabricated from a reply the client lost', document?.findings, []);
     equal('the disconnected connection is closed exactly once without a remote close request', [closeCalls, closeContextCalls, connection?.state], [1, 0, 'closed']);

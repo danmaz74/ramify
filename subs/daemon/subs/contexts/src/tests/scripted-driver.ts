@@ -5,7 +5,8 @@ import type { ApiViewQuery, ApiViewQueryOutcome, OperationTimings, RetainedSessi
 import type { ArchitectViewQuery, ArchitectViewQueryOutcome } from '../../../../../analysis/src/interfaces/architect-view.js';
 import type { AffectedQuery, AffectedSelection, SessionAffectedOutcome } from '../../../../../analysis/src/interfaces/affected.js';
 import type { SymbolDetailRequest } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
-import type { CapturedInput, ProjectRequest, ProjectResolution } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { CapturedInput, ProjectRequest, ProjectResolution, ProjectScope } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import { classifyProjectPath } from '../../../../../analysis/subs/project/src/ownership.js';
 import { historyReport } from './history-fixture.js';
 
 export const testBudgets: ContextBudgets = {
@@ -35,17 +36,18 @@ export interface ScriptedCapture {
   /** The update acquired the project again on a fresh capture; false unless the script says so. */
   readonly reacquired?: boolean;
 }
-export function capture(version = 1, execution: 'completed' | 'invalid' | 'incomplete' = 'completed', inputs?: readonly CapturedInput[]): ScriptedCapture {
+export function capture(version = 1, execution: 'completed' | 'invalid' | 'incomplete' = 'completed', inputs?: readonly CapturedInput[],
+  scope: ProjectScope | null = null): ScriptedCapture {
   const base = historyReport(`run/1:${version}`);
   const observed = inputs ?? [{ path: 'src/index.ts', role: 'source' as const, sha256: hash(String(version)), bytes: 1 }];
   const inputId = `input/1:${hash(JSON.stringify(observed))}`;
   const report: AnalysisReport = {
-    ...base, inputId,
+    ...base, inputId, scope,
     outcome: { execution, check: execution === 'completed' ? 'passed' : 'not-run', coverage: execution === 'completed' ? 'complete' : 'not-run' },
     summary: { ...base.summary, complete: execution === 'completed', owners: version },
   };
   return { status: 'captured', report, revision: {
-    sequence: version, inputId, inputs: observed, changed: observed.map(input => input.path),
+    sequence: version, inputId, inputs: observed, scope, changed: observed.map(input => input.path),
     checked: { path: version === 1 ? 'cold' : 'source', files: observed.filter(input => input.role === 'source').map(input => input.path), accesses: 0, modelRebuilt: version === 1 },
     outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
     delta: { added: [], removed: [], positionOnly: [] },
@@ -114,6 +116,7 @@ export function createScriptedDriver() {
     return result;
   };
   const driver: AnalysisDriver = {
+    classify: classifyProjectPath,
     async resolve(request, _control, known = []) {
       const candidate = known[0];
       if (candidate && answered.get(candidate) === discovery) { resolveCalls.push({ request, known, reused: true }); return candidate; }

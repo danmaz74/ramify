@@ -1,7 +1,7 @@
 import type { AnalysisReport, AnalysisSummary, Capability, RunControl, AnalysisDiagnostic } from '../../../../../analysis/src/interfaces/analysis.js';
 import type { ApiViewProjection, ApiViewSelection, CheckedSet, RevisionTimings, SessionStatus, SessionOpen } from '../../../../../analysis/src/interfaces/session.js';
 import type { SourceLimit, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest, TestTitleLimits } from '../../../../../analysis/subs/typescript/src/interfaces/source.js';
-import type { ProjectRequest, ProjectScope, ProjectResolution, ProjectWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
+import type { PathOwnership, ProjectExclusion, ProjectRequest, ProjectScope, ProjectResolution, ProjectWarning } from '../../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { DependencyDiagramRunner } from '../../../../../analysis/src/interfaces/dependency-analyzer.js';
 import type { ArchitectViewProjection } from '../../../../../analysis/src/interfaces/architect-view.js';
@@ -131,7 +131,35 @@ export interface CheckRequest {
   readonly scope: 'report' | 'delta';
   readonly since?: RevisionId;
   readonly deadlineMs?: number;
+  /** The named paths of a changed check: project-relative, `/`-separated and distinct.
+   * The reply gives each one a disposition. Requires synchronized freshness, whose
+   * `expect` then names exactly the paths the classification analyzes. */
+  readonly paths?: readonly string[];
+  /** Present exactly with `paths`: the context revision sequence whose classification
+   * `expect` follows, null while the client has none. A request whose expectations do
+   * not follow the deciding revision's classification is answered `classification-changed`. */
+  readonly classification?: number | null;
 }
+/**
+ * How a changed check treated one named path, classified by the deciding revision's
+ * ownership table. `checked`: the revision analyzed the path's current content, whose
+ * identity it names, or its deletion. `not-analyzed`: the complete check does not
+ * analyze the path either: it lies in an owned-ignored, external or scratch directory
+ * or another always-excluded path, or it is an owned file that is neither source nor
+ * an analysis input; it needs no content and carries no content identity.
+ * `not-checked`: the path's result could not be established.
+ */
+export type PathCheckDisposition =
+  | { readonly path: string; readonly disposition: 'checked'; readonly module: string; readonly exclusion: null;
+      readonly reason: 'content'; readonly sha256: string }
+  | { readonly path: string; readonly disposition: 'checked'; readonly module: string; readonly exclusion: null;
+      readonly reason: 'deleted'; readonly sha256: null }
+  | { readonly path: string; readonly disposition: 'not-analyzed'; readonly module: string | null;
+      readonly exclusion: ProjectExclusion | null;
+      readonly reason: 'owned-ignored' | 'external' | 'scratch' | 'reserved' | 'owned-non-source' }
+  | { readonly path: string; readonly disposition: 'not-checked'; readonly module: string | null;
+      readonly exclusion: ProjectExclusion | null;
+      readonly reason: 'superseded' | 'unobserved-input' | 'classification-changed' };
 export interface CheckDelta {
   readonly since: RevisionId | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
@@ -149,9 +177,10 @@ export interface Unavailable {
   readonly message: string;
 }
 export type CheckOutcome =
+  /** `paths` holds one disposition per requested path, in request order; empty without `paths`. */
   | { readonly status: 'reported'; readonly requestId: string; readonly published: true;
       readonly revision: ContextRevision; readonly freshness: FreshnessRecord; readonly delta: CheckDelta; readonly report: AnalysisReport | null;
-      readonly timings?: ReplyTimings }
+      readonly paths: readonly PathCheckDisposition[]; readonly timings?: ReplyTimings }
   | { readonly status: 'reported'; readonly requestId: string; readonly published: false;
       readonly revision: null; readonly freshness: FreshnessRecord; readonly delta: null; readonly report: AnalysisReport;
       readonly timings?: ReplyTimings }
@@ -162,6 +191,11 @@ export type CheckOutcome =
         readonly observed: string | null }[] }
   | { readonly status: 'cold'; readonly requestId: string; readonly elapsedMs: number; readonly current: ContextStatus }
   | { readonly status: 'deadline-exceeded'; readonly requestId: string; readonly elapsedMs: number; readonly revision: ContextRevision | null }
+  /** The request's expectations do not follow `revision`'s classification of its paths.
+   * `paths` is that classification: `not-analyzed` paths need no content; every other
+   * path is `not-checked` with reason `classification-changed` and needs its expectation. */
+  | { readonly status: 'classification-changed'; readonly requestId: string; readonly revision: ContextRevision;
+      readonly paths: readonly PathCheckDisposition[] }
   | { readonly status: 'cancelled'; readonly requestId: string }
   | (Unavailable & { readonly requestId: string });
 /** One serialized, synchronized API-view request: always synchronized freshness
@@ -347,6 +381,9 @@ export interface AnalysisDriver {
    * it made still answers the same; otherwise it resolves again. */
   resolve(request: ProjectRequest, control?: RunControl, known?: readonly ProjectResolution[]): Promise<ProjectResolution>;
   open(project: ProjectRequest, setup: ContextSetup, control?: RunControl): Promise<SessionOpen>;
+  /** Project's path classifier over one revision's ownership table: reads nothing and
+   * checks no existence. Contexts classify changed-check paths only through it. */
+  classify(scope: ProjectScope, path: string): PathOwnership;
   dispose(): Promise<void>;
 }
 export interface ContextManagerOptions {

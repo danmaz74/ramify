@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { RunControl, AnalysisReport } from '../../analysis/src/interfaces/analysis.js';
-import type { CheckOutcome, ContextRevision, ContextToken, ExpectedContent } from '../../daemon/src/context-types.js';
-import type { CheckDocument, CliEnvironment, CliExitCode } from './interfaces/cli.js';
+import type { CheckOutcome, ContextRevision, ContextToken, ExpectedContent, PathCheckDisposition } from '../../daemon/src/context-types.js';
+import type { CheckDocument, CheckedPath, CliEnvironment, CliExitCode, NotCheckedReason } from './interfaces/cli.js';
 import { capabilities } from './command-support.js';
 import { formatChangedHuman } from './format.js';
 import { CliFailure, disconnectFailure, serviceFailure } from './errors.js';
@@ -30,23 +30,44 @@ async function canonicalPath(path: string): Promise<string> {
   }
 }
 
-const reasons: readonly CheckDocument['reason'][] = ['cold', 'deadline-exceeded', 'unobserved-input', 'superseded',
+const reasons: readonly NotCheckedReason[] = ['cold', 'deadline-exceeded', 'unobserved-input', 'superseded',
   'incomplete', 'unavailable', 'stopped', 'incompatible', 'evicted-revision', 'resource-unavailable', 'analysis-failed',
   'unknown-context', 'expired-generation', 'unsupported-setup', 'disposed'];
 
-/** Hashing belongs to this lightweight client. A reported result is accepted
- * only after the service establishes coverage of those exact identities. */
+/**
+ * Hashing belongs to this lightweight client, which cannot classify paths itself: the
+ * daemon classifies the named paths by its revision's ownership table, and the client
+ * hashes only the paths that classification analyzes. The first request carries no
+ * classification; a `classification-changed` answer supplies one, and a request whose
+ * classification went stale is retried once more. A reported result is accepted only
+ * with a disposition for every named path.
+ */
 export async function changedCommand(args: ChangedArguments, environment: CliEnvironment, control: RunControl): Promise<CliExitCode> {
   const started = performance.now();
+  const deadline = args.deadlineMs ?? 2_000;
   let waitedMs = 0, root = resolve(environment.cwd, args.root ?? '.');
-  let identities: readonly ExpectedContent[] = args.changed.map(path => ({ path, sha256: null }));
-  let hashed = false;
+  /** The named spellings until the root is known, then the normalized paths, each once. */
+  let paths: readonly string[] = [...new Set(args.changed)];
+  let normalized = false;
+  /** The daemon's latest classification by path; the sequence it was answered at. */
+  let classified = new Map<string, PathCheckDisposition>();
+  let classification: number | null = null;
+  /** Identities hashed once each: recovery keeps the caller's original expectation. */
+  const hashes = new Map<string, string | null>();
   let received: CheckDocument | undefined;
-  function document(reason: CheckDocument['reason'], revision: ContextRevision | null = null,
+  /** Every path not checked for a reason of the whole request, except paths the daemon classified not analyzed. */
+  function notChecked(reason: NotCheckedReason): CheckedPath[] {
+    return paths.map(path => {
+      const known = classified.get(path);
+      return known?.disposition === 'not-analyzed' ? known
+        : { path, disposition: 'not-checked', module: known?.module ?? null, exclusion: known?.exclusion ?? null, reason };
+    });
+  }
+  function document(reason: NotCheckedReason, revision: ContextRevision | null = null,
     report: AnalysisReport | null = null): CheckDocument {
     return { schemaVersion: 'ramify.check/2', root,
       revision: revision ? { id: revision.revision, sequence: revision.sequence, path: revision.checked.path } : null,
-      since: args.since ?? null, changed: identities.map(item => ({ ...item, covered: false })),
+      since: args.since ?? null, paths: notChecked(reason),
       outcome: 'not-checked', reason, execution: report?.outcome.execution ?? null,
       findings: report?.diagnostics.map(issue => ({ ...issue, new: false })) ?? [], removed: [],
       warnings: report?.warnings ?? [], coverage: report?.coverage ?? [], checked: null,
@@ -56,20 +77,43 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
     const result = reportedDocument(value);
     return value.timings ? { ...result, timings: { ...result.timings, reply: value.timings } } : result;
   }
+  /** The exit code and findings are the covering revision's, as the complete check would
+   * report them; a not-analyzed path changes nothing, and any path not checked makes the
+   * whole result not checked, exit 2, with the verified findings retained. */
   function reportedDocument(value: Extract<CheckOutcome, { status: 'reported' }>): CheckDocument {
     if (!value.published) return document(value.report.outcome.execution === 'incomplete' ? 'incomplete' : 'unavailable', null, value.report);
     const { revision, delta } = value;
-    const coherent = value.freshness.mode === 'synchronized' && value.freshness.verified
+    const answered = value.paths.length === paths.length && value.paths.every((item, index) => item.path === paths[index]);
+    if (answered) classified = new Map(value.paths.map(item => [item.path, item]));
+    const coherent = answered && value.freshness.mode === 'synchronized' && value.freshness.verified
       && (revision.outcome.execution === 'invalid' || revision.outcome.execution === 'completed'
         && revision.outcome.check !== 'not-run' && revision.summary.complete);
     if (!coherent) return { ...document('incomplete', revision), execution: revision.outcome.execution,
       findings: delta.findings, warnings: delta.warnings, coverage: delta.coverage };
-    const exitCode = revision.outcome.execution === 'invalid' || revision.outcome.check === 'failed'
+    const failed = value.paths.find(item => item.disposition === 'not-checked');
+    const verdict = revision.outcome.execution === 'invalid' || revision.outcome.check === 'failed'
       || delta.findings.length > 0 || revision.summary.errors > 0 || revision.summary.denied > 0 ? 1 : 0;
-    return { ...document(null, revision), since: delta.since, changed: identities.map(item => ({ ...item, covered: true })),
-      outcome: 'checked', execution: revision.outcome.execution, findings: delta.findings, removed: delta.removed,
-      warnings: delta.warnings, coverage: delta.coverage, checked: revision.checked,
-      timings: { daemon: revision.timings, waitedMs, totalMs: performance.now() - started }, exitCode };
+    return { ...document(failed?.reason ?? 'incomplete', revision), since: delta.since, paths: value.paths,
+      outcome: failed ? 'not-checked' : 'checked', reason: failed?.reason ?? null, execution: revision.outcome.execution,
+      findings: delta.findings, removed: delta.removed, warnings: delta.warnings, coverage: delta.coverage, checked: revision.checked,
+      timings: { daemon: revision.timings, waitedMs, totalMs: performance.now() - started }, exitCode: failed ? 2 : verdict };
+  }
+  /** The expectations the current classification asks for: each analyzed path's content, hashed once. */
+  async function expectations(): Promise<ExpectedContent[]> {
+    const expected: ExpectedContent[] = [];
+    if (classification === null) return expected;
+    for (const path of paths) {
+      if (classified.get(path)?.disposition === 'not-analyzed') continue;
+      if (!hashes.has(path)) {
+        control.signal?.throwIfAborted();
+        let sha256: string | null;
+        try { sha256 = createHash('sha256').update(await readFile(resolve(root, path))).digest('hex'); }
+        catch (error) { if (!missing(error)) throw error; sha256 = null; }
+        hashes.set(path, sha256);
+      }
+      expected.push({ path, sha256: hashes.get(path)! });
+    }
+    return expected;
   }
   async function run(): Promise<CheckDocument> {
     const connected = await environment.connect({ start: 'if-needed', signal: control.signal });
@@ -79,7 +123,7 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
       return document(connected.status === 'stopped' ? 'stopped' : 'unavailable');
     }
     const connection = connected.connection;
-    let token: ContextToken | undefined, reopened = false, recovered = false;
+    let token: ContextToken | undefined, reopened = false, recovered = false, reclassified = false;
     try {
       control.signal?.throwIfAborted();
       while (true) {
@@ -95,44 +139,53 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
           const selected = opened.value.current.selection.root;
           // Recovery preserves the caller's original expectation; re-hashing
           // would silently accept an intervening writer's different content.
-          if (hashed && root !== selected) return document('unobserved-input');
+          if (normalized && root !== selected) return document('unobserved-input');
           root = selected;
-          if (!hashed) {
-            const unique = new Map<string, ExpectedContent>();
+          if (!normalized) {
+            const unique = new Set<string>();
             for (const named of args.changed) {
               control.signal?.throwIfAborted();
               const absolute = await canonicalPath(resolve(root, named));
-              const path = relative(root, absolute).split(sep).join('/');
-              let sha256: string | null;
-              try { sha256 = createHash('sha256').update(await readFile(absolute)).digest('hex'); }
-              catch (error) { if (!missing(error)) throw error; sha256 = null; }
-              unique.set(path, { path, sha256 });
+              unique.add(relative(root, absolute).split(sep).join('/'));
             }
-            identities = [...unique.values()]; hashed = true;
+            paths = [...unique]; normalized = true;
           }
-          if (identities.some(item => !item.path || item.path === '..' || item.path.startsWith('../')
-            || isAbsolute(item.path) || item.path.includes('\\') || item.path.includes('\0'))) return document('unobserved-input');
-          const waiting = performance.now();
-          let response;
-          try {
-            response = await connection.check({ token, requestId: randomUUID(),
-              freshness: { mode: 'synchronized', expect: identities }, scope: 'delta',
-              ...(args.since === undefined ? {} : { since: args.since }), deadlineMs: args.deadlineMs ?? 2_000 }, control);
-          } finally { waitedMs += performance.now() - waiting; }
-          control.signal?.throwIfAborted();
-          if (!response.ok) throw serviceFailure(response.error);
-          const value = response.value;
-          if (value.status === 'reported') return received = reported(value);
-          if (value.status === 'cancelled') throw new CliFailure('cancelled', 'Check was cancelled', value);
-          if (value.status === 'unavailable' && ['expired-generation', 'unknown-context'].includes(value.reason) && !reopened) {
-            reopened = true;
-            await connection.closeContext({ token }); token = undefined;
-            continue;
+          if (paths.some(path => !path || path === '..' || path.startsWith('../')
+            || isAbsolute(path) || path.includes('\\') || path.includes('\0'))) return document('unobserved-input');
+          // Classification answers are followed on the same context; reopening leaves this loop.
+          while (true) {
+            const expect = await expectations();
+            const waiting = performance.now();
+            let response;
+            try {
+              response = await connection.check({ token, requestId: randomUUID(),
+                freshness: { mode: 'synchronized', expect }, scope: 'delta', paths, classification,
+                ...(args.since === undefined ? {} : { since: args.since }), deadlineMs: Math.max(1, Math.ceil(deadline - waitedMs)) }, control);
+            } finally { waitedMs += performance.now() - waiting; }
+            control.signal?.throwIfAborted();
+            if (!response.ok) throw serviceFailure(response.error);
+            const value = response.value;
+            if (value.status === 'reported') return received = reported(value);
+            if (value.status === 'classification-changed') {
+              // The first answer supplies the classification; a stale one is retried once.
+              const stale = classification !== null;
+              classified = new Map(value.paths.map(item => [item.path, item]));
+              if (stale && reclassified) return document('classification-changed', value.revision);
+              reclassified ||= stale; classification = value.revision.sequence;
+              continue; // the same context answers the classified request
+            }
+            if (value.status === 'cancelled') throw new CliFailure('cancelled', 'Check was cancelled', value);
+            if (value.status === 'unavailable' && ['expired-generation', 'unknown-context'].includes(value.reason) && !reopened) {
+              reopened = true;
+              await connection.closeContext({ token }); token = undefined;
+              break; // open the context again
+            }
+            if (value.status === 'unavailable') return document(value.reason);
+            if (value.status === 'cold') return document('cold');
+            if (value.status === 'deadline-exceeded' || value.status === 'superseded') return document(value.status, value.revision);
+            return document('unavailable');
           }
-          if (value.status === 'unavailable') return document(value.reason);
-          if (value.status === 'cold') return document('cold');
-          if (value.status === 'deadline-exceeded' || value.status === 'superseded') return document(value.status, value.revision);
-          return document('unavailable');
+          continue;
         } catch (error) {
           control.signal?.throwIfAborted();
           if (error instanceof CliFailure && ['stopped', 'incompatible', 'resource-unavailable', 'invalid-request'].includes(error.code)) throw error;
@@ -157,8 +210,8 @@ export async function changedCommand(args: ChangedArguments, environment: CliEnv
   try { result = await run(); }
   catch (error) {
     control.signal?.throwIfAborted();
-    result = document(error instanceof CliFailure && reasons.includes(error.code as CheckDocument['reason'])
-      ? error.code as CheckDocument['reason'] : 'unavailable');
+    result = document(error instanceof CliFailure && reasons.includes(error.code as NotCheckedReason)
+      ? error.code as NotCheckedReason : 'unavailable');
     // Cleanup can fail after delivery. Keep the received findings and coverage
     // evidence while reporting the command failure in the same document.
     if (received) result = { ...received, outcome: 'not-checked', reason: result.reason, exitCode: 2 };

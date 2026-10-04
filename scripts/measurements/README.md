@@ -250,7 +250,7 @@ import to the body-edit source before recording its setup identity. Each pair
 deletes the target and recreates it, preserving complete coverage for the other
 workloads. The import preserves the compiler's observation of the absent target
 after deletion; an unreferenced deleted file
-would correctly receive `unobserved-input`. Every edit and revert preserves the
+is checked through the context's record of removed analysis inputs instead. Every edit and revert preserves the
 import, and created/deleted edits reject a missing witness before changing files.
 Only the deleted phase has an absent target and its precise `unresolved-target`
 coverage note, with no finding. The first body sequence launches the installed
@@ -271,7 +271,7 @@ Session timings come from the exact published revision, not elapsed CLI time.
 A hook whose watcher revision has already published is judged by the work it
 caused. Daemon counters are sampled before the hook, immediately after it
 returns and once settled. The hook must be answered from that published
-revision with exit code 0 and every changed entry covered, and must add exactly
+revision with exit code 0 and every named path checked, and must add exactly
 one covered request before it returns. In both intervals every added analysis
 must be a sweep or an audit, which the daemon counts in `sweeps` and `audits` as
 well as `analyses`. No revision may publish and no covered request may be added

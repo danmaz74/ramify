@@ -11,13 +11,18 @@ The handler validates the complete invocation before dispatch and checks stage
 completion before reporting success. Pre-analysis invocation failures use
 `ramify.cli/1`; plain check results retain the bare `ramify.analysis/2` document.
 
-`check --changed <path>...` hashes each named file relative to the selected root,
-with a missing file represented by an absent identity. It requests a compact
-delta with synchronized freshness, a two-second default deadline and an optional
-`--since` revision. JSON output is one `ramify.check/2` document; human output
-marks new findings and names the revision path, checked set and wait. Findings
-anywhere in the project fail the check. Cold, overdue, unobserved, superseded,
-configuration-named and unavailable checks exit 2 explicitly. This command never calls the batch
+`check --changed <path>...` names each path relative to the selected root and
+requests a compact delta with synchronized freshness, a two-second default
+deadline and an optional `--since` revision. It cannot classify paths itself:
+the daemon's `classification-changed` answer says which paths are analyzed, and
+the command hashes those, a missing file as an absent identity, and asks again
+within the remaining deadline, retrying a stale classification once. JSON output
+is one `ramify.check/2` document with each path's disposition; human output marks
+new findings and names the revision path, checked set, wait and any path not
+checked or not analyzed. Findings anywhere in the project fail the check; a path
+not analyzed changes nothing. Cold, overdue, unobserved, superseded,
+configuration-named, unclassifiable and unavailable checks, and checks with a path
+not checked, exit 2 explicitly. This command never calls the batch
 operation, including after exhausted recovery.
 
 The three `check` forms have distinct roles: `--changed` is the bounded hook

@@ -36,6 +36,10 @@ export interface CheckParams {
   readonly scope?: 'report' | 'delta';
   readonly since?: RevisionId;
   readonly deadlineMs?: number;
+  /** A changed check's named paths; see `CheckRequest.paths`. */
+  readonly paths?: readonly string[];
+  /** Present exactly with `paths`; see `CheckRequest.classification`. */
+  readonly classification?: number | null;
 }
 export interface SubscriptionOpened {
   readonly subscription: string;

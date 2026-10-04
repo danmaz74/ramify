@@ -1,4 +1,5 @@
 import type { AnalysisDriver } from '../context-types.js';
+import { classifyProjectPath } from '../../../analysis/subs/project/src/ownership.js';
 import type { AnalysisReport } from '../../../analysis/src/interfaces/analysis.js';
 import type { SessionMeasurements } from '../../../analysis/src/interfaces/measurements.js';
 import type { RetainedSession, SessionRevision } from '../../../analysis/src/interfaces/session.js';
@@ -11,7 +12,7 @@ export function createMeasureDriver(facts: Omit<SessionMeasurements, 'sequence' 
     readonly affected?: (query: AffectedQuery, control?: RunControl) => Promise<SessionAffectedOutcome> } = {}): AnalysisDriver {
   const inputId = `input/1:${'a'.repeat(64)}`;
   const revision: SessionRevision = { sequence: 1, inputId,
-    inputs: [{ path: 'src/index.ts', role: 'source', sha256: 'b'.repeat(64), bytes: 1 }], changed: ['src/index.ts'],
+    inputs: [{ path: 'src/index.ts', role: 'source', sha256: 'b'.repeat(64), bytes: 1 }], scope: null, changed: ['src/index.ts'],
     checked: { path: 'cold', files: ['src/index.ts'], accesses: 0, modelRebuilt: true },
     outcome: { execution: 'completed', check: 'passed', coverage: 'complete' },
     summary: { complete: true, owners: facts.modules.length, sourceFiles: facts.files.filter(file => file.kind === 'source').length,
@@ -23,6 +24,7 @@ export function createMeasureDriver(facts: Omit<SessionMeasurements, 'sequence' 
     diagnostics: [], warnings: [], coverage: [] } as unknown as AnalysisReport;
   let disposed = false;
   return {
+    classify: classifyProjectPath,
     async resolve(request) { return { status: 'resolved', root: request.root ?? request.cwd, selection: request.root ? 'given' : 'found',
       invokedFrom: request.cwd, configuration: 'tsconfig.json' }; },
     async open() {

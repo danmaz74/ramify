@@ -453,8 +453,8 @@ Two read modes make that distinction explicit:
 
 Ramify checks saved files only; it does not accept unsaved content in place of
 disk. A changed-file request supplies context, requested stages/scope, the
-changed file paths and their expected content hashes; it can name deletions and
-renames. Verify that the expected content corresponds to the disk view being
+changed paths and the expected content hashes of the paths its classification
+analyzes; it can name deletions and renames. Verify that the expected content corresponds to the disk view being
 checked. If it no longer does, report a conflict/superseded request or require
 resynchronization.
 
@@ -548,16 +548,29 @@ a fresh batch check.
   A queued request whose expectations the new revision covers, with no other
   known change or required sweep pending, is answered from that revision
   without another update.
-- A configuration or manifest path event requires a sweep in the next capture.
-  An update in that capture that acquired the project again on a fresh
-  capture satisfies that sweep; every other required sweep still runs.
+- A changed check gives each named path a disposition from the ownership
+  table of the latest completed published revision: `checked`, `not-analyzed`
+  or `not-checked`, as the
+  [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks)
+  defines them. Containment decides first: a path in an owned-ignored, external
+  or scratch directory or another always-excluded path is not analyzed and
+  needs no content, and its bytes are never an expectation or a captured input.
+  An owned path outside every exclusion is analyzed and needs its content
+  identity; the covering capture shows whether it is an analysis input, a
+  deletion of one, or an owned file the complete check does not read.
+- A configuration or manifest path event outside every excluded directory
+  requires a sweep in the next capture. An update in that capture that
+  acquired the project again on a fresh capture satisfies that sweep; every
+  other required sweep still runs.
 - A hook verifies a module's exports and their use. A synchronized check that
   names a configuration path names no such change, and its verdict is not
   needed at once: the context answers it immediately as not checked, naming the
   configuration change, and queues the named paths as it would any other. The
-  configuration paths are the ones the path pattern matches and the ones the
-  acquisition observed with the configuration role, such as an `extends` target
-  the configuration helper read. The update behind the reply still runs, so a
+  configuration paths are the analyzed paths the path pattern matches and the
+  ones the acquisition observed with the configuration role, such as an
+  `extends` target the configuration helper read; a package manifest, lockfile
+  or compiler configuration inside an excluded directory is not analyzed and no
+  configuration change. The update behind the reply still runs, so a
   later request waits for that revision and is answered under the new
   configuration. A whole-project report request still waits for its capture.
 - A hook-facing check has a bounded response time. When it cannot be met, for
@@ -627,7 +640,7 @@ paths `unchanged-surface`, `source`, `description`, `metadata`, `membership` and
 
 | Path | Cause | Work |
 | --- | --- | --- |
-| `unchanged-surface` | A source edit that leaves the file's export description and access facts equal by value | Re-extracts that file and refreshes the decisions citing declarations that moved; decides nothing else. |
+| `unchanged-surface` | A source edit that leaves the file's export description and access facts equal by value | Re-extracts that file and refreshes the decisions citing declarations or accesses that moved; decides nothing else. |
 | `source` | A source edit that changes exports or accesses | Recomputes descriptions over their dependency closure, re-interprets the changed files and the importers of every description that changed by value, relinks when the link input changed and decides the accesses the change reaches. |
 | `description` | A `module.ramify` edit | Relinks and decides the accesses whose importer or original owner lies in the affected subtree, with no compiler work. |
 | `metadata` | A README edit | Updates purposes, with no compiler, link or decision work. |
@@ -653,14 +666,41 @@ input identity.
 **Covering rule.** A synchronized request names expected content identities. The
 context answers it from the published revision, with no analysis, when that
 revision observed every named path with the expected identity, the list is
-nonempty, the revision carries the requesting lease's invocation, and no known
-influencing change or required sweep is pending. The rule is evaluated when the
-request arrives and again at each publication. Otherwise the request flushes the
-debounce window, adds its paths to the change set and is answered by the revision
-that covers it. A named path the covering revision did not observe is
-`unobserved-input`; a different identity after the update is `superseded`. A
-request naming a configuration path is answered at once, as the requirement above
-states.
+nonempty or the request is a changed check naming its paths, the revision
+carries the requesting lease's invocation, and no known influencing change or
+required sweep is pending. The rule is evaluated when the request arrives and
+again at each publication. Otherwise the request flushes the debounce window,
+adds its paths to the change set and is answered by the revision that covers it.
+For a request without named paths, a named path the covering revision did not
+observe is `unobserved-input` and a different identity after the update is
+`superseded`. A request naming a configuration path is answered at once, as the
+requirement above states.
+
+**Changed-check classification.** A changed check also carries its normalized
+paths and the context revision sequence whose classification its expectations
+follow, null before it has one. The context classifies the paths with Project's
+classifier, through the analysis driver, over the ownership table of the latest
+completed published revision, before any content rule: the expectations must
+name exactly the analyzed paths. A request whose expectations do not follow that
+classification is answered at once with `classification-changed`, the revision
+and the classification, and nothing is queued for it. A request that follows it
+queues every named path for re-observation; a not-analyzed path is only a hint,
+and the observer reads nothing beneath an exclusion. The covering revision
+classifies the paths again, and a boundary change in that capture answers
+`classification-changed` instead of dispositions. Otherwise an analyzed path is:
+
+- `checked` with its content identity when the revision read the expected bytes;
+- `checked` as deleted when the client found it absent and the revision observed
+  it absent, or no longer holds it as an analysis input that an earlier
+  published revision of the live session held;
+- `not-analyzed` as an owned non-source file when the capture re-observed it and
+  it is no analysis input;
+- `not-checked`, `superseded`, when the revision holds other content or the
+  file the client found absent.
+
+The reply keeps every path's disposition and the revision's findings, so checked
+evidence survives a path that could not be checked. Removed analysis inputs are
+recorded at each publication, bounded by `maxQueuedPaths`.
 
 **Sweep.** `reobserve` stats every observed path, hashes those whose signature
 changed and reports them as ordinary input changes; it replaces Plan 2's periodic
@@ -669,7 +709,8 @@ passed since the start of the previous sweep while the context has activity. It
 never makes a covered request wait and never marks the context reconciling. A
 required sweep follows a configuration, manifest or lockfile change, a watcher
 overflow or error, an opening or conservative context, more queued paths than
-`maxQueuedPaths`, and an empty-expectation plain check; a request waits for it.
+`maxQueuedPaths`, and a plain check naming neither paths nor expectations; a
+request waits for it.
 An update that acquired the project again satisfies a sweep that only
 configuration or manifest events required.
 
@@ -687,15 +728,21 @@ reports the demotion in flight and the moment a demotion passed its deadline
 any context's background maintenance, which cannot take the analysis slot from a
 waiting client (2026-09-14).
 
-**Hook request and reply.** `ramify check --changed <path>...` hashes each named
-file in the CLI, a missing file as absent, and sends one synchronized request with
-`scope: 'delta'`, the expected identities, an optional `since` revision and
-`deadlineMs`. The compact reply names the covering revision's identifier, sequence
-and path, its checked set, every project finding with a `new` mark against `since`
-or the previous revision, removed finding identities, warnings, coverage and
-timings. With `--format json` the CLI writes it as one `ramify.check/2` document.
-The command exits 0 with no finding, 1 with findings or an invalid revision and 2
-when the files were not checked, and it never falls back to batch. The whole
+**Hook request and reply.** `ramify check --changed <path>...` normalizes each
+named path relative to the selected root and sends a synchronized request with
+`scope: 'delta'`, the paths, an optional `since` revision and `deadlineMs`. The
+lightweight client cannot classify paths: its first request carries no
+classification and no content, and the `classification-changed` answer supplies
+one. The CLI then hashes each path that classification analyzes, a missing file
+as absent, and sends the expected identities with the classification's sequence,
+within what remains of the deadline; a classification that goes stale again is
+retried once. The compact reply names the covering revision's identifier,
+sequence and path, its checked set, each named path's disposition, every project
+finding with a `new` mark against `since` or the previous revision, removed
+finding identities, warnings, coverage and timings. With `--format json` the CLI
+writes it as one `ramify.check/2` document. The command exits 0 with no finding,
+1 with findings or an invalid revision, whatever paths are not analyzed, and 2
+when a path was not checked, and it never falls back to batch. The whole
 report is built only for `scope: 'report'`, which the plain `ramify check` requests
 for its unchanged `ramify.analysis/2` document. The
 [CLI invocation contract](cli-invocation.spec.md#hook-and-complete-checks) pairs the
@@ -709,13 +756,13 @@ schemas and transport framing are review items, not new `module.ramify` syntax.
 | Family | Operations and guarantees |
 | --- | --- |
 | Context lifecycle | Open an explicit project/setup, inspect status, synchronize, close; all requests route to an identified context/generation. |
-| Checks | Check changed files or the workspace with requested capabilities and freshness; return covered inputs, stages, findings and coverage. Changed-file checks meet the [fast incremental check](#fast-incremental-checks) requirement. |
+| Checks | Check changed files or the workspace with requested capabilities and freshness; return each changed path's disposition, stages, findings and coverage. Changed-file checks meet the [fast incremental check](#fast-incremental-checks) requirement. |
 | Module inspection | List modules, identify a file's owner/source area, read purpose metadata and expanded contracts, and inspect visibility versus value/type availability. |
 | Explanations | Explain an original binding's exposure and tag/origin decisions for a specified consumer area, or drill into a recorded source occurrence. |
 | Change notifications | Announce published revisions, status changes and updated findings; a reconnect can fetch a complete snapshot without replaying an unbounded event history. |
 | Symbol intelligence | Search usable exports and request optional details at a specified revision, with access evidence and explicit missing enrichment. |
 | Module measurement | `measure({ token, requestId, freshness, deadlineMs? })` synchronizes one current revision, joins its retained inventory/documentation buckets to one bounded all-module API-view render, and returns `ramify.measure/2` without publishing files. API projection or render limits retain valid inventory with a uniform unavailable views reason. Invalid current inventory, cancellation, deadline expiry and supersession terminate the whole request. The transport passes its negotiated `maxResponseBytes` and request-envelope identity into exact incremental escaped UTF-8 counting; direct calls reserve a conservative maximum request-id envelope. Oversized documents are refused whole as `resource-unavailable`. |
-| Affected modules | `affected({ token, requestId, freshness, modules?, paths?, deadlineMs? })` answers, from the covering revision's retained dependency facts, the seed modules, the modules that depend on them and the test modules, with each path seed's module and basis, widening reasons and coverage notes, without publishing files. Synchronized freshness shares the covering-revision scheduler with `measure`; published freshness waits for or reuses a publication. Unknown module IDs and invalid seeds are domain refusals naming the unknown set; invalid current input, cancellation, deadline expiry and supersession terminate the request. Answers above the negotiated response bound are refused whole as `resource-unavailable`. `ramify affected` is its CLI client; `ramify affected --batch` asks a fresh session the same query. |
+| Affected modules | `affected({ token, requestId, freshness, modules?, paths?, deadlineMs? })` answers, from the covering revision's retained dependency facts, the seed modules, the modules that depend on them and the test modules, with each path seed's status, module, basis and exclusion, widening reasons and coverage notes, without publishing files. Synchronized freshness shares the covering-revision scheduler with `measure`; published freshness waits for or reuses a publication. Unknown module IDs and invalid seeds are domain refusals naming the unknown set; invalid current input, cancellation, deadline expiry and supersession terminate the request. Answers above the negotiated response bound are refused whole as `resource-unavailable`. `ramify affected` is its CLI client; `ramify affected --batch` asks a fresh session the same query. |
 | Dependency diagram | `dependencyDiagram({ token, requestId, revision })` answers the behavioral dependency diagram of the context's exact current published revision, only when a client requests it. A revision that is not current is `superseded`; a retained result is `ready`; an equal running job is joined; while any other job runs the answer is `busy/analysis-running`; otherwise one job starts. The job runs a separate analyzer process that acquires the project with the request the revision's inputs were captured with, the one its retained session was opened with, verifies those inputs against the published report, classifies the report's recorded imports in its own compiler helper, projects the diagram and exits. Changed inputs answer `busy/inputs-changed`; a newer publication aborts the job and answers its callers `superseded`; the last caller's cancellation aborts it. A result above its byte limit or the retained budget is `unavailable/resource-limit`. Checks, hooks, watches, materialization and the retained session never classify behavior. |
 
 At most one diagram job runs daemon-wide, and each context retains at most one

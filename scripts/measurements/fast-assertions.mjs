@@ -22,8 +22,8 @@ function coveringEdit(cycle, fixture = null) {
     && Number.isSafeInteger(revision.sequence) && revision.sequence > cycle.beforeSequence
     && document.revision?.sequence === revision.sequence && document.revision.id === revision.revision
     && Array.isArray(cycle.expected) && cycle.expected.length > 0
-    && Array.isArray(document.changed) && document.changed.length === cycle.expected.length
-    && document.changed.every((item, index) => item.covered === true
+    && Array.isArray(document.paths) && document.paths.length === cycle.expected.length
+    && document.paths.every((item, index) => item.disposition === 'checked'
       && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256)
     && same(document.timings?.daemon, revision.timings);
 }
@@ -127,7 +127,7 @@ export function publishedHookAttributed(cycle) {
   return Number.isSafeInteger(document?.revision?.sequence)
     && cycle.beforeHook.contexts?.[0]?.published?.sequence === document.revision.sequence
     && cycle.hook.code === 0 && document.exitCode === 0
-    && Array.isArray(document.changed) && document.changed.length > 0 && document.changed.every(item => item.covered === true)
+    && Array.isArray(document.paths) && document.paths.length > 0 && document.paths.every(item => item.disposition === 'checked')
     && a.coveredRequests === b.coveredRequests + 1
     && a.analyses - b.analyses === maintenance(a) - maintenance(b)
     && s.revisions === b.revisions && s.coveredRequests === a.coveredRequests
@@ -211,8 +211,8 @@ export function assertFastWorkload(id, measurements) {
       && natural(cycle.beforeSequence) && doc.revision?.sequence > cycle.beforeSequence
       && cycle.revision?.revision === doc.revision.id && cycle.revision.sequence === doc.revision.sequence
       && Array.isArray(cycle.expected) && cycle.expected.length > 0
-      && doc.changed?.length === cycle.expected.length && doc.changed.every((item, index) =>
-        item.covered && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
+      && doc.paths?.length === cycle.expected.length && doc.paths.every((item, index) => item.disposition === 'checked'
+        && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
     { code: hook?.code ?? null, reason: doc?.reason ?? null, sequence: doc?.revision?.sequence ?? null });
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
       && cycle.revision.summary?.denied === denied && doc?.findings?.length === findings
@@ -236,8 +236,8 @@ export function assertFastWorkload(id, measurements) {
       && doc.reason === 'configuration-changed' && doc.exitCode === 2 && doc.revision === null
       && doc.checked === null && doc.execution === null && doc.timings?.daemon === null
       && Array.isArray(cycle.expected) && cycle.expected.length > 0
-      && doc.changed?.length === cycle.expected.length && doc.changed.every((item, index) =>
-        item.covered === false && item.path === cycle.expected[index].path && item.sha256 === cycle.expected[index].sha256),
+      && doc.paths?.length === cycle.expected.length && doc.paths.every((item, index) => item.disposition === 'not-checked'
+        && item.reason === 'configuration-changed' && item.path === cycle.expected[index].path && !('sha256' in item)),
     { code: hook?.code ?? null, reason: doc?.reason ?? null, revision: doc?.revision ?? null });
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
       && cycle.revision.summary?.denied === 0 && doc?.findings?.length === 0
@@ -308,7 +308,7 @@ export function assertFastWorkload(id, measurements) {
     count('zero-work client samples', data.zeroWork, 20);
     check('zero-work clients cover the revision without analysis', data.zeroWork?.every(row =>
       row.hook?.document?.outcome === 'checked' && row.hook.code === 0
-      && row.hook.document.changed.every(item => item.covered)
+      && row.hook.document.paths.every(item => item.disposition === 'checked')
       && row.before.counters.analyses === row.after.counters.analyses
       && row.before.counters.revisions === row.after.counters.revisions
       && row.after.counters.coveredRequests > row.before.counters.coveredRequests),

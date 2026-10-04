@@ -9,6 +9,7 @@ import { createProcessDependencyAnalyzer } from './dependency-analyzer-process.j
 import type { AnalysisLimits, RunControl } from '../subs/analysis/src/interfaces/analysis.js';
 import type { RetainedSession, SessionLimits } from '../subs/analysis/src/interfaces/session.js';
 import { createDefaultTagRegistry } from '../subs/analysis/subs/model/src/registry.js';
+import { classifyProjectPath } from '../subs/analysis/subs/project/src/ownership.js';
 import type { AnalysisDriver, WatcherPort, ClockPort, ContextBudgets } from '../subs/daemon/src/context-types.js';
 import type { ApiViewPublisher, ApiViewPublishLimits, DaemonInstance, LogEntry, DaemonService } from '../subs/daemon/src/interfaces/daemon.js';
 import { createDaemonService } from '../subs/daemon/src/service.js';
@@ -91,6 +92,7 @@ function sessionDriver(capacity: SessionLimits): AnalysisDriver {
     return handle;
   }
   return {
+    classify: classifyProjectPath,
     async resolve(request, control, known) {
       if (disposed) throw new Error('Analysis driver is disposed');
       control?.signal?.throwIfAborted();

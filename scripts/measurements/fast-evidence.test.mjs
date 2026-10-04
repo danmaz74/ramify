@@ -47,6 +47,10 @@ function report() {
 
 const verify = value => verifyFastEvidence(value, id, inputs, dependencies);
 
+/** A `ramify.check/2` path the covering revision checked: its content, or its deletion when absent. */
+const checkedPath = item => ({ path: item.path, disposition: 'checked', module: 'fixture', exclusion: null,
+  reason: item.sha256 === null ? 'deleted' : 'content', sha256: item.sha256 });
+
 function cycle(index, kind = 'body') {
   const sequence = index + 2, path = kind === 'body' ? 'src/body.ts' : 'src/api.ts';
   const expected = [{ path, sha256: (index % 2 ? 'a' : 'b').repeat(64) }];
@@ -61,7 +65,7 @@ function cycle(index, kind = 'body') {
     hookStartedAt: index * 1000 + 1, countersBeforeSave: { coveredRequests: 0 },
     hook: { failure: null, signal: null, stderr: '', code: 0, durationMs: 1,
       document: { schemaVersion: 'ramify.check/2', outcome: 'checked', execution: 'completed', exitCode: 0,
-        revision: { id: revision.revision, sequence }, changed: expected.map(item => ({ ...item, covered: true })),
+        revision: { id: revision.revision, sequence }, paths: expected.map(checkedPath),
         findings: [], coverage: [], timings: { daemon: timings } } },
   };
 }
@@ -79,7 +83,7 @@ function editData(name, kind, duration = 1) {
   const cycles = Array.from({ length: 20 }, (_, index) => {
     const row = cycle(index, kind);
     row.expected[0].path = path;
-    row.hook.document.changed[0].path = path;
+    row.hook.document.paths[0].path = path;
     row.revision.checked.path = { body: 'unchanged-surface', description: 'description', created: 'membership' }[kind];
     row.revision.checked.files = [path];
     row.revision.timings.accesses = duration;
@@ -139,8 +143,8 @@ test('checked-set evidence requires covering advancing revisions for every recor
   passing(assertFastWorkload('I5-13:checked-set-bounded', measurements));
   for (const mutate of [
     item => { item.beforeSequence = item.revision.sequence; },
-    item => { item.hook.document.changed[0].covered = false; },
-    item => { item.hook.document.changed[0].sha256 = 'wrong-content'; },
+    item => { item.hook.document.paths[0].disposition = 'not-checked'; },
+    item => { item.hook.document.paths[0].sha256 = 'wrong-content'; },
     item => { item.hook.code = 2; item.hook.document.outcome = 'not-checked'; },
     item => { item.revision.outcome.execution = 'incomplete'; },
   ]) {
@@ -184,8 +188,8 @@ test('racing evidence accepts a hook covered on publication or answered by its o
     ['a covered answer from the revision before the save', row => {
       row.revision.sequence = row.beforeSequence; row.hook.document.revision.sequence = row.beforeSequence; }],
     ['a covered answer naming another revision', row => { row.hook.document.revision.id = 'rev/stale'; }],
-    ['a covered entry with the wrong content', row => { row.hook.document.changed[0].sha256 = 'wrong-content'; }],
-    ['an uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
+    ['a covered entry with the wrong content', row => { row.hook.document.paths[0].sha256 = 'wrong-content'; }],
+    ['an uncovered changed entry', row => { row.hook.document.paths[0].disposition = 'not-checked'; }],
     ['an outdated check document version', row => { row.hook.document.schemaVersion = 'ramify.check/1'; }],
     ['a not-checked reply', row => { row.hook.code = 2; row.hook.document.outcome = 'not-checked'; row.hook.document.exitCode = 2; }],
     ['two covered requests', row => { row.settled.counters.coveredRequests++; }],
@@ -219,7 +223,7 @@ test('filtered extraction requires twenty covering one-file revisions and cannot
       value => { value.cycles.body[19].revision.checked.accesses = 1; },
       value => { value.cycles.body[19].revision.checked.modelRebuilt = true; },
       value => { value.cycles.body[19].revision.checked.files[0] = 'src/wrong.ts'; },
-      value => { value.cycles.body[19].hook.document.changed[0].covered = false; },
+      value => { value.cycles.body[19].hook.document.paths[0].disposition = 'not-checked'; },
       value => { value.cycles.body[19].beforeSequence = value.cycles.body[19].revision.sequence; },
       value => { value.cycles.body[19].revision.outcome.coverage = 'partial'; },
       value => { value.cycles.body[19].revision.timings.accesses = null; },
@@ -253,10 +257,10 @@ test('description and created-file deferrals require complete correctly scoped e
       rows => { rows.pop(); },
       rows => { rows[0].revision.checked.path = 'source'; },
       rows => { rows[0].revision.outcome.execution = 'incomplete'; },
-      rows => { rows[0].hook.document.changed[0].covered = false; },
+      rows => { rows[0].hook.document.paths[0].disposition = 'not-checked'; },
       rows => { rows[0].beforeSequence = rows[0].revision.sequence; },
-      rows => { rows[0].expected[0].path = 'src/unrelated.ts'; rows[0].hook.document.changed[0].path = 'src/unrelated.ts'; },
-      rows => { rows[0].expected[0].sha256 = null; rows[0].hook.document.changed[0].sha256 = null; },
+      rows => { rows[0].expected[0].path = 'src/unrelated.ts'; rows[0].hook.document.paths[0].path = 'src/unrelated.ts'; },
+      rows => { rows[0].expected[0].sha256 = null; rows[0].hook.document.paths[0] = checkedPath(rows[0].expected[0]); },
       rows => { rows[0].revision.summary.denied++; },
     ]) {
       const altered = structuredClone(projectData); mutate(altered.get(name).cycles[kind]);
@@ -292,7 +296,7 @@ test('only deletion accepts the exact unresolved-target note for its stable impo
   for (const name of fastFixtures) {
     const definition = fixture(name), row = cycle(0, 'deleted');
     row.expected = [{ path: definition.created, sha256: null }];
-    row.hook.document.changed = row.expected.map(item => ({ ...item, covered: true }));
+    row.hook.document.paths = row.expected.map(checkedPath);
     row.revision.checked.path = 'broad'; row.revision.outcome.coverage = 'partial';
     row.hook.document.coverage = [{
       id: name === 'reference' ? 'access-limit/1:69a7528da599c0bb91ecdf8acdbb521e4c05fc19dd2c35a1433baa447e559f4f'
@@ -337,7 +341,8 @@ function configurationCycle(index) {
   row.hook.code = 2;
   row.hook.document = { schemaVersion: 'ramify.check/2', outcome: 'not-checked', reason: 'configuration-changed',
     execution: null, exitCode: 2, revision: null, checked: null, findings: [], coverage: [],
-    changed: row.expected.map(item => ({ ...item, covered: false })), timings: { daemon: null } };
+    paths: row.expected.map(item => ({ path: item.path, disposition: 'not-checked', module: 'fixture', exclusion: null,
+      reason: 'configuration-changed' })), timings: { daemon: null } };
   return row;
 }
 
@@ -355,7 +360,7 @@ test('the configuration row requires an immediate not-checked reply and the revi
       [row => { row.hook.document.outcome = 'checked'; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.reason = 'deadline-exceeded'; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.exitCode = 0; }, 'real immediate not-checked CLI result'],
-      [row => { row.hook.document.changed[0].covered = true; }, 'real immediate not-checked CLI result'],
+      [row => { row.hook.document.paths[0].disposition = 'checked'; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.revision = { id: 'rev/6', sequence: 6 }; }, 'real immediate not-checked CLI result'],
       [row => { row.hook.document.findings.push({ id: 'test-control-only' }); }, 'independent outcome'],
       [row => { row.hook.document.coverage.push({ id: 'test-control-only' }); }, 'independent outcome'],
@@ -543,8 +548,8 @@ test('published hooks are judged by the counters sampled when the hook returns',
     ['covered request while settling', row => { row.settled.counters.coveredRequests++; }],
     ['before revision differs from the hook', row => { row.beforeHook.contexts[0].published.sequence--; }],
     ['nonzero exit', row => { row.hook.code = 1; row.hook.document.exitCode = 1; }],
-    ['uncovered changed entry', row => { row.hook.document.changed[0].covered = false; }],
-    ['no changed entries', row => { row.hook.document.changed = []; }],
+    ['uncovered changed entry', row => { row.hook.document.paths[0].disposition = 'not-checked'; }],
+    ['no changed entries', row => { row.hook.document.paths = []; }],
     ['missing after sample', row => { row.afterHook = null; }],
     ['missing sweep counter', row => { delete row.afterHook.counters.sweeps; }],
   ]) {

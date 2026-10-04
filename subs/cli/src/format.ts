@@ -20,7 +20,9 @@ export function formatChangedHuman(document: CheckDocument): string {
   for (const warning of document.warnings) lines.push(`Warning [${warning.code}] ${warning.path}: ${oneLine(warning.message)}`);
   for (const limit of document.coverage) lines.push(`Analysis limit [${limit.code}] ${location(limit.location)}: ${limit.message.replace(/[\r\n]+/g, ' ')}`);
   const checked = document.checked ? `${document.checked.files.length} files (${document.checked.files.join(', ') || 'none'}), ${document.checked.accesses} accesses` : 'none';
-  lines.push(`${document.outcome === 'checked' ? 'Checked' : `Not checked (${document.reason})`}: ${document.changed.map(item => item.path).join(', ')}; checked set: ${checked}; wait: ${document.timings.waitedMs.toFixed(1)} ms; findings: ${document.findings.length}`);
+  // A path the daemon did not analyze, or could not check, names its disposition.
+  const paths = document.paths.map(item => item.disposition === 'checked' ? item.path : `${item.path} (${item.disposition}: ${item.reason})`);
+  lines.push(`${document.outcome === 'checked' ? 'Checked' : `Not checked (${document.reason})`}: ${paths.join(', ')}; checked set: ${checked}; wait: ${document.timings.waitedMs.toFixed(1)} ms; findings: ${document.findings.length}`);
   return lines.join('\n') + '\n';
 }
 

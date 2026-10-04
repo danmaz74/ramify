@@ -491,6 +491,20 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 15: a changed check's reply gives each
+  // named path a `PathCheckDisposition`, which travels with `CheckOutcome` as a
+  // signature companion, so the relays that carry the outcome carry it too.
+  // Contexts' wildcard interface exposure already selects it.
+  { plan: 'Phase 1 project boundaries (path dispositions)',
+    added: {
+      './': [
+        'expose-sub PathCheckDisposition from daemon to descendants',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-sub PathCheckDisposition from contexts to parent',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** A named layer over the archived README purposes, keyed by owner directory:

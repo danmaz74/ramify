@@ -33,7 +33,8 @@ net.Socket.prototype.write = function (chunk, ...rest) {
       if (message?.type === 'request' && message.op === 'check') {
         record('hook-check', { params: message.params });
         const target = process.env.RAMIFY_HOOK_REWRITE;
-        if (!rewritten && target && message.params.scope === 'delta') {
+        // The first delta request carrying the CLI's content hash; the classification request before it carries none.
+        if (!rewritten && target && message.params.scope === 'delta' && message.params.freshness?.expect?.length > 0) {
           rewritten = true;
           fs.appendFileSync(target, '\n// written after the CLI content hash\n');
           record('hook-rewrite', { path: target });

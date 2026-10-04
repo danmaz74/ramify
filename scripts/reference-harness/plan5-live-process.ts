@@ -78,9 +78,14 @@ export async function watchWindow(p: SequenceProcess, label: string, sequence: n
 
 export async function changed(p: SequenceProcess, root: string, a: Assertions, label: string,
   paths: readonly string[], expected: 0 | 1 | 2, since?: string): Promise<CheckDocument> {
+  // Phase 1 project boundaries, iteration 15: each analyzed path the check answers is
+  // checked with the CLI's identity of its content, or its deletion when absent; one it
+  // could not establish is not checked and carries no identity.
   const expectedIdentities = await Promise.all(paths.map(async path => {
-    try { return { path, sha256: hash(await readFile(join(root, path))), covered: expected !== 2 }; }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; return { path, sha256: null, covered: expected !== 2 }; }
+    let sha256: string | null;
+    try { sha256 = hash(await readFile(join(root, path))); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; sha256 = null; }
+    return expected === 2 ? [path, 'not-checked', null] : [path, 'checked', sha256 === null ? 'deleted' : 'content', sha256];
   }));
   const args = ['check', '--changed', ...paths, '--deadline', '60000', ...(since ? ['--since', since] : []), '--format', 'json'];
   const offset = (await liveTrace(p)).length;
@@ -89,7 +94,8 @@ export async function changed(p: SequenceProcess, root: string, a: Assertions, l
   a.equal(`${label}: installed hook exits with one result`, [outcome.code, outcome.error, outcome.signal, outcome.stderr], [expected, null, null, '']);
   const document = JSON.parse(outcome.stdout) as CheckDocument;
   a.equal(`${label}: compact document`, [document.schemaVersion, document.exitCode, outcome.stdout.trim().split('\n').length], ['ramify.check/2', expected, 1]);
-  a.equal(`${label}: exact CLI hashes and coverage`, document.changed, expectedIdentities);
+  a.equal(`${label}: exact CLI identities and dispositions`, document.paths.map(item => item.disposition === 'checked'
+    ? [item.path, item.disposition, item.reason, item.sha256] : [item.path, item.disposition, 'sha256' in item ? item.sha256 : null]), expectedIdentities);
   if (expected !== 2) a.equal(`${label}: completed covering check`, [document.outcome, document.reason, document.execution], ['checked', null, 'completed']);
   const events = (await liveTrace(p)).slice(offset);
   const starts = events.filter(e => e.event === 'start' && e.argv?.[1] === p.executable

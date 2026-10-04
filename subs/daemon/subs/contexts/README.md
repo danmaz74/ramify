@@ -4,13 +4,29 @@ Contexts keeps each selected project root isolated as a context with its own gen
 
 `createContextManager` preserves each opening lease's invocation and capability
 order. Covered delta requests reuse a coherent publication when no influencing
-change or sweep is pending. Other synchronized requests flush the queue; an
-empty expectation requires a sweep started after acknowledgment. A synchronized
-request that names a configuration path is answered at once as unavailable for
-that reason, and the update its paths queued still runs, so the next request
-waits for that revision. Unobserved and superseded identities cannot produce a
-passing check. Request deadlines return cold or deadline-exceeded outcomes while
-the session continues updating.
+change or sweep is pending. Other synchronized requests flush the queue; a plain
+check naming neither paths nor expectations requires a sweep started after
+acknowledgment. A synchronized request that names a configuration path is
+answered at once as unavailable for that reason, and the update its paths queued
+still runs, so the next request waits for that revision. Unobserved and
+superseded identities cannot produce a passing check. Request deadlines return
+cold or deadline-exceeded outcomes while the session continues updating.
+
+A changed check names its paths and the revision sequence whose classification
+its expectations follow. The manager classifies each path with the driver's
+`classify`, Project's classifier, over the ownership table of the latest
+completed published revision, before any content or configuration rule: a path
+in an owned-ignored, external or scratch directory or another always-excluded
+path is `not-analyzed` and needs no content, so a manifest inside such a tree is
+no configuration change; an owned path outside every exclusion is analyzed and
+needs its expected identity. Expectations that do not follow the classification
+are answered `classification-changed` with it, at arrival or when the covering
+revision moved a boundary. Otherwise each analyzed path is `checked` by its read
+content or its deletion, including the removal of an analysis input an earlier
+publication held, `not-analyzed` as an owned non-source file the capture
+re-observed, or `not-checked` as superseded, and the reply keeps the revision's
+findings beside every disposition. Excluded paths are queued only as
+re-observation hints; their bytes never become expectations or captured inputs.
 
 History retains revision headers, diagnostics, warnings, coverage and finding
 deltas. Reports are projected from the session's immutable facts by exact

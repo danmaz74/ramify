@@ -1,4 +1,4 @@
-import type { RetainedSession } from '../../../../analysis/src/interfaces/session.js';
+import type { RetainedSession, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { DependencyDiagramFacts, TestReferenceFacts } from '../../../../analysis/src/interfaces/dependency-diagram.js';
 import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { ContextEvent, ContextExplorerDetailsOutcome, ContextRevision, ContextSelection, ContextState, ContextToken, ExplorerDetailsRequest, RevisionId, SynchronizationState, WatchBatch, WatcherHandle } from './interfaces/contexts.js';
@@ -49,7 +49,16 @@ export interface LiveContext {
   watched: WatchBatch | null;
   lastActivityAt: number;
   hadLease: boolean;
+  /** The ownership scope of the latest published revision whose analysis completed; it
+   * classifies a changed check's paths at that revision and at any later invalid one. */
   scope: ProjectScope | null;
+  /** The session revision behind the published revision while the session lives; the
+   * next publication compares its analysis inputs with it to record removals. */
+  publishedData: SessionRevision | null;
+  /** Analysis inputs a later published revision no longer holds, by path, with the
+   * sequence that removed them: a named absent path among them is checked by its
+   * deletion. Bounded by `maxQueuedPaths`, oldest first. */
+  readonly removed: Map<string, number>;
   state: ContextState;
   synchronization: SynchronizationState;
   lastValid: ContextRevision | null;

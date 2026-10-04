@@ -3,10 +3,11 @@ import type { AnalysisReport, RunControl } from '../../../../analysis/src/interf
 import type { ApiViewProjection, ApiViewQueryOutcome, RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { ArchitectViewProjection, ArchitectViewQueryOutcome } from '../../../../analysis/src/interfaces/architect-view.js';
 import type { SessionMeasurements, SessionMeasurementsOutcome } from '../../../../analysis/src/interfaces/measurements.js';
-import type { ProjectRequest, ProjectResolution } from '../../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyAnalyzerOutcome } from '../../../../analysis/src/interfaces/dependency-analyzer.js';
-import type { AffectedRequest, ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextAffectedOutcome, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExpectedContent, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
+import type { AffectedRequest, ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextAffectedOutcome, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExpectedContent, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, PathCheckDisposition, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
 import type { ExplorerDetailDelivery, LiveContext } from './context.js';
+import { classification, classifyPaths, decide, follows, inputIndex, recordRemovals, unclassified } from './dispositions.js';
 import { createHistory } from './history.js';
 import type { HistoryEntry } from './history.js';
 import { createContextId, createFingerprints, createRevisionId } from './tokens.js';
@@ -110,7 +111,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   }
   function releaseSession(context: LiveContext): Promise<void> {
     const session = context.session; context.session = null; context.publishedSession = null; context.sessionProject = null;
-    context.versions.clear(); context.observedSequence = 0;
+    context.versions.clear(); context.observedSequence = 0; context.publishedData = null;
     // An unavailable session resolves again: known resolutions leave with it.
     context.resolutions.clear();
     return session ? cleanup(session.dispose()) : Promise.resolve();
@@ -125,7 +126,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     endDiagramJob(context, caller => ({ ...unavailable(reason === 'disposed' ? 'disposed' : 'expired-generation'), requestId: caller.requestId }));
     context.queue.length = 0; stopTimers(context); closeWatcher(context);
     // Dispose owns all remaining fact versions; do not send per-version releases after it.
-    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.requested.clear(); context.watched = null; context.invocations.clear(); contexts.delete(context.token.context);
+    void releaseSession(context); context.history.dispose(); context.paths.clear(); context.requested.clear(); context.watched = null; context.invocations.clear(); context.removed.clear(); contexts.delete(context.token.context);
     emit(context, { type: 'context-evicted', token: context.token, reason }); context.subscriptions.clear();
   }
   function answerDiagram(caller: DiagramCaller, outcome: DiagramAnswer): void {
@@ -291,7 +292,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const event of events) {
       if (event.kind === 'overflow' || event.kind === 'error') { context.conservative = true; context.sweepRequired = true; }
       else { context.paths.set(event.path, event.kind === 'renamed' ? 'unknown' : event.kind); context.requested.delete(event.path); }
-      if (configurationPath.test(event.path) && !context.sweepRequired) context.sweepRequired = 'configuration';
+      if (configurationPath.test(event.path) && !context.sweepRequired && contained(context, event.path)) context.sweepRequired = 'configuration';
       if (event.kind === 'error') { closeWatcher(context); context.watcherState = 'unavailable'; }
     }
     if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
@@ -383,11 +384,18 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (resolution.selection === scope.selection && resolution.invokedFrom === scope.invokedFrom) return report;
     return { ...report, scope: { ...scope, selection: resolution.selection, invokedFrom: resolution.invokedFrom } };
   }
+  /**
+   * `data` is the session revision behind `publication`, null for a published-freshness
+   * reader; `captured` says a capture re-observed the request's paths since it arrived.
+   * A changed check's paths are classified at that revision before any content rule.
+   */
   async function deliver(context: LiveContext, entry: PendingCheck, publication: HistoryEntry<ContextRevision>, started: number | null, reused = false,
-    timings: ReplyTimings = { ...noWork(), publication: 0 }): Promise<void> {
+    timings: ReplyTimings = { ...noWork(), publication: 0 }, data: SessionRevision | null = null, captured = false): Promise<void> {
     if (entry.settled) return;
     const baseline = entry.request.since ? context.history.get(entry.request.since) : context.history.getPrevious(publication.revision.revision);
     if (entry.request.since && !baseline) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
+    const paths = pathDispositions(context, entry, publication, data, captured);
+    if (!Array.isArray(paths)) { complete(entry, paths as CheckOutcome); scheduleIdle(context); return; }
     const unpin = context.history.pin(publication.revision.revision);
     const unpinBase = baseline ? context.history.pin(baseline.revision.revision) : () => {};
     context.deliveries.add(entry);
@@ -400,9 +408,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       const report = entry.request.scope === 'report'
         ? publication.report ?? await context.session?.report(undefined, publication.sequence) ?? null : null;
       if (entry.request.scope === 'report' && !report) { complete(entry, { ...unavailable('evicted-revision'), requestId: entry.request.requestId }); return; }
-      if (report) context.scope = report.scope;
       complete(entry, { status: 'reported', requestId: entry.request.requestId, published: true, revision: publication.revision,
-        delta, report: freeze(report && stated(context, entry, report)), freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
+        delta, report: freeze(report && stated(context, entry, report)), paths: freeze(paths),
+        freshness: fresh(entry, started, entry.request.freshness.mode === 'synchronized', reused), timings: freeze({ ...timings }) });
     } catch (error) { complete(entry, { ...unavailable('analysis-failed', String(error)), requestId: entry.request.requestId }); }
     finally { unpinBase(); unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
@@ -523,12 +531,53 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     } catch (error) { completeAffected(entry, unavailableAffected({ ...unavailable('analysis-failed', String(error)), requestId })); }
     finally { unpin(); context.deliveries.delete(entry); scheduleIdle(context); }
   }
-  /** A named path the daemon already knows as configuration: one the configuration path
-   * pattern matches, or one the acquisition observed with the configuration role, such as
-   * an `extends` target the configuration helper read. */
+  /** False only for a path the latest ownership table places in an owned-ignored, external
+   * or scratch directory or another always-excluded path: Ramify reads nothing there, so a
+   * manifest or compiler configuration inside one is no configuration change. */
+  function contained(context: LiveContext, path: string): boolean {
+    if (!context.scope) return true;
+    const owner = driver.classify(context.scope, path);
+    return !(owner.status === 'excluded' || owner.status === 'owned' && owner.exclusion);
+  }
+  /** A named path the daemon already knows as configuration, classified by containment
+   * first: one the configuration path pattern matches, or one the acquisition observed
+   * with the configuration role, such as an `extends` target the configuration helper read. */
   function namesConfiguration(context: LiveContext, path: string): boolean {
-    return configurationPath.test(path)
-      || !!context.session?.current?.inputs.some(input => input.path === path && input.role === 'configuration');
+    if (!contained(context, path)) return false;
+    const current = context.session?.current;
+    return configurationPath.test(path) || (!!current && inputIndex(current).get(path)?.role === 'configuration');
+  }
+  /** The ownership table that classifies paths at `data`: its own when its analysis completed,
+   * else the latest completed published revision's. An invalid acquisition's ownership is no
+   * valid model: its broken descriptions own nothing. */
+  function scopeAt(context: LiveContext, data: SessionRevision | null | undefined): ProjectScope | null {
+    return data?.outcome.execution === 'completed' && data.scope ? data.scope : context.scope;
+  }
+  function expectations(request: CheckRequest): readonly ExpectedContent[] {
+    return request.freshness.mode === 'synchronized' ? request.freshness.expect : [];
+  }
+  /** A changed check's expectations follow the classification at `data`; true for any other request. */
+  function followsAt(context: LiveContext, entry: PendingEntry, data: SessionRevision | null | undefined): boolean {
+    if (entry.kind !== 'check' || !entry.request.paths) return true;
+    const scope = scopeAt(context, data);
+    return !!scope && follows(classifyPaths(driver.classify, scope, entry.request.paths), expectations(entry.request));
+  }
+  /**
+   * The dispositions of a changed check answered from `publication`, whose session revision
+   * is `data`: empty without `paths`; a `classification-changed` outcome when the request's
+   * expectations do not follow the classification at `data`; every path not checked when no
+   * ownership table classifies them.
+   */
+  function pathDispositions(context: LiveContext, entry: PendingCheck, publication: HistoryEntry<ContextRevision>,
+    data: SessionRevision | null, captured: boolean): readonly PathCheckDisposition[] | CheckOutcome {
+    const { paths } = entry.request;
+    if (!paths) return [];
+    const scope = scopeAt(context, data);
+    if (!data || !scope) return unclassified(paths);
+    const classes = classifyPaths(driver.classify, scope, paths), expect = expectations(entry.request);
+    if (!follows(classes, expect)) return { status: 'classification-changed', requestId: entry.request.requestId,
+      revision: publication.revision, paths: freeze(classification(classes)) };
+    return decide(classes, expect, data, captured, context.removed);
   }
   /** The expected-content rendezvous check `check` and `apiView` share: absent
    * evidence of a named path is `unobserved`, a differing hash is a mismatch,
@@ -584,6 +633,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     if (!context.history.append(revision, data)) return false;
     await Promise.all([...releaseWork]);
     context.sequence++; context.publishedSession = context.session; context.publishedProject = context.sessionProject;
+    if (context.publishedData && context.publishedData !== data) recordRemovals(context.removed, context.publishedData, data, revision.sequence, budgets.maxQueuedPaths);
+    context.publishedData = data;
+    if (data.outcome.execution === 'completed' && data.scope) context.scope = data.scope;
     if (data.outcome.execution === 'completed') context.lastValid = revision;
     supersedeDiagram(context, revision);
     emit(context, { type: 'revision-published', token: context.token, revision, coalesced: 0 });
@@ -717,9 +769,10 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
           if (failed) { completeAffected(entry, failed); return Promise.resolve(); }
           return deliverAffected(context, entry, publication, started, reused, timings);
         }
-        const failed = mismatch(context, entry, data);
+        // A changed check is judged per path at this revision instead of as a whole.
+        const failed = entry.request.paths ? null : mismatch(context, entry, data);
         if (failed) { complete(entry, failed); return Promise.resolve(); }
-        return deliver(context, entry, publication, started, reused, timings);
+        return deliver(context, entry, publication, started, reused, timings, data, true);
       }));
       const waiting = context.queue.filter(publishedWait);
       for (const entry of waiting) context.queue.splice(context.queue.indexOf(entry), 1);
@@ -779,7 +832,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   function identityCovered(context: LiveContext, entry: PendingEntry): boolean {
     const data = context.session?.current; const publication = context.history.published;
     return !!data && !!publication && context.publishedSession === context.session && publication.sequence === data.sequence
-      && !entry.needsSweep && invocationKey(entry.invocation) === invocationKey(context.invocation) && !expectationMismatch(entry, data);
+      && !entry.needsSweep && invocationKey(entry.invocation) === invocationKey(context.invocation) && !expectationMismatch(entry, data)
+      && followsAt(context, entry, data);
   }
   /** A covered request is answered from the published revision. Only a running
    * periodic sweep carrying no changes may coexist with coverage: the answer
@@ -810,7 +864,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     for (const entry of requests) {
       if (entry.kind === 'apiView') track(deliverApiView(context, entry, context.history.published!, context.session!.current!, null, true));
       else if (entry.kind === 'affected') track(deliverAffected(context, entry, context.history.published!, null, true));
-      else track(deliver(context, entry, context.history.published!, null, true));
+      else track(deliver(context, entry, context.history.published!, null, true, undefined, context.session!.current!));
     }
   }
   function check(request: CheckRequest, lease: string, control?: RunControl): Promise<CheckOutcome> {
@@ -818,13 +872,21 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const context = found;
     if (control?.signal?.aborted) return Promise.resolve({ status: 'cancelled', requestId: request.requestId });
     return new Promise(resolve => {
+      // A changed check names its paths; an empty expectation list there is no plain check.
       const entry: PendingCheck = { kind: 'check', request: freeze(structuredClone(request)), lease, acknowledged: clock.now(),
         invocation: context.invocations.get(lease) ?? { project: context.project, setup: context.selection.setup },
         revisionAtAcknowledgment: context.history.published?.revision ?? null,
-        needsSweep: request.freshness.mode === 'synchronized' && (request.scope === 'report' || !request.freshness.expect.length),
+        needsSweep: request.freshness.mode === 'synchronized' && (request.scope === 'report' || (!request.paths && !request.freshness.expect.length)),
         resolve, cleanup: () => {}, settled: false, deadlineExpired: false };
+      // A changed check's paths are classified by containment at the published revision
+      // before any content is required: expectations that do not follow it are answered at
+      // once with that classification, and nothing is queued for them.
+      const published = context.history.published;
+      const classes = request.paths && request.freshness.mode === 'synchronized' && context.scope && published
+        ? classifyPaths(driver.classify, context.scope, request.paths) : null;
+      const reclassify = !!classes && !follows(classes, expectations(request));
       // Test coverage before touch() can mark a periodic sweep due for this activity.
-      const covered = request.freshness.mode === 'synchronized' && covers(context, entry);
+      const covered = request.freshness.mode === 'synchronized' && !reclassify && covers(context, entry);
       touch(context);
       let stopDeadline: (() => void) | undefined;
       const unpinSince = request.since && context.history.get(request.since) ? context.history.pin(request.since) : () => {};
@@ -856,19 +918,27 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         if (request.freshness.revision) { complete(entry, { ...unavailable('evicted-revision'), requestId: request.requestId }); return; }
         if (!request.freshness.wait) { complete(entry, { status: 'pending', requestId: request.requestId, current: snapshot(context) }); return; }
       } else {
-        if (covered) { track(deliver(context, entry, context.history.published!, null, true)); return; }
+        if (reclassify) {
+          complete(entry, { status: 'classification-changed', requestId: request.requestId, revision: published!.revision,
+            paths: freeze(classification(classes!)) });
+          scheduleIdle(context); return;
+        }
+        if (covered) { track(deliver(context, entry, context.history.published!, null, true, undefined, context.session!.current!)); return; }
         // A hook verifies a module's exports and their use. A configuration change is not
         // that kind of change and its verdict is not needed at once, so the request is
         // answered immediately as not checked. Its paths still queue an update, which the
-        // next request waits for, so the answer after it is exact.
+        // next request waits for, so the answer after it is exact. Only an analyzed path,
+        // one the request expects, can name configuration.
         const configuration = request.freshness.expect.filter(expectation => namesConfiguration(context, expectation.path));
         // A hook identifies a path to re-observe. The observer determines its
         // actual creation/deletion and role; preserve stronger watcher hints.
         // A path only requests named stays theirs, for withdrawal on a covering publication.
-        // An immediately answered request withdraws nothing and claims none.
-        for (const expected of request.freshness.expect) {
-          if (!context.paths.has(expected.path)) { context.paths.set(expected.path, 'changed'); if (!configuration.length) context.requested.set(expected.path, new Set([entry])); }
-          else if (!configuration.length) context.requested.get(expected.path)?.add(entry);
+        // An immediately answered request withdraws nothing and claims none. A changed
+        // check's not-analyzed paths are hints only: the observer reads nothing beneath an
+        // exclusion and keeps no observation of an inert file, and no content is expected.
+        for (const path of request.paths ?? request.freshness.expect.map(expected => expected.path)) {
+          if (!context.paths.has(path)) { context.paths.set(path, 'changed'); if (!configuration.length) context.requested.set(path, new Set([entry])); }
+          else if (!configuration.length) context.requested.get(path)?.add(entry);
         }
         if (context.paths.size > budgets.maxQueuedPaths) { context.paths.clear(); context.requested.clear(); context.conservative = true; context.sweepRequired = true; }
         if (entry.needsSweep) context.sweepRequired = true;
@@ -1258,7 +1328,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         token: freeze({ context: id, generation: options.generationId() }), selection, project, invocation: { project, setup: requestedSetup },
         openedAt: now, lastActivityAt: now, hadLease: false, invocations: new Map([[lease, { project, setup: requestedSetup }]]), resolutions: new Map([[key, resolution]]), subscriptions: new Map(),
         history: createHistory(budgets.maxHistoryRevisions, budgets.maxHistoryBytes, entry => releaseVersion(context, entry)),
-        queue: [], deliveries: new Set(), explorerDeliveries: new Set(), diagram: null, paths: new Map(), requested: new Map(), watched: null, scope: null, state: 'opening', synchronization: 'initializing', lastValid: null,
+        queue: [], deliveries: new Set(), explorerDeliveries: new Set(), diagram: null, paths: new Map(), requested: new Map(), watched: null, scope: null, publishedData: null, removed: new Map(), state: 'opening', synchronization: 'initializing', lastValid: null,
         session: null, publishedSession: null, sessionProject: null, publishedProject: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,

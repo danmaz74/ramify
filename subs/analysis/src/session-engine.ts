@@ -826,7 +826,10 @@ class Session implements RetainedSession {
       const publish = performance.now() - publishStart;
       const timings = { ...computed.timings, publish, total: performance.now() - started };
       revision = deepFreeze({
-        sequence, inputId: inputId ?? sealedIdentity(inputs), inputs, changed: computed.changed, checked: computed.checked,
+        sequence, inputId: inputId ?? sealedIdentity(inputs), inputs,
+        // The scope the report records: the invalid acquisition's own inventory, else the valid one.
+        scope: (computed.facts.invalid ? computed.facts.invalid.inventory?.scope : computed.facts.inventory?.scope) ?? null,
+        changed: computed.changed, checked: computed.checked,
         outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
         delta, timings,
       });
