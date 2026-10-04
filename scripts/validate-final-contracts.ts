@@ -505,6 +505,23 @@ const declarationLayers: readonly DeclarationLayer[] = [
       ].join('\n'),
     },
   },
+  // Phase 1 project boundaries, iteration 16: a watcher port receives a `WatchScope` and
+  // its handle reports `WatchRegistrations`, which the context status carries, so both
+  // travel with `WatcherPort`, `WatcherHandle` and `ContextStatus` as signature companions.
+  // The strict check-reply decoder is exposed to the root, whose quick environment
+  // decodes replies as the socket client does. Contexts' wildcard interface exposure
+  // already selects both types.
+  { plan: 'Phase 1 project boundaries (watch registrations and strict replies)',
+    added: {
+      './': [
+        'expose-sub WatchScope, WatchRegistrations from daemon to descendants',
+      ].join('\n'),
+      'subs/daemon/': [
+        'expose-src validateServiceReply from "codec.ts" to parent',
+        'expose-sub WatchScope, WatchRegistrations from contexts to parent',
+      ].join('\n'),
+    },
+  },
 ];
 
 /** A named layer over the archived README purposes, keyed by owner directory:

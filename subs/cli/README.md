@@ -52,7 +52,8 @@ updates. Recovery resubscribes once after unexpected loss, and context eviction
 allows one reopen. SIGINT releases the subscription and exits 130.
 
 `daemon status` and `daemon stop` use discovery without startup. Status exposes
-the actual instance, contexts, budgets and counters. Stop names the observed
+the actual instance, contexts, budgets and counters; each context status, here
+and in `ramify.watch/2` status lines, carries its watcher's registrations. Stop names the observed
 instance and waits for that process to exit; absent daemons make both commands
 succeed without launching anything.
 

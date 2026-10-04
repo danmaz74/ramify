@@ -35,6 +35,8 @@ waits. History eviction releases the corresponding worker version. Byte budgets
 include the compact history and the session's facts; oversized candidates fail
 explicitly. Intermediate session versions without a published header are released.
 
+The watcher receives the latest completed revision's exclusions through Project's classifier and is reconfigured when they change. A removed exclusion opens a gap while its directories are registered: until the reconfiguration ends every capture sweeps and nothing is covered, and when it registered any directory its end requires a conservative sweep. The status reports the watcher's registrations.
+
 Watcher changes drive updates independently of requests. Required and periodic
 sweeps reconcile observed inputs, and an idle audit verifies each revision at
 most once. Compiler budgets and inactivity demote hot sessions to warm. Cold
@@ -45,7 +47,7 @@ reopens the session; disposal releases requests, timers and all owned resources.
 The controlled clock's `advance(milliseconds)` runs due callbacks synchronously
 in deadline order, using scheduling order for ties. Tests await asynchronous
 operations separately. The controlled watcher delivers supplied batches to
-matching roots and supports a one-shot attachment failure. Neither control
+matching roots, records each scope it receives, can hold reconfigurations, and supports a one-shot attachment failure. Neither control
 opens an OS timer or file watcher; both expose live resource counts for cleanup
 assertions.
 

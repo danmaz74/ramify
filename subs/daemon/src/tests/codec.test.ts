@@ -220,7 +220,9 @@ describe('ramify.ipc/2: the strict context-status scope carries its ownership ta
   const status = (value: unknown) => ({ token, selection: { root: '/project', scope: 'whole-project', configuration: 'discover',
     setup: { registry: 'registry', capabilities: [] } }, scope: value, state: 'warm', synchronization: 'synchronized', published: null,
   lastValid: null, pending: { requests: 0, changedPaths: 0, analysisRunning: false }, history: { retained: 0, bytes: 0, oldest: null },
-  retainedBytes: 0, leases: { subscriptions: 0, requests: 0 }, watcher: 'active', openedAt: 1, lastActivityAt: 1, level: 'warm',
+  retainedBytes: 0, leases: { subscriptions: 0, requests: 0 }, watcher: 'active',
+  registrations: { sequence: 1, directories: 3, pruned: ['dist', 'external-project', 'fixture-project'], prunedCount: 3 },
+  openedAt: 1, lastActivityAt: 1, level: 'warm',
   session: null, demoting: false, unresponsiveSince: null });
   const event = (value: unknown) => ({ type: 'event', seq: 1, subscription: 'subscription-1',
     event: { type: 'status-changed', token, current: status(value), coalesced: 0 } });

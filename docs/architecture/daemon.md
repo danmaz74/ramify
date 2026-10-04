@@ -667,8 +667,8 @@ input identity.
 context answers it from the published revision, with no analysis, when that
 revision observed every named path with the expected identity, the list is
 nonempty or the request is a changed check naming its paths, the revision
-carries the requesting lease's invocation, and no known influencing change or
-required sweep is pending. The rule is evaluated when the request arrives and
+carries the requesting lease's invocation, and no known influencing change,
+required sweep or watch reconfiguration gap is pending. The rule is evaluated when the request arrives and
 again at each publication. Otherwise the request flushes the debounce window,
 adds its paths to the change set and is answered by the revision that covers it.
 For a request without named paths, a named path the covering revision did not
@@ -709,10 +709,43 @@ passed since the start of the previous sweep while the context has activity. It
 never makes a covered request wait and never marks the context reconciling. A
 required sweep follows a configuration, manifest or lockfile change, a watcher
 overflow or error, an opening or conservative context, more queued paths than
-`maxQueuedPaths`, and a plain check naming neither paths nor expectations; a
-request waits for it.
+`maxQueuedPaths`, a plain check naming neither paths nor expectations, and the
+end of a watch reconfiguration that registered directories an exclusion held
+back; a request waits for it.
 An update that acquired the project again satisfies a sweep that only
 configuration or manifest events required.
+
+**Watch registrations.** The watcher port receives a watch scope: Project's
+classifier over the ownership table of the latest completed published revision,
+whose rooted exclusions it lists, or over an empty table before the first one,
+where only the canonical reserved-path rules (repository metadata, installed
+packages and generated paths, wherever they occur) exclude. It registers no
+directory the scope excludes and nothing beneath one, so an owned-ignored,
+external, scratch, output, package, repository or generated tree holds no
+registration and its byte edits, creations and deletions reach no listener; no
+fixed directory-name set remains. The enclosing directory stays registered, and
+the own creation, removal or replacement of an owned-ignored, external or
+scratch directory is delivered, which keeps boundary-root evidence observed;
+the own entries of the other excluded kinds are not. Registration and event
+classification cost one classifier call per directory met and per event,
+proportional to the path's depth, never to the files beneath an exclusion.
+When a completed publication's rooted exclusions differ from those the watcher
+registered with, the context reconfigures it: registrations beneath a new
+exclusion end, and the directories a removed exclusion held back are registered.
+Changes made there before their registration reach no listener, so until that
+reconfiguration ends every capture sweeps, no request is covered and the context
+is not synchronized; when it registered any directory, its end requires a
+conservative sweep, whose revision, if it finds changes, has cause
+`conservative`. A reconfiguration that only prunes
+loses nothing the context reads and opens no gap. `ContextStatus.registrations`
+reports the active watcher's scope sequence, registered directory count and the
+excluded directories it pruned (at most 20, byte-ordered, with their total);
+null while no watcher is attached. Before the first completed revision the
+watcher registers by the reserved-path rules alone, and that revision's
+exclusions then prune the rest. Changes beneath an exclusion that a stage
+observed, such as a compiler listing of a scratch directory, are reconciled by
+sweeps, a plain synchronized check's included, and by the re-observation hints
+of a changed check that captures, never by a registration beneath the exclusion.
 
 **Deadlines and levels.** A hook request's deadline defaults to
 `updateDeadlineMs`, 2 s. A cold context that cannot publish in time answers

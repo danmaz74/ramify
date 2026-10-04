@@ -102,6 +102,8 @@ export interface ContextStatus {
   readonly retainedBytes: number;
   readonly leases: { readonly subscriptions: number; readonly requests: number };
   readonly watcher: 'active' | 'unavailable' | 'disposed';
+  /** The active watcher's registrations; null while no watcher is attached. */
+  readonly registrations: WatchRegistrations | null;
   readonly openedAt: number;
   readonly lastActivityAt: number;
   /** A demotion is in flight: the session was asked to release its compiler. */
@@ -348,10 +350,45 @@ export interface WatchEvent {
   readonly path: string;
   readonly kind: 'changed' | 'created' | 'deleted' | 'renamed' | 'overflow' | 'error';
 }
-export interface WatcherHandle { close(): Promise<void> }
+/**
+ * What a watcher must not register beneath: one revision's rooted exclusions and the
+ * canonical reserved-path rules, both applied by Project's classifier. A watcher registers
+ * no directory `excluded` names and nothing beneath one; it keeps watching the enclosing
+ * directory, so an owned-ignored, external or scratch directory's own creation, removal
+ * or replacement still reaches the listener.
+ */
+export interface WatchScope {
+  /** The published revision sequence whose ownership table decides; null before the first
+   * completed revision, when only the canonical reserved-path rules exclude. */
+  readonly sequence: number | null;
+  /** That table's rooted exclusions, byte-ordered; empty before it. */
+  readonly exclusions: readonly ProjectExclusion[];
+  /** The exclusion containing a canonical project-relative path, null when none does. */
+  excluded(path: string): ProjectExclusion | null;
+}
+/** A watcher's current registrations, which the context status reports. */
+export interface WatchRegistrations {
+  /** The `WatchScope.sequence` the registrations follow. */
+  readonly sequence: number | null;
+  /** Registered directories, the root included. */
+  readonly directories: number;
+  /** Excluded directories found directly beneath registered ones and not registered,
+   * project-relative and byte-ordered: at most 20, with their total in `prunedCount`. */
+  readonly pruned: readonly string[];
+  readonly prunedCount: number;
+}
+export interface WatcherHandle {
+  /** Apply another revision's exclusions: registrations beneath a newly excluded directory
+   * end, and the directories an exclusion no longer holds back are registered. Resolves with
+   * the number of directories so registered: changes made there before their registration
+   * reached no listener, so a positive number requires the caller to recapture conservatively. */
+  reconfigure(scope: WatchScope): Promise<number>;
+  registrations(): WatchRegistrations;
+  close(): Promise<void>;
+}
 export interface WatcherPort {
   /** A listener without `batch` receives its times from the context clock on delivery. */
-  watch(root: string, listener: (events: readonly WatchEvent[], batch?: WatchBatch) => void): Promise<WatcherHandle>;
+  watch(root: string, scope: WatchScope, listener: (events: readonly WatchEvent[], batch?: WatchBatch) => void): Promise<WatcherHandle>;
 }
 export interface ClockPort {
   now(): number;

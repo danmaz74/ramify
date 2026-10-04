@@ -34,7 +34,10 @@ describe('Plan 2 final contract validator', () => {
       .toEqual(['Plan 6 (project explorer)', 'Plan 6D (behavioral dependency diagram)', 'Plan 8 (signature companions)',
         'Plan 7 (affected modules)', 'Phase 1 project boundaries (root tooling access)',
         // Phase 1 project boundaries, iteration 15: the relay of `PathCheckDisposition` beside `CheckOutcome`.
-        'Phase 1 project boundaries (path dispositions)']);
+        'Phase 1 project boundaries (path dispositions)',
+        // Phase 1 project boundaries, iteration 16: the watch scope and registrations relayed beside
+        // `WatcherPort` and `ContextStatus`, and the strict check-reply decoder exposed to the root.
+        'Phase 1 project boundaries (watch registrations and strict replies)']);
     for (const owner of layered.values()) for (const layer of owner.layers ?? []) expect(layer.plan.trim()).not.toBe('');
     // Each archived purpose is carried through unchanged; a later purpose
     // change arrives as a layer that names the plan which reviewed it.

@@ -13,7 +13,7 @@ import type { ControlledClock, ControlledWatcher } from '../../subs/daemon/subs/
 import type { ApiViewPublisher, DaemonInstance, DaemonService, ServiceConnector, ServiceConnection, WireMessage, DaemonRecord,
   DisconnectReason, StopDisposition } from '../../subs/daemon/src/interfaces/daemon.js';
 import { createFilesystemApiViewPublisher } from '../../subs/daemon/src/api-view-publisher.js';
-import { encodeMessage, decodeMessage } from '../../subs/daemon/src/codec.js';
+import { encodeMessage, decodeMessage, validateServiceReply } from '../../subs/daemon/src/codec.js';
 
 export interface QuickEnvironment {
   readonly service: DaemonService;
@@ -88,6 +88,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
         if (closed || controller.signal.aborted) return cancelled();
         const response = through({ type: 'response', id: request.id, result });
         if (response.type !== 'response') throw new Error('Unexpected quick response');
+        validateServiceReply(request.op, response.result);
         return response.result as ServiceResult<T>;
       } finally {
         requests.delete(request.id);
@@ -151,6 +152,7 @@ export async function createQuickEnvironment(options: Partial<ContextBudgets> = 
         result: await dispatchServiceRequest(service, message.op, message.params, control, undefined, message.id,
           fixture.maxResponseBytes ?? daemonBudgets.maxResponseBytes) });
       if (response.type !== 'response') throw new Error('Unexpected quick response');
+      validateServiceReply(message.op, response.result);
       return response.result;
     },
     async dispose() {

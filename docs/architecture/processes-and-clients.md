@@ -122,7 +122,13 @@ The implemented discovery and launcher helpers use Unix domain sockets in a
 private endpoint directory, grouped by package path, version and production
 runtime bytes. Discovery requires a compiled daemon entry, so it rejects the
 incomplete build. The codec frames UTF-8 JSON with a four-byte big-endian
-length, and the daemon validates each decoded request before dispatch.
+length, and the daemon validates each decoded request before dispatch,
+including a changed check's named paths and classification sequence. Under
+`ramify.ipc/2` the client decodes each check reply strictly, its
+`classification-changed` status and path dispositions included, as it decodes
+context statuses with their watcher registrations; a malformed reply fails the
+connection like any invalid frame, and a peer with another protocol, build key
+or engine is rejected at the handshake.
 Their source and limits are described in the
 [daemon owner](../../subs/daemon/README.md). The web/daemon split is fixed
 independently of those details. Selecting tRPC for the browser does not require

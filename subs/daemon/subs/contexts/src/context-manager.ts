@@ -3,9 +3,9 @@ import type { AnalysisReport, RunControl } from '../../../../analysis/src/interf
 import type { ApiViewProjection, ApiViewQueryOutcome, RetainedSession, SessionChange, SessionRevision } from '../../../../analysis/src/interfaces/session.js';
 import type { ArchitectViewProjection, ArchitectViewQueryOutcome } from '../../../../analysis/src/interfaces/architect-view.js';
 import type { SessionMeasurements, SessionMeasurementsOutcome } from '../../../../analysis/src/interfaces/measurements.js';
-import type { ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectExclusion, ProjectRequest, ProjectResolution, ProjectScope } from '../../../../analysis/subs/project/src/interfaces/project.js';
 import type { DependencyAnalyzerOutcome } from '../../../../analysis/src/interfaces/dependency-analyzer.js';
-import type { AffectedRequest, ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextAffectedOutcome, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExpectedContent, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, PathCheckDisposition, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent } from './interfaces/contexts.js';
+import type { AffectedRequest, ApiViewQueryLimits, ApiViewRequest, CaptureTimings, CaptureWork, CheckOutcome, CheckRequest, ContextAffectedOutcome, ContextApiViewOutcome, ContextDependencyDiagramOutcome, ContextDependencyFactsOutcome, ContextEvent, ContextExplorerDetailsOutcome, ContextManager, ContextManagerOptions, ContextRevision, ContextSetup, ContextStatus, ContextToken, DependencyDiagramRequest, ExpectedContent, ExplorerDetailsRequest, FreshnessRecord, OpenOutcome, PathCheckDisposition, ReplyTimings, RevisionCause, Unavailable, WatchBatch, WatchEvent, WatchScope } from './interfaces/contexts.js';
 import type { ExplorerDetailDelivery, LiveContext } from './context.js';
 import { classification, classifyPaths, decide, follows, inputIndex, recordRemovals, unclassified } from './dispositions.js';
 import { createHistory } from './history.js';
@@ -38,6 +38,11 @@ const knownResolutions = 4;
 const configurationPath = /(?:^|\/)(?:tsconfig[^/]*\.json|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/;
 /** What an update or sweep returns; an update never returns unchanged. */
 type SweepResult = Awaited<ReturnType<RetainedSession['sweep']>>;
+/** Two byte-ordered exclusion lists name the same directories with the same kinds and owners. */
+function sameExclusions(a: readonly ProjectExclusion[], b: readonly ProjectExclusion[]): boolean {
+  return a.length === b.length && a.every((item, index) => item.kind === b[index]!.kind
+    && item.directory === b[index]!.directory && item.owner === b[index]!.owner);
+}
 const noWork = (): { -readonly [K in keyof CaptureWork]: number } => ({ invocationCheck: 0, promotion: 0, workerStatus: 0, workerRoundTrip: 0, sweep: 0 });
 /** Every caller of a job receives the facts answer; `dependencyDiagram` drops its test references. */
 type DiagramAnswer = ContextDependencyFactsOutcome | (Unavailable & { readonly requestId: string });
@@ -94,7 +99,8 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       pending: { requests, changedPaths: context.paths.size, analysisRunning: !!context.running },
       history: { retained: context.history.count, bytes: context.history.bytes, oldest: context.history.oldest?.revision.revision ?? null },
       retainedBytes: (session?.factBytes ?? 0) + (context.diagram?.bytes ?? 0), leases: { subscriptions: context.subscriptions.size, requests },
-      watcher: context.watcherState, openedAt: context.openedAt, lastActivityAt: context.lastActivityAt,
+      watcher: context.watcherState, registrations: context.watcher?.registrations() ?? null,
+      openedAt: context.openedAt, lastActivityAt: context.lastActivityAt,
       demoting: !!context.demoting, unresponsiveSince: context.unresponsiveSince });
   }
   function emit(context: LiveContext, event: ContextEvent): void {
@@ -102,7 +108,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   }
   function changed(context: LiveContext): void { emit(context, { type: 'status-changed', token: context.token, current: snapshot(context), coalesced: 0 }); }
   function closeWatcher(context: LiveContext): void {
-    const handle = context.watcher; context.watcher = null; context.watcherState = 'disposed';
+    const handle = context.watcher; context.watcher = null; context.watcherState = 'disposed'; context.registered = null;
     if (handle) void cleanup(handle.close());
   }
   function stopTimers(context: LiveContext): void {
@@ -223,14 +229,57 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       track((async () => { if (context.session?.status().level === 'hot') await demote(context); else await cool(context); scheduleIdle(context); })());
     });
   }
+  /** The watch scope of `context`: Project's classifier over its latest completed ownership
+   * table, or over the empty table before one, where the reserved-path rules alone exclude. */
+  function watchScope(context: LiveContext): WatchScope {
+    const scope = context.scope ?? context.reserved;
+    return Object.freeze({ sequence: context.scope ? context.scopeSequence : null, exclusions: scope.ownership.exclusions,
+      excluded(path: string): ProjectExclusion | null {
+        const owner = driver.classify(scope, path);
+        return owner.status === 'excluded' || owner.status === 'owned' ? owner.exclusion : null;
+      } });
+  }
+  /**
+   * Give the active watcher the latest completed revision's exclusions when they differ from
+   * those it registered with. Pruning loses nothing the context reads; a removed exclusion may
+   * register directories it held back, a gap whose changes reach no listener, so until that
+   * reconfiguration ends every capture sweeps and nothing is covered or synchronized, and when
+   * it registered any directory its end requires a conservative sweep.
+   */
+  function reregister(context: LiveContext): void {
+    const handle = context.watcher, registered = context.registered;
+    if (!handle || !registered || context.state === 'cold' || context.state === 'evicted' || disposed) return;
+    const next = watchScope(context);
+    if (sameExclusions(registered.exclusions, next.exclusions)) return;
+    const gap = registered.exclusions.some(item => !next.exclusions.some(other => other.directory === item.directory));
+    context.registered = next;
+    if (gap) { context.registering++; if (context.synchronization === 'synchronized') context.synchronization = 'reconciling'; }
+    // A failed reconfiguration reports its error as a watcher event, which reconciles.
+    track(handle.reconfigure(next).catch(() => 0).then(registered => {
+      if (gap) context.registering--;
+      if (context.state === 'evicted' || disposed) return;
+      if (gap && context.watcher === handle && context.state !== 'cold') {
+        if (registered > 0) {
+          context.conservative = true; context.sweepRequired = true; context.background = 'conservative';
+          context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable' : 'conservative';
+          kick();
+        } else if (context.synchronization === 'reconciling' && !context.registering && !context.running && !context.background
+          && !context.sweepRequired && !context.paths.size && context.state === 'warm') context.synchronization = 'synchronized';
+      }
+      changed(context);
+    }));
+  }
   function attach(context: LiveContext): void {
     if (context.attaching || context.watcher || context.state === 'cold' || context.state === 'evicted' || disposed) return;
     context.attaching = true;
-    track(Promise.resolve().then(() => watcher.watch(context.selection.root, (events, batch) => watchEvents(context, events, batch)))
+    const scope = watchScope(context);
+    track(Promise.resolve().then(() => watcher.watch(context.selection.root, scope, (events, batch) => watchEvents(context, events, batch)))
       .then(async handle => {
         if (context.state === 'cold' || context.state === 'evicted' || disposed) await cleanup(handle.close());
-        else { context.watcher = handle; context.watcherState = 'active';
-          if (context.synchronization === 'watcher-unavailable') context.synchronization = context.sweepRequired || (context.running && context.running.sweep !== 'periodic') || context.background ? 'reconciling' : 'synchronized'; }
+        else { context.watcher = handle; context.registered = scope; context.watcherState = 'active';
+          if (context.synchronization === 'watcher-unavailable') context.synchronization = context.sweepRequired || context.registering || (context.running && context.running.sweep !== 'periodic') || context.background ? 'reconciling' : 'synchronized';
+          // A revision published while the walk ran may have changed the exclusions.
+          reregister(context); }
       }).catch(() => {
         if (context.state !== 'evicted' && !disposed) { context.watcherState = 'unavailable'; context.synchronization = 'watcher-unavailable'; context.sweepRequired = true; }
       }).finally(() => { context.attaching = false; }));
@@ -635,7 +684,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     context.sequence++; context.publishedSession = context.session; context.publishedProject = context.sessionProject;
     if (context.publishedData && context.publishedData !== data) recordRemovals(context.removed, context.publishedData, data, revision.sequence, budgets.maxQueuedPaths);
     context.publishedData = data;
-    if (data.outcome.execution === 'completed' && data.scope) context.scope = data.scope;
+    if (data.outcome.execution === 'completed' && data.scope) { context.scope = data.scope; context.scopeSequence = revision.sequence; reregister(context); }
     if (data.outcome.execution === 'completed') context.lastValid = revision;
     supersedeDiagram(context, revision);
     emit(context, { type: 'revision-published', token: context.token, revision, coalesced: 0 });
@@ -667,7 +716,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
     const changes: SessionChange[] = [...context.paths].map(([path, kind]) => ({ path, kind }));
     // A periodic sweep runs alone. A due one waits behind requests and known
     // changes rather than lengthening their capture.
-    const sweepKind = context.sweepRequired || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
+    const sweepKind = context.sweepRequired || context.registering || entries.some(entry => entry.needsSweep) ? 'required' : cause === 'sweep' ? 'periodic' : null;
     const sweep = sweepKind !== null;
     // Only a requirement from configuration path events may be satisfied by the update's reacquisition.
     const reacquirable = context.sweepRequired === 'configuration' && !entries.some(entry => entry.needsSweep);
@@ -756,7 +805,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
       published = true;
       context.state = 'warm';
       context.synchronization = context.watcherState === 'unavailable' ? 'watcher-unavailable'
-        : context.background || context.sweepRequired || context.paths.size ? 'reconciling' : 'synchronized';
+        : context.background || context.sweepRequired || context.registering || context.paths.size ? 'reconciling' : 'synchronized';
       const publication = context.history.published!;
       await Promise.all(entries.map(entry => {
         if (entry.kind === 'apiView') {
@@ -841,7 +890,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   function covers(context: LiveContext, entry: PendingEntry): boolean {
     const running = context.running;
     const maintenance = !running || (running.sweep === 'periodic' && !running.requests.length && !running.changes.length);
-    return maintenance && !context.background && !context.paths.size && !context.sweepRequired
+    return maintenance && !context.background && !context.paths.size && !context.sweepRequired && !context.registering
       && context.synchronization === 'synchronized' && identityCovered(context, entry);
   }
   /** The covering rule again when a revision publishes. The queued synchronized requests
@@ -852,7 +901,7 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
   function coverQueued(context: LiveContext): void {
     const requests = context.queue.filter(entry => !entry.settled && entry.request.freshness.mode === 'synchronized');
     if (!requests.length || context.state !== 'warm' || context.running || context.conservative || context.sweepRequired
-      || context.watcherState === 'unavailable' || (context.background !== null && context.background !== 'request')) return;
+      || context.registering || context.watcherState === 'unavailable' || (context.background !== null && context.background !== 'request')) return;
     const answered = new Set(requests);
     for (const path of context.paths.keys()) {
       const owners = context.requested.get(path);
@@ -1331,6 +1380,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         queue: [], deliveries: new Set(), explorerDeliveries: new Set(), diagram: null, paths: new Map(), requested: new Map(), watched: null, scope: null, publishedData: null, removed: new Map(), state: 'opening', synchronization: 'initializing', lastValid: null,
         session: null, publishedSession: null, sessionProject: null, publishedProject: null, versions: new Set(), observedSequence: 0, sequence: 0, sweepRequired: true, periodicSweepDue: false, lastSweepAt: now, auditedSequence: 0, auditRequired: false, demoting: null, unresponsiveSince: null, cooling: false,
         watcher: null, watcherState: 'disposed', attaching: false, conservative: true, background: 'open', running: null,
+        reserved: freeze({ root: resolution.root, selection: resolution.selection, invokedFrom: resolution.invokedFrom,
+          configuration: resolution.configuration, walkedAreas: [], ownership: { modules: [], exclusions: [] } }),
+        scopeSequence: null, registered: null, registering: 0,
         debounce: null, sweepTimer: null, auditTimer: null, idle: null,
       };
       contexts.set(id, context); const current = snapshot(context); attach(context); scheduleIdle(context); kick();

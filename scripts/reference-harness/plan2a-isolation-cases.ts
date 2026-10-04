@@ -6,13 +6,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry } from '../../subs/analysis/subs/model/src/index.js';
 import { isRamifyGeneratedPath } from '../../subs/analysis/subs/project/src/generated-path.js';
+import { classifyProjectPath } from '../../subs/analysis/subs/project/src/ownership.js';
 import { observeProject } from '../../subs/analysis/subs/project/src/observer.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
 import type { AcquisitionLimits, ProjectReadOptions } from '../../subs/analysis/subs/project/src/interfaces/project.js';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.js';
 import type { RetainedSession, SessionInputs } from '../../subs/analysis/src/interfaces/session.js';
 import { createFilesystemWatcher } from '../../subs/daemon/src/filesystem-watcher.js';
-import type { WatchEvent } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
+import type { WatchEvent, WatchScope } from '../../subs/daemon/subs/contexts/src/interfaces/contexts.js';
 import { createProjectFixture, put } from './fixtures/plan1/project.js';
 import { sessionInputs } from './session-expectations.js';
 import type { InstanceHandler } from './runner.js';
@@ -157,13 +158,22 @@ handlers.set('I2A-02:observer-input-stable', { kind: 'memory', run: async ({ ass
   });
 } });
 
+/** The watch scope before a project's first completed revision: Project's classifier over an
+ * empty ownership table, where only the canonical reserved-path rules, generated names among
+ * them, exclude (Phase 1 project boundaries, iteration 16). */
+const reservedScope: WatchScope = { sequence: null, exclusions: [], excluded(path) {
+  const owner = classifyProjectPath({ root: '/', selection: 'given', invokedFrom: '/', configuration: '', walkedAreas: [],
+    ownership: { modules: [], exclusions: [] } }, path);
+  return owner.status === 'excluded' ? owner.exclusion : null;
+} };
+
 handlers.set('I2A-02:watcher-silent', { kind: 'memory', run: async ({ assertions }) => {
   const root = await mkdtemp(join(tmpdir(), 'ramify-i2a02-watch-'));
   const handles: { close(): Promise<void> }[] = [];
   try {
     await put(root, 'src/value.ts', 'export const value = 1;\n');
     const batches: (readonly WatchEvent[])[] = [];
-    const handle = await createFilesystemWatcher().watch(root, events => { batches.push(events); });
+    const handle = await createFilesystemWatcher().watch(root, reservedScope, events => { batches.push(events); });
     handles.push(handle);
     await put(root, 'src/.ramify/final.ts.md', '# final\n');
     await put(root, 'src/.ramify.tmp-cafef00d/stage.ts', 'export const staged = 1;\n');
@@ -254,7 +264,7 @@ handlers.set('I2A-02:transient-names-excluded', { kind: 'memory', run: async ({ 
   try {
     await put(root, 'src/value.ts', 'export const value = 1;\n');
     await put(root, 'src/.ramify.tmp-99999999/stage.ts', 'export const staged = 1;\n');
-    const handle = await createFilesystemWatcher().watch(root, () => {});
+    const handle = await createFilesystemWatcher().watch(root, reservedScope, () => {});
     handles.push(handle);
     assertions.ok('the watcher attaches no handle beneath the transient stage sibling', !paths.some(path => path.includes('.ramify.tmp-99999999')));
   } finally {

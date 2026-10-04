@@ -5,7 +5,8 @@ import { join, relative, sep } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { createFilesystemWatcher } from '../filesystem-watcher.js';
-import type { ClockPort, WatchBatch, WatchEvent, WatcherHandle } from '../../subs/contexts/src/interfaces/contexts.js';
+import type { ClockPort, WatchBatch, WatchEvent, WatcherHandle, WatchScope } from '../../subs/contexts/src/interfaces/contexts.js';
+import { reservedOnly, watchScope } from './watch-scopes.js';
 
 async function until(predicate: () => boolean): Promise<void> {
   const deadline = performance.now() + 4000;
@@ -20,7 +21,7 @@ async function fixture(run: (root: string, state: {
   readonly times: WatchBatch[];
   readonly native: fs.FSWatcher[];
   readonly paths: string[];
-  open(clock?: Pick<ClockPort, 'now'>): Promise<WatcherHandle>;
+  open(clock?: Pick<ClockPort, 'now'>, scope?: WatchScope): Promise<WatcherHandle>;
 }) => Promise<void>): Promise<void> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-watcher-')));
   const handles: WatcherHandle[] = [];
@@ -38,8 +39,8 @@ async function fixture(run: (root: string, state: {
   try {
     await mkdir(join(root, 'src', 'nested'), { recursive: true });
     await writeFile(join(root, 'src', 'nested', 'value.ts'), 'before');
-    await run(root, { batches, times, native, paths, async open(clock) {
-      const handle = await createFilesystemWatcher(clock).watch(root, (events, batch) => { batches.push(events); if (batch) times.push(batch); });
+    await run(root, { batches, times, native, paths, async open(clock, scope = reservedOnly) {
+      const handle = await createFilesystemWatcher(clock).watch(root, scope, (events, batch) => { batches.push(events); if (batch) times.push(batch); });
       handles.push(handle);
       return handle;
     } });
@@ -71,32 +72,42 @@ describe('filesystem watcher', () => {
     });
   });
 
-  it('never attaches to excluded trees at any depth or follows directory symlinks', async () => {
+  // Project-boundary iteration 16: no fixed name set. Repository and package directories are
+  // reserved wherever they occur; an output or declared directory is excluded only where the
+  // revision's ownership table roots it, so the same names elsewhere stay watched.
+  it('never attaches beneath reserved or rooted exclusions at any depth or follows directory symlinks', async () => {
     await fixture(async (root, state) => {
+      const names = ['node_modules', '.git', 'dist', '.reference-work'];
       for (const parent of [root, join(root, 'src')]) {
-        for (const name of ['node_modules', '.git', 'dist', '.reference-work']) {
+        for (const name of names) {
           await mkdir(join(parent, name, 'child'), { recursive: true });
           await writeFile(join(parent, name, 'child', 'ignored.ts'), 'before');
         }
       }
       await symlink(join(root, 'src', 'nested'), join(root, 'linked'), 'dir');
-      await state.open();
-      expect(state.paths.map(path => relative(root, path)).sort()).toEqual(['', 'src', join('src', 'nested')]);
+      await state.open(undefined, watchScope({ modules: [{ id: 'root', parent: null, directory: '.' }],
+        exclusions: [{ kind: 'external', directory: '.reference-work', owner: null }, { kind: 'output', directory: 'dist', owner: null },
+          { kind: 'scratch', directory: 'src/tmp', owner: 'root' }] }));
+      const watched = ['', 'src', join('src', '.reference-work'), join('src', '.reference-work', 'child'), join('src', 'dist'),
+        join('src', 'dist', 'child'), join('src', 'nested')].sort();
+      expect(state.paths.map(path => relative(root, path)).sort()).toEqual(watched);
       state.native[state.paths.indexOf(root)]!.emit('change', 'rename', 'linked');
       for (const parent of [root, join(root, 'src')]) {
-        for (const name of ['node_modules', '.git', 'dist', '.reference-work']) {
-          await writeFile(join(parent, name, 'child', 'ignored.ts'), 'after');
-        }
+        for (const name of names) await writeFile(join(parent, name, 'child', 'ignored.ts'), 'after');
       }
       await writeFile(join(root, 'src', 'nested', 'value.ts'), 'positive control');
-      await until(() => state.batches.flat().some(event => event.path.endsWith('value.ts')));
+      await until(() => state.batches.flat().some(event => event.path.endsWith('value.ts'))
+        && state.batches.flat().some(event => event.path === join('src', 'dist', 'child', 'ignored.ts')));
       const events = state.batches.flat();
       expect(events).toContainEqual({ path: 'linked', kind: 'renamed' });
-      expect(events.some(event => event.path.split(sep).some(part => ['node_modules', '.git', 'dist', '.reference-work'].includes(part)))).toBe(false);
+      // Nothing beneath an exclusion is reported; the same names outside one are ordinary.
+      expect(events.filter(event => event.path.split(sep).some(part => ['node_modules', '.git'].includes(part)))).toEqual([]);
+      expect(events.filter(event => event.path.startsWith(`dist${sep}`) || event.path.startsWith(`.reference-work${sep}`))).toEqual([]);
+      expect(events).toContainEqual({ path: join('src', '.reference-work', 'child', 'ignored.ts'), kind: 'changed' });
       // A parent watcher may report the symlink entry itself (including delayed
       // native creation events). That hint does not mean its target was watched.
       expect(events.some(event => event.path.startsWith(`linked${sep}`))).toBe(false);
-      expect(state.paths.map(path => relative(root, path)).sort()).toEqual(['', 'src', join('src', 'nested')]);
+      expect(state.paths.map(path => relative(root, path)).sort()).toEqual(watched);
     });
   });
 
@@ -271,8 +282,8 @@ describe('filesystem watcher', () => {
 
   it('rejects a missing or non-directory root without keeping resources', async () => {
     await fixture(async (root, state) => {
-      await expect(createFilesystemWatcher().watch(join(root, 'absent'), () => {})).rejects.toMatchObject({ code: 'ENOENT' });
-      await expect(createFilesystemWatcher().watch(join(root, 'src', 'nested', 'value.ts'), () => {})).rejects.toThrow('not a directory');
+      await expect(createFilesystemWatcher().watch(join(root, 'absent'), reservedOnly, () => {})).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(createFilesystemWatcher().watch(join(root, 'src', 'nested', 'value.ts'), reservedOnly, () => {})).rejects.toThrow('not a directory');
       expect(state.native).toHaveLength(0);
     });
   });
