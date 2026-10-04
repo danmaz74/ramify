@@ -11,6 +11,7 @@ import { analysis, entry, requestCompletion } from './helpers/analysis.js';
 import { copyCapabilityFixture, openCapabilityRuns } from './helpers/capability.js';
 import { assign, edit, installMiniRunner, outline, submit, treeInputs, write } from './helpers/iterations.js';
 import { directReadinessExecution } from './helpers/external-tools.js';
+import { rootDescription } from './helpers/root-description.js';
 import { testReviewPolicy } from './helpers/candidates.js';
 import { freeze, initRepository, runEventsOnDisk, runPath, staleCrashLock, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 
@@ -90,7 +91,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       if (owner === d) return submit({ kind: 'partial', summary: 'D migrated its typed use for combined verification', findings: [], unfinished: [] },
         write('consumer.ts', "import { readFact } from '../../b/src/fact.js';\nexport function legacyLabel(): string { return readFact().text.toUpperCase(); }\n"));
       if (owner === p) return submit({ kind: 'partial', summary: 'P exposed the signature companion for combined verification', findings: [], unfinished: [] },
-        write('../module.ramify', 'ramify 1\nmodule capability-coordination\nexpose-sub readFact, FactResult from b to descendants\n'),
+        write('../module.ramify', rootDescription('capability-coordination', 'expose-sub readFact, FactResult from b to descendants\n')),
         write('assembly.ts', "import { renderA } from '../subs/a/src/caller.js';\nexport const render = () => renderA();\n"));
       if (owner === a && spec.prompt.includes('independent literal')) return submit({ kind: 'completion-proposed', summary: 'A repaired the circular oracle', findings: [] },
         write('tests/caller.test.ts', "import { expect, test } from 'vitest';\nimport { renderA } from '../caller.js';\ntest('A renders the source', () => expect(renderA()).toBe('Fresh fact: old from B'));\n"));
@@ -464,8 +465,20 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
   }
   await until(() => (opened.service.events('need', receipt.jobId) ?? []).some(event => event.type === 'capability-delegated' &&
     event.data.task === 'cap-002'), 30_000);
-  const revisionTask = JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,
-    'capabilities/cap-002/task.json'), 'utf8')) as { revises?: { handback: { id: string; hash: string }; sourceRevision: string } };
+  // The ledger event becomes observable before its record files finish
+  // materializing. Wait for the projection this assertion actually reads.
+  let revisionTaskText = '';
+  await until(async () => {
+    try {
+      revisionTaskText = await readFile(runPath(fixture.root, 'need', receipt.jobId,
+        'capabilities/cap-002/task.json'), 'utf8');
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw error;
+    }
+  }, 30_000);
+  const revisionTask = JSON.parse(revisionTaskText) as { revises?: { handback: { id: string; hash: string }; sourceRevision: string } };
   expect(revisionTask.revises?.handback.id).toBe('cap-001');
   expect(revisionTask.revises?.sourceRevision).toBeTruthy();
   expect((opened.service.events('need', receipt.jobId) ?? []).filter(event => event.type === 'capability-handed-back' &&
