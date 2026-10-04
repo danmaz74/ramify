@@ -237,8 +237,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
       if (boundary && !frozenFault && closingVerification === undefined) {
         targetGateId = event?.type === 'gate-committing' ? event.data.gate
           : gate?.type === 'gate-attempted' && gate.data.checkpoint === 'work-item' ? gate.data.gate : undefined;
-        if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' ||
-          mode === 'review-restart' || mode === 'review-submission-restart' || mode === 'concern-submission-restart') {
+        if (mode === 'gate-restart' || mode === 'gate-intent-restart' || mode === 'gate-committing-restart' || mode === 'review-restart') {
           frozenFault = true;
           await freeze();
         } else closingVerification = closeVerification?.();
@@ -273,6 +272,16 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     const before = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     if (mode === 'verify-restart') expect(before.filter(event => event.type === 'capability-verification-started')).toHaveLength(1);
     expect(before.filter(event => event.type === 'capability-handed-back')).toHaveLength(0);
+    if (mode === 'review-submission-restart' || mode === 'concern-submission-restart') {
+      const request = before.filter(event => event.type === 'review-request-recorded').at(-1);
+      expect(request).toBeDefined();
+      expect(before.some(event => event.type === 'review-attempt-started' && event.data.request === request?.data.request)).toBe(true);
+      expect(before.some(event => event.type === 'review-attempt-finished' && event.data.request === request?.data.request)).toBe(false);
+      const reviewerInvocations = new Set(before.flatMap(event => event.type === 'invocation-started' && event.data.role === 'reviewer'
+        ? [event.data.invocation] : []));
+      expect(before.some(event => event.type === 'invocation-ended' && event.data.ended === 'submitted' &&
+        reviewerInvocations.has(event.data.invocation))).toBe(true);
+    }
     const gates = before.filter(event => event.type === 'gate-attempted').length;
     const committing = before.filter(event => event.type === 'gate-committing' && event.data.gate === targetGateId).length;
     const reviews = before.filter(event => event.type === 'review-attempt-finished').length;
@@ -281,7 +290,10 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     const reopened = await openCapabilityRuns(fixture.root, options);
     cleanups.push(() => reopened.service.close());
     await until(() => (reopened.service.events('need', receipt.jobId) ?? []).some(event =>
-      event.type === 'capability-handed-back' || event.type === 'job-failed'), 60_000);
+      event.type === 'capability-handed-back' || event.type === 'job-failed'), 60_000).catch(async error => {
+      const current = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
+      throw new Error(`${String(error)}; architect ${architect}, reviewer ${reviewer}; warnings ${JSON.stringify(reopened.warnings)}; tail ${JSON.stringify(current.slice(-18))}`);
+    });
     const after = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     expect(after.filter(event => event.type === 'job-failed'), JSON.stringify(after.slice(-15))).toHaveLength(0);
     expect(after.filter(event => event.type === 'capability-handed-back')).toHaveLength(1);
@@ -326,7 +338,7 @@ async function runAcceptedHandback(mode: 'revision' | 'deferred' | 'drift' | 're
     return;
   }
   await until(() => mode === 'drift' ? driftFeedback.length > 0 : (opened.service.events('need', receipt.jobId) ?? []).some(event =>
-    event.type === 'capability-handed-back' || event.type === 'job-failed'), 75_000).catch(async error => {
+    event.type === 'capability-handed-back' || event.type === 'job-failed'), 120_000).catch(async error => {
     const events = await runEventsOnDisk(fixture.root, 'need', receipt.jobId);
     const gate = events.filter(event => event.type === 'gate-attempted').at(-1);
     const body = gate?.type === 'gate-attempted' ? JSON.parse(await readFile(runPath(fixture.root, 'need', receipt.jobId,

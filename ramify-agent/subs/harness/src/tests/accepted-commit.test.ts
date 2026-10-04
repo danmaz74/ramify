@@ -47,7 +47,7 @@ vi.mock('node:child_process', async original =>
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
   try { expectNoProcesses(); } finally { forgetExternalTools(); }
 });
 

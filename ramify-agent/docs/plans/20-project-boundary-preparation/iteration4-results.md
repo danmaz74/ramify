@@ -79,3 +79,41 @@ npm run check:self
 ```
 
 The first command was the reproducer (3 failures, 45 passes). After the correction, the second passed 57 tests across 3 files, and both checks passed. `check:self` again reported 0 errors, 0 warnings and 316 analysis limits.
+
+## Final audit runtime follow-up
+
+The final audit exposed two five-second timeouts in CA19 direct provisional-source snapshot tests. A focused default-timeout run reproduced both; running the same selected tests with a 30-second runner budget passed both in 9.98 seconds total. The tests now declare their measured 30-second budgets individually, and the focused command passes with default runner settings. No snapshot assertion changed.
+
+```sh
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts -t 'snapshot written before its request commit|retry refuses a changed staged or untracked candidate'
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts -t 'snapshot written before its request commit|retry refuses a changed staged or untracked candidate' --testTimeout 30000
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts -t 'snapshot written before its request commit|retry refuses a changed staged or untracked candidate'
+```
+
+The three outcomes were 2 timeout failures, 2 passes, and 2 passes, respectively. The final audit also left the long-running capability-acceptance file unfinished when its 20-minute provider limit expired. One representative acceptance case initially hit its internal 75-second handback wait even though the combined gate had passed; it completed in 82.00 seconds after that wait was raised to 120 seconds. The candidate scratch-safety check now performs its independent Git ignore and index reads concurrently. The same representative then passed in 73.12 seconds. This keeps both preflight decisions and assertions intact while reducing repeated Git process latency.
+
+```sh
+npx vitest run subs/harness/src/tests/capability-acceptance.integration.test.ts -t 'real multi-owner migration, repair, handback and linked revision'
+```
+
+The full focused acceptance file then ran for 951.92 seconds: 11 cases passed and the reviewer-submission restart case failed after waiting 60 seconds for handback. A selected diagnostic rerun reproduced the stall and captured `LedgerCorruptError: another writer appended to it` in the reopened review queue. The crash fixture had frozen its reviewer immediately after the accepted submission, while the old capability writer continued appending to the same ledger during reopen. Both accepted-submission restart variants now close and quiesce the old service at that durable boundary. Before reopening, they assert a started attempt, a submitted reviewer invocation, no terminal review attempt, and no handback; their existing recovery assertions require one replayed review and handback. The selected pair passed twice, including after those boundary assertions were added. The full acceptance file has not been rerun after the fixture correction; the parent final audit will cover it.
+
+```sh
+npx vitest run subs/harness/src/tests/capability-acceptance.integration.test.ts
+npx vitest run subs/harness/src/tests/capability-acceptance.integration.test.ts -t 'accepted reviewer submissions replay before their combined review record'
+npx vitest run subs/harness/src/tests/capability-acceptance.integration.test.ts -t 'accepted reviewer submissions replay before their combined review record|submitted reviewer concern replays into one exact pending attempt'
+```
+
+The first command produced 11 passes and one failure, the second reproduced the ledger race with the diagnostic warning, and the third passed 2 selected cases (10 skipped), 142.00 seconds of tests on the run with the durable-boundary assertions.
+
+The affected recovery, scratch and accepted-commit group initially passed 36 tests and failed one forced-stage case during fixture removal: `ENOTEMPTY` under its transcripts directory. Its shared `afterEach` removed the fixture before closing the service, leaving a live writer during deletion. Reversing cleanup order fixed that teardown race; the complete accepted-commit file then passed 9 tests. The recovery file's 16 tests and scratch file's 12 tests passed in the grouped run, with default Vitest timeouts.
+
+```sh
+npx vitest run subs/harness/src/tests/capability-recovery.test.ts subs/harness/src/tests/scratch.test.ts subs/harness/src/tests/accepted-commit.test.ts
+npx vitest run subs/harness/src/tests/accepted-commit.test.ts
+npm run type-check
+npm run check:self
+git diff --check
+```
+
+The first `type-check` run caught a narrowing error in the new pre-reopen assertion; after using a discriminated event branch, `type-check` passed. `check:self` passed with 0 errors, 0 warnings and 316 analysis limits, and `git diff --check` passed.

@@ -66,8 +66,12 @@ export async function scratchIgnoreConflicts(projectRoot: string, moduleDirs: re
 
 /** The candidate and commit preflight uses Git's effective ignore answer and its index. */
 export async function scratchSafetyRule(projectRoot: string, moduleDirs: readonly string[], git: GitService): Promise<GateRuleRecord> {
-  const conflicts = await scratchIgnoreConflicts(projectRoot, moduleDirs, git);
-  const tracked = await trackedScratchPaths(projectRoot, moduleDirs, git);
+  // These are independent Git reads of the same boundary. Ask them together
+  // so repeated candidate checks do not serialize two subprocess round trips.
+  const [conflicts, tracked] = await Promise.all([
+    scratchIgnoreConflicts(projectRoot, moduleDirs, git),
+    trackedScratchPaths(projectRoot, moduleDirs, git),
+  ]);
   const violations = [
     ...conflicts.map(conflict => ({ rule: 'scratch-ignore', path: conflict.path,
       detail: conflict.rule === null ? 'Git has no ignore rule for this scratch directory'

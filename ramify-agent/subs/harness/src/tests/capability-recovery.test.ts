@@ -112,7 +112,7 @@ test('CA19 CA30: a snapshot written before its request commit is adopted with th
   const reopened = await RunLog.open(join(directory.path, 'events.jsonl'), 'job-001');
   expect(committedRecords(reopened.ledger.replay()).capabilityRequests.get(request.id)?.source).toEqual(before);
   expect(await captureProvisionalSource(input)).toEqual(before);
-});
+}, 30_000);
 
 test('CA19: retry refuses a changed staged or untracked candidate and preserves its bytes', async () => {
   const fixture = await copyCapabilityFixture();
@@ -135,7 +135,7 @@ test('CA19: retry refuses a changed staged or untracked candidate and preserves 
   await git(fixture.root, 'add', tracked);
   await expect(captureProvisionalSource(input)).rejects.toThrow('source was preserved');
   expect((await git(fixture.root, 'show', ':subs/a/src/caller.ts')).trim()).toContain('changedIndex = true');
-});
+}, 30_000);
 
 async function lostBWriterCase(restartBeforeSettlement: boolean): Promise<void> {
   const fixture = await copyCapabilityFixture();
