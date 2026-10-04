@@ -537,13 +537,19 @@ iterations 2 to 5; `--iteration 6` requires the 42 of iterations 2 to 6;
 `--iteration 9` requires the 74 of iterations 2 to 9. The unfiltered `--plan 5` gate requires
 all 103 and is expected to fail until iteration 13.
 
-`plan5-engine-cases.ts` compares the current batch engine with the recorded
-pre-change engine on the same fixture copies: `plan5-baseline-loader.mjs`
-replays the pinned commit's `model` and `typescript` sources over the built
-`dist/` through a module load hook, and `plan5-report-worker.mjs` runs
-`analyzeProject` in a separate process for each engine. The reports must be
-equal except `runId`; the toolkit fixture is a `git archive` of the pinned
-commit so the recorded 229-file, 2,744-access baseline stays fixed.
+`plan5-engine-cases.ts` compares the two builds iteration 2 was reviewed
+against on the same fixture copies: the pre-change commit `e0be049` and the
+iteration 2 commit `2c4ae04c`. Each side is a `git archive` of that commit's
+whole `analysis` owner, and `plan5-report-worker.mjs` runs its
+`analyzeProject` from source under tsx in a separate process, so neither the
+current engine nor a stale `dist/` takes part. The candidate side was re-pinned
+from the working tree on 2026-10-04 because later engine changes cannot match
+the pre-change bytes. The reports must be equal except `runId`; the toolkit
+and reference fixtures are `git archive` copies of `e0be049`, so the recorded
+229-file, 2,744-access and 294-access baselines stay fixed. Both pinned builds
+predate the root marker, so these copies stay unmarked; other instances that
+run the current engine over the pinned toolkit use the marked
+`toolkitFixture`.
 `plan5-engine-fixture.ts` instruments the owner's synchronous
 `AccessInterpretation` inside a real compiler snapshot for the query-count and
 setup-count instances. No Plan 5 engine instance starts a daemon.
