@@ -248,7 +248,7 @@ describe('readiness\'s acceptance steps with the real cucumber-js', () => {
       projectConfig: await captureProjectConfig(fixture.root),
       index: null,
       ramify: new FakeRamifyCli(),
-      git: scriptedGit(fixture.root, { head: fixture.commit, checkpoints: [] }),
+      git: scriptedGit(fixture.root, { head: fixture.commit, checkpoints: [], scratch: { trackedPaths: [[], []] } }),
       head: fixture.commit,
     });
     const step = (name: string) => result.attempt.steps.find(entry => entry.step === name)!;

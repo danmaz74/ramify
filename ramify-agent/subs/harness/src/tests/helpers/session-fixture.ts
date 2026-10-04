@@ -21,6 +21,7 @@ import { declaringScenarios } from './declarations.js';
 import { scenariosCommit, scriptedGit, type ScriptedGit } from './scripted-git.js';
 import { runSessionScenario } from './session-scenario.js';
 import { finalCandidate } from './final-candidate.js';
+import { fixtureScratchGit } from './mock-git.js';
 
 /*
  * Sessions in every state, and every lineage relation, for the browser
@@ -289,7 +290,7 @@ export function liveRunSettings(root: string, pacer: Pacer, checkExecution: Chec
     git,
     runs: {
       inputs: treeInputs(),
-      git,
+      git: fixtureScratchGit(git),
       candidates: final.candidates,
       readinessExecution: directReadinessExecution(),
       checkExecution,

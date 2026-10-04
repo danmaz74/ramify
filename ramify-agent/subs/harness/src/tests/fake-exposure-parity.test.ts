@@ -504,6 +504,7 @@ describe('the rule at a run\'s contract gate', () => {
     expect(repaired!.rules).toEqual([
       { rule: 'fake-naming', outcome: 'passed', violations: [] },
       { rule: 'fake-exposure-parity', outcome: 'passed', violations: [] },
+      { rule: 'scratch-safety', outcome: 'passed', violations: [] },
     ]);
 
     // The registered agreement names what the fake stands for.
@@ -515,7 +516,10 @@ describe('the rule at a run\'s contract gate', () => {
     // recorded it once it existed: both exposed to the parent, so it passed.
     const providerGate = attempts.find(attempt => attempt.subject.iteration === 'wi-002.i01')!;
     expect(providerGate.verdict).toBe('passed');
-    expect(providerGate.rules).toEqual([{ rule: 'fake-exposure-parity', outcome: 'passed', violations: [] }]);
+    expect(providerGate.rules).toEqual([
+      { rule: 'fake-exposure-parity', outcome: 'passed', violations: [] },
+      { rule: 'scratch-safety', outcome: 'passed', violations: [] },
+    ]);
     git.assertAnswered();
   }, 120_000);
 });
