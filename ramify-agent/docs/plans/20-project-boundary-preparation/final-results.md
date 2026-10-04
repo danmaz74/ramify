@@ -42,6 +42,10 @@ git show refs/plan20/final-audit:reports/audit/agent-tests.txt
 
 This separate report reference avoids a post-audit documentation commit. The provider also retains its normal project-scoped run and tree references.
 
+## Final-gate correction history
+
+The first full final audit ran on clean commit `c218442af16b190e3c3fc073e2654e41cc8f8780` and failed. Its immutable report is `refs/audited/projects/ramify-agent-f25e9a298228/runs/2026-10-04T10-19-57Z-c218442af` (report commit `d80e529be01ecf5151840345c836c1c479bcc969`). Structural checking, typechecking, web build and patch integrity passed. The test command reported 21 failed cases, a fixture setup failure, and timed out after 1,200 seconds before capability-acceptance integration completed; this incomplete run is not passing acceptance evidence. The iteration reports retain the focused reproductions, corrections and reruns. The final-audit reference above is reserved for a later passing full audit on the corrected clean commit.
+
 ## Recorded limits
 
 - [Baseline audit](baseline-results.md): one existing capability task-projection race failed; the test now waits for the record file it reads, and its focused rerun passed. All failures and reruns remain recorded separately from final evidence.
