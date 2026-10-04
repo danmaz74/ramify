@@ -30,6 +30,7 @@ import {
   emptyAnalysis, installTestRunner, openRuns as openRealRuns, runEventsOnDisk, runPath, startRun, testPolicy, until,
 } from './helpers/runs.js';
 import { copyFixture } from './helpers/fixture.js';
+import { fixtureScratchGit } from './helpers/mock-git.js';
 import { acquireProjectLock } from '../store/lock.js';
 import { ObservationLog } from '../run/observations.js';
 import { runLayout } from '../run/records.js';
@@ -130,7 +131,7 @@ async function serve(
     runs: {
       inputs: treeInputs(), policy: projectRoot => protocolPolicy(projectRoot), stopGraceMs: 500, warn: () => undefined,
       ...extra.runs,
-      ...(ports ?? { git: unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0),
+      ...(ports ?? { git: fixtureScratchGit(unchangedGit(root, unchangedCheckpoints, unchangedCheckpoints.length ? 4 : 0)),
         candidates: finalCandidate(root, 'unchanged-fixture-revision').candidates, readinessExecution: directReadinessExecution(), checkExecution: createPassingCheckExecution() }),
     },
   });

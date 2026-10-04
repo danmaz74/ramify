@@ -97,7 +97,7 @@ describe('a run whose work items need no change', () => {
       // The intake, the initial architect and the plan's checker, each a fresh session.
       'job-started', 'document-manifest-committed', 'session-opened', 'invocation-started', 'invocation-ended',
       'session-opened', 'invocation-started', 'invocation-ended', 'session-opened', 'invocation-started', 'invocation-ended', 'analysis-accepted',
-      'gate-started', 'readiness-passed', 'scenarios-materializing', 'scenarios-materialized',
+      'gate-started', 'readiness-passed', 'scratch-setting-up', 'scratch-setup-complete', 'scenarios-materializing', 'scenarios-materialized',
       // Each completion request declares its entry's scenario, and the
       // work item's gate implements it.
       'work-item-started', 'hypotheses-delivered', 'session-opened', 'invocation-started', 'invocation-ended',

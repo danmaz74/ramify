@@ -8,7 +8,7 @@ export interface ScratchGitScript {
 }
 
 /** Standard copied fixture: no indexed scratch and its general rule is effective. */
-export function fixtureScratchGit(git: GitService): GitService {
+export function fixtureScratchGit<T extends GitService>(git: T): T {
   return new Proxy(git, {
     get(target, property, receiver) {
       if (property === 'trackedPaths') return async (_project: string, _directories: readonly string[]) => [];

@@ -17,3 +17,13 @@ A single session applies the same tracked-path preflight, cleanup and ignore ver
 - `npm run type-check`, `npm run check:self` and `git diff --cached --check` passed. `check:self` reported 0 errors, 0 warnings and 316 analysis limits.
 
 The scripted recovery witnesses cover the setup effect at the append and commit boundaries. They do not perform a full run resume; the existing run recovery path completes the pending effect and then interrupts the old run. Iteration 4 can use `declaredModuleDirectories`, `harnessChanged` and the scratch helper contracts from iteration 2 without changing this setup path.
+
+## Final audit follow-up
+
+The final audit exposed stale expectations in seven older lifecycle test files. Their expected event and readiness-step sequences now include scratch setup and cleanup. The direct HTTP and standalone-session fixtures explicitly use the copied fixture's scratch Git answers, while the underlying scripted Git adapter still rejects unscripted operations. The projection test continues to assert that queries cause no Git operations or file changes.
+
+- `npm test -- --reporter=dot subs/harness/src/tests/review-stop.test.ts subs/harness/src/tests/session-queries.test.ts subs/harness/src/tests/run-protocol.test.ts subs/harness/src/tests/work-items.test.ts subs/harness/src/tests/projections-pure.test.ts subs/harness/src/tests/project-config.test.ts subs/harness/src/tests/run.test.ts`: 7 files, 85 tests passed.
+- `npm run type-check`: passed.
+- `npm run check:self`: passed with 0 errors, 0 warnings and 316 analysis limits.
+
+The seven-file run finished in eight seconds and showed no stalled worker. The earlier whole-suite 20-minute timeout was not reproduced by these owned tests; the complete audit remains with the parent iteration coordinator.

@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 import { scenariosCommit, scriptedGit } from './scripted-git.js';
+import { fixtureScratchGit } from './mock-git.js';
 import { commandResult } from './command-result.js';
 import { createMappedCheckExecution } from './direct-check-execution.js';
 import { directReadinessExecution } from './external-tools.js';
@@ -13,7 +14,7 @@ import type { SessionSpec } from '../../../subs/agent/src/interfaces/port.js';
 /** External responses for the two-work-item HTTP fixture. HTTP itself stays real. */
 export function protocolPorts(root: string) {
   const final = finalCandidate(root, 'drafts-revision');
-  const git = scriptedGit(root, { previews: final.previews, head: 'protocol-base', checkpoints: [
+  const git = fixtureScratchGit(scriptedGit(root, { previews: final.previews, head: 'protocol-base', checkpoints: [
     scenariosCommit('review-notes', 'scenarios-revision'),
     { subject: 'wi-001.i01', commit: 'notes-revision', changes: [
       { status: 'M', path: `${notesDirectory}/src/notes.ts` }, { status: 'A', path: outsidePath },
@@ -24,7 +25,7 @@ export function protocolPorts(root: string) {
     ].map(path => ({ status: 'A', path: `${draftsDirectory}/${path}` })) },
     { subject: 'wi-002', commit: null, changes: [] },
     { subject: 'final verification of plan "review-notes"', commit: null, changes: [] },
-  ] });
+  ] }));
   const script = protocolScript(root);
   return {
     git, candidates: final.candidates,

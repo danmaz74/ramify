@@ -252,7 +252,8 @@ describe('the project-config and acceptance-runner readiness steps', () => {
     const { snapshot, attempt, record, step } = await run(root, true);
 
     expect(snapshot.state).toBe('completed');
-    expect(attempt.steps.map(entry => entry.step).slice(3, 6)).toEqual(['test-runner', 'project-config', 'acceptance-runner']);
+    const steps = attempt.steps.map(entry => entry.step);
+    expect(steps.slice(steps.indexOf('test-runner'), steps.indexOf('test-runner') + 3)).toEqual(['test-runner', 'project-config', 'acceptance-runner']);
     expect(step('project-config')).toMatchObject({ outcome: 'passed' });
     expect(step('project-config').detail).toBe(
       'ramify-agent.json validates against ramify-agent.project/1; its support code is subs/integration-tests/src/support/world.ts, subs/integration-tests/src/support/hooks.ts; full mode\'s readiness is dry-run',

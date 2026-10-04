@@ -26,7 +26,7 @@ import { expectNoProcesses, forgetExternalTools, openRunsWithoutProcesses } from
 import { FakeRamifyCli } from './helpers/fake-ramify.js';
 import { copyFixture } from './helpers/fixture.js';
 import { readDeclaredTree, shell, treeInputs, unsuitableScope } from './helpers/iterations.js';
-import { mockGit } from './helpers/mock-git.js';
+import { fixtureScratchGit, mockGit } from './helpers/mock-git.js';
 import { emptyAnalysis, runEventsOnDisk, runPath, startRun, stopRun, testPolicy, until } from './helpers/runs.js';
 import { scriptedGit } from './helpers/scripted-git.js';
 import { runSessionScenario } from './helpers/session-scenario.js';
@@ -81,7 +81,7 @@ async function standaloneSession(root: string, steps: readonly ScriptStep[]): Pr
     prompt: 'Raise the note limit to 500.',
     agent: createScriptedAgent(steps),
     ramify: new FakeRamifyCli(),
-    git: mockGit({ currentHead: async () => 'standalone-base', changedPaths: async () => [] }),
+    git: fixtureScratchGit(mockGit({ currentHead: async () => 'standalone-base', changedPaths: async () => [] })),
     checkExecution: createDirectCheckExecution({ script: [] }),
     commandExecution: async request => commandResult(request, { stdout: 'checking\n' }),
     refresh: readDeclaredTree,
@@ -118,7 +118,7 @@ describe('ST09: the project\'s sessions, a run\'s sessions, their transcripts an
 
     const server = await startServerWith({
       projectRoot: root, port: 0, assetsDirectory: join(root, 'no-such-build'), ramify: new FakeRamifyCli(),
-      runs: { inputs: treeInputs(), warn: () => undefined },
+      runs: { inputs: treeInputs(), git: fixtureScratchGit(mockGit()), warn: () => undefined },
     });
     cleanups.push(() => server.close());
     const origin = server.url;
