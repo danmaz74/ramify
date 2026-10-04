@@ -89,10 +89,20 @@ without editing their projects during Phase 1. The Ramify plan specifies the
 | 2 | ramify-audit (`/ramify-audit`) | Verified audit policy, test selection and nested-project auditing against the Phase 1 Ramify artifact, with a fixed audit artifact for agent to consume. |
 | 3 | ramify-agent (`/ramify/ramify-agent`) | Verified assignment scope, scratch lifecycle and verification workflows against both updated providers, followed by final integration acceptance. |
 
-Do not begin a consumer's implementation before its provider's handoff is
-complete. A handoff identifies source and configuration revisions, package
-version and artifact digest, changed contracts, acceptance evidence and any
-explicit limitations.
+Do not begin integrating a provider's changes into a consumer before that
+provider's handoff is complete. A handoff identifies source and configuration
+revisions, package version and artifact digest, changed contracts, acceptance
+evidence and any explicit limitations.
+
+As the user decided on 2026-10-04, ramify-audit and ramify-agent may each
+implement a preparation plan in parallel with the earlier phases. A
+preparation plan contains only work that runs and is verified under the
+consumer's current provider pins: it changes no pin, adopts no updated
+provider contract and commits no root marker. It belongs to its own project,
+is executed outside Phase 1 and does not change Phase 1's write scope.
+Everything that consumes the updated Ramify waits until Ramify is fully
+updated and handed off, and everything in ramify-agent that consumes the
+updated audit waits for the audit's handoff.
 
 A consumer's phase starts and develops against the provider's local package
 artifact; registry publication is not a prerequisite for starting. A
@@ -105,7 +115,10 @@ rebuilt local artifact until that publication.
 ## Consumer plans
 
 The detailed ramify-audit and ramify-agent plans are authored when their phase
-begins, from the actual provider handoff. Earlier drafts written before this
+begins, from the actual provider handoff, and take what the preparation plans
+left. ramify-agent's preparation plan is its Plan 20, at
+`ramify-agent:docs/plans/20-project-boundary-preparation/main-plan.md`;
+ramify-audit's is authored in its repository. Earlier drafts written before this
 sequence were removed on 2026-10-03; they remain in each repository's history
 and are not a starting point.
 
