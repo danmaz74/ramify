@@ -71,9 +71,10 @@ nearest module's auxiliary source with that owner's ordinary area. A `.js`,
 `.jsx`, `.mjs` or `.cjs` file there is compiler source only when the
 configuration admits JavaScript (`allowJs`, which defaults to `checkJs`). Every
 other owned file outside `src/` is inert: neither inventoried nor read, though
-a misplaced description there remains an error. The observer updates an edited
-auxiliary file in place and recomputes the inventory when auxiliary source
-appears or disappears. Declared nested trees, scratch
+a misplaced description there remains an error. The observer applies an edit,
+addition or deletion of auxiliary source in place, as it does beneath `src/`,
+when the walk reaches the file through directories it already lists; a new or
+removed directory, or a link on the way, rebuilds the inventory. Declared nested trees, scratch
 directories, installed dependencies and compiler output supply discovery
 boundaries; an arbitrary compiler source exclusion cannot hide an owner or a
 stray marker.
@@ -86,7 +87,10 @@ new reads; a changed result requires discarding the entire view and dependent
 compiler work. The source/session owners enforce their later-stage deadlines.
 Always await idempotent `dispose()`, including on failures. It clears retained
 bytes and observations; inventory and previously obtained input records remain
-frozen plain data.
+frozen plain data. An observation whose bytes no stage read, such as an
+existence probe or the kind of a listed entry, is identified by its kind and
+canonical path without size or times, so a byte edit of an inert or excluded
+file changes no captured input and the sweep reports nothing for it.
 
 Exact source references use decoded POSIX paths with lexical normalization,
 containment and byte-exact directory comparisons. They never use compiler
@@ -115,9 +119,15 @@ that path or at the target, or a target that exists but is not a directory, is
 `missing-owned-ignored`; an absent external target is valid. Those
 observations are captured inputs, so a tree's appearance or disappearance makes
 the revision stale. Any such issue makes the acquisition invalid. The observer
-ignores changes beneath a declared tree or scratch directory unless the
-compiler reported reading the path, and rebuilds when such a directory itself
-changes.
+rebuilds when a declared tree's or scratch directory's own directory, or a
+directory on the way to a declared tree, changes. Beneath such a directory it
+reads nothing: an unobserved path matters only through a listing the compiler
+configuration recorded, an observed entry whose kind or membership changed
+rebuilds the inventory, since the compiler selection and its warnings can
+change, bytes a stage read keep the ordinary input rule, and a byte edit
+changes nothing. A package manifest appearing in the walked tree, a new
+directory outside every `src/`, and a changed directory holding source,
+modules or a declared tree also rebuild the inventory.
 
 `isRamifyGeneratedSegment` reserves the generated view names at any depth:
 `.ramify` and `.ramify-architect`, and their publisher siblings

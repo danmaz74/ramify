@@ -13,7 +13,7 @@ import { ReportedObservations, inputIdentity, reportedInput } from './observatio
 import type { ConfigurationData } from './configuration-data.js';
 import type {
   CapturedInput, ExactReference, InventoryFile, InventoryModule, InventoryUpdate, ObservationSink,
-  ObservationRetirement, ObservedChange, ProjectInventory, ProjectIssue, ProjectObserve, ProjectObserver, ProjectReadOptions,
+  ObservationRetirement, ObservedChange, ProjectExclusion, ProjectInventory, ProjectIssue, ProjectObserve, ProjectObserver, ProjectReadOptions,
   ProjectResolution, RetainedConfiguration,
 } from './interfaces/project.js';
 
@@ -21,10 +21,41 @@ type Classified =
   | { readonly kind: 'description'; readonly path: string; readonly directory: string }
   | { readonly kind: 'readme'; readonly path: string; readonly directory: string }
   | { readonly kind: 'owned'; readonly path: string; readonly module: InventoryModule }
-  | { readonly kind: 'auxiliary'; readonly path: string; readonly file: InventoryFile }
-  | { readonly kind: 'input'; readonly path: string }
+  | { readonly kind: 'auxiliary'; readonly path: string; readonly module: InventoryModule; readonly file: InventoryFile | undefined }
+  | { readonly kind: 'input'; readonly path: string; readonly refreshed: boolean }
   | { readonly kind: 'structural'; readonly path: string }
   | { readonly kind: 'ignored'; readonly path: string };
+
+/** Lookups of one inventory, so classifying a path follows its depth rather than the inventory's size. */
+interface InventoryIndex {
+  readonly files: ReadonlyMap<string, InventoryFile>;
+  readonly modules: ReadonlyMap<string, InventoryModule>;
+  /** The proper ancestors of every inventoried auxiliary file. */
+  readonly auxiliary: ReadonlySet<string>;
+  /** Every module directory other than the root's, with its proper ancestors. */
+  readonly modulePaths: ReadonlySet<string>;
+  /** The proper ancestors of every declared owned-ignored or external directory. */
+  readonly declared: ReadonlySet<string>;
+}
+const indices = new WeakMap<ProjectInventory, InventoryIndex>();
+/** Add a project-relative directory and its ancestors below the root; a present entry already has its ancestors. */
+function addChain(set: Set<string>, directory: string): void {
+  for (let current = directory; current !== '.' && current !== '' && !set.has(current); current = dirname(current)) set.add(current);
+}
+function indexOf(inventory: ProjectInventory): InventoryIndex {
+  const known = indices.get(inventory);
+  if (known) return known;
+  const auxiliary = new Set<string>(), modulePaths = new Set<string>(), declared = new Set<string>();
+  for (const file of inventory.files) if (file.placement === 'auxiliary') addChain(auxiliary, dirname(file.path));
+  for (const module of inventory.modules) addChain(modulePaths, module.directory);
+  for (const exclusion of inventory.scope.ownership.exclusions) {
+    if (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external') addChain(declared, dirname(exclusion.directory));
+  }
+  const index: InventoryIndex = { files: new Map(inventory.files.map(file => [file.path, file])),
+    modules: new Map(inventory.modules.map(module => [module.directory, module])), auxiliary, modulePaths, declared };
+  indices.set(inventory, index);
+  return index;
+}
 
 /** The kind and written directory of each nested-tree statement, in order. */
 const nestedTrees = (description: InventoryModule['description']): readonly (readonly [string, string])[] =>
@@ -212,84 +243,126 @@ class Observer implements ProjectObserver {
   }
 
   #moduleAt(directory: string): InventoryModule | undefined {
-    const relativeDirectory = relative(this.#capture.root, directory) || '.';
-    return this.#inventory.modules.find(module => module.directory === relativeDirectory);
-  }
-  /** The owner whose ordinary source area contains a path, if any. */
-  #owner(path: string): InventoryModule | undefined {
-    return this.#inventory.modules.find(module =>
-      within(join(this.#capture.root, module.directory, 'src'), path) && basename(path) !== 'module.ramify');
+    return indexOf(this.#inventory).modules.get(relative(this.#capture.root, directory) || '.');
   }
 
   /**
-   * A conservative bridge for auxiliary source: an edit of an inventoried
-   * auxiliary file updates it in place; any other change that can add or
-   * remove auxiliary source, a new owned compiler source file outside every
-   * `src/` or a path above an inventoried auxiliary file, recomputes the
-   * inventory.
+   * Classify one changed path from the current inventory and ownership table.
+   * Only a path whose answer depends on the disk is re-observed here: an
+   * excluded or otherwise unanalyzed entry is compared with what was recorded
+   * about it, never read, so a byte edit of it changes nothing.
    */
-  #auxiliary(path: string, relativePath: string): Classified | undefined {
-    if (relativePath === '') return undefined;
-    const file = this.#inventory.files.find(item => item.path === relativePath);
-    if (file?.placement === 'auxiliary') return { kind: 'auxiliary', path, file };
-    if (file) return undefined;
-    const prefix = `${relativePath}/`;
-    if (this.#inventory.files.some(item => item.placement === 'auxiliary' && item.path.startsWith(prefix))) return { kind: 'structural', path };
-    const ownership = classifyProjectPath(this.#inventory.scope, relativePath);
-    if (ownership.status === 'owned' && ownership.exclusion === null && auxiliarySource(path, this.#configurationData)) {
-      return { kind: 'structural', path };
-    }
-    return undefined;
-  }
-
-  #classify(path: string): Classified {
+  async #classify(path: string): Promise<Classified> {
+    const root = this.#capture.root;
+    const relativePath = relative(root, path);
     // Generated final and transient publisher output is never a real input:
     // ignore it before it can become owned, structural, description, readme
     // or otherwise-observed evidence, at any segment position.
-    if (isRamifyGeneratedPath(relative(this.#capture.root, path))) return { kind: 'ignored', path };
+    if (isRamifyGeneratedPath(relativePath)) return { kind: 'ignored', path };
+    if (!within(root, path)) {
+      return this.#capture.recorded(path) ? { kind: 'input', path, refreshed: false } : { kind: 'ignored', path };
+    }
     const name = basename(path);
-    if (!within(this.#capture.root, path)) {
-      return this.#capture.recorded(path) ? { kind: 'input', path } : { kind: 'ignored', path };
-    }
-    // Declared nested trees and scratch directories are never entered, so a
-    // path beneath one never becomes owned: it is an input only when the
-    // compiler reported reading it. The appearance, disappearance or
-    // replacement of such a directory itself is boundary evidence.
-    const relativePath = relative(this.#capture.root, path);
-    if (relativePath !== '') {
-      const ownership = classifyProjectPath(this.#inventory.scope, relativePath);
-      const exclusion = ownership.status === 'owned' || ownership.status === 'excluded' ? ownership.exclusion : null;
-      if (exclusion && (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external' || exclusion.kind === 'scratch')) {
-        if (exclusion.directory === relativePath) return { kind: 'structural', path };
-        const recorded = this.#capture.recorded(path);
-        if (!recorded) return { kind: 'ignored', path };
-        return broadRoles.has(recorded.role) || broadNames.has(name) ? { kind: 'structural', path } : { kind: 'input', path };
+    const index = indexOf(this.#inventory);
+    const ownership = relativePath === '' ? null : classifyProjectPath(this.#inventory.scope, relativePath);
+    const exclusion = ownership?.status === 'owned' || ownership?.status === 'excluded' ? ownership.exclusion : null;
+    if (exclusion) {
+      if (exclusion.kind === 'owned-ignored' || exclusion.kind === 'external' || exclusion.kind === 'scratch') {
+        return this.#excluded(path, relativePath, exclusion);
       }
+      // Repository metadata, installed packages and compiler output are never
+      // walked: only a path a stage observed there is an input.
+      const recorded = this.#capture.recorded(path);
+      if (!recorded) return { kind: 'ignored', path };
+      return broadRoles.has(recorded.role) || broadNames.has(name) ? { kind: 'structural', path } : { kind: 'input', path, refreshed: false };
     }
+    // A directory on the way to a declared tree carries that tree's existence.
+    if (index.declared.has(relativePath)) return { kind: 'structural', path };
     if (name === 'module.ramify') {
       const directory = dirname(path);
       return this.#moduleAt(directory) ? { kind: 'description', path, directory } : { kind: 'structural', path };
     }
-    const owner = this.#owner(path);
-    if (owner) return { kind: 'owned', path, module: owner };
-    const auxiliary = this.#auxiliary(path, relativePath);
-    if (auxiliary) return auxiliary;
+    // A walked manifest is a module's dependency input or an undeclared project boundary.
+    if (name === 'package.json') return { kind: 'structural', path };
+    const module = ownership?.status === 'owned' ? index.modules.get(ownership.directory) : undefined;
+    if (module && within(join(root, module.directory, 'src'), path)) return { kind: 'owned', path, module };
     if (name === 'README.md' && this.#moduleAt(dirname(path))) return { kind: 'readme', path, directory: dirname(path) };
-    // A directory beneath `subs/` can only be a new or removed child boundary.
-    if (this.#inventory.modules.some(module => within(join(this.#capture.root, module.directory, 'subs'), path))) {
-      return { kind: 'structural', path };
+    const file = index.files.get(relativePath);
+    if (module && file?.placement === 'auxiliary') return { kind: 'auxiliary', path, module, file };
+    // A directory holding auxiliary source or a module boundary: acquisition recomputes what lies beneath.
+    if (index.auxiliary.has(relativePath) || index.modulePaths.has(relativePath)) return { kind: 'structural', path };
+    if (module && !file && auxiliarySource(path, this.#configurationData)) return { kind: 'auxiliary', path, module, file: undefined };
+    return this.#walked(path, name);
+  }
+
+  /**
+   * A declared nested tree or scratch directory is never entered. Its own
+   * directory is boundary evidence. A path beneath it matters only as far as a
+   * stage observed it: read bytes keep the ordinary input rule, and a changed
+   * kind or membership of an entry the compiler configuration listed can change
+   * the compiler selection and its warnings, so acquisition decides. A byte
+   * edit of an unread entry leaves its identity, and so the inputs, unchanged.
+   */
+  async #excluded(path: string, relativePath: string, exclusion: ProjectExclusion): Promise<Classified> {
+    const before = this.#capture.recorded(path);
+    if (exclusion.directory === relativePath) {
+      return before && await this.#unchanged(path) ? { kind: 'ignored', path } : { kind: 'structural', path };
     }
-    const recorded = this.#capture.recorded(path);
-    if (!recorded) return { kind: 'ignored', path };
-    if (broadRoles.has(recorded.role) || broadNames.has(name)) return { kind: 'structural', path };
-    return { kind: 'input', path };
+    if (!before) {
+      // Unobserved: it matters only by changing a listing a stage recorded.
+      const parent = dirname(path);
+      if (!this.#capture.recorded(parent)?.directory) return { kind: 'ignored', path };
+      return await this.#unchanged(parent) ? { kind: 'ignored', path } : { kind: 'structural', path };
+    }
+    if (before.read) {
+      return broadRoles.has(before.role) || broadNames.has(basename(path)) ? { kind: 'structural', path } : { kind: 'input', path, refreshed: false };
+    }
+    if (!await this.#unchanged(path)) return { kind: 'structural', path };
+    // Bytes read through a link at another path still depend on this file.
+    return this.#capture.readThrough(path) ? { kind: 'input', path, refreshed: true } : { kind: 'ignored', path };
+  }
+
+  /**
+   * A walked path outside every source area that no other rule names: an inert
+   * file, a directory, or a candidate a stage observed without reading it. A new
+   * or changed directory can hold anything discovery reads, so acquisition
+   * decides; an inert file changes its input only when its kind does.
+   */
+  async #walked(path: string, name: string): Promise<Classified> {
+    const before = this.#capture.recorded(path);
+    if (before && (broadRoles.has(before.role) || broadNames.has(name))) return { kind: 'structural', path };
+    if (before?.read) return { kind: 'input', path, refreshed: false };
+    if (!before) {
+      await this.#capture.reported(() => this.#capture.refresh(path));
+      if (this.#capture.recorded(path)?.kind === 'directory') return { kind: 'structural', path };
+      // Discovery never needs an inert entry's own observation: leave none.
+      await this.#capture.forget(path);
+      return { kind: 'ignored', path };
+    }
+    const same = await this.#unchanged(path) && !this.#capture.readThrough(path);
+    if (before.kind === 'directory' || this.#capture.recorded(path)?.kind === 'directory') {
+      return same ? { kind: 'ignored', path } : { kind: 'structural', path };
+    }
+    return same ? { kind: 'ignored', path } : { kind: 'input', path, refreshed: true };
+  }
+
+  /** Re-observe one recorded path as a compiler report would; true when its input identity is the same. */
+  async #unchanged(path: string): Promise<boolean> {
+    const identity = this.#capture.identity(path);
+    await this.#capture.reported(() => this.#capture.refresh(path));
+    return identity !== undefined && this.#capture.identity(path) === identity;
   }
 
   async #update(changes: readonly ObservedChange[], signal?: AbortSignal): Promise<InventoryUpdate> {
     const paths = [...new Set(changes.map(change => resolve(this.#capture.root, change.path)))].sort(byteOrder);
-    const classified = paths.map(path => this.#classify(path));
+    const classified: Classified[] = [];
+    for (const path of paths) {
+      signal?.throwIfAborted();
+      const item = await this.#classify(path);
+      if (item.kind === 'structural') return this.#rebuild(signal);
+      classified.push(item);
+    }
     if (classified.every(item => item.kind === 'ignored')) return freeze({ kind: 'unchanged' });
-    if (classified.some(item => item.kind === 'structural')) return this.#rebuild(signal);
 
     const modules = new Map(this.#inventory.modules.map(module => [module.directory, module]));
     const files = new Map(this.#inventory.files.map(file => [file.path, file]));
@@ -301,7 +374,11 @@ class Observer implements ProjectObserver {
       signal?.throwIfAborted();
       const label = relative(this.#capture.root, item.path);
       if (item.kind === 'ignored') continue;
-      if (item.kind === 'input') { await this.#capture.reported(() => this.#capture.refresh(item.path)); changed.push(label); continue; }
+      if (item.kind === 'input') {
+        if (!item.refreshed) await this.#capture.reported(() => this.#capture.refresh(item.path));
+        changed.push(label);
+        continue;
+      }
       if (item.kind === 'description') {
         const module = this.#moduleAt(item.directory)!;
         await this.#capture.refresh(item.path);
@@ -343,11 +420,11 @@ class Observer implements ProjectObserver {
         continue;
       }
       if (item.kind === 'auxiliary') {
-        await this.#capture.refresh(item.path);
-        // A deleted or replaced auxiliary file is recomputed by acquisition.
-        if (this.#capture.recorded(item.path)?.kind !== 'file') return this.#rebuild(signal);
-        files.set(label, { ...item.file, ...await this.#capture.application(item.path, 'source') });
-        changed.push(label);
+        const outcome = await this.#auxiliaryFile(item.path, item.module, item.file, files);
+        if (outcome === 'structural') return this.#rebuild(signal);
+        if (outcome === 'created') created.push(label);
+        else if (outcome === 'deleted') deleted.push(label);
+        else if (outcome === 'changed') changed.push(label);
         continue;
       }
       if (item.kind !== 'owned') continue;
@@ -377,8 +454,9 @@ class Observer implements ProjectObserver {
         walkedAreas: nextModules.flatMap(module => module.areas.map(area => area.root)).sort(byteOrder),
         ownership: scopeOwnership(this.#capture.root, nextModules, this.#configurationData) },
       modules: nextModules, files: nextFiles, references,
-      // A local update moves no boundary and adds or removes no auxiliary
-      // source, so every warning carries over; a rebuild recomputes them.
+      // A local update moves no boundary and changes no compiler selection
+      // inside a declared tree or scratch directory, so every warning carries
+      // over; a rebuild recomputes them.
       warnings: this.#inventory.warnings,
     });
     this.#inventory = inventory;
@@ -402,8 +480,10 @@ class Observer implements ProjectObserver {
     if (kind === 'absent') {
       // A hook can name a file after its deletion was already published.
       // Only an inventoried file can be deleted; preserve any compiler-owned
-      // absence probe and discard an otherwise unobserved request path.
+      // absence probe and discard an otherwise unobserved request path. A
+      // removed directory takes every file beneath it: acquisition decides.
       if (!known) {
+        if (observed?.kind === 'directory') return 'structural';
         if (!observed) await this.#capture.forget(path);
         return 'unchanged';
       }
@@ -428,6 +508,59 @@ class Observer implements ProjectObserver {
     }
     files.set(label, { ...known, ...await this.#capture.application(path, known.kind) });
     return 'changed';
+  }
+
+  /**
+   * One owned compiler source path outside its owner's `src/`, created, deleted
+   * or edited, under the ordinary membership rule. The inventory changes in
+   * place when the walk reaches the file through directories it already lists;
+   * a new directory, a removed one or a link on the way is left to acquisition.
+   */
+  async #auxiliaryFile(path: string, module: InventoryModule, known: InventoryFile | undefined,
+    files: Map<string, InventoryFile>): Promise<'created' | 'deleted' | 'changed' | 'structural' | 'unchanged'> {
+    const label = relative(this.#capture.root, path);
+    const observed = this.#capture.recorded(path);
+    if (known) await this.#capture.refresh(path);
+    else await this.#capture.reported(() => this.#capture.refresh(path));
+    const kind = this.#capture.recorded(path)?.kind ?? 'absent';
+    if (kind === 'absent') {
+      // A path a stage saw present is an input that moved, which only acquisition can place.
+      if (!known) {
+        if (!observed) await this.#capture.forget(path);
+        return observed && observed.kind !== 'absent' ? 'structural' : 'unchanged';
+      }
+      if (!await this.#listedParent(path)) return 'structural';
+      await this.#capture.forget(path);
+      files.delete(label);
+      return 'deleted';
+    }
+    if (kind !== 'file') return 'structural';
+    if (known) {
+      files.set(label, { ...known, ...await this.#capture.application(path, 'source') });
+      return 'changed';
+    }
+    if (!await this.#listedChain(path, join(this.#capture.root, module.directory)) || !await this.#capture.hasExactEntry(path)) return 'structural';
+    files.set(label, { path: label, owner: module.id, area: 'ordinary', kind: 'source', placement: 'auxiliary',
+      ...await this.#capture.application(path, 'source') });
+    return 'created';
+  }
+
+  /** Re-list a file's directory, which the walk enumerated; false when it is no longer such a directory. */
+  async #listedParent(path: string): Promise<boolean> {
+    const parent = dirname(path);
+    if (!this.#capture.recorded(parent)?.directory) return false;
+    await this.#capture.refresh(parent);
+    const now = this.#capture.recorded(parent);
+    return now?.kind === 'directory' && now.directory;
+  }
+  /** As `#listedParent`, when every directory above it up to the owner's directory is one the walk lists. */
+  async #listedChain(path: string, owner: string): Promise<boolean> {
+    for (let directory = dirname(dirname(path)); within(owner, directory); directory = dirname(directory)) {
+      const recorded = this.#capture.recorded(directory);
+      if (recorded?.kind !== 'directory' || !recorded.directory) return false;
+      if (directory === owner) break;
+    }
+    return this.#listedParent(path);
   }
 
   /** Membership of every directory between an area root and a changed entry. */

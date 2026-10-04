@@ -411,7 +411,11 @@ describe('PB1-07: auxiliary compiler source inventory', () => {
 });
 
 describe('observation of auxiliary source', () => {
-  it('updates an edited auxiliary file in place and recomputes the inventory when auxiliary source is added or removed', async () => {
+  // Iteration 12: auxiliary additions and deletions follow the ordinary membership
+  // rule ("Auxiliary edits/additions/deletions use ordinary source invalidation"),
+  // as source beneath src/ does; removing a directory that holds auxiliary
+  // source still recomputes the inventory.
+  it('updates edited, added and deleted auxiliary files in place and recomputes the inventory when their directory goes', async () => {
     await put(app, 'scripts/tool.ts', 'export const tool = 1;\n');
     const result = await observeProject({ request: { cwd: app, root: app, scope: 'whole-project', configuration: 'discover' },
       parse: declaration, marker, limits, registry: 'registry/1:test' });
@@ -434,14 +438,14 @@ describe('observation of auxiliary source', () => {
 
     await put(app, 'scripts/new.ts', 'export const added = 1;\n');
     const created = await observer.apply([{ path: 'scripts/new.ts', kind: 'created' }]);
-    expect(created.kind).toBe('structural');
-    if (created.kind !== 'structural') throw new Error(created.kind);
+    expect(created).toMatchObject({ kind: 'local', created: ['scripts/new.ts'], deleted: [], changed: [] });
+    if (created.kind !== 'local') throw new Error(created.kind);
     expect(created.inventory.files.filter(file => file.placement === 'auxiliary').map(file => file.path)).toEqual(['scripts/new.ts', 'scripts/tool.ts']);
 
     await rm(join(app, 'scripts/tool.ts'));
     const deleted = await observer.apply([{ path: 'scripts/tool.ts', kind: 'deleted' }]);
-    expect(deleted.kind).toBe('structural');
-    if (deleted.kind !== 'structural') throw new Error(deleted.kind);
+    expect(deleted).toMatchObject({ kind: 'local', created: [], deleted: ['scripts/tool.ts'], changed: [] });
+    if (deleted.kind !== 'local') throw new Error(deleted.kind);
     expect(deleted.inventory.files.filter(file => file.placement === 'auxiliary').map(file => file.path)).toEqual(['scripts/new.ts']);
 
     // Removing a directory above an inventoried auxiliary file recomputes too.

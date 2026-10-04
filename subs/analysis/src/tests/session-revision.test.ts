@@ -353,27 +353,30 @@ describe('description, metadata and broad session revisions', () => {
       await audited(handle);
       await equalToBatch(handle, inputs);
 
+      // The invalid branch description leaves its directory a layout-invalid
+      // boundary whose files are neither inventoried nor read, so a byte edit of
+      // its source or README changes no input (iteration 12: an unread
+      // observation answers only its kind): the invalid revision stands, and a
+      // batch evaluation of the edited tree reports the same.
       await put(root, paths.provider, `${fixtureFiles[paths.provider]}export const recoveredValue = 9;\n`);
-      const sourceOnly = await revised(handle, [paths.provider]);
-      expect(sourceOnly.outcome.execution).toBe('invalid');
-      expect(sourceOnly.sequence).toBe(invalid.sequence + 1);
-      expect(sourceOnly.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      const sourceOnly = await handle.update([{ path: paths.provider, kind: 'changed' }]);
+      expect(sourceOnly).toMatchObject({ status: 'revised', identical: true, revision: { sequence: invalid.sequence, outcome: { execution: 'invalid' } } });
+      expect(handle.current!.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
       await audited(handle);
       await equalToBatch(handle, inputs);
 
       const purpose = 'A purpose changed while the description remained invalid.';
       await put(root, paths.readme, `# Branch\n\n${purpose}\n`);
-      const readmeOnly = await revised(handle, [paths.readme]);
-      expect(readmeOnly.outcome.execution).toBe('invalid');
-      expect(readmeOnly.sequence).toBe(sourceOnly.sequence + 1);
-      expect(readmeOnly.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
+      const readmeOnly = await handle.update([{ path: paths.readme, kind: 'changed' }]);
+      expect(readmeOnly).toMatchObject({ status: 'revised', identical: true, revision: { sequence: invalid.sequence, outcome: { execution: 'invalid' } } });
+      expect(handle.current!.diagnostics.some(item => item.category === 'description' && item.location?.file === paths.description)).toBe(true);
       await audited(handle);
       await equalToBatch(handle, inputs);
       expect(comparable(await handle.report(undefined, valid.sequence))).toEqual(comparable(validReport));
 
       await put(root, paths.description, fixtureFiles[paths.description]!);
       const recovered = await revised(handle, [paths.description]);
-      expect(recovered.sequence).toBe(readmeOnly.sequence + 1);
+      expect(recovered.sequence).toBe(invalid.sequence + 1);
       expect(recovered.outcome.execution).toBe('completed');
       expect(recovered.outcome.check).toBe('passed');
       expect(recovered.checked.path).toBe('broad');
