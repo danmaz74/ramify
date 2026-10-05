@@ -269,6 +269,36 @@ test('description and created-file deferrals require complete correctly scoped e
   }
 });
 
+test('description deferrals on a companion-enforcing build expect the setup note only while `value` is exposed', () => {
+  const note = { id: 'companion-limit/1:value', code: 'signature-inferred',
+    location: { file: 'subs/m001/src/interfaces/api.ts', start: 63, end: 72, line: 2, column: 14 },
+    message: '`value` is exposed and its declared signature leaves a type to inference; the companions of an inferred type are not verified',
+    related: [] };
+  const enforcing = name => {
+    const data = editData(name, 'description', 1);
+    data.name = name;
+    for (const row of data.cycles.description) {
+      row.revision.timings.companions = 0;
+      row.hook.document.timings.daemon = row.revision.timings;
+      // An even cycle removes the setup exposure, so `value` is exposed nowhere.
+      const exposed = row.index % 2 === 1;
+      row.hook.document.coverage = exposed ? [structuredClone(note)] : [];
+      row.revision.outcome.coverage = exposed ? 'partial' : 'complete';
+    }
+    return data;
+  };
+  const relink = data => fastDeferrals(['S500', 'S1000'].map(name => measured(name, data(name)))).proportionalRelink.status;
+  assert.equal(relink(enforcing), 'not-triggered');
+  for (const mutate of [
+    rows => { rows[0].hook.document.coverage = [structuredClone(note)]; rows[0].revision.outcome.coverage = 'partial'; },
+    rows => { rows[1].hook.document.coverage = []; rows[1].revision.outcome.coverage = 'complete'; },
+    rows => { rows[1].revision.outcome.coverage = 'complete'; },
+    rows => { rows[1].hook.document.coverage.push({ ...structuredClone(note), code: 'signature-unresolved' }); },
+  ]) {
+    assert.equal(relink(name => { const data = enforcing(name); if (name === 'S500') mutate(data.cycles.description); return data; }), 'not-evaluated');
+  }
+});
+
 test('persistent checkpoint deferral requires a completed published S1000 cold revision', () => {
   const data = { cold: { reply: { status: 'reported', published: true, revision: {
     checked: { path: 'cold' }, outcome: { execution: 'completed', coverage: 'complete' },

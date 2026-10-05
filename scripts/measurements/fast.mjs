@@ -79,10 +79,12 @@ try {
   report.client = client;
   persist();
   const derivedSelected = ['checked-set-bounded', 'cold-open'].includes(selected);
+  // The derived rows reuse the four Plan 5 fixtures' hook workloads; Plan 8's X100 joins none.
+  const derivedSources = fastFixtures.map(name => `I5-13:hook-latency-${name.toLowerCase()}`);
   for (let index = 0; index < report.workloads.length; index++) {
     const id = report.workloads[index].id, suffix = id.replace('I5-13:', '');
     if (['checked-set-bounded', 'cold-open'].includes(suffix)) continue;
-    if (selected !== 'all' && selected !== suffix && !(derivedSelected && suffix.startsWith('hook-latency-'))) continue;
+    if (selected !== 'all' && selected !== suffix && !(derivedSelected && derivedSources.includes(id))) continue;
     if (controller.signal.aborted) throw new Error('Fast measurements interrupted');
     // Workload roots/endpoints are disjoint, and each child drains and stops its own daemons.
     const work = join(scratch, suffix); mkdirSync(work);
@@ -103,7 +105,7 @@ try {
     report.workloads[index] = measured; persist();
   }
   for (const id of ['I5-13:checked-set-bounded', 'I5-13:cold-open']) {
-    const sources = report.workloads.filter(row => row.id.startsWith('I5-13:hook-latency-'));
+    const sources = derivedSources.map(source => report.workloads.find(row => row.id === source));
     if (sources.every(row => row.status !== 'not-executed')) {
       const measurements = deriveFastMeasurements(id, report.workloads), assertions = assertFastWorkload(id, measurements);
       const complete = sources.every(row => row.controllerObservation && !row.failures.length && !row.interrupted);

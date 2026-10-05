@@ -103,8 +103,11 @@ export function pollDaemonStatus(executable, env, cwd, intervalMs = 100) {
   const poll = async () => {
     if (stopped) return;
     try {
+      // The status document lists each context's checked files and its scope;
+      // S1000's approaches the 1 MiB default buffer, past which spawnSync drops
+      // the output and the sample would be silently lost.
       const result = spawnSync(executable, ['daemon', 'status', '--format', 'json'], { cwd, encoding: 'utf8',
-        timeout: 5000, env: { ...process.env, NODE_OPTIONS: '', ...env } });
+        timeout: 5000, maxBuffer: 64 * 1024 ** 2, env: { ...process.env, NODE_OPTIONS: '', ...env } });
       if (result.status === 0 && result.stdout) {
         const parsed = JSON.parse(result.stdout);
         if (parsed.running && parsed.status?.memory) {

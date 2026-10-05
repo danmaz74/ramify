@@ -2,6 +2,7 @@ import { fastBudgets as budgets, fastFixtures, fixtureForId, editKindsFor } from
 import { assertResidentWorkload } from './resident-assertions.mjs';
 import { median } from './common.mjs';
 import { isDeepStrictEqual } from 'node:util';
+import { coverageEquals, fixtureSignatureNotes } from './signature-notes.mjs';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sorted = values => [...(values ?? [])].sort();
@@ -9,15 +10,18 @@ const finite = value => Number.isFinite(value) && value >= 0;
 const med = values => values?.length && values.every(finite) ? median(values) : null;
 const timing = cycle => cycle?.revision?.timings?.total;
 
-/** `fixture` names the pinned signature notes a build enforcing Plan 8's rule adds; see `coverageMatches`. */
-function coveringEdit(cycle, fixture = null) {
+/**
+ * `fixture` names the pinned signature notes a build enforcing Plan 8's rule adds,
+ * and `state` the measurement state; see `coverageMatches`.
+ */
+function coveringEdit(cycle, fixture = null, state = {}) {
   const revision = cycle?.revision, hook = cycle?.hook, document = hook?.document;
-  const notes = expectedSignatureNotes(fixture, revision?.timings).length;
+  const notes = expectedSignatureNotes(fixture, revision?.timings, state).length;
   return hook?.failure === null && hook.signal === null && hook.stderr === '' && [0, 1].includes(hook.code)
     && document?.schemaVersion === 'ramify.check/2' && document.outcome === 'checked'
     && document.execution === 'completed' && document.exitCode === hook.code
     && revision?.outcome?.execution === 'completed' && revision.outcome.coverage === (notes ? 'partial' : 'complete')
-    && coverageMatches(fixture, revision.timings, document.coverage, [])
+    && coverageMatches(fixture, revision.timings, document.coverage, [], state)
     && Number.isSafeInteger(cycle.beforeSequence) && cycle.beforeSequence >= 0
     && Number.isSafeInteger(revision.sequence) && revision.sequence > cycle.beforeSequence
     && document.revision?.sequence === revision.sequence && document.revision.id === revision.revision
@@ -32,7 +36,9 @@ function scopedEdits(data, kind, path) {
   const rows = data?.cycles?.[kind];
   return rows?.length === budgets.editCycles && rows.every((cycle, index) => {
     const denied = kind === 'description' && index % 2 === 0 ? 1 : 0;
-    return cycle.kind === kind && cycle.revision?.checked?.path === path && coveringEdit(cycle, data?.name ?? null)
+    // A description removal is the edit that removes the setup's exposure of `value`.
+    return cycle.kind === kind && cycle.revision?.checked?.path === path
+      && coveringEdit(cycle, data?.name ?? null, { setupExposureRemoved: denied === 1 })
       && cycle.revision.summary?.denied === denied && cycle.hook.code === (denied ? 1 : 0)
       && cycle.hook.document.findings?.length === denied && finite(timing(cycle))
       && (index === 0 || cycle.beforeSequence >= rows[index - 1].revision.sequence
@@ -88,26 +94,15 @@ export function revisionTimingsValid(timings) {
 
 /**
  * The `signature-inferred` notes a build that enforces the rule reports on each
- * fixture, by original. The reference example declares every exposed signature
- * (Plan 8 iteration 7) and has none. The measurement setup of S100, S500 and
- * S1000 exposes m001's literal-initialized `value`, which sets `inferred`; X100
- * annotates every exposed signature and has none.
+ * fixture state, by original: `signature-notes.mjs` pins them for every
+ * measurement recipe. A build that does not enforce the rule reports none.
  */
-const signatureNotes = {
-  reference: [],
-  ...Object.fromEntries(['S100', 'S500', 'S1000'].map(name => [name, ['signature-inferred:value']])),
-};
-const signatureNote = item => typeof item?.code === 'string' && item.code.startsWith('signature-');
-const noteKey = item => `${item.code}:${/^`([^`]+)`/.exec(item.message ?? '')?.[1] ?? ''}`;
-export function expectedSignatureNotes(fixture, timings) {
-  return enforcesCompanions(timings) ? signatureNotes[fixture] ?? [] : [];
+export function expectedSignatureNotes(fixture, timings, state = {}) {
+  return enforcesCompanions(timings) ? fixtureSignatureNotes(fixture, state) : [];
 }
-/** Other coverage entries equal `expected`; signature notes equal the fixture's pinned set, once each. */
-export function coverageMatches(fixture, timings, coverage, expected) {
-  if (!Array.isArray(coverage) || !Array.isArray(expected)) return false;
-  const notes = coverage.filter(signatureNote).map(noteKey).sort();
-  return isDeepStrictEqual(coverage.filter(item => !signatureNote(item)), expected)
-    && same(notes, [...expectedSignatureNotes(fixture, timings)].sort());
+/** Other coverage entries equal `expected`; signature notes equal the fixture state's pinned set, once each. */
+export function coverageMatches(fixture, timings, coverage, expected, state = {}) {
+  return coverageEquals(coverage, expectedSignatureNotes(fixture, timings, state), expected);
 }
 
 const counterFields = ['analyses', 'revisions', 'coveredRequests', 'sweeps', 'audits'];
@@ -201,10 +196,10 @@ export function assertFastWorkload(id, measurements) {
     processes(name, data?.processSamples);
     check(`${name}: observed cleanup`, data?.cleanup?.stopped === true && same(data.cleanup.liveProcesses, []), data?.cleanup ?? null);
   }
-  function completed(label, cycle, denied = 0, expectedCoverage = [], { fixture = null, findings = denied } = {}) {
+  function completed(label, cycle, denied = 0, expectedCoverage = [], { fixture = null, findings = denied, setupExposureRemoved = false } = {}) {
     const hook = cycle?.hook, doc = hook?.document;
-    const timings = cycle?.revision?.timings;
-    const notes = expectedSignatureNotes(fixture, timings).length;
+    const timings = cycle?.revision?.timings, state = { setupExposureRemoved };
+    const notes = expectedSignatureNotes(fixture, timings, state).length;
     check(`${label}: real covering CLI result`, hook?.failure === null && hook.signal === null && hook.stderr === ''
       && hook.code === (findings ? 1 : 0) && doc?.schemaVersion === 'ramify.check/2'
       && doc.outcome === 'checked' && doc.execution === 'completed' && doc.exitCode === hook.code
@@ -216,7 +211,7 @@ export function assertFastWorkload(id, measurements) {
     { code: hook?.code ?? null, reason: doc?.reason ?? null, sequence: doc?.revision?.sequence ?? null });
     check(`${label}: independent outcome`, cycle?.revision?.outcome?.execution === 'completed'
       && cycle.revision.summary?.denied === denied && doc?.findings?.length === findings
-      && coverageMatches(fixture, timings, doc?.coverage, expectedCoverage)
+      && coverageMatches(fixture, timings, doc?.coverage, expectedCoverage, state)
       && cycle.revision.outcome.coverage === (expectedCoverage.length + notes ? 'partial' : 'complete'),
     { denied: cycle?.revision?.summary?.denied ?? null, findings: doc?.findings?.length ?? null,
       coverage: doc?.coverage?.length ?? null });
@@ -322,7 +317,9 @@ export function assertFastWorkload(id, measurements) {
         const removal = index % 2 === 0;
         if (kind === 'configuration') notChecked(`${kind} ${index + 1}`, cycle, name);
         // X100's wildcard still exposes the value whose extra named exposure the description edit removes.
-        else if (kind === 'description') completed(`${kind} ${index + 1}`, cycle, removal && name !== 'X100' ? 1 : 0, [], { fixture: name });
+        // The removal leaves no fixture a signature note; see `signature-notes.mjs`.
+        else if (kind === 'description') completed(`${kind} ${index + 1}`, cycle, removal && name !== 'X100' ? 1 : 0, [],
+          { fixture: name, setupExposureRemoved: removal });
         // A companion removal fails the check with its pinned findings, and no denied import, only where the rule is enforced.
         else if (kind === 'companion') completed(`${kind} ${index + 1}`, cycle, 0, [], { fixture: name,
           findings: removal && enforcesCompanions(cycle?.revision?.timings) ? definition?.companionFindings ?? -1 : 0 });
