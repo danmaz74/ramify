@@ -345,14 +345,14 @@ apply --check` passes on `befc5e77`):
 --- a/docs/model/cross-module-importability.principles.md
 +++ b/docs/model/cross-module-importability.principles.md
 @@ -4,7 +4,7 @@
- 
+
  Whole-tree ownership and project-boundary principles adopted 2026-10-01;
  their detailed contracts, including auxiliary-source rules, are specified
 -separately. The corresponding tooling changes are not yet implemented.
 +separately. Ramify's checks implement them.
- 
+
  ## Purpose
- 
+
 --- a/docs/model/glossary.md
 +++ b/docs/model/glossary.md
 @@ -5,8 +5,9 @@
@@ -364,9 +364,9 @@ apply --check` passes on `befc5e77`):
 +are never exposed, imports into declared nested trees are enforced, and
 +containment decides affected selection and the hook check's path
 +dispositions.
- 
+
  ## Purpose
- 
+
 ```
 
 Other plan status lines that iteration 21 may update are not protected:
