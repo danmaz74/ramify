@@ -491,6 +491,9 @@ export function createContextManager(options: ContextManagerOptions): ContextMan
         completeApiView(entry, { status: 'superseded', requestId, revision: publication.revision });
       } else if (outcome.status === 'cancelled') {
         completeApiView(entry, { status: 'cancelled', requestId });
+      } else if (outcome.reason === 'invalid-location') {
+        // The selection's own refusal, kept as such: a path no analyzed module location contains.
+        completeApiView(entry, { status: 'unavailable', reason: 'invalid-location', message: outcome.message, requestId });
       } else {
         completeApiView(entry, { ...unavailable(outcome.reason === 'resource-limit' ? 'resource-unavailable' : 'analysis-failed',
           `${outcome.reason}: ${outcome.message}`), requestId });

@@ -217,7 +217,7 @@ export function createScriptedDriver() {
             return { status: 'unavailable', reason: 'invalid-revision', message: `Sequence ${query.sequence} is not current` };
           }
           return { status: 'projected', sequence: query.sequence, inputId: current.inputId, projection: {
-            schema: 'ramify.architect-projection/1', sequence: query.sequence, inputId: current.inputId, root: 'fixture',
+            schema: 'ramify.architect-projection/2', sequence: query.sequence, inputId: current.inputId, root: 'fixture',
             modules: [], symbols: [], tests: [],
             counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 } };
         },

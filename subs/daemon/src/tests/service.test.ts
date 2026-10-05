@@ -310,7 +310,7 @@ describe('materialize views (AV25-AV27)', { timeout: 60_000 }, () => {
     expect(f.inputs[0]!.api).toBeNull();
     expect(f.inputs[0]!.renderedApi).toEqual([]);
     expect(f.inputs[0]!.architect).toMatchObject({ modules: 1, dependencies: 'measured' });
-    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/1', revision: revision.revision, input: revision.fingerprints.inputId,
+    expect(await f.meta()).toMatchObject({ schema: 'ramify.architect-view/2', revision: revision.revision, input: revision.fingerprints.inputId,
       dependencies: 'measured', dependencyScope: 'production', testReferences: 'measured', metrics: 'measured' });
     expect(JSON.parse(await f.view('module.json'))).toMatchObject({ metrics: { state: 'measured', views: 'measured',
       contextSize: { exact: { production: { sourceFiles: 1 }, tests: { sourceFiles: 1 },

@@ -14,12 +14,25 @@ export interface ArchitectModuleFacts {
   readonly tags: readonly TagName[];
   /** Present source areas relative to `dir`: `src`, `src/tests`. */
   readonly areas: readonly string[];
+  /**
+   * The owned-ignored and external trees the module's description declares, in
+   * byte order by `dir`: each tree's project-relative directory and the
+   * declaring statement's project-relative description path, line and column.
+   * Nothing beneath a tree is analyzed, so no file, symbol or test inside one
+   * is ever recorded.
+   */
+  readonly boundaries: readonly { readonly kind: 'owned-ignored' | 'external'; readonly dir: string;
+    readonly description: string; readonly line: number; readonly column: number }[];
   /** The README's first top-level prose paragraph, uncut; no fallback to another owner's prose. */
   readonly purpose: { readonly state: 'present'; readonly path: string; readonly text: string }
     | { readonly state: 'missing' };
   /** Inventory files under `<dir>/src/docs/`, project-relative, in byte order. */
   readonly docs: readonly string[];
-  /** Inventory source files of the module's own areas, and of its subtree. */
+  /**
+   * Inventory source files the module owns, and those of its subtree: its source
+   * areas and its analyzed auxiliary source outside `src/`, never inert files
+   * or the contents of an excluded tree.
+   */
   readonly files: { readonly own: number; readonly subtree: number };
 }
 
@@ -33,6 +46,7 @@ export interface ArchitectSymbol {
   readonly binding: string | null;
   /** The owner's exposure names other than `name`, in byte order. */
   readonly exposureNames: readonly string[];
+  /** An original of auxiliary source outside `src/` is always `internal`: no declaration can expose it. */
   readonly role: 'exposed' | 'internal';
   /** Where the owner exposes the original, in byte order; empty when `internal`. */
   readonly destinations: readonly Destination[];
@@ -74,7 +88,7 @@ export interface ArchitectViewCounts {
 
 /** The architect view's facts for one revision: frozen by the session boundary, never retained. */
 export interface ArchitectViewProjection {
-  readonly schema: 'ramify.architect-projection/1';
+  readonly schema: 'ramify.architect-projection/2';
   readonly sequence: number;
   readonly inputId: string;
   readonly root: ModuleId;

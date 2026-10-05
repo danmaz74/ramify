@@ -465,8 +465,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           revision: outcome.revision, elapsedMs: outcome.elapsedMs };
         if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
         if (outcome.status === 'cancelled') return interrupted(null);
+        // The whole-project selection names no location, so `invalid-location` cannot occur here; were it to, it is a failed analysis.
         if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId,
-          reason: outcome.reason, message: outcome.message };
+          reason: outcome.reason === 'invalid-location' ? 'analysis-failed' : outcome.reason, message: outcome.message };
         throw new Error(`Unhandled measurement outcome status: ${(outcome as { status: string }).status}`);
       } finally {
         stopDeadline();

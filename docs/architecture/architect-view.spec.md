@@ -179,13 +179,14 @@ order:
 
 ```json
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "ramify/service-api",
   "dir": "subs/service-api",
   "parent": "ramify",
   "children": [],
   "tags": ["dispatch"],
   "areas": ["src", "src/tests"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/service-api/README.md",
@@ -230,15 +231,28 @@ order:
   `"cut": true` beside it when cut; the map shows the same text.
 - `docs` lists the module's `src/docs/**` files, project-relative, sorted.
   Their contents are not rendered.
-- `files` counts the inventory's source files, TypeScript and JavaScript, in
-  the module's own areas, and the same for its subtree.
-- When project boundaries are implemented, `module.json` also lists the
-  module's declared owned-ignored and external trees with their kinds and
-  declaration locations, and never the files, symbols or tests inside them.
-  `files` and `metrics` then count analyzed auxiliary source and referenced
-  resources outside `src/` and exclude inert and excluded contents. Auxiliary
-  originals appear only as internal evidence. Each document whose shape this
-  changes advances its schema version.
+- `boundaries` lists the owned-ignored and external trees the module's
+  description declares, in byte order by `dir`, one tree per line, and is
+  `[]` when it declares none. Each entry gives the tree's `kind`, its
+  project-relative `dir`, and the declaring statement's project-relative
+  `description` path, `line` and `column`:
+
+  ```json
+  { "kind": "owned-ignored", "dir": "scripts/reference-harness", "description": "module.ramify", "line": 12, "column": 1 }
+  ```
+
+  Nothing beneath a declared tree is analyzed, so no file, symbol or test
+  inside one appears in any record, count or measurement of the view.
+- `files` counts the inventory's source files, TypeScript and JavaScript,
+  that the module owns: those of its source areas and its analyzed auxiliary
+  source, owned compiler source outside every `src/`; and the same for its
+  subtree. `metrics` measures the same inventory. Inert files, scratch
+  directories and declared trees are never counted.
+- An original defined in auxiliary source is recorded like any other, always
+  with role `internal`, since no declaration can expose it; its `file` lies
+  outside `src/`.
+- Version 2 of `ramify.architect-module`, of `ramify.architect-view` and of
+  the session projection `ramify.architect-projection` added `boundaries`.
 - `uses` and `usedBy` count distinct originals per module pair, from the
   dependency facts under the production source filter. Unused imports are
   absent. An `unknown` count is present only when nonzero. Both arrays are
@@ -272,9 +286,9 @@ order:
 - `uses` and `usedBy` entries are ordered by behavioral, then non-behavioral,
   then unknown count, each descending, then by module identifier.
 - The root module has `"dir": ""` and `"parent": null`. A present `purpose`
-  and each nonempty `uses` or `usedBy` span lines as shown, one entry per
-  line; every other array and object is written on one line, with `, `
-  between items and a space inside braces.
+  and each nonempty `boundaries`, `uses` or `usedBy` span lines as shown, one
+  entry per line; every other array and object is written on one line, with
+  `, ` between items and a space inside braces.
 
 ## `behavior.jsonl`
 
@@ -466,7 +480,7 @@ the coverage counts say how much the rule could not decide.
 `_meta.json` is a deterministic single-line JSON document:
 
 ```json
-{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
+{"schema":"ramify.architect-view/2","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
 ```
 
 `dependencies` is `measured` or `unavailable`, and `dependencyScope` names

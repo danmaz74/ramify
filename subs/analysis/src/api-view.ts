@@ -1,4 +1,5 @@
 import { listAvailableOriginals, originalKey } from '../subs/model/src/index.js';
+import { classifyProjectPath } from '../subs/project/src/ownership.js';
 import type { Model, ModuleId, OriginalId, SourceArea } from '../subs/model/src/interfaces/model.js';
 import type { ProjectInventory } from '../subs/project/src/interfaces/project.js';
 import type { SourceCatalog, SymbolDetail, SymbolDetailRequest } from '../subs/typescript/src/interfaces/source.js';
@@ -65,10 +66,12 @@ export function validFacts(facts: SessionFacts): ReturnType<typeof invalid> | nu
   return null;
 }
 
-/** The declared module whose directory is the longest prefix of `from`, or
- * every inventory module in byte order for `scope: 'all'`. A module's own
- * root always matches (its directory is `.`), so an invalid location is
- * reserved for a non-canonical `from` string. */
+/** The module that owns `from` by containment, as Project's classifier of the
+ * revision's scope decides, or every inventory module in byte order for
+ * `scope: 'all'`. A path in auxiliary source outside `src/` selects its owner.
+ * A non-canonical string, a path in a declared nested tree, a module scratch
+ * directory or another always-excluded path, and a path outside the project
+ * are invalid locations. */
 function resolveModules(inventory: ProjectInventory, selection: ApiViewSelection): ModuleResolution {
   const modules = [...inventory.modules].sort((a, b) => byteOrder(a.directory, b.directory));
   if (selection.scope === 'all') return { status: 'ok', modules };
@@ -76,16 +79,16 @@ function resolveModules(inventory: ProjectInventory, selection: ApiViewSelection
   if (from !== '.' && !canonicalPath(from)) {
     return { status: 'invalid-location', message: `"${String(from)}" is not a canonical project-relative path` };
   }
-  const target = from === '.' ? [] : from.split('/');
-  let best: ProjectInventory['modules'][number] | null = null;
-  let bestLength = -1;
-  for (const candidate of modules) {
-    const directory = candidate.directory === '.' ? [] : candidate.directory.split('/');
-    if (directory.length > target.length || directory.length <= bestLength) continue;
-    if (directory.every((segment, index) => segment === target[index])) { best = candidate; bestLength = directory.length; }
+  const ownership = classifyProjectPath(inventory.scope, from);
+  if (ownership.status === 'invalid-path' || ownership.status === 'outside-project') {
+    return { status: 'invalid-location', message: `No declared module directory contains "${from}"` };
   }
-  if (!best) return { status: 'invalid-location', message: `No declared module directory contains "${from}"` };
-  return { status: 'ok', modules: [best] };
+  if (ownership.exclusion) {
+    return { status: 'invalid-location', message: `"${from}" lies in the ${ownership.exclusion.kind} directory "${ownership.exclusion.directory}", which Ramify does not analyze` };
+  }
+  const owner = modules.find(candidate => candidate.id === ownership.module);
+  if (!owner) return { status: 'invalid-location', message: `No declared module directory contains "${from}"` };
+  return { status: 'ok', modules: [owner] };
 }
 
 function parentIndex(model: Model): ReadonlyMap<ModuleId, ModuleId | null> {

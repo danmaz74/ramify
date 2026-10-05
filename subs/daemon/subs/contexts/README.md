@@ -54,7 +54,10 @@ assertions.
 An API-view request names the views it needs; without `views` it is the API
 view alone. At the pinned sequence the manager calls the session's `apiView`
 and `architectView` only for requested views, and either one's supersession
-makes the whole outcome superseded. `dependencyFacts` answers from the same
+makes the whole outcome superseded. A selection the session refuses as an
+invalid location, a path in a declared nested tree, a scratch directory or
+another excluded path, stays `invalid-location`; every other refusal is
+`resource-unavailable` or `analysis-failed`. `dependencyFacts` answers from the same
 analyzer jobs and retained result as `dependencyDiagram` and adds the test
 references retained with the diagram; `dependencyDiagram` is that answer
 without them. The references count against the retention budgets; when only

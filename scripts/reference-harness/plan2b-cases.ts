@@ -197,6 +197,8 @@ export interface DeclaredModule {
   readonly tags: readonly string[];
   readonly readme: boolean;
   readonly statements: readonly DeclaredStatement[];
+  /** The `owned-ignored` and `external` statements, as `module.json` lists them: project-relative directory and 1-based line and column. */
+  readonly trees: readonly { readonly kind: 'owned-ignored' | 'external'; readonly dir: string; readonly line: number; readonly column: number }[];
   /** Child directory name to child module identifier. */
   readonly childByDirectory: Map<string, string>;
 }
@@ -236,10 +238,15 @@ export async function declaredModules(root: string): Promise<DeclaredModule[]> {
       const relay = /^expose-sub\s+(.+?)\s+from\s+(?:"([^"]+)"|([a-z0-9-]+))\s+to\s+(.+)$/.exec(line);
       if (relay) statements.push({ form: 'expose-sub', names: parseNames(relay[1]!), from: relay[2] ?? relay[3]!, to: parseDestinations(relay[4]!) });
     }
+    // Nested-tree statements keep their physical line; the toolkit and the reference project name plain relative directories.
+    const trees = text.split('\n').flatMap((line, index) => {
+      const tree = /^(\s*)(owned-ignored|external)\s+"([^"]+)"\s*(?:\/\/.*)?$/.exec(line);
+      return tree ? [{ kind: tree[2] as 'owned-ignored' | 'external', dir: joinView(dir, tree[3]!), line: index + 1, column: tree[1]!.length + 1 }] : [];
+    }).sort((a, b) => a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0);
     let readme = true;
     try { await stat(join(root, dir, 'README.md')); } catch { readme = false; }
     const module: DeclaredModule = { id: parent ? `${parent.id}/${name}` : name, dir, parent: parent?.id ?? null, children: [], tags,
-      readme, statements, childByDirectory: new Map() };
+      readme, statements, trees, childByDirectory: new Map() };
     modules.push(module);
     parent?.children.push(module.id);
     let entries: string[] = [];
@@ -316,7 +323,7 @@ export async function structuralExpectation(root: string, modules: readonly Decl
   const meta = JSON.parse(files.get('_meta.json') ?? '{}') as Record<string, unknown>;
   // Plan 2C fixed the architect metrics policy as `measure`, and a materialized
   // tree comes from a valid inventory, so its metrics are measured.
-  for (const [key, value] of [['schema', 'ramify.architect-view/1'], ['revision', revision], ['input', inputId], ['modules', modules.length],
+  for (const [key, value] of [['schema', 'ramify.architect-view/2'], ['revision', revision], ['input', inputId], ['modules', modules.length],
     ['dependencies', 'measured'], ['dependencyScope', 'production'], ['testReferences', 'measured'], ['metrics', 'measured']] as const) {
     if (meta[key] !== value) mismatches.push(`_meta.json ${key}: ${JSON.stringify(meta[key])}, expected ${JSON.stringify(value)}`);
   }
@@ -332,6 +339,10 @@ export async function structuralExpectation(root: string, modules: readonly Decl
       ['children', document.children, module.children], ['revision', document.revision, revision],
       ['tags', [...(document.tags as string[] ?? [])].sort(), [...module.tags].sort()],
       ['purpose.state', (document.purpose as { state?: string } | undefined)?.state, module.readme ? 'present' : 'missing'],
+      ['schema', document.schema, 'ramify.architect-module/2'],
+      // Project boundaries: each declared tree with its kind, directory and declaring statement, nothing beneath it.
+      ['boundaries', document.boundaries, module.trees.map(tree => ({ kind: tree.kind, dir: tree.dir,
+        description: joinView(module.dir, 'module.ramify'), line: tree.line, column: tree.column }))],
     ];
     if (module.readme) expectations.push(['purpose.path', (document.purpose as { path?: string }).path, joinView(module.dir, 'README.md')]);
     for (const [field, actual, wanted] of expectations) {
@@ -962,8 +973,8 @@ export async function entryClosures(): Promise<EntryEvidence> {
 
 /** The instruction block the renderer places at the top of every view's `README.md`. */
 export async function renderedInstructionBlock(): Promise<string> {
-  const projection = { schema: 'ramify.architect-projection/1' as const, sequence: 1, inputId: 'input/1:0', root: 'm',
-    modules: [{ module: 'm', dir: '', parent: null, children: [], tags: [], areas: [], purpose: { state: 'missing' as const }, docs: [],
+  const projection = { schema: 'ramify.architect-projection/2' as const, sequence: 1, inputId: 'input/1:0', root: 'm',
+    modules: [{ module: 'm', dir: '', parent: null, children: [], tags: [], areas: [], boundaries: [], purpose: { state: 'missing' as const }, docs: [],
       files: { own: 0, subtree: 0 } }], symbols: [], tests: [],
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 };
   const view = renderArchitectView({ revision: 'rev/1:0:1', projection,

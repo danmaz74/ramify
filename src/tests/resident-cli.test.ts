@@ -346,7 +346,7 @@ describe('resident materialize with views (AV28)', () => {
 
       const meta = JSON.parse(await readFile(join(root, '.ramify-architect/_meta.json'), 'utf8')) as Record<string, unknown>;
       const apiMeta = JSON.parse(await readFile(join(root, 'src/.ramify/_meta.json'), 'utf8')) as Record<string, unknown>;
-      expect(meta).toMatchObject({ schema: 'ramify.architect-view/1', revision: publish!.revision, modules: 2, dependencies: 'measured',
+      expect(meta).toMatchObject({ schema: 'ramify.architect-view/2', revision: publish!.revision, modules: 2, dependencies: 'measured',
         testReferences: 'measured' });
       expect(apiMeta).toMatchObject({ schema: 'ramify.api-view/1', revision: publish!.revision });
       // The consumer's production call and its test's call, from the same analyzer run.

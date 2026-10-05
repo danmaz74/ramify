@@ -234,7 +234,10 @@ export type ContextApiViewOutcome =
   | { readonly status: 'superseded'; readonly requestId: string;
       readonly revision: ContextRevision | null }
   | { readonly status: 'cancelled'; readonly requestId: string }
-  | (Unavailable & { readonly requestId: string });
+  | (Unavailable & { readonly requestId: string })
+  /** The selection names no analyzed module location: a path in a declared nested tree, a scratch
+   * directory or another excluded path, or one outside the project. */
+  | { readonly status: 'unavailable'; readonly reason: 'invalid-location'; readonly message: string; readonly requestId: string };
 /** One affected-module query against the covering revision. Synchronized freshness
  * joins `apiView`'s rendezvous; published freshness answers from the published
  * revision while the live session still holds it. Seeds are passed to the session

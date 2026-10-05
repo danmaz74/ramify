@@ -128,9 +128,14 @@ including selections within one large namespace occurrence.
 Plan 2B's architect view is projected here and rendered here. `planArchitectView`
 lists the symbol details, export shapes, test files and `.feature` files a
 revision needs, and `projectArchitectView` builds the `ArchitectViewProjection`:
-module facts in tree order, every owned exported original once with its role,
-destinations, tags and the ancestors that re-expose it, and the test records of
-every area whose profile includes `testing`. `RetainedSession.architectView`
+module facts in tree order, each with the owned-ignored and external trees its
+description declares, joined to the revision's ownership exclusions, every
+owned exported original once with its role, destinations, tags and the
+ancestors that re-expose it, an auxiliary original outside `src/` always as an
+internal one, and the test records of every area whose profile includes
+`testing`. The API view's `--from` path selects the module that owns it by
+Project's `classifyProjectPath`; a path in a declared tree, a scratch
+directory or another excluded path is an invalid location. `RetainedSession.architectView`
 answers it for the current sequence only, through the worker like `apiView`,
 and reads a `.feature` file only while its bytes equal the revision's captured
 input (`readFeatureTitles`, English keywords). `renderArchitectView` is pure: it

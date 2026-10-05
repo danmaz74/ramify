@@ -13,7 +13,7 @@ const root = 'fixture';
 function moduleFacts(name: string | null, children: readonly string[], purpose: string): ArchitectModuleFacts {
   return {
     module: name ? `${root}/${name}` : root, dir: name ? `subs/${name}` : '', parent: name ? root : null,
-    children: children.map(child => `${root}/${child}`), tags: [], areas: ['src', 'src/tests'],
+    children: children.map(child => `${root}/${child}`), tags: [], areas: ['src', 'src/tests'], boundaries: [],
     purpose: { state: 'present', path: name ? `subs/${name}/README.md` : 'README.md', text: purpose },
     docs: [], files: { own: 2, subtree: name ? 2 : 2 + 2 * children.length },
   };
@@ -56,7 +56,7 @@ export function architectView(options: {
     tests.push(suite(facts.module, facts.dir, local, [`${term}s ${local} once`, `${term}s ${local} twice`]));
   }
   const projection: ArchitectViewProjection = {
-    schema: 'ramify.architect-projection/1', sequence: 1, inputId: 'input/1:fixture', root, modules, symbols, tests,
+    schema: 'ramify.architect-projection/2', sequence: 1, inputId: 'input/1:fixture', root, modules, symbols, tests,
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0,
   };
   return renderArchitectView({ revision: options.revision ?? 'rev/1:fixture', projection,

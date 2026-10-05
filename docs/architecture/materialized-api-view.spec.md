@@ -237,11 +237,12 @@ Without `--all`, the working directory or `--from` resolves to one module and
 the command refreshes, when the ordinary source area exists, that module's
 ordinary view, and, when the testing source area exists, its complete testing
 view. A module with neither area present refreshes zero targets, successfully.
-When project boundaries are implemented, that path resolves by containment: a
-path in auxiliary source outside `src/` selects its owner, whose ordinary view
-beneath `src/` applies to that source, and a path in a declared nested tree or
-another always-excluded path is an invalid location. Auxiliary originals never
-appear as available foreign symbols.
+That path resolves by containment, as the project's path classifier decides:
+a path in auxiliary source outside `src/` selects its owner, whose ordinary
+view beneath `src/` applies to that source, and a path in a declared nested
+tree, a module scratch directory or another always-excluded path is an
+invalid location (exit 2). Auxiliary originals never appear as available
+foreign symbols.
 `--all` refreshes every module in the selected project the same way. Project
 selection follows the existing CLI invocation contract.
 
