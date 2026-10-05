@@ -27,7 +27,9 @@ export interface ResolvedModule {
   readonly exclusion: ProjectExclusion | null;
 }
 
-const codeFile = /\.(?:d\.)?[cm]?[jt]sx?$/;
+/** A name ending in one of the eight code extensions: `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs`. */
+const codeExtension = /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/;
+const codeFile = /\.(?:d\.)?(?:[cm]?ts|tsx|[cm]?js|jsx)$/;
 interface Manifest { readonly name: string | undefined; readonly version: string | undefined; readonly exports: boolean }
 /** True when `path` is `directory` or lies beneath it; both absolute. */
 const within = (directory: string, path: string): boolean => path === directory || path.startsWith(`${directory}${sep}`);
@@ -120,14 +122,14 @@ export class Resolution {
     for (const path of sourcePaths) {
       // An import naming the declaration itself still names code. A compiler
       // resolution to an arbitrary-extension declaration describes a resource.
-      if (!/\.[cm]?[jt]sx?$/.test(specifier)) {
+      if (!codeExtension.test(specifier)) {
         // Match the declaration TypeScript actually selected, including its
         // configured suffix. Stripping a filename suffix without the requested
         // resource path could mistake part of its real extension for a suffix.
         const described = candidates.find(candidate => {
           candidate = resolve(candidate);
           const extension = extname(candidate);
-          if (!extension || /\.[cm]?[jt]sx?$/.test(extension)) return false;
+          if (!extension || codeExtension.test(extension)) return false;
           return (options.moduleSuffixes ?? ['']).some(suffix =>
             path === `${candidate.slice(0, -extension.length)}.d${extension}${suffix}.ts`
             || /\.(?:css|svg|html|png|jpg|json)$/.test(extension) && path === `${candidate}${suffix}.d.ts`);
@@ -137,7 +139,7 @@ export class Resolution {
         // exact requested directory. Identify its described resource from the
         // selected filename; retain an explicit limit if suffix spellings make
         // that interpretation ambiguous. An alias naming source still names code.
-        const namesCode = candidates.some(candidate => /\.[cm]?[jt]sx?$/.test(candidate)
+        const namesCode = candidates.some(candidate => codeExtension.test(candidate)
           && (resolve(candidate) === path || (options.moduleSuffixes ?? ['']).some(suffix =>
             ['.d.ts', '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].some(extension =>
               candidate.endsWith(extension) && resolve(`${candidate.slice(0, -extension.length)}${suffix}${extension}`) === path))));
@@ -226,7 +228,7 @@ export class Resolution {
       const declaration = handle.resolve(this.project);
       return declaration && 'name' in declaration && isStringLiteral(declaration.name as Node)
         && (declaration.name as { text: string }).text.includes('*');
-    }) || /\.(?![cm]?[jt]sx?$)[a-zA-Z0-9]+$/.test(specifier);
+    }) || /\.(?!(?:[cm]?ts|tsx|[cm]?js|jsx)$)[a-zA-Z0-9]+$/.test(specifier);
     if (resourceLike) return resourceTarget;
     // An ambient module declaration involves no resolution route: one that only
     // external or default library files declare stays outside the application.
@@ -298,7 +300,7 @@ export class Resolution {
       if (basename(directory) !== 'node_modules') ancestors.push(directory);
       if (dirname(directory) === directory) break;
     }
-    const stem = file.replace(/(?:\.d)?\.[cm]?[jt]sx?$/, '');
+    const stem = file.replace(/(?:\.d)?\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '');
     const spelled = (directory: string): boolean => within(directory, file) || stem === directory;
     if (ancestors.some(directory => spelled(resolve(directory, 'node_modules', name))
       || spelled(resolve(directory, 'node_modules', '@types', types)))) return true;
@@ -360,7 +362,7 @@ export class Resolution {
    * extension substitution, module suffixes, a directory index or a resource's
    * declaration file. */
   private spelled(candidates: readonly string[], path: string, suffixes: readonly string[] | undefined): boolean {
-    const stem = (file: string): string => file.replace(/(?:\.d)?\.[cm]?[jt]sx?$/, '');
+    const stem = (file: string): string => file.replace(/(?:\.d)?\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '');
     return candidates.some(candidate => {
       const absolute = resolve(candidate), extension = extname(absolute);
       const resource = extension !== '' && !codeFile.test(absolute);

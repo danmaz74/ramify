@@ -72,7 +72,7 @@ export async function assertToolkit(report: AnalysisReport, root: string, assert
   assertions.equal('all toolkit runtime, owned tests and resources inventoried', snapshot.inventory.files.filter(file => file.placement === 'src')
     .map(file => file.path).sort(), disk);
   const auxiliaryDisk = (await filesBelow(root)).filter(path => !inDeclaredTree(path) && !path.split('/').some(segment => segment.startsWith('.ramify'))
-    && /\.(?:[cm]?[jt]sx?)$/.test(path) && !/(?:^|\/)src\//.test(path));
+    && /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/.test(path) && !/(?:^|\/)src\//.test(path));
   assertions.equal('every owned compiler source file outside src/ is its nearest owner\'s auxiliary source, ordinary in area',
     snapshot.inventory.files.filter(file => file.placement !== 'src').map(file => [file.path, file.owner, file.area, file.kind, file.placement]).sort(),
     auxiliaryDisk.map(path => [path, auxiliaryOwners.find(([prefix]) => path.startsWith(prefix))?.[1] ?? 'ramify', 'ordinary', 'source', 'auxiliary']).sort());

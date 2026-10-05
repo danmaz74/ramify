@@ -146,14 +146,20 @@ direct adapters, supplemented by actual transport and process tests. The
 [CLI invocation contract](docs/architecture/cli-invocation.spec.md) fixes how
 `ramify check` selects the project, finds the compiler configuration, reports
 project warnings and exits.
-Compiler-selected files outside every module's `src/`, including sibling
-`tests/` or `interfaces/` and loose `subs/` source, produce warnings without
-failing the check. An owned import targeting them is an outside-scope analysis
-limit, never an allowed import or an external package. Discovered stray
+Owned compiler source outside every module's `src/` and its owned-ignored trees,
+including `scripts/`, sibling `tests/` or `interfaces/` and loose `subs/` source,
+is its nearest module's auxiliary source: it is analyzed under that owner's
+ordinary classification even when the compiler configuration does not select
+it, and its originals can never be exposed. Other owned files there, apart from
+`module.ramify` files and module READMEs, are inert files: Ramify never
+classifies them, though one the compiler reads, such as `tsconfig.json` or an
+imported data file, is a captured input whose change is rechecked.
+Compiler-selected source inside an owned-ignored tree or a module's scratch
+directory produces a warning without failing the check. Discovered stray
 `module.ramify` files are layout errors even with valid contents. Other invalid
 declarations and invalid exposure paths remain errors. A future
-strict project configuration might make the outside-source warnings fail a
-check; its syntax and scope are undecided and it is not part of Plan 1.
+strict project configuration might make project warnings fail a check; its
+syntax and scope are undecided.
 
 [Daemon and analysis architecture](docs/architecture/daemon.md) owns the proposed
 module tree, engine contracts, isolated contexts and revisioned source analysis.

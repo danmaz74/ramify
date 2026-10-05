@@ -117,11 +117,12 @@ owned compiler source outside every `src/`, including sibling `tests/` or
 module's auxiliary source. It is analyzed with that owner's ordinary
 classification whether or not the configuration selects it, and it produces no
 warning. A `.js`, `.jsx`, `.mjs` or `.cjs` file there is compiler source only
-when the configuration admits JavaScript; any other owned file outside `src/`
-is inert and silent, apart from the descriptions, READMEs and configuration the
-analysis reads as inputs. Only declared nested trees and always-excluded paths
-are left out; a nested `tsconfig.json` and repository ignore rules exclude
-nothing.
+when the configuration admits JavaScript. Every other owned file outside `src/`
+and the owned-ignored trees, apart from `module.ramify` files and module
+READMEs, is an inert file and produces no warning; a compiler configuration,
+package manifest or imported data file there is an inert file that may also be
+a captured input. Only declared nested trees and always-excluded paths are left
+out; a nested `tsconfig.json` and repository ignore rules exclude nothing.
 Three nonblocking warnings remain: compiler-selected source inside an
 owned-ignored tree, compiler-selected source inside a module's scratch
 directory, and, when the root lies in a Git repository and `git` is available,
@@ -304,8 +305,11 @@ with exit 2; it never substitutes an approximate result.
 | `ramify check` | Complete check | A synchronized revision covering every current input, including any pending configuration rebuild, with no deadline | No. It reports the whole project; exit 2 means it could not complete. |
 | `ramify check --batch` | Independent complete check | A fresh session that trusts no retained daemon state | No. It reports the whole project; exit 2 means it could not complete. |
 
-A named configuration file, `tsconfig.json`, a file it extends, or a package
-manifest or lockfile, is answered at once as not checked with the reason
+A named configuration file is a file outside every exclusion named
+`tsconfig*.json`, `package.json`, `package-lock.json`, `yarn.lock` or
+`pnpm-lock.yaml`, or another file the revision captured as configuration, such
+as one the compiler configuration extends. It is answered at once as not
+checked with the reason
 `configuration-changed`, unless a published revision already covers it with
 nothing else pending. `--deadline` does not delay that reply. The hook verifies a
 module's exports and their use, which a configuration edit is not; the daemon
@@ -333,9 +337,16 @@ current content or its deletion; deleting
 previously analyzed source is checked once its removal is analyzed.
 `not-analyzed` means the complete check does not analyze the path either: it
 lies in an owned-ignored, external or scratch directory or another
-always-excluded path, or it is an owned file that is neither source nor an
-analysis input. Descriptions, configuration, READMEs and referenced resources
-that the analysis reads are analysis inputs, not inert files. A not-analyzed
+always-excluded path, or it is an inert file the covering revision did not
+capture. Source, resources, `module.ramify` files and module READMEs are not
+inert files. An inert file the covering revision captured, such as an imported
+data file outside `src/`, is `checked` like any captured input, except that a
+named configuration file follows the configuration rule above: a compiler
+configuration or package manifest the revision captured is `checked` only when
+a published revision already covers it with nothing else pending, and a
+lockfile or other configuration-named file the revision did not capture is
+never covered, so naming it is always `not-checked` with the reason
+`configuration-changed`. A not-analyzed
 path is never captured and needs no content coverage, a path in an excluded
 directory is not hashed, and an owned file the covering revision finds to be
 no analysis input carries no content identity although the client hashed it

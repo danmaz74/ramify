@@ -122,6 +122,28 @@ was repaired in `e3c10dc8`
 until its effect runs every class shows unchecked, so the repair needs the
 filter computed during rendering.
 
+The hook check never passes on a lockfile. A lockfile is never a captured
+input, and a configuration-named file the covering revision did not capture
+is never treated as covered, so `ramify check --changed package-lock.json`
+(or `yarn.lock`, `pnpm-lock.yaml`) outside every exclusion always answers
+not checked with the reason `configuration-changed`, exit 2. The repair is to
+answer such an uncaptured file `not-analyzed`; it is left for after the
+phase, so that the hook check does not change before the measurements.
+
+## Follow-ups
+
+Deferred by the user to a later plan, not Phase 1:
+
+- **Module purpose from `module.ramify`.** Decided by the user on 2026-10-05:
+  a module's purpose is to come from its `module.ramify`, not from the first
+  prose paragraph of its `README.md`.
+- **Primitive-literal constants as declared signatures.** After Phase 1, a
+  constant whose initializer is a primitive literal counts as a declared
+  signature, with no `signature-inferred` note. That turns fixture F's
+  verification baselines, which decision 10 of the
+  [main plan](main-plan.md) keeps expecting the note on F's exposed `value`,
+  back to "no note".
+
 ## Known flaky tests
 
 The user's policy of 2026-10-05: a failing test is run alone three times; if

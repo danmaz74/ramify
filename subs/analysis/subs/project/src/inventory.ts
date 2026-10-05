@@ -12,7 +12,8 @@ import type { DescriptionParser, RootMarkerReader, TextSpan } from '../../descri
 import type { ConfigurationData } from './configuration-data.js';
 import type { ExactReference, InventoryFile, InventoryModule, ProjectInventory, ProjectIssue, ProjectOwnership, ProjectScope, ProjectWarning } from './interfaces/project.js';
 
-const compilerSource = /\.(?:[cm]?[jt]sx?)$/;
+/** The eight compiler source extensions: `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs` and `.cjs`. */
+const compilerSource = /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/;
 const javaScript = /\.(?:[cm]?js|jsx)$/;
 /** Compiler-visible source, as distinct from an owned resource. */
 export const inventoryFileKind = (path: string): InventoryFile['kind'] => compilerSource.test(path) ? 'source' : 'resource';

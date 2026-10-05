@@ -53,9 +53,29 @@ directories or a module's scratch directory, excluded from Ramify analysis.
 A **scratch directory** is the module-owned directory `tmp` directly beneath
 its `src/`, for throwaway files excluded from Ramify analysis.
 
+## Compiler source
+
+**Compiler source** is a file with a `.ts`, `.tsx`, `.mts` or `.cts`
+extension, including declaration files, or with a `.js`, `.jsx`, `.mjs` or
+`.cjs` extension when it lies beneath a module's `src/` or the root compiler
+configuration admits JavaScript, whether or not the compiler configuration
+selects it.
+
 ## Auxiliary source
 
-**Auxiliary source** is compiler source a module owns outside its `src/`.
+**Auxiliary source** is compiler source a module owns outside its `src/` and
+outside its owned-ignored trees.
+
+## Inert file
+
+An **inert file** is a file a module owns outside its `src/` and outside its
+owned-ignored trees that is neither compiler source, a `module.ramify` nor the
+module's `README.md`; Ramify does not inventory or classify it.
+
+## Captured input
+
+A **captured input** is a file whose content or absence an analysis revision
+read and fingerprinted, so that a change to it invalidates the revision.
 
 ## Containment
 

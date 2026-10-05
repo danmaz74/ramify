@@ -162,7 +162,7 @@ export async function acquire(root: string): Promise<ProjectInputView> {
       // Discovery never enters a scratch directory or a declared tree.
       if (!owner || placed.status !== 'owned' || placed.exclusion) return [];
       return [{ path: local, owner: owner.id, area: local.startsWith(`${owner.areas[1]!.root}/`) ? 'tests' as const : 'ordinary' as const,
-        kind: /\.(?:[cm]?[jt]sx?)$/.test(local) ? 'source' as const : 'resource' as const, placement: 'src' as const,
+        kind: /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/.test(local) ? 'source' as const : 'resource' as const, placement: 'src' as const,
         sha256: sha256(content), bytes: Buffer.byteLength(content) }];
     }).sort((a, b) => a.path.localeCompare(b.path)),
   };

@@ -246,7 +246,7 @@ handlers.set('I5-03:ambiguity-propagation', {
 async function closureEdits(root: string, assertions: Assertions, fixture: string): Promise<void> {
   await withDescriptions(root, async states => {
     let previous = (await states.both()).whole;
-    const targets = previous.filter(description => /\.[cm]?[jt]sx?$/.test(description.file)
+    const targets = previous.filter(description => /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/.test(description.file)
       && !description.file.endsWith('.d.ts') && description.originals.length)
       .map(description => description.file).sort().slice(0, 30);
     assert.equal(targets.length, 30, `${fixture} needs thirty editable source files`);

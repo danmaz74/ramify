@@ -85,9 +85,10 @@ trees remain owned. The root owns configuration, documentation and other paths
 that no child owns. Ownership is determined for existing, new and deleted
 paths without requiring an inventory entry.
 
-Ownership does not imply analysis or write permission. Inventory only inputs
-the analysis reads and fingerprints; inert owned files need not be listed,
-hashed or watched. Repository ignore rules change neither ownership nor
+Ownership does not imply analysis or write permission. Inventory only the
+source and resources the analysis reads and fingerprints; an inert file is
+never inventoried, and it is hashed and watched only when an analysis revision
+captures it. Repository ignore rules change neither ownership nor
 analysis boundaries.
 
 A present but invalid description is an invalid boundary declaration. A
@@ -135,15 +136,20 @@ the root marker inside a declared tree of either kind is the root of a
 separate project.
 
 Analyze all owned compiler source outside those exclusions, including source
-the compiler configuration did not select. Outside `src/`, a file is compiler
-source when it has a TypeScript or JavaScript source extension; a `.js`,
-`.jsx`, `.mjs` or `.cjs` file is compiler source only when the root compiler
-configuration admits JavaScript (`allowJs`, which defaults to `checkJs`).
-Every other owned file outside `src/` is inert: it is not inventoried and
-receives no source classification. Auxiliary source uses its owner's
-ordinary classification. Compiler-resolution limitations remain explicit
-coverage notes; omitting owned source from the compiler configuration does
-not exempt it from analysis.
+the compiler configuration did not select. Compiler source is a file with a
+`.ts`, `.tsx`, `.mts` or `.cts` extension, declaration files included, or with
+a `.js`, `.jsx`, `.mjs` or `.cjs` extension when it lies beneath a module's
+`src/` or the root compiler configuration admits JavaScript (`allowJs`, which
+defaults to `checkJs`); no other extension makes a file compiler source. Inside
+`src/`, a JavaScript file the compiler does not load is reported as an analysis
+limit; every other file there, apart from a misplaced `module.ramify`, is a
+resource. Outside `src/` and the owned-ignored trees,
+owned compiler source is auxiliary source. Every other owned file there, apart
+from `module.ramify` files and module READMEs, is an inert file: it is not
+inventoried and receives no source classification, even when the compiler
+reads it. Auxiliary source uses its owner's ordinary classification.
+Compiler-resolution limitations remain explicit coverage notes; omitting owned
+source from the compiler configuration does not exempt it from analysis.
 
 A TypeScript dependency or standard-library file does not become application
 source merely because the compiler loads it. Treatment of external packages
