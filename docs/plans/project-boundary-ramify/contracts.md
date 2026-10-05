@@ -382,9 +382,9 @@ transactional publication remain in force.
 CLI root selection follows R7, as [root marker](#root-marker) states:
 iteration 3B implements it in Project for every command that selects a
 project, and iteration 17 demonstrates it through real CLI processes. Production
-selection still consumes resolved profiles; testing modules and nested testing
-areas are excluded, ordinary analyzed auxiliary inputs are eligible, and inert
-owned files are not production merely because they have an owner.
+selection takes files beneath `src/` whose resolved profile is production;
+auxiliary source, testing modules, nested testing areas and inert files are
+never production.
 
 ## Schema versions
 

@@ -306,7 +306,7 @@
     {
       "id": "PB1-31",
       "title": "Production selection policy",
-      "expected": "Resolved testing profiles exclude testing modules/areas; ordinary auxiliary inputs are eligible; inert ownership adds no production files and declared trees/scratch never enter.",
+      "expected": "Production selection takes files beneath `src/` whose resolved profile is production; auxiliary source, testing modules, nested testing areas and inert files are never production, and declared trees/scratch never enter.",
       "producerIteration": 19,
       "fixture": "production-profiles",
       "tier": "public-api",

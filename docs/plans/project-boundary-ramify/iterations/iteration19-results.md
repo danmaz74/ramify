@@ -379,3 +379,10 @@ is put to the user as well. Accepted: `site:dev` also prepares the candidate;
 the script packs an existing build and builds only when an entry is missing.
 The agent did not run `reference:verify` or the audit; the coordinator's gate
 runs them on the committed candidate.
+
+The production clause of PB1-31 was settled by the relay session under the
+user's standing instruction; the user was told and may override it. The case
+and the contracts now state the implemented rule of iteration 8C: production
+selection takes files beneath `src/` whose resolved profile is production,
+and auxiliary source, testing modules, nested testing areas and inert files
+are never production.
