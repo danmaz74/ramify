@@ -390,3 +390,9 @@ analysis module. Git advice is produced on complete checks only, not on
 hook. The agent did not run `reference:verify`; the coordinator's gate runs
 the audit, `reference:cases` and the full Plan 1 and Plan 2 verification on
 the committed candidate.
+
+The CLI's copy of the reserved-name rule is the one deliberate exception to
+"no second ownership algorithm outside Project": the lightweight client may
+not load an analysis module, and `git-advice.test.ts` enforces that the copy
+equals `classifyProjectPath`. The relay session accepted both choices under
+the user's standing instruction; the user was told and may override them.
