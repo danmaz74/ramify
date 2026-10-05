@@ -99,15 +99,22 @@ stays open until a toolkit-owned slice repairs it with its own verification.
 - **High priority for the first follow-up plan: the daemon does not recover a
   context whose session worker died.** Every later hook check of that context
   answers not checked, `unavailable`, until the daemon restarts. In the fast
-  recipe's S1000 workload on `a5b377e8`, the worker exited (1) during the retry
-  after a retained-limit refusal (see [known limitations](#known-limitations)).
-  Every later hook answered `unavailable` in about 33 ms, and the context
-  never published again. The failure branch of `analyze` in
+  recipe's S1000 workload, the worker exited (1) during the retry after a
+  retained-limit refusal (see [known limitations](#known-limitations)). That
+  happened on `a5b377e8` and again on the final candidate `7df84ea2`.
+  - On `a5b377e8`, every later hook answered `unavailable` in about 33 ms, and
+    the context never published again.
+  - On `7df84ea2`, the repaired recipe stops the workload at that first
+    `unavailable` answer and records the point.
+
+  The failure branch of `analyze` in
   `subs/daemon/subs/contexts/src/context-manager.ts` (around lines 778–790)
   keeps the failed session; the same branch exists at `640583cc`, before the
   phase. Evidence: `/home/app/ramify-pb1-evidence/a5b377e8/fast-diagnosis/`
-  (`s1000.json`) and the failed run's outputs in
-  `/home/app/ramify-pb1-evidence/a5b377e8/measurements/`.
+  (`s1000.json`) and that run's outputs in
+  `/home/app/ramify-pb1-evidence/a5b377e8/measurements/`. For `7df84ea2`, the
+  evidence is the `failurePoint` of `I5-13:hook-latency-s1000` in
+  `/home/app/ramify-pb1-evidence/7df84ea2/measurements/fast-report.json`.
 - **A daemon whose working directory is deleted fails later requests.** The
   resident daemon inherits the working directory of the command that starts
   it and never changes it. Once that directory is deleted, every later
@@ -157,25 +164,40 @@ phase, so that the hook check does not change before the measurements.
 - **The per-context retained-fact limit of 96 MiB, 100.7 MB
   (`maxRetainedBytesPerContext`).** When a new revision would exceed it, the
   session refuses the revision and marks itself stale; the daemon discards the
-  revision history and retries once, on the broad path. Measured by the fast
-  recipe on `a5b377e8`:
-  - S500: each create or delete save added about 6.88 MB of retained facts
-    (77.7, 84.5, 91.4 and 98.3 MB; the next would reach about 105 MB). The
-    first crossing came at 98.3 MB, and from then on every fifth such save
-    crossed the limit, from 95.3 MB. Each broad retry took about 14 s against
-    about 2.1 s on the membership path. All eight retries completed correctly.
-    Every second configuration save crossed it too; that path is broad anyway.
-  - S1000: body edit 5 crossed the limit at 95.5 MB with five revisions
-    retained. The broad retry ran about 27.6 s, then the session worker exited
-    (1), probably at its 512 MiB heap; that is unproven, because the recipe
-    captures neither daemon nor worker stderr. The hook answered
-    `analysis-failed: Session worker exited (1)` after 29.0 s, and the context
-    never published again ([known defect](#known-defects-carried-forward)).
+  revision history and retries once, on the broad path. The fast recipe
+  measured this on `a5b377e8` and again, with the same pattern, on the final
+  candidate `7df84ea2`. Figures are from `7df84ea2` unless marked otherwise.
+  - S500: each create or delete save added 6,883,102 bytes (about 6.88 MB) of
+    retained facts (77.7, 84.5, 91.4 and 98.3 MB; the next would reach about
+    105 MB). Every fifth such save crossed the limit. The first crossing was
+    from 98.3 MB and the second from 99.1 MB; the other six were from 95.3 MB.
+    Each broad retry's session work took 13.8–14.2 s, against a median of
+    about 2.2 s on the membership path (`a5b377e8`: about 14 s against about
+    2.1 s). All eight retries completed correctly, and the repaired recipe
+    accepts them. In the `a5b377e8` diagnosis, every second configuration save
+    crossed the limit too; that path is broad anyway.
+  - S1000: body edit 5 crossed the limit from 95,495,083 bytes with five
+    revisions retained, on both runs. The broad retry ran about 27.2 s
+    (`a5b377e8`: about 27.6 s). Then the session worker exited (1), probably at
+    its 512 MiB heap. That is unproven, because the recipe captures neither
+    daemon nor worker stderr. The hook answered
+    `analysis-failed: Session worker exited (1)` after 28.4 s (`a5b377e8`:
+    29.0 s). On `a5b377e8` the context never published again; on `7df84ea2`
+    the repaired recipe stopped the workload at that answer
+    ([known defect](#known-defects-carried-forward)).
   - The phase adds roughly 3% (X100) to 10% (reference) retained facts.
   - The S500 and S1000 fast workloads were waived in Plan 5 and are first
     measured here. `I5-13:hook-latency-s1000` is a measurement gap, and so are
     `I5-13:checked-set-bounded` and `I5-13:cold-open`, which use S1000's
-    process.
+    process. On `7df84ea2`, these three are the only failing fast instances,
+    accepted as gaps under the relay-settled option (a)
+    ([relay-settled wordings](#wordings-settled-through-the-relay-session)).
+    Evidence: `/home/app/ramify-pb1-evidence/7df84ea2/measurements/` and
+    `verification/verify-5.stdout`.
+- **Measurements on Linux only.** As the user decided on 2026-10-04, the
+  measurement recipes ran on Linux only. `I2A-12:linux-macos-bytes` therefore
+  fails for want of a macOS counterpart report. It is a known platform gap and
+  does not fail the final gate (`7df84ea2/verification/verify-2a.stdout`).
 - **Not measured in this phase.** The architect view's size and timing
   measurements of Plans 2B and 2C lie outside the three recipes the user
   approved for iteration 20, and no reference instance needs them.
@@ -261,7 +283,10 @@ of each and may override any of them:
   or deleted revision passes only when the daemon telemetry shows its
   retained-limit refusal and history reset, and the workload lists each such
   retry. A workload whose daemon can no longer publish stops at once and
-  records where; it stays a measurement gap.
+  records where; it stays a measurement gap. The repair is `7df84ea2`, the
+  final candidate. On it, `I5-13:hook-latency-s1000`,
+  `I5-13:checked-set-bounded` and `I5-13:cold-open` are accepted as gaps on
+  this ground.
 
 ## Reference rows whose prose is stale
 

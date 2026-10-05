@@ -1,15 +1,15 @@
 # Iteration 20 results: integration acceptance
 
-**Date:** 2026-10-05. **Status:** draft receipt for [iteration 20](iteration20.md),
-qualification part. It awaits the coordinator's review and the coordinator's
-part of the final gate. The qualification ran in the second worktree on the
-committed candidate `befc5e77`, while the coordinator's gate ran on the same
-commit in the main worktree. This part requalifies the runtime PB1 cases, runs
-the real workflows and reviews write scope, documents and schema identity. The
-coordinator runs the full audit, the three measurement recipes, the four
-`reference:verify` plans and the final `diagrams`/`site:build` on the final
-candidate; their sections below are placeholders. Only what is recorded here
-was run.
+**Date:** 2026-10-05. **Status:** receipt for [iteration 20](iteration20.md),
+in two parts. The qualification part ran in the second worktree on the
+committed candidate `befc5e77`: it requalifies the runtime PB1 cases, runs the
+real workflows and reviews write scope, documents and schema identity. The
+[coordinator's part](#final-gate-on-7df84ea2) ran on the
+final candidate `7df84ea2` in the main worktree: the full audit, the three
+measurement recipes, the four `reference:verify` plans, `check:reference`,
+`diagrams` and `site:build`. It also lists what changed between the two
+candidates and the instances accepted as gaps. Only what is recorded here was
+run.
 
 ## Identity
 
@@ -223,7 +223,7 @@ above. Where a clause rests on the coordinator's part, the row says so.
 | PB1-21 Boundary structural invalidation | 13 | analysis `project-boundary-session` (15, hot and warm with fresh-batch equality), project `project-boundary-observer` (16) | Requalified |
 | PB1-22 Auxiliary incremental membership | 13 | `project-boundary-session`, `project-boundary-observer` | Requalified |
 | PB1-23 Excluded and inert observation | 16 | daemon `project-boundary-watcher`, `project-boundary-wire`; contexts `watch-registration`; wf byte edits, watch stream, registrations; scale inotify | Requalified |
-| PB1-24 Invalidation cancellation and limits | 13 | `project-boundary-session` (overlap, sweep, cancellation, 48 KiB byte bound, compiler cleanup), `project-boundary-observer` | Requalified at the focused boundary; the deadline instances (I5-08) run in the coordinator's Plan 5 verification |
+| PB1-24 Invalidation cancellation and limits | 13 | `project-boundary-session` (overlap, sweep, cancellation, 48 KiB byte bound, compiler cleanup), `project-boundary-observer` | Requalified at the focused boundary; the eight deadline and limit instances (I5-08) passed in the coordinator's Plan 5 verification on `7df84ea2` |
 | PB1-25 Schema and transport coherence | 16 | `project-boundary-wire` (installed daemon over real IPC, stale peers), `codec`; wf resident documents decoded by the CLI | Requalified |
 | PB1-26 Git advisory behavior | 17 | `git-advice`, `project-boundary-cli`; wf and run2 (spaces, absent and failing Git, nested root, excluded directories silent) | Requalified |
 | PB1-27 Architect boundary visibility | 18 | analysis `project-boundary-views` ("PB1-27 …"); wf architect view | Requalified |
@@ -234,21 +234,21 @@ above. Where a clause rests on the coordinator's part, the row says so.
 | PB1-32 Reference harness boundary | 8 | `toolkit-boundaries`; check:self JSON (`scripts/reference-harness` owned-ignored, 0 warnings, named only by its exclusion); `tsc -p tsconfig.scripts.json --listFilesOnly` (1,280 files, 0 harness); locked `reference:cases` (37 files, 393 tests: unchanged inventory) | Requalified; the run had one flaky timeout |
 | PB1-33 Legal toolkit scripting imports | 8 | check:self (0 denied across the root scripts), `auxiliary-source`, model `identity-model`, `project-boundary-analysis` (testing access refused) | Requalified |
 | PB1-34 Site package consumption | 19 | root `package-consumer` (isolated NodeNext install); `npm run site:build` from the packed candidate | Requalified |
-| PB1-35 Full-mode and fallback gate | 20 | — | Coordinator: full audit on the final candidate |
+| PB1-35 Full-mode and fallback gate | 20 | — | Coordinator: full-mode audit on `7df84ea2`, verdict pass ([full audit](#full-audit-pb1-35)); no fallback needed |
 | PB1-37 Bounds and cleanup | 20 | scale and limit witnesses; byte bounds in `project-boundary-session`/`-observer`; every daemon stopped with 0 processes left; browser cleanup; no capacity limit raised in this phase (no limit constant changed in the budget sources since `33d8a739`) | Produced here; see finding 1 |
-| PB1-38 Full regression and reference acceptance | 20 | locked `reference:cases` 392/393 with one flaky timeout, retained | Coordinator: audit, four verifications, measurements |
+| PB1-38 Full regression and reference acceptance | 20 | locked `reference:cases` 392/393 with one flaky timeout, retained | Coordinator, on `7df84ea2`: audit pass, locked `reference:cases` 393/393, Plans 1 and 2 pass, Plans 5 and 2A pass apart from four [accepted gaps](#accepted-gaps) |
 | PB1-41 Root marker grammar | 3A | descriptions `root-marker-grammar` (54) | Requalified |
 | PB1-42 Root selection by marker | 3B | project `root-selection` (13), analysis `root-marker` (4); wf selection rows | Requalified |
 | PB1-43 Root marker validity | 3B | `root-selection`, `root-marker`; wf unmarked root and marked child | Requalified |
-| PB1-44 Toolkit root migration | 3B | `git grep -n -E '^(root )?module ' -- '*module.ramify' ':!ramify-agent'`: 30 headers, exactly two marked (`module.ramify:2`, `examples/collection-review/module.ramify:4`); check:self, check:reference, `reference:cases` | Requalified except the full toolkit suite, which runs in the coordinator's audit |
+| PB1-44 Toolkit root migration | 3B | `git grep -n -E '^(root )?module ' -- '*module.ramify' ':!ramify-agent'`: 30 headers, exactly two marked (`module.ramify:2`, `examples/collection-review/module.ramify:4`); check:self, check:reference, `reference:cases` | Requalified; the full toolkit suite passed in the coordinator's audit on `7df84ea2` |
 
 PB1-36, PB1-39 and PB1-40 are iteration 21's artifact cases and were not run.
 
 Summary: 41 runtime cases.
 
-- 38 are requalified (PB1-01 to PB1-34 and PB1-41 to PB1-44). PB1-24 and PB1-44 are requalified apart from the clauses that run in the coordinator's Plan 5 verification and audit.
+- 38 are requalified (PB1-01 to PB1-34 and PB1-41 to PB1-44). The clauses of PB1-24 and PB1-44 that rest on the coordinator's Plan 5 verification and audit passed on `7df84ea2`.
 - PB1-37 was produced here, with finding 1 for the coordinator.
-- PB1-35 and PB1-38 are the coordinator's.
+- PB1-35 and PB1-38 are the coordinator's. PB1-35 passed; PB1-38 passed apart from the four [accepted gaps](#accepted-gaps).
 - Every case named an executable test or command; none rests on a receipt's claim alone, so no test was added.
 
 ## Flaky occurrence
@@ -378,7 +378,7 @@ provider handoff exists yet").
 `src/`, including sibling `tests/` or `interfaces/` and loose `subs/` source,
 "produce warnings" and that an owned import of them is an outside-scope analysis
 limit. Since 8C they are root auxiliary source with no warning. This is the
-held change C; it was not edited.
+held change C; it was not edited here, and it landed later in `6598a29d`.
 
 ### Remaining defects and gaps
 
@@ -386,6 +386,11 @@ held change C; it was not edited.
 
 - The daemon fails later requests once its working directory is deleted. This predates the phase.
 - `ProjectExplorerPage.tsx` loses an interaction made before a newly rendered model settles.
+
+The coordinator's measurement runs added one more, which also predates the
+phase: the daemon does not recover a context whose session worker died (see
+[measurements](#measurements)). The wording package after `befc5e77` added the
+lockfile behaviour of the hook check. Both are in the handoff.
 
 **Known flaky tests:** A7-11 `compiled-client` (unresolved, not reproduced);
 MT09 and the session-worker cancellation (both product defects, repaired);
@@ -418,15 +423,15 @@ the Git advice child, so it is no longer stale.
 | Absent-directory refusal broader than necessary (13, gap 2) | No later slice; left |
 | Warm sessions publish a revision for an inert event (13, gap 3) | No later slice. A hot session published none (`run.sh` watch) |
 | Pre-existing: the observer keeps its last valid capture after an invalid acquisition (12 gap 7, 13 gap 4) | Left as is |
-| Hook classification round trip cost (15, gap 2) | For the coordinator's `measure:fast` report |
+| Hook classification round trip cost (15, gap 2) | Not isolated by the fast recipe; see [the classification round trip](#the-classification-round-trip) |
 | Invalid revisions classify by the latest completed ownership (15, gap 5) | Left as is |
 | Plan 2B/2C view size and timings on the final build (18) | **Not in the coordinator's measurement list** (resident, fast, Plan 2A). 18 recorded the view size (1,066,266 bytes in 62 files, within the 8 MiB budget) but no timings |
 | Guides to review (17): `batch-verification.md`, `testing.md` | Updated in 19 |
 | `engineering-practices.md` (17) | No change in the phase |
-| `CLAUDE.md` changes A and C and the three stale sentences (19) | Held for the user. A's final text is with the coordinator; C is still pending |
+| `CLAUDE.md` changes A and C and the three stale sentences (19) | Held for the user on `befc5e77`. A and C landed later, in `f342133a` and `6598a29d`; the three stale sentences still wait for the user's wording |
 | `tags.mdx` flagged, `site/package.json` description, `docs/architecture/README.md` dated status (19) | Left |
 | Three Plan 7 purposes; the Project paragraph (final-gate repair, gaps 2–3) | Awaiting the user's review, per that receipt |
-| I2-29, I5-13 and I2A-12 measurement instances (baseline repair 2, final-gate repair, entry-footprints) | The coordinator's measurement run |
+| I2-29, I5-13 and I2A-12 measurement instances (baseline repair 2, final-gate repair, entry-footprints) | Measured on `7df84ea2`. All pass except `I5-13:hook-latency-s1000`, `I5-13:checked-set-bounded`, `I5-13:cold-open` and `I2A-12:linux-macos-bytes`, the [accepted gaps](#accepted-gaps) |
 | `ramify-agent` reads `/2` architect views (18); agent and audit roots unmarked (3A) | Phases 2 and 3 |
 
 **Relay-settled wordings** (read from the coordinator's `RESUME.md`, not
@@ -452,8 +457,8 @@ From this phase's receipts:
 - **Toolkit architect view:** 1,066,266 bytes against Plan 2C's 844,838, within the 8 MiB budget.
 - **Entry footprint help:** about 25 ms.
 
-The resident (I2-29), fast (I5-13) and Plan 2A (I2A-12) timing targets have no
-candidate value yet; they wait for the coordinator's measurement run.
+The candidate values of the resident (I2-29), fast (I5-13) and Plan 2A (I2A-12)
+targets are under [timing targets on the final candidate](#timing-targets-on-the-final-candidate).
 
 ## Findings for the coordinator
 
@@ -474,44 +479,271 @@ candidate value yet; they wait for the coordinator's measurement run.
 3. **Plan 2B/2C measurements** (view size and timings) were listed by iteration 18 for iteration 20 on the final build. They are not among the three recipes the user approved. Decide whether they are part of the measurement run or are reported as not measured.
 4. **Proposed status patches** for `glossary.md` and the importability principles (above). The principles edit is status-only; the procedure requires a decision on a principles file.
 
-## Coordinator's part (placeholders)
+How they were settled before the final candidate:
 
-Each section below is run by the coordinator on the final candidate; its results are appended below.
+- Findings 1 and 3: the relay session accepted the acquisition limit and the unmeasured Plan 2B and 2C views for this phase. The handoff lists both under known limitations and the relay-settled wordings.
+- Finding 2: recorded as a follow-up in the handoff.
+- Finding 4: both status lines were applied in `6598a29d`. The user authorized the principles sentence.
+
+## Final gate on `7df84ea2`
+
+The coordinator ran this part in `/home/app/ramify-pb1`, branch
+`feat/project-boundary-ramify`. Times are UTC on 2026-10-05. Evidence is under
+`/home/app/ramify-pb1-evidence/7df84ea2/`, in `final-candidate-3/`,
+`preflight/`, `measurements/` and `verification/`. The scripts that ran the
+gate and the recipes, `gate.sh` and `measure.sh`, are in the evidence root's
+`coordination/`.
+
+### Final candidate
+
+| Item | Value |
+| --- | --- |
+| Candidate | `7df84ea29377ca3642bb49ef5084b71bf652b2f8`, tree `c4c5c11a21a1c108bc0f104fc9619cc59a44b097` (committed 13:19:13) |
+| Supersedes | `723d4698` and `a5b377e8` (see [attempts](#attempts)) |
+| Configuration (sha256 prefix) | unchanged from `befc5e77`: `package.json` `6662831e` (version 0.2.0), `package-lock.json` `1b822bb4`, `ramify-audit.json` `371ebef9`, `tsconfig.json` `9c67bd1c` |
+| Contract revision (sha256 prefix) | `contracts.md`, `acceptance.md`, `cases.json`, `execution.md`, `budgets.md` and `fixtures.md` unchanged from `befc5e77`; `cli-invocation.spec.md` `73862955`, `module-description.spec.md` `19e292a9`, `docs/model/glossary.md` `fd3a1bad` |
+| Frozen build | the single `npm run build` of gate `final-candidate-3` (exit 0, 13:24). Nothing was rebuilt afterwards. The verification reports record build sha256 `d766e5e0` and source sha256 `4c9b5ed2` (prefixes) |
+| Worktree state | clean for the gate. From the measurement run on, it holds the three untracked measurement archives and the modified `scripts/measurements/results/index.json` that the run wrote, identical at 14:35 and 16:09 (`verification/status-before.txt`, `status-after.txt`). The verification reports therefore record `dirty: true` |
+
+Changes after the qualified candidate `befc5e77` (`git log befc5e77..7df84ea2`):
+
+- `f342133a`: `CLAUDE.md` change A.
+- `6598a29d`: the user's wording package ([receipt](inert-wording-results.md)). It contains the glossary entries and status line, `CLAUDE.md` change C, and passages of `cli-invocation.spec.md` and `module-description.spec.md`. It also contains the principles status sentence the user authorized. In source, it changes the compiler-source extension pattern in `subs/analysis/subs/project/src/inventory.ts` and `subs/analysis/subs/typescript/src/resolution.ts`, with a new test, one test fixture and two harness expectations.
+- `c9f724c5` and `723d4698`: this receipt's qualification part and handoff entries.
+- `a5b377e8` and `7df84ea2`: the measurement recipes under `scripts/measurements/` and plan documents only. No file beneath `src/` or `subs/` changed after `723d4698`.
+
+The qualification matrix above therefore ran on source without `6598a29d`'s
+extension pattern. The audit and the reference chain below ran on the final
+source; the workflow scripts were not repeated on it.
+
+### Attempts
+
+**First attempt, `723d4698`.** Gate `final-candidate` passed: audit verdict
+pass, build exit 0, locked `reference:cases` 37 files and 393 tests
+(`723d4698/final-candidate/`). `measure:resident` ran 10:09:40–10:16:50 and
+exited 1. Four of its nine workloads passed. The other five required complete
+coverage on the synthetic fixtures, which report `partial` for Plan 8's
+expected `signature-inferred` note on `value`. That was a stale recipe
+expectation. The sequence stopped and nothing was rerun
+(`723d4698/measurements/`). The
+[measurement-recipe repair](measurement-recipe-repair-results.md) fixed it
+in `a5b377e8`.
+
+**Second attempt, `a5b377e8`.** Gate `final-candidate-2` passed: audit pass,
+build, `reference:cases` 393/393. The preflight workloads, Plan 2A
+`synthetic-100` and fast `hook-latency-s100`, passed (`a5b377e8/preflight/`).
+`measure:resident` (11:43:49–11:57:35) and `measure:plan2a`
+(11:57:35–12:07:41) exited 0. `measure:fast` (12:07:41–12:58:14) exited 1. The
+cause was the per-context retained-fact limit at S500 and S1000; see the
+[diagnosis and repair](#second-attempt-diagnosis-and-repair). The relay
+session chose option (a), a repair of the recipe only, under the user's rule
+for clear-cut questions. The user may still override it. The repair is
+`7df84ea2`.
+
+**Third run, `7df84ea2`.** This is the evidence recorded below.
 
 ### Full audit (PB1-35)
 
-Run by the coordinator on the final candidate; results appended below.
+Gate `final-candidate-3` (`7df84ea2/final-candidate-3/`), on the clean
+checkout:
 
-### Measurements: `measure:resident`, `measure:fast`, `measure:plan2a`
+- `ramify-audit audit --cwd /home/app/ramify-pb1 --full --force --json`, run with `ramify-audit` 0.3.2 from `/ramify/ramify-agent/node_modules/.bin/`. It ran 13:19:15–13:24:41 and exited 0. Requested and executed mode `full`, verdict `pass`, 0 outstanding failures, 325.1 s. Its checks were `patch-integrity`, `toolkit-build`, `toolkit-structure`, `toolkit-tests` and `toolkit-typecheck`, and the failure ledger was complete with no entries. Run ref `refs/audited/runs/2026-10-05T13-24-41Z-7df84ea29`, report commit `a44c2443`.
+- `npm run build`: exit 0. This is the frozen build.
+- `flock /tmp/ramify-audit-tests.lock npm run reference:cases`: exit 0, 37 files and 393 tests passed, started 13:24:45, 348.4 s.
 
-Run by the coordinator on the final candidate; results appended below.
+No direct-verification fallback was needed. This is an audit pass, not a
+direct gate.
+
+### Measurements
+
+**Preflight.** This is not evidence. Fast `--workload hook-latency-s100` ran
+13:30:41–13:34:29 and S100 was measured and passed. The report's overall
+status is `incomplete`, because no other workload was selected. Its report
+and archive are in `7df84ea2/preflight/`, outside `scripts/measurements/results/`.
+
+**The run.** `measure.sh` ran the three recipes once, in the order resident,
+Plan 2A, fast. Each ran under `flock /tmp/ramify-audit-tests.lock`, on the
+frozen build, on Linux only, with
+`RAMIFY_MEASUREMENT_ACTIVITY='project boundary Phase 1 final candidate'`.
+This follows the user's final measurement decision of 2026-10-04, relayed to
+the coordinator. The recipes run complete as written, with their fixed sample
+counts, on the candidate only, and are compared with archived baselines. In
+the fast hook-latency workloads that is 20 samples per class. Decided
+question 11 of the main plan and `execution.md` still say "samples of 30–50".
+A watcher would have stopped the S500 hook-latency worker after 45 minutes and
+the S1000 worker after 60 minutes, the user's bounds. Neither bound was reached. The S500
+workload ran 14:05:16–14:21:16. The S1000 workload ran from 14:22:01 until it
+stopped at its failure point at 14:23:13. Outputs are in
+`7df84ea2/measurements/`: `timeline.txt`, each recipe's `.stdout`, `.stderr`
+and `.exit`, and `resident-report.json`, `plan2a-report.json` and
+`fast-report.json` (580 MB).
+
+| Recipe | UTC | Exit | Result |
+| --- | --- | --- | --- |
+| `measure:resident` | 13:34:31–13:48:11 | 0 | `passed`. All nine I2-29 workloads measured and passed: `entry-footprints`, `cold-warm-broad-reference`, `cold-warm-broad-hundred`, `repeated-edit-plateau`, `many-contexts`, `slow-consumer`, `synthetic-500`, `synthetic-1000`, `publication-peak`. No advisory miss |
+| `measure:plan2a` | 13:48:11–13:58:18 | 0 | `passed`. `reference-scale`, `toolkit-scale`, `synthetic-100`, `synthetic-1000` and `repeat-plateau` measured and passed. `synthetic-500` was not executed: the recipe's standing policy, from Plan 5's measurement decision of 2026-09-11, excludes it, and the report says so by name |
+| `measure:fast` | 13:58:18–14:34:56 | 1 | `failed`, with exactly three failed workloads: `hook-latency-s1000`, `checked-set-bounded` and `cold-open`. The other seven passed: the reference, S100, S500 and X100 hook-latency workloads, `repeated-edit-plateau`, `hot-warm-memory` and `entry-footprints` |
+
+Archives, untracked in the worktree:
+`scripts/measurements/results/resident-2026-10-05T13-34-32.071Z-7feeb3b4-5d9b-419f-8fcb-da61032a615b.json.gz`,
+`plan2a-2026-10-05T13-48-12.093Z-c143c50f-dccf-4a22-8ca0-ef39abb19ec9.json.gz`
+and `fast-2026-10-05T13-58-18.793Z-a0804e21-9af0-41ae-aa81-9605f7248012.json.gz`
+(20 MB). `index.json` lists them.
+
+**S500 retries at the retained-fact limit.** `I5-13:hook-latency-s500` passed
+with no failed assertion. Its row "membership revisions retried broad at the
+retained-fact limit" lists 8 cycles: created 5, 10, 15 and 20 and deleted 3,
+8, 13 and 18. The largest growth one membership revision added was 6,883,102
+bytes. The reference, S100 and X100 rows list 0 cycles.
+
+- Before each retry the context held six revisions, against the limit of 100,663,296 bytes. Retained facts were 98,304,757 bytes before deleted 3, the first crossing, and 99,078,599 before created 5. Before each of the other six they were 95,255,922.
+- The history reset was observed 2.5–2.8 s after the write. The retry then ran 14.2–14.6 s.
+- The broad revision's session work was 13.8–14.2 s, and the hook took 17.0–17.4 s end to end. Across all 20 created and all 20 deleted saves, the median hook end to end was 2.2 s, and the median session work 2.16 s.
+
+**S1000 failure point.** `I5-13:hook-latency-s1000` recorded "Stopped at body
+5 (racing): the hook answered not-checked (unavailable) after 28403 ms:
+analysis-failed: Session worker exited (1)".
+
+- Body edits 1–4 were checked in 0.8–1.0 s end to end. After them the context retained 74.1, 81.2, 88.4 and 95.5 MB of facts.
+- The failure point records 95,495,083 retained bytes and five revisions before the reset, 5,168,213 bytes of headroom, and the reset observed 1,250 ms after the write. The retry then ran 27.2 s to the end of the window.
+- The hook answered `not-checked`, reason `unavailable`, exit 2.
+- The workload has 24 failed assertions. The first is "workload stopped at its measured failure point". The rest cover body edit 5 and the phases, hooks and probes the workload never reached.
+- `I5-13:checked-set-bounded` fails 8 assertions, all for S1000. `I5-13:cold-open` fails none of its own. Each names the source failure: "Source process I5-13:hook-latency-s1000 stopped at body 5 (racing): analysis-failed: Session worker exited (1); this row has no complete evidence from it."
+
+Recipe output does not capture daemon or worker stderr, so the cause of the
+worker's exit is still unproven.
+
+#### The classification round trip
+
+Iteration 15 made each hook check classify its paths with one extra round
+trip. No recipe isolates its cost, and this run does not either.
+
+- In `subs/cli/src/changed-command.ts`, the client's first check request carries no classification. The daemon answers `classification-changed` with the classification, and the client then sends the classified request.
+- The `ramify.check/2` document records `timings.waitedMs`, the client's time waiting on all of its check requests together, and `timings.totalMs`. It records `timings.reply` only for the last request.
+- No field and no recipe times the first request alone.
+- The session's `classify` stage timing is the revision's change classification, not this round trip.
+
+The evidence allows the following. Values are medians of 20 hooks from
+`fast-report.json`, in milliseconds. A published hook is one whose watcher
+revision had already published, so the hook performs no analysis. A
+zero-work hook is a client on the freshly opened revision.
+
+| Scale | Bare Node process | Zero-work hook: end to end; `waitedMs` | Published hook: end to end | Published hook: `totalMs` | Published hook: `waitedMs`, both requests (range) | Published hook: last request `reply.service` + `reply.clientTransport` |
+| --- | --- | --- | --- | --- | --- | --- |
+| reference | 24.4 | 29.5; 1.58 | 35.9 | 10.1 | 1.70 (1.27–2.19) | 0.50 + 0.44 |
+| S100 | 25.1 | 30.9; 1.91 | 32.1 | 9.9 | 1.36 (1.13–1.68) | 0.16 + 0.42 |
+| S500 | 32.1 | 45.9; 3.81 | 34.5 | 10.8 | 1.57 (1.26–2.49) | 0.15 + 0.44 |
+| S1000 | 29.5 | 44.0; 8.25 | — (not reached) | — | — | — |
+| X100 | 23.9 | 31.0; 1.89 | 34.9 | 10.2 | 1.34 (1.16–1.77) | 0.16 + 0.40 |
+
+So, on a context whose revision already covers the change, the classification
+request and the covered request together took a median of 1.3–1.7 ms of a
+32–36 ms hook. The classification round trip is a part of that time and is
+not measured on its own. In edit cycles, waiting is set by the session work.
+For S500 body edits, for example, the hook waited a median of 381.6 ms for
+327.4 ms of session work.
+
+#### Timing targets on the final candidate
+
+Every target of these recipes is advisory (resident) or an ideal budget
+(fast). A miss is recorded and fails nothing. Plan 2A's report records raw
+measurements, which its I2A-12 instances judge. Baseline values come from the
+archived reports. Pairing them with these values for the user is iteration 21's
+handoff report.
+
+- **Resident:** 36 advisory targets, all met.
+- **Plan 2A:** the report has no target of its own. Every I2A-12 instance except `linux-macos-bytes` passed in the Plan 2A verification.
+- **Fast:** 76 ideal targets, 52 met and 24 missed. The misses are in the table below. Seven of S1000's misses have no value, because the workload stopped before it measured them.
+
+| Workload | Target | Candidate | Target value |
+| --- | --- | --- | --- |
+| reference | body / configuration median session work | 38.6 ms / 1,396 ms | 25 ms / 1,000 ms |
+| S100 | body / configuration median session work | 61.9 ms / 2,852 ms | 60 ms / 2,500 ms |
+| S500 | body / configuration median session work | 327.4 ms / 14,018 ms | 200 ms / 8,000 ms |
+| X100 | body / configuration median session work | 88.5 ms / 3,604 ms | 60 ms / 2,500 ms |
+| S1000 | body median session work (5 cycles); racing median hook end to end (5 cycles) | 717.0 ms; 942.0 ms | 400 ms; 900 ms |
+| S1000 | source, description, readme, created, deleted, configuration session work; published hook | no value | — |
+| `repeated-edit-plateau` | reference: worker supervisor RSS growth, combined process RSS growth, compiler server RSS | 22.1, 46.2, 217.5 MiB | 19, 19, 192 MiB |
+| `repeated-edit-plateau` | S100: worker supervisor RSS growth, combined process RSS growth, worker heap growth beyond history | 24.8, 37.0, 11.5 MiB | 19, 19, 5 MiB |
+| `cold-open` | reference cold session work | 1,712 ms | 1,500 ms |
+
+`cold-open` also records S1000 cold session work of 24.4 s against 40 s. That
+row is failed for want of complete S1000 evidence, so the value is not
+accepted evidence.
 
 ### Reference verification: Plans 1, 2, 5 and 2A
 
-Run by the coordinator on the final candidate; results appended below.
+The verifications ran in the final gate's order, without a rebuild. Each was
+`npm run reference:verify -- --plan <n> --format json` under the machine test
+lock. Outputs are in `7df84ea2/verification/`: `timeline.txt` and
+`verify-<n>.stdout`, `.stderr` and `.exit`. Every report names revision
+`7df84ea2`, the same source and build digests, Node v22.23.3 and TypeScript
+7.0.2.
+
+| Plan | UTC | Exit | Required | Passed | Failed | Report (`.reference-work/reports/`) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 14:35:15–14:54:46 | 0 | 308 | 308 | 0 | `plan1-full-516e56e1-…` |
+| 2 | 14:54:46–15:10:38 | 0 | 174 | 174 | 0 | `plan2-full-3fbd7bc7-…` |
+| 5 | 15:10:38–15:56:34 | 1 | 103 | 100 | 3 | `plan5-full-fb58f98f-…` |
+| 2A | 15:56:34–16:09:30 | 1 | 104 | 103 | 1 | `plan2a-full-4ef44e5d-…` |
+
+- **Plan 2** also lists 10 superseded, not required records: nine `I2-10` records and `I2-11:reuse-equal`, each naming its Plan 5 counterpart. All nine I2-29 measurement instances passed.
+- **Plan 5** failed only `I5-13:hook-latency-s1000`, `I5-13:checked-set-bounded` and `I5-13:cold-open`. Each fails one assertion, "current raw fast measurement evidence is available and verified", because the evidence reader refuses with the S1000 failure-point text above. `I5-13:hook-latency-s500` and the other I5-13 instances passed, as did all eight I5-08 instances, `I5-10:plan2-gate-amended` and `I5-14:plan2-regression`. The latter ran its own same-input amended Plan 2 gate: 174/174 with ten superseded records.
+- **Plan 2A** failed only `I2A-12:linux-macos-bytes`, on its one assertion that a macOS counterpart report is present. Its Linux-report assertions passed. `I2A-12:synthetic-500` passed: S500 is recorded as not executed, and no measurement was fabricated. All seven I2A-13 instances passed. Among them, `I2A-13:predecessor-regressions` found Plan 1 still 308/308, and Plans 2 and 5 with no failure outside their recorded closure-baseline rows.
 
 ### Final `check:reference`, `diagrams` and `site:build`
 
-Run by the coordinator on the final candidate; results appended below.
+These ran after the verifications, without a rebuild (16:09:30–16:09:40, all
+exit 0).
+
+- `npm run check:reference`: execution completed, check passed, coverage complete. 15 owners, 56 source files, 5 resources, 318 accesses; 0 errors, 0 warnings, 0 analysis limits; 179 allowed, 0 denied, 139 external.
+- `npm run diagrams`: wrote the nine SVGs. The worktree status was identical before and after, so no committed diagram changed.
+- `npm run site:build`: installed `ramify.ts@0.2.0` into `site/node_modules` from the packed frozen build: `ramify.ts-0.2.0.tgz`, 492 files, sha256 `675ed7aad80fcee177f2e4b63e54d6537f0a0d2644ace05e79c41a711b10b91e`. The Docusaurus build succeeded.
+
+### Accepted gaps
+
+Four required instances fail on `7df84ea2`. They are accepted as gaps, not
+passes:
+
+| Instance | Why it fails | Decided by | Handoff |
+| --- | --- | --- | --- |
+| `I2A-12:linux-macos-bytes` | The measurements ran on Linux only, so no macOS counterpart report exists | The user's measurement decision of 2026-10-04 (decided question 11 of the [main plan](../main-plan.md)) | [Known limitations](../handoff.md#known-limitations) |
+| `I5-13:hook-latency-s1000` | The S1000 session worker exited during the broad retry after a retained-limit refusal, and the daemon kept the dead session | The relay session's option (a), under the user's rule for clear-cut questions; the user may override it | [Known limitations](../handoff.md#known-limitations), [known defects](../handoff.md#known-defects-carried-forward) |
+| `I5-13:checked-set-bounded` | Uses the S1000 process | As above | As above |
+| `I5-13:cold-open` | Uses the S1000 process | As above | As above |
+
+The user's measurement bounds had already provided for one case: a workload
+stopped at its 45- or 60-minute bound would be a waived gap. The S1000
+workload was not stopped by its bound; it failed. The final gate's rule in
+[execution.md](../execution.md#final-gate) says that a failure other than a
+timing predicate fails the gate, so these three gaps rest on the relay's
+option (a) alone.
 
 ### Protected-file comparison and final handoff identity
 
-Run by the coordinator on the final candidate; results appended below.
+`git diff --name-status 33d8a739 7df84ea2` changes these protected documents
+(outside `ramify-agent/`):
 
-## Second measurement attempt on `a5b377e8`
+- the eight specifications the [write-scope review](#write-scope) lists;
+- `docs/model/glossary.md`;
+- `docs/model/cross-module-importability.principles.md`.
 
-The first attempt, on `723d4698`, stopped in the resident recipe; its repair is
-the [measurement-recipe repair](measurement-recipe-repair-results.md), committed
-as `a5b377e8`. The coordinator ran the three approved recipes on `a5b377e8` in
-`/home/app/ramify-pb1`. Outputs are in
+Between `befc5e77` and `7df84ea2`, only `6598a29d` changed protected
+documents. It changed `cli-invocation.spec.md`, `module-description.spec.md`,
+`glossary.md` and the principles file. The principles change is the one
+status sentence the user authorized; no principle changed. The write-scope
+review's "No `.principles.md` file changed" therefore holds for `befc5e77`
+only. No hunk-by-hunk comparison against the recorded baselines and
+approvals was recorded in this run.
+
+The identity handed to iteration 21 is the [final candidate](#final-candidate)
+above, with its frozen build, the receipts in `7df84ea2/` and this receipt.
+
+### Second attempt: diagnosis and repair
+
+Outputs of the second attempt are in
 `/home/app/ramify-pb1-evidence/a5b377e8/measurements/` (`timeline.txt`, each
 recipe's `.stdout`, `.stderr` and `.exit`, and `failed-run-archive/`).
-
-| Recipe | UTC | Exit |
-| --- | --- | --- |
-| `measure:resident` | 11:43:49–11:57:35 | 0 |
-| `measure:plan2a` | 11:57:35–12:07:41 | 0 |
-| `measure:fast` | 12:07:41–12:58:14 | 1 |
 
 In the fast report, the reference, S100 and X100 hook workloads,
 `repeated-edit-plateau`, `hot-warm-memory` and `entry-footprints` passed. Four
@@ -544,7 +776,7 @@ The handoff records the [limit](../handoff.md#known-limitations) and the
 [defect](../handoff.md#known-defects-carried-forward).
 
 **Repair** (relay-settled option (a): the recipe only; no candidate source
-changed; uncommitted for the coordinator's review):
+changed; committed as `7df84ea2`):
 
 - `fast-assertions.mjs`: a broad created or deleted revision passes its
   `revision path` assertion only when the workload's daemon telemetry, between
@@ -575,4 +807,7 @@ accepts exactly the eight cycles named above and no other save, and the S500
 workload's assertions all pass. Over `s1000.json` the stop triggers first at
 body edit 5. It records 95,495,083 retained bytes with five revisions before
 the reset, a retry of about 27.7 s from the observed reset to the reply, and
-the worker's exit message. No recipe was rerun; the coordinator reruns them.
+the worker's exit message. These checks ran over the second attempt's saved
+data; the recipes themselves ran again only on `7df84ea2`, as recorded
+[above](#measurements). There the stop triggered at the same edit with the
+same retained bytes.
