@@ -595,7 +595,10 @@ worker keeps one warm TypeScript 7.0.2 compiler server as a child process with
 exactly one live snapshot; compiler objects never leave the `typescript`
 adapter, and the daemon's event loop never waits on the compiler. Messages
 between the context and the worker are frozen plain data: changes in, revisions
-and outcomes out. A full report crosses only when a caller requests one. Batch
+and outcomes out. A full report crosses only when a caller requests one. An
+abort reaches the worker as a message, so the worker can publish before it
+observes one. A call aborted while it waits answers `cancelled` unless its reply
+published a revision; it then answers that revision, the session's current one. Batch
 checks keep their finite compiler helpers and share the pipeline code.
 
 **Retained facts.** The session retains the observed inputs, per-file export descriptions with the files, resources, shims and absences each one depended on, per-file access facts, the linked model, per-access decisions and reverse indexes.

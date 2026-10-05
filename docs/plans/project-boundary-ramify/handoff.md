@@ -111,3 +111,25 @@ stays open until a toolkit-owned slice repairs it with its own verification.
   directory with `WITH_R`, `DELETE_R` and `EXACT_COPY` set. The harness case
   `I2A-13:self-reference-checks` now keeps every copy until its daemon has
   stopped; the runtime is unchanged.
+
+The project explorer page loses an interaction made before a newly rendered
+model settles: in `subs/explorer/src/ProjectExplorerPage.tsx`, the effects
+that set the presentation-class filter and the `?module=` focus from the
+first model overwrite a class toggle or selection made between that model's
+first render and those effects. The module tree page had the same defect and
+was repaired in `e3c10dc8`
+([receipt](iterations/mt09-repair-results.md)); this page is not, because
+until its effect runs every class shows unchecked, so the repair needs the
+filter computed during rendering.
+
+## Known flaky tests
+
+The user's policy of 2026-10-05: a failing test is run alone three times; if
+all three pass it is flaky, the gate counts as passed for it, and the
+occurrence is listed here with its failing output.
+
+| Test | Date | Gate | Failing output | State |
+| --- | --- | --- | --- | --- |
+| `src/tests/compiled-client.test.ts`, A7-11:compiled-child: the compiled client's result for `affected example/mid --path docs/notes.md --batch` differed from the Node entry's, in the relocated copy only | 2026-10-04 | Iteration 14, Plan 1 `I1-28:relocated-package` | `.reference-work/evidence/7cf05b52-22e2-42df-a7e6-b196b78231c2.json.gz` in the phase worktree; investigation in [the receipt](iterations/iteration14-fix-results.md) | Not reproduced; cause unknown. The test now records both outputs. |
+| `subs/explorer/src/tests/ModuleTreePage.test.tsx`, MT09 | 2026-10-04 | Iteration 16 milestone, audit | Audit run `refs/audited/runs/2026-10-04T23-24-54Z-3b5c168fa` | Resolved: a product defect, repaired in `e3c10dc8`. |
+| `subs/analysis/src/tests/session-worker.test.ts`, "cancels queued and active calls without losing the last published revision" | 2026-10-05 | Iteration 17 rerun, Plan 1 `I1-28:relocated-package` | `.reference-work/evidence/f030a68f-8c50-4572-82f9-e2f026a5d3b0.json.gz` in the phase worktree | Resolved: a product defect in the session host, repaired with [this receipt](iterations/session-cancel-repair-results.md). |
