@@ -42,7 +42,12 @@ The concrete representation is defined separately in
 [Directory Structure And Module Description Specification](docs/model/module-description.spec.md).
 It specifies the required `src/` and `subs/` layout, with optional same-owner
 `src/tests/` and `src/interfaces/`, and the formal `module.ramify` version 1
-language. Modules may occur only beneath `subs/`. The module header classifies
+language. Modules may occur only beneath `subs/`. The project root's description
+is marked `root module <name>`, and `ramify check` climbs to the nearest marked
+description. A description may declare nested trees as `owned-ignored` or
+`external`; Ramify does not inventory or analyze them, and an analyzed file
+that imports from one violates the boundary unless the import resolves through
+a package, which makes it external. The module header classifies
 ordinary `src/`, including interfaces; the nested `src/tests/` area uses its
 fixed testing profile: `testing` plus all required-importer tags in the module
 header, without inheriting required-symbol tags. There is no `tests tagged [...]`
