@@ -16,6 +16,12 @@ export function compactStatus(status) {
         timings: context.published.timings, outcome: context.published.outcome, summary: context.published.summary } })) };
 }
 
+function compactContext(context) {
+  return { level: context.level, state: context.state, synchronization: context.synchronization,
+    published: context.published?.sequence ?? null, pending: context.pending, history: context.history,
+    retainedBytes: context.retainedBytes };
+}
+
 /** All operations use the installed client and production daemon. */
 export class FastResident extends Resident {
   telemetry = [];
@@ -53,10 +59,23 @@ export class FastResident extends Resident {
   async status() { return unwrap(await this.connection.daemonStatus()); }
   async published(token, after = 0) {
     const deadline = performance.now() + 600_000;
+    const work = counters => counters.analyses - counters.sweeps - counters.audits;
+    const start = work((await this.status()).counters);
+    const idle = context => !context.pending.analysisRunning && !context.pending.changedPaths && !context.pending.requests;
     for (;;) {
       const current = await this.context(token);
       if (current.published?.sequence > after && !current.pending.analysisRunning && !current.pending.changedPaths) return current;
       assert.ok(performance.now() < deadline, 'Publication did not arrive within finite ten minute guard');
+      if (idle(current)) {
+        // An analysis that ran and settled without publishing will not publish later:
+        // stop now rather than wait out the guard. Counters read on both sides of an
+        // idle, unpublished snapshot with no analysis between them.
+        const first = work((await this.status()).counters), again = await this.context(token);
+        const second = work((await this.status()).counters);
+        if (first > start && first === second && idle(again) && !(again.published?.sequence > after)) {
+          throw new Error(`Context settled without publishing after ${first - start} analyses: ${JSON.stringify(compactContext(again))}`);
+        }
+      }
       if (!current.pending.analysisRunning && current.level === 'cold' && current.synchronization !== 'initializing') {
         throw new Error(`Context failed to publish: ${JSON.stringify(current)}`);
       }

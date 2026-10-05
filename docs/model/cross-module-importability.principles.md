@@ -4,7 +4,7 @@
 
 Whole-tree ownership and project-boundary principles adopted 2026-10-01;
 their detailed contracts, including auxiliary-source rules, are specified
-separately. The corresponding tooling changes are not yet implemented.
+separately. Ramify's checks implement them.
 
 ## Purpose
 

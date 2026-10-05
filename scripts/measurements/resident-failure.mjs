@@ -22,7 +22,7 @@ export async function coldCommand(host, project, measurements) {
   // Establish its cleanup connection before checking that report.
   try { await host.connect('never'); } catch (error) { connectionFailure = error; }
   try {
-    const report = reportCommand(sample, project.owners);
+    const report = reportCommand(sample, project);
     if (connectionFailure !== undefined) throw connectionFailure;
     return { sample, report };
   } catch (error) {

@@ -195,7 +195,7 @@ describe('listAvailableOriginals', () => {
         const byBinding = new Map(available.map((entry) => [entry.original.binding, entry]));
         for (const symbol of catalog) {
           const entry = byBinding.get(symbol.id.binding);
-          const importerFile = { file: `${area.root}/probe.ts`, area };
+          const importerFile = { file: `${area.root}/probe.ts`, area, auxiliary: false };
           const decide = (request: 'value' | 'type-only') => explainImport(model,
             { importer: importerFile, location: { file: importerFile.file, start: 0, end: 0, line: 1, column: 1 },
               target: symbol.origin, forwarding: [], selection: { original: symbol.id, request } });

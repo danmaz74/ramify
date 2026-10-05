@@ -7,6 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { connectDaemon } from 'ramify.ts/client';
 import { capabilities, packageRoot, median } from './common.mjs';
 import { observeResidentProcesses } from './resident-observer.mjs';
+import { coverageEquals, fixtureSignatureNotes } from './signature-notes.mjs';
 
 const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
 export const engine = `ramify.ts@${manifest.version}+typescript@7.0.2`;
@@ -39,7 +40,19 @@ export function capturedExpected(report, expected) {
   });
   return captured;
 }
-export function reportCommand(result, owners, denied = 0, expected = []) {
+/**
+ * A completed check of `project` in its measurement state: passed, or failed by
+ * exactly `denied` imports, with coverage limited by exactly the fixture's pinned
+ * signature notes (`signature-notes.mjs`) and by nothing else.
+ */
+export function assertMeasuredOutcome(report, project, { denied = 0, setupExposureRemoved = false } = {}) {
+  const notes = fixtureSignatureNotes(project.name, { setupExposureRemoved });
+  assert.deepEqual(report.outcome, { execution: 'completed', check: denied ? 'failed' : 'passed', coverage: notes.length ? 'partial' : 'complete' });
+  assert.equal(report.summary.owners, project.owners); assert.equal(report.summary.denied, denied);
+  assert.ok(coverageEquals(report.coverage, notes),
+    `${project.name} coverage must be exactly ${JSON.stringify(notes)}: ${JSON.stringify(report.coverage)?.slice(0, 4096)}`);
+}
+export function reportCommand(result, project, { denied = 0, expected = [], setupExposureRemoved = false } = {}) {
   assert.equal(result.failure, null); assert.equal(result.signal, null);
   assert.equal(result.stderr, '', 'Resident command must not fall back or recover');
   if (result.code !== (denied ? 1 : 0)) {
@@ -48,10 +61,9 @@ export function reportCommand(result, owners, denied = 0, expected = []) {
     assert.fail(`Resident command exited ${result.code}; expected ${denied ? 1 : 0}${detail ? `: ${detail.slice(0, 4096)}` : ''}`);
   }
   const report = JSON.parse(result.stdout);
-  assert.equal(report.schemaVersion, 'ramify.analysis/1');
-  assert.deepEqual(report.outcome, { execution: 'completed', check: denied ? 'failed' : 'passed', coverage: 'complete' });
-  assert.equal(report.summary.owners, owners); assert.equal(report.summary.denied, denied);
-  assert.equal(report.coverage.length, 0); assert.ok(report.stages.every(stage => stage.status === 'completed'));
+  assert.equal(report.schemaVersion, 'ramify.analysis/2');
+  assertMeasuredOutcome(report, project, { denied, setupExposureRemoved });
+  assert.ok(report.stages.every(stage => stage.status === 'completed'));
   return { inputId: report.inputId, runId: report.runId, summary: report.summary, outcome: report.outcome,
     captured: capturedExpected(report, expected),
     reportBytes: Buffer.byteLength(result.stdout), outputSha256: createHash('sha256').update(result.stdout).digest('hex') };
@@ -123,7 +135,7 @@ export class Resident {
     const outcome = unwrap(await this.connection.check({ token, requestId: randomUUID(), freshness: { mode: 'synchronized', expect } }));
     const durationMs = performance.now() - started;
     assert.equal(outcome.status, 'reported', JSON.stringify(outcome)); assert.equal(outcome.published, true, JSON.stringify(outcome));
-    assert.equal(outcome.report.outcome.execution, 'completed'); assert.equal(outcome.report.summary.owners, project.owners);
+    assertMeasuredOutcome(outcome.report, project);
     assert.equal(outcome.freshness.mode, 'synchronized'); assert.equal(outcome.freshness.verified, true);
     // With explicit identities the covering revision may predate this request.
     // Empty-expect plain checks retain the post-acknowledgment sweep contract.

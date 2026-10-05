@@ -44,9 +44,9 @@ describe('modularity projection: declared ownership', () => {
   const test = view(report, 'test');
 
   it('records provenance, the ownership tree and views in contract order', () => {
-    expect(report.schemaVersion).toBe('ramify.modularity/2');
+    expect(report.schemaVersion).toBe('ramify.modularity/3');
     expect(report.provenance).toEqual({
-      revision: 'batch:input-1', analysisSchema: 'ramify.analysis/1', inputId: 'input-1',
+      revision: 'batch:input-1', analysisSchema: 'ramify.analysis/2', inputId: 'input-1',
       registryId: buildReport(graphSpec).registry!.id, check: 'passed', analysisCoverage: 'complete',
       capabilities: ['coverage', 'registry', 'static-access'], omittedScopes: [], ownership: 'declared', candidateId: null,
     });
@@ -58,6 +58,19 @@ describe('modularity projection: declared ownership', () => {
     expect(report.coverage).toEqual({ state: 'complete', detail: { limitIds: [], unattributedAccesses: 0, unknownDependencies: 0 } });
     expect(production.owners.map(item => item.owner)).toEqual(['app', 'app/core', 'app/ui', 'app/ui/widgets']);
     expect(test.owners.map(item => item.owner)).toEqual(['app', 'app/core', 'app/tools']);
+  });
+
+  // The modularity report specification: owned compiler source outside src/ is
+  // analyzed as its owner's auxiliary source, so it counts as that owner's
+  // production source, and its accesses as that owner's occurrences.
+  it('counts auxiliary source as its owner\'s production source', () => {
+    const script = 'subs/ui/scripts/build.ts';
+    const spec: FixtureSpec = { ...graphSpec, files: [...graphSpec.files, { path: script, owner: 'app/ui', placement: 'auxiliary', bytes: 9 }],
+      accesses: [...graphSpec.accesses, { id: 'a12', importer: script, target: paths.view, selections: [{ file: paths.view, binding: 'render' }] }] };
+    const auxiliary = view(projected(buildReport(spec)), 'production');
+    expect(values(auxiliary.summary).all).toMatchObject({ owners: 4, sourceFiles: 8, applicationOccurrences: 8, sameOwnerOccurrences: 2,
+      crossOwnerOccurrences: 6, edges: 6, outsideModuleOccurrences: 0 });
+    expect(measured(owner(auxiliary, 'app/ui').exact.all).internalOccurrences).toBe(measured(owner(production, 'app/ui').exact.all).internalOccurrences + 1);
   });
 
   it('summarizes each source filter per load variant without mixing production and test', () => {
@@ -336,6 +349,23 @@ describe('modularity projection: coverage', () => {
     expect(partial(owner(production, 'app').subtree.all).coverage.unattributedAccesses).toBe(2);
   });
 
+  it('counts nested-tree and excluded occurrences with unresolved ones, as unattributed and never as edges', () => {
+    const base = measured(view(projected(buildReport(graphSpec)), 'production').summary.all);
+    const spec: FixtureSpec = { ...graphSpec, accesses: [...graphSpec.accesses,
+      { id: 'a14', importer: paths.button, target: { nested: 'vendor/tool.ts' } },
+      { id: 'a15', importer: paths.button, target: { excluded: 'dist/out.d.ts' }, runtime: false },
+    ] };
+    const production = view(projected(buildReport(spec)), 'production');
+    // Neither names a provider: no edge or application occurrence is added.
+    expect(partial(production.summary.all)).toMatchObject({
+      observed: { edges: base.edges, applicationOccurrences: base.applicationOccurrences, outsideModuleOccurrences: 0, unresolvedOccurrences: 2 },
+      coverage: { limitIds: [], unattributedAccesses: 2, unknownDependencies: 0 } });
+    expect(production.edges.map(edge => [edge.consumer, edge.provider])).toEqual(
+      view(projected(buildReport(graphSpec)), 'production').edges.map(edge => [edge.consumer, edge.provider]));
+    expect(partial(production.summary.runtime).coverage.unattributedAccesses).toBe(1);
+    expect(partial(production.summary.typeOnly).coverage.unattributedAccesses).toBe(1);
+  });
+
   it('applies incomplete source export descriptions and unlocated limits', () => {
     const incomplete: FixtureSpec = { ...graphSpec, files: graphSpec.files.map(file => file.path === paths.helper
       ? { ...file, state: 'incomplete' as const, issueIds: ['issue-h'] } : file) };
@@ -375,7 +405,9 @@ describe('modularity projection: availability and determinism', () => {
   });
 
   it('produces byte-identical JSON independent of input order and run identity', () => {
-    const spec: FixtureSpec = { ...graphSpec, independentScopes: ['site', 'examples/app'],
+    // Declared nested trees are the omitted scopes; a module scratch directory is not one.
+    const spec: FixtureSpec = { ...graphSpec, exclusions: [{ kind: 'external', directory: 'examples/app', owner: null },
+      { kind: 'owned-ignored', directory: 'site', owner: 'app' }, { kind: 'scratch', directory: 'src/tmp', owner: 'app' }],
       behavior: { facts: [{ consumer: paths.main, file: paths.model, binding: 'makeModel', classification: 'behavioral' }] } };
     const forward = buildReport(spec);
     const reversed = buildReport({ ...spec, modules: [...spec.modules].reverse(), files: [...spec.files].reverse(),

@@ -11,7 +11,7 @@ it('preserves every frozen S100 path and byte independently of the new generator
   const files = syntheticOwnerFiles(100);
   expect([...files]).toEqual([...hundredOwnerFiles()]);
   const entries = [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-  expect(createHash('sha256').update(JSON.stringify(entries)).digest('hex')).toBe('d5b77b9ff57c443b35f386f40598506ff20c51c4ec75b800371f0cec089c0897');
+  expect(createHash('sha256').update(JSON.stringify(entries)).digest('hex')).toBe('1b20168da7aa947bd25364d6da2bc5e156d63e529997e6c527820e24573f7098');
 });
 it.each([0, -1, 1.5, 1001, NaN, Infinity])('rejects an invalid owner count %s', count => {
   expect(() => syntheticOwnerFiles(count)).toThrow('Owner count');

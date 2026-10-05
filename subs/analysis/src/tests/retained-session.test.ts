@@ -12,7 +12,7 @@ const probe = 'subs/consumer/src/probe.ts';
 const other = 'subs/consumer/src/other.ts';
 const extra = 'subs/consumer/src/extra.ts';
 const fixtureFiles = {
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src publicValue, PublicType from "interfaces/api.ts" to descendants\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src publicValue, PublicType from "interfaces/api.ts" to descendants\n',
   'README.md': '# Fixture\n\nThis fixture exercises the retained session.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',

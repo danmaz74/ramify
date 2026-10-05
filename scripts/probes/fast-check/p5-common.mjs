@@ -7,7 +7,7 @@ import { dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API } from 'typescript/unstable/sync';
 import { readProject } from '../../../dist/subs/analysis/subs/project/src/read-project.js';
-import { parseDescription } from '../../../dist/subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../../dist/subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry, deriveSourceAreas } from '../../../dist/subs/analysis/subs/model/src/index.js';
 export const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const sha = value => createHash('sha256').update(value).digest('hex');
@@ -20,7 +20,7 @@ export const defaults = { R: 'examples/collection-review', T: '.', S100: '.refer
 export function rootOf(argument) { const p=resolve(argument); return statSync(p).isDirectory() ? p : JSON.parse(readFileSync(p,'utf8')).scope.root; }
 export async function acquire(argument) {
   const root=rootOf(argument);
-  const result=await readProject({ request:{cwd:repo,root,scope:'whole-project',configuration:'discover'},parse:parseDescription,limits:acquisitionLimits });
+  const result=await readProject({ request:{cwd:repo,root,scope:'whole-project',configuration:'discover'},parse:parseDescription,marker:readRootMarker,limits:acquisitionLimits });
   assert.equal(result.status,'acquired',JSON.stringify(result.issues));
   const inventory=result.view.inventory, registry=createDefaultTagRegistry();
   const areas=inventory.modules.flatMap(m=>{const r=deriveSourceAreas(registry,m.id,m.areas.find(a=>a.kind==='ordinary').root,m.headerTags);assert.equal(r.status,'valid');return r.value;});

@@ -11,7 +11,7 @@ import { treeIdentity } from './identities.mjs';
 import { measureProcess, processRows } from './process-observer.mjs';
 import { fastInputs, fastDependencies } from './fast-inputs.mjs';
 import { fastBudgets, fastWorkloads, fastFixtures, exposingFixtures } from './fast-plan.mjs';
-import { assertFastWorkload, deriveFastMeasurements, fastDeferrals } from './fast-assertions.mjs';
+import { assertFastWorkload, deriveFastMeasurements, derivedSourceFailure, fastDeferrals } from './fast-assertions.mjs';
 
 const args = process.argv.slice(2);
 if (args.length === 1 && args[0] === '--help') {
@@ -79,10 +79,12 @@ try {
   report.client = client;
   persist();
   const derivedSelected = ['checked-set-bounded', 'cold-open'].includes(selected);
+  // The derived rows reuse the four Plan 5 fixtures' hook workloads; Plan 8's X100 joins none.
+  const derivedSources = fastFixtures.map(name => `I5-13:hook-latency-${name.toLowerCase()}`);
   for (let index = 0; index < report.workloads.length; index++) {
     const id = report.workloads[index].id, suffix = id.replace('I5-13:', '');
     if (['checked-set-bounded', 'cold-open'].includes(suffix)) continue;
-    if (selected !== 'all' && selected !== suffix && !(derivedSelected && suffix.startsWith('hook-latency-'))) continue;
+    if (selected !== 'all' && selected !== suffix && !(derivedSelected && derivedSources.includes(id))) continue;
     if (controller.signal.aborted) throw new Error('Fast measurements interrupted');
     // Workload roots/endpoints are disjoint, and each child drains and stops its own daemons.
     const work = join(scratch, suffix); mkdirSync(work);
@@ -103,16 +105,17 @@ try {
     report.workloads[index] = measured; persist();
   }
   for (const id of ['I5-13:checked-set-bounded', 'I5-13:cold-open']) {
-    const sources = report.workloads.filter(row => row.id.startsWith('I5-13:hook-latency-'));
+    const sources = derivedSources.map(source => report.workloads.find(row => row.id === source));
     if (sources.every(row => row.status !== 'not-executed')) {
       const measurements = deriveFastMeasurements(id, report.workloads), assertions = assertFastWorkload(id, measurements);
-      const complete = sources.every(row => row.controllerObservation && !row.failures.length && !row.interrupted);
+      const collected = row => row.controllerObservation && !row.failures.length && !row.interrupted;
+      const complete = sources.every(collected);
       const observations = sources.map(row => row.controllerObservation).filter(Boolean);
       report.workloads[report.workloads.findIndex(row => row.id === id)] = { id,
         sourceWorkloadIds: sources.map(row => row.id), startedAt: sources[0].startedAt,
         completedAt: new Date().toISOString(), status: complete ? 'measured' : 'failed',
         passed: complete && assertions.every(row => row.passed), measurements, assertions,
-        failures: complete ? [] : ['One or more source process workloads failed to collect complete evidence.'], interrupted: false,
+        failures: sources.filter(row => !collected(row)).map(derivedSourceFailure), interrupted: false,
         controllerObservation: { durationMs: observations.reduce((sum, row) => sum + row.durationMs, 0),
           processes: observations.flatMap(row => row.processes), samples: observations.flatMap(row => row.samples),
           failure: observations.find(row => row.failure)?.failure ?? null, code: complete ? 0 : 1, signal: null,

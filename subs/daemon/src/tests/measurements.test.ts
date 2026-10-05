@@ -16,7 +16,7 @@ documentation: { files: 1, bytes: 20 } });
 const inventory: SessionMeasurements = { sequence: 1, inputId: 'input-1', modules: [
   { id: 'root', dir: '', parent: null, exact: bucket(1), subtree: bucket(2) },
   { id: 'root/child', dir: 'subs/child', parent: 'root', exact: bucket(1), subtree: bucket(1) },
-], files: [], outsideModuleFiles: [] };
+], files: [] };
 
 describe('daemon module measurements (MM05, MM07)', () => {
   it('measures publication bytes in memory, joins exact/subtree values and reuses selected buffers', async () => {

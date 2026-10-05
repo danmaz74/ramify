@@ -42,6 +42,8 @@ class SessionHost implements RetainedSession {
   readonly #inputs: SessionInputs;
   readonly #worker: Worker;
   readonly #pending = new Map<number, Pending>();
+  /** Replies whose revision became current when they arrived. */
+  readonly #published = new WeakSet<object>();
   readonly #children = new Set<number>();
   readonly #exit: Promise<void>;
   readonly #rss: RssSampler;
@@ -101,14 +103,17 @@ class SessionHost implements RetainedSession {
         this.#pending.delete(message.id); pending.cleanup();
         if (message.kind === 'error') { pending.reject(new Error(message.message)); return; }
         let result = deepFreeze(message.result);
+        let published = false;
         if (result && 'revision' in result) {
           if (this.#current?.sequence === result.revision.sequence) result = { ...result, revision: this.#current };
-          else this.#current = result.revision;
+          else { this.#current = result.revision; published = true; }
         }
         if (timedResult(pending.operation, result)) {
           result = { ...result, timings: { invocationCheck: 0, promotion: 0, ...result.timings, workerRoundTrip: received - pending.sent } };
         }
-        pending.resolve(deepFreeze(result));
+        const answer = deepFreeze(result);
+        if (published && answer) this.#published.add(answer);
+        pending.resolve(answer);
       }).catch(error => this.#fail(failure('analysis-failed', String(error))));
     });
     this.#worker.on('error', error => {
@@ -145,7 +150,7 @@ class SessionHost implements RetainedSession {
     if (control.signal?.aborted) return { status: 'cancelled' };
     try {
       const result = await this.#request({ operation: 'update', changes, ...(invocation ? { invocation } : {}) }, control) as SessionUpdate;
-      return control.signal?.aborted ? { status: 'cancelled' } : result;
+      return this.#cancelled(control, result) ? { status: 'cancelled' } : result;
     }
     catch (error) { return this.#reportedFailure(error as Error); }
   }
@@ -153,7 +158,7 @@ class SessionHost implements RetainedSession {
     if (control.signal?.aborted) return { status: 'cancelled' };
     try {
       const result = await this.#request({ operation: 'sweep' }, control) as SessionUpdate | { status: 'unchanged'; timings?: OperationTimings };
-      return control.signal?.aborted ? { status: 'cancelled' } : result;
+      return this.#cancelled(control, result) ? { status: 'cancelled' } : result;
     }
     catch (error) { return this.#reportedFailure(error as Error); }
   }
@@ -163,7 +168,7 @@ class SessionHost implements RetainedSession {
     // the outcome for this revision instead of receiving a rejection.
     try {
       const result = await this.#request({ operation: 'verify' }, control) as VerifyOutcome;
-      return control.signal?.aborted ? { status: 'cancelled' } : result;
+      return this.#cancelled(control, result) ? { status: 'cancelled' } : result;
     }
     catch (error) {
       const reported = await this.#reportedFailure(error as Error);
@@ -309,6 +314,15 @@ class SessionHost implements RetainedSession {
         this.#pending.delete(id); control.signal?.removeEventListener('abort', abort); reject(error);
       }
     });
+  }
+  /**
+   * An abort reaches the worker as a message, so the worker can publish before
+   * it observes one. A call aborted while it waited answers `cancelled` unless
+   * its reply published a revision: the session's current revision is then that
+   * reply's, and the call answers it.
+   */
+  #cancelled(control: RunControl, result: WorkerResult): boolean {
+    return control.signal?.aborted === true && !(result !== null && typeof result === 'object' && this.#published.has(result));
   }
   #rejectPending(error: Error): void {
     for (const pending of this.#pending.values()) { pending.cleanup(); pending.reject(error); }

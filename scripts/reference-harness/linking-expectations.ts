@@ -1,24 +1,15 @@
-import { resolve } from 'node:path';
-import { createDefaultTagRegistry, originalKey } from '../../subs/analysis/subs/model/src/index.js';
+import { originalKey } from '../../subs/analysis/subs/model/src/index.js';
 import type { OriginalId } from '../../subs/analysis/subs/model/src/index.js';
 import { validateProject } from '../../subs/analysis/src/validation-entry.js';
-import type { AnalysisInputs, ValidationRun } from '../../subs/analysis/src/validation-entry.js';
+import type { ValidationRun } from '../../subs/analysis/src/validation-entry.js';
+import { validationInputs } from '../validation-inputs.js';
 import type { Assertions } from './runner.js';
 import { recordObservation } from './observations.js';
 
 export type ValidProject = Extract<ValidationRun, { status: 'valid' }>;
-export function validationInputs(root: string): AnalysisInputs {
-  root = resolve(root);
-  return { project: { root, cwd: root, scope: 'whole-project', configuration: 'discover' },
-    registry: createDefaultTagRegistry(), capabilities: ['registry', 'layout', 'metadata', 'descriptions', 'source-catalog', 'exposure-linking'],
-    limits: { acquisition: { attempts: 3, maxFiles: 50_000, maxApplicationFiles: 20_000,
-      maxFileBytes: 8 * 1024 ** 2, maxInputBytes: 256 * 1024 ** 2, maxApplicationBytes: 64 * 1024 ** 2,
-      maxOwners: 1000, maxDepth: 128, deadlineMs: 30_000 }, source: { maxExports: 250_000,
-      maxAccesses: 250_000, maxSelections: 1_000_000, maxForwardingDepth: 256, deadlineMs: 90_000 },
-    // Match the reviewed dispatch capacity when comparing direct API and CLI reports.
-    maxExposurePairs: 1_000_000, maxDiagnostics: 100_000, maxReportBytes: 96 * 1024 ** 2,
-    disposeTimeoutMs: 5000, deadlineMs: 120_000 } };
-}
+// Defined by the root in scripts/validation-inputs.ts, which validate-final-contracts.ts
+// imports instead of this tree.
+export { validationInputs };
 export async function validated(root: string, assertions: Assertions): Promise<ValidProject> {
   const result = await validateProject(validationInputs(root));
   recordObservation('validation', result.status === 'valid'
@@ -109,7 +100,8 @@ export const referenceContracts: readonly (readonly [id: string, owner: string, 
 export function assertReference(result: { input: Pick<ValidProject['input'], 'inventory'>;
   catalog: ValidProject['catalog']; linked: ValidProject['linked'] }, assertions: Assertions, permutation?: string): void {
   assertions.equal('fifteen reference owners', result.input.inventory.modules.length, 15);
-  assertions.equal('all reference source files catalogued', result.catalog.files.length, 59);
+  // Project-boundary iteration 8C: 59 src/ files plus the root's two configuration files, now auxiliary source.
+  assertions.equal('all reference source files catalogued', result.catalog.files.length, 61);
   assertions.equal('all 34 reference statements expanded', result.linked.selections.length, 34);
   for (const [id, owner, index, provider, form, selector, destinations, pairs] of referenceContracts) {
     const module = ownerId(owner);

@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { originalKey, resolveTagRegistry } from '../subs/model/src/index.js';
-import type { CapturedInput, ProjectObserver, ProjectResolution } from '../subs/project/src/interfaces/project.js';
+import type { CapturedInput, ProjectObserver, ProjectRequest, ProjectResolution } from '../subs/project/src/interfaces/project.js';
 import { observeProject } from '../subs/project/src/observer.js';
 import { resolveProjectRoot } from '../subs/project/src/resolve-root.js';
 import type { ExportShape, SymbolDetail, SymbolDetailRequest, TestFileTitles } from '../subs/typescript/src/interfaces/source.js';
@@ -40,6 +40,9 @@ interface Version {
 
 /** Distinct invocation requests whose resolutions a session keeps for reuse. */
 const knownResolutions = 4;
+/** Two project requests that resolve alike: the same raw fields, before any path is canonicalized. */
+const sameRequest = (a: ProjectRequest, b: ProjectRequest): boolean =>
+  a.cwd === b.cwd && (a.root ?? null) === (b.root ?? null) && a.scope === b.scope && a.configuration === b.configuration;
 const explorerDetailLimits = {
   maxSignatureBytes: 2048,
   maxDocumentationBytes: 512,
@@ -152,7 +155,7 @@ class Session implements RetainedSession {
     const started = performance.now();
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, marker: readRootMarker, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -261,13 +264,20 @@ class Session implements RetainedSession {
       // A cancellation reobservation completed without noticing stops here,
       // before the revision step applies anything.
       if (control.signal?.aborted) return this.#cancelledSweep(observer);
-      if (!changes.length) return { status: 'unchanged' };
+      // A stale session's observer is past its published revision, and an invalid
+      // acquisition left the observer on its last valid capture: in both, finding
+      // nothing changed proves nothing about the published revision, so the
+      // revision step reconciles with the disk as an update would.
+      const reconcile = this.#state.stale || this.#state.facts?.invalid != null;
+      if (!changes.length && !reconcile) return { status: 'unchanged' };
       const started = performance.now();
       const result = await revise(this.#state, changes, control.signal);
       if (result.status === 'cancelled') return { status: 'cancelled' };
       if (result.status === 'released') return this.#reopen(changes, started, control.signal);
       if (result.status === 'reported') return result;
-      if (result.status === 'identical') return { status: 'revised', revision: this.#current!, identical: true, reacquired: false };
+      if (result.status === 'identical') {
+        return changes.length ? { status: 'revised', revision: this.#current!, identical: true, reacquired: false } : { status: 'unchanged' };
+      }
       return this.#complete(result, started, control.signal);
     });
   }
@@ -492,7 +502,6 @@ class Session implements RetainedSession {
       if (control.signal?.aborted) return { status: 'cancelled' };
       return { status: 'measured', measurements: {
         sequence, inputId: current.inputId, modules, files,
-        outsideModuleFiles: [...facts.inventory.outsideModuleFiles],
       } };
     });
   }
@@ -703,7 +712,11 @@ class Session implements RetainedSession {
     // it made answers the same on disk; the scope comparison below still runs.
     const observed = state.observer?.resolution ?? null;
     if (observed && observed !== this.#observedResolution) { this.#observedResolution = observed; this.#remember(observed); }
-    const resolved = await resolveProjectRoot(invocation.project, signal, this.#resolutions);
+    const resolved = await resolveProjectRoot(invocation.project, readRootMarker, signal, this.#resolutions);
+    // The opening request resolving to an invalid root (a missing or unmarked root
+    // description, or a symlink) is the project's current state, not another project:
+    // the update's acquisition, made with that request, reports it as a batch read does.
+    if (resolved.status === 'invalid' && sameRequest(invocation.project, state.project)) return null;
     if (resolved.status !== 'resolved') return problem(`The invocation does not resolve to a project: ${resolved.issues.map(issue => issue.message).join('; ')}`);
     this.#remember(resolved);
     if (resolved.root !== scope.root || resolved.configuration !== scope.configuration) {
@@ -725,7 +738,7 @@ class Session implements RetainedSession {
     const state = this.#state;
     const timings = zeroTimings();
     let start = performance.now();
-    const observed = await observeProject({ request: state.project, parse: this.#parse, limits: this.#acquisition,
+    const observed = await observeProject({ request: state.project, parse: this.#parse, marker: readRootMarker, limits: this.#acquisition,
       registry: state.registry.id, ...(signal ? { signal } : {}) });
     timings.inventory = performance.now() - start;
     if (observed.status === 'cancelled') return { status: 'cancelled' };
@@ -813,7 +826,10 @@ class Session implements RetainedSession {
       const publish = performance.now() - publishStart;
       const timings = { ...computed.timings, publish, total: performance.now() - started };
       revision = deepFreeze({
-        sequence, inputId: inputId ?? sealedIdentity(inputs), inputs, changed: computed.changed, checked: computed.checked,
+        sequence, inputId: inputId ?? sealedIdentity(inputs), inputs,
+        // The scope the report records: the invalid acquisition's own inventory, else the valid one.
+        scope: (computed.facts.invalid ? computed.facts.invalid.inventory?.scope : computed.facts.inventory?.scope) ?? null,
+        changed: computed.changed, checked: computed.checked,
         outcome: report.outcome, summary: report.summary, diagnostics: report.diagnostics, warnings: report.warnings, coverage: report.coverage,
         delta, timings,
       });

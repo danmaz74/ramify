@@ -12,3 +12,7 @@ expose-src resolveProjectRoot from "resolve-root.ts" to parent
 expose-src observeProject from "observer.ts" to parent
 // P5: the canonical reserved generated-output path predicate.
 expose-src isRamifyGeneratedPath from "generated-path.ts" to parent
+// P6: the canonical path ownership classifier over a scope's ownership table.
+expose-src classifyProjectPath from "ownership.ts" to parent
+// P7: the README purpose reader, for the root's final-contract validation.
+expose-src readPurpose from "purpose.ts" to parent

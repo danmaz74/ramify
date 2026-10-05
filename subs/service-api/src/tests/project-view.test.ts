@@ -9,11 +9,11 @@ const area = (owner: string, root: string) => ({ owner, kind: 'ordinary' as cons
 const providerArea = area('fixture/provider', 'subs/provider/src');
 const consumerArea = area('fixture/consumer', 'subs/consumer/src');
 const original = { kind: 'code' as const, owner: 'fixture/provider', file: 'api.ts', binding: 'Value' };
-const providerOrigin = { file: 'subs/provider/src/api.ts', area: providerArea };
-const consumerOrigin = { file: 'subs/consumer/src/use.ts', area: consumerArea };
+const providerOrigin = { file: 'subs/provider/src/api.ts', area: providerArea, auxiliary: false };
+const consumerOrigin = { file: 'subs/consumer/src/use.ts', area: consumerArea, auxiliary: false };
 const selection = (exportedName: string) => ({ location: location('subs/consumer/src/use.ts'), exportedName,
   localName: exportedName.toLowerCase(), original, request: 'value' as const, explicitType: false,
-  forwarding: [{ file: 'src/index.ts', area: area('fixture', 'src') }], status: 'resolved' as const });
+  forwarding: [{ file: 'src/index.ts', area: area('fixture', 'src'), auxiliary: false }], status: 'resolved' as const });
 const access = (id: string, target: unknown, selections: readonly unknown[] = [], coverageIds: readonly string[] = []) => ({
   id, location: location('subs/consumer/src/use.ts'), importer: consumerOrigin, specifier: id,
   form: 'import' as const, selectionForm: selections.length ? 'named' as const : 'none' as const,
@@ -29,7 +29,7 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
     access('package', { kind: 'external', resolution: 'package', name: 'react', resolvedFile: '/node_modules/react/index.js' }),
     access('builtin', { kind: 'external', resolution: 'builtin', name: 'node:fs', resolvedFile: null }),
     access('standard', { kind: 'external', resolution: 'standard-library', name: 'lib.es2022', resolvedFile: null }),
-    access('outside', { kind: 'outside-module', file: 'scripts/tool.ts' }),
+    access('outside', { kind: 'outside-project', file: 'scripts/tool.ts' }),
     access('unresolved', { kind: 'unresolved' }, [], ['coverage-target']),
   ];
   const results = accesses.map(item => ({ accessId: item.id,
@@ -45,19 +45,19 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
     { name: 'dispatch', kind: 'required-importer' as const }, { name: 'browser', kind: 'required-symbol' as const },
   ], isDefault: false };
   const report = {
-    schemaVersion: 'ramify.analysis/1', runId: 'run/1:fixture', inputId: 'input/1:fixture',
+    schemaVersion: 'ramify.analysis/2', runId: 'run/1:fixture', inputId: 'input/1:fixture',
     request: { project: { cwd: '/fixture', root: '/fixture', scope: 'whole-project', configuration: 'discover' },
       registry, capabilities: [], limits: { acquisition: { attempts: 1, maxFiles: 100, maxApplicationFiles: 100,
         maxFileBytes: 1000, maxInputBytes: 1000, maxApplicationBytes: 1000, maxOwners: 10, maxDepth: 10, deadlineMs: 1000 },
       source: { maxExports: 100, maxAccesses: 100, maxSelections: 100, maxForwardingDepth: 10, deadlineMs: 1000 },
       maxExposurePairs: 100, maxDiagnostics: 100, maxReportBytes: 32 * 1024 ** 2, disposeTimeoutMs: 1000, deadlineMs: 1000 } },
-    scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [] },
+    scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
     registry, capabilities: [], stages: [{ stage: 'report', status: 'completed', blockedBy: [], diagnosticIds: [] }],
     outcome: { execution: 'completed', check: 'failed', coverage: 'partial' }, diagnostics: [], warnings: [], coverage: limits,
     summary: { complete: true, owners: 3, sourceFiles: 3, resources: 1, originals: 1, accesses: 8,
       allowed: 6, denied: 2, errors: 1, warnings: 0, coverageNotes: 3, external: 3 },
     snapshot: {
-      inventory: { scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], independentScopes: [] },
+      inventory: { scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json', walkedAreas: [], ownership: { modules: [], exclusions: [] } },
         modules: [
           { id: 'fixture', name: 'fixture', parent: null, directory: '.', headerTags: [], areas: [{ owner: 'fixture', kind: 'ordinary', root: 'src', present: true }], purpose: { state: 'present', readme: 'README.md', paragraph: 'Root.' }, description: {} },
           { id: 'fixture/consumer', name: 'consumer', parent: 'fixture', directory: 'subs/consumer', headerTags: ['dispatch'], areas: [{ ...consumerArea, present: true }], purpose: { state: 'missing-file', readme: 'subs/consumer/README.md' }, description: {} },
@@ -68,7 +68,7 @@ function fixture(): { readonly report: AnalysisReport; readonly revision: Contex
           { path: 'subs/consumer/src/use.ts', owner: 'fixture/consumer', area: 'ordinary', kind: 'source', sha256: 'b', bytes: 1 },
           { path: 'subs/provider/src/api.ts', owner: 'fixture/provider', area: 'ordinary', kind: 'source', sha256: 'c', bytes: 1 },
           { path: 'subs/provider/src/data.json', owner: 'fixture/provider', area: 'ordinary', kind: 'resource', sha256: 'd', bytes: 1 },
-        ], references: [], outsideModuleFiles: [], warnings: [] },
+        ], references: [], warnings: [] },
       areas: [area('fixture', 'src'), consumerArea, providerArea], inputs: [],
       catalog: { originals: [{ id: original, origin: providerOrigin, declarations: [location('subs/provider/src/api.ts')], hasValue: true, hasType: true }],
         files: [{ file: 'subs/provider/src/api.ts', state: 'complete', issueIds: [], descriptionFiles: [], exports: [
@@ -121,11 +121,11 @@ describe('createProjectExplorerModel', () => {
       .map(item => item.target.kind === 'external' ? item.target.resolution : null)).toEqual([
         'package', 'builtin', 'standard-library',
       ]);
-    expect(reportAccesses.filter(item => item.target.kind === 'outside-module')).toHaveLength(1);
+    expect(reportAccesses.filter(item => item.target.kind === 'outside-project')).toHaveLength(1);
     expect(reportAccesses.filter(item => item.target.kind === 'unresolved')).toHaveLength(1);
     const omittedTargetLabels = reportAccesses.flatMap(item => item.target.kind === 'external'
       ? [item.target.name]
-      : item.target.kind === 'outside-module' ? [item.target.file]
+      : item.target.kind === 'outside-project' ? [item.target.file]
         : item.target.kind === 'unresolved' ? ['unresolved'] : []);
     expect(omittedTargetLabels).toEqual(['react', 'node:fs', 'lib.es2022', 'scripts/tool.ts', 'unresolved']);
     expect(reportAccesses.find(item => item.id === 'unresolved')?.coverageIds).toEqual(['coverage-target']);
@@ -140,7 +140,9 @@ describe('createProjectExplorerModel', () => {
     const roundTripped = JSON.parse(encoded) as unknown;
     expect(roundTripped).toEqual(first.view);
     const encodedBytes = Buffer.byteLength(encoded, 'utf8');
-    expect(encodedBytes).toBe(5_880);
+    // Each of the two projected selections carries one forwarding origin, and
+    // each origin's `,"auxiliary":false` member adds 18 bytes.
+    expect(encodedBytes).toBe(5_880 + 2 * 18);
     expect(encodedBytes).toBeLessThanOrEqual(8_485);
     const serializedKeys = new Set<string>();
     const serializedStrings = new Set<string>();

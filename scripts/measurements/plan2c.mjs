@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { arch, cpus, platform, release, totalmem } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { packageRoot, pollDaemonStatus, runCommand } from './plan2a-fixtures.mjs';
-import { specifiedArchitectLimits } from '../reference-harness/plan2b-cases.ts';
+import { specifiedArchitectLimits } from './plan2b-views.ts';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.ts';
 import { createDefaultTagRegistry } from '../../subs/analysis/subs/model/src/index.ts';
 import { limits as batchLimits } from '../../src/batch.ts';
@@ -148,7 +148,7 @@ try {
   const cold = await command(['measure', '--format', 'json'], endpoint);
   assert.equal(cold.code, 0, cold.stderr || cold.stdout);
   const document = JSON.parse(cold.stdout);
-  assert.equal(document.schema, 'ramify.measure/1');
+  assert.equal(document.schema, 'ramify.measure/2');
   const checked = await consistency(document);
   assert.deepEqual(checked.mismatches, []);
   const warm = await command(['measure', '--format', 'json'], endpoint);
@@ -168,7 +168,7 @@ try {
     measureWarm: { exitCode: warm.code, durationMs: round(warm.durationMs), stderr: warm.stderr },
     architectSessionQuery: sessionQuery, architect, architectRepeat: repeat };
   evidence.toolkit = { revision: document.revision, modules: document.modules.length, files: document.files.length,
-    outsideModuleFiles: document.outsideModuleFiles.length, views: document.views, architectView: size,
+    views: document.views, architectView: size,
     measureDocument: relative(packageRoot, documentOutput), consistency: relative(packageRoot, consistencyOutput) };
   evidence.hitCost = await hitCost(packageRoot);
   const prior = JSON.parse(await readFile(join(packageRoot, 'docs/plans/iteration-2b-generated-views/evidence/plan2b-measurements.json'), 'utf8'));

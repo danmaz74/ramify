@@ -7,7 +7,7 @@ import { Capture } from '../capture.js';
 import { byteOrder } from '../data.js';
 import { observeProject } from '../observer.js';
 import type { ObservationSink, ProjectObserver } from '../interfaces/project.js';
-import { declaration, fixture, limits, put } from './fixtures.js';
+import { declaration, fixture, limits, marker, put } from './fixtures.js';
 
 // Every content identity and input identity passes through `createHash`.
 const hashing = vi.hoisted(() => ({ calls: 0 }));
@@ -42,7 +42,7 @@ function capture(at = root): Capture {
 }
 async function observe(): Promise<ProjectObserver> {
   const result = await observeProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' },
-    parse: declaration, limits, registry });
+    parse: declaration, marker, limits, registry });
   if (result.status !== 'observing') throw new Error(`Expected an observing project: ${JSON.stringify(result)}`);
   disposals.push(() => result.observer.dispose());
   return result.observer;
@@ -59,7 +59,7 @@ type Report = (sink: ObservationSink) => void;
 /** A newly acquired observer given the same reports, promoted when the original promoted them. */
 async function reobserved(reports: readonly Report[], promoted: boolean): Promise<{ inputs: string; inputId: string }> {
   const result = await observeProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' },
-    parse: declaration, limits, registry });
+    parse: declaration, marker, limits, registry });
   if (result.status !== 'observing') throw new Error('Expected an observing project');
   try {
     for (const report of reports) report(result.observer.sink);

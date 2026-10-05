@@ -24,6 +24,24 @@ interface MutableDependencies { files: Set<string>; resources: Set<string>; shim
 const order = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const sorted = (values: Iterable<string>): readonly string[] => [...new Set(values)].sort(order);
 const noCompanions: SignatureCompanions = { named: [], evidence: [], inferred: false, unresolved: 0 };
+/** Where an always-excluded target lies; its contents are never interpreted. */
+const excludedDetail = (target: ResolvedModule): string =>
+  `${target.file} lies in the always-excluded ${target.exclusion?.kind} directory ${target.exclusion?.directory} and is not interpreted`;
+/**
+ * The limit a forwarding export records for a target it cannot interpret: an
+ * external dependency or a declared tree describes no application original
+ * (the description is incomplete), an always-excluded target is the
+ * excluded-target limit, and a target outside the root keeps its own code.
+ */
+function forwardingLimit(target: ResolvedModule, subject: string): readonly [SourceLimit['code'], string] {
+  switch (target.kind) {
+    case 'external': return ['unresolved-original', `${subject} forwards a compiler-resolved external dependency`];
+    case 'nested-tree': return ['unresolved-original', `${subject} forwards ${target.file}, which lies in the declared `
+      + `${target.exclusion?.kind} tree ${target.exclusion?.directory} and is not interpreted`];
+    case 'excluded': return ['excluded-target', `${subject} forwards ${excludedDetail(target)}`];
+    default: return ['outside-module-target', `${subject} targets a file outside the analyzed application source`];
+  }
+}
 
 let companionRequests = 0;
 /** Batched symbol requests the companion collection has made in this process: the
@@ -197,7 +215,7 @@ class CatalogBuilder {
     if (!inventory) return null;
     const area = this.inputs.areas.find(area => area.owner === inventory.owner && area.kind === inventory.area);
     if (!area) throw new Error(`Missing resolved source area for ${file}`);
-    return { file: inventory.path, area: { ...area, profile: [...area.profile] } };
+    return { file: inventory.path, area: { ...area, profile: [...area.profile] }, auxiliary: inventory.placement === 'auxiliary' };
   }
   private location(node: Node): SourceLocation {
     const source = node.getSourceFile(), start = node.getStart();
@@ -791,9 +809,12 @@ class CatalogBuilder {
             this.unresolvedCompilerTarget(file, specifier);
             return { name, original: null, namespace: null, forwarding };
           }
-          if (target.kind === 'outside-module' || target.kind === 'external') {
-            this.limit(file, target.kind === 'outside-module' ? 'outside-module-target' : 'unresolved-original',
-              target.kind === 'external' ? `Export ${name} forwards a compiler-resolved external dependency` : `Export ${name} targets source outside owned modules`, specifier);
+          // A target outside the root, in a declared tree or in an always-excluded
+          // path is never interpreted: its exports describe no application original.
+          // The re-export statement's own access carries the boundary finding or limit.
+          if (target.kind === 'outside-project' || target.kind === 'nested-tree' || target.kind === 'excluded' || target.kind === 'external') {
+            const [code, message] = forwardingLimit(target, `Export ${name}`);
+            this.limit(file, code, message, specifier);
             return { name, original: null, namespace: null, forwarding };
           }
         }
@@ -890,8 +911,12 @@ class CatalogBuilder {
       if (!isExportDeclaration(statement) || statement.exportClause || !statement.moduleSpecifier) continue;
       const target = this.target(statement.moduleSpecifier);
       if (target.kind !== 'application' || !target.file) {
-        this.limit(file, target.kind === 'outside-module' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target' : 'incomplete-exports',
-          'Cannot enumerate every application original of this star export', statement.moduleSpecifier);
+        // A declared tree's exports are never interpreted, so its star export is
+        // incomplete; the statement's own access carries the boundary finding.
+        const message = 'Cannot enumerate every application original of this star export';
+        if (target.kind === 'excluded') this.limit(file, 'excluded-target', `${message}: ${excludedDetail(target)}`, statement.moduleSpecifier);
+        else this.limit(file, target.kind === 'outside-project' ? 'outside-module-target' : target.kind === 'resource-target' ? 'resource-target'
+          : 'incomplete-exports', message, statement.moduleSpecifier);
         if (target.kind === 'unresolved' || target.kind === 'resource-target') this.unresolvedCompilerTarget(file, statement.moduleSpecifier);
         continue;
       }

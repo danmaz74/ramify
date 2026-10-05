@@ -14,7 +14,7 @@ export async function sessionInputWitness(): Promise<{ assertions: number; steps
   const provider = 'subs/provider/src/provider.ts';
   const source = "import { privateValue } from '../../../src/main.js';\nvoid privateValue;\n";
   const files: Record<string, string> = {
-    'module.ramify': 'ramify 1\nmodule fixture\n',
+    'module.ramify': 'ramify 1\nroot module fixture\n',
     'README.md': '# Root\n\nRoot purpose.\n',
     'package.json': '{"type":"module"}',
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',

@@ -1,10 +1,10 @@
 import type { AffectedBatchOperation, BatchOperation } from '../../../../src/interfaces/batch.js';
 import type { DaemonStatus } from '../../../../src/interfaces/service.js';
 import type { ServiceConnector, DaemonRecord } from '../../../daemon/src/interfaces/daemon.js';
-import type { ContextStatus, ContextRevision, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
+import type { ContextStatus, ContextRevision, PathCheckDisposition, ReplyTimings, RevisionId } from '../../../daemon/src/context-types.js';
 import type { AnalysisReport, AnalysisDiagnostic, RunControl } from '../../../analysis/src/interfaces/analysis.js';
 import type { RevisionPath, CheckedSet, RevisionTimings } from '../../../analysis/src/interfaces/session.js';
-import type { OutsideSourceWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
+import type { ProjectExclusion, ProjectWarning } from '../../../analysis/subs/project/src/interfaces/project.js';
 import type { SourceLimit } from '../../../analysis/subs/typescript/src/interfaces/source.js';
 import type { AffectedSelection } from '../../../analysis/src/interfaces/affected.js';
 
@@ -36,19 +36,42 @@ export interface CliEnvironment {
   /** Resolves a refusal when this client cannot run the installed build, otherwise null.
    * A command awaits it before it connects or runs batch; help and version do not. */
   readonly buildRefusal?: () => Promise<string | null>;
+  /** Root-owned Git command port for the advisory `ignored-but-walked` warnings of a complete
+   * check. Without it a check gives no Git advice; tests inject a scripted port. */
+  readonly git?: GitPort;
 }
+/**
+ * What Git answered for one selected root. `listed` carries Git's NUL-terminated list of
+ * the repository-ignored untracked entries beneath the root, relative to it, a wholly
+ * ignored directory named once with a trailing `/`. Every other answer gives no advice.
+ */
+export type GitAnswer =
+  | { readonly status: 'listed'; readonly output: Uint8Array }
+  | { readonly status: 'not-repository' }
+  | { readonly status: 'unavailable' }
+  | { readonly status: 'failed'; readonly message: string };
+/** Lists the ignored entries beneath a canonical project root. It never throws for a Git failure. */
+export type GitPort = (root: string, control?: RunControl) => Promise<GitAnswer>;
+/** Why a changed check could not establish its result, for the whole request or one path. */
+export type NotCheckedReason = 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | 'classification-changed';
+/** One named path of a `ramify.check/2` document: the daemon's disposition, or not checked
+ * for a reason of the whole request. Only a checked path carries a content or deletion identity. */
+export type CheckedPath = Exclude<PathCheckDisposition, { readonly disposition: 'not-checked' }>
+  | { readonly path: string; readonly disposition: 'not-checked'; readonly module: string | null;
+      readonly exclusion: ProjectExclusion | null; readonly reason: NotCheckedReason };
 export interface CheckDocument {
-  readonly schemaVersion: 'ramify.check/1';
+  readonly schemaVersion: 'ramify.check/2';
   readonly root: string;
   readonly revision: { readonly id: RevisionId; readonly sequence: number; readonly path: RevisionPath } | null;
   readonly since: RevisionId | null;
-  readonly changed: readonly { readonly path: string; readonly sha256: string | null; readonly covered: boolean }[];
+  /** One disposition per named path, in the order first named, each path once. */
+  readonly paths: readonly CheckedPath[];
   readonly outcome: 'checked' | 'not-checked';
-  readonly reason: 'cold' | 'deadline-exceeded' | 'unobserved-input' | 'superseded' | 'incomplete' | 'unavailable' | 'stopped' | 'incompatible' | 'evicted-revision' | 'resource-unavailable' | 'analysis-failed' | 'unknown-context' | 'expired-generation' | 'unsupported-setup' | 'disposed' | 'configuration-changed' | null;
+  readonly reason: NotCheckedReason | null;
   readonly execution: AnalysisReport['outcome']['execution'] | null;
   readonly findings: readonly (AnalysisDiagnostic & { readonly new: boolean })[];
   readonly removed: readonly string[];
-  readonly warnings: readonly OutsideSourceWarning[];
+  readonly warnings: readonly ProjectWarning[];
   readonly coverage: readonly SourceLimit[];
   readonly checked: CheckedSet | null;
   readonly timings: { readonly daemon: RevisionTimings | null; readonly waitedMs: number; readonly totalMs: number;
@@ -57,21 +80,21 @@ export interface CheckDocument {
   readonly exitCode: 0 | 1 | 2;
 }
 export type WatchLine =
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'status'; readonly current: ContextStatus }
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'revision'; readonly revision: ContextRevision;
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'status'; readonly current: ContextStatus }
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'revision'; readonly revision: ContextRevision;
       readonly coalesced: number; readonly report: AnalysisReport }
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'revision-evicted';
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'revision-evicted';
       readonly revision: ContextRevision; readonly coalesced: number }
-  | { readonly schemaVersion: 'ramify.watch/1'; readonly event: 'evicted' | 'stopped' | 'unavailable';
+  | { readonly schemaVersion: 'ramify.watch/2'; readonly event: 'evicted' | 'stopped' | 'unavailable';
       readonly reason: string };
 export type DaemonStatusDocument =
-  | { readonly schemaVersion: 'ramify.daemon-status/1'; readonly running: true; readonly status: DaemonStatus }
-  | { readonly schemaVersion: 'ramify.daemon-status/1'; readonly running: false;
+  | { readonly schemaVersion: 'ramify.daemon-status/2'; readonly running: true; readonly status: DaemonStatus }
+  | { readonly schemaVersion: 'ramify.daemon-status/2'; readonly running: false;
       readonly record: DaemonRecord | null };
 /** One `ramify affected --format json` answer. `revision.sequence` is the resident
  * revision's sequence and null for a batch session. */
 export interface AffectedDocument {
-  readonly schemaVersion: 'ramify.affected-cli/1';
+  readonly schemaVersion: 'ramify.affected-cli/2';
   readonly root: string;
   readonly mode: 'resident' | 'batch';
   readonly revision: { readonly sequence: number | null; readonly inputId: string };

@@ -55,11 +55,16 @@ export async function nodeProcess(args: readonly string[], env: NodeJS.ProcessEn
   }
 }
 
+/** Delivers one host request to the worker; a route may defer delivery by keeping `forward`. */
+export type RequestRoute = (request: unknown, forward: () => void) => void;
+
 /** Observe the supervised worker handle without replacing its worker entry. */
 export async function observedOpen(inputs: SessionInputs): Promise<{
-  opened: SessionOpen; worker: SessionWorker; messages: WorkerMessage[]; requests: unknown[]; cleanup: () => void;
+  opened: SessionOpen; worker: SessionWorker; messages: WorkerMessage[]; requests: unknown[];
+  route: { current: RequestRoute | null }; cleanup: () => void;
 }> {
   const workers: SessionWorker[] = [], messages: WorkerMessage[] = [], requests: unknown[] = [];
+  const route: { current: RequestRoute | null } = { current: null };
   const restores: (() => void)[] = [];
   const record = (message: WorkerMessage): void => { messages.push(message); };
   const created = (event: unknown): void => {
@@ -69,7 +74,8 @@ export async function observedOpen(inputs: SessionInputs): Promise<{
     const spy = vi.spyOn(worker, 'postMessage').mockImplementation((value, transfer) => {
       frozenPlain(value);
       requests.push(value);
-      send(value, transfer);
+      const forward = (): void => send(value, transfer);
+      if (route.current) route.current(value, forward); else forward();
     });
     restores.push(() => { spy.mockRestore(); worker.off('message', record); });
   };
@@ -78,7 +84,7 @@ export async function observedOpen(inputs: SessionInputs): Promise<{
   try {
     const opened = await openRetainedSession(inputs);
     expect(workers).toHaveLength(1);
-    return { opened, worker: workers[0]!, messages, requests, cleanup: () => restores.forEach(restore => restore()) };
+    return { opened, worker: workers[0]!, messages, requests, route, cleanup: () => restores.forEach(restore => restore()) };
   } catch (error) {
     restores.forEach(restore => restore());
     await Promise.all(workers.map(worker => worker.terminate()));

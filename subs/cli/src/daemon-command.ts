@@ -11,7 +11,7 @@ export async function daemonCommand(args: { readonly action: 'status' | 'stop'; 
   const publish = (document: DaemonStatusDocument, human: string) => environment.stdout(args.format === 'json'
     ? JSON.stringify(document) + '\n' : human + '\n');
   if (connected.status !== 'connected') {
-    publish({ schemaVersion: 'ramify.daemon-status/1', running: false,
+    publish({ schemaVersion: 'ramify.daemon-status/2', running: false,
       record: connected.status === 'stopped' ? connected.record : null }, args.action === 'stop' ? 'no daemon running' : 'not running');
     return 0;
   }
@@ -20,7 +20,7 @@ export async function daemonCommand(args: { readonly action: 'status' | 'stop'; 
     if (args.action === 'status') {
       const result = await connection.daemonStatus();
       if (!result.ok) throw serviceFailure(result.error);
-      publish({ schemaVersion: 'ramify.daemon-status/1', running: true, status: result.value },
+      publish({ schemaVersion: 'ramify.daemon-status/2', running: true, status: result.value },
         `Daemon ${result.value.pid} (${result.value.instanceId}) running; ${result.value.contexts.length} contexts; ${result.value.subscriptions} subscriptions`);
     } else {
       const result = await connection.stopDaemon({ instanceId: connection.daemon.instance.instanceId });
@@ -34,7 +34,7 @@ export async function daemonCommand(args: { readonly action: 'status' | 'stop'; 
         await delay(20, undefined, { signal: control.signal });
       }
       const stopped = await environment.connect({ start: 'never', signal: control.signal });
-      publish({ schemaVersion: 'ramify.daemon-status/1', running: false,
+      publish({ schemaVersion: 'ramify.daemon-status/2', running: false,
         record: stopped.status === 'stopped' ? stopped.record : null }, 'Stopped: daemon stopped explicitly');
       if (stopped.status === 'connected') await stopped.connection.close();
     }

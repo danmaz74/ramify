@@ -31,7 +31,7 @@ export interface NamedSelection {
 export type DescriptionSelection =
   | { readonly kind: 'named'; readonly names: readonly NamedSelection[] }
   | { readonly kind: 'wildcard'; readonly span: TextSpan };
-export interface DescriptionStatement {
+export interface ExposureStatement {
   readonly index: number;
   readonly kind: 'expose-src' | 'expose-test' | 'expose-sub';
   readonly span: TextSpan;
@@ -41,11 +41,21 @@ export interface DescriptionStatement {
     readonly span: TextSpan } | null;
   readonly destinations: readonly ('parent' | 'descendants')[];
 }
+/** A declared nested tree; its directory is the decoded string, interpreted only by project acquisition. */
+export interface NestedTreeStatement {
+  readonly index: number;
+  readonly kind: 'owned-ignored' | 'external';
+  readonly span: TextSpan;
+  readonly directory: { readonly value: string; readonly span: TextSpan };
+}
+/** Indices are positions among all statements of one description, in source order. */
+export type DescriptionStatement = ExposureStatement | NestedTreeStatement;
 export interface DescriptionDocument {
   readonly file: string;
   readonly version: 1;
+  /** `root` is the root marker's span, null when unmarked; `span` covers the whole module line from its first keyword. */
   readonly module: { readonly name: string; readonly tags: readonly string[];
-    readonly span: TextSpan };
+    readonly root: TextSpan | null; readonly span: TextSpan };
   readonly tokens: readonly DescriptionToken[];
   readonly statements: readonly DescriptionStatement[];
 }
@@ -55,3 +65,5 @@ export type ParsedDescription =
       readonly tokens: readonly DescriptionToken[];
       readonly issues: readonly DescriptionIssue[] };
 export type DescriptionParser = (file: string, text: string) => ParsedDescription;
+/** Decides the root marker from a description's module line alone, as `readRootMarker` does; null when unmarked. */
+export type RootMarkerReader = (file: string, text: string) => TextSpan | null;

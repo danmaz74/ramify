@@ -409,6 +409,8 @@ function decisionCounts(facts: SessionFacts): Pick<SnapshotCounts, 'accesses' | 
       }
       accesses++;
       if (decision.result.outcome === 'external') external++;
+      // A boundary denial has no symbol decision; its access result is denied.
+      else if (decision.result.outcome === 'denied') denied++;
       for (const item of decision.result.decisions) {
         if (item.status === 'allowed') allowed++;
         else if (item.status === 'denied') denied++;

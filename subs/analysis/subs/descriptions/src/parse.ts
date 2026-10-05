@@ -1,13 +1,14 @@
 import type {
   DescriptionDocument, DescriptionIssue, DescriptionSelection, DescriptionStatement,
-  DescriptionToken, NamedSelection, ParsedDescription, TextSpan,
+  DescriptionToken, ExposureStatement, NamedSelection, NestedTreeStatement, ParsedDescription, TextSpan,
 } from './interfaces/syntax.js';
 import { tokenize } from './tokenize.js';
 import type { TokenLine } from './tokenize.js';
 
 const moduleName = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const exportName = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const specialTags = new Set(['testing', 'browser', 'ui']);
+// Keywords that remain valid tag names; the registry alone decides whether a tag exists.
+const specialTags = new Set(['testing', 'browser', 'ui', 'owned-ignored', 'external', 'root']);
 const through = (first: TextSpan, last: TextSpan): TextSpan => ({ ...first, end: last.end });
 
 // Recovery is at a physical line boundary, where every version 1 statement ends.
@@ -66,7 +67,15 @@ class LineParser {
     return this.take();
   }
 
-  private tags(): NonNullable<DescriptionStatement['tags']> {
+  private directory(): DescriptionToken {
+    const token = this.token;
+    if (!token || token.kind !== 'string') this.fail('invalid-name', 'A nested-tree directory must be a quoted string.');
+    if (!token.decoded.length) this.fail('empty-name', 'Decoded names and paths must not be empty.');
+    if (/[\u0000-\u001f\u007f]/u.test(token.decoded)) this.fail('invalid-name', 'Decoded names and paths cannot contain control characters.');
+    return this.take();
+  }
+
+  private tags(): NonNullable<ExposureStatement['tags']> {
     const first = this.take(); // tagged
     this.horizontal();
     if (!this.is('[')) this.fail('invalid-tag-syntax', 'Expected a bracketed tag list.');
@@ -93,7 +102,7 @@ class LineParser {
     return { values, span: through(first.span, last.span) };
   }
 
-  private selection(kind: DescriptionStatement['kind']): DescriptionSelection {
+  private selection(kind: ExposureStatement['kind']): DescriptionSelection {
     if (this.is('*')) {
       if (kind === 'expose-test') this.fail('invalid-selection', 'expose-test accepts only named selections.');
       const token = this.take();
@@ -119,7 +128,7 @@ class LineParser {
     return { kind: 'named', names };
   }
 
-  private destinations(): DescriptionStatement['destinations'] {
+  private destinations(): ExposureStatement['destinations'] {
     const values: ('parent' | 'descendants')[] = [];
     while (true) {
       if (!this.is('parent') && !this.is('descendants')) this.fail('invalid-destination', 'Expected the bare destination parent or descendants.');
@@ -146,26 +155,33 @@ class LineParser {
     this.finish();
   }
 
+  /** The caller admits `root` here only when `module` follows it. */
   module(): DescriptionDocument['module'] {
     const first = this.take();
+    let root: TextSpan | null = null;
+    if (first.raw === 'root') {
+      root = first.span;
+      this.horizontal();
+      this.take();
+    }
     this.horizontal();
     const name = this.name(true);
     let tags: readonly string[] = [];
     if (this.is('tagged')) { this.horizontal(); tags = this.tags().values; }
     this.finish();
-    return { name: name.decoded, tags, span: through(first.span, this.previous.span) };
+    return { name: name.decoded, tags, root, span: through(first.span, this.previous.span) };
   }
 
-  exposure(index: number): DescriptionStatement {
+  exposure(index: number): ExposureStatement {
     const first = this.take();
-    const kind = first.raw as DescriptionStatement['kind'];
+    const kind = first.raw as ExposureStatement['kind'];
     this.horizontal();
     const selection = this.selection(kind);
     this.horizontal();
     this.keyword('from', 'missing-from');
     this.horizontal();
     const from = this.name(kind === 'expose-sub', kind !== 'expose-sub');
-    let tags: DescriptionStatement['tags'] = null;
+    let tags: ExposureStatement['tags'] = null;
     if (this.is('tagged')) {
       if (kind === 'expose-sub') this.fail('unknown-clause', 'expose-sub cannot assign tags.');
       this.horizontal();
@@ -179,6 +195,34 @@ class LineParser {
     return { index, kind, span: through(first.span, this.previous.span), selection,
       from: { value: from.decoded, span: from.span }, tags, destinations };
   }
+
+  /** Keep the decoded directory as written; normalization and containment belong to project acquisition. */
+  nestedTree(index: number): NestedTreeStatement {
+    const first = this.take();
+    const kind = first.raw as NestedTreeStatement['kind'];
+    this.horizontal();
+    const directory = this.directory();
+    this.finish();
+    return { index, kind, span: through(first.span, directory.span),
+      directory: { value: directory.decoded, span: directory.span } };
+  }
+}
+
+/** The header rule both readers share: a line is the module header when it begins with `module`, or with `root` then `module`. */
+const moduleHeader = (line: TokenLine): boolean =>
+  line.tokens[0]?.raw === 'module' || (line.tokens[0]?.raw === 'root' && line.tokens[1]?.raw === 'module');
+
+/**
+ * The root marker's span, decided from the module line alone: the second
+ * significant line, after a `ramify` version line, is the module header and
+ * begins with `root`. Errors after that line do not remove the marker. A
+ * missing or misplaced header carries none. The caller supplies only the text
+ * it could decode.
+ */
+export function readRootMarker(file: string, text: string): TextSpan | null {
+  const [version, header] = tokenize(file, text).lines.filter(line => line.tokens.length);
+  if (version?.tokens[0]?.raw !== 'ramify' || !header || !moduleHeader(header)) return null;
+  return header.tokens[0].raw === 'root' ? header.tokens[0].span : null;
 }
 
 function freeze<T>(value: T): T {
@@ -189,7 +233,7 @@ function freeze<T>(value: T): T {
   return value;
 }
 
-/** Parse syntax only: registry, file paths, originals and exposure linking are later stages. */
+/** Parse syntax only: registry, file and directory paths, originals and exposure linking are later stages. */
 export function parseDescription(file: string, text: string): ParsedDescription {
   const { tokens, lines, issues } = tokenize(file, text);
   let versionSeen = false;
@@ -210,7 +254,7 @@ export function parseDescription(file: string, text: string): ParsedDescription 
         if (significantLines !== 0) report('invalid-order', 'The version header must be the first statement.');
         versionSeen = true;
         if (!line.invalid) parser.version();
-      } else if (first.raw === 'module') {
+      } else if (moduleHeader(line)) {
         if (moduleSeen) report('duplicate-header', 'The module header must occur exactly once.');
         if (!versionSeen || significantLines !== 1) report('invalid-order', 'The module header must follow the version header.');
         moduleSeen = true;
@@ -218,6 +262,11 @@ export function parseDescription(file: string, text: string): ParsedDescription 
       } else if (['expose-src', 'expose-test', 'expose-sub'].includes(first.raw)) {
         if (!versionSeen || !moduleSeen) report('invalid-order', 'Exposure statements must follow both headers.');
         if (!line.invalid) statements.push(parser.exposure(statements.length));
+      } else if (first.raw === 'owned-ignored' || first.raw === 'external') {
+        if (!versionSeen || !moduleSeen) report('invalid-order', 'Nested-tree statements must follow both headers.');
+        if (!line.invalid) statements.push(parser.nestedTree(statements.length));
+      } else if (first.raw === 'root') {
+        report('unknown-statement', 'The root marker belongs only immediately before module on the module line.');
       } else if (first.raw === 'tests' && line.tokens[1]?.raw === 'tagged') {
         report('test-profile-declaration', 'The testing profile has no declaration syntax.');
       } else report('unknown-statement', `Unknown statement ${first.raw}.`);

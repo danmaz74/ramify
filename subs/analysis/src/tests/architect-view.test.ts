@@ -111,25 +111,25 @@ describe('projectArchitectView: symbols (AV08)', () => {
 });
 
 describe('projectArchitectView: modules (AV09)', () => {
-  it('lists every module in tree order with its directory, parent, children, tags, areas, purpose, docs and source counts', () => withFacts(async (facts, state, root) => {
+  it('lists every module in tree order with its directory, parent, children, tags, areas, declared trees, purpose, docs and source counts', () => withFacts(async (facts, state, root) => {
     const result = await project(facts, state, root);
     const present = (path: string, text: string) => ({ state: 'present', path, text });
     expect(result.root).toBe('fixture');
     expect(result.modules).toEqual([
       { module: 'fixture', dir: '', parent: null, children: ['fixture/alpha', 'fixture/beta', 'fixture/checks', 'fixture/core', 'fixture/gamma'],
-        tags: [], areas: ['src'], purpose: present('README.md', 'A three-level project for the architect view.'), docs: [], files: { own: 2, subtree: 17 } },
-      { module: 'fixture/alpha', dir: 'subs/alpha', parent: 'fixture', children: [], tags: [], areas: ['src'],
+        tags: [], areas: ['src'], boundaries: [], purpose: present('README.md', 'A three-level project for the architect view.'), docs: [], files: { own: 2, subtree: 17 } },
+      { module: 'fixture/alpha', dir: 'subs/alpha', parent: 'fixture', children: [], tags: [], areas: ['src'], boundaries: [],
         purpose: present('subs/alpha/README.md', 'Alpha builds engines.'), docs: [], files: { own: 4, subtree: 4 } },
-      { module: 'fixture/beta', dir: 'subs/beta', parent: 'fixture', children: [], tags: ['ui'], areas: ['src'],
+      { module: 'fixture/beta', dir: 'subs/beta', parent: 'fixture', children: [], tags: ['ui'], areas: ['src'], boundaries: [],
         purpose: present('subs/beta/README.md', 'Beta drives the engine.'), docs: [], files: { own: 1, subtree: 1 } },
-      { module: 'fixture/checks', dir: 'subs/checks', parent: 'fixture', children: [], tags: ['testing'], areas: ['src'],
+      { module: 'fixture/checks', dir: 'subs/checks', parent: 'fixture', children: [], tags: ['testing'], areas: ['src'], boundaries: [],
         purpose: present('subs/checks/README.md', 'Checks exercise the engine.'), docs: [], files: { own: 2, subtree: 2 } },
-      { module: 'fixture/core', dir: 'subs/core', parent: 'fixture', children: ['fixture/core/engine'], tags: [], areas: ['src', 'src/tests'],
+      { module: 'fixture/core', dir: 'subs/core', parent: 'fixture', children: ['fixture/core/engine'], tags: [], areas: ['src', 'src/tests'], boundaries: [],
         purpose: present('subs/core/README.md', 'Core runs the engine for the rest of the project.'),
         docs: [paths.guide, paths.usage], files: { own: 4, subtree: 7 } },
-      { module: 'fixture/core/engine', dir: 'subs/core/subs/engine', parent: 'fixture/core', children: [], tags: [], areas: ['src', 'src/tests'],
+      { module: 'fixture/core/engine', dir: 'subs/core/subs/engine', parent: 'fixture/core', children: [], tags: [], areas: ['src', 'src/tests'], boundaries: [],
         purpose: { state: 'missing' }, docs: [], files: { own: 3, subtree: 3 } },
-      { module: 'fixture/gamma', dir: 'subs/gamma', parent: 'fixture', children: [], tags: [], areas: ['src'],
+      { module: 'fixture/gamma', dir: 'subs/gamma', parent: 'fixture', children: [], tags: [], areas: ['src'], boundaries: [],
         purpose: present('subs/gamma/README.md', 'Gamma reads a loose value.'), docs: [], files: { own: 1, subtree: 1 } },
     ]);
   }), timeout);
@@ -233,7 +233,7 @@ describe('projectArchitectView: bounds and inputs', () => {
       tests: [...provided.tests].reverse(), features: [...provided.features].reverse() };
     expect(projectArchitectView(facts, 3, 'input/1:architect', reversed, architectLimits)).toEqual(first);
     expect(JSON.parse(JSON.stringify(first))).toEqual(first);
-    expect(projection(first)).toMatchObject({ schema: 'ramify.architect-projection/1', sequence: 3, inputId: 'input/1:architect' });
+    expect(projection(first)).toMatchObject({ schema: 'ramify.architect-projection/2', sequence: 3, inputId: 'input/1:architect' });
     const without = <T>(values: readonly T[]): T[] => values.slice(1);
     expect(() => projectArchitectView(facts, 3, 'x', { ...provided, details: without<SymbolDetail>(provided.details) }, architectLimits)).toThrow(/symbol detail/);
     expect(() => projectArchitectView(facts, 3, 'x', { ...provided, shapes: without(provided.shapes) }, architectLimits)).toThrow(/export shape/);

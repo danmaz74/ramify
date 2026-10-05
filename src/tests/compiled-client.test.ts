@@ -28,6 +28,7 @@ function run(command: string, args: readonly string[], options: { cwd: string; e
     child.once('close', (code, signal) => { clearTimeout(timer); accept({ code, signal, stdout, stderr, ms: performance.now() - started }); });
   });
 }
+const outcome = (result: Outcome) => [result.code, result.signal, result.stdout, result.stderr] as const;
 const withoutRunId = (text: string) => text.replace(/"runId":"[^"]+"/g, '"runId":"<run>"');
 async function processesMentioning(text: string): Promise<string[]> {
   const { stdout } = await promisify(execFile)('ps', ['-eo', 'pid=,args=']);
@@ -68,11 +69,13 @@ describe('compiled client process contracts', () => {
     for (const args of [['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
       ['affected', 'example/mid', '--path', 'docs/notes.md', '--batch']]) {
       const [compiled, node] = [await run(launcher, args, { cwd: root, env }), await run(process.execPath, [nodeEntry, ...args], { cwd: root, env })];
-      expect([compiled.code, compiled.signal, compiled.stdout, compiled.stderr], args.join(' ')).toEqual([0, null, node.stdout, node.stderr]);
+      // A JSON report keeps only the message: name both complete outcomes so a mismatch explains itself.
+      const outcomes = `${args.join(' ')}\ncompiled: ${JSON.stringify(outcome(compiled))}\nnode: ${JSON.stringify(outcome(node))}`;
+      expect([...outcome(compiled), ...outcome(node).slice(0, 2)], outcomes).toEqual([0, null, node.stdout, node.stderr, 0, null]);
     }
     const document = JSON.parse((await run(launcher, ['affected', '--path', 'subs/core/src/interfaces/api.ts', '--batch', '--format', 'json'],
       { cwd: root, env })).stdout);
-    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/1', root, mode: 'batch', revision: { sequence: null },
+    expect(document).toMatchObject({ schemaVersion: 'ramify.affected-cli/2', root, mode: 'batch', revision: { sequence: null },
       selection: { changedModules: [{ id: 'example/core' }], affectedModules: [{ id: 'example/app' }, { id: 'example/mid' }],
         selection: 'dependency-closure' } });
     expect(document.revision.inputId).toBe(document.selection.inputId);
@@ -199,7 +202,7 @@ describe('compiled client process contracts', () => {
       const bin = join(installation, 'node_modules/.bin/ramify');
       const batch = await run(bin, ['check', '--batch', '--format', 'json'], { cwd: root, env });
       expect([batch.code, batch.signal, batch.stderr]).toEqual([0, null, '']);
-      expect(JSON.parse(batch.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/1', summary: { complete: true, owners: 2 } });
+      expect(JSON.parse(batch.stdout)).toMatchObject({ schemaVersion: 'ramify.analysis/2', summary: { complete: true, owners: 2 } });
       // Only the compiled client can answer without Node on PATH.
       const version = await run(bin, ['--version'], { cwd: root, env: { ...env, PATH: '/usr/bin:/bin' } });
       expect([version.code, version.stderr]).toEqual([0, '']);

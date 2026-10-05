@@ -9,7 +9,7 @@ import { createQuickEnvironment, type QuickEnvironment } from '../../../../src/t
 
 /** `example/app -> example/mid -> example/core`, where an arrow means "depends on", and an unrelated `example/lone`. */
 const files: Record<string, string> = {
-  'module.ramify': 'ramify 1\nmodule example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
+  'module.ramify': 'ramify 1\nroot module example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
   'README.md': '# Example\n\nAn affected-module service fixture.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true },
@@ -162,7 +162,7 @@ describe('daemon affected operation (A7-07)', { timeout: 120_000 }, () => {
 
     // The independently expected answer for the stated edges.
     const expected = {
-      schemaVersion: 'ramify.affected/1', paths: [{ path: 'subs/core/src/interfaces/api.ts', module: 'example/core', basis: 'inventory' }],
+      schemaVersion: 'ramify.affected/2', paths: [{ path: 'subs/core/src/interfaces/api.ts', status: 'owned', module: 'example/core', basis: 'inventory', exclusion: null }],
       changedModules: [core], affectedModules: [app, mid], testModules: [app, core, mid],
       selection: 'dependency-closure', widening: [], coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed',
     };

@@ -9,8 +9,19 @@ import type { AffectedFacts } from '../affected-query.js';
  * `consumer -> provider` is one access from the consumer's file to the
  * provider's file. Expected answers are written by hand in the tests.
  */
-export const scope: ProjectScope = { root: '/project', selection: 'given', invokedFrom: '/project', configuration: 'tsconfig.json',
-  walkedAreas: [], independentScopes: [] };
+const byteOrder = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+/**
+ * The scope of a fixture: its modules' ownership table, with each module's
+ * scratch directory and no declared tree, in the classifier's byte order.
+ */
+export function scopeOf(modules: readonly Pick<InventoryModule, 'id' | 'parent' | 'directory'>[]): ProjectScope {
+  const owners = modules.map(({ id, parent, directory }) => ({ id, parent, directory }))
+    .sort((a, b) => byteOrder(a.directory, b.directory) || byteOrder(a.id, b.id));
+  const exclusions = owners.map(owner => ({ kind: 'scratch' as const, directory: `${sourceRoot(owner.directory)}/tmp`, owner: owner.id }))
+    .sort((a, b) => byteOrder(a.directory, b.directory));
+  return { root: '/project', selection: 'given', invokedFrom: '/project', configuration: 'tsconfig.json', walkedAreas: [],
+    ownership: { modules: owners, exclusions } };
+}
 
 const location = (file: string) => ({ file, start: 0, end: 1, line: 1, column: 1 });
 const sourceRoot = (directory: string): string => directory === '.' ? 'src' : `${directory}/src`;
@@ -34,12 +45,12 @@ export const sourceFile = (module: { readonly id: string; readonly directory: st
 
 export function inventoryFile(path: string, owner: string, area: 'ordinary' | 'tests' = 'ordinary',
   kind: 'source' | 'resource' = 'source'): InventoryFile {
-  return { path, owner, area, kind, sha256: '0'.repeat(64), bytes: 1 };
+  return { path, owner, area, kind, placement: 'src', sha256: '0'.repeat(64), bytes: 1 };
 }
 
 export function origin(file: string, owner: string, kind: 'ordinary' | 'tests' = 'ordinary'): SourceOrigin {
   const area: SourceArea = { owner, kind, root: file.slice(0, file.lastIndexOf('/')), profile: kind === 'tests' ? ['testing'] : [] };
-  return { file, area };
+  return { file, area, auxiliary: false };
 }
 
 let accessCount = 0;
@@ -84,7 +95,8 @@ export function graphFacts(spec: GraphSpec): AffectedFacts {
     access(origin(fileOf(consumer), consumer), { kind: 'application', origin: origin(fileOf(provider), provider) },
       [selection({ owner: provider, file: fileOf(provider) })]));
   const files = [...modules.map(module => inventoryFile(sourceFile(module), module.id)), ...spec.files ?? []];
-  const inventory: ProjectInventory = { scope, modules, files, references: [], outsideModuleFiles: [], warnings: [] };
+  const scope = scopeOf(modules);
+  const inventory: ProjectInventory = { scope, modules, files, references: [], warnings: [] };
   return { inventory, accesses: [...edgeAccesses, ...spec.accesses ?? []], shims: spec.shims ?? [], coverage: spec.coverage ?? [],
     scope, inputId: 'input/1', analysisCheck: spec.analysisCheck ?? 'passed' };
 }
@@ -138,7 +150,7 @@ export const coverageGraph = (...coverage: SourceLimit[]): AffectedFacts => ({ .
  * declaration shim lives in `shims`.
  */
 export const formFiles: Record<string, string> = {
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src rootValue, RootType from "interfaces/api.ts" to descendants\n'
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src rootValue, RootType from "interfaces/api.ts" to descendants\n'
     + 'expose-sub * from p to descendants\n',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true, paths: { '@probe/*': ['./subs/lonely/src/*', './subs/p/src/*'] } }, include: ['src', 'subs'] }),

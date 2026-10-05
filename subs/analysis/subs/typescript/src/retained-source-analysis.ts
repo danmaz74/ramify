@@ -102,7 +102,8 @@ class RetainedSourceState implements RetainedSourceAnalysis {
     this.#sink = inputs.sink;
     this.#lifetime = inputs.signal;
     this.#adoptInventory(inputs.inventory);
-    this.#host = { fileExists: path => this.#fileExists(path), readFile: path => this.#readFile(path), resourceWitness: '' };
+    this.#host = { fileExists: path => this.#fileExists(path), readFile: path => this.#readFile(path),
+      realpath: path => this.#realpath(path), directoryExists: path => this.#directoryExists(path), resourceWitness: '' };
     this.#lifetime?.addEventListener('abort', this.#aborted, { once: true });
   }
 

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isRamifyGeneratedPath, isRamifyGeneratedSegment } from '../generated-path.js';
 import { readProject } from '../read-project.js';
 import type { ProjectInputView } from '../interfaces/project.js';
-import { fixture, limits, put, syntax } from './fixtures.js';
+import { fixture, limits, marker, put, syntax } from './fixtures.js';
 
 describe('isRamifyGeneratedSegment / isRamifyGeneratedPath', () => {
   it('recognizes exactly the final catalog and the two transient publisher forms', () => {
@@ -71,7 +71,7 @@ describe('generated-output isolation at the project acquisition boundary', () =>
   beforeEach(async () => { work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-generated-path-'))); root = join(work, 'project'); await fixture(root); });
   afterEach(async () => { for (const view of views.splice(0)) await view.dispose(); await rm(work, { recursive: true, force: true }); });
   async function read() {
-    const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, limits });
+    const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, marker, limits });
     expect(result.status).toBe('acquired');
     if (result.status !== 'acquired') throw new Error('unreachable');
     views.push(result.view);
@@ -110,7 +110,6 @@ describe('generated-output isolation at the project acquisition boundary', () =>
     await put(root, 'src/.ramify-architects/real.ts', 'export const nearMiss = 1;\n');
     const view = await read();
     expect(view.inventory.files.map(file => file.path)).toEqual(['src/.ramify-architects/real.ts', 'src/value.ts']);
-    expect(view.inventory.outsideModuleFiles).toEqual([]);
     expect(view.inputs.filter(input => architectPath(input.path))).toEqual([]);
   });
 
@@ -119,14 +118,15 @@ describe('generated-output isolation at the project acquisition boundary', () =>
     // directories. The listings the configuration host serves never show the
     // reserved one (the capture omits it before the host's own filter), and an
     // explicit `files` entry naming it is dropped from the selection, while
-    // the near miss is selected as ordinary outside-module source.
+    // the near miss is inventoried as the root's auxiliary source.
     await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { types: [], module: 'ESNext', moduleResolution: 'bundler' },
       include: ['src', '.ramify-*/**/*'], files: ['.ramify-architect/explicit.ts'] }) + '\n');
     await put(root, '.ramify-architect/generated.ts', 'export const generated = 1;\n');
     await put(root, '.ramify-architect/explicit.ts', 'export const explicit = 1;\n');
     await put(root, '.ramify-architects/near.ts', 'export const nearMiss = 1;\n');
     const view = await read();
-    expect(view.inventory.outsideModuleFiles).toEqual(['.ramify-architects/near.ts']);
+    expect(view.inventory.files.filter(file => file.placement === 'auxiliary').map(file => [file.path, file.owner]))
+      .toEqual([['.ramify-architects/near.ts', view.inventory.modules[0]!.id]]);
     expect(view.inputs.filter(input => architectPath(input.path))).toEqual([]);
     expect(view.inputs.some(input => input.path.startsWith('.ramify-architects'))).toBe(true);
     expect(view.inventory.files.map(file => file.path)).toContain('src/value.ts');

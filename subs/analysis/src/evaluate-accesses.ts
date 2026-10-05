@@ -2,10 +2,26 @@ import { createHash } from 'node:crypto';
 import { setImmediate } from 'node:timers/promises';
 import { explainImport, originalKey } from '../subs/model/src/index.js';
 import type { ImportDecision, Model, SourceLocation } from '../subs/model/src/interfaces/model.js';
-import type { SourceAccess } from '../subs/typescript/src/interfaces/source.js';
+import type { SourceAccess, SourceTarget } from '../subs/typescript/src/interfaces/source.js';
 import type { AccessResult, AnalysisDiagnostic } from './interfaces/analysis.js';
 
 const order = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+/**
+ * Every target kind names its outcome; only an application target can be
+ * `checked`. A nested-tree target is a definite project-boundary denial; an
+ * always-excluded target stays unverifiable with its excluded-target limit.
+ */
+function outcomeOf(target: SourceTarget, unknown: boolean, checked: boolean): AccessResult['outcome'] {
+  switch (target.kind) {
+    case 'application': return unknown ? checked ? 'mixed' : 'unverifiable' : 'checked';
+    case 'external': return 'external';
+    case 'outside-project': return 'outside-scope';
+    case 'nested-tree': return 'denied';
+    case 'unresolved': case 'excluded': return 'unverifiable';
+    default: { const never: never = target; throw new TypeError(`Unknown source target ${JSON.stringify(never)}`); }
+  }
+}
 
 /** Analysis-owned request mapping, ready for the session's decide stage. Call
  * only with a model built from valid, linked descriptions of these inputs. */
@@ -45,7 +61,16 @@ function* evaluateSteps(model: Model, accesses: readonly SourceAccess[], maxDiag
     const decisions: ImportDecision[] = [], ids: string[] = [];
     let unknown = access.coverageIds.length > 0;
     let checked = false;
-    if (access.target.kind === 'application') {
+    if (access.target.kind === 'nested-tree') {
+      // Imports into a declared tree are decided before symbol selection and
+      // the same-owner exemption: every form, including type-only and
+      // symbol-free loads and re-exports, is one located boundary finding and
+      // no symbol decision. Package resolution never reaches this target.
+      const { file, exclusion } = access.target;
+      ids.push(add(access, access.selections[0]?.location ?? access.location, 'project-boundary-import',
+        `${access.specifier === null ? file : `'${access.specifier}'`} resolves to ${file} in the declared ${exclusion.kind} tree ${exclusion.directory}; `
+        + 'an import into a declared tree must use package resolution'));
+    } else if (access.target.kind === 'application') {
       const target = access.target.origin;
       const decide = (location: SourceLocation, selection: Parameters<typeof explainImport>[1]['selection'],
         forwarding: Parameters<typeof explainImport>[1]['forwarding']): void => {
@@ -84,9 +109,7 @@ function* evaluateSteps(model: Model, accesses: readonly SourceAccess[], maxDiag
       if (!access.selections.length && access.selectionForm === 'unknown') unknown = true;
     }
     const result: AccessResult = { accessId: access.id, decisions,
-      outcome: access.target.kind === 'external' ? 'external' : access.target.kind === 'outside-module' ? 'outside-scope'
-        : access.target.kind === 'unresolved' ? 'unverifiable' : unknown ? checked ? 'mixed' : 'unverifiable' : 'checked',
-      diagnostics: ids, coverage: access.coverageIds };
+      outcome: outcomeOf(access.target, unknown, checked), diagnostics: ids, coverage: access.coverageIds };
     collect?.result(result);
     results.push(result);
     yield;

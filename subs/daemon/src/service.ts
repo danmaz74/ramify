@@ -32,7 +32,7 @@ const apiViewLimits: ApiViewQueryLimits = {
 
 /** Plan 2B's dependency wait for the architect view, on the service clock: the pause after
  * each busy answer, and the limit of the whole wait from its first request. */
-export const dependencyWait = Object.freeze({ intervalMs: 250, limitMs: 125_000 });
+export const dependencyWait: Readonly<{ intervalMs: number; limitMs: number }> = Object.freeze({ intervalMs: 250, limitMs: 125_000 });
 
 /** How the dependency wait ended: facts to render with, or no publication at all. */
 type DependencyWait =
@@ -89,6 +89,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
   const manager = createContextManager({ ...options, apiViewLimits, dependencyDiagrams, engine: options.instance.engine, generationId: () => `gen/1:${randomUUID()}`,
     driver: {
       resolve: (request, control, known) => options.driver.resolve(request, control, known),
+      classify: (scope, path) => options.driver.classify(scope, path),
       async open(project, setup, control) {
         const opened = await measured(control, () => options.driver.open(project, setup, control));
         if (opened.status !== 'opened') return opened;
@@ -437,9 +438,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
             reason: 'analysis-failed', message: `Joining module measurements failed: ${String(error)}` }; }
           if (joined.state !== 'measured') return { status: 'unavailable', requestId: outcome.requestId,
             reason: 'analysis-failed', message: `The current inventory cannot be measured: ${joined.reason}` };
-          const document: MeasureDocument = { schema: 'ramify.measure/1', revision: outcome.revision.revision,
+          const document: MeasureDocument = { schema: 'ramify.measure/2', revision: outcome.revision.revision,
             root, ownershipRule: measurementOwnershipRule, views: joined.views, modules: joined.modules,
-            files: outcome.measurements.files, outsideModuleFiles: outcome.measurements.outsideModuleFiles };
+            files: outcome.measurements.files };
           const measured: Extract<MeasureOutcome, { readonly status: 'measured' }> = {
             status: 'measured', requestId: outcome.requestId, freshness: outcome.freshness, document };
           const transport = responseBudgets.getStore();
@@ -464,8 +465,9 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
           revision: outcome.revision, elapsedMs: outcome.elapsedMs };
         if (outcome.status === 'superseded') return { status: 'superseded', requestId: outcome.requestId, revision: outcome.revision };
         if (outcome.status === 'cancelled') return interrupted(null);
+        // The whole-project selection names no location, so `invalid-location` cannot occur here; were it to, it is a failed analysis.
         if (outcome.status === 'unavailable') return { status: 'unavailable', requestId: outcome.requestId,
-          reason: outcome.reason, message: outcome.message };
+          reason: outcome.reason === 'invalid-location' ? 'analysis-failed' : outcome.reason, message: outcome.message };
         throw new Error(`Unhandled measurement outcome status: ${(outcome as { status: string }).status}`);
       } finally {
         stopDeadline();
@@ -615,7 +617,7 @@ export function createDaemonService(options: DaemonServiceOptions): DaemonServic
         const contexts = observe();
         const memory = process.memoryUsage();
         const host = transportCounters(result);
-        return success({ ...options.instance, protocol: 'ramify.ipc/1', startedAt, state: stopping ? 'stopping' : 'running',
+        return success({ ...options.instance, protocol: 'ramify.ipc/2', startedAt, state: stopping ? 'stopping' : 'running',
           connections: host.connections || Math.max(0, clients.size - 1),
           subscriptions: [...clients.values()].reduce((sum, client) => sum + client.subscriptions.size, 0), contexts,
           budgets: options.budgets, counters: { ...counters, coalescedEvents: counters.coalescedEvents + host.coalescedEvents,

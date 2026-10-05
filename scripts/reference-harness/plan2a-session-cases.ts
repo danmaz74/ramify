@@ -26,7 +26,7 @@ import type { Assertions, InstanceHandler } from './runner.js';
  * convention (see `plan2a-projection-cases.ts`'s `ancestryFiles`).
  */
 const fixtureFiles: Record<string, string> = {
-  'module.ramify': 'ramify 1\nmodule fixture\nexpose-src rootValue, RootType from "interfaces/api.ts" to descendants\n',
+  'module.ramify': 'ramify 1\nroot module fixture\nexpose-src rootValue, RootType from "interfaces/api.ts" to descendants\n',
   'README.md': '# Fixture\n\nA root and two independently accessed subtrees.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',

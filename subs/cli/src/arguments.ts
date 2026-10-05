@@ -21,20 +21,28 @@ are discovered from the working directory; --root gives an explicit root.
                    configuration changes included.
   check --batch    Independent complete check in a fresh session that trusts no
                    daemon state.
-  check --changed  Bounded hook check. Hashes the named paths relative to the
-                   root and waits for a daemon revision covering them; it never
-                   falls back to batch. A named configuration file, such as
-                   tsconfig.json, a file it extends or a package manifest, is
-                   answered at once as not checked while the daemon verifies it.
-                   --deadline bounds the wait (default 2000 ms; maximum
-                   600000 ms) but does not delay that reply. --since marks
-                   findings added since that revision.
+  check --changed  Bounded hook check with the complete check's findings and
+                   exit code. Paths are relative to the root; the daemon
+                   classifies them by the project's ownership, the CLI hashes
+                   those that classification analyzes, and the check waits for
+                   a daemon revision covering them. It never falls back to
+                   batch. Each path is checked, not analyzed (an excluded,
+                   ignored or inert path, which the complete check does not
+                   analyze either) or not checked. A named configuration file,
+                   such as tsconfig.json, a file it extends or a package
+                   manifest, is answered at once as not checked while the daemon
+                   verifies it. --deadline bounds the wait (default 2000 ms;
+                   maximum 600000 ms) but does not delay that reply. --since
+                   marks findings added since that revision.
   --no-snapshot    Leave the snapshot of every evaluated import out of a
                    complete check's JSON report. The report keeps its schema
                    and sets "snapshot": null; its summary, outcome and findings
                    are unchanged.
 --since and --deadline require --changed; --changed cannot accompany --batch.
 --no-snapshot requires --format json and cannot accompany --changed.
+Inside a Git repository, a complete check also warns about each directory Git
+ignores that Ramify still walks (ignored-but-walked); that advice never
+changes the result.
 Watch streams revisions until interrupted. Status and stop never start a daemon.
 
 materialize refreshes one module's or the whole project's generated .ramify
@@ -51,19 +59,22 @@ dependency facts. Without --view, materialize refreshes the API view alone.
 in one transaction.
 
 measure prints revision-bound context-size buckets for every module and the
-owned file inventory. --format json prints the ramify.measure/1 document;
+owned file inventory. --format json prints the ramify.measure/2 document;
 without it, measure prints a short exact/subtree table. It is a synchronized,
 whole-project daemon query: it writes nothing and never falls back to batch.
 
 affected selects the modules whose tests a change calls for. Seeds are module
-IDs and --path paths relative to the root, as the inventory spells them; give at
-least one. The answer lists the changed modules, the modules that depend on
+IDs and --path paths relative to the root, present or not; give at least one.
+A path selects its owning module, also in an owned-ignored tree or a scratch
+directory; a path in an external tree or another always-excluded path selects
+nothing. The answer lists the changed modules, the modules that depend on
 them, and the test modules, from one revision's dependency facts. A path
-outside every module widens the answer to all modules, as does partial
-coverage; the widening reasons are printed. Without --batch it is a
-synchronized resident query that never falls back to batch; --batch answers
-from a fresh session that trusts no daemon state. --format json prints one
-ramify.affected-cli/1 document. --changed, --since and --deadline do not apply.
+outside the project, written with a leading ../, widens the answer to all
+modules, as does partial coverage; the widening reasons are printed. Without
+--batch it is a synchronized resident query that never falls back to batch;
+--batch answers from a fresh session that trusts no daemon state.
+--format json prints one ramify.affected-cli/2 document.
+--changed, --since and --deadline do not apply.
 
 explore selects one project through the resident daemon, starts or reuses that
 project's resident explorer server, prints its /analysis/latest URL, opens it in
@@ -73,9 +84,10 @@ falls back to batch analysis.
 
 Exit codes: 0 completed, 1 violations or invalid input, 2 unable to complete,
 130 interrupted. Warnings and analysis limits alone do not fail a check.
-Changed checks: 0 checked with no findings, 1 findings or invalid revision,
-2 not checked (including cold, deadline, unobserved or superseded content, and a
-named configuration file).
+Changed checks: 0 no findings and 1 findings or an invalid revision, exactly as
+the complete check, whatever paths are not analyzed; 2 the result could not be
+established: a path not checked (cold, deadline, unobserved or superseded
+content, a named configuration file, or a classification that changed again).
 materialize: 0 every requested target complete, 1 the project is invalid,
 2 unavailable, partial/rollback failure, deadline, supersession or incompatible
 service, 130 interrupted.
@@ -190,7 +202,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
   if (command === 'check') {
     if (changed && batch) throw new Error('--changed cannot be combined with --batch');
     if (!changed && (since !== undefined || deadlineMs !== undefined)) throw new Error('--since and --deadline require --changed');
-    // A changed check's ramify.check/1 document has no snapshot to leave out.
+    // A changed check's ramify.check/2 document has no snapshot to leave out.
     if (changed && noSnapshot) throw new Error('--no-snapshot cannot be combined with --changed');
     if (noSnapshot && format !== 'json') throw new Error('--no-snapshot requires --format json');
     return { command, ...project, batch, ...(changed ? { changed } : {}),

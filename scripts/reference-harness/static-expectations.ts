@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { linkDescriptions } from '../../subs/analysis/subs/descriptions/src/link.js';
 import { buildModel, createDefaultTagRegistry, deriveSourceAreas } from '../../subs/analysis/subs/model/src/index.js';
 import type { ImportDecision, ModelResult } from '../../subs/analysis/subs/model/src/index.js';
@@ -25,7 +25,7 @@ export const staticForms = new Set(['import', 'import-type', 'inline-type-import
 export async function staticProject(root: string) {
   const inputs = validationInputs(root);
   const registry = createDefaultTagRegistry();
-  const acquired = await readProject({ request: inputs.project, parse: parseDescription, limits: inputs.limits.acquisition });
+  const acquired = await readProject({ request: inputs.project, parse: parseDescription, marker: readRootMarker, limits: inputs.limits.acquisition });
   if (acquired.status !== 'acquired') throw new Error(JSON.stringify(acquired));
   let source: SourceAnalysis | undefined;
   try {

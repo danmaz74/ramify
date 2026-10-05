@@ -53,7 +53,7 @@ directory layout and metadata. Ramify-managed snapshot export is deferred.
 
 ## Baseline validation and identity
 
-Accept the current `ramify.architect-view/1` format, including bounded or
+Accept the current `ramify.architect-view/2` format, including bounded or
 unavailable evidence explicitly represented by its metadata. A complete
 publication is not the same as complete source knowledge.
 

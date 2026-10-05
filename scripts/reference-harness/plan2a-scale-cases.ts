@@ -5,7 +5,7 @@ import { createFilesystemApiViewPublisher } from '../../subs/daemon/src/api-view
 import type { ApiViewPublishLimits } from '../../subs/daemon/src/interfaces/daemon.js';
 import { createQuickEnvironment } from '../../src/tests/quick-environment.js';
 import { capabilities } from '../../subs/cli/src/command-support.js';
-import { writeMaterializeFixture } from './plan2a-materialize-fixture.js';
+import { writeMaterializeFixture } from '../measurements/plan2a-materialize-fixture.js';
 import { repositoryRoot } from './plan.js';
 import { command } from './processes.js';
 import { recordObservation } from './observations.js';

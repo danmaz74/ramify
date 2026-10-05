@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { deriveSourceAreas, resolveTagRegistry } from '../subs/model/src/index.js';
 import type { SourceArea, SourceLocation } from '../subs/model/src/interfaces/model.js';
@@ -23,7 +23,7 @@ function projectDiagnostics(issues: readonly ProjectIssue[], parsed: ReadonlyMap
     if (issue.code === 'invalid-description' && description?.status === 'invalid') {
       return description.issues.map(item => diagnostic(item.code, item.message, 'description', [{ file: item.file, ...item.span }]));
     }
-    return [diagnostic(issue.code, issue.message, 'acquisition', [{ file: issue.path, start: 0, end: 0, line: 1, column: 1 }])];
+    return [diagnostic(issue.code, issue.message, 'acquisition', [{ file: issue.path, ...issue.span ?? { start: 0, end: 0, line: 1, column: 1 } }])];
   });
   return [...new Map(diagnostics.map(item => [item.id, item])).values()];
 }
@@ -64,7 +64,7 @@ export async function acquireInventory(inputs: InventoryInputs, control: RunCont
         const parsed = new Map<string, ParsedDescription>();
         const acquired = await readProject({ request: inputs.project, parse: (file, text) => {
           const description = parseDescription(file, text); parsed.set(file, description); return description;
-        }, limits: { ...inputs.limits, attempts: 1, deadlineMs: Math.max(1, Math.ceil(deadline - performance.now())) }, signal: abort.signal });
+        }, marker: readRootMarker, limits: { ...inputs.limits, attempts: 1, deadlineMs: Math.max(1, Math.ceil(deadline - performance.now())) }, signal: abort.signal });
         if (acquired.status === 'cancelled') break;
         if (acquired.status !== 'acquired') {
           result = { status: acquired.status, diagnostics: projectDiagnostics(acquired.issues, parsed) };

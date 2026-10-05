@@ -12,7 +12,7 @@ async function fixture(run: (root: string) => Promise<void>): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), 'ramify-production-'));
   try {
     const files: Record<string, string> = {
-      'module.ramify': 'ramify 1\nmodule fixture tagged [dispatch]\n',
+      'module.ramify': 'ramify 1\nroot module fixture tagged [dispatch]\n',
       'package.json': JSON.stringify({ name: 'production-fixture', type: 'module', exports: {
         './api': { import: './dist/src/interfaces/api.js', types: './dist/src/interfaces/api.d.ts' },
       } }),
@@ -65,7 +65,7 @@ describe('inventory-driven production build', () => {
   }), 15_000);
 
   it('fails invalid selection without printing a success-shaped document', async () => fixture(async root => {
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture tagged [unknown]\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture tagged [unknown]\n');
     const result = await command(root);
     expect(result.code).toBe(1); expect(result.stdout).toBe(''); expect(result.stderr).toContain('unknown-tag');
   }));

@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 13](iteration13.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** Analysis affected selection plus mechanical root/daemon request-result relays. No changes beneath `ramify-agent/` or
+**Owners and write scope:** Analysis affected selection plus mechanical root/daemon request-result relays and the reference harness's expected values for affected outputs this slice changes. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -38,8 +38,8 @@ Do not load the complete reference harness or generated catalogs into one contex
 ## Deliverables
 
 1. Resolve every seed with Project facts: inventory/declaration/area/containment/excluded/none. Return complete ownership topology without per-file inert inventory.
-2. Preserve reverse-import closure, coverage widening, warm/current-revision checks, limits and cancellation; root ownership never means automatic descendant selection.
-3. Add project-boundary-affected.test.ts with all written topology answers, absent/deleted/rename sides and outside seeds; propagate the new answer schema and strict consumers.
+2. Preserve reverse-import closure, coverage widening, warm/current-revision checks, limits and cancellation; root ownership never means automatic descendant selection. `ramify affected` selects its project through the root-marker selection of iteration 3B; this slice adds no selection behavior, and its topology fixtures mark the root and the ignored projects as [fixtures.md](../fixtures.md) shows.
+3. Add project-boundary-affected.test.ts with all written topology answers, absent/deleted/rename sides and outside seeds. Extend `ramify.affected/2` and `ramify.affected-cli/2`, advanced in iteration 3, through their strict consumers and the harness's expected values, per [schema versions](../contracts.md#schema-versions) and [iteration gates](../execution.md#iteration-gates).
 
 ## Matrix rows executed here
 

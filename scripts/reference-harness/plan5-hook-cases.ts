@@ -50,11 +50,14 @@ async function changed(p: SequenceProcess, root: string, a: Assertions, label: s
   recordObservation(label, { ...result, raw: await archiveObservation(label, result) });
   a.equal(`${label}: finite process exit and stderr`, [result.code, result.signal, result.error, result.stderr], [expected, null, null, '']);
   const document = JSON.parse(result.stdout) as CheckDocument;
-  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/1', 1, expected]);
+  a.equal(`${label}: one compact document and matching exit`, [document.schemaVersion, result.stdout.trim().split('\n').length, document.exitCode], ['ramify.check/2', 1, expected]);
+  // Phase 1 project boundaries, iteration 15: each named path carries a disposition in
+  // place of the coverage flag. An answered check leaves no path not checked; a check
+  // that could not establish its result shows none of these single paths as checked.
   if (expected === 0 || expected === 1) {
-    a.equal(`${label}: covering publication`, [document.outcome, document.reason, document.changed.every(item => item.covered)], ['checked', null, true]);
+    a.equal(`${label}: covering publication`, [document.outcome, document.reason, document.paths.every(item => item.disposition !== 'not-checked')], ['checked', null, true]);
     a.ok(`${label}: revision and checked set`, document.revision && document.checked && document.timings.daemon);
-  } else a.equal(`${label}: no pass without coverage`, [document.outcome, document.changed.every(item => !item.covered)], ['not-checked', true]);
+  } else a.equal(`${label}: no pass without coverage`, [document.outcome, document.paths.length > 0 && document.paths.every(item => item.disposition !== 'checked')], ['not-checked', true]);
   return document;
 }
 async function stop(p: SequenceProcess): Promise<void> {
@@ -93,8 +96,14 @@ add('changed-hashes-in-cli', async (p, root, _directory, a) => {
     const offset = (await trace(p)).length;
     await changed(p, root, a, 'covered hash', 0);
     const events = (await trace(p)).slice(offset), sent = events.filter(event => event.event === 'hook-check');
-    a.equal('one delta request hashes the named file in the CLI', sent.map(event => [event.params?.scope, event.params?.freshness]),
-      [['delta', { mode: 'synchronized', expect: [{ path: assembly, sha256: hash(await readFile(join(root, assembly))) }] }]]);
+    // Phase 1 project boundaries, iteration 15: the lightweight client cannot classify paths.
+    // Its first delta request names the path with no content; the daemon's classification at
+    // the published revision asks for the source's content, which the second one carries.
+    const published = before.value.contexts[0]?.published?.sequence ?? null;
+    a.equal('the CLI names the path without content, then hashes it in one delta request', sent.map(event =>
+      [event.params?.scope, event.params?.paths, event.params?.classification, event.params?.freshness]), [
+      ['delta', [assembly], null, { mode: 'synchronized', expect: [] }],
+      ['delta', [assembly], published, { mode: 'synchronized', expect: [{ path: assembly, sha256: hash(await readFile(join(root, assembly))) }] }]]);
     a.equal('default deadline is 2000 ms', sent[0].params?.deadlineMs, 2000);
     a.ok('CLI file read is observed', events.some(event => event.event === 'hook-read' && event.pid === sent[0].pid && event.path === join(root, assembly)));
     // Opening still validates project/configuration selection. Once the CLI
@@ -104,7 +113,12 @@ add('changed-hashes-in-cli', async (p, root, _directory, a) => {
     const after = await client.daemonStatus();
     a.equal('covered answer does no analysis and increments covering counter', after.ok && [after.value.counters.analyses - before.value.counters.analyses,
       after.value.counters.coveredRequests - before.value.counters.coveredRequests], [0, 1]);
-    await changed(p, root, a, 'absent hash', 2, ['src/missing.ts']);
+    // Phase 1 project boundaries, iteration 15: a root-owned path that is no file and no
+    // analysis input is one the complete check does not analyze. It is not analyzed and
+    // leaves the clean project's exit 0, with no identity in the document.
+    const missing = await changed(p, root, a, 'absent hash', 0, ['src/missing.ts']);
+    a.equal('missing never-analyzed file is not analyzed', missing.paths,
+      [{ path: 'src/missing.ts', disposition: 'not-analyzed', module: 'collection-review', exclusion: null, reason: 'owned-non-source' }]);
     const absent = (await trace(p)).filter(event => event.event === 'hook-check').at(-1)!;
     a.equal('missing file travels as an absent identity', absent.params?.freshness, { mode: 'synchronized', expect: [{ path: 'src/missing.ts', sha256: null }] });
   } finally { await client.close(); }
@@ -188,8 +202,8 @@ add('plain-check-unchanged', async (p, root, _directory, a) => {
   const resident = await p.check(root, false), batch = await p.check(root, true);
   const { runId: _resident, ...one } = resident, { runId: _batch, ...two } = batch;
   a.equal('plain resident document remains exactly batch except runId', one, two);
-  a.equal('plain schema and independent reference expectation', [resident.schemaVersion, resident.summary.owners, resident.summary.denied], ['ramify.analysis/1', 15, 0]);
-  a.equal('compact members do not leak into plain report', ['revision', 'since', 'changed', 'timings', 'exitCode'].filter(key => key in resident), []);
+  a.equal('plain schema and independent reference expectation', [resident.schemaVersion, resident.summary.owners, resident.summary.denied], ['ramify.analysis/2', 15, 0]);
+  a.equal('compact members do not leak into plain report', ['revision', 'since', 'paths', 'timings', 'exitCode'].filter(key => key in resident), []);
   const human = await p.run(root, ['check']);
   a.equal('plain human exit', [human.code, human.stderr], [0, '']);
   a.ok('plain mode includes revision path', /Mode: resident.*(?:cold|unchanged-surface|source|description|metadata|broad)/.test(human.stdout));

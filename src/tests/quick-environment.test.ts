@@ -4,6 +4,10 @@ import { createSessionDriver } from '../resident-assembly.js';
 import { fixture } from './fixture.js';
 import type { ServiceConnection } from '../../subs/daemon/src/interfaces/daemon.js';
 import type { QuickEnvironment } from './quick-environment.js';
+import type { WatchScope } from '../../subs/daemon/src/context-types.js';
+
+/** The controlled port registers nothing, so any scope serves its tests. */
+const scope: WatchScope = { sequence: null, exclusions: [], excluded: () => null };
 
 async function connect(environment: QuickEnvironment): Promise<ServiceConnection> {
   const result = await environment.connect({ start: 'never' });
@@ -95,12 +99,12 @@ describe('quick transport and cleanup boundaries', () => {
 
   it('reports leaked handles and still disposes both controls', async () => {
     const environment = await createQuickEnvironment();
-    await environment.watcher.watch('/unreleased', () => {});
+    await environment.watcher.watch('/unreleased', scope, () => {});
     environment.clock.schedule(1000, () => {});
     await expect(environment.dispose()).rejects.toThrow('leaked 0 connections, 1 watchers and 1 timers');
     expect(environment.watcher.active).toBe(0);
     expect(environment.clock.pending).toBe(0);
-    await expect(environment.watcher.watch('/after', () => {})).rejects.toThrow('disposed');
+    await expect(environment.watcher.watch('/after', scope, () => {})).rejects.toThrow('disposed');
     expect(() => environment.clock.schedule(1, () => {})).toThrow('disposed');
   });
 });

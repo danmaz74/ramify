@@ -69,7 +69,6 @@ export interface SessionMeasurements {
   readonly inputId: string;
   readonly modules: readonly InventoryModuleMeasurement[];
   readonly files: readonly MeasurementFileRecord[];
-  readonly outsideModuleFiles: readonly string[];
 }
 
 export type SessionMeasurementsOutcome =

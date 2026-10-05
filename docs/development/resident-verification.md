@@ -7,7 +7,7 @@ the current build must pass the complete matrix and resource/platform checks.
 | Command | Behavior |
 | --- | --- |
 | `ramify check [--root <dir>] [--format json]` | Synchronized resident check; human output identifies the daemon, context and revision. |
-| `ramify check --batch [...]` | Independent disposable analysis, with the unchanged `ramify.analysis/1` JSON report. |
+| `ramify check --batch [...]` | Independent disposable analysis, with the `ramify.analysis/2` JSON report; inside a Git repository the CLI adds its Git advice warnings. |
 | `ramify watch [...]` | Streams revisions fetched by exact id; SIGINT releases the subscription and exits 130. |
 | `ramify daemon status`, `ramify daemon stop` | Status and explicit stop without starting a daemon. |
 | `ramify --help`, `ramify --version` | Available without starting an engine or daemon. |

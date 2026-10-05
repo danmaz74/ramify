@@ -3,7 +3,7 @@ import type { RamifyService, ServiceResult } from '../../../src/interfaces/servi
 import type { RunControl } from '../../analysis/src/interfaces/analysis.js';
 import type { ContextEvent } from '../subs/contexts/src/interfaces/contexts.js';
 import type { ConnectOptions, DisconnectReason, EndpointSelection, Welcome, WireMessage } from './interfaces/daemon.js';
-import { createFrameDecoder, encodeMessage, validateWireMessage } from './codec.js';
+import { createFrameDecoder, encodeMessage, validateServiceReply, validateWireMessage } from './codec.js';
 
 export class ConnectionFailure extends Error {
   constructor(readonly reason: DisconnectReason) { super('message' in reason ? reason.message : reason.kind); }
@@ -35,7 +35,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
   let resolveClosed!: () => void;
   const closed = new Promise<void>(resolve => { resolveClosed = resolve; });
   const ready = new Promise<void>((resolve, decline) => { accept = resolve; reject = decline; });
-  const pending = new Map<string, { finish: (result: ServiceResult<unknown>) => void; cleanup: () => void;
+  const pending = new Map<string, { readonly op: string; finish: (result: ServiceResult<unknown>) => void; cleanup: () => void;
     listen?: (event: ContextEvent) => void }>();
   const subscriptions = new Map<string, (event: ContextEvent) => void>();
   function fail(reason: DisconnectReason): void {
@@ -80,6 +80,8 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
       case 'response': {
         const request = pending.get(message.id);
         if (!request) throw new Error('Response names an unknown request');
+        // A malformed reply is a protocol failure, like any invalid frame.
+        validateServiceReply(request.op, message.result);
         pending.delete(message.id); request.cleanup();
         if (request.listen && message.result.ok) {
           const value = message.result.value as { subscription?: unknown };
@@ -98,7 +100,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
   const decoder = createFrameDecoder(64 * 1024, receive);
   const abort = () => { fail({ kind: 'closed' }); socket.destroy(); };
   const timeout = setTimeout(() => { fail({ kind: 'failure', message: 'Daemon handshake timed out' }); socket.destroy(); }, handshakeMs);
-  socket.on('connect', () => send({ type: 'hello', handshake: { protocol: 'ramify.ipc/1', client: options.client,
+  socket.on('connect', () => send({ type: 'hello', handshake: { protocol: 'ramify.ipc/2', client: options.client,
     buildKey: endpoint.buildKey, engine: options.engine } }));
   socket.on('data', bytes => { try { decoder.push(typeof bytes === 'string' ? Buffer.from(bytes) : bytes); } catch (error) {
     const reason: DisconnectReason = { kind: 'failure', message: (error as Error).message };
@@ -120,7 +122,7 @@ export async function openSocketConnection(endpoint: EndpointSelection, options:
     const sent = performance.now();
     return new Promise(resolve => {
       const abortRequest = () => { if (pending.has(id)) send({ type: 'cancel', id }); };
-      pending.set(id, { finish: result => resolve((op === 'check' || op === 'materialize' || op === 'affected' ? transported(result, performance.now() - sent) : result) as ServiceResult<T>),
+      pending.set(id, { op, finish: result => resolve((op === 'check' || op === 'materialize' || op === 'affected' ? transported(result, performance.now() - sent) : result) as ServiceResult<T>),
         cleanup: () => control?.signal?.removeEventListener('abort', abortRequest), listen });
       try {
         send({ type: 'request', id, op, params });

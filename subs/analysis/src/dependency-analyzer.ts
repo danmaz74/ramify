@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import { deriveSourceAreas } from '../subs/model/src/index.js';
 import type { SourceArea } from '../subs/model/src/interfaces/model.js';
 import { readProject } from '../subs/project/src/read-project.js';
@@ -108,7 +108,7 @@ export async function analyzeDependencyDiagram(input: DependencyAnalyzerInput, c
   try {
     const acquisitionStart = performance.now();
     const acquisition = report.request.limits.acquisition;
-    const acquired = await readProject({ request: input.project, parse: parseDescription, signal: abort.signal,
+    const acquired = await readProject({ request: input.project, parse: parseDescription, marker: readRootMarker, signal: abort.signal,
       limits: { ...acquisition, attempts: 1, deadlineMs: remaining(acquisition.deadlineMs) } });
     check();
     if (acquired.status === 'cancelled') throw Object.assign(new Error('Project acquisition was cancelled'), { code: 'cancelled' });

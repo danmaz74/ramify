@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { installedCommand, packageRoot, pollDaemonStatus, runCommand } from './plan2a-fixtures.mjs';
 import { plan2aDependencies } from './plan2a-inputs.mjs';
 import { materializeSynthetic } from './materialize.ts';
-import { copyProject, readViewTree, specifiedArchitectLimits, withoutRevision } from '../reference-harness/plan2b-cases.ts';
+import { copyProject, readViewTree, specifiedArchitectLimits, withoutRevision } from './plan2b-views.ts';
 import { openRetainedSession } from '../../subs/analysis/src/retained-session.ts';
 import { limits as batchLimits } from '../../src/batch.ts';
 import { dependencyWait } from '../../subs/daemon/src/service.ts';

@@ -12,11 +12,11 @@ editing; follow the [protected-document procedure](../execution.md#protected-pri
 
 ## Goal
 
-Declare site, examples/collection-review and scripts/reference-harness owned-ignored; ramify-agent external; declare .reference-work, .history, .cucumber-viz, .playwright-mcp and actual source-shaped generated/planning trees requiring boundaries.
+Declare site, examples/collection-review and scripts/reference-harness owned-ignored; ramify-agent external; declare .reference-work, .history, .cucumber-viz and .playwright-mcp external, and the actual source-shaped generated/planning trees requiring boundaries.
 
 ## Read first
 
-- [Contracts](../contracts.md): Description language; Canonical path ownership.
+- [Contracts](../contracts.md): Description language; Root marker; Canonical path ownership.
 - [Alignment](../alignment.md), the relevant owning specifications it names,
   and [source state](../source-state.md); verify the active checkout and revision.
 - [Acceptance](../acceptance.md): PB1-03, PB1-05, PB1-09, PB1-11, PB1-32, PB1-40 and the independent
@@ -39,7 +39,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 
 ## Deliverables
 
-1. Declare site, examples/collection-review and scripts/reference-harness owned-ignored; ramify-agent external; declare .reference-work, .history, .cucumber-viz, .playwright-mcp and actual source-shaped generated/planning trees requiring boundaries.
+1. Declare site, examples/collection-review and scripts/reference-harness owned-ignored; ramify-agent external; and the actual source-shaped generated/planning trees requiring boundaries. As the user decided on 2026-10-03 ([decided question 1](../main-plan.md#decided-questions)), declare all four tool directories `.reference-work`, `.history`, `.cucumber-viz` and `.playwright-mcp` as `external` in the toolkit root `module.ramify`; an external directory may be absent, so the audit's fresh checkout stays valid. `examples/collection-review/.reference-work` lies inside the declared example tree and needs no declaration. The root description already carries the marker from iteration 3A; keep it. A project inside any declared tree, such as the example or ramify-agent, is a separate project whose own description is not interpreted.
 2. Re-inventory all owned fixture-package and source-shaped data directories; add declarations at their owner. The harness's fixtures lie inside its ignored tree and need none. Do not infer boundaries from Git or tsconfig.
 3. Add scratch/compiler exclusions in all toolkit compiler scopes and runner configurations; keep source-area classifications and production exclusions. Preserve existing Git ignore rules; harness scratch lifecycle remains Phase 3.
 
@@ -58,6 +58,7 @@ From the toolkit checkout:
 
 ```sh
 npm run type-check
+npm run build
 flock /tmp/ramify-audit-tests.lock npm run reference:cases
 ```
 
@@ -69,7 +70,7 @@ required gate without changed inputs or unresolved failures.
 
 ## Exit criteria
 
-The declaration/compile inventory is ready for wider discovery; no unsupported audit fields or external project edits appear. Document absent/generated external directories explicitly.
+The declaration/compile inventory is ready for wider discovery; no unsupported audit fields or external project edits appear. The four tool directories are declared external, and each generated directory's treatment is documented.
 
 Record `iteration7-results.md` through supported workflow tooling when executing,
 with changed behavior, tested case instances, commands, primary artifact links,

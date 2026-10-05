@@ -192,6 +192,19 @@ real daemon and helper/native descendants; controller memory is excluded from
 acceptance peaks. Sampled peaks can miss shorter spikes, and summed RSS counts
 shared mappings repeatedly.
 
+The compiled client can answer `ramify --help` faster than one sampler
+interval, so `entry-footprints` may hold no resident sample of it. The help
+record carries its measured wall time (`durationMs`), the sampler interval
+(`samplerIntervalMs`) and `belowSamplingResolution`. The measuring code sets
+that marker, with `rssBytes: null`, only when no sample holds resident bytes
+and the process exited within one interval. A marked row passes `help completed
+below sampling resolution` when its raw samples are complete and hold no
+resident bytes, the interval is the recipe's 50 ms and the wall time is finite,
+positive and below it. Any other help row must pass `help contains real
+externally sampled RSS`: a run of one interval or longer without a resident
+sample fails. This relaxes a reviewed check by user decision, 2026-10-05.
+The fast recipe reuses the same record and predicates.
+
 The values in `resident-plan.mjs` retain the numeric iteration-1 baselines.
 Empirical latency, RSS, heap and growth misses are advisory under the active
 scope decision. Missing samples, workload errors, invalid outcomes, exceeded
@@ -250,7 +263,7 @@ import to the body-edit source before recording its setup identity. Each pair
 deletes the target and recreates it, preserving complete coverage for the other
 workloads. The import preserves the compiler's observation of the absent target
 after deletion; an unreferenced deleted file
-would correctly receive `unobserved-input`. Every edit and revert preserves the
+is checked through the context's record of removed analysis inputs instead. Every edit and revert preserves the
 import, and created/deleted edits reject a missing witness before changing files.
 Only the deleted phase has an absent target and its precise `unresolved-target`
 coverage note, with no finding. The first body sequence launches the installed
@@ -271,7 +284,7 @@ Session timings come from the exact published revision, not elapsed CLI time.
 A hook whose watcher revision has already published is judged by the work it
 caused. Daemon counters are sampled before the hook, immediately after it
 returns and once settled. The hook must be answered from that published
-revision with exit code 0 and every changed entry covered, and must add exactly
+revision with exit code 0 and every named path checked, and must add exactly
 one covered request before it returns. In both intervals every added analysis
 must be a sweep or an audit, which the daemon counts in `sweeps` and `audits` as
 well as `analyses`. No revision may publish and no covered request may be added
@@ -285,7 +298,17 @@ opens, and Plan 2's unchanged entry-footprint workloads. The checked-set and col
 instances reuse those process observations with independent predicates; they do
 not claim an additional execution. Created/deleted files must report the
 membership path; a fixture change whose reach cannot be bounded would report the
-broad path and fail this workload.
+broad path and fail this workload. The one exception is the daemon's retry after
+a refusal at the per-context retained-fact limit: a broad created or deleted
+revision passes when the socket poll, between the write and the publication,
+shows the context's history reset to one revision while the analysis ran, from
+retained bytes whose headroom under the reported `maxRetainedBytesPerContext`
+was smaller than one membership revision's growth in the same workload. The
+row `membership revisions retried broad at the retained-fact limit` lists every
+such cycle. A save whose hook answers `unavailable`, or whose analysis settles
+without a new revision, stops its workload at once with its `failurePoint`
+recorded; the workload fails, and a derived row that needs its process names
+that point.
 
 The external POSIX sampler observes process RSS at a 50 ms target interval.
 A separate socket poll records daemon counters, contexts, retained facts and
@@ -423,7 +446,7 @@ npm run measure:plan2a-platform
 ```
 
 Materializes the small, checked-in
-[`plan2a-materialize-fixture.ts`](../reference-harness/plan2a-materialize-fixture.ts)
+[`plan2a-materialize-fixture.ts`](plan2a-materialize-fixture.ts)
 through the real installed CLI and daemon, and records: the first publication,
 a real unchanged-repeat no-op, a real symlinked-target refusal, and a real
 rollback (a genuine `EACCES` fault forces a failed second publish; the earlier
@@ -484,7 +507,7 @@ RAMIFY_MEASUREMENT_ACTIVITY='Idle host; no other builds or measurements' npm run
 The command uses the built CLI and one owned endpoint. It records a measure
 after daemon startup and a warm repeat, verifies the sum of exact owner buckets
 against the root subtree and every listed byte count against disk, and writes
-the complete `ramify.measure/1` toolkit document. It then measures the architect
+the complete `ramify.measure/2` toolkit document. It then measures the architect
 session query, materialization, unchanged repeat, generated size, Plan 2B search
 terms and sampled daemon/worker/compiler memory. The report chooses the fixed
 architect metrics policy only from the agreed budgets and preserves Plan 2B's

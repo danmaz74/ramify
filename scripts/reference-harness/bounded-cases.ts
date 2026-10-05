@@ -165,7 +165,7 @@ add('I1-20:no-declaration', 'F', ({ root }) => put(root, 'src/use.ts', "import {
 }, { prepare: async ({ root }) => {
   await mkdir(join(root, 'subs/consumer/subs'), { recursive: true });
   await rename(join(root, 'subs/provider'), join(root, 'subs/consumer/subs/provider'));
-  await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+  await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
   await put(root, probe, "export { value } from '../subs/provider/src/interfaces/api.js';\n");
 } });
 

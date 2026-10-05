@@ -36,6 +36,10 @@ export interface CheckParams {
   readonly scope?: 'report' | 'delta';
   readonly since?: RevisionId;
   readonly deadlineMs?: number;
+  /** A changed check's named paths; see `CheckRequest.paths`. */
+  readonly paths?: readonly string[];
+  /** Present exactly with `paths`; see `CheckRequest.classification`. */
+  readonly classification?: number | null;
 }
 export interface SubscriptionOpened {
   readonly subscription: string;
@@ -71,7 +75,7 @@ export interface DaemonStatus {
   readonly version: string;
   readonly engine: string;
   readonly buildKey: string;
-  readonly protocol: 'ramify.ipc/1';
+  readonly protocol: 'ramify.ipc/2';
   readonly startedAt: number;
   readonly state: 'running' | 'stopping';
   readonly connections: number;
@@ -130,14 +134,13 @@ export interface MeasureParams {
 }
 /** The deterministic machine document returned by a successful measurement. */
 export interface MeasureDocument {
-  readonly schema: 'ramify.measure/1';
+  readonly schema: 'ramify.measure/2';
   readonly revision: RevisionId;
   readonly root: string;
   readonly ownershipRule: string;
   readonly views: MeasurementViews;
   readonly modules: readonly ModuleMeasurement[];
   readonly files: readonly MeasurementFileRecord[];
-  readonly outsideModuleFiles: readonly string[];
 }
 export type MeasureOutcome =
   | { readonly status: 'measured'; readonly requestId: string;

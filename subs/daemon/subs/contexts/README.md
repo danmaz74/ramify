@@ -4,13 +4,29 @@ Contexts keeps each selected project root isolated as a context with its own gen
 
 `createContextManager` preserves each opening lease's invocation and capability
 order. Covered delta requests reuse a coherent publication when no influencing
-change or sweep is pending. Other synchronized requests flush the queue; an
-empty expectation requires a sweep started after acknowledgment. A synchronized
-request that names a configuration path is answered at once as unavailable for
-that reason, and the update its paths queued still runs, so the next request
-waits for that revision. Unobserved and superseded identities cannot produce a
-passing check. Request deadlines return cold or deadline-exceeded outcomes while
-the session continues updating.
+change or sweep is pending. Other synchronized requests flush the queue; a plain
+check naming neither paths nor expectations requires a sweep started after
+acknowledgment. A synchronized request that names a configuration path is
+answered at once as unavailable for that reason, and the update its paths queued
+still runs, so the next request waits for that revision. Unobserved and
+superseded identities cannot produce a passing check. Request deadlines return
+cold or deadline-exceeded outcomes while the session continues updating.
+
+A changed check names its paths and the revision sequence whose classification
+its expectations follow. The manager classifies each path with the driver's
+`classify`, Project's classifier, over the ownership table of the latest
+completed published revision, before any content or configuration rule: a path
+in an owned-ignored, external or scratch directory or another always-excluded
+path is `not-analyzed` and needs no content, so a manifest inside such a tree is
+no configuration change; an owned path outside every exclusion is analyzed and
+needs its expected identity. Expectations that do not follow the classification
+are answered `classification-changed` with it, at arrival or when the covering
+revision moved a boundary. Otherwise each analyzed path is `checked` by its read
+content or its deletion, including the removal of an analysis input an earlier
+publication held, `not-analyzed` as an owned non-source file the capture
+re-observed, or `not-checked` as superseded, and the reply keeps the revision's
+findings beside every disposition. Excluded paths are queued only as
+re-observation hints; their bytes never become expectations or captured inputs.
 
 History retains revision headers, diagnostics, warnings, coverage and finding
 deltas. Reports are projected from the session's immutable facts by exact
@@ -18,6 +34,8 @@ sequence only when requested. A request pins its retained baseline while it
 waits. History eviction releases the corresponding worker version. Byte budgets
 include the compact history and the session's facts; oversized candidates fail
 explicitly. Intermediate session versions without a published header are released.
+
+The watcher receives the latest completed revision's exclusions through Project's classifier and is reconfigured when they change. A removed exclusion opens a gap while its directories are registered: until the reconfiguration ends every capture sweeps and nothing is covered, and when it registered any directory its end requires a conservative sweep. The status reports the watcher's registrations.
 
 Watcher changes drive updates independently of requests. Required and periodic
 sweeps reconcile observed inputs, and an idle audit verifies each revision at
@@ -29,14 +47,17 @@ reopens the session; disposal releases requests, timers and all owned resources.
 The controlled clock's `advance(milliseconds)` runs due callbacks synchronously
 in deadline order, using scheduling order for ties. Tests await asynchronous
 operations separately. The controlled watcher delivers supplied batches to
-matching roots and supports a one-shot attachment failure. Neither control
+matching roots, records each scope it receives, can hold reconfigurations, and supports a one-shot attachment failure. Neither control
 opens an OS timer or file watcher; both expose live resource counts for cleanup
 assertions.
 
 An API-view request names the views it needs; without `views` it is the API
 view alone. At the pinned sequence the manager calls the session's `apiView`
 and `architectView` only for requested views, and either one's supersession
-makes the whole outcome superseded. `dependencyFacts` answers from the same
+makes the whole outcome superseded. A selection the session refuses as an
+invalid location, a path in a declared nested tree, a scratch directory or
+another excluded path, stays `invalid-location`; every other refusal is
+`resource-unavailable` or `analysis-failed`. `dependencyFacts` answers from the same
 analyzer jobs and retained result as `dependencyDiagram` and adds the test
 references retained with the diagram; `dependencyDiagram` is that answer
 without them. The references count against the retention budgets; when only

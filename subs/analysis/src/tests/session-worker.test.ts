@@ -185,15 +185,77 @@ workerSuite('retained session worker', import.meta.url, () => {
       const inFlight = handle.update([{ path: paths.provider, kind: 'changed' }], { signal: active.signal });
       const behind = handle.update([], { signal: queued.signal });
       queued.abort(); active.abort();
-      expect(await inFlight).toEqual({ status: 'cancelled' });
+      const settled = await inFlight;
       expect(await behind).toEqual({ status: 'cancelled' });
-      expect(handle.current).toBe(revision);
+      // The aborts reach the worker as messages. An active update the worker
+      // published before observing its abort answers that revision, which is
+      // then current; the next test takes that path deterministically.
+      if (settled.status === 'cancelled') expect(handle.current).toBe(revision);
+      else {
+        expect(settled).toMatchObject({ status: 'revised', identical: false });
+        if (settled.status !== 'revised') throw new Error(JSON.stringify(settled));
+        expect(settled.revision.sequence).toBe(revision.sequence + 1);
+        expect(handle.current).toBe(settled.revision);
+      }
       const restored = await handle.update([{ path: paths.provider, kind: 'changed' }]);
       expect(restored.status).toBe('revised');
       if (restored.status !== 'revised') throw new Error(JSON.stringify(restored));
       expect(restored.revision.outcome.execution).toBe('completed');
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); observation.cleanup(); }
+  }), timeout);
+
+  it('answers a call whose abort reaches the worker after it published with the revision it made current', () => fixture(async (root, inputs) => {
+    const observation = await opened(inputs);
+    const { handle, revision, requests, messages, route } = observation;
+    // An abort reaches the worker as a message. Holding the worker's cancel
+    // until the call has settled is the interleaving in which the worker
+    // publishes before it observes the abort.
+    const held: (() => void)[] = [];
+    route.current = (request, forward) => {
+      if ((request as { operation?: unknown }).operation === 'cancel') held.push(forward); else forward();
+    };
+    const reply = (id: number) => messages.find(message => message.kind === 'reply' && message.id === id);
+    const aborted = async <T>(call: (signal: AbortSignal) => Promise<T>): Promise<{ readonly answer: T; readonly id: number }> => {
+      const controller = new AbortController();
+      const pending = call(controller.signal);
+      const id = (requests.at(-1) as { id: number }).id;
+      controller.abort();
+      return { answer: await pending, id };
+    };
+    try {
+      await handle.releaseCompiler();
+      await replace(root, paths.provider, '  return 2;', '  return 3;');
+      const updated = await aborted(signal => handle.update([{ path: paths.provider, kind: 'changed' }], { signal }));
+      expect(held).toHaveLength(1);
+      expect(reply(updated.id)).toMatchObject({ result: { status: 'revised', revision: { sequence: revision.sequence + 1 } } });
+      expect(updated.answer.status).toBe('revised');
+      if (updated.answer.status !== 'revised') throw new Error(JSON.stringify(updated.answer));
+      expect(updated.answer.revision.sequence).toBe(revision.sequence + 1);
+      expect(handle.current).toBe(updated.answer.revision);
+
+      await replace(root, paths.provider, '  return 3;', '  return 4;');
+      const swept = await aborted(signal => handle.sweep({ signal }));
+      expect(held).toHaveLength(2);
+      expect(swept.answer.status).toBe('revised');
+      if (swept.answer.status !== 'revised') throw new Error(JSON.stringify(swept.answer));
+      expect(swept.answer.revision.sequence).toBe(revision.sequence + 2);
+      expect(handle.current).toBe(swept.answer.revision);
+
+      // A reply that publishes nothing leaves the aborted call cancelled.
+      const same = await aborted(signal => handle.update([], { signal }));
+      expect(held).toHaveLength(3);
+      expect(reply(same.id)).toMatchObject({ result: { status: 'revised', identical: true } });
+      expect(same.answer).toEqual({ status: 'cancelled' });
+      expect(handle.current).toBe(swept.answer.revision);
+      route.current = null;
+      for (const forward of held.splice(0)) forward();
+      await equalToBatch(handle, inputs);
+    } finally {
+      route.current = null;
+      for (const forward of held.splice(0)) forward();
+      await handle.dispose(); observation.cleanup();
+    }
   }), timeout);
 
   it('reports abrupt worker loss, clears the current revision and releases its live compiler', () => fixture(async (_root, inputs) => {

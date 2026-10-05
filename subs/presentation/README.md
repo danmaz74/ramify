@@ -20,6 +20,11 @@ with explicit browser promises. Root relays presentation declarations without
 importing UI values. The layout child owns numerical placement and viewport
 operations; presentation joins its neutral keyed results to teaching content.
 
+The static diagram emitter, `scripts/emit-diagrams.ts` (`npm run diagrams`),
+is this owner's source outside `src/`. It uses the owner's ordinary profile,
+so it renders the owned components and definitions as same-owner source and
+writes them to package-root `site/static/diagrams/`.
+
 Owned tests live in `src/tests/`. Their SVG assertions require the emitter's
 existing artifacts under package-root `site/static/diagrams/`; this owner has
 no snapshot directory of its own.

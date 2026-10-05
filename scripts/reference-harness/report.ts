@@ -20,7 +20,7 @@ export function checkerSummary(report: Pick<AnalysisReport, 'outcome' | 'summary
     `Scope: ${report.summary.owners} owners, ${report.summary.sourceFiles} source files, ${report.summary.resources} resources, ${report.summary.accesses} accesses`,
     `Application decisions: ${report.summary.allowed} allowed, ${report.summary.denied} denied; proven external selections: ${report.summary.external}`,
     ...report.diagnostics.map(issue => `  Error [${issue.code}] ${issue.location?.file ?? '.'}:${issue.location?.line ?? 1}: ${issue.message}`),
-    ...report.warnings.map(warning => `  Warning [${warning.code}] ${warning.entry}: ${warning.count}`),
+    ...report.warnings.map(warning => `  Warning [${warning.code}] ${warning.path}: ${warning.message}`),
     ...report.coverage.map(note => `  Coverage [${note.code}] ${note.location.file}:${note.location.line}: ${note.message}`)];
 }
 

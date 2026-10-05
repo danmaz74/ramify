@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { relative, isAbsolute } from 'node:path';
-import { parseDescription } from '../subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../subs/descriptions/src/parse.js';
 import type { ParsedDescription } from '../subs/descriptions/src/interfaces/syntax.js';
 import { linkDescriptions } from '../subs/descriptions/src/link.js';
 import { buildModel, deriveSourceAreas, resolveTagRegistry } from '../subs/model/src/index.js';
@@ -89,7 +89,7 @@ export async function runAnalysis(inputs: AnalysisInputs, cancellation: AbortSig
                 parse: (file, text) => {
                   const result = parseDescription(file, text);
                   parsed.set(file, result); return result;
-                },
+                }, marker: readRootMarker,
                 limits: { ...inputs.limits.acquisition, attempts: 1, deadlineMs: remaining(inputs.limits.acquisition.deadlineMs - acquisitionElapsed) }, signal: abort.signal });
               acquisitionElapsed += performance.now() - acquisitionStart;
               check();

@@ -19,7 +19,7 @@ export function hundredOwnerFiles(): ReadonlyMap<string, string> {
     const name = index === 0 ? 'bench' : `m${String(index).padStart(3, '0')}`;
     const prefix = index === 0 ? '' : `subs/${name}/`;
     const tags = index === 0 ? 'dispatch' : index % 10 === 0 ? 'testing' : '';
-    files.set(`${prefix}module.ramify`, `ramify 1\nmodule "${name}" tagged [${tags}]\n`);
+    files.set(`${prefix}module.ramify`, `ramify 1\n${index === 0 ? 'root ' : ''}module "${name}" tagged [${tags}]\n`);
     files.set(`${prefix}README.md`, `# ${name}\n\nSupplies deterministic workload bytes for the hundred-owner batch measurement.\n`);
     files.set(`${prefix}src/interfaces/api.ts`, padded(
       'export interface Input { readonly value: number }\nexport const value = 1;\n', 1024,

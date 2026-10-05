@@ -125,7 +125,7 @@ export function diagramImport(model: Model, importer: string | { readonly module
   const area = modelModule(model, key).areas.find((item) => item.kind === 'ordinary')!;
   const original = diagramOriginal(model, owner, name);
   const file = `${area.root}/diagram-consumer.ts`;
-  return explainImport(model, { importer: { area, file }, target: original.origin, forwarding: [],
+  return explainImport(model, { importer: { area, file, auxiliary: false }, target: original.origin, forwarding: [],
     location: { file, start: 0, end: 1, line: 1, column: 1 },
     selection: { original: original.id, request: typeof importer !== 'string' && importer.binding === 'type' ? 'type-only' : 'value' } });
 }

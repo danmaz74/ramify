@@ -62,7 +62,7 @@ it('constructs setup once and does not traverse project arrays in twenty one-fil
     // A missing compiler source is an independent coverage witness. Throwing
     // iteration traps detect any whole-inventory work after construction.
     const project = { program: { getSourceFile: () => undefined } } as unknown as Project;
-    const interpreter = new AccessInterpretation(project, inputs, { resourceWitness: '', readFile: () => null, fileExists: () => false }, catalog, new Map());
+    const interpreter = new AccessInterpretation(project, inputs, { resourceWitness: '', readFile: () => null, fileExists: () => false, realpath: path => path, directoryExists: () => false }, catalog, new Map());
     const trap = () => { throw new Error('repeated setup traversal'); };
     Object.defineProperty(inputs.inventory.files, Symbol.iterator, { value: trap });
     Object.defineProperty(inputs.inventory.files, 'map', { value: trap });

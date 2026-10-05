@@ -38,6 +38,15 @@ async function copyTree(sourceRoot: string, destinationRoot: string, excluded: R
 
 interface GitProject { readonly root: string; readonly kind: 'R' | 'T'; dispose(): Promise<void>; }
 
+/**
+ * The root description's owned-ignored trees that a copy leaves out are
+ * recreated empty: each must exist as a real directory, and nothing beneath
+ * one is ever read, so an empty directory is an equivalent input.
+ */
+async function restoreOwnedIgnored(root: string): Promise<void> {
+  const description = await readFile(join(root, 'module.ramify'), 'utf8');
+  for (const [, directory] of description.matchAll(/^owned-ignored "([^"\\]+)"[ \t]*$/gm)) await mkdir(join(root, directory!), { recursive: true });
+}
 /** An isolated, `git init`-and-committed copy, so "Git status unchanged" is
  * meaningful. `node_modules` is symlinked from the real checkout (matching
  * the measurement fixtures' own convention): faster than copying, and never
@@ -47,6 +56,7 @@ async function isolatedGitProject(kind: 'R' | 'T', scratchRoot: string): Promise
   const root = await mkdtemp(join(scratchRoot, `${kind.toLowerCase()}-`));
   const source = kind === 'R' ? join(repositoryRoot, 'examples/collection-review') : repositoryRoot;
   await copyTree(source, root, kind === 'R' ? new Set(['node_modules', 'dist', '.reference-work', '.git', '.vite']) : excludedTopLevel);
+  await restoreOwnedIgnored(root);
   await symlink(join(source, 'node_modules'), join(root, 'node_modules'));
   const git = (args: readonly string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_NAME: 'plan2a-harness', GIT_AUTHOR_EMAIL: 'plan2a-harness@example.invalid',
@@ -247,7 +257,7 @@ export const plan2aWorkflowHandlers: ReadonlyMap<string, InstanceHandler> = new 
       const root = await mkdtemp(join(tmpdir(), 'plan2a-i11-negative-'));
       try {
         await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext', strict: true } }));
-        await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule f-root\n\nexpose-sub Widget from provider to descendants\n');
+        await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module f-root\n\nexpose-sub Widget from provider to descendants\n');
         await mkdir(join(root, 'subs/provider/src'), { recursive: true });
         await writeFile(join(root, 'subs/provider/module.ramify'), 'ramify 1\nmodule provider\n\nexpose-src Widget from "api.ts" to parent\n');
         await writeFile(join(root, 'subs/provider/src/api.ts'), 'export class Widget {\n  greet(): string { return \'hi\'; }\n}\n');

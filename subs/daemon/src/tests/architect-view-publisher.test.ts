@@ -296,6 +296,14 @@ describe('an existing .ramify-architect that is not recognizably generated (AV22
       await mkdir(join(root, '.ramify-architect'));
       await writeFile(join(root, '.ramify-architect/_meta.json'), '{"schema":"ramify.api-view/1","module":"m"}\n');
     }],
+    // Deliverable 4 of project-boundary iteration 18: only `ramify.architect-view/<number>` is an architect view.
+    ...['{}', '{"schema":2}', '{"schema":"ramify.architect-view"}', '{"schema":"ramify.architect-view/"}', '{"schema":"ramify.architect-view/x"}',
+      '{"schema":"ramify.architect-view/2.1"}', '{"schema":"ramify.architect-view/-1"}', '{"schema":"ramify.architect-viewer/2"}',
+      '{"schema":" ramify.architect-view/2"}', '["ramify.architect-view/2"]'].map(text =>
+      [`a directory whose _meta.json is ${text}`, 'invalid-path' as const, async (root: string) => {
+        await mkdir(join(root, '.ramify-architect'));
+        await writeFile(join(root, '.ramify-architect/_meta.json'), `${text}\n`);
+      }] as [string, 'invalid-path', (root: string) => Promise<void>]),
     ['a directory whose _meta.json is not JSON', 'invalid-path', async root => {
       await mkdir(join(root, '.ramify-architect'));
       await writeFile(join(root, '.ramify-architect/_meta.json'), '{"schema":"ramify.architect-view/1"\n');
@@ -348,15 +356,19 @@ describe('an existing .ramify-architect that is not recognizably generated (AV22
     expect(await tree(root)).toEqual(before);
   });
 
-  it('replaces a directory whose _meta.json names the architect schema', async () => {
-    const root = await tempRoot();
-    await mkdir(join(root, '.ramify-architect'));
-    await writeFile(join(root, '.ramify-architect/_meta.json'), '{"schema":"ramify.architect-view/1"}\n');
-    await writeFile(join(root, '.ramify-architect/stale.jsonl'), '{}\n');
-    const outcome = await onePublisher(controlled()).publish(root, 'rev-1', architectOnly(view), 'req-1');
-    expect(outcome).toMatchObject({ status: 'published', targets: [{ changed: true }] });
-    expect(await tree(join(root, '.ramify-architect'))).toEqual(expectedTree(view));
-  });
+  // Deliverable 4 of project-boundary iteration 18: a view written by any Ramify version is replaced.
+  it.each(['ramify.architect-view/1', 'ramify.architect-view/2', 'ramify.architect-view/3', 'ramify.architect-view/40'])(
+    'replaces a directory whose _meta.json names %s', async schema => {
+      const root = await tempRoot();
+      await mkdir(join(root, '.ramify-architect/old-module'), { recursive: true });
+      await writeFile(join(root, '.ramify-architect/_meta.json'), `${JSON.stringify({ schema, revision: 'rev/9:old' })}\n`);
+      await writeFile(join(root, '.ramify-architect/stale.jsonl'), '{}\n');
+      await writeFile(join(root, '.ramify-architect/old-module/module.json'), '{}\n');
+      const outcome = await onePublisher(controlled()).publish(root, 'rev-1', architectOnly(view), 'req-1');
+      expect(outcome).toMatchObject({ status: 'published', targets: [{ changed: true }] });
+      expect(await tree(join(root, '.ramify-architect'))).toEqual(expectedTree(view));
+      expect(JSON.parse(meta)).toMatchObject({ schema: 'ramify.architect-view/2' });
+    });
 });
 
 describe('leftover architect siblings (AV22)', () => {

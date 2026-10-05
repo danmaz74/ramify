@@ -14,7 +14,7 @@ export async function fixture(run: (root: string) => Promise<void>): Promise<voi
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-cli-')));
   try {
     for (const [path, text] of Object.entries({
-      'module.ramify': 'ramify 1\nmodule fixture\nexpose-src value from "interfaces/api.ts" to descendants\n',
+      'module.ramify': 'ramify 1\nroot module fixture\nexpose-src value from "interfaces/api.ts" to descendants\n',
       'README.md': '# Fixture\n\nA CLI fixture.\n',
       'package.json': '{"type":"module"}',
       'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler',
@@ -34,9 +34,9 @@ export async function invoke(root: string, argv: readonly string[], batch: Batch
 }
 
 /** The affected-module reference project: `example/app -> example/mid -> example/core`, where an arrow
- * means "depends on", an unrelated `example/lone`, and an unowned `docs/notes.md`. */
+ * means "depends on", an unrelated `example/lone`, and `docs/notes.md`, inert prose the root owns. */
 export const affectedFiles: Readonly<Record<string, string>> = {
-  'module.ramify': 'ramify 1\nmodule example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
+  'module.ramify': 'ramify 1\nroot module example\nexpose-sub * from core to descendants\nexpose-sub * from mid to descendants\n',
   'README.md': '# Example\n\nThe affected-module reference project.\n',
   'package.json': '{"type":"module"}',
   'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', types: [], skipLibCheck: true },

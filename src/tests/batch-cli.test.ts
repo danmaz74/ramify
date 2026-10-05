@@ -70,12 +70,15 @@ describe('CLI with real batch sessions', () => {
       walkedAreas: expect.arrayContaining(['src', 'subs/consumer/src']) });
   }), 15_000);
 
-  it('prints failures before outside-source warnings, coverage and the completed scope', async () => fixture(async root => {
-    await put(root, 'tests/helper.ts', 'export const helper = 1;');
+  // A selected file in the scratch directory warns; tests/helper.ts would now be
+  // root auxiliary source, which warns about nothing.
+  it('prints failures before project warnings, coverage and the completed scope', async () => fixture(async root => {
+    await put(root, 'src/tmp/draft.ts', 'export const draft = 1;');
     await put(root, 'subs/consumer/src/use.ts', "import { privateValue } from '../../../src/interfaces/api.js'; void privateValue; declare const target: string; void import(target);\n");
     const result = await invoke(root, ['check', '--batch']);
     expect(result.exitCode).toBe(1);
-    const ordered = ['Error [not-visible] subs/consumer/src/use.ts:1:', 'Warning [outside-module-source] tests: 1',
+    const ordered = ['Error [not-visible] subs/consumer/src/use.ts:1:',
+      'Warning [compiler-selected-scratch] src/tmp: 1 compiler-selected file in the scratch directory of module fixture, which Ramify does not analyze; exclude the directory from the compiler configuration (src/tmp/draft.ts)\n',
       'Analysis limit [nonliteral-target]', 'Completed scope:'];
     const positions = ordered.map(text => result.stdout.indexOf(text));
     expect(positions.every(index => index >= 0)).toBe(true);
@@ -85,20 +88,21 @@ describe('CLI with real batch sessions', () => {
   }), 15_000);
 
   it('allows bounded coverage and warnings while retaining their structured evidence', async () => fixture(async root => {
-    await put(root, 'tests/helper.ts', 'export const helper = 1;');
+    await put(root, 'src/tmp/draft.ts', 'export const draft = 1;');
     // A module: a script's ambient declaration would add a shared-global note.
     await put(root, 'subs/consumer/src/use.ts', "declare const path: string; void import(path); export {};\n");
     const result = await invoke(root, ['check', '--batch', '--format', 'json']);
     const report = JSON.parse(result.stdout) as AnalysisReport;
     expect(result.exitCode).toBe(0);
     expect(report.outcome).toEqual({ execution: 'completed', check: 'passed', coverage: 'partial' });
-    expect(report.warnings).toEqual([{ code: 'outside-module-source', entry: 'tests', count: 1, files: ['tests/helper.ts'] }]);
+    expect(report.warnings).toEqual([{ code: 'compiler-selected-scratch', path: 'src/tmp',
+      message: '1 compiler-selected file in the scratch directory of module fixture, which Ramify does not analyze; exclude the directory from the compiler configuration', files: ['src/tmp/draft.ts'], count: 1 }]);
     expect(report.coverage[0].code).toBe('nonliteral-target');
-    expect(report.snapshot!.inventory.files.some(file => file.path === 'tests/helper.ts')).toBe(false);
+    expect(report.snapshot!.inventory.files.some(file => file.path === 'src/tmp/draft.ts')).toBe(false);
   }), 15_000);
 
   it('fails invalid descriptions with blocked checking as exit 1', async () => fixture(async root => {
-    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value from "missing.ts" to descendants\n');
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nexpose-src value from "missing.ts" to descendants\n');
     const result = await invoke(root, ['check', '--batch', '--format', 'json']);
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(result.stdout)).toMatchObject({ outcome: { execution: 'invalid', check: 'failed' },
@@ -110,7 +114,19 @@ describe('CLI with real batch sessions', () => {
     // Explicitly place the working directory outside all described ancestors.
     const result = await invoke('/', ['check', '--batch', '--format', 'json']);
     expect(result.exitCode).toBe(2);
-    expect(JSON.parse(result.stdout).diagnostics.some((issue: AnalysisDiagnostic) => issue.message.includes('/'))).toBe(true);
+    expect(JSON.parse(result.stdout).diagnostics).toEqual([expect.objectContaining({ code: 'root-not-found', message: 'No marked project root at or above /' })]);
+  }), 15_000);
+
+  it('selects only a marked root: an unmarked --root exits 1 and an unmarked climb exits 2, each saying to add the marker', async () => fixture(async root => {
+    const explicit = await invoke(root, ['check', '--batch', '--format', 'json', '--root', 'subs/consumer']);
+    expect(explicit.exitCode).toBe(1);
+    expect(JSON.parse(explicit.stdout).diagnostics).toEqual([expect.objectContaining({ code: 'unmarked-root-description', category: 'layout',
+      message: `${join(root, 'subs/consumer/module.ramify')} does not carry the root marker: add root before module on its module line to declare the project root` })]);
+    await put(root, 'module.ramify', 'ramify 1\nmodule fixture\nexpose-src value from "interfaces/api.ts" to descendants\n');
+    const found = await invoke(join(root, 'subs/consumer/src'), ['check', '--batch', '--format', 'json']);
+    expect(found.exitCode).toBe(2);
+    expect(JSON.parse(found.stdout).diagnostics).toEqual([expect.objectContaining({ code: 'root-not-found',
+      message: `No marked project root at or above ${join(root, 'subs/consumer/src')}; the nearest description is ${join(root, 'subs/consumer/module.ramify')}: add root before module on its module line if it is the project root` })]);
   }), 15_000);
 
   it('refuses browser verification through the batch capability contract', async () => fixture(async root => {
@@ -189,14 +205,14 @@ describe('CLI with real batch sessions', () => {
   it('A7-11: affected --batch hands the seeds to the affected batch operation alone and never connects', () => affectedFixture(async root => {
     const invocations: AffectedBatchInvocation[] = [];
     const stdout: string[] = [];
-    const exitCode = await runCli(['affected', 'example/lone', '--path', 'subs/mid/src/interfaces/api.ts', '--path', 'docs/notes.md',
+    const exitCode = await runCli(['affected', 'example/lone', '--path', 'subs/mid/src/interfaces/api.ts', '--path', '../notes.md',
       '--batch', '--root', root, '--format', 'json'], { cwd: join(root, 'subs/lone'), version: '1', stdout: text => { stdout.push(text); },
       stderr: text => { throw new Error(text); }, connect: async () => { throw new Error('Unexpected daemon connection'); },
       batch: async () => { throw new Error('Unexpected check batch'); },
       affectedBatch: async (invocation, control) => { invocations.push(invocation); return runAffectedBatch(invocation, control); } });
     expect([exitCode, stdout.length]).toEqual([0, 1]);
     expect(invocations).toEqual([{ cwd: join(root, 'subs/lone'), root, modules: ['example/lone'],
-      paths: ['subs/mid/src/interfaces/api.ts', 'docs/notes.md'] }]);
+      paths: ['subs/mid/src/interfaces/api.ts', '../notes.md'] }]);
     const document = JSON.parse(stdout[0]!) as AffectedDocument;
     expect(document).toMatchObject({ mode: 'batch', root, revision: { sequence: null } });
     expect(document.selection).toMatchObject({ changedModules: [{ id: 'example/lone', directory: 'subs/lone' }, { id: 'example/mid', directory: 'subs/mid' }],

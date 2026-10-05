@@ -20,10 +20,14 @@ import { Assertions } from './runner.js';
 import type { InstanceHandler, ProjectContext } from './runner.js';
 
 // Independent Plan 2 literal, also required by the revised Plan 1 relocation.
+// The eight reviewed entries, plus `ramify.ts/module-tree`, which 26bba1e2 added
+// as the reviewed package addition `./module-tree` (ModuleTreeCanvas) in
+// scripts/validate-final-contracts.ts and in Plan 1's relocation entries.
 export const completionEntries = {
   'ramify.ts': 'createAnalysisSession', 'ramify.ts/analysis': 'analyzeProject',
   'ramify.ts/analysis/inventory': 'acquireInventory', 'ramify.ts/model': 'createDefaultTagRegistry',
   'ramify.ts/layout': 'placeNodes', 'ramify.ts/presentation': 'ModelDiagram',
+  'ramify.ts/module-tree': 'ModuleTreeCanvas',
   'ramify.ts/cli': 'runCli', 'ramify.ts/client': 'connectDaemon',
 } as const;
 const probe = 'subs/daemon/subs/contexts/src/__i2_probe.ts';
@@ -47,7 +51,8 @@ export function assertClientClosure(events: readonly TraceEvent[], installed: st
 }
 
 export function assertContextsDenial(report: AnalysisReport, assertions: Assertions): void {
-  completed(report, assertions, 'complete', 'failed');
+  // Project-boundary iteration 8C: the toolkit's auxiliary scripts keep its coverage partial (see assertToolkit).
+  completed(report, assertions, 'partial', 'failed');
   assertions.equal('contexts has exactly the independently expected dispatch denial', report.diagnostics.map(issue => ({
     code: issue.code, file: issue.location?.file, line: issue.location?.line, original: issue.original, importer: issue.importer,
   })), [{ code: 'required-importer-tag', file: probe, line: 1,

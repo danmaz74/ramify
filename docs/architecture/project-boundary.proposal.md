@@ -1,13 +1,18 @@
 # Project boundary and whole-tree ownership
 
 **Date:** 2026-09-30, revised 2026-10-01. **Status:** adopted in the owning
-principles, specifications and glossaries on 2026-10-01; not implemented. This document records
+principles, specifications and glossaries on 2026-10-01; the nested-tree
+statement syntax and the Ramify contracts the user accepted on 2026-10-03 were
+adopted in the owning specifications in commit `6d0c66f0`. Ramify's part is
+implemented by the [Phase 1 plan](../plans/project-boundary-ramify/main-plan.md),
+qualified on commit `7df84ea2` and handed off as a local, unpublished
+`ramify.ts` 0.2.0 artifact on 2026-10-05 (see its
+[handoff](../plans/project-boundary-ramify/handoff.md#phase-1-handoff)); the
+audit and agent parts remain for Phases 2 and 3. This document records
 the design decisions, implementation recipes and migration guidance. Section 13
-links to the authoritative principles, specifications and vocabulary. The existing CLI and
-runtime contracts describe current behavior until their implementations and
-contracts are migrated. Nested-tree statement syntax must be completed in the
-module-description specification before parser implementation; the implementation
-plan schedules that work and the remaining delivery. The
+links to the authoritative principles, specifications and vocabulary. The CLI and
+runtime contracts describe current behavior; Ramify's were migrated in Phase 1,
+and the audit's and agent's are migrated in Phases 2 and 3. The
 [implementation plan](../plans/project-boundary-sequential/main-plan.md) contains the
 toolkit, audit and harness work packages and their acceptance gates, ordered
 Ramify first, then ramify-audit, then ramify-agent.
@@ -105,8 +110,8 @@ the parent's, and is analyzed as the parent's.
 
 A module declares each nested tree in its own description, by directory
 relative to the module, with one of two kinds. The statements are part of
-the description grammar, beside the exposure statements; their exact syntax
-is the implementation plan's.
+the description grammar, beside the exposure statements; their syntax is the
+version 1 grammar's `nested-tree-line` in the module description specification.
 
 | Kind | Part of the project | Owned and written by the declaring module | Analyzed |
 | --- | --- | --- | --- |
@@ -133,8 +138,9 @@ enclosing project: the declaring module owns it, its tests may read it, and
 Ramify sees none of its descriptions, modules or imports. It is a project
 only from its own directory, where `ramify`, the audit and the harness run
 on it as on any root, with the enclosing project an ordinary external
-package. The enclosing project records nothing about that, and detaching the
-tree is deleting the declaration and moving the directory.
+package. Its root description carries the root marker. The enclosing project
+records nothing about that, and detaching the tree is deleting the declaration
+and moving the directory.
 
 The declaration is an analysis gap by design, bounded by these rules:
 
@@ -173,8 +179,9 @@ descend into either.
 outside `src/` and `subs/` with its own `tsconfig.json` and no file selected
 by the root configuration, stops ending the walk. It remains as a
 diagnostic: an undeclared directory that is not a module's own directory
-and holds a root description or a package manifest is a layout error that
-names the declaration to add.
+and holds a package manifest is a layout error that names the declaration to
+add, and so is a description carrying the root marker anywhere outside a
+declared tree other than at the selected root.
 Nothing is dropped silently, and migration is guided.
 
 ## 6. Imports across a boundary
@@ -475,9 +482,12 @@ reference-harness command.
 - The version 1 description grammar gains the two nested-tree statements.
 - Production selection is unchanged: it consumes resolved areas, and owned
   non-source files are not production.
-- The CLI's root selection is unchanged: the climb stops at a description
-  outside `subs/`, so an invocation from inside an ignored tree selects the
-  project there.
+- A project root declares itself with the root marker, `root module <name>`,
+  per decision 14. Without `--root`, the CLI selects the nearest description
+  at or above the working directory that carries the marker; unmarked
+  descriptions never stop the climb. An invocation from inside an ignored
+  tree, beneath `subs/` or elsewhere, therefore selects the marked project
+  there.
 
 ### ramify-agent harness
 
@@ -652,20 +662,33 @@ Of 2026-10-03:
     imports into toolkit internals stay unverified, as a declared and visible
     gap. Making it a testing module, or a project consuming the toolkit's
     package, is left to a later plan.
+14. A project root declares itself with a `root` prefix on its module line,
+    `root module <name>`, in format version 1; existing root descriptions are
+    invalid until migrated. Without `--root`, root selection takes the nearest
+    description at or above the working directory carrying the marker, and
+    `--root` must name one. A marked description inside a declared tree is a
+    separate project and is not interpreted; one elsewhere in the evaluated
+    tree is a layout error. No principle changes: the tree already has an
+    explicit application root.
 
 ## 13. Adopted principles, specifications and glossary entries
 
-The owning documents now contain the decisions adopted on 2026-10-01. Their
-adoption does not establish runtime support. Detailed implementation recipes,
-diagnostics and migration guidance remain in sections 3 to 11; the exact
-nested-tree statement syntax and executable acceptance remain implementation
-work. Shared terms have one definition and are reused by consumers.
+The owning documents now contain the decisions adopted on 2026-10-01. On
+2026-10-03 commit `6d0c66f0` adopted the
+[Ramify contracts](../plans/project-boundary-ramify/contracts.md) the user
+accepted: the nested-tree statement syntax and declaration validation in the
+module description specification, and their consequences in the source
+interpretation, CLI invocation, architect-view, materialized API-view and
+modularity-report specifications. Adoption does not establish runtime support.
+Detailed implementation recipes, diagnostics and migration guidance remain in
+sections 3 to 11; executable acceptance remains implementation work. Shared
+terms have one definition and are reused by consumers.
 Repository-qualified references name separate repositories, not sibling checkouts.
 
 | Owner | Authoritative document | Adopted content |
 | --- | --- | --- |
 | Ramify model | [Model glossary](../model/glossary.md) | Whole-tree owned contents, nested trees, exclusions, scratch, auxiliary source, containment and package resolution. |
-| Ramify layout | [Module description specification](../model/module-description.spec.md) | Path ownership, explicit discovery boundaries, auxiliary-source rules and non-exposable auxiliary originals. Nested-tree statement syntax remains pending. |
+| Ramify layout | [Module description specification](../model/module-description.spec.md) | Path ownership, explicit discovery boundaries, auxiliary-source rules and non-exposable auxiliary originals; nested-tree statement syntax and declaration validation, adopted 2026-10-03; the root marker and its validity, adopted 2026-10-03. |
 | Ramify imports | [Importability specification](../model/cross-module-importability.spec.md) | Ownership, auxiliary-source classification and imports across project boundaries. |
 | Ramify source interpretation | [TypeScript source specification](../model/typescript-source-interpretation.spec.md) | Resolution provenance, linked packages, nested-tree violations and explicit excluded analysis. |
 | Ramify architectural evidence | [Module architect principles](../agents/module-architect.principles.md) | Visible owned-ignored boundaries without claims about their contents. |

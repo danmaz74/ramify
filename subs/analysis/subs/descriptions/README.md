@@ -15,12 +15,26 @@ whitespace and comments. Names and paths retain exact decoded strings.
 
 A valid result contains located headers, tokens and ordered statements. An
 invalid result contains tokens and sorted diagnostics, with no partial document.
+Statements are either exposure statements or `owned-ignored` and `external`
+nested-tree statements, each holding one located decoded directory; indices
+count all statements in source order. The linker and exact source references
+read exposure statements only; nested-tree statements belong to project
+acquisition.
+The module header records the root marker's span when its line begins with
+`root`, and null otherwise; the header span then begins at the marker. The
+parser accepts a description either way and never decides which description
+is the project root. A `root` keyword anywhere else is malformed.
+`readRootMarker(file, text)` decides the marker from the module line alone, for
+project selection: the second significant line, after a `ramify` line, is the
+module header by the parser's own header rule and begins with `root`. It
+returns the marker's span, so later errors leave a marked description marked,
+and a missing or misplaced header leaves it unmarked.
 Tokenization collects lexical errors throughout the input. Parsing recovers at
 physical line boundaries after a malformed clause; a lexically invalid line
 is not interpreted from its incomplete tokens. Duplicate tag/destination items
 each receive their own diagnostic. Returned data is deeply frozen and JSON-safe.
 
-Unknown tag names await registry validation. Path normalization, containment,
+Unknown tag names await registry validation. Path and directory normalization, containment,
 exact file existence, symlinks, wildcard eligibility, export ownership and
 exposure semantics await acquisition/linking. The parser never probes a path or
 validates UTF-8 bytes that its string input cannot represent; acquisition owns
@@ -33,5 +47,11 @@ files and evaluates direct-child contracts from leaves to root. It assigns tags
 through the model before publishing the complete result. Empty expansions and
 ineffective named child selections retain declaration evidence; invalid
 prerequisites, collisions, conflicting assignments and incomplete expansions
-return diagnostics without a partial model. All catalogued originals, including
+return diagnostics without a partial model. A selection whose export denotes
+an original defined in auxiliary source, directly or through any same-owner
+forwarding chain or interface wildcard, is an `auxiliary-original-exposure`
+located at the selection, with the original's declarations. Re-exposure is
+exposure, so a parent's `expose-sub` selecting that name is reported at its own
+selection; the child's selection stays declared rather than becoming a missing
+export. No tag clause is assigned to such an original. All catalogued originals, including
 unexposed exports, retain their defining source areas and mandatory tags.

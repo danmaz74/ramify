@@ -10,7 +10,7 @@ async function fixture(run: (root: string, inputs: InventoryInputs) => Promise<v
   const root = await mkdtemp(join(tmpdir(), 'ramify-inventory-'));
   try {
     const files: Record<string, string> = {
-      'module.ramify': 'ramify 1\nmodule fixture tagged [browser]\n',
+      'module.ramify': 'ramify 1\nroot module fixture tagged [browser]\n',
       'package.json': '{"type":"module"}',
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', types: [] }, include: ['src', 'outside.ts'] }),
       'src/interfaces/api.ts': 'export interface Api { readonly name: string }',
@@ -50,8 +50,11 @@ describe('inventory analysis entry', () => {
       expect.objectContaining({ path: 'src/resource.css', kind: 'resource' }),
       expect.objectContaining({ path: 'subs/specs/src/interfaces/spec.ts', area: 'ordinary' }),
     ]));
-    expect(result.snapshot.inventory.outsideModuleFiles).toEqual(['outside.ts']);
-    expect(result.snapshot.inventory.files.some(file => file.path === 'outside.ts')).toBe(false);
+    // Root-owned compiler source outside src/ is the root's auxiliary source, ordinary in area.
+    expect(result.snapshot.inventory.files.filter(file => file.placement === 'auxiliary')).toEqual([
+      expect.objectContaining({ path: 'outside.ts', owner: 'fixture', area: 'ordinary', kind: 'source' }),
+    ]);
+    expect(result.snapshot.inventory).not.toHaveProperty('outsideModuleFiles');
     await expect(stat(join(root, 'subs/empty/src'))).rejects.toMatchObject({ code: 'ENOENT' });
     expect(Object.isFrozen(result.snapshot.inventory.modules[0])).toBe(true);
     expect(Object.isFrozen(result.snapshot.areas[0]!.profile)).toBe(true);
@@ -75,7 +78,7 @@ describe('inventory analysis entry', () => {
   it('rejects forged registries before acquisition, and invalid headers without partial snapshots', async () => fixture(async (root, inputs) => {
     expect(await acquireInventory({ ...inputs, project: { ...inputs.project, root: join(root, 'absent') },
       registry: { ...inputs.registry, id: 'forged' } })).toMatchObject({ status: 'invalid', diagnostics: [{ code: 'invalid-registry' }] });
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture tagged [unknown]\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture tagged [unknown]\n');
     const result = await acquireInventory(inputs);
     expect(result).toMatchObject({ status: 'invalid', diagnostics: [{ code: 'unknown-tag', location: { file: 'module.ramify', line: 2 } }] });
     expect(result).not.toHaveProperty('snapshot');

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 /**
  * ramify.ts runs its own test toolchain. This config exists so that vitest,
@@ -8,6 +8,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/tests/**/*.test.{ts,tsx}', 'subs/**/src/**/*.test.{ts,tsx}'],
+    // Run nothing from a module's scratch directory, `tmp` directly beneath its `src/`.
+    exclude: [...configDefaults.exclude, 'src/tmp/**', 'subs/**/src/tmp/**'],
     // Session workers use their configured heap limits. Clear the host runner's
     // V8 override for children; the override-rejection case supplies its own env.
     env: { NODE_OPTIONS: '' },

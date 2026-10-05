@@ -25,7 +25,7 @@ export function firstDifference(left: unknown, right: unknown, path = '$'): stri
 
 export function parseAnalysisDocument(text: string): AnalysisReport {
   const report = JSON.parse(text) as AnalysisReport;
-  assert.equal(report?.schemaVersion, 'ramify.analysis/1', 'Expected the bare analysis document');
+  assert.equal(report?.schemaVersion, 'ramify.analysis/2', 'Expected the bare analysis document');
   assert.equal(typeof report.runId, 'string', 'Missing runId');
   assert.deepEqual(Object.keys(report).sort(), ['schemaVersion', 'runId', 'inputId', 'request', 'scope', 'registry',
     'stages', 'capabilities', 'outcome', 'snapshot', 'diagnostics', 'warnings', 'coverage', 'summary'].sort(),

@@ -17,7 +17,7 @@ import { changedCleanupWitness } from './changed-cleanup.js';
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'ramify-changed-command-'));
   await mkdir(join(root, 'src'));
-  await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+  await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
   await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
   await writeFile(join(root, 'src/main.ts'), 'export const value = 1;\n');
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
@@ -52,12 +52,20 @@ describe('changed check command', { timeout: 30_000 }, () => {
         cwd: f.root, version: '0', connect, stdout: value => { stdout.push(value); }, stderr: value => { stderr.push(value); },
         batch: async () => { throw new Error('Unexpected batch'); },
       });
-      expect([exit, requests.length, stdout.length, stderr]).toEqual([0, 1, 1, []]);
-      expect(requests[0]).toMatchObject({ scope: 'delta', deadlineMs: 2_000,
-        freshness: { mode: 'synchronized', expect: [{ path: 'src/main.ts', sha256: createHash('sha256').update('export const value = 1;\n').digest('hex') }] } });
+      // The client cannot classify: its first request names the normalized path once with
+      // no classification and no content; the daemon's classification answer at the cold
+      // revision asks for the source's content, which the second request carries.
+      const sha256 = createHash('sha256').update('export const value = 1;\n').digest('hex');
+      expect([exit, requests.length, stdout.length, stderr]).toEqual([0, 2, 1, []]);
+      expect(requests[0]).toMatchObject({ scope: 'delta', deadlineMs: 2_000, paths: ['src/main.ts'], classification: null,
+        freshness: { mode: 'synchronized', expect: [] } });
+      expect(requests[1]).toMatchObject({ scope: 'delta', paths: ['src/main.ts'], classification: 1,
+        freshness: { mode: 'synchronized', expect: [{ path: 'src/main.ts', sha256 }] } });
+      expect(requests[1].deadlineMs).toBeLessThanOrEqual(2_000);
       const output = JSON.parse(stdout[0]) as CheckDocument;
-      expect(output).toMatchObject({ schemaVersion: 'ramify.check/1', root: f.root, outcome: 'checked', reason: null,
-        execution: 'completed', exitCode: 0, findings: [], changed: [{ path: 'src/main.ts', covered: true }] });
+      expect(output).toMatchObject({ schemaVersion: 'ramify.check/2', root: f.root, outcome: 'checked', reason: null,
+        execution: 'completed', exitCode: 0, findings: [],
+        paths: [{ path: 'src/main.ts', disposition: 'checked', module: 'fixture', exclusion: null, reason: 'content', sha256 }] });
       expect(output.revision?.path).toBe('cold');
       expect(output.timings.totalMs).toBeGreaterThanOrEqual(output.timings.waitedMs);
     } finally { await f.dispose(); }
@@ -78,7 +86,10 @@ describe('changed check command', { timeout: 30_000 }, () => {
           get reason(): DisconnectReason | null { return failed && !recovered ? { kind: 'failure', message: 'Injected lost response' } : null; },
           async check(params, control) {
             requests.push(params);
-            if (!failed) { failed = true; await writeFile(join(f.root, 'src/main.ts'), 'export const value = 3;\n'); throw new Error('Lost response'); }
+            // The response lost is the first one to a request carrying the hashed content.
+            if (!failed && params.freshness.mode === 'synchronized' && params.freshness.expect.length) {
+              failed = true; await writeFile(join(f.root, 'src/main.ts'), 'export const value = 3;\n'); throw new Error('Lost response');
+            }
             return connection.check(params, control);
           },
           async recover() { recoveries++; recovered = true;
@@ -86,10 +97,15 @@ describe('changed check command', { timeout: 30_000 }, () => {
         } };
       };
       const result = await command(f.root, connect, ['--deadline', '5000']);
-      expect([result.code, result.batchCalls, result.stderr, recoveries, requests.length]).toEqual([2, 0, [], 1, 2]);
-      expect(requests[1].freshness).toEqual(requests[0].freshness);
+      // The classification answer, the hashed request whose response is lost, and its retry.
+      expect([result.code, result.batchCalls, result.stderr, recoveries, requests.length]).toEqual([2, 0, [], 1, 3]);
+      expect(requests[0].freshness).toEqual({ mode: 'synchronized', expect: [] });
+      expect(requests[2].freshness).toEqual(requests[1].freshness);
+      expect(requests[1].freshness).toEqual({ mode: 'synchronized', expect: [{ path: 'src/main.ts',
+        sha256: createHash('sha256').update('export const value = 2;\n').digest('hex') }] });
       expect(result.document).toMatchObject({ outcome: 'not-checked', reason: 'superseded', exitCode: 2,
-        changed: [{ covered: false }] });
+        paths: [{ path: 'src/main.ts', disposition: 'not-checked', module: 'fixture', exclusion: null, reason: 'superseded' }] });
+      expect(result.document?.paths[0]).not.toHaveProperty('sha256');
     } finally { await f.dispose(); }
   });
 
@@ -113,7 +129,8 @@ describe('changed check command', { timeout: 30_000 }, () => {
       };
       const result = await command(f.root, connect, ['--deadline', '1']);
       expect([result.code, result.batchCalls, result.stderr]).toEqual([2, 0, []]);
-      expect(result.document).toMatchObject({ outcome: 'not-checked', reason, checked: null, changed: [{ covered: false }] });
+      expect(result.document).toMatchObject({ outcome: 'not-checked', reason, checked: null,
+        paths: [{ path: 'src/main.ts', disposition: 'not-checked', exclusion: null, reason }] });
       const next = await command(f.root, f.quick.connect, ['--deadline', '5000']);
       expect(next.document?.outcome).toBe('checked');
     } finally { await f.dispose(); }
@@ -121,10 +138,10 @@ describe('changed check command', { timeout: 30_000 }, () => {
 
   it.each(['failure', 'incompatible', 'explicit-stop'] as const)('keeps %s connections explicit with one compact document and no batch', async kind => {
     const reason: DisconnectReason = kind === 'failure' ? { kind, message: 'failed startup' }
-      : kind === 'incompatible' ? { kind, client: 'ramify.ipc/1', daemon: 'ramify.ipc/2' } : { kind, requestId: null };
+      : kind === 'incompatible' ? { kind, client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' } : { kind, requestId: null };
     const result = await command('/project', async () => ({ status: 'unavailable', attempts: 3, reason, message: 'Unavailable' }));
     expect([result.code, result.stdout.length, result.stderr, result.batchCalls]).toEqual([2, 1, [], 0]);
-    expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/1', outcome: 'not-checked',
+    expect(result.document).toMatchObject({ schemaVersion: 'ramify.check/2', outcome: 'not-checked',
       reason: kind === 'failure' ? 'unavailable' : kind === 'explicit-stop' ? 'stopped' : 'incompatible', exitCode: 2 });
   });
 
@@ -160,7 +177,8 @@ describe('changed check command', { timeout: 30_000 }, () => {
         } };
       };
       const result = await command(f.root, connect, ['--deadline', '5000']);
-      expect([result.code, result.document?.reason, result.document?.changed[0].covered]).toEqual([2, 'incomplete', false]);
+      expect([result.code, result.document?.reason, result.document?.paths[0].disposition, result.document?.paths[0].reason])
+        .toEqual([2, 'incomplete', 'not-checked', 'incomplete']);
     } finally { await f.dispose(); }
   });
 
@@ -168,11 +186,12 @@ describe('changed check command', { timeout: 30_000 }, () => {
     const f = await fixture();
     try {
       expect((await command(f.root, f.quick.connect, ['--deadline', '5000'])).code).toBe(0);
-      await writeFile(join(f.root, 'module.ramify'), 'ramify 1\nmodule fixture\nexpose-src\n');
+      await writeFile(join(f.root, 'module.ramify'), 'ramify 1\nroot module fixture\nexpose-src\n');
       const result = await command(f.root, f.quick.connect, ['--deadline', '5000'], {}, 'module.ramify');
       expect([result.code, result.batchCalls, result.stderr]).toEqual([1, 0, []]);
       expect(result.document).toMatchObject({ outcome: 'checked', execution: 'invalid', reason: null,
-        changed: [{ path: 'module.ramify', covered: true }], exitCode: 1 });
+        paths: [{ path: 'module.ramify', disposition: 'checked', exclusion: null, reason: 'content',
+          sha256: createHash('sha256').update('ramify 1\nroot module fixture\nexpose-src\n').digest('hex') }], exitCode: 1 });
       expect(result.document?.findings.length).toBeGreaterThan(0);
       expect(result.document?.findings.some(finding => finding.new)).toBe(true);
     } finally { await f.dispose(); }
@@ -186,7 +205,9 @@ describe('changed check command', { timeout: 30_000 }, () => {
         if (connected.status !== 'connected') return connected;
         return { ...connected, connection: { ...connected.connection,
           async check(params, control) {
-            const response = await connected.connection.check({ ...params, scope: 'report' }, control);
+            // A plain report request obtains a real report; its paths would ask for a classification first.
+            const { paths: _paths, classification: _classification, ...plain } = params;
+            const response = await connected.connection.check({ ...plain, scope: 'report' }, control);
             if (!response.ok || response.value.status !== 'reported' || !response.value.report) throw new Error('Expected a report to exercise failure rendering');
             const value: CheckOutcome = { status: 'reported', requestId: params.requestId, published: false,
               revision: null, delta: null, freshness: response.value.freshness,
@@ -201,7 +222,8 @@ describe('changed check command', { timeout: 30_000 }, () => {
       const result = await command(f.root, connect, ['--deadline', '5000']);
       expect([result.code, result.batchCalls, result.stdout.length, result.stderr]).toEqual([2, 0, 1, []]);
       expect(result.document).toMatchObject({ outcome: 'not-checked', reason: execution, execution, revision: null,
-        changed: [{ covered: false }], findings: [{ code: 'missing-stage', new: false }], exitCode: 2 });
+        paths: [{ path: 'src/main.ts', disposition: 'not-checked', module: null, exclusion: null, reason: execution }],
+        findings: [{ code: 'missing-stage', new: false }], exitCode: 2 });
     } finally { await f.dispose(); }
   });
 
@@ -268,14 +290,17 @@ describe('changed check command', { timeout: 30_000 }, () => {
       const configuration = await command(f.root, f.quick.connect, [], {}, 'tsconfig.json');
       expect([configuration.code, configuration.batchCalls, configuration.stderr]).toEqual([2, 0, []]);
       expect(configuration.document).toMatchObject({ outcome: 'not-checked', reason: 'configuration-changed', exitCode: 2,
-        revision: null, execution: null, findings: [], checked: null, changed: [{ path: 'tsconfig.json', covered: false }] });
-      expect(formatChangedHuman(configuration.document!)).toContain('Not checked (configuration-changed): tsconfig.json');
+        revision: null, execution: null, findings: [], checked: null,
+        paths: [{ path: 'tsconfig.json', disposition: 'not-checked', module: 'fixture', exclusion: null, reason: 'configuration-changed' }] });
+      expect(formatChangedHuman(configuration.document!)).toContain('Path tsconfig.json: not checked (configuration-changed; module fixture)\n'
+        + 'Outcome: not checked (configuration-changed; 0 checked, 0 not analyzed, 1 not checked); checked set: none;');
       // The next hook waits for the revision the configuration edit queued.
       await writeFile(join(f.root, 'src/main.ts'), 'export const value = 2;\n');
       const source = await command(f.root, f.quick.connect);
       expect([source.code, source.batchCalls, source.stderr]).toEqual([0, 0, []]);
       expect(source.document).toMatchObject({ outcome: 'checked', reason: null, execution: 'completed',
-        changed: [{ path: 'src/main.ts', covered: true }] });
+        paths: [{ path: 'src/main.ts', disposition: 'checked', module: 'fixture', reason: 'content',
+          sha256: createHash('sha256').update('export const value = 2;\n').digest('hex') }] });
       // A batch check of the same edit is unchanged: it runs its own session and reports in full.
       const stdout: string[] = [];
       const code = await runCli(['check', '--batch', '--format', 'json'], { cwd: f.root, version: '0',

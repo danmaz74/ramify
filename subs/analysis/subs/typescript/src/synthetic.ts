@@ -1,4 +1,5 @@
 import { dirname, relative, resolve } from 'node:path';
+import { classifyProjectPath } from '../../project/src/ownership.js';
 import type { ProjectInventory } from '../../project/src/interfaces/project.js';
 import { FILE_BYTES, SourceFailure, encode } from './wire.js';
 
@@ -33,10 +34,23 @@ export function syntheticCandidate(configuration: string, candidate: number): { 
   };
 }
 
+/**
+ * Whether a configuration-selected file lies in a declared nested tree or a
+ * module scratch directory. Discovery never enters those, so the synthetic
+ * configuration never roots their files, whatever the configuration selects.
+ */
+function unanalyzedSelection(inventory: ProjectInventory, file: string): boolean {
+  const path = relative(inventory.scope.root, file);
+  if (path === '') return false;
+  const owned = classifyProjectPath(inventory.scope, path);
+  const exclusion = owned.status === 'owned' || owned.status === 'excluded' ? owned.exclusion : null;
+  return exclusion?.kind === 'owned-ignored' || exclusion?.kind === 'external' || exclusion?.kind === 'scratch';
+}
+
 export function syntheticInputs(inventory: ProjectInventory, configuration: string, selectedFiles: readonly string[],
   resourceWitness: string): SyntheticInputs {
   const root = inventory.scope.root;
-  const roots = new Set(selectedFiles);
+  const roots = new Set(selectedFiles.filter(file => !unanalyzedSelection(inventory, file)));
   for (const file of inventory.files) if (file.kind === 'source') roots.add(resolve(root, file.path));
   roots.add(resourceWitness);
   const configurationBytes = encode({ extends: configuration, files: [...roots].sort(), include: [], exclude: [] }, FILE_BYTES);

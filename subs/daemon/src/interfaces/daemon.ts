@@ -82,7 +82,7 @@ export interface DaemonRecord {
   readonly buildKey: string;
   readonly version: string;
   readonly engine: string;
-  readonly protocol: 'ramify.ipc/1';
+  readonly protocol: 'ramify.ipc/2';
   readonly socket: string;
   readonly startedAt: number;
   readonly state: 'starting' | 'running' | 'stopped';
@@ -94,13 +94,13 @@ export interface StopDisposition {
   readonly requestId: string | null;
 }
 export interface Handshake {
-  readonly protocol: 'ramify.ipc/1';
+  readonly protocol: 'ramify.ipc/2';
   readonly client: { readonly name: string; readonly version: string };
   readonly buildKey: string;
   readonly engine: string;
 }
 export interface Welcome {
-  readonly protocol: 'ramify.ipc/1';
+  readonly protocol: 'ramify.ipc/2';
   readonly instance: DaemonInstance;
   readonly capabilities: readonly ServiceCapability[];
   readonly limits: { readonly maxRequestBytes: number; readonly maxResponseBytes: number;

@@ -578,13 +578,13 @@ describe('renderArchitectView: README.md (AV16)', () => {
 
 describe('renderArchitectView: metadata (AV17)', () => {
   it('writes the fixed fields and only the nonzero exceptional counts, and repeats the revision in every module.json', () => {
-    expect(text(render(measured()), '_meta.json')).toBe('{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect",'
+    expect(text(render(measured()), '_meta.json')).toBe('{"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect",'
       + '"modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured",'
       + '"unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"unclassifiedExercises":1,"coverage":1}\n');
-    expect(text(render(unreferenced()), '_meta.json')).toBe('{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect",'
+    expect(text(render(unreferenced()), '_meta.json')).toBe('{"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect",'
       + '"modules":7,"dependencies":"measured","dependencyScope":"production","testReferences":"unavailable","metrics":"measured",'
       + '"unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}\n');
-    expect(text(render(unavailable), '_meta.json')).toBe('{"schema":"ramify.architect-view/1","revision":"rev/1:architect","input":"input/1:architect",'
+    expect(text(render(unavailable), '_meta.json')).toBe('{"schema":"ramify.architect-view/2","revision":"rev/1:architect","input":"input/1:architect",'
       + '"modules":7,"dependencies":"unavailable","dependencyReason":"wait-limit","dependencyScope":"production","testReferences":"unavailable",'
       + '"metrics":"measured","unknownShapes":1,"detailsUnavailable":1,"testsUnavailable":1,"coverage":1}\n');
     const counts = { coverage: 2, detailsUnavailable: 3, unknownShapes: 4, dynamicTitles: 5, testsUnavailable: 6, cut: 7 };
@@ -595,14 +595,14 @@ describe('renderArchitectView: metadata (AV17)', () => {
     for (const directory of modules) {
       const document = JSON.parse(text(render(measured()), `${directory}module.json`)) as Record<string, unknown>;
       expect(document.revision).toBe(revision);
-      expect(Object.keys(document)).toEqual(['schema', 'module', 'dir', 'parent', 'children', 'tags', 'areas', 'purpose', 'docs', 'files',
+      expect(Object.keys(document)).toEqual(['schema', 'module', 'dir', 'parent', 'children', 'tags', 'areas', 'boundaries', 'purpose', 'docs', 'files',
         'symbols', 'tests', 'uses', 'usedBy', 'metrics', 'revision']);
     }
   });
 
   it('writes module facts, symbol and test counts in module.json', () => {
-    expect(JSON.parse(text(render(unavailable), 'core/module.json'))).toEqual({ schema: 'ramify.architect-module/1', module: 'fixture/core',
-      dir: 'subs/core', parent: 'fixture', children: ['fixture/core/engine'], tags: [], areas: ['src', 'src/tests'],
+    expect(JSON.parse(text(render(unavailable), 'core/module.json'))).toEqual({ schema: 'ramify.architect-module/2', module: 'fixture/core',
+      dir: 'subs/core', parent: 'fixture', children: ['fixture/core/engine'], tags: [], areas: ['src', 'src/tests'], boundaries: [],
       purpose: { state: 'present', path: 'subs/core/README.md', text: 'Core runs the engine for the rest of the project.' },
       docs: ['subs/core/src/docs/guide.md', 'subs/core/src/docs/notes/usage.md'], files: { own: 4, subtree: 7 },
       symbols: { exposed: 1, internal: 1, supporting: 3, unknown: 0 }, tests: { suites: 1, titles: 2 },
@@ -672,13 +672,13 @@ function symbol(module: ModuleId, name: string, overrides: Partial<ArchitectSymb
 }
 function moduleFacts(module: ModuleId, parent: ModuleId | null, children: readonly ModuleId[]): ArchitectModuleFacts {
   const name = module.split('/').at(-1)!;
-  return { module, dir: parent === null ? '' : `subs/${name}`, parent, children, tags: [], areas: ['src'],
+  return { module, dir: parent === null ? '' : `subs/${name}`, parent, children, tags: [], areas: ['src'], boundaries: [],
     purpose: { state: 'present', path: parent === null ? 'README.md' : `subs/${name}/README.md`, text: `The ${name} module.` },
     docs: [], files: { own: 1, subtree: 1 } };
 }
 function projection(symbols: readonly ArchitectSymbol[], consumers: readonly ModuleId[] = [], records: readonly ArchitectTestRecord[] = []): ArchitectViewProjection {
   const children = byteOrdered(['app/lib', ...consumers]);
-  return { schema: 'ramify.architect-projection/1', sequence: 1, inputId, root: 'app',
+  return { schema: 'ramify.architect-projection/2', sequence: 1, inputId, root: 'app',
     modules: [moduleFacts('app', null, children), ...children.map(child => moduleFacts(child, 'app', []))],
     symbols, tests: records,
     counts: { coverage: 0, detailsUnavailable: 0, unknownShapes: 0, dynamicTitles: 0, testsUnavailable: 0, cut: 0 }, bytes: 0 };

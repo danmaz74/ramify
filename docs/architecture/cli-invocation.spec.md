@@ -1,9 +1,12 @@
 # CLI invocation
 
-**Date:** 2026-09-08. **Status:** Decided invocation contract for `ramify check`.
-The delivery plans reference this document; they do not restate it. Command
-names other than `check` are listed in [processes and clients](processes-and-clients.md)
-and get their invocation contracts when their plans are written.
+**Date:** 2026-09-08. **Status:** Decided and implemented invocation contract for
+`ramify check` and `ramify affected`. Ramify's project-boundary phase implemented
+root selection by the root marker, auxiliary source, declared nested trees, the
+project warnings and the hook check's path dispositions described here. The
+delivery plans reference this document; they do not restate it. Other command
+names are listed in [processes and clients](processes-and-clients.md) and get
+their invocation contracts when their plans are written.
 
 ## The one rule
 
@@ -25,27 +28,35 @@ ramify --version
 
 The project is the tree beneath one root description: the root's `src/`, its
 `subs/` children and their `src/` and `subs/` recursively, with each owner's
-`src/tests/` and `src/interfaces/` areas.
+`src/tests/` and `src/interfaces/` areas. The root description declares itself
+with the root marker, `root module <name>`, as the
+[module description specification](../model/module-description.spec.md#a-description-file-establishes-a-directory-boundary)
+defines; every other description in the tree is unmarked.
+
+Selection by the root marker is implemented, and checking a project reports
+every other marked description its discovery meets. Discovery prunes declared
+nested trees before descent, so it never reads a marked description inside
+one, and a directory's own `tsconfig.json` no longer stops it.
 
 1. `--root <dir>` names the root explicitly. The directory must contain a
-   root `module.ramify`; nothing above it is examined.
-2. Without `--root`, take the nearest directory at or above the working
-   directory that contains `module.ramify` as the candidate. Find its nearest
-   proper ancestor containing another description. If the candidate lies
-   strictly beneath that ancestor's `subs/`, advance to that ancestor and
-   repeat. Ordinary grouping directories between `subs/` and a child do not
-   stop the climb. Otherwise the candidate is an independent project root:
-   stop, without skipping that nearer declared boundary to join a higher tree.
-   If the climb would stop at a candidate directly under `subs/` and the
-   parent of that `subs/` directory has no description, report that missing parent
-   description instead of treating the child as an independent root.
-3. Outside any ramified project, the command fails with exit 2 and a message
-   naming the working directory. It never searches subdirectories.
+   `module.ramify` carrying the root marker; nothing above it is examined. A
+   description there without the marker is an invalid selection, exit 1,
+   whose message says to add the marker.
+2. Without `--root`, select the nearest directory at or above the working
+   directory whose `module.ramify` carries the root marker. Unmarked
+   descriptions are modules of that root and never stop the climb, whatever
+   their position relative to any `subs/` directory.
+3. When no description at or above the working directory carries the marker,
+   the command fails with exit 2 and a message naming the working directory.
+   When an unmarked description lies at or above it, the message also names
+   the nearest one and says to add `root` to its module line if it is the
+   project root. It never searches subdirectories.
 
 Paths are canonicalized before the climb, so a working directory reached
-through a symlink finds the same root as its real path. A consequence of the
-discovery rule is that an implicitly selected root may not itself sit directly
-under a directory named `subs`.
+through a symlink finds the same root as its real path. Selection does not
+depend on whether a marked description lies beneath another project's `subs/`
+or inside one of its declared nested trees. Checking that enclosing project
+reports a marked description outside its declared trees as a layout error.
 
 The report states the root and how it was selected: given, or found from the
 working directory. A resident check states the selection of its own invocation
@@ -55,11 +66,12 @@ discovery climb, so it can differ from a batch run that found the root by climbi
 from a subdirectory. Working from inside a nested module, an excluded-looking
 directory such as the toolkit's `site/`, or an independent project nested in
 the tree such as the toolkit's example, all resolve by the same rule, and the
-example resolves to its own root because `examples/` is not `subs/`.
+example resolves to its own root because its description carries the marker.
 For example, a command inside `project/subs/group/child/src/` selects `project`
-when `project` and `child` are the declared modules. An independent project
-inside `project/subs/child/examples/demo/` selects `demo`: its nearest containing
-module is `child`, and `demo` is outside that module's `subs/`.
+when `project`'s description carries the marker and `child`'s does not. A
+project in an owned-ignored tree `project/subs/child/fixtures/demo/`, whose
+description carries the marker, is selected from inside `demo`, although it
+lies beneath `project`'s `subs/`.
 
 ## Compiler configuration
 
@@ -82,7 +94,7 @@ have selected it.
 
 This owned inventory is the application source set supplied to model
 validation. Compiler exclusion alone does not invalidate an exposure of an
-owned file. The outside-module file inventory described below is separate.
+owned file.
 
 Plan 1 handles one configuration as one program. A solution-style
 configuration that has `references` and no files of its own is an unavailable
@@ -98,60 +110,109 @@ code.
 
 ## Files outside modules
 
-The configuration also defines what the project's own files are, in the
-ordinary TypeScript sense: the files its `files`, `include` and `exclude`
-select. Any of those files that lies outside every module's `src/` is a
-project file outside modules. It is not checked, and it produces a warning.
-This includes sibling `tests/` or `interfaces/` directories and loose files
-beneath `subs/`. These files receive no module source-area classification, and
-their presence alone does not make the layout invalid or fail the check.
+Ownership follows the
+[module description specification](../model/module-description.spec.md):
+owned compiler source outside every `src/`, including sibling `tests/` or
+`interfaces/` directories and loose source beneath `subs/`, is its nearest
+module's auxiliary source. It is analyzed with that owner's ordinary
+classification whether or not the configuration selects it, and it produces no
+warning. A `.js`, `.jsx`, `.mjs` or `.cjs` file there is compiler source only
+when the configuration admits JavaScript. Every other owned file outside `src/`
+and the owned-ignored trees, apart from `module.ramify` files and module
+READMEs, is an inert file and produces no warning; a compiler configuration,
+package manifest or imported data file there is an inert file that may also be
+a captured input. Only declared nested trees and always-excluded paths are left
+out; a nested `tsconfig.json` and repository ignore rules exclude nothing.
+Three nonblocking warnings remain: compiler-selected source inside an
+owned-ignored tree, compiler-selected source inside a module's scratch
+directory, and, when the root lies in a Git repository and `git` is available,
+each repository-ignored directory the check would still enter. The CLI derives
+that last warning from Git's output; it is never an analysis input and never
+changes the result. Root selection follows the root marker, as
+[selecting the project](#selecting-the-project) states.
 
-Warnings are aggregated per top-level entry relative to the root: one warning
-per stray file directly under the root, and one per top-level directory that
-contains stray files, with the count. A stray `module.ramify` found outside
-the permitted module locations, including beside these files, is an individual
-layout error even if its contents are valid. It fails the check with exit 1;
-it is not included in the ordinary file-warning count and needs no strict
-configuration. Invalid descriptions within the checked tree, including markers
-inside `src/` or at reserved container roots, and invalid exposure paths remain
-errors.
+The Git advice is the warning `ignored-but-walked`, located at the directory
+and listing no files. A complete check, resident, batch or after batch
+fallback, adds it once its report is complete. When `.git` exists at or above
+the selected root, the CLI runs
+`git ls-files --others --ignored --exclude-standard --directory -z` once in
+that root, bounded in time and output, and reads its NUL-terminated entries as
+they are, whitespace and newlines included. It warns about each listed
+directory beneath the root that the revision's ownership leaves Ramify to
+enter, naming the module whose walk enters it; an excluded directory, its
+descendants, the root itself and entries outside it give none. No repository,
+no `git` executable and a failed or oversized command give no warning and
+print nothing. The advice reads no ignore file, never enters the report's
+input identity or scope, and never changes ownership, selection, findings or
+the exit code. It appears among the human report's warnings and in the JSON
+report's `warnings`, counted in its summary. The bounded hook check, `watch`
+and `affected` ask Git nothing.
 
-Outside module source areas, files outside the configuration's selection are
-silent. Every owned `src/` is still checked regardless of that selection.
-`node_modules`, build outputs, a nested independent project with its own
-configuration and tooling compiled under another configuration are silent by the project's own
-conventions, not by a Ramify rule. Projects that want different treatment,
-such as declaring a tooling directory as intentionally unowned or silencing a
-warning, will do so in a Ramify project configuration file. That file's
-format is unspecified and is not part of Plan 1.
+A selected file inside an owned-ignored tree or a module's scratch directory
+is neither inventoried nor read, the compiler does not receive it as a root
+file, and it produces one `compiler-selected-owned-ignored` or
+`compiler-selected-scratch` warning per tree or scratch directory, located at
+that directory. A selected file inside an external tree produces no warning.
+Each warning carries a code, a path and a message and, where it lists files,
+at most 20 of them in byte order with their total count.
+
+A stray `module.ramify` found outside the permitted module locations,
+including beside auxiliary source, is an individual layout error even if its
+contents are valid. It fails the check with exit 1 and needs no strict
+configuration; source beneath it has no owner. Invalid descriptions within the
+checked tree, including descriptions inside `src/` or at reserved container
+roots, and invalid exposure paths remain errors.
+
+`node_modules` and the configuration's output directories are always excluded.
+A nested project belongs in a declared nested tree: undeclared, its marked root
+description or package manifest is a layout error. Projects that want
+different treatment, such as silencing a warning, will do so in a Ramify
+project configuration file. That file's format is unspecified and is not part
+of Plan 1.
 
 In the future, we might add a **strict** project configuration that makes
-outside-module-source warnings fail the check. The option's syntax and exact
-scope are undecided; Plan 1 has no strict configuration or CLI flag.
+project warnings fail the check. The option's syntax and exact scope are
+undecided; Plan 1 has no strict configuration or CLI flag.
 
-An owned import whose target is a project file outside modules is reported as
-outside scope: an analysis limit on that import, never an allowed import and
-never an external package.
+An import whose target is auxiliary source is an application import decided by
+the ordinary rules: same-owner access is allowed, and another owner's import of
+an auxiliary original is denied, since no exposure can select one. An owned
+import whose target, without package resolution, lies inside a declared nested
+tree is the definite finding `project-boundary-import`, category `import`, for
+every import form, including type-only and symbol-free imports and re-exports;
+it is located at the import and fails the check with exit 1. One inside an
+always-excluded path such as compiler output is unverifiable, with the
+nonblocking `excluded-target` analysis limit on that import; one outside the
+root is outside scope, with the nonblocking `outside-module-target` limit.
+None is an allowed import or an external package.
 
 ## Output and exit
 
 The human report prints the root and how it was selected, the compiler
 configuration in use, a `Mode:` line, failures first, then warnings, then
-analysis limits, then the completed scope. `--format json` writes the unchanged
-`ramify.analysis/1` report to stdout, without the human mode line or an added mode
-member. Invocation failures use a `ramify.cli/1` diagnostic document. Logging goes
-to stderr; nothing else is written to stdout in that mode. Locations are relative
-to the root regardless of the working directory. Ordering is deterministic.
+analysis limits, then the completed scope. `--format json` writes the
+`ramify.analysis/2` report to stdout, unchanged apart from the Git advice
+warnings, without the human mode line or an added mode member. Invocation
+failures use a `ramify.cli/1` diagnostic document. Logging goes to stderr;
+nothing else is written to stdout in that mode. Locations are relative to the
+root regardless of the working directory. Ordering is deterministic.
+
+Project boundaries moved every machine document whose payload shape they
+changed to its next version, including `ramify.analysis/2`, `ramify.check/2`,
+`ramify.affected-cli/2` and the IPC protocol `ramify.ipc/2`. No reader for an
+earlier version is kept: a version number changes so that an outdated reader
+fails on it rather than misreading the document. Documents whose shape did not
+change keep their version.
 
 `--no-snapshot` leaves the snapshot, the record of every evaluated import, out of
-that report. The report keeps `ramify.analysis/1` and sets `snapshot` to null; its
+that report. The report keeps `ramify.analysis/2` and sets `snapshot` to null; its
 summary, outcome, findings, warnings, analysis limits and exit code are those of
 the same check with the snapshot. A caller that reads only the verdict and its
 findings uses it: on the toolkit itself the snapshot is almost all of a
 25 MB report. It applies to complete checks in both modes; a batch session drops
 the snapshot before its result leaves the session, and a resident check drops it
 when printing. The flag requires `--format json` and cannot accompany `--changed`,
-whose `ramify.check/1` document has no snapshot; either misuse is an invalid
+whose `ramify.check/2` document has no snapshot; either misuse is an invalid
 invocation, exit 2.
 
 | Exit | Meaning |
@@ -201,12 +262,30 @@ opens the project context and requests synchronized freshness from the
 resident daemon, and never falls back to batch. `--batch` answers from a fresh
 session over the same root, with the same capabilities as `check --batch`, in
 the same process seam, and disposes it. `--format json` prints one
-`ramify.affected-cli/1` document with the root, the mode, the revision's
+`ramify.affected-cli/2` document with the root, the mode, the revision's
 sequence (null in batch) and input identity, and the selection; failures use
 `ramify.cli/1`. It exits 0 for any answer, including one widened to all
 modules, 1 for an invalid project, an unknown module ID or an invalid seed,
 2 when unavailable, pending, cold, superseded or past a deadline, and 130 when
 interrupted. `--changed`, `--since` and `--deadline` do not apply.
+
+`ramify affected` answers every path
+seed by containment under the current declarations, without an inventory entry
+or a filesystem read, so absent, new and deleted paths and both sides of a
+rename resolve. Each path seed states whether the path is owned, excluded or
+outside the project, with its exclusion when one applies. An owned path,
+including one in an owned-ignored tree or a scratch directory, selects its
+owner and that owner's transitive importers. A path in an external tree or
+another always-excluded path selects nothing. Only a path outside the project,
+written with a leading `../`, widens the answer to all modules; any other
+malformed seed is an invalid seed. Human output prints one line per path
+seed: owned, with its module, basis and any owned-ignored or scratch
+exclusion; excluded, with its exclusion; or outside the project. The
+selection's scope carries the
+revision's whole ownership topology: its modules and their rooted exclusions,
+while repository, package and generated segments are excluded wherever they
+occur. These answers use `ramify.affected-cli/2`, carrying a
+`ramify.affected/2` selection.
 
 ### Hook and complete checks
 
@@ -222,12 +301,15 @@ with exit 2; it never substitutes an approximate result.
 
 | Form | Role | Waits for | Answers not checked |
 | --- | --- | --- | --- |
-| `ramify check --changed <path>...` | Bounded hook check | A daemon revision covering the named files' identities, up to `--deadline` (default 2000 ms) | Yes, exit 2, when it cannot answer in time or at all: a cold daemon, an expired deadline, unobserved or superseded content, or a named configuration file. It never falls back to batch. |
+| `ramify check --changed <path>...` | Bounded hook check | A daemon revision covering the identities of the named paths its classification analyzes, up to `--deadline` (default 2000 ms) | Yes, exit 2, when it cannot answer in time or at all: a cold daemon, an expired deadline, unobserved or superseded content, a named configuration file, or a classification that changes again after its one retry. It never falls back to batch. |
 | `ramify check` | Complete check | A synchronized revision covering every current input, including any pending configuration rebuild, with no deadline | No. It reports the whole project; exit 2 means it could not complete. |
 | `ramify check --batch` | Independent complete check | A fresh session that trusts no retained daemon state | No. It reports the whole project; exit 2 means it could not complete. |
 
-A named configuration file, `tsconfig.json`, a file it extends, or a package
-manifest or lockfile, is answered at once as not checked with the reason
+A named configuration file is a file outside every exclusion named
+`tsconfig*.json`, `package.json`, `package-lock.json`, `yarn.lock` or
+`pnpm-lock.yaml`, or another file the revision captured as configuration, such
+as one the compiler configuration extends. It is answered at once as not
+checked with the reason
 `configuration-changed`, unless a published revision already covers it with
 nothing else pending. `--deadline` does not delay that reply. The hook verifies a
 module's exports and their use, which a configuration edit is not; the daemon
@@ -238,12 +320,46 @@ not verified, never as a pass. An end-of-task hook, a pre-commit hook or CI runs
 `ramify check`, or `--batch` where no daemon state should be trusted. That
 complete check gives a configuration edit its verdict.
 
-The hook check hashes the named paths relative to the selected root. It exits 0
-when the covering revision has no findings, 1 for findings or an invalid
-revision, and 2 when it was not checked, naming the reason. One known limit:
+The hook check names paths relative to the selected root and hashes those the
+daemon's classification analyzes. It exits 0 when the covering revision has no
+findings and 1 for findings or an invalid revision, whatever paths are not
+analyzed, and 2 when the result could not be established, naming the reason.
+Its human output prints one line per named path with its disposition, reason,
+module and exclusion, then an outcome line with the counts of each
+disposition; only a checked path reads as checked. One known limit:
 where the root `tsconfig.json` carries `references` beside its own files, a
 created or deleted file makes the daemon find the project again rather than
 reuse what it knows, so those hooks are slower than the same hooks elsewhere.
+
+The hook check gives each named path one disposition. `checked` means the
+covering revision completed the relevant analysis with evidence of the path's
+current content or its deletion; deleting
+previously analyzed source is checked once its removal is analyzed.
+`not-analyzed` means the complete check does not analyze the path either: it
+lies in an owned-ignored, external or scratch directory or another
+always-excluded path, or it is an inert file the covering revision did not
+capture. Source, resources, `module.ramify` files and module READMEs are not
+inert files. An inert file the covering revision captured, such as an imported
+data file outside `src/`, is `checked` like any captured input, except that a
+named configuration file follows the configuration rule above: a compiler
+configuration or package manifest the revision captured is `checked` only when
+a published revision already covers it with nothing else pending, and a
+lockfile or other configuration-named file the revision did not capture is
+never covered, so naming it is always `not-checked` with the reason
+`configuration-changed`. A not-analyzed
+path is never captured and needs no content coverage, a path in an excluded
+directory is not hashed, and an owned file the covering revision finds to be
+no analysis input carries no content identity although the client hashed it
+before that was known. A not-analyzed path never changes the exit code: a request naming only such paths exits 0 when the covering
+revision has no findings and 1 when it has findings or is invalid, exactly as
+`ramify check` would. `not-checked` means the hook could not establish the
+result for that path, for example through stale or unobserved content, an
+expired deadline, a named configuration file or unavailable work; it gives
+exit 2 and retains findings verified before the failure. The disposition, not
+the exit code, states that a path was not analyzed, and no such path is shown
+as passing source checks. The `ramify.check/2` document reports these
+dispositions in place of each changed path's coverage flag, with the analyzed
+content or deletion identity only for checked paths.
 
 ## Decisions recorded here
 
@@ -256,6 +372,9 @@ reuse what it knows, so those hooks are slower than the same hooks elsewhere.
   beyond the analysis limits they cause.
 - Root discovery from a subdirectory is part of Plan 1; `--root` is the
   override, not the primary form.
+- A project root declares itself with the root marker, and the climb selects
+  the nearest description carrying it (decided 2026-10-03). Unmarked
+  descriptions never stop the climb.
 - Single compiler configuration per project in Plan 1; references later. No
   configuration override: the root's `tsconfig.json` is the whole-project
   configuration.

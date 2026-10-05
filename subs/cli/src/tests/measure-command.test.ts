@@ -15,7 +15,7 @@ async function put(root: string, path: string, value: string): Promise<void> {
 
 async function fixture() {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'ramify-measure-command-')));
-  await put(root, 'module.ramify', 'ramify 1\nmodule fixture\n');
+  await put(root, 'module.ramify', 'ramify 1\nroot module fixture\n');
   await put(root, 'README.md', '# Fixture\n\nMeasured fixture.\n');
   await put(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' },
     include: ['src', 'subs', 'outside.ts'] }));
@@ -48,7 +48,7 @@ function hiddenCapability(connect: ServiceConnector): ServiceConnector {
   };
 }
 
-type Attribution = { readonly state: 'generated' | 'inventoried' | 'outside' | 'excluded' | 'unobserved';
+type Attribution = { readonly state: 'generated' | 'inventoried' | 'excluded' | 'unobserved';
   readonly provisional?: { readonly owner: string; readonly area: 'ordinary' | 'tests' | 'documentation' } };
 
 /** Independent implementation of the rule printed in the public document. */
@@ -59,7 +59,6 @@ function attribute(document: MeasureDocument, path: string): Attribution {
     || /^\.ramify(?:-architect)?\.(?:tmp|old)-.+(?:\.marker\.json)?$/.test(segment));
   if (generated) return { state: 'generated' };
   if (document.files.some(file => file.path === path)) return { state: 'inventoried' };
-  if (document.outsideModuleFiles.includes(path)) return { state: 'outside' };
   if (segments.some(segment => ['.git', 'node_modules', 'bower_components', 'jspm_packages'].includes(segment))) return { state: 'excluded' };
   const module = [...document.modules].filter(item => item.dir === '' ? true : path === item.dir || path.startsWith(`${item.dir}/`))
     .sort((a, b) => b.dir.length - a.dir.length)[0];
@@ -84,10 +83,12 @@ describe('measure command', { timeout: 60_000 }, () => {
       const json = await invoke(f.root, connect, ['measure', '--format', 'json']);
       expect([json.exit, json.stderr, json.batchCalls, json.writes]).toEqual([0, '', 0, 1]);
       const document = JSON.parse(json.stdout) as MeasureDocument;
-      expect(document).toMatchObject({ schema: 'ramify.measure/1', root: f.root, views: 'measured' });
+      expect(document).toMatchObject({ schema: 'ramify.measure/2', root: f.root, views: 'measured' });
       expect(document.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
       expect(document.files.map(file => file.path)).toEqual([...document.files.map(file => file.path)].sort());
-      expect(document.outsideModuleFiles).toContain('outside.ts');
+      // Root-owned compiler source outside src/ is the root's auxiliary source, listed with its ordinary area.
+      expect(document.files.find(file => file.path === 'outside.ts')).toMatchObject({ owner: 'fixture', area: 'ordinary', kind: 'source' });
+      expect(document).not.toHaveProperty('outsideModuleFiles');
       expect(requests).toHaveLength(1);
       expect(requests[0]).toMatchObject({ freshness: { mode: 'synchronized', expect: [] } });
       const human = await invoke(f.root, f.quick.connect, ['measure']);
@@ -142,7 +143,9 @@ describe('measure command', { timeout: 60_000 }, () => {
       await put(f.root, 'src/.ramify-other/real.ts', 'export const similar = true;\n');
       await put(f.root, 'node_modules/pkg/index.ts', 'export const dependency = true;\n');
       await put(f.root, 'dist/output.ts', 'export const output = true;\n');
-      await put(f.root, 'examples/independent/module.ramify', 'ramify 1\nmodule independent\n');
+      // A nested project is declared: its marked root is never read, and its contents are not observed.
+      await put(f.root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "examples/independent"\n');
+      await put(f.root, 'examples/independent/module.ramify', 'ramify 1\nroot module independent\n');
       await put(f.root, 'examples/independent/tsconfig.json', '{}\n');
       await put(f.root, 'examples/independent/src/own.ts', 'export const independent = true;\n');
       await symlink(join(f.root, 'outside.ts'), join(f.root, 'src/link.ts'));
@@ -151,7 +154,7 @@ describe('measure command', { timeout: 60_000 }, () => {
       expect(first.exit).toBe(0);
       const document = JSON.parse(first.stdout) as MeasureDocument;
       expect(attribute(document, 'src/main.ts')).toEqual({ state: 'inventoried' });
-      expect(attribute(document, 'outside.ts')).toEqual({ state: 'outside' });
+      expect(attribute(document, 'outside.ts')).toEqual({ state: 'inventoried' });
       for (const path of ['src/.ramify/deep/catalog.md', 'subs/child/src/.ramify.tmp-run/staged.ts',
         'src/tests/.ramify.old-run.marker.json', '.ramify-architect.old-run/nested/module.json']) {
         expect(attribute(document, path), path).toEqual({ state: 'generated' });
@@ -159,7 +162,9 @@ describe('measure command', { timeout: 60_000 }, () => {
       expect(attribute(document, 'node_modules/pkg/missing.ts')).toEqual({ state: 'excluded' });
       expect(attribute(document, 'src/.ramify-other/real.ts')).toEqual({ state: 'inventoried' });
       expect(attribute(document, 'src/link.ts')).toEqual({ state: 'unobserved', provisional: { owner: 'fixture', area: 'ordinary' } });
-      expect(attribute(document, 'dist/output.ts')).toEqual({ state: 'unobserved' });
+      // The fixture configures no outDir, so dist/ is an ordinary owned directory and its
+      // compiler source is the root's auxiliary source (iteration 8C), not output.
+      expect(attribute(document, 'dist/output.ts')).toEqual({ state: 'inventoried' });
       expect(attribute(document, 'examples/independent/src/own.ts')).toEqual({ state: 'unobserved' });
       expect(attribute(document, 'subs/child/src/future.ts')).toEqual({ state: 'unobserved',
         provisional: { owner: 'fixture/child', area: 'ordinary' } });

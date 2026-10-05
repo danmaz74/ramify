@@ -65,6 +65,19 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
     add('invalid-prerequisite', `Catalog is missing inventoried file ${file.path}`, []);
   }
   if (issues.length) return invalid();
+  // An original defined in auxiliary source cannot be exposed, however a
+  // selection reaches it: the catalog's export already names the original at
+  // the end of any same-owner forwarding chain. Re-exposure is exposure, so each
+  // statement selecting one is reported at its selection, with the original's
+  // declarations. The selection stays declared, so a re-exposure names the same
+  // original rather than a missing export; no valid model is published.
+  const auxiliary = (original: OriginalId, selected: SourceLocation, describe: string): boolean => {
+    const fact = facts.get(originalKey(original));
+    if (!fact?.origin.auxiliary) return false;
+    add('auxiliary-original-exposure', `${describe} denotes the original ${original.binding} of ${original.owner}, defined in `
+      + `auxiliary source ${fact.origin.file}; an auxiliary original cannot be exposed`, [selected, ...fact.declarations]);
+    return true;
+  };
   const assignments = new Map<string, { tags: readonly string[]; location: SourceLocation }[]>();
   const selections: ExpandedSelection[] = [];
   const exposures: Exposure[] = [];
@@ -80,6 +93,8 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
     const toParent = new Set<string>();
     contracts.set(module.id, { names, toParent });
     for (const statement of doc.statements) {
+      // Nested-tree statements bound project acquisition; they never expose a symbol.
+      if ('directory' in statement) continue;
       const site = location(doc.file, statement.span);
       const fromSite = location(doc.file, statement.from.span);
       const pairs: { name: string; original: OriginalId; effective: boolean }[] = [];
@@ -101,7 +116,10 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
         for (const selectedName of selected) {
           const entry = contract.names.get(selectedName.name);
           if (!entry) add('missing-export', `Child ${child} declares no exposed name ${JSON.stringify(selectedName.name)}`, [location(doc.file, selectedName.span)]);
-          else select({ name: selectedName.alias, original: entry.original, effective: contract.toParent.has(originalKey(entry.original)) });
+          else {
+            auxiliary(entry.original, location(doc.file, selectedName.span), `Name ${JSON.stringify(selectedName.name)} from child ${child}`);
+            select({ name: selectedName.alias, original: entry.original, effective: contract.toParent.has(originalKey(entry.original)) });
+          }
         }
       } else {
         const reference = references.get(JSON.stringify([doc.file, statement.index]));
@@ -148,8 +166,10 @@ export function linkDescriptions({ registry, inventory, catalog }: LinkInputs): 
             add('foreign-original', `Export ${JSON.stringify(selectedName.name)} in ${provider} belongs to ${entry.original.owner}`,
               [selectedSite, ...facts.get(originalKey(entry.original))!.declarations]);
           } else {
+            const rejected = auxiliary(entry.original, selectedSite, `Export ${JSON.stringify(selectedName.name)} in ${provider}`);
             select({ name: selectedName.alias, original: entry.original, effective: true });
-            if (statement.tags) {
+            // A rejected auxiliary original keeps its defined tags: no tag clause applies to it.
+            if (statement.tags && !rejected) {
               const key = originalKey(entry.original);
               const all = assignments.get(key) ?? [];
               all.push({ tags: statement.tags.values, location: location(doc.file, statement.tags.span) });

@@ -24,14 +24,14 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
   const quick = await createQuickEnvironment({ sweepIntervalMs: 600_000 });
   const originalBytes = 'export const value = 1;\n', laterBytes = 'export const value = 2;\n';
   const hash = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
-  const requests: CheckParams[] = [], starts: string[] = [], recoveries: string[] = [], events: string[] = [];
+  const requests: CheckParams[] = [], classifications: CheckParams[] = [], starts: string[] = [], recoveries: string[] = [], events: string[] = [];
   const stdout: string[] = [], stderr: string[] = [];
   let batchCalls = 0, closeCalls = 0, closeContextCalls = 0, openCalls = 0;
   let connection: ServiceConnection | undefined, serviceReply: ServiceResult<CheckOutcome> | undefined;
   let lost = false;
   try {
     await mkdir(join(root, 'src'));
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n');
     await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: {
       target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext' } }));
     await writeFile(join(root, 'src/main.ts'), originalBytes);
@@ -46,6 +46,12 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
         get reason(): DisconnectReason | null { return lost ? { kind: 'failure', message: 'Connection lost before check reply delivery' } : actual.reason; },
         async openContext(params, control) { openCalls++; return actual.openContext(params, control); },
         async check(params, control) {
+          // The client's first request carries no content and obtains the daemon's
+          // classification; the delivery fault applies to the request carrying the hash.
+          if (!lost && params.freshness.mode === 'synchronized' && !params.freshness.expect.length) {
+            classifications.push(structuredClone(params));
+            return actual.check(params, control);
+          }
           requests.push(structuredClone(params)); events.push('check-dispatched');
           serviceReply = await actual.check(params, control); events.push('service-replied');
           // A caller retry must retain the hash taken before this second write.
@@ -57,11 +63,11 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
           recoveries.push(authorization); events.push('recovery-exhausted');
           if (reason === 'stopped') return { status: 'stopped', record: {
             schemaVersion: 'ramify.daemon-record/1', ...actual.daemon.instance,
-            protocol: 'ramify.ipc/1', socket: '/quick', startedAt: quick.clock.now(), state: 'stopped',
+            protocol: 'ramify.ipc/2', socket: '/quick', startedAt: quick.clock.now(), state: 'stopped',
             stopped: { at: quick.clock.now(), reason: 'explicit', requestId: 'recovery-stop' },
           } };
           return { status: 'unavailable', attempts: 3, reason: reason === 'incompatible'
-            ? { kind: 'incompatible', client: 'ramify.ipc/1', daemon: 'ramify.ipc/2' }
+            ? { kind: 'incompatible', client: 'ramify.ipc/2', daemon: 'ramify.ipc/0' }
             : { kind: 'failure', message: 'Reconnect and restart attempts exhausted' } };
         },
         async closeContext(params) { closeContextCalls++; return actual.closeContext(params); },
@@ -75,7 +81,7 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
     });
     const document = stdout.length === 1 ? JSON.parse(stdout[0]) as CheckDocument : null;
     equal('one successful initial connection and context opening', [starts, openCalls], [['if-needed'], 1]);
-    equal('one real check before reply loss', requests.length, 1);
+    equal('one classification answer, then one real check before reply loss', [classifications.length, requests.length], [1, 1]);
     equal('real service completed a covering clean revision before reply loss',
       serviceReply?.ok && serviceReply.value.status === 'reported' && serviceReply.value.published
         ? [serviceReply.value.revision.outcome.execution, serviceReply.value.freshness.verified, serviceReply.value.delta.findings.length]
@@ -87,11 +93,12 @@ export async function exhaustedRecoveryWitness(reason: 'unavailable' | 'stopped'
     equal('terminal recovery selects exit 2 without batch', [exitCode, batchCalls], [2, 0]);
     equal('exactly one stdout document with empty stderr', [stdout.length, stderr], [1, []]);
     equal('output is the compact terminal outcome', document ? [document.schemaVersion, document.outcome, document.reason, document.exitCode] : null,
-      ['ramify.check/1', 'not-checked', reason, 2]);
+      ['ramify.check/2', 'not-checked', reason, 2]);
     equal('lost response cannot claim a published result', document ? [document.revision, document.execution, document.checked, document.timings.daemon] : null,
       [null, null, null, null]);
-    equal('output retains the original expectation without coverage', document?.changed,
-      [{ path: 'src/main.ts', sha256: hash(originalBytes), covered: false }]);
+    // A path not checked carries no identity; the sent request above holds the original hash.
+    equal('output names the path not checked for the terminal reason, with no identity', document?.paths,
+      [{ path: 'src/main.ts', disposition: 'not-checked', module: 'fixture', exclusion: null, reason }]);
     equal('disk changed after the original expectation was sent', hash(await readFile(join(root, 'src/main.ts'), 'utf8')), hash(laterBytes));
     equal('no findings are fabricated from a reply the client lost', document?.findings, []);
     equal('the disconnected connection is closed exactly once without a remote close request', [closeCalls, closeContextCalls, connection?.state], [1, 0, 'closed']);

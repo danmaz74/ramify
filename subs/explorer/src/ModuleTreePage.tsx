@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ModuleTreeView } from '../../presentation/subs/project-view/src/ModuleTreeView.js';
-import { ancestorsOf, collapsibleAtDepth, indexModuleTree } from '../../presentation/subs/project-view/src/module-tree.js';
+import { ancestorsOf, collapsibleAtDepth, indexModuleTree, type ModuleTreeIndex } from '../../presentation/subs/project-view/src/module-tree.js';
 import { usePublishedProjectView, type ExplorerClient } from './published-project-view.js';
 
 /** Trees larger than this start collapsed below depth 2. */
@@ -33,8 +33,7 @@ export function ModuleTreePage({ client, pollIntervalMs = 3000, openModule = ope
       if (initialModuleId !== null) for (const ancestor of ancestorsOf(index, initialModuleId)) initial.delete(ancestor);
       return initial;
     }
-    const kept = [...collapsed].filter(id => (index.children.get(id)?.length ?? 0) > 0);
-    return kept.length === collapsed.size ? collapsed : new Set(kept);
+    return keptCollapsible(collapsed, index);
   }, [collapsed, data, index, initialModuleId]);
 
   useEffect(() => {
@@ -42,8 +41,14 @@ export function ModuleTreePage({ client, pollIntervalMs = 3000, openModule = ope
     if (collapsed === null && initialModuleId !== null && !index.modulesById.has(initialModuleId)) {
       setFocusNotice(`Module ${initialModuleId} is not in this revision`);
     }
-    if (selected !== selectedModuleId) setSelected(selectedModuleId);
-    if (collapsed !== collapsedModuleIds) setCollapsed(collapsedModuleIds);
+    // Updater functions: a click can land between this render's commit and this effect, so the
+    // stored value may be newer than the one this render saw. Only the starting set replaces null.
+    if (selected !== selectedModuleId) {
+      setSelected(previous => previous !== null && index.modulesById.has(previous) ? previous : null);
+    }
+    if (collapsed !== collapsedModuleIds) {
+      setCollapsed(previous => previous === null ? collapsedModuleIds : keptCollapsible(previous, index));
+    }
   }, [collapsed, collapsedModuleIds, data, index, initialModuleId, selected, selectedModuleId]);
 
   const toggleCollapsed = useCallback((id: string) => setCollapsed(previous => {
@@ -72,6 +77,12 @@ export function importExplorerUrl(id: string): string {
 
 function openInImportExplorer(id: string): void {
   window.open(importExplorerUrl(id), '_blank', 'noopener');
+}
+
+/** The collapsed IDs whose modules still have children, the same set when none was dropped. */
+function keptCollapsible(collapsed: ReadonlySet<string>, index: ModuleTreeIndex): ReadonlySet<string> {
+  const kept = [...collapsed].filter(id => (index.children.get(id)?.length ?? 0) > 0);
+  return kept.length === collapsed.size ? collapsed : new Set(kept);
 }
 
 function joinNotices(...notices: readonly (string | null)[]): string | null {

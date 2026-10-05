@@ -1,10 +1,20 @@
 # Directory Structure And Module Description Specification
 
 **Status:** Active specification. Whole-tree ownership and declared nested-tree
-boundaries were adopted on 2026-10-01 and are not yet implemented. Nested-tree
-semantics are adopted; their concrete syntax is pending and must be completed
-in this specification before parser implementation. The implementation plan
-schedules that work. The exposure grammar below remains specified independently.
+boundaries were adopted on 2026-10-01. Their concrete statement syntax and
+declaration validation were specified on 2026-10-03; the parser accepts the
+statement syntax, and discovery validates each declaration and prunes declared
+trees and module scratch directories before descent. The root marker on the
+module line and its validity rules were specified on 2026-10-03; the parser
+accepts the marker, the root is selected by it and discovery enforces its
+validity, never reading a marked description inside a declared nested tree.
+Acquisition reports the compiler-selection warnings, and auxiliary source is
+inventoried and analyzed with its owner's ordinary classification. Linking
+rejects an exposure that selects an auxiliary original, directly or through
+forwarding aliases, with the located `auxiliary-original-exposure` error.
+Analysis enforces the import rule for declared trees: an import into one
+without package resolution is the definite `project-boundary-import` finding.
+The exposure grammar below is unchanged.
 
 **Format version:** 1
 
@@ -47,10 +57,21 @@ The exact, case-sensitive filename is `module.ramify`. A directory containing
 this file is a declared module root. The containing directory is the module's
 ownership boundary; the file has no field for a different ownership directory.
 
-The application root is selected explicitly by the caller and must contain
-`module.ramify`. A tool may default to its working directory when that
-directory contains the file. It must not guess a root from several discovered
-modules. All modules in one evaluation belong to this one root.
+The application root declares itself in its own description with the root
+marker: the keyword `root` before `module` on its module line. No other
+description in the evaluation carries the marker. The caller selects the root,
+explicitly or by a documented search from its working directory for the
+nearest description carrying the marker, as the
+[CLI invocation specification](../architecture/cli-invocation.spec.md#selecting-the-project)
+defines for `ramify`. The selected directory must contain a description
+carrying the marker; a selected description without it is invalid, and its
+diagnostic says to add the marker. A tool must not guess a root from several
+discovered modules. All modules in one evaluation belong to this one root.
+
+```ramify
+ramify 1
+root module shop
+```
 
 The parent of a non-root module is its nearest strictly containing module
 directory. A directory without a description file is an ordinary directory,
@@ -64,9 +85,10 @@ trees remain owned. The root owns configuration, documentation and other paths
 that no child owns. Ownership is determined for existing, new and deleted
 paths without requiring an inventory entry.
 
-Ownership does not imply analysis or write permission. Inventory only inputs
-the analysis reads and fingerprints; inert owned files need not be listed,
-hashed or watched. Repository ignore rules change neither ownership nor
+Ownership does not imply analysis or write permission. Inventory only the
+source and resources the analysis reads and fingerprints; an inert file is
+never inventoried, and it is hashed and watched only when an analysis revision
+captures it. Repository ignore rules change neither ownership nor
 analysis boundaries.
 
 A present but invalid description is an invalid boundary declaration. A
@@ -100,19 +122,34 @@ description interpreted by this evaluation may occur inside a module's
 Within the discovered tree, detect misplaced descriptions, including those inside `src/`
 or outside `subs/`, and report layout errors. It must not ignore
 them as ordinary files. Existing projects must adopt this layout before their
-descriptions can be accepted; adding marker files alone is not sufficient.
+descriptions can be accepted; adding description files alone is not sufficient.
 
 Discovery exclusions are the declared nested trees and always-excluded paths.
 Never infer an independent project boundary merely from a `tsconfig.json` or
 from the root compiler's selection. An undeclared directory that is not a
-module's own directory and contains a root description or package manifest is
-a layout error. An excluded description is not interpreted by this evaluation.
+module's own directory and contains a package manifest is a layout error.
+A description carrying the root marker, other than the selected root's, is a
+layout error wherever discovery meets it, including beneath `subs/`: the root
+of another project inside the tree belongs within a declared nested tree.
+An excluded description is not interpreted by this evaluation; one carrying
+the root marker inside a declared tree of either kind is the root of a
+separate project.
 
 Analyze all owned compiler source outside those exclusions, including source
-the compiler configuration did not select. Auxiliary source uses its owner's
-ordinary classification. Compiler-resolution limitations remain explicit
-coverage notes; omitting owned source from the compiler configuration does
-not exempt it from analysis.
+the compiler configuration did not select. Compiler source is a file with a
+`.ts`, `.tsx`, `.mts` or `.cts` extension, declaration files included, or with
+a `.js`, `.jsx`, `.mjs` or `.cjs` extension when it lies beneath a module's
+`src/` or the root compiler configuration admits JavaScript (`allowJs`, which
+defaults to `checkJs`); no other extension makes a file compiler source. Inside
+`src/`, a JavaScript file the compiler does not load is reported as an analysis
+limit; every other file there, apart from a misplaced `module.ramify`, is a
+resource. Outside `src/` and the owned-ignored trees,
+owned compiler source is auxiliary source. Every other owned file there, apart
+from `module.ramify` files and module READMEs, is an inert file: it is not
+inventoried and receives no source classification, even when the compiler
+reads it. Auxiliary source uses its owner's ordinary classification.
+Compiler-resolution limitations remain explicit coverage notes; omitting owned
+source from the compiler configuration does not exempt it from analysis.
 
 A TypeScript dependency or standard-library file does not become application
 source merely because the compiler loads it. Treatment of external packages
@@ -135,30 +172,62 @@ to escape its checked boundary.
 
 ### Declared Nested Trees Bound Interpretation
 
-The following semantics are adopted. Concrete declaration syntax remains pending.
+Discovery implements the declaration, validation and pruning rules of this
+section, and acquisition reports the warning about compiler-selected source in
+an owned-ignored tree.
 
 A module declares each nested tree in its own description, using a directory
 relative to the module and one of two kinds: `owned-ignored` or `external`.
-The directory must lie beneath that module and outside every child module.
-An `owned-ignored` directory must exist; an `external` directory need not.
-External trees must lie outside the declaring module's `src/`; owned-ignored
-trees may lie within owned source, including `src/tests/`.
+The directory must lie strictly beneath that module and outside every child
+module. External trees must lie outside the declaring module's `src/`;
+owned-ignored trees may lie within owned source, including `src/tests/`.
+
+```ramify
+ramify 1
+root module shop
+
+owned-ignored "examples/demo"
+external "tool-cache"
+```
+
+Resolve the decoded directory string relative to the declaring module. It
+must be relative, use `/` separators, and contain no backslash or empty path
+segment, so a leading or terminal `/` is invalid. Normalize `.` and `..`
+segments before containment checks; the result must remain strictly beneath
+the declaring module's directory. Absolute and drive-qualified paths, URLs
+and globs are unsupported.
+
+Validation does not traverse symbolic links. A declared directory, or any
+directory between it and its declaring module, that is a symbolic link makes
+the declaration invalid. An `owned-ignored` directory must exist as a real
+directory. An `external` directory may be absent; when present it must be a
+real directory.
+
+Any two nested-tree declarations whose resolved directories are equal, or one
+of which lies beneath the other, are invalid, whatever their kinds or
+declaring modules. At most one declaration therefore contains any path, and
+no precedence rule exists between declarations. A declaration whose directory
+is an always-excluded path or lies beneath one is invalid; a declared tree may
+contain always-excluded paths.
 
 Do not descend into either kind. Owned-ignored contents retain their owner but
-are never inventoried, compiled by Ramify, checked or watched. External contents
+are never inventoried, compiled by Ramify or checked, and a change beneath them
+never affects a result. The [daemon architecture](../architecture/daemon.md)
+states from when a resident watcher registers nothing beneath them. External contents
 have no owner in this evaluation. Plain data needs no declaration. A project
 within an owned-ignored tree is data to the enclosing evaluation and a separate
-project when selected as its own root.
+project when selected as its own root. A project within a declared tree of
+either kind carries the root marker in its own root description, which the
+enclosing evaluation does not interpret.
 
 Warn about compiler-selected source within an owned-ignored tree. A declaration
 does not prevent another runner or tool from executing the tree's contents;
 that limitation is a convention, not a Ramify guarantee. Imports into declared
 nested trees follow the source-interpretation boundary rule.
 
-The declarations extend version 1 beside exposure statements. Their exact
-tokens and grammar are not yet specified; implementations must not invent
-syntax from the kind names alone. Complete the grammar in this specification
-before implementing or claiming syntax validation for these declarations.
+The declarations extend version 1 beside exposure statements without changing
+the format version. Their syntax is the `nested-tree-line` of the
+[version 1 grammar](#specified-version-1-exposure-grammar).
 
 ### Always-Excluded Paths Do Not Enter Analysis
 
@@ -347,9 +416,9 @@ name nor identifier assigns tags or confers importability.
 ### A Description Is Static Architectural Data
 
 A version 1 description contains a version header, one module declaration,
-and zero or more `expose-src`, `expose-test`, or `expose-sub` statements.
-The adopted extension also declares nested trees beside those statements;
-its syntax remains pending.
+which carries the root marker exactly when the module is the project root,
+and zero or more `expose-src`, `expose-test`, `expose-sub`, `owned-ignored`,
+or `external` statements.
 It is parsed as data and never executed.
 There are no expressions, variables, imports, includes, conditional blocks,
 or configuration inheritance.
@@ -387,18 +456,20 @@ Before applying the following grammar, the parser:
 4. Terminates each remaining line with one LF, including a final line that
    originally had no newline.
 
-The EBNF below describes the specified exposure language; the adopted
-nested-tree statement extension is pending syntax definition. Commas outside
+The EBNF below describes the specified exposure, nested-tree and root-marker language. Commas outside
 quotes mean concatenation, `|` means alternatives, `{ ... }` means zero or more repetitions,
 and `[ ... ]` means optional. Quoted text denotes a literal token. The special
 terminals `BARE-NAME`, `BARE-MODULE-NAME`, `STRING`, `SPACE`, `TAB`, and `LF`
 are defined immediately below the grammar.
 
 ```ebnf
-document       = version-line, module-line, { exposure-line } ;
+document       = version-line, module-line,
+                 { exposure-line | nested-tree-line } ;
 version-line   = "ramify", hws, "1", LF ;
-module-line    = "module", hws, module-name, [ hws, tag-clause ], LF ;
+module-line    = [ "root", hws ], "module", hws, module-name,
+                 [ hws, tag-clause ], LF ;
 exposure-line  = source-line | test-line | sub-line ;
+nested-tree-line = ( "owned-ignored" | "external" ), hws, STRING, LF ;
 source-line    = "expose-src", hws, whole-selection, source-tail ;
 test-line      = "expose-test", hws, selection-list, source-tail ;
 source-tail    = hws, "from", hws, STRING,
@@ -416,7 +487,8 @@ name           = BARE-NAME | STRING ;
 module-name    = BARE-MODULE-NAME | STRING ;
 tag-clause     = "tagged", hws, "[", ows, [ tag-list ], ows, "]" ;
 tag-list       = tag, { ows, ",", ows, tag } ;
-tag            = "testing" | "browser" | "ui" | BARE-MODULE-NAME ;
+tag            = "testing" | "browser" | "ui" | "owned-ignored" | "external"
+               | "root" | BARE-MODULE-NAME ;
 destination-list = destination, { ows, ",", ows, destination } ;
 destination    = "parent" | "descendants" ;
 
@@ -425,15 +497,16 @@ ows            = { SPACE | TAB } ;
 ```
 
 - The reserved keywords are exactly `ramify`, `module`, `expose-src`,
-  `expose-test`, `expose-sub`, `from`, `as`, `tagged`, `to`, `parent`,
-  `descendants`, `testing`, `browser`, and `ui`. They are reserved in every name
-  position: a source export, child-exposed name, alias, module declaration, or child reference equal to
-  one of these keywords must be double-quoted.
+  `expose-test`, `expose-sub`, `owned-ignored`, `external`, `root`, `from`,
+  `as`, `tagged`, `to`, `parent`, `descendants`, `testing`, `browser`, and `ui`.
+  They are reserved in every name position: a source export, child-exposed
+  name, alias, module declaration, or child reference equal to one of these
+  keywords must be double-quoted.
 - An unquoted word is a maximal run of ASCII letters, digits, `_`, `$`, or `-`.
   Match the whole word before classifying it: an exact keyword match is always
   a keyword and cannot be parsed as a bare name, regardless of position.
-  Keyword prefixes do not reserve a word: `fromValue` and `testing-tools` are
-  not keywords. Matching is case-sensitive, so `From` is not a keyword either.
+  Keyword prefixes do not reserve a word: `fromValue`, `testing-tools` and
+  `root-tools` are not keywords. Matching is case-sensitive, so `From` is not a keyword either.
 - `BARE-NAME` is a complete unquoted word matching
   `[A-Za-z_$][A-Za-z0-9_$]*`, excluding the reserved keywords.
   `BARE-MODULE-NAME` is a complete unquoted word matching
@@ -459,12 +532,14 @@ ows            = { SPACE | TAB } ;
 
 Tag names use the lower-case, hyphen-separated spelling of `BARE-MODULE-NAME`,
 with `testing`, `browser`, and `ui` also accepted despite their legacy keyword
-status. Every use must resolve in the evaluation's registry. Thus `dispatch`
+status, and `owned-ignored`, `external` and `root` despite their keyword status. Every
+use must resolve in the evaluation's registry. Thus `dispatch`
 and registered project tags are valid without adding grammar keywords;
 registering a tag does not reserve its name in export or module-name positions.
 Registering tags does not extend the fixed keyword list. Quoted tags and unknown tag names
-are errors. The three explicit alternatives in `tag` preserve existing lexical
-syntax; they do not give these names extra matching or propagation semantics.
+are errors. The six explicit alternatives in `tag` preserve lexical syntax;
+they do not give these names extra matching or propagation semantics. A
+nested-tree statement and the root marker define no tag.
 
 For example, this module and its selected and exposed names all require quotes:
 
@@ -493,6 +568,23 @@ testing module may use `module tests tagged [testing]`.
 Semicolons, implicit sources, JSON objects, and unknown clauses are invalid.
 A quoted export name `"*"`, if one exists, names that exact export; it is
 never a wildcard.
+
+An `owned-ignored` or `external` statement consists of its keyword and one
+quoted directory. It accepts no tag clause, selection, alias, `from`, `to`,
+destination, or other clause, and an unquoted or empty directory is invalid.
+Nested-tree statements may appear before, between, or after exposure
+statements; like exposure statements, their order has no semantic effect.
+
+The root marker is the bare keyword `root` immediately before `module` on the
+module line, separated from it by horizontal whitespace. It occurs nowhere
+else: `root` on its own line, before any statement other than the module
+header, or after `module` on the module line is malformed syntax. A
+description carries the marker exactly when its module line begins with
+`root`. The marker declares the module the root of its own
+project; it adds no exposure, tag, classification or ownership, and it does
+not change the module's name or identifier. The format version stays 1, so a
+description written before the marker existed parses unchanged and remains
+valid as a non-root module.
 
 ### Exposure Statements Name Symbols And Destinations
 
@@ -917,9 +1009,11 @@ application model from descriptions containing them:
 | An unquoted reserved keyword used as a name | Keywords cannot identify exports, aliases, modules, or children without quoting |
 | Invalid module name or duplicate sibling name | Module identity is ambiguous |
 | Missing root description or an invalid nested description | The ownership tree cannot be accepted |
+| A selected root description without the root marker | The root is not declared; the diagnostic says to add the marker |
+| A description carrying the root marker, other than the selected root's, outside every declared nested tree | Another project's root inside the evaluated tree must lie within a declared nested tree |
 | An interpreted module declared inside `src/` (including tests or interfaces), at a reserved container root, or outside its parent's `subs/` | The required module layout is violated |
 | An exposure selecting an original defined in auxiliary source | Auxiliary originals cannot be exposed, including through forwarding aliases |
-| A nested-tree declaration outside its owner's contents, an external tree beneath `src/`, or a missing owned-ignored directory | The declared boundary is invalid |
+| A nested-tree declaration outside its owner's contents, equal to its module directory, inside a child module, at or beneath an always-excluded path, traversing a symlink, or with a malformed directory path; an external tree beneath `src/`; a missing owned-ignored directory or a declared path that exists but is not a real directory; two declarations whose directories are equal or nested | The declared boundary is invalid |
 | Missing source path, excluded target, symlink traversal, escape from the statement's `src/` or `src/tests/` root, or a non-file target | The source reference has no valid application target |
 | A source file owned by another module or a foreign forwarding export claimed as owned | Source references cannot transfer ownership |
 | An `expose-sub` name that is not a declared direct child | The reference does not identify a permitted provider |
@@ -1007,9 +1101,19 @@ diagnostics for TypeScript source forms separately from the `module.ramify`
 parser. Analysis limits in a completed source check are nonblocking by default;
 invalid descriptions or registries still fail model validation.
 
-The adopted whole-tree ownership, auxiliary-source and nested-tree rules are
-not yet implemented. Specification adoption does not establish parser or
-checker support; the nested-tree syntax must be specified before implementation.
+Discovery implements the nested-tree declarations, their validation and the
+pruning of declared trees and module scratch directories. Acquisition warns
+about compiler-selected source in an owned-ignored tree or a module scratch
+directory, never inventories or reads it and never makes it a compiler root.
+Auxiliary source is inventoried and analyzed under its owner's ordinary
+classification. Linking reports an exposure that selects an auxiliary original
+as the located `auxiliary-original-exposure` error. Analysis reports an import
+into a declared tree without package resolution as the definite
+`project-boundary-import` finding; the rest of whole-tree ownership is not yet
+implemented. The root marker, specified on 2026-10-03, is parsed, selects the
+root and is enforced in discovery; a marked description inside a declared
+nested tree is never read.
+Specification adoption does not establish parser or checker support.
 
 Tooling must identify the version 1 features it implements and report missing
 required analysis explicitly.

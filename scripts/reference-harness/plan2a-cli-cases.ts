@@ -8,7 +8,7 @@ import type { CliEnvironment } from '../../subs/cli/src/interfaces/cli.js';
 import type { ServiceConnection, ServiceConnector } from '../../subs/daemon/src/interfaces/daemon.js';
 import { assertResidentTrace, readTrace, withSequenceProcess } from './equivalence-process.js';
 import { sessionModulePattern } from './plan5-completion-cases.js';
-import { writeMaterializeFixture } from './plan2a-materialize-fixture.js';
+import { writeMaterializeFixture } from '../measurements/plan2a-materialize-fixture.js';
 import { repositoryRoot } from './plan.js';
 import type { InstanceHandler } from './runner.js';
 
@@ -137,7 +137,7 @@ export const plan2aCliHandlers: ReadonlyMap<string, InstanceHandler> = new Map<s
       const result = await invoke(['materialize', '--all'], wrapped);
       a.equal('one expired generation reopens through the existing recovery and still completes', [result.code, materializeCalls, closeContextCalls], [0, 2, 2]);
       const stopped: ServiceConnector = async () => ({ status: 'stopped', record: { schemaVersion: 'ramify.daemon-record/1',
-        instanceId: 'x', pid: 1, buildKey: '0000000000000000', version: '0.0.0', engine: 'test', protocol: 'ramify.ipc/1',
+        instanceId: 'x', pid: 1, buildKey: '0000000000000000', version: '0.0.0', engine: 'test', protocol: 'ramify.ipc/2',
         socket: '/quick', startedAt: 0, state: 'stopped', stopped: { at: 0, reason: 'explicit', requestId: null } } });
       const stoppedResult = await invoke(['materialize', '--all'], stopped);
       a.equal('a stopped peer never triggers batch fallback', stoppedResult.code, 2);
@@ -198,7 +198,7 @@ export const plan2aCliHandlers: ReadonlyMap<string, InstanceHandler> = new Map<s
       await writeMaterializeFixture(root);
       await withSequenceProcess(async processes => {
         const status = await processes.status();
-        a.equal('the installed launcher starts the daemon on demand', status.schemaVersion, 'ramify.daemon-status/1');
+        a.equal('the installed launcher starts the daemon on demand', status.schemaVersion, 'ramify.daemon-status/2');
         const before = (await readTrace(processes.traceFile)).length;
         const outcome = await processes.run(root, ['materialize', '--all']);
         // 3 targets, not 4: the fixture's root module owns no `src/` (a pure

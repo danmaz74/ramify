@@ -10,7 +10,7 @@ async function fixture(run: (root: string, inputs: AnalysisInputs) => Promise<vo
   const root = await mkdtemp(join(tmpdir(), 'ramify-validation-'));
   try {
     await mkdir(join(root, 'src/interfaces'), { recursive: true });
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\nexpose-src * from "interfaces/api.ts" to descendants\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\nexpose-src * from "interfaces/api.ts" to descendants\n');
     await writeFile(join(root, 'package.json'), '{"type":"module"}\n');
     await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext',
       moduleResolution: 'bundler', types: [], skipLibCheck: true }, include: ['src'] }));
@@ -44,7 +44,7 @@ describe('real project validation library', () => {
   }), 30_000);
 
   it('retains parsed locations and blocks catalog/link output for malformed declarations', async () => fixture(async (root, inputs) => {
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\nexpose-test * from "api.ts" to parent\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\nexpose-test * from "api.ts" to parent\n');
     const result = await validateProject(inputs);
     expect(result).toMatchObject({ status: 'invalid', diagnostics: expect.arrayContaining([expect.objectContaining({
       code: 'invalid-selection', location: expect.objectContaining({ file: 'module.ramify', line: 3 }),
@@ -54,7 +54,7 @@ describe('real project validation library', () => {
   }));
 
   it('does not fabricate missing exports in named selections', async () => fixture(async (root, inputs) => {
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\nexpose-src Absent from "interfaces/api.ts" to parent\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\nexpose-src Absent from "interfaces/api.ts" to parent\n');
     expect(await validateProject(inputs)).toMatchObject({ status: 'invalid', diagnostics: [{ code: 'missing-export',
       location: expect.objectContaining({ file: 'module.ramify', line: 3, column: 12 }) }] });
   }), 15_000);
@@ -86,7 +86,7 @@ describe('real project validation library', () => {
   }));
 
   it('rejects unknown header tags before catalog acquisition', async () => fixture(async (root, inputs) => {
-    await writeFile(join(root, 'module.ramify'), 'ramify 1\nmodule fixture tagged [unknown]\n');
+    await writeFile(join(root, 'module.ramify'), 'ramify 1\nroot module fixture tagged [unknown]\n');
     expect(await validateProject(inputs)).toMatchObject({ status: 'invalid', diagnostics: [{ code: 'unknown-tag', location: expect.objectContaining({ line: 2 }) }] });
   }));
 

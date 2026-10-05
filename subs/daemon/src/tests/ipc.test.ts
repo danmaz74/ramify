@@ -278,7 +278,7 @@ import { createMeasureDriver } from './measure-driver.js';
         resourceFiles: 0, resourceBytes: 0 }, tests: { sourceFiles: 0, sourceBytes: 0, resourceFiles: 0, resourceBytes: 0 },
       documentation: { files: 0, bytes: 0 } };
       return createMeasureDriver({ modules: [{ id: 'example', dir: '', parent: null, exact: bucket, subtree: bucket }],
-        files, outsideModuleFiles: ['outside/外-"quote"-\\slash.ts'] });
+        files });
     };
     const run = async (maximum: number) => {
       const fixture = await ipcFixture({ maxResponseBytes: maximum }, true, driver());
@@ -317,7 +317,7 @@ import { createMeasureDriver } from './measure-driver.js';
         resourceFiles: 0, resourceBytes: 0 }, tests: { sourceFiles: 0, sourceBytes: 0, resourceFiles: 0, resourceBytes: 0 },
       documentation: { files: 0, bytes: 0 } };
       const driver = createMeasureDriver({ modules: [{ id: 'example', dir: '', parent: null, exact: bucket, subtree: bucket }],
-        files, outsideModuleFiles: [] }, false, { apiView: projectionReady });
+        files }, false, { apiView: projectionReady });
       const fixture = await ipcFixture({}, true, driver);
       const client = await fixture.connect();
       const opened = await client.openContext(fixture.params);
@@ -368,12 +368,13 @@ import { createMeasureDriver } from './measure-driver.js';
       if (!socket.ok || socket.value.status !== 'answered' || !direct.ok || direct.value.status !== 'answered') {
         throw new Error(JSON.stringify([socket, direct]));
       }
-      // The one-module fixture: the seed module changed, nothing depends on it, and the unowned
-      // manifest path widens the test selection to every module.
+      // The one-module fixture: the seed module changed and nothing depends on it. The root owns
+      // the manifest by containment, so the path seeds the root and nothing widens.
       const root = { id: 'example', directory: '.' };
-      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/1',
-        paths: [{ path: 'package.json', module: null, basis: 'none' }, { path: 'src/index.ts', module: 'example', basis: 'inventory' }],
-        changedModules: [root], affectedModules: [], testModules: [root], selection: 'all-modules', widening: ['unowned-path'],
+      expect(socket.value.result).toMatchObject({ schemaVersion: 'ramify.affected/2',
+        paths: [{ path: 'package.json', status: 'owned', module: 'example', basis: 'containment', exclusion: null },
+          { path: 'src/index.ts', status: 'owned', module: 'example', basis: 'inventory', exclusion: null }],
+        changedModules: [root], affectedModules: [], testModules: [root], selection: 'dependency-closure', widening: [],
         analysisCheck: 'passed' });
       expect(socket.value.revision).toEqual(direct.value.revision);
       expect(socket.value.result).toEqual(direct.value.result);
@@ -437,12 +438,12 @@ import { createMeasureDriver } from './measure-driver.js';
   it('A7-08:disconnect during the request aborts the session query, releases the lease and leaves the daemon usable', async () => {
     const signals: AbortSignal[] = [];
     let blocking = true;
-    const driver = createMeasureDriver({ modules: [], files: [], outsideModuleFiles: [] }, false, {
+    const driver = createMeasureDriver({ modules: [], files: [] }, false, {
       affected: async (query, control) => {
-        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/1',
+        if (!blocking) return { status: 'answered', sequence: query.sequence, result: { schemaVersion: 'ramify.affected/2',
           inputId: 'input/1:scripted', paths: [], changedModules: [], affectedModules: [], testModules: [], selection: 'dependency-closure',
           widening: [], scope: { root: '/fixture', selection: 'given', invokedFrom: '/fixture', configuration: 'tsconfig.json',
-            walkedAreas: [], independentScopes: [] }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
+            walkedAreas: [], ownership: { modules: [], exclusions: [] } }, coverage: { status: 'complete', notes: [] }, analysisCheck: 'passed' } };
         signals.push(control!.signal!);
         return new Promise(resolve => control!.signal!.addEventListener('abort', () => resolve({ status: 'cancelled' }), { once: true }));
       },

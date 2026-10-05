@@ -14,8 +14,16 @@ vi.mock('../report-copy.js', async importOriginal => {
 });
 
 const tools = 'tools/outside.ts';
-/** Findings, an outside-source warning and coverage notes, so every list a revision keeps is non-empty. */
+/**
+ * Findings, a project warning and coverage notes, so every list a revision
+ * keeps is non-empty. Since iteration 8C a loose root file would be root
+ * auxiliary source, so `tools` is an owned-ignored tree: its selected file
+ * warns, and the import of it is a nested-tree target, which since
+ * project-boundary iteration 11 is a definite boundary denial without a
+ * coverage note; the non-literal dynamic import keeps coverage non-empty.
+ */
 const evidence: Record<string, string> = {
+  'module.ramify': `${fixtureFiles['module.ramify']}owned-ignored "tools"\n`,
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler',
     types: [], skipLibCheck: true }, include: ['src', 'subs', 'tools'] }),
   [tools]: 'export const outside = 1;\n',
@@ -63,8 +71,9 @@ describe('hook publication builds only what a revision keeps', () => {
       expect([open.patches, open.builds, open.bounds, open.copies]).toEqual([0, 0, 0, 0]);
       expect(revision.outcome).toEqual({ execution: 'completed', check: 'failed', coverage: 'partial' });
       expect([revision.diagnostics.length, revision.warnings.length, revision.coverage.length].every(count => count > 0)).toBe(true);
-      expect(revision.summary).toMatchObject({ owners: 4, originals: 5, accesses: 7, allowed: 4, denied: 1, errors: 1,
-        warnings: 1, coverageNotes: 2 });
+      // Denials: the unexposed privateValue and the boundary import of tools/outside.ts.
+      expect(revision.summary).toMatchObject({ owners: 4, originals: 5, accesses: 7, allowed: 4, denied: 2, errors: 2,
+        warnings: 1, coverageNotes: 1 });
       const opening = await expectFullFields(handle, state, revision);
       expect(opening.snapshot?.accesses).toHaveLength(revision.summary.accesses);
 
@@ -87,7 +96,8 @@ describe('hook publication builds only what a revision keeps', () => {
         await expectFullFields(handle, state, update.result);
         previous = update.result;
       }
-      expect(previous.summary.denied).toBe(2);
+      // The source step's added privateValue denial stays through recovery.
+      expect(previous.summary.denied).toBe(3);
       await audited(handle);
       await equalToBatch(handle, inputs);
     } finally { await handle.dispose(); }

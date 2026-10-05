@@ -45,18 +45,27 @@ for (const [subcase, fixture] of [['reference-sequence-live', 'R'], ['hundred-ow
             assertLiveStep(fixture, index + 1, previous.report, current.report, a);
             if (index === 0 || index === 1) a.equal(`${label}: one file and no permission work`, current.revision.checked,
               { path: 'unchanged-surface', files: [liveSequencePaths.coreCatalog], accesses: 0, modelRebuilt: false });
-            if (index === 2) a.equal(`${label}: only the new import is decided`, current.revision.checked,
-              { path: 'source', files: [liveSequencePaths.reviewsRouter], accesses: 1, modelRebuilt: false });
+            // A source revision decides each access of a re-interpreted file
+            // whose facts changed by value, location included. Since Plan 8
+            // iteration 7 (ff01212e) R's router imports ProtocolRouter on line
+            // 11, directly below the line 10 anchor, so the inserted import
+            // moves that one access too. S100's router has no access below it.
+            if (index === 2) a.equal(`${label}: only the new import and the accesses it moves are decided`, current.revision.checked,
+              { path: 'source', files: [liveSequencePaths.reviewsRouter], accesses: fixture === 'R' ? 2 : 1, modelRebuilt: false });
             if (index === 9) a.equal(`${label}: metadata performs no compiler or decision work`,
               [current.revision.checked, current.revision.timings.compiler, current.revision.timings.link, current.revision.timings.decide],
               [{ path: 'metadata', files: [], accesses: 0, modelRebuilt: false }, 0, 0, 0]);
             if (index >= 10) a.equal(`${label}: membership takes the membership path`, current.revision.checked.path, 'membership');
-            // A removed unreferenced file is no longer observed by batch. The
-            // exact contract rejects its absent hash, then a retained source
-            // identity rendezvous confirms the removal revision for the project.
+            // A removed unreferenced file is no longer observed by batch. Phase 1
+            // project boundaries, iteration 15: the deletion of a previously analyzed
+            // source is checked once its removal is analyzed, here by the watcher's
+            // publication before the hook, with the revision's verdict; a retained
+            // source identity rendezvous then confirms the removal revision.
             if (index === 11) {
-              const absent = await changed(p, root, a, `${label} absent path`, step.paths, 2);
-              a.equal(`${label}: absent unobserved path is explicit`, absent.reason, 'unobserved-input');
+              const absent = await changed(p, root, a, `${label} absent path`, step.paths, current.report.summary.errors ? 1 : 0);
+              a.equal(`${label}: deleted source is checked by its removal`, [absent.reason, absent.revision?.sequence,
+                absent.paths.map(item => [item.path, item.disposition, item.reason])],
+              [null, current.revision.sequence, step.paths.map(path => [path, 'checked', 'deleted'])]);
             }
             const hook = await changed(p, root, a, `${label} hook`, index === 11 ? [assembly] : step.paths,
               current.report.summary.errors ? 1 : 0, previous.revision.revision);
@@ -103,7 +112,10 @@ reference('hook-race-watcher', async (root, directory, a) => withLiveProcess(roo
     a.ok('a real native watcher event was held', events.some(e => e.event === 'live-native-event' && e.held));
     a.equal('racing hook returns before native event delivery', events.filter(e => e.event === 'live-native-delivered'), []);
     a.equal('racing hook joins exactly one actual update', events.filter(e => e.event === 'live-work' && e.operation === 'update').length, 1);
-    const check = events.find(e => e.event === 'live-check' && e.params?.scope === 'delta');
+    // Phase 1 project boundaries, iteration 15: the delta request carrying the CLI's hash,
+    // after the one that obtains the classification.
+    const check = events.find(e => e.event === 'live-check' && e.params?.scope === 'delta'
+      && e.params.freshness.mode === 'synchronized' && e.params.freshness.expect.length > 0);
     const reply = events.find(e => e.event === 'live-check-result' && e.requestId === check?.params?.requestId);
     a.equal('racing response is verified from the new update', reply?.freshness && [reply.freshness.verified, reply.freshness.reusedRevision], [true, false]);
   } finally { await rm(gate, { force: true }); }
@@ -128,7 +140,8 @@ reference('hook-race-watcher', async (root, directory, a) => withLiveProcess(roo
   const laterEvents = (await liveTrace(p)).slice(laterOffset), after = await status(p);
   a.equal('later hook reuses the covering revision', later.revision?.sequence, settled.contexts[0].published!.sequence);
   a.equal('later hook does no analysis', after.counters.analyses, settled.counters.analyses);
-  const request = laterEvents.find(e => e.event === 'live-check' && e.params?.scope === 'delta');
+  const request = laterEvents.find(e => e.event === 'live-check' && e.params?.scope === 'delta'
+    && e.params.freshness.mode === 'synchronized' && e.params.freshness.expect.length > 0);
   const reply = laterEvents.find(e => e.event === 'live-check-result' && e.requestId === request?.params?.requestId);
   a.equal('later wire response states verified reuse with no capture', reply?.freshness &&
     [reply.freshness.verified, reply.freshness.reusedRevision, reply.freshness.captureStarted], [true, true, null]);
@@ -172,7 +185,7 @@ reference('burst-coalesced', async (root, directory, a) => withLiveProcess(root,
     a.equal('every hook is answered from one of the burst revisions',
       documents.map(document => sequences.includes(document.revision?.sequence ?? -1)), paths.map(() => true));
     a.equal('every hook is covered by the revision that answered it',
-      documents.map(document => document.changed.every(identity => identity.covered)), paths.map(() => true));
+      documents.map(document => document.paths.every(item => item.disposition === 'checked')), paths.map(() => true));
     a.equal('the burst revisions together name all five changed files',
       [...new Set(revisions.flatMap(revision => revision.revision.changed))].sort(), [...paths].sort());
     a.equal('burst has no findings or superseded hook', documents.map(document => [document.reason, document.findings]), paths.map(() => [null, []]));

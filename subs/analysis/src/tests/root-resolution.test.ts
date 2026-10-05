@@ -19,7 +19,7 @@ vi.mock('../../subs/project/src/resolve-root.js', async original => {
     const hook = createHook({ init(_id, type) { if (type === 'PROCESSWRAP') resolutions.helpers++; } }).enable();
     try {
       const resolution = await actual.resolveProjectRoot(...args);
-      if (!(args[2] ?? []).includes(resolution)) resolutions.fresh++;
+      if (!(args[3] ?? []).includes(resolution)) resolutions.fresh++;
       return resolution;
     } finally { hook.disable(); }
   } };
@@ -147,9 +147,9 @@ describe('invocation checks reuse the session resolution', () => {
       const created = await counted(() => handle.update([], {}, invocation));
       expect(created.resolutions).toBe(0);
       expect(created.result).toMatchObject({ status: 'revised' });
-      // A description in `src/` is the nearest boundary of this working directory:
+      // A marked description in `src/` is the nearest root of this working directory (R7):
       // the invocation now resolves to an independent root, not the session's.
-      await put(root, 'subs/branch/src/module.ramify', 'ramify 1\nmodule moved\n');
+      await put(root, 'subs/branch/src/module.ramify', 'ramify 1\nroot module moved\n');
       const moved = await counted(() => handle.update([], {}, invocation));
       expect(moved.resolutions).toBe(1);
       // The engine's failure projection reports an invocation refusal as an internal error with its message.

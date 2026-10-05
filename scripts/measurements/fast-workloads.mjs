@@ -7,6 +7,7 @@ import { companionEditKinds, editKindsFor, fastBudgets, fixtureForId } from './f
 import { command, sampleMetrics, unwrap } from './resident-driver.mjs';
 import { executeResidentWorkload } from './resident-workloads.mjs';
 import { sha256 } from './common.mjs';
+import { retainedLimitReset } from './fast-assertions.mjs';
 
 function settledSample(value) {
   const sample = sampleMetrics(value);
@@ -16,6 +17,41 @@ function settledSample(value) {
     published: context.published && { sequence: context.published.sequence, fingerprints: context.published.fingerprints },
     lastValid: context.lastValid && { sequence: context.lastValid.sequence, fingerprints: context.lastValid.fingerprints },
   })) };
+}
+
+const maintenance = counters => counters.sweeps + counters.audits;
+
+/**
+ * Why a save leaves the daemon unable to publish: its hook answered
+ * `unavailable` (as when the session worker exits), or an analysis ran and
+ * settled without publishing a new revision. Null for a save that published.
+ */
+export function analysisStop(cycle, before, current) {
+  const document = cycle.hook?.document;
+  if (document?.outcome === 'not-checked' && document.reason === 'unavailable') return 'unavailable';
+  const b = cycle.countersBeforeSave, s = cycle.settled?.counters;
+  const analyses = b && s ? s.analyses - b.analyses - (maintenance(s) - maintenance(b)) : 0;
+  return current?.published?.sequence === before?.published?.sequence && analyses > 0 ? 'no-revision' : null;
+}
+
+/**
+ * The measured failure point of a stopped workload: the save, the hook's
+ * answer, and the context's retained bytes before the history reset and the
+ * retry's duration as the daemon telemetry shows them.
+ */
+export function failurePoint(cycle, telemetry, trigger, before = null) {
+  const hook = cycle.hook, document = hook?.document;
+  const phase = cycle.position === 'published' ? 'watcher already published' : cycle.kind;
+  const finding = document?.findings?.find(item => item.category === 'unavailable') ?? document?.findings?.[0] ?? null;
+  const returnedAt = cycle.hookStartedAt + (hook?.durationMs ?? 0);
+  return { phase, kind: cycle.kind, position: cycle.position, cycle: cycle.index + 1, trigger,
+    beforeSequence: cycle.beforeSequence, publishedSequence: cycle.revision?.sequence ?? null,
+    hook: { code: hook?.code ?? null, durationMs: hook?.durationMs ?? null, outcome: document?.outcome ?? null,
+      reason: document?.reason ?? null, execution: document?.execution ?? null },
+    message: finding?.message ?? null,
+    contextBefore: before && { retainedBytes: before.retainedBytes ?? null, historyRetained: before.history?.retained ?? null },
+    retainedLimit: retainedLimitReset(telemetry, cycle.revision?.token, cycle.beforeSequence, cycle.writtenAt,
+      Number.isFinite(returnedAt) ? returnedAt : Date.now()) };
 }
 
 export async function executeFastWorkload(id, options, measurements, checkpoint) {
@@ -62,10 +98,26 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
     const current = await host.context(token);
     const revision = current.published;
     const mark = host.observer.mark();
-    return { kind, index, position, expected, writtenAt, hookStartedAt,
+    const cycle = { kind, index, position, expected, writtenAt, hookStartedAt,
       beforeSequence: before.published.sequence, countersBeforeSave,
       beforeHook: beforeHook && compactStatus(beforeHook), afterHook: afterHook && compactStatus(afterHook), hook, revision, settled,
       settledProcessSample: host.observer.samples[mark] };
+    const trigger = analysisStop(cycle, before, current);
+    if (trigger) Object.defineProperty(cycle, 'stop', { value: failurePoint(cycle, host.telemetry, trigger, before), enumerable: false });
+    return cycle;
+  }
+  /**
+   * Keeps a save in its row, then stops the workload at once when the daemon can
+   * no longer publish: every later save would only wait out its guard.
+   */
+  function keep(target, list, cycle) {
+    list.push(cycle);
+    if (!cycle.stop) return;
+    target.failurePoint = cycle.stop;
+    const { phase, position, cycle: number, trigger, message, hook } = cycle.stop;
+    throw new Error(`Stopped at ${phase} ${number} (${position}): the hook answered ${hook.outcome ?? 'nothing'}`
+      + `${hook.reason ? ` (${hook.reason})` : ''} after ${Math.round(hook.durationMs ?? 0)} ms`
+      + `${message ? `: ${message}` : ''}${trigger === 'no-revision' ? '; the analysis settled without a new revision' : ''}`);
   }
   async function captureHost(host, destination) {
     try { await host.close(); }
@@ -96,13 +148,13 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
       for (const kind of ['body', 'source', 'description', 'readme', 'configuration']) {
         const cycles = measurements.cycles[kind] = [];
         for (let index = 0; index < fastBudgets.editCycles; index++) {
-          cycles.push(await save(host, project, token, kind, index)); checkpoint(kind, index + 1, 20);
+          keep(measurements, cycles, await save(host, project, token, kind, index)); checkpoint(kind, index + 1, 20);
         }
       }
       measurements.cycles.created = []; measurements.cycles.deleted = [];
       for (let index = 0; index < fastBudgets.editCycles; index++) {
-        measurements.cycles.deleted.push(await save(host, project, token, 'deleted', index));
-        measurements.cycles.created.push(await save(host, project, token, 'created', index));
+        keep(measurements, measurements.cycles.deleted, await save(host, project, token, 'deleted', index));
+        keep(measurements, measurements.cycles.created, await save(host, project, token, 'created', index));
         checkpoint('deleted/created pairs', index + 1, 20);
       }
       // Plan 8's two edit classes follow every Plan 5 racing class, so those keep their order;
@@ -110,11 +162,11 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
       for (const kind of companionEditKinds.filter(kind => editKindsFor(name).includes(kind))) {
         const cycles = measurements.cycles[kind] = [];
         for (let index = 0; index < fastBudgets.editCycles; index++) {
-          cycles.push(await save(host, project, token, kind, index)); checkpoint(kind, index + 1, 20);
+          keep(measurements, cycles, await save(host, project, token, kind, index)); checkpoint(kind, index + 1, 20);
         }
       }
       for (let index = 0; index < fastBudgets.editCycles; index++) {
-        measurements.published.push(await save(host, project, token, 'body', index, 'published'));
+        keep(measurements, measurements.published, await save(host, project, token, 'body', index, 'published'));
         checkpoint('watcher already published', index + 1, 20);
       }
       measurements.cloneProbe = await host.cloneProbe();
@@ -127,7 +179,7 @@ export async function executeFastWorkload(id, options, measurements, checkpoint)
       try {
         const { token } = await start(host, project, destination);
         for (let index = 0; index < fastBudgets.repeatedCycles; index++) {
-          destination.cycles.push(await save(host, project, token, 'body', index));
+          keep(destination, destination.cycles, await save(host, project, token, 'body', index));
           checkpoint(`${name}: alternating edit/revert`, index + 1, fastBudgets.repeatedCycles);
         }
       } finally { await captureHost(host, destination); }

@@ -20,7 +20,7 @@ export interface ExpandedSelection {
 export interface LinkIssue {
   readonly code: 'missing-file' | 'missing-export' | 'foreign-original'
     | 'incomplete-expansion' | 'ambiguous-expansion' | 'invalid-wildcard-target'
-    | 'unknown-child' | 'name-collision' | 'unknown-tag'
+    | 'unknown-child' | 'name-collision' | 'auxiliary-original-exposure' | 'unknown-tag'
     | 'missing-required-tag' | 'conflicting-tags' | 'invalid-prerequisite';
   readonly message: string;
   readonly locations: readonly SourceLocation[];

@@ -1,14 +1,15 @@
-# Phase 1 contract proposal
+# Phase 1 contracts
 
-**Status:** proposed for the user's review. These are implementation contracts,
-not claims of support. The user accepts or revises R1–R6 before iteration 1;
-iteration 1 records that revision and puts the precise rules in the owning
-specifications before iteration 2 implements them. Names below
-are proposed additions to existing interfaces, not discovered available APIs.
+**Status:** accepted by the user on 2026-10-03 and adopted in the owning
+specifications in iteration 1 (commit `6d0c66f0`); implementation pending.
+R7, the root marker, was decided by the user on 2026-10-03 after iteration 2;
+the coordinator adopts its specification patches before iteration 3A.
+These are implementation contracts, not claims of support. Names below are
+planned additions to existing interfaces, not discovered available APIs.
 
 ## Review decisions
 
-| ID | Proposed decision | Review boundary |
+| ID | Decision | Review boundary |
 | --- | --- | --- |
 | R1 | Two standalone version 1 statements: `owned-ignored "directory"` and `external "directory"`. | Grammar, reserved names, spans, malformed input and statement ordering. |
 | R2 | Reject duplicate normalized directories and overlapping nested-tree declarations; reject symlink traversal, escapes, reserved exclusions and child-module overlap. | Decided 2026-10-03 as the simplest rule: any two declarations whose directories are equal or nested are an error, whatever their kinds, so at most one exclusion ever matches a path and no precedence rule exists. |
@@ -16,22 +17,31 @@ are proposed additions to existing interfaces, not discovered available APIs.
 | R4 | A changed check gives the result the complete check would give on the project after the change. Paths Ramify does not analyze carry a not-analyzed disposition and need no content coverage; they never change the exit code. Exit 2 remains only for a check that could not establish that result. | Hook/API disposition, content freshness and negative controls. |
 | R5 | Decided 2026-10-03: correctness under the new rules comes first, optimization second. No rule is weakened to meet a limit or timing target. Capacity limits remain safety limits and are raised with a recorded measurement if the new rules need it. Earlier timing targets are measured and reported to the user at the end of the plan; missing one does not stop the plan. Inert/excluded contents never become inputs. | [Budgets](budgets.md), observation and cancellation coverage. |
 | R6 | Decided 2026-10-03: the reference harness stays at `scripts/reference-harness/` as an owned-ignored tree of the root, with its compiler configuration, runner and commands unchanged; analyzed toolkit code no longer imports from it. Site consumes packed toolkit exports. | No analyzed importer of the tree, package/build graph and preserved test inventory. |
+| R7 | Decided 2026-10-03: a project root declares itself with `root` before `module` on its module line, in format version 1, so existing root descriptions are invalid until migrated. Without `--root`, selection takes the nearest description at or above the working directory carrying the marker; unmarked descriptions never stop the climb, and no marked description means exit 2. `--root` must name a marked description. A marked description inside a declared tree is a separate project and is not interpreted; one elsewhere in the evaluated tree is a layout error; a selected root without the marker is an error whose message says to add it. | Grammar and reserved keyword, climb and resolution reuse, discovery validity, and migration of every toolkit root, generator and fixture before enforcement. See [root marker](#root-marker). |
 
-R2, R4 and R6 carry the user's decisions of 2026-10-03, and the user accepted
-R1 and R3 as drafted and decided R5 on the same day; no entry is an open question. For R3 the
-user confirmed that the path and the current declarations alone decide
-ownership, and that no backwards compatibility is kept: the version numbers
-change only so that an outdated reader fails clearly. R4 follows the user's decision of 2026-10-03: the changed check is the quick
-form of the complete check and, wherever it answers, gives exactly the result
-the complete check would give on the project after the change. It differs
-only in analyzing the change against the retained baseline. The rule is stated
-in the [CLI invocation specification](../../architecture/cli-invocation.spec.md#hook-and-complete-checks),
-added at the user's request; the not-analyzed dispositions below are the part
-iteration 1 still has to adopt there.
+The user accepted all six entries on 2026-10-03: R2, R4, R5 and R6 as decided
+in their rows, and R1 and R3 as drafted. The user decided R7 later the same
+day; it resolves the plan's former open question on root selection inside an
+owned-ignored tree beneath `subs/`, and needs no principles edit, since the
+importability principles already require an explicit application root. For R3 the user confirmed that the path
+and the current declarations alone decide ownership, and that no backwards
+compatibility is kept: the version numbers change only so that an outdated
+reader fails clearly. Under R4 the changed check is the quick form of the
+complete check and, wherever it answers, gives exactly the result the complete
+check would give on the project after the change. It differs only in analyzing
+the change against the retained baseline. The rule and the per-path
+dispositions below are stated in the
+[CLI invocation specification](../../architecture/cli-invocation.spec.md#hook-and-complete-checks).
 
-The review receipt resolves all six entries to accepted concrete wording or a
-revised contract package. Adoption, implementation and acceptance are separate
-statuses. Changes to an accepted interface invalidate affected downstream receipts.
+Iteration 1 adopted the accepted wording in the owning specifications (commit
+`6d0c66f0`) and recorded the review receipt in
+[its results](iterations/iteration1-results.md). R7's exact patches to the
+module description and CLI invocation specifications, the glossary and the
+proposal are adopted by the coordinator under the
+[protected-document procedure](execution.md#protected-principles-and-specifications)
+before iteration 3A, and the receipt is recorded with that iteration's
+handoff. Runtime support and acceptance remain with the producing slices. Changes to an accepted interface invalidate
+affected downstream receipts.
 
 ## Description language and validation
 
@@ -67,10 +77,84 @@ An owned-ignored target must be an existing real directory. An external target
 may be absent; an existing target must be a real directory.
 
 Planned Project issue codes are `invalid-nested-tree`, `missing-owned-ignored`,
-`overlapping-nested-tree` and `undeclared-project-boundary`, retaining located
-declaration evidence. A malformed statement is a description error. An invalid
+`overlapping-nested-tree`, `undeclared-project-boundary` and, for R7,
+`unmarked-root-description`, retaining located declaration evidence.
+Iteration 3B introduces `undeclared-project-boundary` for marked descriptions;
+iteration 8 extends it to package manifests. A malformed statement is a description error. An invalid
 boundary makes acquisition invalid; never attribute hidden contents to the
 parent and continue with a valid partial model.
+
+## Root marker
+
+R7 extends the module line without changing the format version:
+
+```ebnf
+module-line = [ "root", hws ], "module", hws, module-name,
+              [ hws, tag-clause ], LF ;
+```
+
+`root` joins the reserved keywords as `owned-ignored` and `external` did. In
+every name position it must be double-quoted, as in `module "root"`. In tag
+position it remains a valid lowercase tag name resolved only through the
+registry, like the other special tag tokens; the marker defines no tag. A
+`root` keyword anywhere other than immediately before the header's `module`
+keyword is malformed syntax, reported with the existing parser codes; no new
+parser issue code is added. No committed or generated toolkit description
+uses a bare `root` in a name or tag position (verified at `3f435172`;
+`ramify-agent/` included).
+
+`DescriptionDocument.module` gains `root: TextSpan | null`: the span of the
+marker keyword, null when unmarked. The header's existing `span` covers the
+whole module line, beginning at the marker when present. An unmarked document
+remains valid: the parser does not know which description is the root.
+
+**Marker determination.** A description carries the marker when its module
+line begins with `root`. Selection decides this from the module line alone,
+using the Descriptions owner's tokenizer and header rules, supplied to Project
+the way `parse` is supplied today; Project gains no second grammar. A
+description whose module line begins with `root` carries the marker even when
+later lines are invalid, so the climb stops there and acquisition reports
+those errors. A description whose module line cannot be read, because of an
+encoding error before it or a missing or misplaced header, does not carry it.
+
+**Selection.** Without `--root`, selection takes the nearest directory at or
+above the canonical working directory whose `module.ramify` carries the marker,
+reading each description it passes. Unmarked descriptions never stop it. The
+`subs/`-based advance and the missing-parent-description check are removed;
+a child left without its parent description is reported by the selected
+project's discovery as a misplaced description. No marked description at or
+above the working directory remains `root-not-found`: status unavailable,
+exit 2, naming the working directory. When an unmarked description lies at
+or above the working directory, the message also names the nearest one and
+says to add `root` to its module line if it is the project root. `--root` must name a directory whose
+description carries the marker. A description there without it is
+`unmarked-root-description`: status invalid, exit 1 like
+`missing-root-description`, naming that description, with a message that
+says to add `root` before `module`. Symlink rules are unchanged.
+
+A reused resolution's discovery evidence includes the marker determination of
+every description selection read, so a marker change at any of them makes the
+reused resolution stale. A byte edit that leaves every determination unchanged
+does not.
+
+**Acquisition validity.** The root description acquisition parses must carry
+the marker; otherwise acquisition is invalid with `unmarked-root-description`,
+which also covers a change between selection and reading. Every other
+description the walk interprets that carries the marker is
+`undeclared-project-boundary`, category layout, located at the marker, with a
+message naming the nested-tree declaration to add in its nearest enclosing
+module. That directory contributes no module, and its contents are not
+attributed to an enclosing module, as for the existing layout-invalid
+descriptions. Until iteration 8 the walk still skips inferred independent
+scopes, so it does not read a marked description inside one. Iteration 8
+prunes declared trees before descent, so a marked description inside a
+declared tree is never read and is the root of a separate project.
+
+**Migration.** Every existing toolkit root description, and every toolkit
+generator or fixture that writes one, adopts the marker before enforcement;
+child descriptions stay unmarked. Iteration 3A migrates them and iteration 3B
+enforces the rule. `ramify-agent/` and `/ramify-audit` update their own roots,
+fixtures and target projects in their phases.
 
 ## Canonical path ownership and inventory
 
@@ -113,10 +197,11 @@ fact; ordinary ownership does not prove a path was inventoried or checked.
 `InventoryModule` retains its existing source areas and description. Its nested
 trees are obtained by joining the scope's ownership facts; do not keep a second
 independently computed boundary table. `InventoryFile` adds
-`placement: 'src' | 'auxiliary' | 'referenced-resource'`. Auxiliary means owned
-compiler source outside `src/` only, with ordinary classification. A referenced
-resource outside `src/` has an ordinary owner/profile but is not auxiliary code.
-Inventory descriptions, READMEs, compiler source, configuration, required package
+`placement: 'src' | 'auxiliary'`. Auxiliary means owned
+compiler source outside `src/` only, with ordinary classification. Phase 1
+produces no placement for a resource outside `src/`: source importing one keeps
+a nonblocking `resource-target` limit, and bytes the compiler reads stay
+captured inputs. Inventory descriptions, READMEs, compiler source, configuration, required package
 metadata and referenced resources only. Inert docs/data and excluded contents
 are never application inputs, per-file hashes or per-file watch targets.
 Only auxiliary compiler source is newly added by the base inventory walk.
@@ -193,6 +278,14 @@ and `ignored-but-walked`. Warnings remain nonblocking. Source outside `src/`
 is analyzed; no outside-module-source warning survives. Git advice is produced
 by the CLI, not the analysis model or scope fingerprint.
 
+Iteration 8B fixed the open details: a compiler-selection warning is one per
+owned-ignored tree or scratch directory, located at that directory; `files`
+holds at most 20 files in byte order and `count` the total; warnings are
+ordered by path, then code; a compiler-selected file in an external tree
+produces no warning. Until iteration 8C inventories auxiliary source, the
+outside-source warning is carried in this shape under the transitional code
+`outside-module-source`.
+
 Affected answers keep module seeds and the reverse-import dependency graph.
 Extend path bases with `containment` and `excluded`. Every path seed includes
 `status: 'owned' | 'excluded' | 'outside-project'` and `exclusion`, nullable.
@@ -254,9 +347,10 @@ shown as passing source checks.
 Upgrade `ramify.analysis`, `ramify.affected`, `ramify.affected-cli`,
 `ramify.check`, `ramify.watch`, `ramify.daemon-status`, architect projection/view/
 module schemas to version 2 wherever their existing payload shapes change.
-Use `ramify.ipc/2` for the strict daemon handshake and codec. Record the exact
-schema inventory in iteration 1, including nested worker messages, root service
-types, dependency reports, measurement results and browser DTOs. Unchanged
+Use `ramify.ipc/2` for the strict daemon handshake and codec. Iteration 1
+recorded the schema inventory, including nested worker messages, root service
+types, dependency reports, measurement results and browser DTOs;
+[schema versions](#schema-versions) places each version change. Unchanged
 formats retain their version. Reject mismatched wire peers coherently; no old
 schema decoder is implemented.
 
@@ -285,11 +379,72 @@ uses the owner's ordinary profile and publishes beneath its `src/`; selection
 from an excluded tree is invalid-location. Existing projection budgets and
 transactional publication remain in force.
 
-CLI root climbing remains unchanged: a description outside `subs/` establishes
-its own root, including when invoked within a nested project. Production
-selection still consumes resolved profiles; testing modules and nested testing
-areas are excluded, ordinary analyzed auxiliary inputs are eligible, and inert
-owned files are not production merely because they have an owner.
+CLI root selection follows R7, as [root marker](#root-marker) states:
+iteration 3B implements it in Project for every command that selects a
+project, and iteration 17 demonstrates it through real CLI processes. Production
+selection takes files beneath `src/` whose resolved profile is production;
+auxiliary source, testing modules, nested testing areas and inert files are
+never production.
+
+## Schema versions
+
+A document's schema version advances in the slice that first changes its
+payload shape, so an outdated reader fails rather than misreads (R3). That
+slice changes the identifier and updates every toolkit reader in the same
+candidate: producers, CLI, batch process, daemon, the hook example, measurement
+scripts, toolkit tests and the reference harness's expected values. A document
+changes shape when one of its embedded values without its own schema
+identifier does, such as `ProjectScope` or report warnings. An envelope that
+carries a document with its own identifier, such as an IPC message or a watch
+line carrying an analysis report, advances that document's identifier
+instead; the envelope advances only when its own members change. The IPC
+protocol identifier covers the wire messages and the fields its strict codec
+decodes.
+
+Where an early slice changes a shape that a later slice changes again, the
+version advances once, at the first change, and the later slices extend
+that version, version 2 for all but the modularity report, before the
+phase's handoff. This is an alpha migration: no reader
+exists for the intermediate shapes, and only the final shape is handed off.
+
+| Document | Advances in | First shape change | Later slices extending it |
+| --- | --- | --- | --- |
+| `ramify.analysis/2` | 2 | The report snapshot's parsed descriptions gain the nested-tree statement member | 3 scope `ownership`; 3A the parsed module header's `root` marker span; 3B the `unmarked-root-description` and marked-description `undeclared-project-boundary` layout issues; 4 origin, placement and target vocabulary; 8 `independentScopes` removed, `ProjectWarning`; 11 denied outcome, boundary diagnostics and excluded-target coverage |
+| `ramify.affected/2`, `ramify.affected-cli/2` | 3 | The selection's `scope` gains `ownership` | 8 `independentScopes` removed; 14 bases, seed status, exclusion and topology; 17 CLI output |
+| `ramify.watch/2`, `ramify.daemon-status/2` | 3 | Context status `scope` gains `ownership`; daemon status names `ramify.ipc/2` | 8 `independentScopes` removed; 15–17 check and status fields |
+| `ramify.ipc/2` | 3 | The strict codec's context-status scope gains `ownership` | 8 `independentScopes` removed; 15–16 check request paths, classification sequence and dispositions |
+| `ramify.check/2` | 8 | Embedded warnings become `ProjectWarning` | 11 boundary findings; 15 and 17 path dispositions replace `covered` |
+| `ramify.measure/2` | 8 | `outsideModuleFiles` retires | 18 measurement buckets |
+| `ramify.modularity/3` | 8 | `omittedScopes` lists declared nested trees instead of `independentScopes`; outside occurrences count `outside-project` targets, as the [modularity report specification](../../architecture/modularity-report.spec.md) requires | None |
+| `ramify.architect-module/2`, `ramify.architect-view/2`, `ramify.architect-projection/2` | 18 | Boundary metadata in module records | None |
+| `ramify.api-view`, `ramify.api-view-projection`, `ramify.explorer-*` | 18, only if the shape changes | Not expected | None |
+| `ramify.cli/1`, `ramify.production-files/1`, `ramify.daemon-record/1` and every other identifier | Unchanged | None | None |
+
+The daemon record keeps `ramify.daemon-record/1`; from iteration 3 its
+`protocol` member names `ramify.ipc/2`, which its reader already compares
+exactly. Iteration 4 renames `outside-module` to `outside-project` in
+`SourceTarget`, which extends `ramify.analysis/2`, and in the modularity
+producer's internal target kinds without changing the serialized modularity
+report. Toolkit tests use `ramify.ipc/2` as the incompatible-peer literal;
+iteration 3 replaces it with a literal no build produces. R7's issue codes are
+new values of existing code fields, not new members: a document that carries
+such a code as a string without enumerating it, such as `ramify.check/1` before
+iteration 8 or a `ramify.cli/1` diagnostic, keeps its version, and the human
+report keeps its root and selection lines.
+
+Diagnostic, warning, coverage-note and limit code fields are open sets
+(decided by the user on 2026-10-03): a reader tolerates a code it does not
+know, and a new code is not a shape change. A changed meaning of an existing
+value, or a new value in a closed status field that readers branch on, such as
+an outcome or an execution status, is a shape change and advances the version.
+A DTO exchanged only between a server and a page of the same build is exempt
+from the rule for an embedded value without its own schema identifier: the
+explorer's browser model keeps `ramify.explorer-http/1` unless iteration 18
+changes the HTTP envelope itself.
+
+If a slice finds an
+earlier shape change than this table names, the version advances in that slice
+and the coordinator updates the table.
 
 ## Git advisory warning
 

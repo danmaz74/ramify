@@ -179,13 +179,14 @@ order:
 
 ```json
 {
-  "schema": "ramify.architect-module/1",
+  "schema": "ramify.architect-module/2",
   "module": "ramify/service-api",
   "dir": "subs/service-api",
   "parent": "ramify",
   "children": [],
   "tags": ["dispatch"],
   "areas": ["src", "src/tests"],
+  "boundaries": [],
   "purpose": {
     "state": "present",
     "path": "subs/service-api/README.md",
@@ -230,8 +231,28 @@ order:
   `"cut": true` beside it when cut; the map shows the same text.
 - `docs` lists the module's `src/docs/**` files, project-relative, sorted.
   Their contents are not rendered.
-- `files` counts the inventory's source files, TypeScript and JavaScript, in
-  the module's own areas, and the same for its subtree.
+- `boundaries` lists the owned-ignored and external trees the module's
+  description declares, in byte order by `dir`, one tree per line, and is
+  `[]` when it declares none. Each entry gives the tree's `kind`, its
+  project-relative `dir`, and the declaring statement's project-relative
+  `description` path, `line` and `column`:
+
+  ```json
+  { "kind": "owned-ignored", "dir": "scripts/reference-harness", "description": "module.ramify", "line": 12, "column": 1 }
+  ```
+
+  Nothing beneath a declared tree is analyzed, so no file, symbol or test
+  inside one appears in any record, count or measurement of the view.
+- `files` counts the inventory's source files, TypeScript and JavaScript,
+  that the module owns: those of its source areas and its analyzed auxiliary
+  source, owned compiler source outside every `src/`; and the same for its
+  subtree. `metrics` measures the same inventory. Inert files, scratch
+  directories and declared trees are never counted.
+- An original defined in auxiliary source is recorded like any other, always
+  with role `internal`, since no declaration can expose it; its `file` lies
+  outside `src/`.
+- Version 2 of `ramify.architect-module`, of `ramify.architect-view` and of
+  the session projection `ramify.architect-projection` added `boundaries`.
 - `uses` and `usedBy` count distinct originals per module pair, from the
   dependency facts under the production source filter. Unused imports are
   absent. An `unknown` count is present only when nonzero. Both arrays are
@@ -265,9 +286,9 @@ order:
 - `uses` and `usedBy` entries are ordered by behavioral, then non-behavioral,
   then unknown count, each descending, then by module identifier.
 - The root module has `"dir": ""` and `"parent": null`. A present `purpose`
-  and each nonempty `uses` or `usedBy` span lines as shown, one entry per
-  line; every other array and object is written on one line, with `, `
-  between items and a space inside braces.
+  and each nonempty `boundaries`, `uses` or `usedBy` span lines as shown, one
+  entry per line; every other array and object is written on one line, with
+  `, ` between items and a space inside braces.
 
 ## `behavior.jsonl`
 
@@ -459,7 +480,7 @@ the coverage counts say how much the rule could not decide.
 `_meta.json` is a deterministic single-line JSON document:
 
 ```json
-{"schema":"ramify.architect-view/1","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
+{"schema":"ramify.architect-view/2","revision":"rev/1:…","input":"input/1:…","modules":15,"dependencies":"measured","dependencyScope":"production","testReferences":"measured","metrics":"measured"}
 ```
 
 `dependencies` is `measured` or `unavailable`, and `dependencyScope` names
@@ -487,7 +508,7 @@ buckets without writing files. Its JSON form is:
 
 ```json
 {
-  "schema": "ramify.measure/1",
+  "schema": "ramify.measure/2",
   "revision": "rev/1:…",
   "root": "…",
   "ownershipRule": "the ordered rule below",
@@ -499,13 +520,14 @@ buckets without writing files. Its JSON form is:
   "files": [
     { "path": "subs/analysis/src/architect-view.ts", "owner": "ramify/analysis",
       "area": "ordinary", "kind": "source", "bytes": 12345 }
-  ],
-  "outsideModuleFiles": []
+  ]
 }
 ```
 
 `modules` is ordered by module identifier and `files` by project-relative
-path. Source and resource records retain physical area `ordinary` or `tests`.
+path. Source and resource records retain physical area `ordinary` or `tests`;
+auxiliary source, owned compiler source outside every `src/`, is listed with
+its owner's `ordinary` area. Version 2 retired `outsideModuleFiles`.
 Documentation records use `area` and `kind` `documentation` and name only the
 owner's root `README.md` or `module.ramify`. The root module has an empty `dir`
 and null `parent`. The complete-record source-classification derivation is the
@@ -520,8 +542,7 @@ root; malformed paths and escapes are not attributable:
    `.old-<suffix>` siblings at any depth, including sibling marker files.
    Similar names such as `.ramify-other` are not reserved.
 2. A `files` record is `inventoried` with exactly its recorded owner, area,
-   kind and bytes. An `outsideModuleFiles` record is known outside the owned
-   inventory and receives no owner, even when its spelling resembles source.
+   kind and bytes.
 3. An unlisted path beneath `.git`, `node_modules`, `bower_components` or
    `jspm_packages` is `excluded`.
 4. Every other unlisted path is `unobserved`. Its nearest listed module may
@@ -530,12 +551,12 @@ root; malformed paths and escapes are not attributable:
    locations receive no provisional owner. Attribution never climbs to an
    ancestor's source area when the nearest module does not own the location.
 
-Configured output exclusions, independent compiler scopes, invalid boundaries
-and symlink observations are not completely represented. Consequently an
-uninventoried path cannot be asserted present, owned, ordinary, empty or outside
-the project from spelling alone, and no symlink following is implied. A later
-inventory refresh may establish the file. This is a deliberate evidence limit,
-not a zero measurement.
+Configured output exclusions, declared nested trees, scratch directories,
+invalid boundaries and symlink observations are not completely represented.
+Consequently an uninventoried path cannot be asserted present, owned, ordinary,
+empty or outside the project from spelling alone, and no symlink following is
+implied. A later inventory refresh may establish the file. This is a deliberate
+evidence limit, not a zero measurement.
 
 ## Materialization
 
@@ -618,8 +639,8 @@ platform. Files use UTF-8, LF and a terminating newline; JSONL has exactly one
 record per line; there are no timestamps, host paths or process identifiers.
 Two identifiers are the analysis's own, not the view's: the `revision` names
 the daemon context's generation, so two daemons' views of the same inputs
-differ in that identifier alone, and the `input` identity records the absent
-`module.ramify` of each ancestor directory, so copies of one project at
+differ in that identifier alone, and the `input` identity records the
+project's canonical root and configuration paths, so copies of one project at
 different paths also differ in it. Every other byte is equal.
 
 Bounds a successor plan must measure before freezing, on the reference

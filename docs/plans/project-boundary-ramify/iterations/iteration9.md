@@ -2,7 +2,7 @@
 
 **Plan:** [Phase 1: Ramify project boundaries](../main-plan.md).
 **Prerequisites:** [Iteration 8](iteration8.md) and every earlier receipt. The iteration 1 reviewed contract revision is mandatory. Recheck the immediate handoff before editing.
-**Owners and write scope:** TypeScript adapter and its captured-resolution interfaces. No changes beneath `ramify-agent/` or
+**Owners and write scope:** TypeScript adapter and its captured-resolution interfaces; the reference harness's expected values for targets this slice changes. No changes beneath `ramify-agent/` or
 `/ramify-audit`, including installs or generated outputs.
 
 **Protected documents:** Read the relevant authorities. Do not change any
@@ -38,7 +38,7 @@ Do not load the complete reference harness or generated catalogs into one contex
 ## Deliverables
 
 1. Retain the actual package route before canonical real-target classification. Verify the pinned TypeScript resolver evidence using code/resources and linked NodeNext packages.
-2. Emit explicit nested-tree, outside-project and application targets through the canonical Project classifier; keep unresolved/unsupported evidence as coverage.
+2. Emit explicit nested-tree, outside-project and application targets through the canonical Project classifier; keep unresolved/unsupported evidence as coverage. These extend `ramify.analysis/2`; where an asserted target changes, such as owned source outside `src/` becoming an application target, update the harness's expected values under [iteration gates](../execution.md#iteration-gates).
 3. Add project-boundary-resolution.test.ts with paired true-package and bare-alias controls sharing the same physical target; test type-only/symbol-free imports and forwarding provenance.
 
 ## Matrix rows executed here

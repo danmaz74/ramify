@@ -5,14 +5,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readProject } from '../read-project.js';
 import type { ProjectRead, ProjectReadOptions, ProjectInputView } from '../interfaces/project.js';
-import { fixture, limits, put, syntax } from './fixtures.js';
+import { declaration, fixture, limits, marker, put, syntax } from './fixtures.js';
 
 let work: string, root: string;
 const views: ProjectInputView[] = [];
 beforeEach(async () => { work = await realpath(await mkdtemp(join(tmpdir(), 'ramify-project-'))); root = join(work, 'project'); await fixture(root); });
 afterEach(async () => { for (const view of views.splice(0)) await view.dispose(); await rm(work, { recursive: true, force: true }); });
 async function read(changes: Partial<ProjectReadOptions> = {}): Promise<ProjectRead> {
-  const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, limits, ...changes });
+  const result = await readProject({ request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: syntax, marker, limits, ...changes });
   if (result.status === 'acquired') views.push(result.view);
   return result;
 }
@@ -36,8 +36,11 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.files.map(f => [f.path, f.area])).toEqual([
       ['src/helpers/tests/ordinary.ts', 'ordinary'], ['src/icon.bin', 'ordinary'], ['src/omitted.ts', 'ordinary'], ['src/tests/helper.ts', 'tests'], ['src/value.ts', 'ordinary'],
+      // Owned compiler source outside src/, selected or not, is the root's auxiliary source; the
+      // inherited configuration admits JavaScript, so the `.js` file is compiler source.
+      ['tests/selected.js', 'ordinary'], ['tests/unselected.ts', 'ordinary'],
     ]);
-    expect(acquired.inventory.outsideModuleFiles).toEqual(['tests/selected.js']);
+    expect(acquired.inventory.files.filter(f => f.placement === 'auxiliary').map(f => f.path)).toEqual(['tests/selected.js', 'tests/unselected.ts']);
     expect(acquired.inputs.filter(i => i.role === 'configuration').map(i => i.path)).toEqual(['base.json', 'tsconfig.json']);
     expect((await acquired.seal()).status).toBe('coherent');
   });
@@ -48,7 +51,8 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.scope.configuration).toBe(join(work, 'tsconfig.json'));
     expect(acquired.inventory.modules.map(m => m.id)).toEqual(['fixture']);
-    expect(acquired.inventory.outsideModuleFiles).toEqual([]);
+    // The selected file above the root belongs to no module of this project.
+    expect(acquired.inventory.files.map(f => f.path)).toEqual(['src/value.ts']);
     expect(acquired.inputs.some(i => i.role === 'configuration' && i.path.startsWith('external:'))).toBe(true);
     expect(acquired.inputs.some(i => i.role === 'description' && i.path.startsWith('external:'))).toBe(false);
   });
@@ -59,7 +63,8 @@ describe('real project configuration and scope', () => {
     await put(root, 'tsconfig.json', '{"extends":"config-base"}');
     await put(root, 'tests/selected.js', 'export {};');
     const acquired = view(await read());
-    expect(acquired.inventory.outsideModuleFiles).toEqual(['tests/selected.js']);
+    // The package configuration admits JavaScript, so the selected `.js` file is root auxiliary source.
+    expect(acquired.inventory.files.map(f => [f.path, f.placement])).toEqual([['src/value.ts', 'src'], ['tests/selected.js', 'auxiliary']]);
     expect(acquired.inputs.some(i => i.path === 'node_modules/config-base/package.json' && i.bytes > 0)).toBe(true);
     expect(acquired.inputs.some(i => i.path === 'node_modules/config-base/config.json' && i.role === 'configuration')).toBe(true);
   });
@@ -91,7 +96,8 @@ describe('real project configuration and scope', () => {
     expect(await read()).toMatchObject({ status: 'incomplete', issues: [{ code: 'read-failure', message: expect.stringContaining('absent.json') }] });
   });
   it('rejects malformed description UTF-8 before calling the parser', async () => {
-    await put(root, 'module.ramify', new Uint8Array([0xff]));
+    // The invalid byte follows the marked module line, so the root stays selected (R7).
+    await put(root, 'module.ramify', new Uint8Array([...Buffer.from('ramify 1\nroot module fixture\n'), 0xff]));
     let called = false;
     const result = await read({ parse: (...args) => { called = true; return syntax(...args); } });
     expect(called).toBe(false);
@@ -102,10 +108,21 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read({ request: { cwd: join(work, 'source-link'), configuration: 'discover', scope: 'whole-project' } }));
     expect(acquired.inventory.scope).toMatchObject({ root, invokedFrom: join(root, 'src'), selection: 'found' });
   });
-  it('rejects a missing parent marker above a child directly under subs', async () => {
+  it('finds no project above an unmarked child directly under subs whose parent has no description', async () => {
+    // R7: an unmarked description never stops the climb, and nothing above carries the marker.
     const child = join(work, 'orphan/subs/child'); await fixture(child);
-    expect(await read({ request: { cwd: join(child, 'src'), configuration: 'discover', scope: 'whole-project' } }))
-      .toMatchObject({ status: 'invalid', issues: [{ code: 'missing-root-description', message: expect.stringContaining('parent description') }] });
+    await put(child, 'module.ramify', 'ramify 1\nmodule child\n');
+    const result = await read({ request: { cwd: join(child, 'src'), configuration: 'discover', scope: 'whole-project' } });
+    expect(result).toMatchObject({ status: 'unavailable', inventory: null, issues: [{ code: 'root-not-found',
+      message: `No marked project root at or above ${join(child, 'src')}; the nearest description is ${join(child, 'module.ramify')}: add root before module on its module line if it is the project root` }] });
+  });
+  it('reports an unmarked orphan child beneath a marked root as a stray description of that root', async () => {
+    await put(root, 'orphan/subs/child/module.ramify', 'ramify 1\nmodule child\n');
+    await put(root, 'orphan/subs/child/src/value.ts', 'export const value = 1;\n');
+    const result = await read({ request: { cwd: join(root, 'orphan/subs/child/src'), configuration: 'discover', scope: 'whole-project' } });
+    expect(result).toMatchObject({ status: 'invalid', inventory: { scope: { root, selection: 'found', invokedFrom: join(root, 'orphan/subs/child/src') } },
+      issues: [{ code: 'stray-description', path: 'orphan/subs/child/module.ramify' }] });
+    if (result.status === 'invalid') expect(result.issues).toHaveLength(1);
   });
   it.each(['src', 'subs', 'src/tests', 'src/interfaces'])('rejects a marker at %s', async path => {
     await put(root, `${path}/module.ramify`, 'ramify 1\nmodule child\n');
@@ -157,15 +174,20 @@ describe('real project configuration and scope', () => {
     const acquired = view(await read());
     expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture']);
     expect(acquired.inventory.files.map(file => file.path)).toEqual(['src/value.ts']);
-    expect(acquired.inventory.outsideModuleFiles).toEqual([]);
     expect(acquired.inventory.warnings).toEqual([]);
     expect(acquired.inputs.some(input => input.path === `${excluded}/module.ramify`)).toBe(false);
   });
-  it('keeps independent projects out of enclosing discovery', async () => {
+  it('keeps a declared nested project out of enclosing discovery and reports an undeclared one', async () => {
     await fixture(join(root, 'examples/demo'));
-    const acquired = view(await read());
-    expect(acquired.inventory.scope.independentScopes).toEqual(['examples/demo']);
-    expect(acquired.inventory.modules).toHaveLength(1);
+    // Undeclared, its own configuration no longer ends discovery: its marked root is another project's root.
+    const undeclared = await read({ parse: declaration });
+    expect(undeclared).toMatchObject({ status: 'invalid', issues: [{ code: 'undeclared-project-boundary', path: 'examples/demo/module.ramify' }] });
+    if (undeclared.status === 'invalid') expect(undeclared.issues).toHaveLength(1);
+    // Declared, it is never entered: nothing beneath it is read or inventoried.
+    await put(root, 'module.ramify', 'ramify 1\nroot module fixture\nowned-ignored "examples/demo"\n');
+    const acquired = view(await read({ parse: declaration }));
+    expect(acquired.inventory.modules.map(module => module.id)).toEqual(['fixture']);
+    expect(acquired.inputs.filter(input => input.path.startsWith('examples/demo/'))).toEqual([]);
   });
 });
 
@@ -185,16 +207,20 @@ describe('acquisition limits and cancellation', () => {
     await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
     await put(root, 'subs/child/module.ramify', 'ramify 1\nmodule child\n');
     await put(root, 'subs/child/src/kept.ts', 'export {};');
-    await put(root, 'src/z-failure.ts', bytes);
+    // Selected source beneath the invalid boundary is no longer read, so the
+    // stopping read is a later module's README, read when the walk reaches it.
+    await put(root, 'subs/child/subs/late/module.ramify', 'ramify 1\nmodule late\n');
+    await put(root, 'subs/child/subs/late/README.md', bytes);
     const result = await read({ limits: { ...limits, maxFileBytes: 512 } });
     expect(result.status).toBe('incomplete');
     if (result.status !== 'incomplete') throw new Error('Expected incomplete acquisition');
     expect(result.issues.map(issue => [issue.code, issue.path])).toEqual([
-      ['description-in-src', 'src/module.ramify'], [code, 'src/z-failure.ts'],
+      ['description-in-src', 'src/module.ramify'], [code, 'subs/child/subs/late/README.md'],
     ]);
     expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture', 'fixture/child']);
     expect(result.inventory?.files.map(file => file.path)).toEqual(['subs/child/src/kept.ts']);
-    expect(result.inventory?.warnings).toEqual([{ code: 'outside-module-source', entry: 'src', count: 2, files: ['src/value.ts', 'src/z-failure.ts'] }]);
+    // Source beneath the layout-invalid boundary has no owner and no outside-module warning.
+    expect(result.inventory?.warnings).toEqual([]);
     expect(Object.isFrozen(result.inventory)).toBe(true);
     expect(Object.isFrozen(result.issues)).toBe(true);
   });
@@ -216,7 +242,7 @@ describe('acquisition limits and cancellation', () => {
     await put(root, 'src/module.ramify', 'ramify 1\nmodule hidden\n');
     let calls = 0;
     const result = await read({ parse: (file, text) => {
-      writeFileSync(join(root, 'module.ramify'), `ramify 1\nmodule fixture\n// ${++calls}\n`);
+      writeFileSync(join(root, 'module.ramify'), `ramify 1\nroot module fixture\n// ${++calls}\n`);
       return syntax(file, text);
     } });
     expect(calls).toBe(3);
@@ -226,7 +252,8 @@ describe('acquisition limits and cancellation', () => {
       ['changed-input', '.'], ['description-in-src', 'src/module.ramify'],
     ]);
     expect(result.inventory?.modules.map(module => module.id)).toEqual(['fixture']);
-    expect(result.inventory?.outsideModuleFiles).toEqual(['src/value.ts']);
+    // Source beneath the layout-invalid boundary is neither inventoried nor warned about.
+    expect(result.inventory?.files).toEqual([]);
   });
   it('returns cancelled for an already aborted request', async () => {
     const controller = new AbortController(); controller.abort();
@@ -246,7 +273,7 @@ describe('acquisition limits and cancellation', () => {
     let calls = 0;
     const result = await read({ parse: (file, text) => {
       // This injected parser barrier is test-only; the real parser is pure.
-      if (!calls++) writeFileSync(join(root, 'module.ramify'), 'ramify 1\nmodule fixture\n// changed\n');
+      if (!calls++) writeFileSync(join(root, 'module.ramify'), 'ramify 1\nroot module fixture\n// changed\n');
       return syntax(file, text);
     } });
     expect(calls).toBe(2);
@@ -255,7 +282,7 @@ describe('acquisition limits and cancellation', () => {
   it('returns incomplete after the finite retry policy is exhausted', async () => {
     let calls = 0;
     const result = await read({ parse: (file, text) => {
-      writeFileSync(join(root, 'module.ramify'), `ramify 1\nmodule fixture\n// ${++calls}\n`);
+      writeFileSync(join(root, 'module.ramify'), `ramify 1\nroot module fixture\n// ${++calls}\n`);
       return syntax(file, text);
     } });
     expect(calls).toBe(3);

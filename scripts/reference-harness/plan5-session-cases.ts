@@ -15,6 +15,7 @@ import { sessionInputs } from './session-expectations.js';
 import type { Assertions, InstanceHandler, ProjectContext } from './runner.js';
 
 const coreCatalog = `${coreDirectory}/src/catalog.ts`;
+const coreHistory = `${coreDirectory}/src/history.ts`;
 const reviewsRouter = 'subs/workspace/subs/reviews/src/router.ts';
 const validationSource = 'subs/workspace/subs/reviews/subs/validation/src/validate.ts';
 const sessionLimits = { updateDeadlineMs: 2_000, sweepIntervalMs: 30_000, workerHeapMiB: 512, maxRetainedFactBytes: 96 * 1024 ** 2 };
@@ -157,7 +158,13 @@ handlers.set('I5-06:import-added-self-only', {
           "import type { ProtocolFacilities } from '../../../../../src/interfaces/protocol.js';\nimport type { RevisionScope } from '../../contracts/src/interfaces/vocabulary.js';\n")]);
       assertions.equal('the revision takes the source path', revision.checked.path, 'source');
       assertions.equal('only the edited file is re-interpreted', revision.checked.files, [reviewsRouter]);
-      assertions.equal('exactly the new access is decided and the model is not rebuilt', [revision.checked.accesses, revision.checked.modelRebuilt], [1, false]);
+      // A source revision decides each access of a re-interpreted file whose
+      // facts changed by value, location included. Since Plan 8 iteration 7
+      // (ff01212e) the router imports ProtocolRouter on line 11, directly below
+      // the line 10 anchor and its only access below it, so the inserted import
+      // moves that one access too: the new access and the moved one are decided.
+      assertions.equal('exactly the new access and the one access it moves are decided and the model is not rebuilt',
+        [revision.checked.accesses, revision.checked.modelRebuilt], [2, false]);
       assertions.equal('the new access is allowed with no finding added', [revision.delta.added, revision.summary.errors, revision.summary.accesses - cold.summary.accesses], [[], 0, 1]);
       assertions.equal('one more allowed decision than the cold revision', revision.summary.allowed - cold.summary.allowed, 1);
     } finally { await session.dispose(); }
@@ -197,7 +204,12 @@ handlers.set('I5-06:wide-fanin-bounded', {
     const { revision, before } = await exportAdded(root, assertions, 'wide-fanin', 'export const fanInProbeSchema = z.number();');
     const importers = new Set(importersOf(before, vocabulary));
     const importing = importingAccesses(before, vocabulary);
-    assertions.equal('the vocabulary file is reached by the reviewed number of importing accesses', importing, 56);
+    // One access per selected binding. The reviewed 56 are the bindings that 26
+    // import statements select from the vocabulary file before Plan 8 iteration
+    // 7; ff01212e added two type imports, `RecordId` in the catalog router and
+    // `Finding`, `Observation`, `RecordId` and `ReviewStatus` in the reviews
+    // router, so 28 statements now select 61 bindings.
+    assertions.equal('the vocabulary file is reached by the reviewed number of importing accesses and the five Plan 8 added', importing, 61);
     assertions.equal('no file that imports none of its exports is re-interpreted', revision.checked.files.filter(file => file !== vocabulary && !importers.has(file)), []);
     assertions.ok('the accesses decided are at most the importing accesses plus the file\'s own',
       revision.checked.accesses <= importing + ownAccesses(before, vocabulary));
@@ -211,15 +223,24 @@ handlers.set('I5-06:export-removed-missing', {
     const { session } = await open(root);
     try {
       const before = await batch(root);
+      // Since Plan 8 iteration 7 (ff01212e) the root exposes `revisionScopeSchema`
+      // by name, so removing that export invalidates the root description. The
+      // vocabulary's other exports are exposed through the contracts wildcard,
+      // and each imported one the root does not expose is named by an exposed
+      // original's signature, so removing it would add `exposed-without-companion`.
+      // The case removes the export of `resolvePredecessors` from the catalog
+      // core's history file instead: it is exported for that owner's own files
+      // and tests, no description selects it and no signature names it, so its
+      // two importers are the only findings and every description stays valid.
       const { revision } = await step(assertions, session, root, 'export removed', async () =>
-        [await replace(root, vocabulary, 'export const revisionScopeSchema: z.ZodDiscriminatedUnion<', 'const revisionScopeSchema: z.ZodDiscriminatedUnion<')]);
-      const importingFiles = (before.snapshot?.accesses ?? []).filter(access => access.selections.some(selection => selection.exportedName === 'revisionScopeSchema'))
+        [await replace(root, coreHistory, 'export function resolvePredecessors(', 'function resolvePredecessors(')]);
+      const importingFiles = (before.snapshot?.accesses ?? []).filter(access => access.selections.some(selection => selection.exportedName === 'resolvePredecessors'))
         .map(access => access.importer.file).sort(order);
-      assertions.equal('three files import the removed name', importingFiles, ['subs/workspace/subs/catalog/src/mcp.ts', 'subs/workspace/subs/reviews/src/mcp.ts', reviewsRouter]);
+      assertions.equal('the core catalog and its test import the removed name', importingFiles, [coreCatalog, `${coreDirectory}/src/tests/catalog.test.ts`]);
       assertions.equal('every importing access reports missing-export at its own import statement and nothing else appears',
         revision.delta.added.map(item => [item.code, item.location?.file]).sort(), importingFiles.map(file => ['missing-export', file]).sort());
       assertions.equal('the project has exactly those findings', [revision.summary.errors, revision.delta.removed], [importingFiles.length, []]);
-      assertions.equal('the checked set is the vocabulary file and its importers only', revision.checked.files, [...new Set([vocabulary, ...importersOf(before, vocabulary)])].sort(order));
+      assertions.equal('the checked set is the edited file and its importers only', revision.checked.files, [...new Set([coreHistory, ...importersOf(before, coreHistory)])].sort(order));
     } finally { await session.dispose(); }
   },
 });

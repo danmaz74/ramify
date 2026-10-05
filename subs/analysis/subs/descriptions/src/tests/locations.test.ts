@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseDescription } from '../parse.js';
+import type { DescriptionStatement, ExposureStatement } from '../interfaces/syntax.js';
+
+function exposure(statement: DescriptionStatement | undefined): ExposureStatement {
+  if (!statement || 'directory' in statement) throw new Error('Expected an exposure statement');
+  return statement;
+}
 
 describe('original text locations and retained parser data', () => {
   it('returns the complete classified token stream without whitespace or comments', () => {
@@ -33,9 +39,9 @@ describe('original text locations and retained parser data', () => {
       { kind: 'keyword', raw: 'module', decoded: 'module', span: { start: 12, end: 18, line: 2, column: 2 } },
       { kind: 'string', raw: '"ui"', decoded: 'ui', span: { start: 19, end: 23, line: 2, column: 9 } },
     ]);
-    expect(document.module).toEqual({ name: 'ui', tags: ['ui'], span: { start: 12, end: 35, line: 2, column: 2 } });
+    expect(document.module).toEqual({ name: 'ui', tags: ['ui'], root: null, span: { start: 12, end: 35, line: 2, column: 2 } });
     expect(document.tokens.filter(({ kind }) => kind === 'comment')).toEqual([]);
-    const statement = document.statements[0];
+    const statement = exposure(document.statements[0]);
     expect(statement.span).toEqual({ start: 53, end: 119, line: 4, column: 3 });
     expect(statement.selection).toEqual({ kind: 'named', names: [{ name: '😀', alias: 'B', span: { start: 64, end: 73, line: 4, column: 14 } }] });
     expect(statement.from).toEqual({ value: 'interfaces/api.ts', span: { start: 79, end: 99, line: 4, column: 29 } });
@@ -50,7 +56,7 @@ describe('original text locations and retained parser data', () => {
     if (result.status !== 'valid') throw new Error('Expected valid');
     expect(result.document.module.span.line).toBe(5);
     expect(result.document.statements[0].span.line).toBe(7);
-    expect(result.document.statements[0].selection).toMatchObject({ kind: 'named', names: [{ name: 'x"//y', alias: 'x"//y' }] });
+    expect(exposure(result.document.statements[0]).selection).toMatchObject({ kind: 'named', names: [{ name: 'x"//y', alias: 'x"//y' }] });
   });
 
   it('locates missing constructs at original end of line without inventing a final newline', () => {

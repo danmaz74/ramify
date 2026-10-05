@@ -1,6 +1,6 @@
 import { originalKey } from '../subs/model/src/index.js';
 import type { Destination, Model, ModuleId, ModuleRecord, Original } from '../subs/model/src/interfaces/model.js';
-import type { InventoryModule } from '../subs/project/src/interfaces/project.js';
+import type { InventoryModule, ProjectOwnership } from '../subs/project/src/interfaces/project.js';
 import type { ExportShape, SymbolDetail, SymbolDetailLimits, SymbolDetailRequest, TestFileTitles,
   TestTitleLimits } from '../subs/typescript/src/interfaces/source.js';
 import { validFacts } from './api-view.js';
@@ -52,9 +52,12 @@ interface Selected {
   readonly name: string;
   readonly file: string;
 }
+type Boundary = ArchitectModuleFacts['boundaries'][number];
 interface Selection {
   readonly modules: readonly { readonly record: ModuleRecord; readonly inventory: InventoryModule }[];
   readonly order: ReadonlyMap<ModuleId, number>;
+  /** Each module's declared nested trees, joined to the revision's ownership exclusions. */
+  readonly boundaries: ReadonlyMap<ModuleId, readonly Boundary[]>;
   readonly symbols: readonly Selected[];
   readonly testFiles: readonly { readonly module: ModuleId; readonly file: string; readonly feature: boolean }[];
 }
@@ -93,6 +96,59 @@ function treeOrder(model: Model): ModuleRecord[] | null {
 }
 
 /**
+ * The project-relative directory a nested-tree statement names, resolved
+ * against its module's directory. Valid facts guarantee the statement decoded
+ * strictly beneath its module; the result is only ever looked up in the
+ * revision's ownership exclusions, never used on its own.
+ */
+function declaredDirectory(moduleDirectory: string, written: string): string {
+  const segments = moduleDirectory === '.' ? [] : moduleDirectory.split('/');
+  for (const segment of written.split('/')) {
+    if (segment === '.') continue;
+    if (segment === '..') segments.pop();
+    else segments.push(segment);
+  }
+  return segments.join('/');
+}
+
+/**
+ * Each module's declared owned-ignored and external trees, from its parsed
+ * description joined to the scope's ownership exclusions: a statement whose
+ * directory is no exclusion of its kind and owner, or a declared exclusion no
+ * statement accounts for, makes the facts unusable.
+ */
+function boundariesOf(modules: readonly InventoryModule[], ownership: ProjectOwnership):
+  ReadonlyMap<ModuleId, readonly Boundary[]> | Unavailable {
+  const declared = ownership.exclusions.filter(exclusion => exclusion.kind === 'owned-ignored' || exclusion.kind === 'external');
+  const byDirectory = new Map(declared.map(exclusion => [exclusion.directory, exclusion]));
+  const claimed = new Set<string>();
+  const result = new Map<ModuleId, Boundary[]>();
+  for (const module of modules) {
+    const boundaries: Boundary[] = [];
+    if (module.description.status === 'valid') {
+      const document = module.description.document;
+      for (const statement of document.statements) {
+        if (!('directory' in statement)) continue;
+        const dir = declaredDirectory(module.directory, statement.directory.value);
+        const exclusion = byDirectory.get(dir);
+        if (!exclusion || exclusion.kind !== statement.kind || exclusion.owner !== (statement.kind === 'owned-ignored' ? module.id : null)
+          || claimed.has(dir)) {
+          return { status: 'unavailable', reason: 'analysis-failed',
+            message: `The ${statement.kind} tree "${dir}" that module "${module.id}" declares is not one of the revision's exclusions` };
+        }
+        claimed.add(dir);
+        boundaries.push({ kind: statement.kind, dir, description: document.file, line: statement.span.line, column: statement.span.column });
+      }
+    }
+    result.set(module.id, boundaries.sort((a, b) => byteOrder(a.dir, b.dir)));
+  }
+  if (claimed.size !== declared.length) {
+    return { status: 'unavailable', reason: 'analysis-failed', message: 'A declared tree of the revision has no declaring module statement' };
+  }
+  return result;
+}
+
+/**
  * The join both steps share: the declared modules in tree order, the catalog
  * originals of declared owners that their defining files export, once each
  * under their byte-least export name, and the test files of `testing`-profile
@@ -116,6 +172,8 @@ function select(facts: SessionFacts): Selection | Unavailable {
     modules.push({ record, inventory: found });
   }
   const order = new Map(ordered.map((module, index) => [module.id, index]));
+  const boundaries = boundariesOf(modules.map(module => module.inventory), inventory.scope.ownership);
+  if ('status' in boundaries) return boundaries;
   const originals = new Map(model.originals.map(original => [originalKey(original.id), original]));
   const files = new Map(facts.catalog.files.map(file => [file.file, file]));
   const seen = new Set<string>();
@@ -140,7 +198,7 @@ function select(facts: SessionFacts): Selection | Unavailable {
     && (file.kind === 'source' ? testSource.test(file.path) : file.path.endsWith('.feature')))
     .map(file => ({ module: file.owner, file: file.path, feature: file.kind === 'resource' }))
     .sort((a, b) => order.get(a.module)! - order.get(b.module)! || byteOrder(a.file, b.file));
-  return { modules, order, symbols, testFiles };
+  return { modules, order, boundaries, symbols, testFiles };
 }
 
 /** The compiler requests and `.feature` files a projection of `facts` needs. */
@@ -177,6 +235,7 @@ function moduleFacts(selection: Selection, facts: SessionFacts): ArchitectModule
     children: [...children.get(record.id) ?? []].sort(byteOrder),
     tags: [...record.headerTags],
     areas: module.areas.filter(area => area.present).map(area => area.kind === 'ordinary' ? 'src' : 'src/tests').sort(byteOrder),
+    boundaries: [...selection.boundaries.get(record.id) ?? []],
     purpose: module.purpose.state === 'present' ? { state: 'present', path: module.purpose.readme, text: module.purpose.paragraph } : { state: 'missing' },
     docs: [...docs.get(record.id) ?? []].sort(byteOrder),
     files: { own: own.get(record.id) ?? 0, subtree: subtree.get(record.id) ?? 0 },
@@ -291,7 +350,7 @@ export function projectArchitectView(facts: SessionFacts, sequence: number, inpu
   // The catalog limits a check report publishes: a resource description counts only when the inventory references it.
   counts.coverage = new Set(facts.catalog.coverage.filter(note => note.code !== 'resource-description'
     || facts.inventory!.references.some(reference => reference.normalized === note.location.file)).map(note => note.id)).size;
-  const draft = { schema: 'ramify.architect-projection/1' as const, sequence, inputId, root: modules[0]!.module,
+  const draft = { schema: 'ramify.architect-projection/2' as const, sequence, inputId, root: modules[0]!.module,
     modules, symbols, tests, counts, bytes: 0 };
   const bytes = Buffer.byteLength(JSON.stringify(draft), 'utf8');
   if (bytes > limits.maxProjectionBytes) {

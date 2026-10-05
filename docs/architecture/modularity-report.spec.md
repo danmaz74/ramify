@@ -39,8 +39,8 @@ remain authoritative for those rules. Dependency vocabulary follows the
 | The opt-in `dependency-behavior` capability in batch analysis; attaching its facts to the snapshot | `analysis` | existing batch pipeline |
 | Contract types; pure projection of `{revision, report}`; deduplication, coverage and aggregates; candidate ownership validation and boundary changes; pure change-affinity projection | `analysis` | `src/interfaces/modularity.ts`, `src/modularity*.ts`, `src/change-affinity.ts` |
 | Pure dependency-diagram projection shared by `projectModularity` and the resident operation | `analysis` | `src/interfaces/dependency-diagram.ts`, `src/dependency-diagram.ts` |
-| Git history adapter producing `ChangeHistory` | modularity probe | `scripts/probes/modularity/git-history.ts` |
-| Probe that runs the analysis, the projections and writes JSON and Markdown | modularity probe | `scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
+| Git history adapter producing `ChangeHistory` | `analysis`, auxiliary source | `subs/analysis/scripts/probes/modularity/git-history.ts` |
+| Probe that runs the analysis, the projections and writes JSON and Markdown | `analysis`, auxiliary source | `subs/analysis/scripts/probes/modularity/baseline.ts`, rendering in `markdown.ts` |
 
 **Projection owner.** `analysis` owns the `AnalysisReport` contract that is the
 projection's only source input, and the modularity analysis already assigns it
@@ -64,12 +64,13 @@ cost, and a later boundary review may move the projection with the evidence it
 produces.
 
 **Probe and Git adapter.** Git execution is repository-history acquisition, not
-source analysis, so it stays outside `analysis`. `scripts/` has its own compiler
-scope (`tsconfig.scripts.json`) and is not compiler-selected by the project's
-`tsconfig.json`, so the probe neither becomes module-owned source nor produces
-outside-module warnings. Existing probes import built package output; the
-modularity probe imports `ramify.ts/analysis` from `dist/`. Promotion to a
-supported command would move the adapter into `cli`, still outside `analysis`.
+source analysis, so it stays outside `analysis`'s `src/`. The probe and its Git
+adapter are `analysis`'s auxiliary source under
+`subs/analysis/scripts/probes/modularity/`, with the ordinary profile: they
+import `analysis` source by relative path as same-owner source, cannot import
+its testing source, and cannot be exposed. `tsconfig.scripts.json` compiles
+them; the project's `tsconfig.json` does not select them. Promotion to a
+supported command would move the adapter into `cli`, outside `analysis`.
 
 **Exposure.** Nothing is exposed in iteration 1. Expected additions:
 
@@ -97,8 +98,10 @@ an application target the **target file** is `target.origin.file`.
 
 **Application occurrence.** An occurrence whose target kind is `application`.
 Only application occurrences form dependencies. External (`package`, `builtin`,
-`standard-library`), `outside-module` and `unresolved` occurrences are counted
-separately and never contribute to an edge.
+`standard-library`), `outside-project` and `unresolved` occurrences are counted
+separately and never contribute to an edge. `nested-tree` and `excluded`
+occurrences name no provider either: they are counted with `unresolved`
+occurrences and never contribute to an edge.
 
 **Original identity.** The triple `(kind, defining file, binding)` of an
 `OriginalId`. `OriginalId.file` is relative to the declared owner's ordinary
@@ -156,8 +159,8 @@ and the ordinary source of testing-classified modules such as
 `integration-tests`. The **test subset** contains testing-classified source files.
 
 An occurrence passes a source filter when its importer file is in that subset.
-The same importer rule applies to external, outside-module and unresolved
-counts. The provider file is not filtered: a production occurrence targeting a
+The same importer rule applies to external, outside-project, unresolved,
+nested-tree and excluded counts. The provider file is not filtered: a production occurrence targeting a
 testing-classified file is a check violation and remains counted, so the
 report never hides it.
 
@@ -246,9 +249,17 @@ exposed to both destinations counts once in each destination row and once in
 repository interface use = selected exposed owned originals / exposed owned originals
 ```
 
-The label is `repository interface use`, never unused API. Independent compiler
-scopes (`ProjectScope.independentScopes`) are recorded as `omittedScopes` in
-provenance; their absence from the graph is not zero use.
+The label is `repository interface use`, never unused API. The declared
+nested-tree directories, owned-ignored and external, are recorded as
+`omittedScopes` in provenance, in byte order; consumers inside them are absent
+from the graph, so their absence is not zero use. Module scratch directories
+and other always-excluded paths are not listed.
+
+Owned compiler source outside `src/`, including scripts and probes, is
+analyzed as its owner's auxiliary source and counts as that owner's source,
+rather than as an `outside-project` target. Renaming the
+`outside-module` target kind to `outside-project` left the report's shape
+unchanged.
 
 Under candidate ownership, declarations are unchanged, so interface use is
 `unavailable` with reason `candidate-exposure`. Compare candidates with
@@ -509,9 +520,12 @@ results and ownership of the report.
 
 ### Whole projection
 
-The report schema is `ramify.modularity/2`; version 2 added the required
+The report schema is `ramify.modularity/3`; version 3 records the declared
+nested-tree directories as `omittedScopes`, where version 2 recorded inferred
+independent compiler scopes, and version 2 added the required
 `ModularityView.dependencyDiagram`. Documents recorded under
-`ramify.modularity/1` remain historical evidence and are not rewritten.
+`ramify.modularity/1` and `ramify.modularity/2` remain historical evidence and
+are not rewritten.
 
 `projectModularity` returns `unavailable` with reason `analysis-incomplete`
 unless `report.outcome.execution` is `completed` and `inputId`, `registry`,
@@ -548,8 +562,9 @@ size adds the counted resources.
 A metric is partial when any of these holds:
 
 1. an occurrence in scope names a `coverageIds` entry;
-2. an occurrence in scope from a scope file has an `unresolved` or
-   `outside-module` target (counted in `unattributedAccesses`);
+2. an occurrence in scope from a scope file has an `unresolved`,
+   `outside-project`, `nested-tree` or `excluded` target (counted in
+   `unattributedAccesses`);
 3. a selection of an application occurrence in scope has a status other than
    `resolved`; external selections never resolve to an original;
 4. a source file in scope has `FileExports.state` other than `complete`, or a
@@ -701,7 +716,7 @@ Candidate modules may own no files; they then appear only in `modules`.
 `RevisionId`, or `batch:<inputId>` for a disposable batch analysis.
 `ModularityProvenance` records it with the analysis schema, `inputId`, registry
 id, check and coverage outcomes, the requested-and-executed capabilities, the
-omitted independent scopes and the ownership mode and candidate id. The
+omitted declared nested trees and the ownership mode and candidate id. The
 analysis `runId` is excluded because it is random.
 
 Git-derived facts carry `ChangeHistoryProvenance` in their own report. The
@@ -802,6 +817,6 @@ ranking; they are not declared roles.
 - **Iteration 5** adds candidate validation, candidate recomputation and
   `boundaryChanges` to both projections.
 - **Iteration 6** writes the Candidate A and B mappings as `CandidateOwnership`
-  inputs under `scripts/probes/modularity/candidates/` and evaluates them with
+  inputs under `subs/analysis/scripts/probes/modularity/candidates/` and evaluates them with
   one probe run whose `--name` output lands beside the baseline in
   `scripts/probes/results/modularity/`.

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { parseDescription } from '../../subs/analysis/subs/descriptions/src/parse.js';
+import { parseDescription, readRootMarker } from '../../subs/analysis/subs/descriptions/src/parse.js';
 import { createDefaultTagRegistry, deriveSourceAreas } from '../../subs/analysis/subs/model/src/index.js';
 import { observeProject } from '../../subs/analysis/subs/project/src/observer.js';
 import { readProject } from '../../subs/analysis/subs/project/src/read-project.js';
@@ -48,7 +48,7 @@ function batchIdentity(inventory: ProjectInventory, inputs: readonly CapturedInp
   }))}`;
 }
 function options(root: string): ProjectReadOptions {
-  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: parseDescription, limits: acquisition, registry };
+  return { request: { cwd: root, root, configuration: 'discover', scope: 'whole-project' }, parse: parseDescription, marker: readRootMarker, limits: acquisition, registry };
 }
 function areasOf(inventory: ProjectInventory): readonly SourceArea[] {
   return inventory.modules.flatMap(module => {

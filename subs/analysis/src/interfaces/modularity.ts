@@ -257,13 +257,13 @@ export interface ModularityProvenance {
   readonly analysisCoverage: AnalysisReport['outcome']['coverage'];
   /** Requested and executed capabilities, in byte order. */
   readonly capabilities: readonly Capability[];
-  /** `ProjectScope.independentScopes`: consumers absent from the repository measures. */
+  /** The declared nested-tree directories, owned-ignored and external: consumers absent from the repository measures. */
   readonly omittedScopes: readonly string[];
   readonly ownership: 'declared' | 'candidate';
   readonly candidateId: string | null;
 }
 export interface ModularityReport {
-  readonly schemaVersion: 'ramify.modularity/2';
+  readonly schemaVersion: 'ramify.modularity/3';
   readonly provenance: ModularityProvenance;
   readonly coverage: { readonly state: 'complete' | 'partial'; readonly detail: MetricCoverage };
   /** The ownership tree in use, ordered by id. */
